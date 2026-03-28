@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/window.h"
+#include "vk_descriptors.h"
 #include "vk_types.h"
 
 struct GLFWwindow;
@@ -26,11 +27,12 @@ struct DeletionQueue {
 };
 
 struct FrameData {
-    VkSemaphore _swapchainSemaphore, _renderSemaphore;
-    VkFence _renderFence;
+    VkSemaphore _swapchainSemaphore{VK_NULL_HANDLE};
+    VkSemaphore _renderSemaphore{VK_NULL_HANDLE};
+    VkFence _renderFence{VK_NULL_HANDLE};
 
-    VkCommandPool _commandPool;
-    VkCommandBuffer _mainCommandBuffer;
+    VkCommandPool _commandPool{VK_NULL_HANDLE};
+    VkCommandBuffer _mainCommandBuffer{VK_NULL_HANDLE};
 
     DeletionQueue _deletionQueue;
 };
@@ -75,17 +77,34 @@ public:
 
     DeletionQueue _mainDeletionQueue;
 
-    VmaAllocator _allocator;
+    VmaAllocator _allocator{VK_NULL_HANDLE};
 
     AllocatedImage _drawImage;
-    VkExtent2D _drawExtent;
+    VkExtent2D _drawExtent{};
+
+    DescriptorAllocator globalDescriptorAllocator;
+
+    VkDescriptorSet _drawImageDescriptors{VK_NULL_HANDLE};
+    VkDescriptorSetLayout _drawImageDescriptorLayout{VK_NULL_HANDLE};
+
+    VkPipeline _gradientPipeline{VK_NULL_HANDLE};
+    VkPipelineLayout _gradientPipelineLayout{VK_NULL_HANDLE};
 
 private:
     bool init_vulkan();
     bool init_swapchain();
     bool init_commands();
     bool init_sync_structures();
+    bool init_descriptors();
+    bool init_pipelines();
+    bool init_background_pipelines();
+
     bool create_swapchain(uint32_t width, uint32_t height);
+    bool recreate_swapchain();
+    bool create_draw_resources(VkExtent2D extent);
+    void destroy_draw_resources();
+    void update_draw_image_descriptors();
+    VkExtent2D get_framebuffer_extent() const;
     void draw_background(VkCommandBuffer cmd);
     void destroy_swapchain();
 };
