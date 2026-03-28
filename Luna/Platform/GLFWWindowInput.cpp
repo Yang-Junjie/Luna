@@ -1,4 +1,4 @@
-#include "Core/input.hpp"
+#include "Core/input.h"
 #include "Platform/GLFWKeyCodes.hpp"
 #include "Platform/GLFWMouseCodes.hpp"
 #include "Platform/GLFWWindow.hpp"

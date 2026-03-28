@@ -1,9 +1,13 @@
+set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
+
 add_library(
     LunaCore
     STATIC
     Core/application.h
     Core/application.cpp
-    Core/input.hpp
+    Core/input.h
+    Imgui/ImGuiLayer.hpp
+    Imgui/ImGuiLayer.cpp
     Core/key_codes.h
     Core/layer.h
     Core/layer_stack.h
@@ -38,15 +42,20 @@ add_library(
     Vulkan/vk_loader.cpp
     Vulkan/camera.cpp
     Vulkan/camera.h
+    ${THIRD_PARTY_DIR}/imgui/imgui.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_demo.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_draw.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_tables.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
+    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
+    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp
 )
-
-set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
 
 target_include_directories(
     LunaCore
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${THIRD_PARTY_DIR}/third_party
+        ${THIRD_PARTY_DIR}/imgui
         ${THIRD_PARTY_DIR}/spdlog/include
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm

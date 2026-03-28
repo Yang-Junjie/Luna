@@ -158,7 +158,7 @@ void VulkanEngine::cleanup()
     LUNA_CORE_INFO("Vulkan engine cleanup complete");
 }
 
-void VulkanEngine::draw()
+void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const BeforePresentFunction& beforePresent)
 {
     if (_device == VK_NULL_HANDLE || _swapchain == VK_NULL_HANDLE) {
         LUNA_CORE_WARN("Skipping frame because Vulkan device or swapchain is not ready");
@@ -208,25 +208,45 @@ void VulkanEngine::draw()
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
     // transition our main draw image into general layout so we can write into it
-    // we will overwrite it all so we dont care about what was the older layout
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+    vkutil::transition_image(cmd, _drawImage.image, _drawImageLayout, VK_IMAGE_LAYOUT_GENERAL);
+    _drawImageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     draw_background(cmd);
 
     // transition the draw image and the swapchain image into their correct transfer layouts
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    _drawImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     vkutil::transition_image(
-        cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        cmd,
+        _swapchainImages[swapchainImageIndex],
+        _swapchainImageLayouts[swapchainImageIndex],
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    _swapchainImageLayouts[swapchainImageIndex] = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
     // execute a copy from the draw image into the swapchain
     vkutil::copy_image_to_image(
         cmd, _drawImage.image, _swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
 
-    // set swapchain image layout to Present so we can show it on the screen
-    vkutil::transition_image(cmd,
-                             _swapchainImages[swapchainImageIndex],
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    if (overlayRenderer) {
+        vkutil::transition_image(cmd,
+                                 _swapchainImages[swapchainImageIndex],
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        _swapchainImageLayouts[swapchainImageIndex] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        overlayRenderer(cmd, _swapchainImageViews[swapchainImageIndex], _swapchainExtent);
+
+        vkutil::transition_image(cmd,
+                                 _swapchainImages[swapchainImageIndex],
+                                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    } else {
+        vkutil::transition_image(cmd,
+                                 _swapchainImages[swapchainImageIndex],
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                 VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+    }
+    _swapchainImageLayouts[swapchainImageIndex] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
     // finalize the command buffer (we can no longer add commands, but it can now be executed)
     VK_CHECK(vkEndCommandBuffer(cmd));
@@ -241,6 +261,10 @@ void VulkanEngine::draw()
     VkSubmitInfo2 submit = vkinit::submit_info(&cmdinfo, &signalInfo, &waitInfo);
 
     VK_CHECK(vkQueueSubmit2(_graphicsQueue, 1, &submit, get_current_frame()._renderFence));
+
+    if (beforePresent) {
+        beforePresent();
+    }
 
     VkPresentInfoKHR presentInfo = {};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -409,6 +433,7 @@ bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
         return false;
     }
     _swapchainImageViews = imageViewsRet.value();
+    _swapchainImageLayouts.assign(_swapchainImages.size(), VK_IMAGE_LAYOUT_UNDEFINED);
 
     LUNA_CORE_INFO("Created swapchain: {}x{}, images={}",
                    _swapchainExtent.width,
@@ -454,6 +479,7 @@ void VulkanEngine::destroy_swapchain()
 
     _swapchainImageViews.clear();
     _swapchainImages.clear();
+    _swapchainImageLayouts.clear();
 
     vkDestroySwapchainKHR(_device, _swapchain, nullptr);
     _swapchain = VK_NULL_HANDLE;
@@ -654,6 +680,7 @@ bool VulkanEngine::create_draw_resources(VkExtent2D extent)
 
     _drawImage.imageFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     _drawImage.imageExtent = drawImageExtent;
+    _drawImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageUsageFlags drawImageUsages{};
     drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -713,6 +740,7 @@ void VulkanEngine::destroy_draw_resources()
 
     _drawImage.imageExtent = {};
     _drawImage.imageFormat = VK_FORMAT_UNDEFINED;
+    _drawImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 void VulkanEngine::update_draw_image_descriptors()

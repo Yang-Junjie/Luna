@@ -41,6 +41,9 @@ constexpr unsigned int FRAME_OVERLAP = 2;
 
 class VulkanEngine {
 public:
+    using OverlayRenderFunction = std::function<void(VkCommandBuffer, VkImageView, VkExtent2D)>;
+    using BeforePresentFunction = std::function<void()>;
+
     bool _isInitialized{false};
     int _frameNumber{0};
     VkExtent2D _windowExtent{1'700, 900};
@@ -51,7 +54,17 @@ public:
 
     bool init(luna::Window& window);
     void cleanup();
-    void draw();
+    void draw(const OverlayRenderFunction& overlayRenderer = {}, const BeforePresentFunction& beforePresent = {});
+
+    uint32_t getSwapchainImageCount() const
+    {
+        return static_cast<uint32_t>(_swapchainImages.size());
+    }
+
+    VkFormat getSwapchainImageFormat() const
+    {
+        return _swapchainImageFormat;
+    }
 
     FrameData _frames[FRAME_OVERLAP];
 
@@ -73,6 +86,7 @@ public:
 
     std::vector<VkImage> _swapchainImages;
     std::vector<VkImageView> _swapchainImageViews;
+    std::vector<VkImageLayout> _swapchainImageLayouts;
     VkExtent2D _swapchainExtent{};
 
     DeletionQueue _mainDeletionQueue;
@@ -81,6 +95,7 @@ public:
 
     AllocatedImage _drawImage;
     VkExtent2D _drawExtent{};
+    VkImageLayout _drawImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
 
     DescriptorAllocator globalDescriptorAllocator;
 

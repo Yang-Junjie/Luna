@@ -1,6 +1,7 @@
 #pragma once
 #include "Events/application_event.h"
 #include "Events/event.h"
+#include "Imgui/ImGuiLayer.hpp"
 #include "layer.h"
 #include "layer_stack.h"
 #include "timestep.h"
@@ -16,6 +17,7 @@ struct ApplicationSpecification {
     std::string name = "Luna";
     uint32_t windowWidth = 1'600, windowHeight = 900;
     bool maximized = false;
+    bool enableMultiViewport = false;
 };
 
 class Application {
@@ -25,6 +27,11 @@ public:
 
     void pushLayer(std::unique_ptr<Layer> layer);
     void pushOverlay(std::unique_ptr<Layer> overlay);
+
+    ImGuiLayer* getImGuiLayer() const
+    {
+        return m_imGuiLayerRaw;
+    }
 
     void close()
     {
@@ -69,6 +76,9 @@ private:
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
     VulkanEngine m_engine;
+
+    std::unique_ptr<ImGuiLayer> m_imGuiLayer;
+    ImGuiLayer* m_imGuiLayerRaw = nullptr;
     LayerStack m_layerStack;
 
     Timestep m_timestep;

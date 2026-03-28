@@ -37,11 +37,32 @@ Application::Application(const ApplicationSpecification& spec)
         return;
     }
 
+    auto* nativeWindow = static_cast<GLFWwindow*>(m_window->getNativeWindow());
+    m_imGuiLayer = std::make_unique<ImGuiLayer>(nativeWindow, m_engine, m_specification.enableMultiViewport);
+    m_imGuiLayerRaw = m_imGuiLayer.get();
+    m_imGuiLayer->onAttach();
+
+    if (!m_imGuiLayer->isInitialized()) {
+        LUNA_CORE_ERROR("ImGui initialization failed");
+        m_imGuiLayer.reset();
+        m_imGuiLayerRaw = nullptr;
+        m_engine.cleanup();
+        m_window.reset();
+        s_instance = nullptr;
+        return;
+    }
+
     m_initialized = true;
 }
 
 Application::~Application()
 {
+    if (m_imGuiLayer != nullptr) {
+        m_imGuiLayer->onDetach();
+        m_imGuiLayer.reset();
+        m_imGuiLayerRaw = nullptr;
+    }
+
     m_engine.cleanup();
     s_instance = nullptr;
 }
@@ -83,7 +104,27 @@ void Application::run()
 
 void Application::renderFrame()
 {
-    m_engine.draw();
+    if (m_imGuiLayer != nullptr && m_imGuiLayer->isInitialized()) {
+        m_imGuiLayer->begin();
+
+        for (auto& layer : m_layerStack) {
+            layer->onImGuiRender();
+        }
+
+        m_imGuiLayer->end();
+    }
+
+    m_engine.draw(
+        [this](VkCommandBuffer commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent) {
+            if (m_imGuiLayer != nullptr) {
+                m_imGuiLayer->render(commandBuffer, targetImageView, targetExtent);
+            }
+        },
+        [this]() {
+            if (m_imGuiLayer != nullptr) {
+                m_imGuiLayer->renderPlatformWindows();
+            }
+        });
 }
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
@@ -109,6 +150,10 @@ void Application::onEvent(Event& event)
     dispatcher.dispatch<WindowResizeEvent>([this](WindowResizeEvent& e) {
         return onWindowResize(e);
     });
+
+    if (m_imGuiLayer != nullptr) {
+        m_imGuiLayer->onEvent(event);
+    }
 
     for (auto it = m_layerStack.rbegin(); it != m_layerStack.rend(); ++it) {
         if (event.handled) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/layer.h"
+#include "imgui.h"
 
 namespace luna::editor {
 
@@ -9,6 +10,11 @@ public:
     EditorLayer()
         : Layer("EditorLayer")
     {}
+
+    virtual void onImGuiRender()
+    {
+        ImGui::ShowDemoWindow();
+    }
 };
 
 } // namespace luna::editor
