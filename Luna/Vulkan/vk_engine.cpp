@@ -1,15 +1,14 @@
 #include "vk_engine.h"
 
 #define GLFW_INCLUDE_NONE
+#include "VkBootstrap.h"
 #include "vk_images.h"
 #include "vk_initializers.h"
 #include "vk_types.h"
-#include "VkBootstrap.h"
 
-#include <chrono>
+#include <cmath>
 #include <GLFW/glfw3.h>
-#include <stdexcept>
-#include <thread>
+
 VulkanEngine* loadedEngine = nullptr;
 
 #ifndef NDEBUG
@@ -18,90 +17,117 @@ constexpr bool bUseValidationLayers = true;
 constexpr bool bUseValidationLayers = false;
 #endif
 
+namespace {
+
+template <typename T>
+void logVkbError(const char* step, const vkb::Result<T>& result)
+{
+    LUNA_CORE_ERROR("{} failed: {}", step, result.error().message());
+    for (const std::string& reason : result.full_error().detailed_failure_reasons) {
+        LUNA_CORE_ERROR("  {}", reason);
+    }
+}
+
+} // namespace
+
 VulkanEngine& VulkanEngine::Get()
 {
     return *loadedEngine;
 }
 
-void VulkanEngine::init()
+bool VulkanEngine::init(luna::Window& window)
 {
-    assert(loadedEngine == nullptr);
+    if (loadedEngine != nullptr) {
+        LUNA_CORE_ERROR("VulkanEngine already initialized");
+        return false;
+    }
+
     loadedEngine = this;
     LUNA_CORE_INFO("Initializing Vulkan engine");
 
-    if (!glfwInit()) {
-        throw std::runtime_error("Failed to initialize GLFW");
-    }
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-    _window = glfwCreateWindow(static_cast<int>(_windowExtent.width),
-                               static_cast<int>(_windowExtent.height),
-                               "Vulkan Engine",
-                               nullptr,
-                               nullptr);
+    _window = static_cast<GLFWwindow*>(window.getNativeWindow());
     if (_window == nullptr) {
-        glfwTerminate();
-        throw std::runtime_error("Failed to create GLFW window");
+        LUNA_CORE_ERROR("Failed to acquire native GLFW window");
+        loadedEngine = nullptr;
+        return false;
     }
 
+    _windowExtent = {window.getWidth(), window.getHeight()};
     LUNA_CORE_INFO("Created GLFW window: {}x{}", _windowExtent.width, _windowExtent.height);
 
-    init_vulkan();
-    init_swapchain();
-    init_commands();
-    init_sync_structures();
+    if (!init_vulkan() || !init_swapchain() || !init_commands() || !init_sync_structures()) {
+        cleanup();
+        return false;
+    }
 
     _isInitialized = true;
     LUNA_CORE_INFO("Vulkan engine initialized");
+    return true;
 }
 
 void VulkanEngine::cleanup()
 {
-    if (_isInitialized) {
-        LUNA_CORE_INFO("Cleaning up Vulkan engine");
+    LUNA_CORE_INFO("Cleaning up Vulkan engine");
 
+    if (_device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(_device);
 
         for (int i = 0; i < FRAME_OVERLAP; i++) {
-            vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
-            _frames[i]._commandPool = VK_NULL_HANDLE;
+            if (_frames[i]._commandPool != VK_NULL_HANDLE) {
+                vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+                _frames[i]._commandPool = VK_NULL_HANDLE;
+            }
 
-            vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
-            _frames[i]._renderFence = VK_NULL_HANDLE;
+            if (_frames[i]._renderFence != VK_NULL_HANDLE) {
+                vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
+                _frames[i]._renderFence = VK_NULL_HANDLE;
+            }
 
-            vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
-            _frames[i]._renderSemaphore = VK_NULL_HANDLE;
+            if (_frames[i]._renderSemaphore != VK_NULL_HANDLE) {
+                vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
+                _frames[i]._renderSemaphore = VK_NULL_HANDLE;
+            }
 
-            vkDestroySemaphore(_device, _frames[i]._swapchainSemaphore, nullptr);
-            _frames[i]._swapchainSemaphore = VK_NULL_HANDLE;
+            if (_frames[i]._swapchainSemaphore != VK_NULL_HANDLE) {
+                vkDestroySemaphore(_device, _frames[i]._swapchainSemaphore, nullptr);
+                _frames[i]._swapchainSemaphore = VK_NULL_HANDLE;
+            }
         }
-
-        destroy_swapchain();
-
-        if (_surface != VK_NULL_HANDLE) {
-            vkDestroySurfaceKHR(_instance, _surface, nullptr);
-            _surface = VK_NULL_HANDLE;
-        }
-        if (_device != VK_NULL_HANDLE) {
-            vkDestroyDevice(_device, nullptr);
-            _device = VK_NULL_HANDLE;
-        }
-
-        if (_instance != VK_NULL_HANDLE) {
-            vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
-            vkDestroyInstance(_instance, nullptr);
-            _instance = VK_NULL_HANDLE;
-        }
-
-        glfwDestroyWindow(_window);
-        _window = nullptr;
-        glfwTerminate();
-
-        _isInitialized = false;
-        LUNA_CORE_INFO("Vulkan engine cleanup complete");
     }
 
+    destroy_swapchain();
+
+    if (_instance != VK_NULL_HANDLE && _surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(_instance, _surface, nullptr);
+        _surface = VK_NULL_HANDLE;
+    }
+
+    if (_device != VK_NULL_HANDLE) {
+        vkDestroyDevice(_device, nullptr);
+        _device = VK_NULL_HANDLE;
+    }
+
+    if (_instance != VK_NULL_HANDLE) {
+        if (_debug_messenger != VK_NULL_HANDLE) {
+            vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
+            _debug_messenger = VK_NULL_HANDLE;
+        }
+
+        vkDestroyInstance(_instance, nullptr);
+        _instance = VK_NULL_HANDLE;
+    }
+
+    _window = nullptr;
+    _chosenGPU = VK_NULL_HANDLE;
+    _graphicsQueue = VK_NULL_HANDLE;
+    _graphicsQueueFamily = 0;
+    _swapchain = VK_NULL_HANDLE;
+    _swapchainImageFormat = VK_FORMAT_UNDEFINED;
+    _swapchainExtent = {};
+    _isInitialized = false;
     loadedEngine = nullptr;
+
+    LUNA_CORE_INFO("Vulkan engine cleanup complete");
 }
 
 void VulkanEngine::draw()
@@ -126,7 +152,7 @@ void VulkanEngine::draw()
         cmd, _swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
     VkClearColorValue clearValue;
-    float flash = std::abs(std::sin(_frameNumber / 120.f));
+    const float flash = std::abs(std::sin(_frameNumber / 120.0f));
     clearValue = {{0.0f, 0.0f, flash, 1.0f}};
 
     VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
@@ -166,36 +192,41 @@ void VulkanEngine::draw()
     _frameNumber++;
 }
 
-void VulkanEngine::run()
+bool VulkanEngine::init_vulkan()
 {
-    while (!glfwWindowShouldClose(_window)) {
-        glfwPollEvents();
-
-        stop_rendering = glfwGetWindowAttrib(_window, GLFW_ICONIFIED) == GLFW_TRUE;
-
-        if (stop_rendering) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        draw();
+    uint32_t glfwExtensionCount = 0;
+    const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
+        LUNA_CORE_ERROR("Failed to query GLFW Vulkan instance extensions");
+        return false;
     }
-}
 
-void VulkanEngine::init_vulkan()
-{
     vkb::InstanceBuilder builder;
     auto inst_ret = builder.set_app_name("Example Vulkan Application")
                         .request_validation_layers(bUseValidationLayers)
                         .use_default_debug_messenger()
+                        .enable_extensions(glfwExtensionCount, glfwExtensions)
                         .require_api_version(1, 3, 0)
                         .build();
+    if (!inst_ret) {
+        logVkbError("Vulkan instance creation", inst_ret);
+        return false;
+    }
 
     vkb::Instance vkb_inst = inst_ret.value();
     _instance = vkb_inst.instance;
     _debug_messenger = vkb_inst.debug_messenger;
 
-    glfwCreateWindowSurface(_instance, _window, nullptr, &_surface);
+    if (_window == nullptr) {
+        LUNA_CORE_ERROR("No native GLFW window available for Vulkan surface creation");
+        return false;
+    }
+
+    const VkResult surfaceResult = glfwCreateWindowSurface(_instance, _window, nullptr, &_surface);
+    if (surfaceResult != VK_SUCCESS) {
+        LUNA_CORE_ERROR("Failed to create Vulkan surface: {}", string_VkResult(surfaceResult));
+        return false;
+    }
 
     VkPhysicalDeviceVulkan13Features features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
     features.dynamicRendering = true;
@@ -211,26 +242,47 @@ void VulkanEngine::init_vulkan()
                                    .set_required_features_12(features12)
                                    .set_surface(_surface)
                                    .select();
+    if (!physical_device_ret) {
+        logVkbError("Physical device selection", physical_device_ret);
+        return false;
+    }
 
     vkb::PhysicalDevice physicalDevice = physical_device_ret.value();
 
     vkb::DeviceBuilder deviceBuilder{physicalDevice};
 
     auto device_ret = deviceBuilder.build();
+    if (!device_ret) {
+        logVkbError("Logical device creation", device_ret);
+        return false;
+    }
 
     vkb::Device vkbDevice = device_ret.value();
 
     _device = vkbDevice.device;
     _chosenGPU = physicalDevice.physical_device;
-    _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
-    _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    auto graphicsQueueRet = vkbDevice.get_queue(vkb::QueueType::graphics);
+    if (!graphicsQueueRet) {
+        logVkbError("Graphics queue fetch", graphicsQueueRet);
+        return false;
+    }
+    _graphicsQueue = graphicsQueueRet.value();
+
+    auto graphicsQueueIndexRet = vkbDevice.get_queue_index(vkb::QueueType::graphics);
+    if (!graphicsQueueIndexRet) {
+        logVkbError("Graphics queue family fetch", graphicsQueueIndexRet);
+        return false;
+    }
+    _graphicsQueueFamily = graphicsQueueIndexRet.value();
 
     VkPhysicalDeviceProperties gpuProperties{};
     vkGetPhysicalDeviceProperties(_chosenGPU, &gpuProperties);
     LUNA_CORE_INFO("Selected GPU: {}", gpuProperties.deviceName);
+    return true;
 }
 
-void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
+bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
 {
     vkb::SwapchainBuilder swapchainBuilder{_chosenGPU, _device, _surface};
 
@@ -243,18 +295,35 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
                              .set_desired_extent(width, height)
                              .add_image_usage_flags(VK_IMAGE_USAGE_TRANSFER_DST_BIT)
                              .build();
+    if (!swapchain_ret) {
+        logVkbError("Swapchain creation", swapchain_ret);
+        return false;
+    }
 
     vkb::Swapchain vkbSwapchain = swapchain_ret.value();
 
     _swapchainExtent = vkbSwapchain.extent;
     _swapchain = vkbSwapchain.swapchain;
-    _swapchainImages = vkbSwapchain.get_images().value();
-    _swapchainImageViews = vkbSwapchain.get_image_views().value();
+
+    auto imagesRet = vkbSwapchain.get_images();
+    if (!imagesRet) {
+        logVkbError("Swapchain image fetch", imagesRet);
+        return false;
+    }
+    _swapchainImages = imagesRet.value();
+
+    auto imageViewsRet = vkbSwapchain.get_image_views();
+    if (!imageViewsRet) {
+        logVkbError("Swapchain image view fetch", imageViewsRet);
+        return false;
+    }
+    _swapchainImageViews = imageViewsRet.value();
 
     LUNA_CORE_INFO("Created swapchain: {}x{}, images={}",
                    _swapchainExtent.width,
                    _swapchainExtent.height,
                    _swapchainImages.size());
+    return true;
 }
 
 void VulkanEngine::destroy_swapchain()
@@ -263,8 +332,7 @@ void VulkanEngine::destroy_swapchain()
         return;
     }
 
-    for (int i = 0; i < _swapchainImageViews.size(); i++) {
-
+    for (size_t i = 0; i < _swapchainImageViews.size(); i++) {
         vkDestroyImageView(_device, _swapchainImageViews[i], nullptr);
     }
 
@@ -275,35 +343,63 @@ void VulkanEngine::destroy_swapchain()
     _swapchain = VK_NULL_HANDLE;
 }
 
-void VulkanEngine::init_swapchain()
+bool VulkanEngine::init_swapchain()
 {
-    create_swapchain(_windowExtent.width, _windowExtent.height);
+    return create_swapchain(_windowExtent.width, _windowExtent.height);
 }
 
-void VulkanEngine::init_commands()
+bool VulkanEngine::init_commands()
 {
     VkCommandPoolCreateInfo commandPoolInfo =
         vkinit::command_pool_create_info(_graphicsQueueFamily, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
-
-        VK_CHECK(vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool));
+        const VkResult commandPoolResult =
+            vkCreateCommandPool(_device, &commandPoolInfo, nullptr, &_frames[i]._commandPool);
+        if (commandPoolResult != VK_SUCCESS) {
+            LUNA_CORE_ERROR("Failed to create command pool: {}", string_VkResult(commandPoolResult));
+            return false;
+        }
 
         VkCommandBufferAllocateInfo cmdAllocInfo = vkinit::command_buffer_allocate_info(_frames[i]._commandPool, 1);
 
-        VK_CHECK(vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer));
+        const VkResult commandBufferResult =
+            vkAllocateCommandBuffers(_device, &cmdAllocInfo, &_frames[i]._mainCommandBuffer);
+        if (commandBufferResult != VK_SUCCESS) {
+            LUNA_CORE_ERROR("Failed to allocate command buffer: {}", string_VkResult(commandBufferResult));
+            return false;
+        }
     }
+
+    return true;
 }
 
-void VulkanEngine::init_sync_structures()
+bool VulkanEngine::init_sync_structures()
 {
     VkFenceCreateInfo fenceCreateInfo = vkinit::fence_create_info(VK_FENCE_CREATE_SIGNALED_BIT);
     VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::semaphore_create_info();
 
     for (int i = 0; i < FRAME_OVERLAP; i++) {
-        VK_CHECK(vkCreateFence(_device, &fenceCreateInfo, nullptr, &_frames[i]._renderFence));
+        const VkResult fenceResult = vkCreateFence(_device, &fenceCreateInfo, nullptr, &_frames[i]._renderFence);
+        if (fenceResult != VK_SUCCESS) {
+            LUNA_CORE_ERROR("Failed to create fence: {}", string_VkResult(fenceResult));
+            return false;
+        }
 
-        VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._swapchainSemaphore));
-        VK_CHECK(vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore));
+        const VkResult swapchainSemaphoreResult =
+            vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._swapchainSemaphore);
+        if (swapchainSemaphoreResult != VK_SUCCESS) {
+            LUNA_CORE_ERROR("Failed to create swapchain semaphore: {}", string_VkResult(swapchainSemaphoreResult));
+            return false;
+        }
+
+        const VkResult renderSemaphoreResult =
+            vkCreateSemaphore(_device, &semaphoreCreateInfo, nullptr, &_frames[i]._renderSemaphore);
+        if (renderSemaphoreResult != VK_SUCCESS) {
+            LUNA_CORE_ERROR("Failed to create render semaphore: {}", string_VkResult(renderSemaphoreResult));
+            return false;
+        }
     }
+
+    return true;
 }

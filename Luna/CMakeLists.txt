@@ -1,8 +1,28 @@
 add_library(
     LunaCore
     STATIC
+    Core/application.h
+    Core/application.cpp
+    Core/input.hpp
+    Core/key_codes.h
+    Core/layer.h
+    Core/layer_stack.h
+    Core/layer_stack.cpp
     Core/log.h
     Core/log.cpp
+    Core/mouse_codes.h
+    Core/timestep.h
+    Core/window.h
+    Core/window.cpp
+    Events/application_event.h
+    Events/event.h
+    Events/key_event.h
+    Events/mouse_event.h
+    Platform/GLFWKeyCodes.hpp
+    Platform/GLFWMouseCodes.hpp
+    Platform/GLFWWindow.hpp
+    Platform/GLFWWindow.cpp
+    Platform/GLFWWindowInput.cpp
     Vulkan/vk_types.h
     Vulkan/vk_initializers.cpp
     Vulkan/vk_initializers.h

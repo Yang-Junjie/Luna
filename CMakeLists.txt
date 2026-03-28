@@ -24,7 +24,8 @@ add_subdirectory(third_party/VMA)
 add_subdirectory(third_party/vkbootstrap)
 
 add_subdirectory(Luna)
+add_subdirectory(Editor)
 
 
 add_executable(LunaApp Luna/Core/main.cpp)
-target_link_libraries(LunaApp PRIVATE LunaCore)
+target_link_libraries(LunaApp PRIVATE LunaEditor)
