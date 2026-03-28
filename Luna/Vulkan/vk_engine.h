@@ -39,6 +39,22 @@ struct FrameData {
 
 constexpr unsigned int FRAME_OVERLAP = 2;
 
+struct ComputePushConstants {
+    glm::vec4 data1;
+    glm::vec4 data2;
+    glm::vec4 data3;
+    glm::vec4 data4;
+};
+
+struct ComputeEffect {
+    const char* name;
+
+    VkPipeline pipeline;
+    VkPipelineLayout layout;
+
+    ComputePushConstants data;
+};
+
 class VulkanEngine {
 public:
     using OverlayRenderFunction = std::function<void(VkCommandBuffer, VkImageView, VkExtent2D)>;
@@ -73,6 +89,23 @@ public:
         return _frames[_frameNumber % FRAME_OVERLAP];
     }
 
+    // temporary
+    std::vector<ComputeEffect>& get_background_effects()
+    {
+        return backgroundEffects;
+    }
+
+    // temporary
+    int& get_current_background_effect()
+    {
+        return currentBackgroundEffect;
+    }
+
+    const int& get_current_background_effect() const
+    {
+        return currentBackgroundEffect;
+    }
+
     VkInstance _instance{VK_NULL_HANDLE};
     VkDebugUtilsMessengerEXT _debug_messenger{VK_NULL_HANDLE};
     VkPhysicalDevice _chosenGPU{VK_NULL_HANDLE};
@@ -104,6 +137,9 @@ public:
 
     VkPipeline _gradientPipeline{VK_NULL_HANDLE};
     VkPipelineLayout _gradientPipelineLayout{VK_NULL_HANDLE};
+
+    std::vector<ComputeEffect> backgroundEffects;
+    int currentBackgroundEffect{0};
 
 private:
     bool init_vulkan();

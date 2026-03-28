@@ -216,11 +216,10 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     // transition the draw image and the swapchain image into their correct transfer layouts
     vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     _drawImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vkutil::transition_image(
-        cmd,
-        _swapchainImages[swapchainImageIndex],
-        _swapchainImageLayouts[swapchainImageIndex],
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vkutil::transition_image(cmd,
+                             _swapchainImages[swapchainImageIndex],
+                             _swapchainImageLayouts[swapchainImageIndex],
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     _swapchainImageLayouts[swapchainImageIndex] = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
     // execute a copy from the draw image into the swapchain
@@ -445,23 +444,17 @@ bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd)
 {
-    // // make a clear-color from frame number. This will flash with a 120 frame period.
-    // VkClearColorValue clearValue;
-    // float flash = std::abs(std::sin(_frameNumber / 120.f));
-    // clearValue = {{0.0f, 0.0f, flash, 1.0f}};
 
-    // VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
+    ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
 
-    // // clear image
-    // vkCmdClearColorImage(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-    // bind the gradient drawing compute pipeline
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
 
-    // bind the descriptor set containing the draw image for the compute pipeline
     vkCmdBindDescriptorSets(
         cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
 
-    // execute the compute pipeline dispatch. We are using 16x16 workgroup size so we need to divide by it
+    vkCmdPushConstants(
+        cmd, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
+
     vkCmdDispatch(cmd, std::ceil(_drawExtent.width / 16.0), std::ceil(_drawExtent.height / 16.0), 1);
 }
 
@@ -599,41 +592,68 @@ bool VulkanEngine::init_pipelines()
 
 bool VulkanEngine::init_background_pipelines()
 {
+
     VkPipelineLayoutCreateInfo computeLayout{};
     computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    computeLayout.pNext = nullptr;
     computeLayout.pSetLayouts = &_drawImageDescriptorLayout;
     computeLayout.setLayoutCount = 1;
+
+    VkPushConstantRange pushConstant{};
+    pushConstant.offset = 0;
+    pushConstant.size = sizeof(ComputePushConstants);
+    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    computeLayout.pPushConstantRanges = &pushConstant;
+    computeLayout.pushConstantRangeCount = 1;
 
     VK_CHECK(vkCreatePipelineLayout(_device, &computeLayout, nullptr, &_gradientPipelineLayout));
 
     VkShaderModule computeDrawShader;
-    if (!vkutil::load_shader_module("../Shaders/Internal/gradient.spv", _device, &computeDrawShader)) {
-        LUNA_CORE_ERROR("Failed to load shader module");
-        return false;
-    }
-
-    VkPipelineShaderStageCreateInfo stageinfo{};
-    stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stageinfo.pNext = nullptr;
-    stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageinfo.module = computeDrawShader;
-    stageinfo.pName = "main";
+    vkutil::load_shader_module("../Shaders/Internal/gradient.spv", _device, &computeDrawShader);
+    VkShaderModule skyShader;
+    vkutil::load_shader_module("../Shaders/Internal/sky.spv", _device, &skyShader);
 
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    computePipelineCreateInfo.pNext = nullptr;
     computePipelineCreateInfo.layout = _gradientPipelineLayout;
-    computePipelineCreateInfo.stage = stageinfo;
+    computePipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    computePipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    computePipelineCreateInfo.stage.pName = "main";
 
+    computePipelineCreateInfo.stage.module = computeDrawShader;
     VK_CHECK(
         vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &_gradientPipeline));
 
-    vkDestroyShaderModule(_device, computeDrawShader, nullptr);
+    ComputeEffect gradient;
+    gradient.layout = _gradientPipelineLayout;
+    gradient.name = "gradient";
+    gradient.pipeline = _gradientPipeline;
+    gradient.data.data1 = glm::vec4(1, 0, 0, 1);
+    gradient.data.data2 = glm::vec4(0, 0, 1, 1);
 
-    _mainDeletionQueue.push_function([&]() {
-        vkDestroyPipelineLayout(_device, _gradientPipelineLayout, nullptr);
-        vkDestroyPipeline(_device, _gradientPipeline, nullptr);
+    computePipelineCreateInfo.stage.module = skyShader;
+    VkPipeline skyPipeline;
+    VK_CHECK(vkCreateComputePipelines(_device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &skyPipeline));
+
+    ComputeEffect sky;
+    sky.layout = _gradientPipelineLayout;
+    sky.name = "sky";
+    sky.pipeline = skyPipeline;
+    sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
+
+    backgroundEffects.push_back(gradient);
+    backgroundEffects.push_back(sky);
+
+    vkDestroyShaderModule(_device, computeDrawShader, nullptr);
+    vkDestroyShaderModule(_device, skyShader, nullptr);
+
+    VkPipeline p1 = _gradientPipeline;
+    VkPipeline p2 = skyPipeline;
+    VkPipelineLayout layout = _gradientPipelineLayout;
+
+    _mainDeletionQueue.push_function([=]() {
+        vkDestroyPipelineLayout(_device, layout, nullptr);
+        vkDestroyPipeline(_device, p1, nullptr);
+        vkDestroyPipeline(_device, p2, nullptr);
     });
 
     LUNA_CORE_INFO("Initialized background compute pipeline");
@@ -713,10 +733,8 @@ bool VulkanEngine::create_draw_resources(VkExtent2D extent)
         return false;
     }
 
-    LUNA_CORE_INFO("Created draw image: {}x{}, format={}",
-                   extent.width,
-                   extent.height,
-                   string_VkFormat(_drawImage.imageFormat));
+    LUNA_CORE_INFO(
+        "Created draw image: {}x{}, format={}", extent.width, extent.height, string_VkFormat(_drawImage.imageFormat));
     return true;
 }
 
@@ -745,7 +763,8 @@ void VulkanEngine::destroy_draw_resources()
 
 void VulkanEngine::update_draw_image_descriptors()
 {
-    if (_device == VK_NULL_HANDLE || _drawImageDescriptors == VK_NULL_HANDLE || _drawImage.imageView == VK_NULL_HANDLE) {
+    if (_device == VK_NULL_HANDLE || _drawImageDescriptors == VK_NULL_HANDLE ||
+        _drawImage.imageView == VK_NULL_HANDLE) {
         return;
     }
 

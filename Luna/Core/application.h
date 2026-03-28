@@ -55,6 +55,12 @@ public:
         return m_initialized;
     }
 
+    // temporary
+    VulkanEngine& getEngine()
+    {
+        return m_engine;
+    }
+
 protected:
     virtual void onInit() {}
 
