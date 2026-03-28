@@ -126,7 +126,7 @@ LambdaBodyIndentation: Signature
 # =========================================================
 # 模板相关
 # =========================================================
-BreakTemplateDeclarations: Yes
+AlwaysBreakTemplateDeclarations: MultiLine
 
 # =========================================================
 # switch 风格
