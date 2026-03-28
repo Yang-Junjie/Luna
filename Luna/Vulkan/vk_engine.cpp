@@ -27,6 +27,7 @@ void VulkanEngine::init()
 {
     assert(loadedEngine == nullptr);
     loadedEngine = this;
+    LUNA_CORE_INFO("Initializing Vulkan engine");
 
     if (!glfwInit()) {
         throw std::runtime_error("Failed to initialize GLFW");
@@ -43,17 +44,21 @@ void VulkanEngine::init()
         throw std::runtime_error("Failed to create GLFW window");
     }
 
+    LUNA_CORE_INFO("Created GLFW window: {}x{}", _windowExtent.width, _windowExtent.height);
+
     init_vulkan();
     init_swapchain();
     init_commands();
     init_sync_structures();
 
     _isInitialized = true;
+    LUNA_CORE_INFO("Vulkan engine initialized");
 }
 
 void VulkanEngine::cleanup()
 {
     if (_isInitialized) {
+        LUNA_CORE_INFO("Cleaning up Vulkan engine");
 
         vkDeviceWaitIdle(_device);
 
@@ -93,6 +98,7 @@ void VulkanEngine::cleanup()
         glfwTerminate();
 
         _isInitialized = false;
+        LUNA_CORE_INFO("Vulkan engine cleanup complete");
     }
 
     loadedEngine = nullptr;
@@ -218,6 +224,10 @@ void VulkanEngine::init_vulkan()
     _chosenGPU = physicalDevice.physical_device;
     _graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
     _graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+    VkPhysicalDeviceProperties gpuProperties{};
+    vkGetPhysicalDeviceProperties(_chosenGPU, &gpuProperties);
+    LUNA_CORE_INFO("Selected GPU: {}", gpuProperties.deviceName);
 }
 
 void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
@@ -240,6 +250,11 @@ void VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
     _swapchain = vkbSwapchain.swapchain;
     _swapchainImages = vkbSwapchain.get_images().value();
     _swapchainImageViews = vkbSwapchain.get_image_views().value();
+
+    LUNA_CORE_INFO("Created swapchain: {}x{}, images={}",
+                   _swapchainExtent.width,
+                   _swapchainExtent.height,
+                   _swapchainImages.size());
 }
 
 void VulkanEngine::destroy_swapchain()

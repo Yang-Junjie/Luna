@@ -5,3 +5,4 @@ bin/
 cmake-build-debug-mingw/
 docs/
 Experimental/
+logs/
