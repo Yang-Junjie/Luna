@@ -1,0 +1,46 @@
+name: Clang Format Check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clang-format:
+    name: Verify C/C++ formatting
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          mapfile -t files < <(
+            git ls-files -- \
+              '*.c' '*.cc' '*.cpp' '*.cxx' \
+              '*.h' '*.hh' '*.hpp' '*.hxx' \
+              '*.ipp' '*.inl' \
+              ':!:third_party/**' \
+              ':!:build/**' \
+              ':!:logs/**' \
+              ':!:.cache/**'
+          )
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No tracked C/C++ source files found."
+            exit 0
+          fi
+
+          echo "Checking ${#files[@]} files against .clang-format"
+          clang-format --version
+          clang-format --dry-run --Werror --style=file "${files[@]}"
