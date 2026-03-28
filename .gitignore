@@ -1,0 +1,7 @@
+build/
+.claude/
+.cache/
+bin/
+cmake-build-debug-mingw/
+docs/
+Experimental/
