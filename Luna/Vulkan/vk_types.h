@@ -18,11 +18,19 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
-#define VK_CHECK(x)                                                                               \
-    do {                                                                                          \
-        const VkResult err__ = (x);                                                               \
-        if (err__ != VK_SUCCESS) {                                                                \
-            LUNA_CORE_FATAL("Vulkan call failed: {} returned {}", #x, string_VkResult(err__));   \
-            std::abort();                                                                         \
-        }                                                                                         \
+#define VK_CHECK(x)                                                                            \
+    do {                                                                                       \
+        const VkResult err__ = (x);                                                            \
+        if (err__ != VK_SUCCESS) {                                                             \
+            LUNA_CORE_FATAL("Vulkan call failed: {} returned {}", #x, string_VkResult(err__)); \
+            std::abort();                                                                      \
+        }                                                                                      \
     } while (0)
+
+struct AllocatedImage {
+    VkImage image;
+    VkImageView imageView;
+    VmaAllocation allocation;
+    VkExtent3D imageExtent;
+    VkFormat imageFormat;
+};

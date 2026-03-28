@@ -5,12 +5,34 @@
 
 struct GLFWwindow;
 
+struct DeletionQueue {
+    std::deque<std::function<void()>> deletors;
+
+    // TODO(Yang) : need to be optimalized, because the std::funcation is too slow
+    void push_function(std::function<void()>&& function)
+    {
+        deletors.push_back(function);
+    }
+
+    void flush()
+    {
+        // reverse iterate the deletion queue to execute all the functions
+        for (auto it = deletors.rbegin(); it != deletors.rend(); it++) {
+            (*it)(); // call functors
+        }
+
+        deletors.clear();
+    }
+};
+
 struct FrameData {
     VkSemaphore _swapchainSemaphore, _renderSemaphore;
     VkFence _renderFence;
 
     VkCommandPool _commandPool;
     VkCommandBuffer _mainCommandBuffer;
+
+    DeletionQueue _deletionQueue;
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -51,11 +73,19 @@ public:
     std::vector<VkImageView> _swapchainImageViews;
     VkExtent2D _swapchainExtent{};
 
+    DeletionQueue _mainDeletionQueue;
+
+    VmaAllocator _allocator;
+
+    AllocatedImage _drawImage;
+    VkExtent2D _drawExtent;
+
 private:
     bool init_vulkan();
     bool init_swapchain();
     bool init_commands();
     bool init_sync_structures();
     bool create_swapchain(uint32_t width, uint32_t height);
+    void draw_background(VkCommandBuffer cmd);
     void destroy_swapchain();
 };
