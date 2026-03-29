@@ -89,6 +89,10 @@ void Application::run()
             continue;
         }
 
+        if (m_engine.is_swapchain_resize_requested()) {
+            m_engine.resize_swapchain();
+        }
+
         onUpdate(m_timestep);
 
         for (auto& layer : m_layerStack) {
@@ -167,6 +171,9 @@ void Application::onEvent(Event& event)
 bool Application::onWindowResize(const WindowResizeEvent& event)
 {
     m_minimized = event.getWidth() == 0 || event.getHeight() == 0;
+    if (!m_minimized) {
+        m_engine.request_swapchain_resize();
+    }
     return false;
 }
 

@@ -54,7 +54,7 @@ add_library(
 
 target_include_directories(
     LunaCore
-    PUBLIC
+    SYSTEM PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${THIRD_PARTY_DIR}/imgui
         ${THIRD_PARTY_DIR}/spdlog/include
@@ -63,7 +63,8 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/vkbootstrap/src
 )
 
-target_link_libraries(LunaCore PUBLIC
+target_link_libraries(LunaCore 
+        PUBLIC
         spdlog::spdlog
         GPUOpen::VulkanMemoryAllocator
         Vulkan::Vulkan

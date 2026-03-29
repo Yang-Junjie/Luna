@@ -9,6 +9,7 @@
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <GLFW/glfw3.h>
@@ -157,6 +158,7 @@ void VulkanEngine::cleanup()
         }
 
         destroy_swapchain();
+        destroy_draw_resources();
         _mainDeletionQueue.flush();
     }
 
@@ -224,10 +226,11 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
         _device, _swapchain, 1'000'000'000, get_current_frame()._swapchainSemaphore, nullptr, &swapchainImageIndex);
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
         logSwapchainResult("vkAcquireNextImageKHR", acquireResult, _swapchainExtent, get_framebuffer_extent());
-        recreate_swapchain();
+        resize_requested = true;
         return;
     }
     if (acquireResult == VK_SUBOPTIMAL_KHR) {
+        resize_requested = true;
         recreateAfterPresent = true;
         logSwapchainResult("vkAcquireNextImageKHR", acquireResult, _swapchainExtent, get_framebuffer_extent());
     } else if (acquireResult != VK_SUCCESS) {
@@ -242,8 +245,10 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     VkCommandBufferBeginInfo cmdBeginInfo =
         vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-    _drawExtent.width = _drawImage.imageExtent.width;
-    _drawExtent.height = _drawImage.imageExtent.height;
+    _drawExtent.width =
+        std::max(1u, static_cast<uint32_t>(std::min(_swapchainExtent.width, _drawImage.imageExtent.width) * renderScale));
+    _drawExtent.height = std::max(
+        1u, static_cast<uint32_t>(std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale));
 
     VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
@@ -323,13 +328,13 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
 
     const VkResult presentResult = vkQueuePresentKHR(_graphicsQueue, &presentInfo);
     if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
+        resize_requested = true;
         logSwapchainResult("vkQueuePresentKHR", presentResult, _swapchainExtent, get_framebuffer_extent());
-        recreate_swapchain();
     } else if (presentResult != VK_SUCCESS) {
         LUNA_CORE_FATAL("Vulkan call failed: vkQueuePresentKHR returned {}", string_VkResult(presentResult));
         std::abort();
     } else if (recreateAfterPresent) {
-        recreate_swapchain();
+        resize_requested = true;
     }
 
     _frameNumber++;
@@ -485,7 +490,7 @@ bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
                    _swapchainExtent.height,
                    _swapchainImages.size());
 
-    return create_draw_resources(_swapchainExtent);
+    return true;
 }
 
 void VulkanEngine::draw_background(VkCommandBuffer cmd)
@@ -512,8 +517,7 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     VkRenderingAttachmentInfo depthAttachment =
         vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
-    vkutil::transition_image(
-        cmd, _depthImage.image, _depthImageLayout, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    vkutil::transition_image(cmd, _depthImage.image, _depthImageLayout, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
     _depthImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
 
     VkRenderingInfo renderInfo = vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
@@ -541,7 +545,9 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, _meshPipeline);
 
     if (!testMeshes.empty()) {
-        const float aspect = _drawExtent.height == 0 ? 1.0f : static_cast<float>(_drawExtent.width) / static_cast<float>(_drawExtent.height);
+        const float aspect = _drawExtent.height == 0
+                                 ? 1.0f
+                                 : static_cast<float>(_drawExtent.width) / static_cast<float>(_drawExtent.height);
         glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(70.0f), aspect, 0.1f, 10000.0f);
         projection[1][1] *= -1.0f;
 
@@ -585,8 +591,6 @@ void VulkanEngine::draw_geometry(VkCommandBuffer cmd)
 
 void VulkanEngine::destroy_swapchain()
 {
-    destroy_draw_resources();
-
     if (_swapchain == VK_NULL_HANDLE) {
         return;
     }
@@ -620,7 +624,11 @@ bool VulkanEngine::init_swapchain()
                    _windowExtent.height,
                    framebufferExtent.width,
                    framebufferExtent.height);
-    return create_swapchain(framebufferExtent.width, framebufferExtent.height);
+    if (!create_swapchain(framebufferExtent.width, framebufferExtent.height)) {
+        return false;
+    }
+
+    return create_draw_resources(framebufferExtent);
 }
 
 bool VulkanEngine::init_commands()
@@ -840,7 +848,7 @@ void VulkanEngine::init_mesh_pipeline()
     pipelineBuilder.disable_blending();
 
     pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
-
+    pipelineBuilder.enable_blending_additive();
     // connect the image format we will draw into, from draw image
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
     pipelineBuilder.set_depth_format(_depthImage.imageFormat);
@@ -928,7 +936,7 @@ bool VulkanEngine::init_background_pipelines()
     return true;
 }
 
-bool VulkanEngine::recreate_swapchain()
+bool VulkanEngine::resize_swapchain()
 {
     const VkExtent2D framebufferExtent = get_framebuffer_extent();
     if (framebufferExtent.width == 0 || framebufferExtent.height == 0) {
@@ -954,6 +962,7 @@ bool VulkanEngine::recreate_swapchain()
         update_draw_image_descriptors();
     }
 
+    resize_requested = false;
     return true;
 }
 
@@ -1009,8 +1018,8 @@ bool VulkanEngine::create_draw_resources(VkExtent2D extent)
 
     const VkImageCreateInfo depthImageInfo =
         vkinit::image_create_info(_depthImage.imageFormat, depthImageUsages, drawImageExtent);
-    const VkResult depthImageResult =
-        vmaCreateImage(_allocator, &depthImageInfo, &allocationInfo, &_depthImage.image, &_depthImage.allocation, nullptr);
+    const VkResult depthImageResult = vmaCreateImage(
+        _allocator, &depthImageInfo, &allocationInfo, &_depthImage.image, &_depthImage.allocation, nullptr);
     if (depthImageResult != VK_SUCCESS) {
         LUNA_CORE_ERROR("Failed to create depth image: {}", string_VkResult(depthImageResult));
         vkDestroyImageView(_device, _drawImage.imageView, nullptr);

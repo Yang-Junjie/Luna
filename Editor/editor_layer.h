@@ -18,6 +18,9 @@ public:
         auto& effects = engine.get_background_effects();
 
         if (ImGui::Begin("background")) {
+            ImGui::SliderFloat("Render Scale", &engine.renderScale, 0.3f, 1.0f);
+            ImGui::Separator();
+
             if (effects.empty()) {
                 ImGui::TextUnformatted("No background effects available.");
                 ImGui::End();

@@ -70,6 +70,8 @@ public:
     bool _isInitialized{false};
     int _frameNumber{0};
     VkExtent2D _windowExtent{1'700, 900};
+    bool resize_requested{false};
+    float renderScale{1.0f};
 
     GLFWwindow* _window{nullptr};
 
@@ -78,6 +80,15 @@ public:
     bool init(luna::Window& window);
     void cleanup();
     void draw(const OverlayRenderFunction& overlayRenderer = {}, const BeforePresentFunction& beforePresent = {});
+    void request_swapchain_resize()
+    {
+        resize_requested = true;
+    }
+    bool is_swapchain_resize_requested() const
+    {
+        return resize_requested;
+    }
+    bool resize_swapchain();
 
     uint32_t getSwapchainImageCount() const
     {
@@ -175,8 +186,6 @@ private:
     void init_default_data();
 
     bool create_swapchain(uint32_t width, uint32_t height);
-    bool recreate_swapchain();
-
     bool create_draw_resources(VkExtent2D extent);
     void destroy_draw_resources();
 
