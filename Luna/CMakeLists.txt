@@ -1,5 +1,12 @@
 set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
 
+set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_demo.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_draw.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_tables.cpp
+    ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
+    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
+    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
 add_library(
     LunaCore
     STATIC
@@ -42,13 +49,7 @@ add_library(
     Vulkan/vk_loader.cpp
     Vulkan/camera.cpp
     Vulkan/camera.h
-    ${THIRD_PARTY_DIR}/imgui/imgui.cpp
-    ${THIRD_PARTY_DIR}/imgui/imgui_demo.cpp
-    ${THIRD_PARTY_DIR}/imgui/imgui_draw.cpp
-    ${THIRD_PARTY_DIR}/imgui/imgui_tables.cpp
-    ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
-    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
-    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp
+    ${IMGUI_SOURCE}
 )
 
 target_include_directories(
@@ -68,6 +69,9 @@ target_link_libraries(LunaCore PUBLIC
         Vulkan::Vulkan
         glfw
         vk-bootstrap::vk-bootstrap
+        stb::stb
+        fastgltf::fastgltf
+        simdjson::simdjson
 )
 
 target_compile_definitions(LunaCore PUBLIC SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)

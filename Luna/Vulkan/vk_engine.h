@@ -2,6 +2,7 @@
 
 #include "Core/window.h"
 #include "vk_descriptors.h"
+#include "vk_loader.h"
 #include "vk_types.h"
 
 struct GLFWwindow;
@@ -35,6 +36,12 @@ struct FrameData {
     VkCommandBuffer _mainCommandBuffer{VK_NULL_HANDLE};
 
     DeletionQueue _deletionQueue;
+};
+
+struct ImmediateSubmitContext {
+    VkFence _fence{VK_NULL_HANDLE};
+    VkCommandPool _commandPool{VK_NULL_HANDLE};
+    VkCommandBuffer _commandBuffer{VK_NULL_HANDLE};
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -83,6 +90,7 @@ public:
     }
 
     FrameData _frames[FRAME_OVERLAP];
+    ImmediateSubmitContext _immContext;
 
     FrameData& get_current_frame()
     {
@@ -127,8 +135,10 @@ public:
     VmaAllocator _allocator{VK_NULL_HANDLE};
 
     AllocatedImage _drawImage;
+    AllocatedImage _depthImage;
     VkExtent2D _drawExtent{};
     VkImageLayout _drawImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+    VkImageLayout _depthImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
 
     DescriptorAllocator globalDescriptorAllocator;
 
@@ -141,6 +151,17 @@ public:
     std::vector<ComputeEffect> backgroundEffects;
     int currentBackgroundEffect{0};
 
+    VkPipelineLayout _trianglePipelineLayout;
+    VkPipeline _trianglePipeline;
+
+    VkPipelineLayout _meshPipelineLayout;
+    VkPipeline _meshPipeline;
+
+    GPUMeshBuffers rectangle;
+    std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+
+    GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
 private:
     bool init_vulkan();
     bool init_swapchain();
@@ -149,13 +170,25 @@ private:
     bool init_descriptors();
     bool init_pipelines();
     bool init_background_pipelines();
+    void init_triangle_pipeline();
+    void init_mesh_pipeline();
+    void init_default_data();
 
     bool create_swapchain(uint32_t width, uint32_t height);
     bool recreate_swapchain();
+
     bool create_draw_resources(VkExtent2D extent);
     void destroy_draw_resources();
+
+    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+    void destroy_buffer(const AllocatedBuffer& buffer);
+    void immediate_submit(const std::function<void(VkCommandBuffer cmd)>& function);
+
     void update_draw_image_descriptors();
     VkExtent2D get_framebuffer_extent() const;
+
     void draw_background(VkCommandBuffer cmd);
+    void draw_geometry(VkCommandBuffer cmd);
+
     void destroy_swapchain();
 };
