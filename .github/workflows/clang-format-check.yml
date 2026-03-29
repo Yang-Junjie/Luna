@@ -1,30 +1,34 @@
-name: Clang Format Check
+name: Clang Format Auto-Fix
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   clang-format:
-    name: Verify C/C++ formatting
+    name: Format C/C++ Code
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Install clang-format
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-format
 
-      - name: Check formatting
+      - name: Run clang-format
         shell: bash
         run: |
+          # 找到所有需要格式化的文件
           mapfile -t files < <(
             git ls-files -- \
               '*.c' '*.cc' '*.cpp' '*.cxx' \
@@ -36,11 +40,17 @@ jobs:
               ':!:.cache/**'
           )
 
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No tracked C/C++ source files found."
-            exit 0
+          if [ "${#files[@]}" -ne 0 ]; then
+            echo "Formatting ${#files[@]} files..."
+            # -i 表示直接修改文件
+            clang-format -i "${files[@]}"
+          else
+            echo "No files to format."
           fi
 
-          echo "Checking ${#files[@]} files against .clang-format"
-          clang-format --version
-          clang-format --dry-run --Werror --style=file "${files[@]}"
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto-format C/C++ code with clang-format"
+          commit_user_name: github-actions[bot]
+          commit_user_email: github-actions[bot]@users.noreply.github.com
