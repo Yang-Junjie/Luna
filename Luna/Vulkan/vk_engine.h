@@ -155,6 +155,9 @@ public:
 
     VkDescriptorSet _drawImageDescriptors{VK_NULL_HANDLE};
     VkDescriptorSetLayout _drawImageDescriptorLayout{VK_NULL_HANDLE};
+    uint32_t _drawImageDescriptorBinding{0};
+    uint32_t _drawImageDescriptorCount{1};
+    VkDescriptorType _drawImageDescriptorType{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE};
 
     VkPipeline _gradientPipeline{VK_NULL_HANDLE};
     VkPipelineLayout _gradientPipelineLayout{VK_NULL_HANDLE};

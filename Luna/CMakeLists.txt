@@ -7,6 +7,31 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
+
+set(RHI_SOURCE
+    RHI/types.h
+    RHI/shader.h
+    RHI/resource_layout.h)
+
+set(VULKAN_BACKEND_SOURCE 
+    Vulkan/vk_types.h
+    Vulkan/vk_initializers.cpp
+    Vulkan/vk_initializers.h
+    Vulkan/vk_images.h
+    Vulkan/vk_images.cpp 
+    Vulkan/vk_descriptors.h
+    Vulkan/vk_descriptors.cpp
+    Vulkan/vk_pipelines.h
+    Vulkan/vk_pipelines.cpp
+    Vulkan/vk_engine.h
+    Vulkan/vk_engine.cpp
+    Vulkan/vk_loader.h
+    Vulkan/vk_loader.cpp
+    Vulkan/vk_shader.cpp
+    Vulkan/vk_shader.h
+    Vulkan/camera.cpp
+    Vulkan/camera.h)
+
 add_library(
     LunaCore
     STATIC
@@ -34,21 +59,8 @@ add_library(
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
-    Vulkan/vk_types.h
-    Vulkan/vk_initializers.cpp
-    Vulkan/vk_initializers.h
-    Vulkan/vk_images.h
-    Vulkan/vk_images.cpp 
-    Vulkan/vk_descriptors.h
-    Vulkan/vk_descriptors.cpp
-    Vulkan/vk_pipelines.h
-    Vulkan/vk_pipelines.cpp
-    Vulkan/vk_engine.h
-    Vulkan/vk_engine.cpp
-    Vulkan/vk_loader.h
-    Vulkan/vk_loader.cpp
-    Vulkan/camera.cpp
-    Vulkan/camera.h
+    ${RHI_SOURCE}
+    ${VULKAN_BACKEND_SOURCE}
     ${IMGUI_SOURCE}
 )
 
@@ -73,6 +85,7 @@ target_link_libraries(LunaCore
         stb::stb
         fastgltf::fastgltf
         simdjson::simdjson
+        spirv-cross-core
 )
 
 target_compile_definitions(LunaCore PUBLIC SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)

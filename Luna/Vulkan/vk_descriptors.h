@@ -1,5 +1,6 @@
 #pragma once
 
+#include "RHI/shader.h"
 #include "vk_types.h"
 
 struct DescriptorLayoutBuilder {
@@ -7,9 +8,13 @@ struct DescriptorLayoutBuilder {
     std::vector<VkDescriptorSetLayoutBinding> bindings;
 
     void add_binding(uint32_t binding, VkDescriptorType type);
+    void add_binding_from_reflection(const luna::ShaderReflectionData& data, VkShaderStageFlags shaderStages);
+    void add_bindings_from_reflection(const luna::Shader::ReflectionMap& reflectionMap,
+                                      uint32_t setIndex,
+                                      VkShaderStageFlags shaderStages);
     void clear();
     VkDescriptorSetLayout build(VkDevice device,
-                                VkShaderStageFlags shaderStages,
+                                VkShaderStageFlags shaderStages = 0,
                                 void* pNext = nullptr,
                                 VkDescriptorSetLayoutCreateFlags flags = 0);
 };

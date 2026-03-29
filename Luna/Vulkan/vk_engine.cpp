@@ -4,6 +4,7 @@
 #include "vk_images.h"
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
+#include "vk_shader.h"
 #include "vk_types.h"
 #include "VkBootstrap.h"
 #define VMA_IMPLEMENTATION
@@ -11,6 +12,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <optional>
 
 #include <GLFW/glfw3.h>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -43,6 +48,58 @@ void logSwapchainResult(const char* step, VkResult result, VkExtent2D swapchainE
                    swapchainExtent.height,
                    framebufferExtent.width,
                    framebufferExtent.height);
+}
+
+std::optional<std::vector<uint32_t>> load_spirv_code(const std::filesystem::path& filePath)
+{
+    std::ifstream file(filePath, std::ios::ate | std::ios::binary);
+    if (!file.is_open()) {
+        return std::nullopt;
+    }
+
+    const size_t fileSize = static_cast<size_t>(file.tellg());
+    if (fileSize == 0 || (fileSize % sizeof(uint32_t)) != 0) {
+        return std::nullopt;
+    }
+
+    std::vector<uint32_t> buffer(fileSize / sizeof(uint32_t));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(fileSize));
+    file.close();
+
+    return buffer;
+}
+
+bool reflect_shader_bindings(const std::filesystem::path& filePath,
+                             luna::ShaderType shaderType,
+                             VkShaderStageFlags shaderStages,
+                             DescriptorLayoutBuilder& builder)
+{
+    const auto spirvCode = load_spirv_code(filePath);
+    if (!spirvCode.has_value()) {
+        LUNA_CORE_ERROR("Failed to read SPIR-V shader for reflection: {}", filePath.string());
+        return false;
+    }
+
+    const luna::VulkanShader shader(*spirvCode, shaderType);
+    builder.add_bindings_from_reflection(shader.getReflectionMap(), 0, shaderStages);
+    return true;
+}
+
+std::vector<DescriptorAllocator::PoolSizeRatio> build_pool_ratios(const DescriptorLayoutBuilder& builder)
+{
+    std::map<VkDescriptorType, float> descriptorCounts;
+    for (const auto& binding : builder.bindings) {
+        descriptorCounts[binding.descriptorType] += static_cast<float>(std::max(1u, binding.descriptorCount));
+    }
+
+    std::vector<DescriptorAllocator::PoolSizeRatio> poolRatios;
+    poolRatios.reserve(descriptorCounts.size());
+    for (const auto& [type, count] : descriptorCounts) {
+        poolRatios.push_back({type, count});
+    }
+
+    return poolRatios;
 }
 
 } // namespace
@@ -712,17 +769,47 @@ bool VulkanEngine::init_sync_structures()
 
 bool VulkanEngine::init_descriptors()
 {
-    // create a descriptor pool that will hold 10 sets with 1 image each
-    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1}};
-
-    globalDescriptorAllocator.init_pool(_device, 10, sizes);
-
-    // make the descriptor set layout for our compute draw
-    {
-        DescriptorLayoutBuilder builder;
-        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-        _drawImageDescriptorLayout = builder.build(_device, VK_SHADER_STAGE_COMPUTE_BIT);
+    DescriptorLayoutBuilder builder;
+    if (!reflect_shader_bindings("../Shaders/Internal/gradient.spv", luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT,
+                                 builder) ||
+        !reflect_shader_bindings("../Shaders/Internal/sky.spv", luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT,
+                                 builder)) {
+        return false;
     }
+
+    if (builder.bindings.empty()) {
+        LUNA_CORE_ERROR("No descriptor bindings were reflected for compute shaders");
+        return false;
+    }
+
+    const auto drawImageBindingIt = std::find_if(builder.bindings.begin(),
+                                                 builder.bindings.end(),
+                                                 [](const VkDescriptorSetLayoutBinding& binding) {
+                                                     return binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                                                 });
+    if (drawImageBindingIt == builder.bindings.end()) {
+        LUNA_CORE_ERROR("Failed to find reflected storage image binding for background compute shaders");
+        return false;
+    }
+
+    _drawImageDescriptorBinding = drawImageBindingIt->binding;
+    _drawImageDescriptorCount = drawImageBindingIt->descriptorCount;
+    _drawImageDescriptorType = drawImageBindingIt->descriptorType;
+
+    if (_drawImageDescriptorType != VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) {
+        LUNA_CORE_ERROR("Background compute shaders must expose a storage image descriptor in set 0");
+        return false;
+    }
+
+    if (_drawImageDescriptorCount != 1) {
+        LUNA_CORE_ERROR("Only single storage image descriptors are currently supported, reflected count={}",
+                        _drawImageDescriptorCount);
+        return false;
+    }
+
+    auto sizes = build_pool_ratios(builder);
+    globalDescriptorAllocator.init_pool(_device, 10, sizes);
+    _drawImageDescriptorLayout = builder.build(_device);
 
     // allocate a descriptor set for our draw image
     _drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
@@ -1103,10 +1190,10 @@ void VulkanEngine::update_draw_image_descriptors()
     VkWriteDescriptorSet drawImageWrite = {};
     drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     drawImageWrite.pNext = nullptr;
-    drawImageWrite.dstBinding = 0;
+    drawImageWrite.dstBinding = _drawImageDescriptorBinding;
     drawImageWrite.dstSet = _drawImageDescriptors;
-    drawImageWrite.descriptorCount = 1;
-    drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    drawImageWrite.descriptorCount = _drawImageDescriptorCount;
+    drawImageWrite.descriptorType = _drawImageDescriptorType;
     drawImageWrite.pImageInfo = &imageInfo;
 
     vkUpdateDescriptorSets(_device, 1, &drawImageWrite, 0, nullptr);
