@@ -2,6 +2,7 @@
 
 #include "Core/log.h"
 
+#include <cstdint>
 #include <cstdlib>
 
 #include <array>
@@ -62,4 +63,30 @@ struct GPUMeshBuffers {
 struct GPUDrawPushConstants {
     glm::mat4 worldMatrix;
     VkDeviceAddress vertexBuffer;
+};
+
+struct GPUSceneData {
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection;
+    glm::vec4 sunlightColor;
+};
+
+enum class MaterialPass : uint8_t {
+    MainColor,
+    Transparent,
+    Other,
+};
+
+struct MaterialPipeline {
+    VkPipeline pipeline{VK_NULL_HANDLE};
+    VkPipelineLayout layout{VK_NULL_HANDLE};
+};
+
+struct MaterialInstance {
+    MaterialPipeline* pipeline{nullptr};
+    VkDescriptorSet materialSet{VK_NULL_HANDLE};
+    MaterialPass passType{MaterialPass::MainColor};
 };

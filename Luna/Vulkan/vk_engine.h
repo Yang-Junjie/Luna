@@ -1,11 +1,15 @@
 #pragma once
 
 #include "Core/window.h"
+#include "camera.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
 #include "vk_types.h"
 
+#include <unordered_map>
+
 struct GLFWwindow;
+class VulkanEngine;
 
 struct DeletionQueue {
     std::deque<std::function<void()>> deletors;
@@ -34,6 +38,7 @@ struct FrameData {
 
     VkCommandPool _commandPool{VK_NULL_HANDLE};
     VkCommandBuffer _mainCommandBuffer{VK_NULL_HANDLE};
+    DescriptorAllocatorGrowable _frameDescriptors;
 
     DeletionQueue _deletionQueue;
 };
@@ -60,6 +65,36 @@ struct ComputeEffect {
     VkPipelineLayout layout;
 
     ComputePushConstants data;
+};
+
+struct MaterialConstants {
+    glm::vec4 colorFactors{1.0f};
+    glm::vec4 metal_rough_factors{1.0f};
+    glm::vec4 extra[14]{};
+};
+
+struct MaterialResources {
+    AllocatedImage colorImage;
+    VkSampler colorSampler{VK_NULL_HANDLE};
+    AllocatedImage metalRoughImage;
+    VkSampler metalRoughSampler{VK_NULL_HANDLE};
+    AllocatedBuffer dataBuffer;
+    uint32_t dataBufferOffset{0};
+};
+
+struct GLTFMetallic_Roughness {
+    MaterialPipeline opaquePipeline;
+    MaterialPipeline transparentPipeline;
+
+    VkDescriptorSetLayout materialLayout{VK_NULL_HANDLE};
+
+    void build_pipelines(VulkanEngine* engine);
+    void clear_resources(VkDevice device);
+
+    MaterialInstance write_material(VkDevice device,
+                                    MaterialPass pass,
+                                    const MaterialResources& resources,
+                                    DescriptorAllocator& descriptorAllocator);
 };
 
 class VulkanEngine {
@@ -155,9 +190,17 @@ public:
 
     VkDescriptorSet _drawImageDescriptors{VK_NULL_HANDLE};
     VkDescriptorSetLayout _drawImageDescriptorLayout{VK_NULL_HANDLE};
+    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout{VK_NULL_HANDLE};
     uint32_t _drawImageDescriptorBinding{0};
     uint32_t _drawImageDescriptorCount{1};
     VkDescriptorType _drawImageDescriptorType{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE};
+
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerboardImage;
+    VkSampler _defaultSamplerLinear{VK_NULL_HANDLE};
+    VkSampler _defaultSamplerNearest{VK_NULL_HANDLE};
 
     VkPipeline _gradientPipeline{VK_NULL_HANDLE};
     VkPipelineLayout _gradientPipelineLayout{VK_NULL_HANDLE};
@@ -167,14 +210,26 @@ public:
 
     VkPipelineLayout _trianglePipelineLayout;
     VkPipeline _trianglePipeline;
-
-    VkPipelineLayout _meshPipelineLayout;
-    VkPipeline _meshPipeline;
+    MaterialInstance _defaultMaterialInstance;
+    GLTFMetallic_Roughness metalRoughMaterial;
 
     GPUMeshBuffers rectangle;
-    std::vector<std::shared_ptr<MeshAsset>> testMeshes;
+    std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+    DrawContext mainDrawContext;
+    GPUSceneData sceneData{};
+    Camera mainCamera;
+
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(
+        void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    void destroy_image(const AllocatedImage& image);
+    void destroy_buffer(const AllocatedBuffer& buffer);
 
     GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+    friend class LoadedGLTF;
+    friend std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
+                                                               const std::filesystem::path& filePath);
 
 private:
     bool init_vulkan();
@@ -193,7 +248,6 @@ private:
     void destroy_draw_resources();
 
     AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-    void destroy_buffer(const AllocatedBuffer& buffer);
     void immediate_submit(const std::function<void(VkCommandBuffer cmd)>& function);
 
     void update_draw_image_descriptors();
@@ -201,6 +255,7 @@ private:
 
     void draw_background(VkCommandBuffer cmd);
     void draw_geometry(VkCommandBuffer cmd);
+    void update_scene();
 
     void destroy_swapchain();
 };

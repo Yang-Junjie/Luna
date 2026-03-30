@@ -4,11 +4,11 @@
 namespace luna {
 enum class ShaderType : uint32_t {
     None = 0,
-    Vertex = 1 << 0,      // 00001
-    TessControl = 1 << 1, // 00010
-    TessEval = 1 << 2,    // 00100
-    Geometry = 1 << 3,    // 01000
-    Fragment = 1 << 4,    // 10000
+    Vertex = 1 << 0,      // 000001
+    TessControl = 1 << 1, // 000010
+    TessEval = 1 << 2,    // 000100
+    Geometry = 1 << 3,    // 001000
+    Fragment = 1 << 4,    // 010000
     Compute = 1 << 5,     // 100000
 
     AllGraphics = Vertex | Fragment | Geometry,
