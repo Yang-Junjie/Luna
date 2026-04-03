@@ -26,12 +26,12 @@ struct MeshAsset {
 struct RenderObject {
     uint32_t indexCount{0};
     uint32_t firstIndex{0};
-    VkBuffer indexBuffer{VK_NULL_HANDLE};
+    vk::Buffer indexBuffer{};
 
     MaterialInstance* material{nullptr};
 
     glm::mat4 transform{1.0f};
-    VkDeviceAddress vertexBufferAddress{0};
+    vk::DeviceAddress vertexBufferAddress{};
 };
 
 struct DrawContext {
@@ -82,7 +82,7 @@ public:
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
     std::vector<std::shared_ptr<Node>> topNodes;
     std::vector<AllocatedImage> images;
-    std::vector<VkSampler> samplers;
+    std::vector<vk::Sampler> samplers;
     std::vector<AllocatedBuffer> materialDataBuffers;
     std::vector<std::shared_ptr<MaterialInstance>> materials;
     DescriptorAllocator materialDescriptorPool;

@@ -88,4 +88,11 @@ target_link_libraries(LunaCore
         spirv-cross-core
 )
 
-target_compile_definitions(LunaCore PUBLIC SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+target_compile_definitions(
+    LunaCore
+    PUBLIC
+        SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
+        VULKAN_HPP_DISABLE_ENHANCED_MODE
+        VULKAN_HPP_NO_CONSTRUCTORS
+        VULKAN_HPP_NO_EXCEPTIONS
+)

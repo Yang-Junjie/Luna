@@ -32,21 +32,21 @@ struct DeletionQueue {
 };
 
 struct FrameData {
-    VkSemaphore _swapchainSemaphore{VK_NULL_HANDLE};
-    VkSemaphore _renderSemaphore{VK_NULL_HANDLE};
-    VkFence _renderFence{VK_NULL_HANDLE};
+    vk::Semaphore _swapchainSemaphore{};
+    vk::Semaphore _renderSemaphore{};
+    vk::Fence _renderFence{};
 
-    VkCommandPool _commandPool{VK_NULL_HANDLE};
-    VkCommandBuffer _mainCommandBuffer{VK_NULL_HANDLE};
+    vk::CommandPool _commandPool{};
+    vk::CommandBuffer _mainCommandBuffer{};
     DescriptorAllocatorGrowable _frameDescriptors;
 
     DeletionQueue _deletionQueue;
 };
 
 struct ImmediateSubmitContext {
-    VkFence _fence{VK_NULL_HANDLE};
-    VkCommandPool _commandPool{VK_NULL_HANDLE};
-    VkCommandBuffer _commandBuffer{VK_NULL_HANDLE};
+    vk::Fence _fence{};
+    vk::CommandPool _commandPool{};
+    vk::CommandBuffer _commandBuffer{};
 };
 
 constexpr unsigned int FRAME_OVERLAP = 2;
@@ -61,8 +61,8 @@ struct ComputePushConstants {
 struct ComputeEffect {
     const char* name;
 
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
+    vk::Pipeline pipeline{};
+    vk::PipelineLayout layout{};
 
     ComputePushConstants data;
 };
@@ -75,9 +75,9 @@ struct MaterialConstants {
 
 struct MaterialResources {
     AllocatedImage colorImage;
-    VkSampler colorSampler{VK_NULL_HANDLE};
+    vk::Sampler colorSampler{};
     AllocatedImage metalRoughImage;
-    VkSampler metalRoughSampler{VK_NULL_HANDLE};
+    vk::Sampler metalRoughSampler{};
     AllocatedBuffer dataBuffer;
     uint32_t dataBufferOffset{0};
 };
@@ -86,12 +86,12 @@ struct GLTFMetallic_Roughness {
     MaterialPipeline opaquePipeline;
     MaterialPipeline transparentPipeline;
 
-    VkDescriptorSetLayout materialLayout{VK_NULL_HANDLE};
+    vk::DescriptorSetLayout materialLayout{};
 
     void build_pipelines(VulkanEngine* engine);
-    void clear_resources(VkDevice device);
+    void clear_resources(vk::Device device);
 
-    MaterialInstance write_material(VkDevice device,
+    MaterialInstance write_material(vk::Device device,
                                     MaterialPass pass,
                                     const MaterialResources& resources,
                                     DescriptorAllocator& descriptorAllocator);
@@ -99,12 +99,12 @@ struct GLTFMetallic_Roughness {
 
 class VulkanEngine {
 public:
-    using OverlayRenderFunction = std::function<void(VkCommandBuffer, VkImageView, VkExtent2D)>;
+    using OverlayRenderFunction = std::function<void(vk::CommandBuffer, vk::ImageView, vk::Extent2D)>;
     using BeforePresentFunction = std::function<void()>;
 
     bool _isInitialized{false};
     int _frameNumber{0};
-    VkExtent2D _windowExtent{1'700, 900};
+    vk::Extent2D _windowExtent{1'700, 900};
     bool resize_requested{false};
     float renderScale{1.0f};
 
@@ -130,7 +130,7 @@ public:
         return static_cast<uint32_t>(_swapchainImages.size());
     }
 
-    VkFormat getSwapchainImageFormat() const
+    vk::Format getSwapchainImageFormat() const
     {
         return _swapchainImageFormat;
     }
@@ -160,21 +160,21 @@ public:
         return currentBackgroundEffect;
     }
 
-    VkInstance _instance{VK_NULL_HANDLE};
-    VkDebugUtilsMessengerEXT _debug_messenger{VK_NULL_HANDLE};
-    VkPhysicalDevice _chosenGPU{VK_NULL_HANDLE};
-    VkDevice _device{VK_NULL_HANDLE};
-    VkSurfaceKHR _surface{VK_NULL_HANDLE};
-    VkQueue _graphicsQueue{VK_NULL_HANDLE};
+    vk::Instance _instance{};
+    vk::DebugUtilsMessengerEXT _debug_messenger{};
+    vk::PhysicalDevice _chosenGPU{};
+    vk::Device _device{};
+    vk::SurfaceKHR _surface{};
+    vk::Queue _graphicsQueue{};
     uint32_t _graphicsQueueFamily{0};
 
-    VkSwapchainKHR _swapchain{VK_NULL_HANDLE};
-    VkFormat _swapchainImageFormat{VK_FORMAT_UNDEFINED};
+    vk::SwapchainKHR _swapchain{};
+    vk::Format _swapchainImageFormat{vk::Format::eUndefined};
 
-    std::vector<VkImage> _swapchainImages;
-    std::vector<VkImageView> _swapchainImageViews;
+    std::vector<vk::Image> _swapchainImages;
+    std::vector<vk::ImageView> _swapchainImageViews;
     std::vector<VkImageLayout> _swapchainImageLayouts;
-    VkExtent2D _swapchainExtent{};
+    vk::Extent2D _swapchainExtent{};
 
     DeletionQueue _mainDeletionQueue;
 
@@ -182,34 +182,34 @@ public:
 
     AllocatedImage _drawImage;
     AllocatedImage _depthImage;
-    VkExtent2D _drawExtent{};
+    vk::Extent2D _drawExtent{};
     VkImageLayout _drawImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
     VkImageLayout _depthImageLayout{VK_IMAGE_LAYOUT_UNDEFINED};
 
     DescriptorAllocator globalDescriptorAllocator;
 
-    VkDescriptorSet _drawImageDescriptors{VK_NULL_HANDLE};
-    VkDescriptorSetLayout _drawImageDescriptorLayout{VK_NULL_HANDLE};
-    VkDescriptorSetLayout _gpuSceneDataDescriptorLayout{VK_NULL_HANDLE};
+    vk::DescriptorSet _drawImageDescriptors{};
+    vk::DescriptorSetLayout _drawImageDescriptorLayout{};
+    vk::DescriptorSetLayout _gpuSceneDataDescriptorLayout{};
     uint32_t _drawImageDescriptorBinding{0};
     uint32_t _drawImageDescriptorCount{1};
-    VkDescriptorType _drawImageDescriptorType{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE};
+    vk::DescriptorType _drawImageDescriptorType{vk::DescriptorType::eStorageImage};
 
     AllocatedImage _whiteImage;
     AllocatedImage _blackImage;
     AllocatedImage _greyImage;
     AllocatedImage _errorCheckerboardImage;
-    VkSampler _defaultSamplerLinear{VK_NULL_HANDLE};
-    VkSampler _defaultSamplerNearest{VK_NULL_HANDLE};
+    vk::Sampler _defaultSamplerLinear{};
+    vk::Sampler _defaultSamplerNearest{};
 
-    VkPipeline _gradientPipeline{VK_NULL_HANDLE};
-    VkPipelineLayout _gradientPipelineLayout{VK_NULL_HANDLE};
+    vk::Pipeline _gradientPipeline{};
+    vk::PipelineLayout _gradientPipelineLayout{};
 
     std::vector<ComputeEffect> backgroundEffects;
     int currentBackgroundEffect{0};
 
-    VkPipelineLayout _trianglePipelineLayout;
-    VkPipeline _trianglePipeline;
+    vk::PipelineLayout _trianglePipelineLayout{};
+    vk::Pipeline _trianglePipeline{};
     MaterialInstance _defaultMaterialInstance;
     GLTFMetallic_Roughness metalRoughMaterial;
 
@@ -219,9 +219,28 @@ public:
     GPUSceneData sceneData{};
     Camera mainCamera;
 
-    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(vk::Extent3D size,
+                                vk::Format format,
+                                vk::ImageUsageFlags usage,
+                                bool mipmapped = false);
+    AllocatedImage create_image(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false)
+    {
+        return create_image(to_vk(size),
+                            static_cast<vk::Format>(format),
+                            static_cast<vk::ImageUsageFlags>(usage),
+                            mipmapped);
+    }
     AllocatedImage create_image(
-        void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+        void* data, vk::Extent3D size, vk::Format format, vk::ImageUsageFlags usage, bool mipmapped = false);
+    AllocatedImage create_image(
+        void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false)
+    {
+        return create_image(data,
+                            to_vk(size),
+                            static_cast<vk::Format>(format),
+                            static_cast<vk::ImageUsageFlags>(usage),
+                            mipmapped);
+    }
     void destroy_image(const AllocatedImage& image);
     void destroy_buffer(const AllocatedBuffer& buffer);
 
@@ -244,17 +263,21 @@ private:
     void init_default_data();
 
     bool create_swapchain(uint32_t width, uint32_t height);
-    bool create_draw_resources(VkExtent2D extent);
+    bool create_draw_resources(vk::Extent2D extent);
     void destroy_draw_resources();
 
-    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-    void immediate_submit(const std::function<void(VkCommandBuffer cmd)>& function);
+    AllocatedBuffer create_buffer(size_t allocSize, vk::BufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+    AllocatedBuffer create_buffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+    {
+        return create_buffer(allocSize, static_cast<vk::BufferUsageFlags>(usage), memoryUsage);
+    }
+    void immediate_submit(const std::function<void(vk::CommandBuffer cmd)>& function);
 
     void update_draw_image_descriptors();
-    VkExtent2D get_framebuffer_extent() const;
+    vk::Extent2D get_framebuffer_extent() const;
 
-    void draw_background(VkCommandBuffer cmd);
-    void draw_geometry(VkCommandBuffer cmd);
+    void draw_background(vk::CommandBuffer cmd);
+    void draw_geometry(vk::CommandBuffer cmd);
     void update_scene();
 
     void destroy_swapchain();

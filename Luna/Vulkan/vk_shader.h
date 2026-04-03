@@ -1,7 +1,7 @@
 #pragma once
 #include "RHI/shader.h"
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 namespace luna {
 class VulkanShader : public Shader {
@@ -13,6 +13,6 @@ public:
 
 private:
     ShaderType m_type;
-    VkShaderModule m_shaderModule = VK_NULL_HANDLE;
+    vk::ShaderModule m_shaderModule{};
 };
 } // namespace luna

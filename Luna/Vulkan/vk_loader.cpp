@@ -56,47 +56,47 @@ std::string make_node_name(const fastgltf::Node& node, size_t index)
     return "node_" + std::to_string(index);
 }
 
-VkSamplerAddressMode extract_wrap(fastgltf::Wrap wrap)
+vk::SamplerAddressMode extract_wrap(fastgltf::Wrap wrap)
 {
     switch (wrap) {
         case fastgltf::Wrap::ClampToEdge:
-            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            return vk::SamplerAddressMode::eClampToEdge;
         case fastgltf::Wrap::MirroredRepeat:
-            return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+            return vk::SamplerAddressMode::eMirroredRepeat;
         case fastgltf::Wrap::Repeat:
         default:
-            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            return vk::SamplerAddressMode::eRepeat;
     }
 }
 
-VkFilter extract_filter(fastgltf::Filter filter)
+vk::Filter extract_filter(fastgltf::Filter filter)
 {
     switch (filter) {
         case fastgltf::Filter::Nearest:
         case fastgltf::Filter::NearestMipMapNearest:
         case fastgltf::Filter::NearestMipMapLinear:
-            return VK_FILTER_NEAREST;
+            return vk::Filter::eNearest;
         case fastgltf::Filter::Linear:
         case fastgltf::Filter::LinearMipMapNearest:
         case fastgltf::Filter::LinearMipMapLinear:
         default:
-            return VK_FILTER_LINEAR;
+            return vk::Filter::eLinear;
     }
 }
 
-VkSamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
+vk::SamplerMipmapMode extract_mipmap_mode(fastgltf::Filter filter)
 {
     switch (filter) {
         case fastgltf::Filter::NearestMipMapNearest:
         case fastgltf::Filter::LinearMipMapNearest:
-            return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+            return vk::SamplerMipmapMode::eNearest;
         case fastgltf::Filter::NearestMipMapLinear:
         case fastgltf::Filter::LinearMipMapLinear:
-            return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            return vk::SamplerMipmapMode::eLinear;
         case fastgltf::Filter::Nearest:
         case fastgltf::Filter::Linear:
         default:
-            return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            return vk::SamplerMipmapMode::eLinear;
     }
 }
 
@@ -190,7 +190,7 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
                                                           const fastgltf::Asset& asset,
                                                           const fastgltf::DataSource& source,
                                                           const std::filesystem::path& basePath,
-                                                          VkFormat format)
+                                                          vk::Format format)
 {
     if (engine == nullptr) {
         return std::nullopt;
@@ -211,7 +211,11 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
         }
 
         AllocatedImage image =
-            engine->create_image(pixels, VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1}, format, VK_IMAGE_USAGE_SAMPLED_BIT);
+            engine->create_image(
+                pixels,
+                vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                format,
+                vk::ImageUsageFlagBits::eSampled);
         stbi_image_free(pixels);
         return image;
     };
@@ -226,7 +230,10 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
             stbi_uc* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
             if (pixels != nullptr) {
                 AllocatedImage image = engine->create_image(
-                    pixels, VkExtent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1}, format, VK_IMAGE_USAGE_SAMPLED_BIT);
+                    pixels,
+                    vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                    format,
+                    vk::ImageUsageFlagBits::eSampled);
                 stbi_image_free(pixels);
                 return image;
             }
@@ -241,21 +248,23 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
     return decode_memory(bytes.data(), bytes.size());
 }
 
-VkSampler create_sampler(VulkanEngine* engine, const fastgltf::Sampler& sampler)
+vk::Sampler create_sampler(VulkanEngine* engine, const fastgltf::Sampler& sampler)
 {
-    VkSamplerCreateInfo samplerInfo{.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    samplerInfo.magFilter = sampler.magFilter.has_value() ? extract_filter(sampler.magFilter.value()) : VK_FILTER_LINEAR;
-    samplerInfo.minFilter = sampler.minFilter.has_value() ? extract_filter(sampler.minFilter.value()) : VK_FILTER_LINEAR;
+    vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.magFilter =
+        sampler.magFilter.has_value() ? extract_filter(sampler.magFilter.value()) : vk::Filter::eLinear;
+    samplerInfo.minFilter =
+        sampler.minFilter.has_value() ? extract_filter(sampler.minFilter.value()) : vk::Filter::eLinear;
     samplerInfo.mipmapMode =
-        sampler.minFilter.has_value() ? extract_mipmap_mode(sampler.minFilter.value()) : VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        sampler.minFilter.has_value() ? extract_mipmap_mode(sampler.minFilter.value()) : vk::SamplerMipmapMode::eLinear;
     samplerInfo.addressModeU = extract_wrap(sampler.wrapS);
     samplerInfo.addressModeV = extract_wrap(sampler.wrapT);
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
     samplerInfo.minLod = 0.0f;
     samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
 
-    VkSampler newSampler = VK_NULL_HANDLE;
-    VK_CHECK(vkCreateSampler(engine->_device, &samplerInfo, nullptr, &newSampler));
+    vk::Sampler newSampler{};
+    VK_CHECK(engine->_device.createSampler(&samplerInfo, nullptr, &newSampler));
     return newSampler;
 }
 
@@ -389,22 +398,22 @@ void LoadedGLTF::clearAll()
         }
 
         for (auto& buffer : materialDataBuffers) {
-            if (buffer.buffer != VK_NULL_HANDLE && buffer.allocation != VK_NULL_HANDLE) {
+            if (buffer.buffer && buffer.allocation != VK_NULL_HANDLE) {
                 creator->destroy_buffer(buffer);
             }
         }
 
-        for (const VkSampler sampler : samplers) {
-            if (sampler == VK_NULL_HANDLE || sampler == creator->_defaultSamplerLinear ||
+        for (const vk::Sampler sampler : samplers) {
+            if (!sampler || sampler == creator->_defaultSamplerLinear ||
                 sampler == creator->_defaultSamplerNearest) {
                 continue;
             }
 
-            vkDestroySampler(creator->_device, sampler, nullptr);
+            creator->_device.destroySampler(sampler, nullptr);
         }
 
         for (const auto& image : images) {
-            if (image.image == VK_NULL_HANDLE || image.image == creator->_whiteImage.image ||
+            if (!image.image || image.image == creator->_whiteImage.image ||
                 image.image == creator->_blackImage.image || image.image == creator->_greyImage.image ||
                 image.image == creator->_errorCheckerboardImage.image) {
                 continue;
@@ -468,7 +477,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
     for (size_t imageIndex = 0; imageIndex < gltf.images.size(); imageIndex++) {
         const auto& image = gltf.images[imageIndex];
         const auto loadedImage =
-            load_image_from_data_source(engine, gltf, image.data, filePath.parent_path(), VK_FORMAT_R8G8B8A8_SRGB);
+            load_image_from_data_source(engine, gltf, image.data, filePath.parent_path(), vk::Format::eR8G8B8A8Srgb);
         if (loadedImage.has_value()) {
             scene->images[imageIndex] = loadedImage.value();
         } else {
@@ -479,8 +488,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
 
     {
         std::vector<DescriptorAllocator::PoolSizeRatio> materialPoolRatios = {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1.0f},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2.0f},
+            {vk::DescriptorType::eUniformBuffer, 1.0f},
+            {vk::DescriptorType::eCombinedImageSampler, 2.0f},
         };
         scene->materialDescriptorPool.init_pool(
             engine->_device, std::max(1u, static_cast<uint32_t>(gltf.materials.size())), materialPoolRatios);
@@ -500,7 +509,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
                       0.0f);
 
         AllocatedBuffer materialBuffer =
-            engine->create_buffer(sizeof(MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+            engine->create_buffer(
+                sizeof(MaterialConstants), vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
         std::memcpy(materialBuffer.info.pMappedData, &constants, sizeof(MaterialConstants));
         scene->materialDataBuffers.push_back(materialBuffer);
 
@@ -514,7 +524,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
             if (textureInfo.textureIndex < gltf.textures.size()) {
                 const auto& texture = gltf.textures[textureInfo.textureIndex];
                 if (texture.imageIndex.has_value() && texture.imageIndex.value() < scene->images.size() &&
-                    scene->images[texture.imageIndex.value()].image != VK_NULL_HANDLE) {
+                    scene->images[texture.imageIndex.value()].image) {
                     resources.colorImage = scene->images[texture.imageIndex.value()];
                 }
                 if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < scene->samplers.size()) {
@@ -530,7 +540,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
             if (textureInfo.textureIndex < gltf.textures.size()) {
                 const auto& texture = gltf.textures[textureInfo.textureIndex];
                 if (texture.imageIndex.has_value() && texture.imageIndex.value() < scene->images.size() &&
-                    scene->images[texture.imageIndex.value()].image != VK_NULL_HANDLE) {
+                    scene->images[texture.imageIndex.value()].image) {
                     resources.metalRoughImage = scene->images[texture.imageIndex.value()];
                 }
                 if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < scene->samplers.size()) {

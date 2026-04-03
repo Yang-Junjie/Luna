@@ -119,7 +119,7 @@ void Application::renderFrame()
     }
 
     m_engine.draw(
-        [this](VkCommandBuffer commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent) {
+        [this](vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent) {
             if (m_imGuiLayer != nullptr) {
                 m_imGuiLayer->render(commandBuffer, targetImageView, targetExtent);
             }

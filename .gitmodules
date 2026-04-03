@@ -26,3 +26,6 @@
 [submodule "third_party/SPIRV-Cross"]
 	path = third_party/SPIRV-Cross
 	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "third_party/vulkan-hpp"]
+	path = third_party/vulkan-hpp
+	url = https://github.com/KhronosGroup/Vulkan-Hpp.git

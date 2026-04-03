@@ -2,7 +2,7 @@
 
 #include "Core/layer.h"
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 
 struct GLFWwindow;
 
@@ -25,7 +25,7 @@ public:
     void begin();
     void end();
 
-    void render(VkCommandBuffer commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent);
+    void render(vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent);
     void renderPlatformWindows();
 
     void blockEvents(bool block)
@@ -49,7 +49,7 @@ private:
     bool m_blockEvents = true;
     bool m_attached = false;
     bool m_enableMultiViewport = false;
-    VkFormat m_colorAttachmentFormat = VK_FORMAT_UNDEFINED;
+    vk::Format m_colorAttachmentFormat = vk::Format::eUndefined;
     GLFWwindow* m_window = nullptr;
     VulkanEngine* m_engine = nullptr;
 };

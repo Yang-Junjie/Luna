@@ -33,8 +33,8 @@ void ImGuiLayer::onAttach()
         return;
     }
 
-    if (m_window == nullptr || m_engine == nullptr || m_engine->_device == VK_NULL_HANDLE ||
-        m_engine->_swapchainImageFormat == VK_FORMAT_UNDEFINED) {
+    if (m_window == nullptr || m_engine == nullptr || !m_engine->_device ||
+        m_engine->_swapchainImageFormat == vk::Format::eUndefined) {
         LUNA_CORE_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
         return;
     }
@@ -71,11 +71,11 @@ void ImGuiLayer::onAttach()
 
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.ApiVersion = VK_API_VERSION_1_3;
-    initInfo.Instance = m_engine->_instance;
-    initInfo.PhysicalDevice = m_engine->_chosenGPU;
-    initInfo.Device = m_engine->_device;
+    initInfo.Instance = static_cast<VkInstance>(m_engine->_instance);
+    initInfo.PhysicalDevice = static_cast<VkPhysicalDevice>(m_engine->_chosenGPU);
+    initInfo.Device = static_cast<VkDevice>(m_engine->_device);
     initInfo.QueueFamily = m_engine->_graphicsQueueFamily;
-    initInfo.Queue = m_engine->_graphicsQueue;
+    initInfo.Queue = static_cast<VkQueue>(m_engine->_graphicsQueue);
     initInfo.DescriptorPoolSize = kImGuiDescriptorPoolSize;
     initInfo.MinImageCount = imageCount;
     initInfo.ImageCount = imageCount;
@@ -91,7 +91,8 @@ void ImGuiLayer::onAttach()
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
     pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipelineRenderingInfo.colorAttachmentCount = 1;
-    pipelineRenderingInfo.pColorAttachmentFormats = &m_colorAttachmentFormat;
+    const VkFormat colorAttachmentFormat = static_cast<VkFormat>(m_colorAttachmentFormat);
+    pipelineRenderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
     initInfo.PipelineInfoMain.PipelineRenderingCreateInfo = pipelineRenderingInfo;
     initInfo.PipelineInfoForViewports.PipelineRenderingCreateInfo = pipelineRenderingInfo;
 
@@ -113,15 +114,15 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    if (m_engine != nullptr && m_engine->_device != VK_NULL_HANDLE) {
-        vkDeviceWaitIdle(m_engine->_device);
+    if (m_engine != nullptr && m_engine->_device) {
+        VK_CHECK(m_engine->_device.waitIdle());
     }
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    m_colorAttachmentFormat = VK_FORMAT_UNDEFINED;
+    m_colorAttachmentFormat = vk::Format::eUndefined;
     m_attached = false;
 }
 
@@ -161,7 +162,7 @@ void ImGuiLayer::end()
     ImGui::Render();
 }
 
-void ImGuiLayer::render(VkCommandBuffer commandBuffer, VkImageView targetImageView, VkExtent2D targetExtent)
+void ImGuiLayer::render(vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent)
 {
     if (!m_attached) {
         return;
@@ -172,23 +173,21 @@ void ImGuiLayer::render(VkCommandBuffer commandBuffer, VkImageView targetImageVi
         return;
     }
 
-    VkRenderingAttachmentInfo colorAttachment{};
-    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    vk::RenderingAttachmentInfo colorAttachment{};
     colorAttachment.imageView = targetImageView;
-    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    colorAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
+    colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
 
-    VkRenderingInfo renderingInfo{};
-    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    vk::RenderingInfo renderingInfo{};
     renderingInfo.renderArea.extent = targetExtent;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;
 
-    vkCmdBeginRendering(commandBuffer, &renderingInfo);
-    ImGui_ImplVulkan_RenderDrawData(drawData, commandBuffer);
-    vkCmdEndRendering(commandBuffer);
+    commandBuffer.beginRendering(&renderingInfo);
+    ImGui_ImplVulkan_RenderDrawData(drawData, static_cast<VkCommandBuffer>(commandBuffer));
+    commandBuffer.endRendering();
 }
 
 void ImGuiLayer::renderPlatformWindows()
@@ -218,11 +217,11 @@ void ImGuiLayer::checkVulkanResult(VkResult result)
     }
 
     if (result < 0) {
-        LUNA_CORE_FATAL("ImGui Vulkan backend error: {}", string_VkResult(result));
+        LUNA_CORE_FATAL("ImGui Vulkan backend error: {}", vk::to_string(static_cast<vk::Result>(result)));
         std::abort();
     }
 
-    LUNA_CORE_WARN("ImGui Vulkan backend warning: {}", string_VkResult(result));
+    LUNA_CORE_WARN("ImGui Vulkan backend warning: {}", vk::to_string(static_cast<vk::Result>(result)));
 }
 
 void ImGuiLayer::setImGuiWidgetStyle()
