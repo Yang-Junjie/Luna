@@ -9,9 +9,13 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
 
 set(RHI_SOURCE
-    RHI/types.h
-    RHI/shader.h
-    RHI/resource_layout.h)
+    RHI/Types.h
+    RHI/Shader.h
+    RHI/Descriptors.h
+    RHI/CommandContext.h
+    RHI/RHIDevice.h
+    RHI/RHIDevice.cpp
+    RHI/ResourceLayout.h)
 
 set(VULKAN_BACKEND_SOURCE 
     Vulkan/vk_types.h
@@ -47,6 +51,9 @@ add_library(
     Core/log.h
     Core/log.cpp
     Core/mouse_codes.h
+    Core/Paths.h
+    Renderer/RenderService.h
+    Renderer/RenderService.cpp
     Core/timestep.h
     Core/window.h
     Core/window.cpp
@@ -92,6 +99,9 @@ target_compile_definitions(
     LunaCore
     PUBLIC
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
+        LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
+        LUNA_SHADER_ROOT="${PROJECT_SOURCE_DIR}/Shaders"
+        LUNA_ASSET_ROOT="${PROJECT_SOURCE_DIR}/assets"
         VULKAN_HPP_DISABLE_ENHANCED_MODE
         VULKAN_HPP_NO_CONSTRUCTORS
         VULKAN_HPP_NO_EXCEPTIONS

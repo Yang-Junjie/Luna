@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/window.h"
+#include "RHI/Descriptors.h"
 #include "camera.h"
 #include "vk_descriptors.h"
 #include "vk_loader.h"
@@ -67,6 +68,11 @@ struct ComputeEffect {
     ComputePushConstants data;
 };
 
+struct TriangleVertex {
+    float position[2]{};
+    float color[3]{};
+};
+
 struct MaterialConstants {
     glm::vec4 colorFactors{1.0f};
     glm::vec4 metal_rough_factors{1.0f};
@@ -101,6 +107,11 @@ class VulkanEngine {
 public:
     using OverlayRenderFunction = std::function<void(vk::CommandBuffer, vk::ImageView, vk::Extent2D)>;
     using BeforePresentFunction = std::function<void()>;
+    enum class DemoMode : uint8_t {
+        LegacyScene = 0,
+        ClearColor,
+        Triangle
+    };
 
     bool _isInitialized{false};
     int _frameNumber{0};
@@ -115,6 +126,23 @@ public:
     bool init(luna::Window& window);
     void cleanup();
     void draw(const OverlayRenderFunction& overlayRenderer = {}, const BeforePresentFunction& beforePresent = {});
+    void setDemoMode(DemoMode mode)
+    {
+        m_demoMode = mode;
+    }
+    DemoMode getDemoMode() const
+    {
+        return m_demoMode;
+    }
+    void setDemoClearColor(vk::ClearColorValue clearColor)
+    {
+        m_demoClearColor = clearColor;
+    }
+    void setTriangleShaderPaths(std::filesystem::path vertexShaderPath, std::filesystem::path fragmentShaderPath)
+    {
+        m_triangleVertexShaderPath = std::move(vertexShaderPath);
+        m_triangleFragmentShaderPath = std::move(fragmentShaderPath);
+    }
     void request_swapchain_resize()
     {
         resize_requested = true;
@@ -241,8 +269,16 @@ public:
                             static_cast<vk::ImageUsageFlags>(usage),
                             mipmapped);
     }
+    AllocatedBuffer create_buffer(const luna::BufferDesc& desc, const void* initialData = nullptr);
+    AllocatedImage create_image(const luna::ImageDesc& desc, const void* initialData = nullptr);
+    vk::Sampler create_sampler(const luna::SamplerDesc& desc);
     void destroy_image(const AllocatedImage& image);
     void destroy_buffer(const AllocatedBuffer& buffer);
+    bool uploadTriangleVertices(std::span<const TriangleVertex> vertices);
+    uint32_t getTriangleVertexCount() const
+    {
+        return m_triangleVertexCount;
+    }
 
     GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
@@ -278,7 +314,25 @@ private:
 
     void draw_background(vk::CommandBuffer cmd);
     void draw_geometry(vk::CommandBuffer cmd);
+    void draw_triangle(vk::CommandBuffer cmd);
     void update_scene();
 
     void destroy_swapchain();
+
+private:
+    DemoMode m_demoMode = DemoMode::LegacyScene;
+    vk::ClearColorValue m_demoClearColor = [] {
+        vk::ClearColorValue value{};
+        value.float32[0] = 0.08f;
+        value.float32[1] = 0.12f;
+        value.float32[2] = 0.18f;
+        value.float32[3] = 1.0f;
+        return value;
+    }();
+    std::filesystem::path m_triangleVertexShaderPath;
+    std::filesystem::path m_triangleFragmentShaderPath;
+    AllocatedBuffer m_triangleVertexBuffer{};
+    uint32_t m_triangleVertexCount = 0;
+    bool m_loggedBeginFramePass = false;
+    bool m_loggedPresentPass = false;
 };

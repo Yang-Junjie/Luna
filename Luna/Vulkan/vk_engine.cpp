@@ -1,5 +1,6 @@
 #include "vk_engine.h"
 
+#include "Core/Paths.h"
 #include <Core/log.h>
 
 #define GLFW_INCLUDE_NONE
@@ -33,6 +34,118 @@ constexpr bool bUseValidationLayers = false;
 #endif
 
 namespace {
+std::filesystem::path shader_path(std::string_view relativePath)
+{
+    return luna::paths::shader(relativePath);
+}
+
+std::filesystem::path asset_path(std::string_view relativePath)
+{
+    return luna::paths::asset(relativePath);
+}
+
+vk::BufferUsageFlags to_vulkan_buffer_usage(luna::BufferUsage usage)
+{
+    vk::BufferUsageFlags flags{};
+    const uint32_t bits = static_cast<uint32_t>(usage);
+
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::TransferSrc)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eTransferSrc;
+    }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::TransferDst)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eTransferDst;
+    }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::Vertex)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eVertexBuffer;
+    }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::Index)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eIndexBuffer;
+    }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::Uniform)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eUniformBuffer;
+    }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::Storage)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eStorageBuffer;
+    }
+
+    return flags;
+}
+
+vk::ImageUsageFlags to_vulkan_image_usage(luna::ImageUsage usage)
+{
+    vk::ImageUsageFlags flags{};
+    const uint32_t bits = static_cast<uint32_t>(usage);
+
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::TransferSrc)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::TransferDst)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eTransferDst;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::Sampled)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eSampled;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::ColorAttachment)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eColorAttachment;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::DepthStencilAttachment)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ImageUsage::Storage)) != 0) {
+        flags |= vk::ImageUsageFlagBits::eStorage;
+    }
+
+    return flags;
+}
+
+VmaMemoryUsage to_vma_memory_usage(luna::MemoryUsage usage)
+{
+    switch (usage) {
+        case luna::MemoryUsage::Upload:
+            return VMA_MEMORY_USAGE_CPU_TO_GPU;
+        case luna::MemoryUsage::Readback:
+            return VMA_MEMORY_USAGE_GPU_TO_CPU;
+        case luna::MemoryUsage::Default:
+        default:
+            return VMA_MEMORY_USAGE_GPU_ONLY;
+    }
+}
+
+vk::Filter to_vulkan_filter(luna::FilterMode filter)
+{
+    switch (filter) {
+        case luna::FilterMode::Nearest:
+            return vk::Filter::eNearest;
+        case luna::FilterMode::Linear:
+        default:
+            return vk::Filter::eLinear;
+    }
+}
+
+vk::SamplerMipmapMode to_vulkan_mipmap_mode(luna::SamplerMipmapMode mode)
+{
+    switch (mode) {
+        case luna::SamplerMipmapMode::Nearest:
+            return vk::SamplerMipmapMode::eNearest;
+        case luna::SamplerMipmapMode::Linear:
+        default:
+            return vk::SamplerMipmapMode::eLinear;
+    }
+}
+
+vk::SamplerAddressMode to_vulkan_sampler_address_mode(luna::SamplerAddressMode mode)
+{
+    switch (mode) {
+        case luna::SamplerAddressMode::ClampToEdge:
+            return vk::SamplerAddressMode::eClampToEdge;
+        case luna::SamplerAddressMode::MirroredRepeat:
+            return vk::SamplerAddressMode::eMirroredRepeat;
+        case luna::SamplerAddressMode::Repeat:
+        default:
+            return vk::SamplerAddressMode::eRepeat;
+    }
+}
+
 uint32_t pack_rgba8(float r, float g, float b, float a)
 {
     const auto to_u8 = [](float v) -> uint32_t {
@@ -128,12 +241,13 @@ std::vector<DescriptorAllocator::PoolSizeRatio> build_pool_ratios(const Descript
 
 bool load_shader_module_with_fallback(vk::Device device,
                                       vk::ShaderModule* outShaderModule,
-                                      std::initializer_list<const char*> paths,
+                                      std::initializer_list<std::filesystem::path> paths,
                                       const char* stageLabel)
 {
-    for (const char* path : paths) {
-        if (vkutil::load_shader_module(path, device, outShaderModule)) {
-            LUNA_CORE_INFO("Loaded {} shader module from '{}'", stageLabel, path);
+    for (const auto& path : paths) {
+        const std::string pathString = luna::paths::display(path);
+        if (vkutil::load_shader_module(pathString.c_str(), device, outShaderModule)) {
+            LUNA_CORE_INFO("Loaded {} shader module from '{}'", stageLabel, pathString);
             return true;
         }
     }
@@ -144,7 +258,7 @@ bool load_shader_module_with_fallback(vk::Device device,
 
 bool load_shader_module_with_fallback(VkDevice device,
                                       VkShaderModule* outShaderModule,
-                                      std::initializer_list<const char*> paths,
+                                      std::initializer_list<std::filesystem::path> paths,
                                       const char* stageLabel)
 {
     vk::ShaderModule shaderModule{};
@@ -183,31 +297,15 @@ bool render_object_sort(const RenderObject& a, const RenderObject& b)
 
 void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
 {
-    DescriptorLayoutBuilder materialLayoutBuilder;
-    materialLayoutBuilder.add_binding(0, vk::DescriptorType::eUniformBuffer);
-    materialLayoutBuilder.add_binding(1, vk::DescriptorType::eCombinedImageSampler);
-    materialLayoutBuilder.add_binding(2, vk::DescriptorType::eCombinedImageSampler);
-    materialLayout = materialLayoutBuilder.build(engine->_device, vk::ShaderStageFlagBits::eFragment);
-
-    vk::ShaderModule meshFragShader{};
-    vk::ShaderModule meshVertexShader{};
-    const bool loadedFrag = load_shader_module_with_fallback(engine->_device,
-                                                             &meshFragShader,
-                                                             {"../Shaders/Internal/mesh.frag.spv"},
-                                                             "mesh fragment");
-    const bool loadedVert = load_shader_module_with_fallback(engine->_device,
-                                                             &meshVertexShader,
-                                                             {"../Shaders/Internal/mesh.vert.spv"},
-                                                             "mesh vertex");
-    if (!loadedFrag || !loadedVert) {
-        if (meshFragShader) {
-            engine->_device.destroyShaderModule(meshFragShader, nullptr);
-        }
-        if (meshVertexShader) {
-            engine->_device.destroyShaderModule(meshVertexShader, nullptr);
-        }
-        return;
-    }
+    luna::ResourceLayoutDesc materialLayoutDesc{};
+    materialLayoutDesc.debugName = "MaterialLayout";
+    materialLayoutDesc.bindings.push_back(
+        {0, luna::ResourceType::UniformBuffer, 1, luna::ShaderType::Fragment});
+    materialLayoutDesc.bindings.push_back(
+        {1, luna::ResourceType::CombinedImageSampler, 1, luna::ShaderType::Fragment});
+    materialLayoutDesc.bindings.push_back(
+        {2, luna::ResourceType::CombinedImageSampler, 1, luna::ShaderType::Fragment});
+    materialLayout = build_resource_layout(engine->_device, materialLayoutDesc);
 
     vk::PushConstantRange matrixRange{};
     matrixRange.offset = 0;
@@ -227,26 +325,26 @@ void GLTFMetallic_Roughness::build_pipelines(VulkanEngine* engine)
     opaquePipeline.layout = newLayout;
     transparentPipeline.layout = newLayout;
 
-    PipelineBuilder pipelineBuilder;
-    pipelineBuilder.set_shaders(meshVertexShader, meshFragShader);
-    pipelineBuilder.set_input_topology(vk::PrimitiveTopology::eTriangleList);
-    pipelineBuilder.set_polygon_mode(vk::PolygonMode::eFill);
-    pipelineBuilder.set_cull_mode(vk::CullModeFlagBits::eNone, vk::FrontFace::eClockwise);
-    pipelineBuilder.set_multisampling_none();
-    pipelineBuilder.disable_blending();
-    pipelineBuilder.enable_depthtest(true, vk::CompareOp::eLessOrEqual);
-    pipelineBuilder.set_color_attachment_format(engine->_drawImage.imageFormat);
-    pipelineBuilder.set_depth_format(engine->_depthImage.imageFormat);
-    pipelineBuilder._pipelineLayout = newLayout;
+    const std::string meshVertexPath = luna::paths::display(shader_path("Internal/mesh.vert.spv"));
+    const std::string meshFragmentPath = luna::paths::display(shader_path("Internal/mesh.frag.spv"));
 
-    opaquePipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
+    luna::GraphicsPipelineDesc opaquePipelineDesc{};
+    opaquePipelineDesc.debugName = "Mesh pipeline";
+    opaquePipelineDesc.vertexShader = {luna::ShaderType::Vertex, meshVertexPath};
+    opaquePipelineDesc.fragmentShader = {luna::ShaderType::Fragment, meshFragmentPath};
+    opaquePipelineDesc.topology = luna::PrimitiveTopology::TriangleList;
+    opaquePipelineDesc.polygonMode = luna::PolygonMode::Fill;
+    opaquePipelineDesc.cullMode = luna::CullMode::None;
+    opaquePipelineDesc.frontFace = luna::FrontFace::Clockwise;
+    opaquePipelineDesc.colorAttachments.push_back({luna::PixelFormat::RGBA16Float, false});
+    opaquePipelineDesc.depthStencil = {luna::PixelFormat::D32Float, true, true, luna::CompareOp::LessOrEqual};
+    opaquePipeline.pipeline = build_graphics_pipeline(engine->_device, opaquePipelineDesc, newLayout);
 
-    pipelineBuilder.enable_blending_alphablend();
-    pipelineBuilder.enable_depthtest(false, vk::CompareOp::eLessOrEqual);
-    transparentPipeline.pipeline = pipelineBuilder.build_pipeline(engine->_device);
-
-    engine->_device.destroyShaderModule(meshFragShader, nullptr);
-    engine->_device.destroyShaderModule(meshVertexShader, nullptr);
+    luna::GraphicsPipelineDesc transparentPipelineDesc = opaquePipelineDesc;
+    transparentPipelineDesc.debugName = {};
+    transparentPipelineDesc.colorAttachments.front().blendEnabled = true;
+    transparentPipelineDesc.depthStencil.depthWriteEnabled = false;
+    transparentPipeline.pipeline = build_graphics_pipeline(engine->_device, transparentPipelineDesc, newLayout);
 }
 
 void GLTFMetallic_Roughness::clear_resources(vk::Device device)
@@ -283,23 +381,30 @@ MaterialInstance GLTFMetallic_Roughness::write_material(vk::Device device,
     materialInstance.pipeline = pass == MaterialPass::Transparent ? &transparentPipeline : &opaquePipeline;
     materialInstance.materialSet = descriptorAllocator.allocate(device, materialLayout);
 
-    DescriptorWriter writer;
-    writer.write_buffer(0,
-                        resources.dataBuffer.buffer,
-                        sizeof(MaterialConstants),
-                        resources.dataBufferOffset,
-                        vk::DescriptorType::eUniformBuffer);
-    writer.write_image(1,
-                       resources.colorImage.imageView,
-                       resources.colorSampler,
-                       vk::ImageLayout::eShaderReadOnlyOptimal,
-                       vk::DescriptorType::eCombinedImageSampler);
-    writer.write_image(2,
-                       resources.metalRoughImage.imageView,
-                       resources.metalRoughSampler,
-                       vk::ImageLayout::eShaderReadOnlyOptimal,
-                       vk::DescriptorType::eCombinedImageSampler);
-    writer.update_set(device, materialInstance.materialSet);
+    VulkanResourceBindingRegistry bindingRegistry;
+    const luna::BufferHandle materialBuffer = bindingRegistry.register_buffer(resources.dataBuffer.buffer);
+    const luna::ImageHandle colorImage = bindingRegistry.register_image_view(resources.colorImage.imageView);
+    const luna::SamplerHandle colorSampler = bindingRegistry.register_sampler(resources.colorSampler);
+    const luna::ImageHandle metalRoughImage = bindingRegistry.register_image_view(resources.metalRoughImage.imageView);
+    const luna::SamplerHandle metalRoughSampler = bindingRegistry.register_sampler(resources.metalRoughSampler);
+
+    luna::ResourceSetWriteDesc materialWrite{};
+    materialWrite.buffers.push_back(
+        {0, materialBuffer, resources.dataBufferOffset, sizeof(MaterialConstants), luna::ResourceType::UniformBuffer});
+    materialWrite.images.push_back({1, colorImage, colorSampler, luna::ResourceType::CombinedImageSampler});
+    materialWrite.images.push_back({2, metalRoughImage, metalRoughSampler, luna::ResourceType::CombinedImageSampler});
+
+    const bool updated = update_resource_set(device, bindingRegistry, materialInstance.materialSet, materialWrite);
+
+    bindingRegistry.unregister_buffer(materialBuffer);
+    bindingRegistry.unregister_image_view(colorImage);
+    bindingRegistry.unregister_sampler(colorSampler);
+    bindingRegistry.unregister_image_view(metalRoughImage);
+    bindingRegistry.unregister_sampler(metalRoughSampler);
+
+    if (!updated) {
+        LUNA_CORE_ERROR("Failed to update material resource bindings via RHI");
+    }
 
     return materialInstance;
 }
@@ -317,6 +422,10 @@ bool VulkanEngine::init(luna::Window& window)
     }
 
     loadedEngine = this;
+    _frameNumber = 0;
+    resize_requested = false;
+    m_loggedBeginFramePass = false;
+    m_loggedPresentPass = false;
     LUNA_CORE_INFO("Initializing Vulkan engine");
 
     _window = static_cast<GLFWwindow*>(window.getNativeWindow());
@@ -349,6 +458,10 @@ bool VulkanEngine::init(luna::Window& window)
 
 void VulkanEngine::init_default_data()
 {
+    if (m_demoMode != DemoMode::LegacyScene) {
+        return;
+    }
+
     mainCamera.position = glm::vec3(0.0f, 0.0f, 5.0f);
     mainCamera.pitch = 0.0f;
     mainCamera.yaw = 0.0f;
@@ -357,12 +470,19 @@ void VulkanEngine::init_default_data()
     uint32_t grey = pack_rgba8(0.66f, 0.66f, 0.66f, 1.0f);
     uint32_t black = pack_rgba8(0.0f, 0.0f, 0.0f, 0.0f);
 
-    _whiteImage = create_image(
-        &white, vk::Extent3D{1, 1, 1}, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled);
-    _greyImage =
-        create_image(&grey, vk::Extent3D{1, 1, 1}, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled);
-    _blackImage = create_image(
-        &black, vk::Extent3D{1, 1, 1}, vk::Format::eR8G8B8A8Unorm, vk::ImageUsageFlagBits::eSampled);
+    const luna::ImageDesc defaultTextureDesc{
+        .width = 1,
+        .height = 1,
+        .depth = 1,
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .format = luna::PixelFormat::RGBA8Unorm,
+        .usage = luna::ImageUsage::Sampled,
+        .debugName = "DefaultTexture",
+    };
+    _whiteImage = create_image(defaultTextureDesc, &white);
+    _greyImage = create_image(defaultTextureDesc, &grey);
+    _blackImage = create_image(defaultTextureDesc, &black);
 
     std::array<uint32_t, 16 * 16> pixels;
     for (uint32_t x = 0; x < 16; x++) {
@@ -370,25 +490,51 @@ void VulkanEngine::init_default_data()
             pixels[y * 16 + x] = (x % 2 == y % 2) ? 0xFF000000 : 0xFFFF00FF;
         }
     }
-    _errorCheckerboardImage = create_image(
-        pixels.data(), VkExtent3D{16, 16, 1}, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    const luna::ImageDesc errorTextureDesc{
+        .width = 16,
+        .height = 16,
+        .depth = 1,
+        .mipLevels = 1,
+        .arrayLayers = 1,
+        .format = luna::PixelFormat::RGBA8Unorm,
+        .usage = luna::ImageUsage::Sampled,
+        .debugName = "ErrorCheckerboard",
+    };
+    _errorCheckerboardImage = create_image(errorTextureDesc, pixels.data());
 
-    vk::SamplerCreateInfo sampl{};
-    sampl.magFilter = vk::Filter::eNearest;
-    sampl.minFilter = vk::Filter::eNearest;
-    VK_CHECK(_device.createSampler(&sampl, nullptr, &_defaultSamplerNearest));
+    const luna::SamplerDesc nearestSamplerDesc{
+        .magFilter = luna::FilterMode::Nearest,
+        .minFilter = luna::FilterMode::Nearest,
+        .mipmapMode = luna::SamplerMipmapMode::Nearest,
+        .addressModeU = luna::SamplerAddressMode::Repeat,
+        .addressModeV = luna::SamplerAddressMode::Repeat,
+        .addressModeW = luna::SamplerAddressMode::Repeat,
+        .debugName = "DefaultNearestSampler",
+    };
+    _defaultSamplerNearest = create_sampler(nearestSamplerDesc);
 
-    sampl.magFilter = vk::Filter::eLinear;
-    sampl.minFilter = vk::Filter::eLinear;
-    VK_CHECK(_device.createSampler(&sampl, nullptr, &_defaultSamplerLinear));
+    const luna::SamplerDesc linearSamplerDesc{
+        .magFilter = luna::FilterMode::Linear,
+        .minFilter = luna::FilterMode::Linear,
+        .mipmapMode = luna::SamplerMipmapMode::Linear,
+        .addressModeU = luna::SamplerAddressMode::Repeat,
+        .addressModeV = luna::SamplerAddressMode::Repeat,
+        .addressModeW = luna::SamplerAddressMode::Repeat,
+        .debugName = "DefaultLinearSampler",
+    };
+    _defaultSamplerLinear = create_sampler(linearSamplerDesc);
 
     MaterialConstants materialConstants{};
     materialConstants.colorFactors = glm::vec4(1.0f);
     materialConstants.metal_rough_factors = glm::vec4(1.0f);
 
-    AllocatedBuffer materialConstantsBuffer =
-        create_buffer(sizeof(MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    std::memcpy(materialConstantsBuffer.info.pMappedData, &materialConstants, sizeof(MaterialConstants));
+    const luna::BufferDesc materialConstantsDesc{
+        .size = sizeof(MaterialConstants),
+        .usage = luna::BufferUsage::Uniform,
+        .memoryUsage = luna::MemoryUsage::Upload,
+        .debugName = "DefaultMaterialConstants",
+    };
+    AllocatedBuffer materialConstantsBuffer = create_buffer(materialConstantsDesc, &materialConstants);
 
     MaterialResources materialResources{};
     materialResources.colorImage = _whiteImage;
@@ -421,7 +567,7 @@ void VulkanEngine::init_default_data()
         }
     });
 
-    auto loadedScene = loadGltf(this, "../assets/basicmesh.glb");
+    auto loadedScene = loadGltf(this, asset_path("basicmesh.glb"));
     if (!loadedScene.has_value()) {
         LUNA_CORE_WARN("Falling back to empty scene set because basicmesh.glb failed to load");
         return;
@@ -480,6 +626,22 @@ void VulkanEngine::cleanup()
             _immContext._fence = VK_NULL_HANDLE;
         }
 
+        if (m_triangleVertexBuffer.buffer != VK_NULL_HANDLE) {
+            destroy_buffer(m_triangleVertexBuffer);
+            m_triangleVertexBuffer = {};
+            m_triangleVertexCount = 0;
+        }
+
+        if (_trianglePipeline != VK_NULL_HANDLE) {
+            _device.destroyPipeline(_trianglePipeline, nullptr);
+            _trianglePipeline = VK_NULL_HANDLE;
+        }
+
+        if (_trianglePipelineLayout != VK_NULL_HANDLE) {
+            _device.destroyPipelineLayout(_trianglePipelineLayout, nullptr);
+            _trianglePipelineLayout = VK_NULL_HANDLE;
+        }
+
         destroy_swapchain();
         destroy_draw_resources();
         _mainDeletionQueue.flush();
@@ -530,12 +692,19 @@ void VulkanEngine::cleanup()
     loadedEngine = nullptr;
 
     LUNA_CORE_INFO("Vulkan engine cleanup complete");
+    LUNA_CORE_INFO("RHI shutdown complete");
 }
 
 void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const BeforePresentFunction& beforePresent)
 {
     if (_device == VK_NULL_HANDLE || _swapchain == VK_NULL_HANDLE) {
         LUNA_CORE_WARN("Skipping frame because Vulkan device or swapchain is not ready");
+        return;
+    }
+
+    const vk::Extent2D framebufferExtent = get_framebuffer_extent();
+    if (framebufferExtent.width == 0 || framebufferExtent.height == 0) {
+        resize_requested = true;
         return;
     }
 
@@ -586,6 +755,10 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     update_scene();
 
     VK_CHECK(cmd.begin(&cmdBeginInfo));
+    if (!m_loggedBeginFramePass) {
+        LUNA_CORE_INFO("BeginFrame PASS");
+        m_loggedBeginFramePass = true;
+    }
 
     // transition our main draw image into general layout so we can write into it
     vkutil::transition_image(cmd, _drawImage.image, _drawImageLayout, VK_IMAGE_LAYOUT_GENERAL);
@@ -666,8 +839,17 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     } else if (presentResult != vk::Result::eSuccess) {
         LUNA_CORE_FATAL("Vulkan call failed: vkQueuePresentKHR returned {}", vk::to_string(presentResult));
         std::abort();
-    } else if (recreateAfterPresent) {
-        resize_requested = true;
+    } else {
+        if (!m_loggedPresentPass) {
+            LUNA_CORE_INFO("Present PASS");
+            if (m_demoMode == DemoMode::LegacyScene) {
+                LUNA_CORE_INFO("Acquire/Present via RHI PASS");
+            }
+            m_loggedPresentPass = true;
+        }
+        if (recreateAfterPresent) {
+            resize_requested = true;
+        }
     }
 
     _frameNumber++;
@@ -710,6 +892,7 @@ bool VulkanEngine::init_vulkan()
         return false;
     }
     _surface = rawSurface;
+    LUNA_CORE_INFO("Surface created");
 
     VkPhysicalDeviceVulkan13Features features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
     features.dynamicRendering = true;
@@ -761,6 +944,7 @@ bool VulkanEngine::init_vulkan()
 
     VkPhysicalDeviceProperties gpuProperties{};
     vkGetPhysicalDeviceProperties(_chosenGPU, &gpuProperties);
+    LUNA_CORE_INFO("Backend=Vulkan, GPU={}, GraphicsQueueFamily={}", gpuProperties.deviceName, _graphicsQueueFamily);
     LUNA_CORE_INFO("Selected GPU: {}", gpuProperties.deviceName);
 
     VmaAllocatorCreateInfo allocatorInfo = {};
@@ -836,12 +1020,22 @@ bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
                    _swapchainExtent.width,
                    _swapchainExtent.height,
                    _swapchainImages.size());
+    LUNA_CORE_INFO("Swapchain created, Format={}, Extent={}x{}",
+                   string_VkFormat(_swapchainImageFormat),
+                   _swapchainExtent.width,
+                   _swapchainExtent.height);
 
     return true;
 }
 
 void VulkanEngine::draw_background(vk::CommandBuffer cmd)
 {
+    if (m_demoMode == DemoMode::ClearColor || m_demoMode == DemoMode::Triangle) {
+        const vk::ImageSubresourceRange colorRange =
+            vkinit::image_subresource_range(vk::ImageAspectFlagBits::eColor);
+        cmd.clearColorImage(_drawImage.image, vk::ImageLayout::eGeneral, &m_demoClearColor, 1, &colorRange);
+        return;
+    }
 
     ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
 
@@ -857,6 +1051,15 @@ void VulkanEngine::draw_background(vk::CommandBuffer cmd)
 
 void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
 {
+    if (m_demoMode == DemoMode::Triangle) {
+        draw_triangle(cmd);
+        return;
+    }
+
+    if (m_demoMode == DemoMode::ClearColor) {
+        return;
+    }
+
     // begin a render pass  connected to our draw image
     vk::RenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -888,9 +1091,13 @@ void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
 
     cmd.setScissor(0, 1, &scissor);
 
-    AllocatedBuffer sceneDataBuffer =
-        create_buffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-    std::memcpy(sceneDataBuffer.info.pMappedData, &sceneData, sizeof(GPUSceneData));
+    const luna::BufferDesc sceneDataDesc{
+        .size = sizeof(GPUSceneData),
+        .usage = luna::BufferUsage::Uniform,
+        .memoryUsage = luna::MemoryUsage::Upload,
+        .debugName = "SceneDataBuffer",
+    };
+    AllocatedBuffer sceneDataBuffer = create_buffer(sceneDataDesc, &sceneData);
 
     get_current_frame()._deletionQueue.push_function([=, this]() {
         destroy_buffer(sceneDataBuffer);
@@ -899,9 +1106,16 @@ void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
     const vk::DescriptorSet globalDescriptor =
         get_current_frame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
 
-    DescriptorWriter writer;
-    writer.write_buffer(0, sceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    writer.update_set(_device, globalDescriptor);
+    VulkanResourceBindingRegistry bindingRegistry;
+    const luna::BufferHandle sceneBufferHandle = bindingRegistry.register_buffer(sceneDataBuffer.buffer);
+
+    luna::ResourceSetWriteDesc globalWrite{};
+    globalWrite.buffers.push_back({0, sceneBufferHandle, 0, sizeof(GPUSceneData), luna::ResourceType::UniformBuffer});
+    const bool updatedGlobalBindings = update_resource_set(_device, bindingRegistry, globalDescriptor, globalWrite);
+    bindingRegistry.unregister_buffer(sceneBufferHandle);
+    if (!updatedGlobalBindings) {
+        LUNA_CORE_ERROR("Failed to update global scene bindings via RHI");
+    }
 
     std::sort(mainDrawContext.opaqueSurfaces.begin(), mainDrawContext.opaqueSurfaces.end(), render_object_sort);
 
@@ -954,6 +1168,44 @@ void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
     draw_objects(mainDrawContext.opaqueSurfaces);
     draw_objects(mainDrawContext.transparentSurfaces);
 
+    cmd.endRendering();
+}
+
+void VulkanEngine::draw_triangle(vk::CommandBuffer cmd)
+{
+    if (!_trianglePipeline || !m_triangleVertexBuffer.buffer || m_triangleVertexCount == 0) {
+        return;
+    }
+
+    vk::RenderingAttachmentInfo colorAttachment =
+        vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    vk::RenderingAttachmentInfo depthAttachment =
+        vkinit::depth_attachment_info(_depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+
+    vkutil::transition_image(cmd, _depthImage.image, _depthImageLayout, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+    _depthImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+
+    vk::RenderingInfo renderInfo = vkinit::rendering_info(_drawExtent, &colorAttachment, &depthAttachment);
+    cmd.beginRendering(&renderInfo);
+
+    vk::Viewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(_drawExtent.width);
+    viewport.height = static_cast<float>(_drawExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    cmd.setViewport(0, 1, &viewport);
+
+    vk::Rect2D scissor{};
+    scissor.offset = vk::Offset2D{0, 0};
+    scissor.extent = _drawExtent;
+    cmd.setScissor(0, 1, &scissor);
+
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, _trianglePipeline);
+    const vk::DeviceSize vertexOffset = 0;
+    cmd.bindVertexBuffers(0, 1, &m_triangleVertexBuffer.buffer, &vertexOffset);
+    cmd.draw(m_triangleVertexCount, 1, 0, 0);
     cmd.endRendering();
 }
 
@@ -1106,11 +1358,15 @@ bool VulkanEngine::init_sync_structures()
 
 bool VulkanEngine::init_descriptors()
 {
+    if (m_demoMode != DemoMode::LegacyScene) {
+        return true;
+    }
+
     DescriptorLayoutBuilder builder;
     if (!reflect_shader_bindings(
-            "../Shaders/Internal/gradient.spv", luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT, builder) ||
+            shader_path("Internal/gradient.spv"), luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT, builder) ||
         !reflect_shader_bindings(
-            "../Shaders/Internal/sky.spv", luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT, builder)) {
+            shader_path("Internal/sky.spv"), luna::ShaderType::Compute, VK_SHADER_STAGE_COMPUTE_BIT, builder)) {
         return false;
     }
 
@@ -1143,10 +1399,11 @@ bool VulkanEngine::init_descriptors()
         return false;
     }
 
-    DescriptorLayoutBuilder sceneDataBuilder;
-    sceneDataBuilder.add_binding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    _gpuSceneDataDescriptorLayout =
-        sceneDataBuilder.build(_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    luna::ResourceLayoutDesc globalLayoutDesc{};
+    globalLayoutDesc.debugName = "GlobalLayout";
+    globalLayoutDesc.bindings.push_back(
+        {0, luna::ResourceType::UniformBuffer, 1, luna::ShaderType::Vertex | luna::ShaderType::Fragment});
+    _gpuSceneDataDescriptorLayout = build_resource_layout(_device, globalLayoutDesc);
 
     std::array<DescriptorAllocatorGrowable::PoolSizeRatio, 2> frameSizes = {
         DescriptorAllocatorGrowable::PoolSizeRatio{vk::DescriptorType::eUniformBuffer, 3.f},
@@ -1188,24 +1445,51 @@ bool VulkanEngine::init_descriptors()
 bool VulkanEngine::init_pipelines()
 {
     init_triangle_pipeline();
+    if (m_demoMode != DemoMode::LegacyScene) {
+        return true;
+    }
+
     init_mesh_pipeline();
     return init_background_pipelines();
 }
 
 void VulkanEngine::init_triangle_pipeline()
 {
+    auto resolve_triangle_shader_path = [&](const std::filesystem::path& overridePath,
+                                            std::string_view fallbackRelativePath) -> std::filesystem::path {
+        if (!overridePath.empty()) {
+            return overridePath.lexically_normal();
+        }
+
+        return shader_path(fallbackRelativePath);
+    };
+
     vk::ShaderModule triangleFragShader{};
-    if (!vkutil::load_shader_module("../Shaders/Internal/colored_triangle.frag.spv", _device, &triangleFragShader)) {
+    const std::string triangleFragmentPath =
+        luna::paths::display(resolve_triangle_shader_path(m_triangleFragmentShaderPath, "Internal/colored_triangle.frag.spv"));
+    if (!vkutil::load_shader_module(triangleFragmentPath.c_str(), _device, &triangleFragShader)) {
         LUNA_CORE_ERROR("Error when building the triangle fragment shader module");
     } else {
         LUNA_CORE_INFO("Triangle fragment shader succesfully loaded");
     }
 
     vk::ShaderModule triangleVertexShader{};
-    if (!vkutil::load_shader_module("../Shaders/Internal/colored_triangle.vert.spv", _device, &triangleVertexShader)) {
+    const std::string triangleVertexPath =
+        luna::paths::display(resolve_triangle_shader_path(m_triangleVertexShaderPath, "Internal/colored_triangle.vert.spv"));
+    if (!vkutil::load_shader_module(triangleVertexPath.c_str(), _device, &triangleVertexShader)) {
         LUNA_CORE_ERROR("Error when building the triangle vertex shader module");
     } else {
         LUNA_CORE_INFO("Triangle vertex shader succesfully loaded");
+    }
+
+    if (!triangleFragShader || !triangleVertexShader) {
+        if (triangleFragShader) {
+            _device.destroyShaderModule(triangleFragShader, nullptr);
+        }
+        if (triangleVertexShader) {
+            _device.destroyShaderModule(triangleVertexShader, nullptr);
+        }
+        return;
     }
 
     // build the pipeline layout that controls the inputs/outputs of the shader
@@ -1219,6 +1503,17 @@ void VulkanEngine::init_triangle_pipeline()
     pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
     // connecting the vertex and pixel shaders to the pipeline
     pipelineBuilder.set_shaders(triangleVertexShader, triangleFragShader);
+    const bool usesCustomTriangleShaders = !m_triangleVertexShaderPath.empty() || !m_triangleFragmentShaderPath.empty();
+    if (usesCustomTriangleShaders) {
+        const vk::VertexInputBindingDescription vertexBinding{
+            0, static_cast<uint32_t>(sizeof(TriangleVertex)), vk::VertexInputRate::eVertex};
+        const std::array<vk::VertexInputAttributeDescription, 2> vertexAttributes = {
+            vk::VertexInputAttributeDescription{0, 0, vk::Format::eR32G32Sfloat, offsetof(TriangleVertex, position)},
+            vk::VertexInputAttributeDescription{1, 0, vk::Format::eR32G32B32Sfloat, offsetof(TriangleVertex, color)},
+        };
+        pipelineBuilder.set_vertex_input(std::span<const vk::VertexInputBindingDescription>(&vertexBinding, 1),
+                                         std::span<const vk::VertexInputAttributeDescription>(vertexAttributes));
+    }
     // it will draw triangles
     pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
     // filled triangles
@@ -1229,8 +1524,8 @@ void VulkanEngine::init_triangle_pipeline()
     pipelineBuilder.set_multisampling_none();
     // no blending
     pipelineBuilder.disable_blending();
-    // no depth testing
-    pipelineBuilder.enable_depthtest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+    // this demo triangle does not need depth testing
+    pipelineBuilder.disable_depthtest();
 
     // connect the image format we will draw into, from draw image
     pipelineBuilder.set_color_attachment_format(_drawImage.imageFormat);
@@ -1238,15 +1533,13 @@ void VulkanEngine::init_triangle_pipeline()
 
     // finally build the pipeline
     _trianglePipeline = pipelineBuilder.build_pipeline(_device);
+    if (_trianglePipeline) {
+        LUNA_CORE_INFO("Graphics pipeline created: Triangle");
+    }
 
     // clean structures
     _device.destroyShaderModule(triangleFragShader, nullptr);
     _device.destroyShaderModule(triangleVertexShader, nullptr);
-
-    _mainDeletionQueue.push_function([&]() {
-        _device.destroyPipelineLayout(_trianglePipelineLayout, nullptr);
-        _device.destroyPipeline(_trianglePipeline, nullptr);
-    });
 }
 
 void VulkanEngine::init_mesh_pipeline()
@@ -1275,9 +1568,11 @@ bool VulkanEngine::init_background_pipelines()
     VK_CHECK(_device.createPipelineLayout(&computeLayout, nullptr, &_gradientPipelineLayout));
 
     vk::ShaderModule computeDrawShader{};
-    vkutil::load_shader_module("../Shaders/Internal/gradient.spv", _device, &computeDrawShader);
+    const std::string gradientShaderPath = luna::paths::display(shader_path("Internal/gradient.spv"));
+    vkutil::load_shader_module(gradientShaderPath.c_str(), _device, &computeDrawShader);
     vk::ShaderModule skyShader{};
-    vkutil::load_shader_module("../Shaders/Internal/sky.spv", _device, &skyShader);
+    const std::string skyShaderPath = luna::paths::display(shader_path("Internal/sky.spv"));
+    vkutil::load_shader_module(skyShaderPath.c_str(), _device, &skyShader);
 
     vk::ComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.layout = _gradientPipelineLayout;
@@ -1340,9 +1635,15 @@ bool VulkanEngine::resize_swapchain()
                    framebufferExtent.width,
                    framebufferExtent.height);
     VK_CHECK(vkDeviceWaitIdle(_device));
+    destroy_draw_resources();
     destroy_swapchain();
     if (!create_swapchain(framebufferExtent.width, framebufferExtent.height)) {
         LUNA_CORE_ERROR("Swapchain recreation failed");
+        return false;
+    }
+
+    if (!create_draw_resources(framebufferExtent)) {
+        LUNA_CORE_ERROR("Draw resource recreation failed");
         return false;
     }
 
@@ -1351,6 +1652,7 @@ bool VulkanEngine::resize_swapchain()
     }
 
     resize_requested = false;
+    LUNA_CORE_INFO("Swapchain recreated");
     return true;
 }
 
@@ -1374,6 +1676,9 @@ bool VulkanEngine::create_draw_resources(vk::Extent2D extent)
 
     LUNA_CORE_INFO(
         "Created draw image: {}x{}, format={}", extent.width, extent.height, string_VkFormat(_drawImage.imageFormat));
+    if (m_demoMode == DemoMode::LegacyScene) {
+        LUNA_CORE_INFO("Offscreen color/depth images created via RHI: {}x{}", extent.width, extent.height);
+    }
     return true;
 }
 
@@ -1521,6 +1826,66 @@ void VulkanEngine::destroy_image(const AllocatedImage& image)
     }
 }
 
+AllocatedBuffer VulkanEngine::create_buffer(const luna::BufferDesc& desc, const void* initialData)
+{
+    AllocatedBuffer buffer = create_buffer(
+        static_cast<size_t>(desc.size), to_vulkan_buffer_usage(desc.usage), to_vma_memory_usage(desc.memoryUsage));
+
+    if (initialData == nullptr || desc.size == 0) {
+        return buffer;
+    }
+
+    if (buffer.info.pMappedData != nullptr) {
+        std::memcpy(buffer.info.pMappedData, initialData, static_cast<size_t>(desc.size));
+        return buffer;
+    }
+
+    AllocatedBuffer stagingBuffer =
+        create_buffer(static_cast<size_t>(desc.size), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    std::memcpy(stagingBuffer.info.pMappedData, initialData, static_cast<size_t>(desc.size));
+
+    immediate_submit([&](vk::CommandBuffer cmd) {
+        vk::BufferCopy copy{};
+        copy.srcOffset = 0;
+        copy.dstOffset = 0;
+        copy.size = static_cast<vk::DeviceSize>(desc.size);
+        cmd.copyBuffer(stagingBuffer.buffer, buffer.buffer, 1, &copy);
+    });
+
+    destroy_buffer(stagingBuffer);
+    return buffer;
+}
+
+AllocatedImage VulkanEngine::create_image(const luna::ImageDesc& desc, const void* initialData)
+{
+    const vk::Extent3D extent{desc.width, desc.height, desc.depth};
+    const vk::Format format = to_vulkan_format(desc.format);
+    const vk::ImageUsageFlags usage = to_vulkan_image_usage(desc.usage);
+
+    if (initialData == nullptr) {
+        return create_image(extent, format, usage, desc.mipLevels > 1);
+    }
+
+    return create_image(const_cast<void*>(initialData), extent, format, usage, desc.mipLevels > 1);
+}
+
+vk::Sampler VulkanEngine::create_sampler(const luna::SamplerDesc& desc)
+{
+    vk::SamplerCreateInfo samplerInfo{};
+    samplerInfo.magFilter = to_vulkan_filter(desc.magFilter);
+    samplerInfo.minFilter = to_vulkan_filter(desc.minFilter);
+    samplerInfo.mipmapMode = to_vulkan_mipmap_mode(desc.mipmapMode);
+    samplerInfo.addressModeU = to_vulkan_sampler_address_mode(desc.addressModeU);
+    samplerInfo.addressModeV = to_vulkan_sampler_address_mode(desc.addressModeV);
+    samplerInfo.addressModeW = to_vulkan_sampler_address_mode(desc.addressModeW);
+    samplerInfo.minLod = desc.minLod;
+    samplerInfo.maxLod = desc.maxLod;
+
+    vk::Sampler sampler{};
+    VK_CHECK(_device.createSampler(&samplerInfo, nullptr, &sampler));
+    return sampler;
+}
+
 AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, vk::BufferUsageFlags usage, VmaMemoryUsage memoryUsage)
 {
     // allocate buffer
@@ -1545,6 +1910,48 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, vk::BufferUsageFla
 void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 {
     vmaDestroyBuffer(_allocator, static_cast<VkBuffer>(buffer.buffer), buffer.allocation);
+}
+
+bool VulkanEngine::uploadTriangleVertices(std::span<const TriangleVertex> vertices)
+{
+    if (_device == VK_NULL_HANDLE || _allocator == VK_NULL_HANDLE) {
+        LUNA_CORE_ERROR("Cannot upload triangle vertices because Vulkan device is not initialized");
+        return false;
+    }
+
+    if (vertices.empty()) {
+        LUNA_CORE_ERROR("Triangle vertex upload requires at least one vertex");
+        return false;
+    }
+
+    if (m_triangleVertexBuffer.buffer != VK_NULL_HANDLE) {
+        destroy_buffer(m_triangleVertexBuffer);
+        m_triangleVertexBuffer = {};
+        m_triangleVertexCount = 0;
+    }
+
+    const size_t vertexBufferSize = vertices.size() * sizeof(TriangleVertex);
+    AllocatedBuffer stagingBuffer =
+        create_buffer(vertexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    std::memcpy(stagingBuffer.info.pMappedData, vertices.data(), vertexBufferSize);
+
+    m_triangleVertexBuffer =
+        create_buffer(vertexBufferSize,
+                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                      VMA_MEMORY_USAGE_GPU_ONLY);
+
+    immediate_submit([&](vk::CommandBuffer cmd) {
+        vk::BufferCopy vertexCopy{};
+        vertexCopy.srcOffset = 0;
+        vertexCopy.dstOffset = 0;
+        vertexCopy.size = vertexBufferSize;
+        cmd.copyBuffer(stagingBuffer.buffer, m_triangleVertexBuffer.buffer, 1, &vertexCopy);
+    });
+
+    destroy_buffer(stagingBuffer);
+    m_triangleVertexCount = static_cast<uint32_t>(vertices.size());
+    LUNA_CORE_INFO("Uploaded {} vertices", m_triangleVertexCount);
+    return true;
 }
 
 void VulkanEngine::immediate_submit(const std::function<void(vk::CommandBuffer cmd)>& function)
@@ -1616,6 +2023,9 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
     });
 
     destroy_buffer(staging);
+    if (m_demoMode == DemoMode::LegacyScene) {
+        LUNA_CORE_INFO("Mesh buffers uploaded via RHI: vertices={}, indices={}", vertices.size(), indices.size());
+    }
 
     return newSurface;
 }

@@ -1,5 +1,5 @@
 #pragma once
-#include "RHI/shader.h"
+#include "RHI/Shader.h"
 
 #include <vulkan/vulkan.hpp>
 

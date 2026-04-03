@@ -1,4 +1,5 @@
 #pragma once
+#include "RHI/Descriptors.h"
 #include "vk_types.h"
 
 namespace vkutil {
@@ -18,6 +19,8 @@ inline bool load_shader_module(const char* filePath, VkDevice device, VkShaderMo
 class PipelineBuilder {
 public:
     std::vector<vk::PipelineShaderStageCreateInfo> _shaderStages;
+    std::vector<vk::VertexInputBindingDescription> _vertexInputBindings;
+    std::vector<vk::VertexInputAttributeDescription> _vertexInputAttributes;
 
     vk::PipelineInputAssemblyStateCreateInfo _inputAssembly;
     vk::PipelineRasterizationStateCreateInfo _rasterizer;
@@ -40,6 +43,8 @@ public:
     {
         set_shaders(vk::ShaderModule(vertexShader), vk::ShaderModule(fragmentShader));
     }
+    void set_vertex_input(std::span<const vk::VertexInputBindingDescription> bindings,
+                          std::span<const vk::VertexInputAttributeDescription> attributes);
     void set_input_topology(vk::PrimitiveTopology topology);
     void set_input_topology(VkPrimitiveTopology topology)
     {
@@ -78,3 +83,15 @@ public:
 
     vk::Pipeline build_pipeline(vk::Device device);
 };
+
+vk::Format to_vulkan_format(luna::PixelFormat format);
+vk::PrimitiveTopology to_vulkan_topology(luna::PrimitiveTopology topology);
+vk::PolygonMode to_vulkan_polygon_mode(luna::PolygonMode mode);
+vk::CullModeFlags to_vulkan_cull_mode(luna::CullMode mode);
+vk::FrontFace to_vulkan_front_face(luna::FrontFace frontFace);
+vk::CompareOp to_vulkan_compare_op(luna::CompareOp compareOp);
+vk::Format to_vulkan_vertex_format(luna::VertexFormat format);
+
+vk::Pipeline build_graphics_pipeline(vk::Device device,
+                                     const luna::GraphicsPipelineDesc& desc,
+                                     vk::PipelineLayout layout);

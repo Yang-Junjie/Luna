@@ -2,13 +2,14 @@
 #include "Events/application_event.h"
 #include "Events/event.h"
 #include "Imgui/ImGuiLayer.hpp"
+#include "Renderer/RenderService.h"
 #include "layer.h"
 #include "layer_stack.h"
 #include "timestep.h"
-#include "Vulkan/vk_engine.h"
 #include "window.h"
 
 #include <memory>
+#include <array>
 #include <string>
 
 namespace luna {
@@ -17,7 +18,9 @@ struct ApplicationSpecification {
     std::string name = "Luna";
     uint32_t windowWidth = 1'600, windowHeight = 900;
     bool maximized = false;
+    bool enableImGui = true;
     bool enableMultiViewport = false;
+    RenderServiceSpecification renderService;
 };
 
 class Application {
@@ -56,9 +59,14 @@ public:
     }
 
     // temporary
+    RenderService& getRenderService()
+    {
+        return m_renderService;
+    }
+
     VulkanEngine& getEngine()
     {
-        return m_engine;
+        return m_renderService.requireNativeVulkanEngine();
     }
 
 protected:
@@ -81,7 +89,7 @@ private:
 
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
-    VulkanEngine m_engine;
+    RenderService m_renderService;
 
     std::unique_ptr<ImGuiLayer> m_imGuiLayer;
     ImGuiLayer* m_imGuiLayerRaw = nullptr;

@@ -30,26 +30,32 @@ Application::Application(const ApplicationSpecification& spec)
         onEvent(event);
     });
 
-    if (!m_engine.init(*m_window)) {
+    if (!m_renderService.init(*m_window, m_specification.renderService)) {
         LUNA_CORE_ERROR("Renderer initialization failed");
         m_window.reset();
         s_instance = nullptr;
         return;
     }
 
-    auto* nativeWindow = static_cast<GLFWwindow*>(m_window->getNativeWindow());
-    m_imGuiLayer = std::make_unique<ImGuiLayer>(nativeWindow, m_engine, m_specification.enableMultiViewport);
-    m_imGuiLayerRaw = m_imGuiLayer.get();
-    m_imGuiLayer->onAttach();
+    if (m_specification.enableImGui) {
+        auto* nativeWindow = static_cast<GLFWwindow*>(m_window->getNativeWindow());
+        auto nativeBridge = m_renderService.getNativeVulkanBridge();
+        m_imGuiLayer = std::make_unique<ImGuiLayer>(
+            nativeWindow, *nativeBridge.engine, m_specification.enableMultiViewport);
+        m_imGuiLayerRaw = m_imGuiLayer.get();
+        m_imGuiLayer->onAttach();
 
-    if (!m_imGuiLayer->isInitialized()) {
-        LUNA_CORE_ERROR("ImGui initialization failed");
-        m_imGuiLayer.reset();
-        m_imGuiLayerRaw = nullptr;
-        m_engine.cleanup();
-        m_window.reset();
-        s_instance = nullptr;
-        return;
+        if (!m_imGuiLayer->isInitialized()) {
+            LUNA_CORE_ERROR("ImGui initialization failed");
+            m_imGuiLayer.reset();
+            m_imGuiLayerRaw = nullptr;
+            m_renderService.shutdown();
+            m_window.reset();
+            s_instance = nullptr;
+            return;
+        }
+
+        LUNA_CORE_INFO("ImGui path=Native Vulkan");
     }
 
     m_initialized = true;
@@ -63,7 +69,7 @@ Application::~Application()
         m_imGuiLayerRaw = nullptr;
     }
 
-    m_engine.cleanup();
+    m_renderService.shutdown();
     s_instance = nullptr;
 }
 
@@ -89,8 +95,8 @@ void Application::run()
             continue;
         }
 
-        if (m_engine.is_swapchain_resize_requested()) {
-            m_engine.resize_swapchain();
+        if (m_renderService.is_swapchain_resize_requested()) {
+            m_renderService.resize_swapchain();
         }
 
         onUpdate(m_timestep);
@@ -118,7 +124,7 @@ void Application::renderFrame()
         m_imGuiLayer->end();
     }
 
-    m_engine.draw(
+    m_renderService.draw(
         [this](vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent) {
             if (m_imGuiLayer != nullptr) {
                 m_imGuiLayer->render(commandBuffer, targetImageView, targetExtent);
@@ -172,7 +178,7 @@ bool Application::onWindowResize(const WindowResizeEvent& event)
 {
     m_minimized = event.getWidth() == 0 || event.getHeight() == 0;
     if (!m_minimized) {
-        m_engine.request_swapchain_resize();
+        m_renderService.request_swapchain_resize();
     }
     return false;
 }

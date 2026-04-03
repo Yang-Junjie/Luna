@@ -1,0 +1,58 @@
+set(LUNA_RHI_TRIANGLE_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Shaders)
+set(LUNA_RHI_TRIANGLE_SHADER_OUTPUT_DIR ${PROJECT_BINARY_DIR}/Shaders/RhiTriangle)
+
+set(LUNA_RHI_TRIANGLE_VERTEX_SHADER_SOURCE ${LUNA_RHI_TRIANGLE_SHADER_SOURCE_DIR}/triangle.vert)
+set(LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_SOURCE ${LUNA_RHI_TRIANGLE_SHADER_SOURCE_DIR}/triangle.frag)
+set(LUNA_RHI_TRIANGLE_VERTEX_SHADER_OUTPUT ${LUNA_RHI_TRIANGLE_SHADER_OUTPUT_DIR}/triangle.vert.spv)
+set(LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_OUTPUT ${LUNA_RHI_TRIANGLE_SHADER_OUTPUT_DIR}/triangle.frag.spv)
+
+add_custom_command(
+    OUTPUT ${LUNA_RHI_TRIANGLE_VERTEX_SHADER_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_RHI_TRIANGLE_SHADER_OUTPUT_DIR}
+    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=vert ${LUNA_RHI_TRIANGLE_VERTEX_SHADER_SOURCE} -o ${LUNA_RHI_TRIANGLE_VERTEX_SHADER_OUTPUT}
+    DEPENDS ${LUNA_RHI_TRIANGLE_VERTEX_SHADER_SOURCE}
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_RHI_TRIANGLE_SHADER_OUTPUT_DIR}
+    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=frag ${LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_SOURCE} -o ${LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_OUTPUT}
+    DEPENDS ${LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_SOURCE}
+    VERBATIM
+)
+
+add_custom_target(
+    LunaRhiTriangleShaders
+    DEPENDS
+        ${LUNA_RHI_TRIANGLE_VERTEX_SHADER_OUTPUT}
+        ${LUNA_RHI_TRIANGLE_FRAGMENT_SHADER_OUTPUT}
+)
+
+add_executable(
+    LunaRhiTriangle
+    main.cpp
+)
+
+add_dependencies(LunaRhiTriangle LunaRhiTriangleShaders)
+
+target_include_directories(
+    LunaRhiTriangle
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(
+    LunaRhiTriangle
+    PRIVATE
+        LunaCore
+)
+
+target_compile_definitions(
+    LunaRhiTriangle
+    PRIVATE
+        LUNA_RHI_TRIANGLE_SAMPLE_NAME="LunaRhiTriangle"
+        LUNA_RHI_TRIANGLE_BUILD_SHADER_ROOT="${PROJECT_BINARY_DIR}/Shaders/RhiTriangle"
+)
+
+luna_configure_runtime_output(LunaRhiTriangle)

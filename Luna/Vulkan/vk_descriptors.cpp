@@ -5,7 +5,26 @@
 #include <algorithm>
 
 namespace {
-vk::DescriptorType mapResourceTypeToVulkan(luna::ResourceType type)
+void add_or_merge_binding(std::vector<vk::DescriptorSetLayoutBinding>& bindings,
+                          const vk::DescriptorSetLayoutBinding& binding)
+{
+    const auto existing =
+        std::find_if(bindings.begin(), bindings.end(), [&](const vk::DescriptorSetLayoutBinding& candidate) {
+            return candidate.binding == binding.binding;
+        });
+
+    if (existing == bindings.end()) {
+        bindings.push_back(binding);
+        return;
+    }
+
+    assert(existing->descriptorType == binding.descriptorType);
+    assert(existing->descriptorCount == binding.descriptorCount);
+    existing->stageFlags |= binding.stageFlags;
+}
+} // namespace
+
+vk::DescriptorType to_vulkan_descriptor_type(luna::ResourceType type)
 {
     switch (type) {
         case luna::ResourceType::UniformBuffer:
@@ -30,31 +49,55 @@ vk::DescriptorType mapResourceTypeToVulkan(luna::ResourceType type)
     }
 }
 
-void add_or_merge_binding(std::vector<vk::DescriptorSetLayoutBinding>& bindings,
-                          const vk::DescriptorSetLayoutBinding& binding)
+vk::ShaderStageFlags to_vulkan_shader_stages(luna::ShaderType visibility)
 {
-    const auto existing =
-        std::find_if(bindings.begin(), bindings.end(), [&](const vk::DescriptorSetLayoutBinding& candidate) {
-            return candidate.binding == binding.binding;
-        });
+    vk::ShaderStageFlags stages{};
+    const uint32_t bits = static_cast<uint32_t>(visibility);
 
-    if (existing == bindings.end()) {
-        bindings.push_back(binding);
-        return;
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::Vertex)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eVertex;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::TessControl)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eTessellationControl;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::TessEval)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eTessellationEvaluation;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::Geometry)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eGeometry;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::Fragment)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eFragment;
+    }
+    if ((bits & static_cast<uint32_t>(luna::ShaderType::Compute)) != 0) {
+        stages |= vk::ShaderStageFlagBits::eCompute;
     }
 
-    assert(existing->descriptorType == binding.descriptorType);
-    assert(existing->descriptorCount == binding.descriptorCount);
-    existing->stageFlags |= binding.stageFlags;
+    return stages;
 }
-} // namespace
+
+vk::ImageLayout to_vulkan_image_layout(luna::ResourceType type)
+{
+    switch (type) {
+        case luna::ResourceType::StorageImage:
+            return vk::ImageLayout::eGeneral;
+        case luna::ResourceType::CombinedImageSampler:
+        case luna::ResourceType::SampledImage:
+        case luna::ResourceType::InputAttachment:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case luna::ResourceType::Sampler:
+            return vk::ImageLayout::eUndefined;
+        default:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+    }
+}
 
 void DescriptorLayoutBuilder::add_binding_from_reflection(const luna::ShaderReflectionData& data,
                                                           vk::ShaderStageFlags shaderStages)
 {
     vk::DescriptorSetLayoutBinding binding{};
     binding.binding = data.binding;
-    binding.descriptorType = mapResourceTypeToVulkan(data.type);
+    binding.descriptorType = to_vulkan_descriptor_type(data.type);
     binding.descriptorCount = std::max(1u, data.count);
     binding.stageFlags = shaderStages;
     binding.pImmutableSamplers = nullptr;
@@ -115,6 +158,169 @@ vk::DescriptorSetLayout DescriptorLayoutBuilder::build(vk::Device device,
     vk::DescriptorSetLayout set{};
     VK_CHECK(device.createDescriptorSetLayout(&info, nullptr, &set));
     return set;
+}
+
+luna::BufferHandle VulkanResourceBindingRegistry::register_buffer(vk::Buffer buffer)
+{
+    if (!buffer) {
+        return {};
+    }
+
+    const uint64_t id = m_nextBufferId++;
+    m_buffers.insert_or_assign(id, buffer);
+    return luna::BufferHandle::fromRaw(id);
+}
+
+luna::ImageHandle VulkanResourceBindingRegistry::register_image_view(vk::ImageView imageView)
+{
+    if (!imageView) {
+        return {};
+    }
+
+    const uint64_t id = m_nextImageViewId++;
+    m_imageViews.insert_or_assign(id, imageView);
+    return luna::ImageHandle::fromRaw(id);
+}
+
+luna::SamplerHandle VulkanResourceBindingRegistry::register_sampler(vk::Sampler sampler)
+{
+    if (!sampler) {
+        return {};
+    }
+
+    const uint64_t id = m_nextSamplerId++;
+    m_samplers.insert_or_assign(id, sampler);
+    return luna::SamplerHandle::fromRaw(id);
+}
+
+void VulkanResourceBindingRegistry::unregister_buffer(luna::BufferHandle handle)
+{
+    if (!handle.isValid()) {
+        return;
+    }
+
+    m_buffers.erase(handle.value);
+}
+
+void VulkanResourceBindingRegistry::unregister_image_view(luna::ImageHandle handle)
+{
+    if (!handle.isValid()) {
+        return;
+    }
+
+    m_imageViews.erase(handle.value);
+}
+
+void VulkanResourceBindingRegistry::unregister_sampler(luna::SamplerHandle handle)
+{
+    if (!handle.isValid()) {
+        return;
+    }
+
+    m_samplers.erase(handle.value);
+}
+
+vk::Buffer VulkanResourceBindingRegistry::resolve_buffer(luna::BufferHandle handle) const
+{
+    const auto it = m_buffers.find(handle.value);
+    return it != m_buffers.end() ? it->second : vk::Buffer{};
+}
+
+vk::ImageView VulkanResourceBindingRegistry::resolve_image_view(luna::ImageHandle handle) const
+{
+    const auto it = m_imageViews.find(handle.value);
+    return it != m_imageViews.end() ? it->second : vk::ImageView{};
+}
+
+vk::Sampler VulkanResourceBindingRegistry::resolve_sampler(luna::SamplerHandle handle) const
+{
+    const auto it = m_samplers.find(handle.value);
+    return it != m_samplers.end() ? it->second : vk::Sampler{};
+}
+
+vk::DescriptorSetLayout build_resource_layout(vk::Device device,
+                                              const luna::ResourceLayoutDesc& desc,
+                                              const void* pNext,
+                                              vk::DescriptorSetLayoutCreateFlags flags)
+{
+    std::vector<vk::DescriptorSetLayoutBinding> bindings;
+    bindings.reserve(desc.bindings.size());
+
+    for (const luna::ResourceBindingDesc& bindingDesc : desc.bindings) {
+        vk::DescriptorSetLayoutBinding binding{};
+        binding.binding = bindingDesc.binding;
+        binding.descriptorType = to_vulkan_descriptor_type(bindingDesc.type);
+        binding.descriptorCount = std::max(1u, bindingDesc.count);
+        binding.stageFlags = to_vulkan_shader_stages(bindingDesc.visibility);
+        binding.pImmutableSamplers = nullptr;
+        add_or_merge_binding(bindings, binding);
+    }
+
+    std::sort(bindings.begin(),
+              bindings.end(),
+              [](const vk::DescriptorSetLayoutBinding& lhs, const vk::DescriptorSetLayoutBinding& rhs) {
+                  return lhs.binding < rhs.binding;
+              });
+
+    vk::DescriptorSetLayoutCreateInfo info{};
+    info.pNext = pNext;
+    info.flags = flags;
+    info.bindingCount = static_cast<uint32_t>(bindings.size());
+    info.pBindings = bindings.data();
+
+    vk::DescriptorSetLayout layout{};
+    VK_CHECK(device.createDescriptorSetLayout(&info, nullptr, &layout));
+
+    if (!desc.debugName.empty()) {
+        LUNA_CORE_INFO("{} created via RHI", desc.debugName);
+    }
+
+    return layout;
+}
+
+bool update_resource_set(vk::Device device,
+                         const VulkanResourceBindingRegistry& registry,
+                         vk::DescriptorSet set,
+                         const luna::ResourceSetWriteDesc& writeDesc)
+{
+    DescriptorWriter writer;
+
+    for (const luna::BufferBindingWriteDesc& bufferWrite : writeDesc.buffers) {
+        const vk::Buffer buffer = registry.resolve_buffer(bufferWrite.buffer);
+        if (!buffer) {
+            LUNA_CORE_ERROR("Failed to resolve RHI buffer binding {}", bufferWrite.binding);
+            return false;
+        }
+
+        writer.write_buffer(bufferWrite.binding,
+                            buffer,
+                            static_cast<size_t>(bufferWrite.size),
+                            static_cast<size_t>(bufferWrite.offset),
+                            to_vulkan_descriptor_type(bufferWrite.type));
+    }
+
+    for (const luna::ImageBindingWriteDesc& imageWrite : writeDesc.images) {
+        const vk::ImageView imageView = registry.resolve_image_view(imageWrite.image);
+        if (!imageView) {
+            LUNA_CORE_ERROR("Failed to resolve RHI image binding {}", imageWrite.binding);
+            return false;
+        }
+
+        const vk::Sampler sampler = registry.resolve_sampler(imageWrite.sampler);
+        if (imageWrite.type == luna::ResourceType::CombinedImageSampler && !sampler) {
+            LUNA_CORE_ERROR("Failed to resolve RHI sampler binding {}", imageWrite.binding);
+            return false;
+        }
+
+        writer.write_image(imageWrite.binding,
+                           imageView,
+                           sampler,
+                           to_vulkan_image_layout(imageWrite.type),
+                           to_vulkan_descriptor_type(imageWrite.type));
+    }
+
+    writer.update_set(device, set);
+    return true;
 }
 
 void DescriptorAllocator::init_pool(vk::Device device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios)

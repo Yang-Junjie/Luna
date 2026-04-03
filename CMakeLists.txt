@@ -6,6 +6,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+function(luna_configure_runtime_output target_name)
+    set_target_properties(${target_name} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/Debug"
+    )
+
+    foreach(config Debug Release RelWithDebInfo MinSizeRel)
+        string(TOUPPER "${config}" config_upper)
+        set_target_properties(${target_name} PROPERTIES
+            "RUNTIME_OUTPUT_DIRECTORY_${config_upper}" "${PROJECT_BINARY_DIR}/${config}"
+        )
+    endforeach()
+endfunction()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wno-nullability-completeness)
 endif()
@@ -59,7 +72,9 @@ add_subdirectory(third_party/SPIRV-Cross EXCLUDE_FROM_ALL)
 
 add_subdirectory(Luna)
 add_subdirectory(Editor)
+add_subdirectory(Samples/LunaRhiTriangle)
 
 
 add_executable(LunaApp Luna/Core/main.cpp)
 target_link_libraries(LunaApp PRIVATE LunaEditor)
+luna_configure_runtime_output(LunaApp)

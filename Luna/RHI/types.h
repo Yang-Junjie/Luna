@@ -1,17 +1,124 @@
 #pragma once
 #include <cstdint>
+#include <optional>
+#include <string_view>
+#include <type_traits>
 
 namespace luna {
+enum class RHIResult : uint32_t {
+    Success = 0,
+    NotReady,
+    InvalidArgument,
+    Unsupported,
+    OutOfMemory,
+    DeviceLost,
+    InternalError
+};
+
+enum class RHIBackend : uint32_t {
+    Vulkan = 1
+};
+
+template <typename Tag> struct Handle {
+    uint64_t value = 0;
+
+    friend constexpr bool operator==(Handle, Handle) noexcept = default;
+
+    constexpr bool isValid() const noexcept
+    {
+        return value != 0;
+    }
+
+    explicit constexpr operator bool() const noexcept
+    {
+        return isValid();
+    }
+
+    static constexpr Handle fromRaw(uint64_t rawValue) noexcept
+    {
+        return Handle{rawValue};
+    }
+};
+
+using DeviceHandle = Handle<struct DeviceHandleTag>;
+using BufferHandle = Handle<struct BufferHandleTag>;
+using ImageHandle = Handle<struct ImageHandleTag>;
+using SamplerHandle = Handle<struct SamplerHandleTag>;
+using ShaderHandle = Handle<struct ShaderHandleTag>;
+using PipelineHandle = Handle<struct PipelineHandleTag>;
+using SwapchainHandle = Handle<struct SwapchainHandleTag>;
+
+constexpr std::string_view to_string(RHIResult result) noexcept
+{
+    switch (result) {
+        case RHIResult::Success:
+            return "Success";
+        case RHIResult::NotReady:
+            return "NotReady";
+        case RHIResult::InvalidArgument:
+            return "InvalidArgument";
+        case RHIResult::Unsupported:
+            return "Unsupported";
+        case RHIResult::OutOfMemory:
+            return "OutOfMemory";
+        case RHIResult::DeviceLost:
+            return "DeviceLost";
+        case RHIResult::InternalError:
+            return "InternalError";
+        default:
+            return "Unknown";
+    }
+}
+
+constexpr std::string_view to_string(RHIBackend backend) noexcept
+{
+    switch (backend) {
+        case RHIBackend::Vulkan:
+            return "Vulkan";
+        default:
+            return "Unknown";
+    }
+}
+
+constexpr char ascii_lower(char value) noexcept
+{
+    return value >= 'A' && value <= 'Z' ? static_cast<char>(value - 'A' + 'a') : value;
+}
+
+inline bool iequals_ascii(std::string_view lhs, std::string_view rhs) noexcept
+{
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+
+    for (size_t index = 0; index < lhs.size(); ++index) {
+        if (ascii_lower(lhs[index]) != ascii_lower(rhs[index])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+inline std::optional<RHIBackend> parse_rhi_backend(std::string_view name) noexcept
+{
+    if (iequals_ascii(name, "vulkan")) {
+        return RHIBackend::Vulkan;
+    }
+
+    return std::nullopt;
+}
+
 enum class ShaderType : uint32_t {
     None = 0,
-    Vertex = 1 << 0,      // 000001
-    TessControl = 1 << 1, // 000010
-    TessEval = 1 << 2,    // 000100
-    Geometry = 1 << 3,    // 001000
-    Fragment = 1 << 4,    // 010000
-    Compute = 1 << 5,     // 100000
+    Vertex = 1u << 0,
+    TessControl = 1u << 1,
+    TessEval = 1u << 2,
+    Geometry = 1u << 3,
+    Fragment = 1u << 4,
+    Compute = 1u << 5,
 
-    AllGraphics = Vertex | Fragment | Geometry,
+    AllGraphics = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 4),
     All = 0xFF'FF'FF'FF
 };
 

@@ -190,7 +190,7 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
                                                           const fastgltf::Asset& asset,
                                                           const fastgltf::DataSource& source,
                                                           const std::filesystem::path& basePath,
-                                                          vk::Format format)
+                                                          luna::PixelFormat format)
 {
     if (engine == nullptr) {
         return std::nullopt;
@@ -210,12 +210,17 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
             return std::nullopt;
         }
 
-        AllocatedImage image =
-            engine->create_image(
-                pixels,
-                vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-                format,
-                vk::ImageUsageFlagBits::eSampled);
+        const luna::ImageDesc imageDesc{
+            .width = static_cast<uint32_t>(width),
+            .height = static_cast<uint32_t>(height),
+            .depth = 1,
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .format = format,
+            .usage = luna::ImageUsage::Sampled,
+            .debugName = "GLTFImage",
+        };
+        AllocatedImage image = engine->create_image(imageDesc, pixels);
         stbi_image_free(pixels);
         return image;
     };
@@ -229,11 +234,17 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
             int channels = 0;
             stbi_uc* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
             if (pixels != nullptr) {
-                AllocatedImage image = engine->create_image(
-                    pixels,
-                    vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-                    format,
-                    vk::ImageUsageFlagBits::eSampled);
+                const luna::ImageDesc imageDesc{
+                    .width = static_cast<uint32_t>(width),
+                    .height = static_cast<uint32_t>(height),
+                    .depth = 1,
+                    .mipLevels = 1,
+                    .arrayLayers = 1,
+                    .format = format,
+                    .usage = luna::ImageUsage::Sampled,
+                    .debugName = "GLTFImage",
+                };
+                AllocatedImage image = engine->create_image(imageDesc, pixels);
                 stbi_image_free(pixels);
                 return image;
             }
@@ -250,22 +261,40 @@ std::optional<AllocatedImage> load_image_from_data_source(VulkanEngine* engine,
 
 vk::Sampler create_sampler(VulkanEngine* engine, const fastgltf::Sampler& sampler)
 {
-    vk::SamplerCreateInfo samplerInfo{};
-    samplerInfo.magFilter =
-        sampler.magFilter.has_value() ? extract_filter(sampler.magFilter.value()) : vk::Filter::eLinear;
-    samplerInfo.minFilter =
-        sampler.minFilter.has_value() ? extract_filter(sampler.minFilter.value()) : vk::Filter::eLinear;
-    samplerInfo.mipmapMode =
-        sampler.minFilter.has_value() ? extract_mipmap_mode(sampler.minFilter.value()) : vk::SamplerMipmapMode::eLinear;
-    samplerInfo.addressModeU = extract_wrap(sampler.wrapS);
-    samplerInfo.addressModeV = extract_wrap(sampler.wrapT);
-    samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+    const auto to_rhi_filter = [](vk::Filter filter) {
+        return filter == vk::Filter::eNearest ? luna::FilterMode::Nearest : luna::FilterMode::Linear;
+    };
+    const auto to_rhi_mipmap_mode = [](vk::SamplerMipmapMode mode) {
+        return mode == vk::SamplerMipmapMode::eNearest ? luna::SamplerMipmapMode::Nearest
+                                                       : luna::SamplerMipmapMode::Linear;
+    };
+    const auto to_rhi_address_mode = [](vk::SamplerAddressMode mode) {
+        switch (mode) {
+            case vk::SamplerAddressMode::eClampToEdge:
+                return luna::SamplerAddressMode::ClampToEdge;
+            case vk::SamplerAddressMode::eMirroredRepeat:
+                return luna::SamplerAddressMode::MirroredRepeat;
+            case vk::SamplerAddressMode::eRepeat:
+            default:
+                return luna::SamplerAddressMode::Repeat;
+        }
+    };
 
-    vk::Sampler newSampler{};
-    VK_CHECK(engine->_device.createSampler(&samplerInfo, nullptr, &newSampler));
-    return newSampler;
+    const luna::SamplerDesc samplerDesc{
+        .magFilter =
+            to_rhi_filter(sampler.magFilter.has_value() ? extract_filter(sampler.magFilter.value()) : vk::Filter::eLinear),
+        .minFilter =
+            to_rhi_filter(sampler.minFilter.has_value() ? extract_filter(sampler.minFilter.value()) : vk::Filter::eLinear),
+        .mipmapMode = to_rhi_mipmap_mode(sampler.minFilter.has_value() ? extract_mipmap_mode(sampler.minFilter.value())
+                                                                       : vk::SamplerMipmapMode::eLinear),
+        .addressModeU = to_rhi_address_mode(extract_wrap(sampler.wrapS)),
+        .addressModeV = to_rhi_address_mode(extract_wrap(sampler.wrapT)),
+        .addressModeW = luna::SamplerAddressMode::Repeat,
+        .minLod = 0.0f,
+        .maxLod = VK_LOD_CLAMP_NONE,
+        .debugName = "GLTFSampler",
+    };
+    return engine->create_sampler(samplerDesc);
 }
 
 glm::vec4 to_glm_vec4(const fastgltf::math::nvec4& value)
@@ -477,7 +506,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
     for (size_t imageIndex = 0; imageIndex < gltf.images.size(); imageIndex++) {
         const auto& image = gltf.images[imageIndex];
         const auto loadedImage =
-            load_image_from_data_source(engine, gltf, image.data, filePath.parent_path(), vk::Format::eR8G8B8A8Srgb);
+            load_image_from_data_source(engine, gltf, image.data, filePath.parent_path(), luna::PixelFormat::RGBA8Srgb);
         if (loadedImage.has_value()) {
             scene->images[imageIndex] = loadedImage.value();
         } else {
@@ -508,10 +537,13 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
                       0.0f,
                       0.0f);
 
-        AllocatedBuffer materialBuffer =
-            engine->create_buffer(
-                sizeof(MaterialConstants), vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        std::memcpy(materialBuffer.info.pMappedData, &constants, sizeof(MaterialConstants));
+        const luna::BufferDesc materialBufferDesc{
+            .size = sizeof(MaterialConstants),
+            .usage = luna::BufferUsage::Uniform,
+            .memoryUsage = luna::MemoryUsage::Upload,
+            .debugName = "GLTFMaterialConstants",
+        };
+        AllocatedBuffer materialBuffer = engine->create_buffer(materialBufferDesc, &constants);
         scene->materialDataBuffers.push_back(materialBuffer);
 
         MaterialResources resources{};
@@ -554,6 +586,14 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
         scene->materials[materialIndex] =
             std::make_shared<MaterialInstance>(
                 engine->metalRoughMaterial.write_material(engine->_device, pass, resources, scene->materialDescriptorPool));
+    }
+
+    if (!scene->materials.empty()) {
+        LUNA_CORE_INFO("Material resources uploaded via RHI: materials={}, buffers={}, imageBindings={}, samplerBindings={}",
+                       scene->materials.size(),
+                       scene->materialDataBuffers.size(),
+                       scene->materials.size() * 2,
+                       scene->materials.size() * 2);
     }
 
     std::vector<std::shared_ptr<MeshAsset>> meshesByIndex;

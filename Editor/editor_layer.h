@@ -47,7 +47,8 @@ public:
             return;
         }
 
-        auto& camera = luna::Application::get().getEngine().mainCamera;
+        auto& renderService = luna::Application::get().getRenderService();
+        auto& camera = renderService.getMainCamera();
 
         const glm::vec2 mousePosition = luna::Input::getMousePosition();
         const glm::vec2 mouseDelta = mousePosition - m_lastMousePosition;
@@ -97,19 +98,20 @@ public:
 
     void onImGuiRender() override
     {
-        auto& engine = luna::Application::get().getEngine();
-        auto& effects = engine.get_background_effects();
+        auto& renderService = luna::Application::get().getRenderService();
+        auto& camera = renderService.getMainCamera();
+        auto& effects = renderService.getBackgroundEffects();
 
         if (ImGui::Begin("background")) {
-            ImGui::SliderFloat("Render Scale", &engine.renderScale, 0.3f, 1.0f);
+            ImGui::SliderFloat("Render Scale", &renderService.getRenderScale(), 0.3f, 1.0f);
             ImGui::Separator();
 
             ImGui::Text("Camera Active: %s", m_cameraActive ? "Yes" : "No");
             ImGui::Text("Position: %.2f %.2f %.2f",
-                        engine.mainCamera.position.x,
-                        engine.mainCamera.position.y,
-                        engine.mainCamera.position.z);
-            ImGui::Text("Pitch/Yaw: %.2f %.2f", engine.mainCamera.pitch, engine.mainCamera.yaw);
+                        camera.position.x,
+                        camera.position.y,
+                        camera.position.z);
+            ImGui::Text("Pitch/Yaw: %.2f %.2f", camera.pitch, camera.yaw);
             ImGui::TextUnformatted("Hold RMB to look around. WASD move, Q/E vertical, Shift boost.");
             ImGui::Separator();
 
@@ -119,7 +121,7 @@ public:
                 return;
             }
 
-            auto& currentEffectIndex = engine.get_current_background_effect();
+            auto& currentEffectIndex = renderService.getCurrentBackgroundEffect();
             const int lastEffectIndex = static_cast<int>(effects.size()) - 1;
 
             if (currentEffectIndex < 0) {
@@ -145,14 +147,14 @@ public:
         ImGui::End();
 
         if (ImGui::Begin("Scene")) {
-            auto sceneIt = engine.loadedScenes.find("basicmesh");
-            if (sceneIt == engine.loadedScenes.end() || !sceneIt->second) {
+            auto scene = renderService.findLoadedScene("basicmesh");
+            if (!scene) {
                 ImGui::TextUnformatted("basicmesh scene not loaded.");
             } else {
                 std::vector<std::shared_ptr<Node>> editableNodes;
                 editableNodes.reserve(3);
 
-                for (const auto& topNode : sceneIt->second->topNodes) {
+                for (const auto& topNode : scene->topNodes) {
                     collectEditableNodes(topNode, editableNodes, 3);
                     if (editableNodes.size() >= 3) {
                         break;
