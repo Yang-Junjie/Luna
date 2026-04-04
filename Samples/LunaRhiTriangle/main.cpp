@@ -36,6 +36,10 @@ struct CommandLineOptions {
 struct RecordingCommandContext final : public luna::IRHICommandContext {
     luna::RenderingInfo lastRenderingInfo{};
     luna::ClearColorValue lastClearColor{};
+    luna::ImageBarrierInfo lastImageBarrier{};
+    luna::BufferBarrierInfo lastBufferBarrier{};
+    luna::BufferCopyInfo lastBufferCopy{};
+    luna::BufferImageCopyInfo lastBufferImageCopy{};
     luna::ImageCopyInfo lastImageCopy{};
     luna::PipelineHandle boundPipeline{};
     luna::BufferHandle boundVertexBuffer{};
@@ -46,6 +50,7 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
     uint64_t vertexBufferOffset = 0;
     uint64_t indexBufferOffset = 0;
     luna::ResourceSetHandle boundResourceSet{};
+    std::vector<uint32_t> boundDynamicOffsets{};
     luna::DrawArguments lastDraw{};
     luna::IndexedDrawArguments lastDrawIndexed{};
     std::vector<uint8_t> lastPushConstants;
@@ -54,8 +59,13 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
     uint32_t beginRenderingCallCount = 0;
     uint32_t endRenderingCallCount = 0;
     uint32_t clearCallCount = 0;
+    uint32_t imageBarrierCallCount = 0;
+    uint32_t bufferBarrierCallCount = 0;
     uint32_t transitionImageCallCount = 0;
+    uint32_t copyBufferCallCount = 0;
     uint32_t copyImageCallCount = 0;
+    uint32_t copyBufferToImageCallCount = 0;
+    uint32_t copyImageToBufferCallCount = 0;
     uint32_t bindPipelineCallCount = 0;
     uint32_t bindComputePipelineCallCount = 0;
     uint32_t bindVertexBufferCallCount = 0;
@@ -65,6 +75,7 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
     uint32_t drawCallCount = 0;
     uint32_t drawIndexedCallCount = 0;
     uint32_t dispatchCallCount = 0;
+    uint32_t dispatchIndirectCallCount = 0;
 
     luna::RHIResult beginRendering(const luna::RenderingInfo& renderingInfo) override
     {
@@ -86,6 +97,20 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
         return luna::RHIResult::Success;
     }
 
+    luna::RHIResult imageBarrier(const luna::ImageBarrierInfo& barrierInfo) override
+    {
+        lastImageBarrier = barrierInfo;
+        ++imageBarrierCallCount;
+        return luna::RHIResult::Success;
+    }
+
+    luna::RHIResult bufferBarrier(const luna::BufferBarrierInfo& barrierInfo) override
+    {
+        lastBufferBarrier = barrierInfo;
+        ++bufferBarrierCallCount;
+        return luna::RHIResult::Success;
+    }
+
     luna::RHIResult transitionImage(luna::ImageHandle image, luna::ImageLayout newLayout) override
     {
         transitionedImage = image;
@@ -94,10 +119,31 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
         return luna::RHIResult::Success;
     }
 
+    luna::RHIResult copyBuffer(const luna::BufferCopyInfo& copyInfo) override
+    {
+        lastBufferCopy = copyInfo;
+        ++copyBufferCallCount;
+        return luna::RHIResult::Success;
+    }
+
     luna::RHIResult copyImage(const luna::ImageCopyInfo& copyInfo) override
     {
         lastImageCopy = copyInfo;
         ++copyImageCallCount;
+        return luna::RHIResult::Success;
+    }
+
+    luna::RHIResult copyBufferToImage(const luna::BufferImageCopyInfo& copyInfo) override
+    {
+        lastBufferImageCopy = copyInfo;
+        ++copyBufferToImageCallCount;
+        return luna::RHIResult::Success;
+    }
+
+    luna::RHIResult copyImageToBuffer(const luna::BufferImageCopyInfo& copyInfo) override
+    {
+        lastBufferImageCopy = copyInfo;
+        ++copyImageToBufferCallCount;
         return luna::RHIResult::Success;
     }
 
@@ -132,9 +178,11 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
         return luna::RHIResult::Success;
     }
 
-    luna::RHIResult bindResourceSet(luna::ResourceSetHandle resourceSet) override
+    luna::RHIResult bindResourceSet(luna::ResourceSetHandle resourceSet,
+                                    std::span<const uint32_t> dynamicOffsets = {}) override
     {
         boundResourceSet = resourceSet;
+        boundDynamicOffsets.assign(dynamicOffsets.begin(), dynamicOffsets.end());
         ++bindResourceSetCallCount;
         return luna::RHIResult::Success;
     }
@@ -173,6 +221,12 @@ struct RecordingCommandContext final : public luna::IRHICommandContext {
     luna::RHIResult dispatch(uint32_t, uint32_t, uint32_t) override
     {
         ++dispatchCallCount;
+        return luna::RHIResult::Success;
+    }
+
+    luna::RHIResult dispatchIndirect(luna::BufferHandle, uint64_t) override
+    {
+        ++dispatchIndirectCallCount;
         return luna::RHIResult::Success;
     }
 };
@@ -1256,7 +1310,8 @@ bool run_resourceset_image_self_test(luna::RHIBackend backend)
     }
 
     luna::ResourceSetWriteDesc validWrite{};
-    validWrite.images.push_back({1, image, sampler, luna::ResourceType::CombinedImageSampler});
+    validWrite.images.push_back(
+        {.binding = 1, .image = image, .sampler = sampler, .type = luna::ResourceType::CombinedImageSampler});
 
     if (context.device->updateResourceSet(resourceSet, validWrite) != luna::RHIResult::Success) {
         shutdown_test_device(&context);
@@ -1264,7 +1319,8 @@ bool run_resourceset_image_self_test(luna::RHIBackend backend)
     }
 
     luna::ResourceSetWriteDesc invalidWrite{};
-    invalidWrite.images.push_back({1, {}, sampler, luna::ResourceType::CombinedImageSampler});
+    invalidWrite.images.push_back(
+        {.binding = 1, .image = {}, .sampler = sampler, .type = luna::ResourceType::CombinedImageSampler});
     const luna::RHIResult invalidResult = context.device->updateResourceSet(resourceSet, invalidWrite);
     if (invalidResult == luna::RHIResult::Success) {
         shutdown_test_device(&context);

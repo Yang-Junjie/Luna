@@ -17,7 +17,14 @@ struct ResourceBindingDesc {
 
 struct ResourceLayoutDesc {
     std::string_view debugName;
+    uint32_t setIndex = 0;
     std::vector<ResourceBindingDesc> bindings;
+};
+
+struct BufferBindingElementWriteDesc {
+    BufferHandle buffer{};
+    uint64_t offset = 0;
+    uint64_t size = 0;
 };
 
 struct BufferBindingWriteDesc {
@@ -26,13 +33,24 @@ struct BufferBindingWriteDesc {
     uint64_t offset = 0;
     uint64_t size = 0;
     ResourceType type = ResourceType::UniformBuffer;
+    uint32_t firstArrayElement = 0;
+    std::vector<BufferBindingElementWriteDesc> elements;
+};
+
+struct ImageBindingElementWriteDesc {
+    ImageViewHandle imageView{};
+    ImageHandle image{};
+    SamplerHandle sampler{};
 };
 
 struct ImageBindingWriteDesc {
     uint32_t binding = 0;
+    ImageViewHandle imageView{};
     ImageHandle image{};
     SamplerHandle sampler{};
     ResourceType type = ResourceType::CombinedImageSampler;
+    uint32_t firstArrayElement = 0;
+    std::vector<ImageBindingElementWriteDesc> elements;
 };
 
 struct ResourceSetWriteDesc {

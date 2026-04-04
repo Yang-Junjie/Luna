@@ -45,6 +45,7 @@ template <typename Tag> struct Handle {
 using DeviceHandle = Handle<struct DeviceHandleTag>;
 using BufferHandle = Handle<struct BufferHandleTag>;
 using ImageHandle = Handle<struct ImageHandleTag>;
+using ImageViewHandle = Handle<struct ImageViewHandleTag>;
 using SamplerHandle = Handle<struct SamplerHandleTag>;
 using ShaderHandle = Handle<struct ShaderHandleTag>;
 using PipelineHandle = Handle<struct PipelineHandleTag>;

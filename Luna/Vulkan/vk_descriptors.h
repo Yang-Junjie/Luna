@@ -90,26 +90,56 @@ private:
 };
 
 struct DescriptorWriter {
-    std::deque<vk::DescriptorImageInfo> imageInfos;
-    std::deque<vk::DescriptorBufferInfo> bufferInfos;
+    std::deque<std::vector<vk::DescriptorImageInfo>> imageInfos;
+    std::deque<std::vector<vk::DescriptorBufferInfo>> bufferInfos;
     std::vector<vk::WriteDescriptorSet> writes;
 
     void write_image(
-        uint32_t binding, vk::ImageView image, vk::Sampler sampler, vk::ImageLayout layout, vk::DescriptorType type);
+        uint32_t binding,
+        vk::ImageView image,
+        vk::Sampler sampler,
+        vk::ImageLayout layout,
+        vk::DescriptorType type,
+        uint32_t arrayElement = 0);
 
     void write_image(
-        uint32_t binding, vk::ImageView image, vk::Sampler sampler, VkImageLayout layout, VkDescriptorType type)
+        uint32_t binding,
+        vk::ImageView image,
+        vk::Sampler sampler,
+        VkImageLayout layout,
+        VkDescriptorType type,
+        uint32_t arrayElement = 0)
     {
         write_image(
-            binding, image, sampler, static_cast<vk::ImageLayout>(layout), static_cast<vk::DescriptorType>(type));
+            binding, image, sampler, static_cast<vk::ImageLayout>(layout), static_cast<vk::DescriptorType>(type), arrayElement);
     }
 
-    void write_buffer(uint32_t binding, vk::Buffer buffer, size_t size, size_t offset, vk::DescriptorType type);
+    void write_images(uint32_t binding,
+                      std::span<const vk::DescriptorImageInfo> infos,
+                      vk::DescriptorType type,
+                      uint32_t firstArrayElement = 0);
 
-    void write_buffer(uint32_t binding, vk::Buffer buffer, size_t size, size_t offset, VkDescriptorType type)
+    void write_buffer(uint32_t binding,
+                      vk::Buffer buffer,
+                      size_t size,
+                      size_t offset,
+                      vk::DescriptorType type,
+                      uint32_t arrayElement = 0);
+
+    void write_buffer(uint32_t binding,
+                      vk::Buffer buffer,
+                      size_t size,
+                      size_t offset,
+                      VkDescriptorType type,
+                      uint32_t arrayElement = 0)
     {
-        write_buffer(binding, buffer, size, offset, static_cast<vk::DescriptorType>(type));
+        write_buffer(binding, buffer, size, offset, static_cast<vk::DescriptorType>(type), arrayElement);
     }
+
+    void write_buffers(uint32_t binding,
+                       std::span<const vk::DescriptorBufferInfo> infos,
+                       vk::DescriptorType type,
+                       uint32_t firstArrayElement = 0);
 
     void clear();
     void update_set(vk::Device device, vk::DescriptorSet set);
@@ -122,15 +152,16 @@ vk::ImageLayout to_vulkan_image_layout(luna::ResourceType type);
 class VulkanResourceBindingRegistry {
 public:
     luna::BufferHandle register_buffer(vk::Buffer buffer);
-    luna::ImageHandle register_image_view(vk::ImageView imageView);
+    luna::ImageViewHandle register_image_view(vk::ImageView imageView);
+    bool register_image_view(luna::ImageViewHandle handle, vk::ImageView imageView);
     luna::SamplerHandle register_sampler(vk::Sampler sampler);
 
     void unregister_buffer(luna::BufferHandle handle);
-    void unregister_image_view(luna::ImageHandle handle);
+    void unregister_image_view(luna::ImageViewHandle handle);
     void unregister_sampler(luna::SamplerHandle handle);
 
     vk::Buffer resolve_buffer(luna::BufferHandle handle) const;
-    vk::ImageView resolve_image_view(luna::ImageHandle handle) const;
+    vk::ImageView resolve_image_view(luna::ImageViewHandle handle) const;
     vk::Sampler resolve_sampler(luna::SamplerHandle handle) const;
 
 private:

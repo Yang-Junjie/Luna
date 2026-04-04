@@ -60,6 +60,9 @@ inline vk::RenderingAttachmentInfo depth_attachment_info(vk::ImageView view, VkI
 vk::RenderingInfo rendering_info(vk::Extent2D renderExtent,
                                  const vk::RenderingAttachmentInfo* colorAttachment,
                                  const vk::RenderingAttachmentInfo* depthAttachment);
+vk::RenderingInfo rendering_info(vk::Extent2D renderExtent,
+                                 std::span<const vk::RenderingAttachmentInfo> colorAttachments,
+                                 const vk::RenderingAttachmentInfo* depthAttachment);
 
 vk::ImageSubresourceRange image_subresource_range(vk::ImageAspectFlags aspectMask);
 
@@ -78,8 +81,20 @@ vk::WriteDescriptorSet write_descriptor_buffer(vk::DescriptorType type,
                                                uint32_t binding);
 vk::DescriptorBufferInfo buffer_info(vk::Buffer buffer, vk::DeviceSize offset, vk::DeviceSize range);
 
-vk::ImageCreateInfo image_create_info(vk::Format format, vk::ImageUsageFlags usageFlags, vk::Extent3D extent);
-vk::ImageViewCreateInfo imageview_create_info(vk::Format format, vk::Image image, vk::ImageAspectFlags aspectFlags);
+vk::ImageCreateInfo image_create_info(vk::Format format,
+                                      vk::ImageUsageFlags usageFlags,
+                                      vk::Extent3D extent,
+                                      vk::ImageType imageType = vk::ImageType::e2D,
+                                      uint32_t mipLevels = 1,
+                                      uint32_t arrayLayers = 1);
+vk::ImageViewCreateInfo imageview_create_info(vk::Format format,
+                                              vk::Image image,
+                                              vk::ImageAspectFlags aspectFlags,
+                                              vk::ImageViewType viewType = vk::ImageViewType::e2D,
+                                              uint32_t levelCount = 1,
+                                              uint32_t layerCount = 1,
+                                              uint32_t baseMipLevel = 0,
+                                              uint32_t baseArrayLayer = 0);
 vk::PipelineLayoutCreateInfo pipeline_layout_create_info();
 vk::PipelineShaderStageCreateInfo pipeline_shader_stage_create_info(vk::ShaderStageFlagBits stage,
                                                                     vk::ShaderModule shaderModule,

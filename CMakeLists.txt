@@ -81,6 +81,10 @@ add_subdirectory(Samples/RhiIndexedQuad)
 add_subdirectory(Samples/RhiOffscreenCopy)
 add_subdirectory(Samples/RhiComputeBackground)
 add_subdirectory(Samples/RhiPublicHeaders)
+add_subdirectory(Samples/RhiImageLab)
+add_subdirectory(Samples/RhiImageViewLab)
+add_subdirectory(Samples/RhiBindingLab)
+add_subdirectory(Samples/RhiSyncLab)
 
 
 add_executable(LunaApp Luna/Core/main.cpp)

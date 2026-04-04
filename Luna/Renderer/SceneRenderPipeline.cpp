@@ -416,8 +416,10 @@ bool SceneRenderPipeline::init(IRHIDevice& device)
         ResourceSetWriteDesc writeDesc{};
         writeDesc.buffers.push_back({0, m_sceneBuffer, 0, sizeof(SceneUniformData), ResourceType::UniformBuffer});
         writeDesc.buffers.push_back({1, material.uniformBuffer, 0, sizeof(SceneMaterialUniformData), ResourceType::UniformBuffer});
-        writeDesc.images.push_back({2, m_whiteTexture, m_linearSampler, ResourceType::CombinedImageSampler});
-        writeDesc.images.push_back({3, m_whiteTexture, m_linearSampler, ResourceType::CombinedImageSampler});
+        writeDesc.images.push_back(
+            {.binding = 2, .image = m_whiteTexture, .sampler = m_linearSampler, .type = ResourceType::CombinedImageSampler});
+        writeDesc.images.push_back(
+            {.binding = 3, .image = m_whiteTexture, .sampler = m_linearSampler, .type = ResourceType::CombinedImageSampler});
         if (device.updateResourceSet(material.resourceSet, writeDesc) != RHIResult::Success) {
             return false;
         }
@@ -743,11 +745,13 @@ bool SceneRenderPipeline::ensure_size_dependent_resources(IRHIDevice& device,
     }
 
     ResourceSetWriteDesc computeWrite{};
-    computeWrite.images.push_back({0, m_backgroundImage, {}, ResourceType::StorageImage});
+    computeWrite.images.push_back({.binding = 0, .image = m_backgroundImage, .sampler = {}, .type = ResourceType::StorageImage});
     ResourceSetWriteDesc backgroundSampleWrite{};
-    backgroundSampleWrite.images.push_back({0, m_backgroundImage, m_linearSampler, ResourceType::CombinedImageSampler});
+    backgroundSampleWrite.images.push_back(
+        {.binding = 0, .image = m_backgroundImage, .sampler = m_linearSampler, .type = ResourceType::CombinedImageSampler});
     ResourceSetWriteDesc sceneColorSampleWrite{};
-    sceneColorSampleWrite.images.push_back({0, m_sceneColorImage, m_linearSampler, ResourceType::CombinedImageSampler});
+    sceneColorSampleWrite.images.push_back(
+        {.binding = 0, .image = m_sceneColorImage, .sampler = m_linearSampler, .type = ResourceType::CombinedImageSampler});
     if (device.updateResourceSet(m_computeSet, computeWrite) != RHIResult::Success ||
         device.updateResourceSet(m_backgroundSampleSet, backgroundSampleWrite) != RHIResult::Success ||
         device.updateResourceSet(m_sceneColorSampleSet, sceneColorSampleWrite) != RHIResult::Success) {

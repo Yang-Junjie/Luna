@@ -54,8 +54,11 @@ public:
                                   const void* data,
                                   uint64_t size,
                                   uint64_t offset = 0) = 0;
+    virtual RHIResult readBuffer(BufferHandle handle, void* outData, uint64_t size, uint64_t offset = 0) = 0;
     virtual RHIResult createImage(const ImageDesc& desc, ImageHandle* outHandle, const void* initialData = nullptr) = 0;
     virtual void destroyImage(ImageHandle handle) = 0;
+    virtual RHIResult createImageView(const ImageViewDesc& desc, ImageViewHandle* outHandle) = 0;
+    virtual void destroyImageView(ImageViewHandle handle) = 0;
     virtual RHIResult createSampler(const SamplerDesc& desc, SamplerHandle* outHandle) = 0;
     virtual void destroySampler(SamplerHandle handle) = 0;
     virtual RHIResult createShader(const ShaderDesc& desc, ShaderHandle* outHandle) = 0;

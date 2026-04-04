@@ -171,7 +171,7 @@ luna::BufferHandle VulkanResourceBindingRegistry::register_buffer(vk::Buffer buf
     return luna::BufferHandle::fromRaw(id);
 }
 
-luna::ImageHandle VulkanResourceBindingRegistry::register_image_view(vk::ImageView imageView)
+luna::ImageViewHandle VulkanResourceBindingRegistry::register_image_view(vk::ImageView imageView)
 {
     if (!imageView) {
         return {};
@@ -179,7 +179,17 @@ luna::ImageHandle VulkanResourceBindingRegistry::register_image_view(vk::ImageVi
 
     const uint64_t id = m_nextImageViewId++;
     m_imageViews.insert_or_assign(id, imageView);
-    return luna::ImageHandle::fromRaw(id);
+    return luna::ImageViewHandle::fromRaw(id);
+}
+
+bool VulkanResourceBindingRegistry::register_image_view(luna::ImageViewHandle handle, vk::ImageView imageView)
+{
+    if (!handle.isValid() || !imageView) {
+        return false;
+    }
+
+    m_imageViews.insert_or_assign(handle.value, imageView);
+    return true;
 }
 
 luna::SamplerHandle VulkanResourceBindingRegistry::register_sampler(vk::Sampler sampler)
@@ -202,7 +212,7 @@ void VulkanResourceBindingRegistry::unregister_buffer(luna::BufferHandle handle)
     m_buffers.erase(handle.value);
 }
 
-void VulkanResourceBindingRegistry::unregister_image_view(luna::ImageHandle handle)
+void VulkanResourceBindingRegistry::unregister_image_view(luna::ImageViewHandle handle)
 {
     if (!handle.isValid()) {
         return;
@@ -226,7 +236,7 @@ vk::Buffer VulkanResourceBindingRegistry::resolve_buffer(luna::BufferHandle hand
     return it != m_buffers.end() ? it->second : vk::Buffer{};
 }
 
-vk::ImageView VulkanResourceBindingRegistry::resolve_image_view(luna::ImageHandle handle) const
+vk::ImageView VulkanResourceBindingRegistry::resolve_image_view(luna::ImageViewHandle handle) const
 {
     const auto it = m_imageViews.find(handle.value);
     return it != m_imageViews.end() ? it->second : vk::ImageView{};
@@ -286,37 +296,99 @@ bool update_resource_set(vk::Device device,
     DescriptorWriter writer;
 
     for (const luna::BufferBindingWriteDesc& bufferWrite : writeDesc.buffers) {
-        const vk::Buffer buffer = registry.resolve_buffer(bufferWrite.buffer);
-        if (!buffer) {
-            LUNA_CORE_ERROR("Failed to resolve RHI buffer binding {}", bufferWrite.binding);
-            return false;
+        if (bufferWrite.elements.empty()) {
+            const vk::Buffer buffer = registry.resolve_buffer(bufferWrite.buffer);
+            if (!buffer) {
+                LUNA_CORE_ERROR("Failed to resolve RHI buffer binding {}", bufferWrite.binding);
+                return false;
+            }
+
+            writer.write_buffer(bufferWrite.binding,
+                                buffer,
+                                static_cast<size_t>(bufferWrite.size),
+                                static_cast<size_t>(bufferWrite.offset),
+                                to_vulkan_descriptor_type(bufferWrite.type),
+                                bufferWrite.firstArrayElement);
+            continue;
         }
 
-        writer.write_buffer(bufferWrite.binding,
-                            buffer,
-                            static_cast<size_t>(bufferWrite.size),
-                            static_cast<size_t>(bufferWrite.offset),
-                            to_vulkan_descriptor_type(bufferWrite.type));
+        std::vector<vk::DescriptorBufferInfo> infos;
+        infos.reserve(bufferWrite.elements.size());
+        for (const luna::BufferBindingElementWriteDesc& element : bufferWrite.elements) {
+            const vk::Buffer buffer = registry.resolve_buffer(element.buffer);
+            if (!buffer) {
+                LUNA_CORE_ERROR("Failed to resolve RHI buffer binding {}", bufferWrite.binding);
+                return false;
+            }
+
+            infos.push_back(vk::DescriptorBufferInfo{
+                .buffer = buffer,
+                .offset = static_cast<vk::DeviceSize>(element.offset),
+                .range = static_cast<vk::DeviceSize>(element.size),
+            });
+        }
+
+        writer.write_buffers(
+            bufferWrite.binding, infos, to_vulkan_descriptor_type(bufferWrite.type), bufferWrite.firstArrayElement);
     }
 
     for (const luna::ImageBindingWriteDesc& imageWrite : writeDesc.images) {
-        const vk::ImageView imageView = registry.resolve_image_view(imageWrite.image);
-        if (!imageView) {
-            LUNA_CORE_ERROR("Failed to resolve RHI image binding {}", imageWrite.binding);
-            return false;
+        if (imageWrite.elements.empty()) {
+            luna::ImageViewHandle imageViewHandle = imageWrite.imageView;
+            if (!imageViewHandle.isValid() && imageWrite.image.isValid()) {
+                imageViewHandle = luna::ImageViewHandle::fromRaw(imageWrite.image.value);
+            }
+
+            const vk::ImageView imageView = registry.resolve_image_view(imageViewHandle);
+            if (!imageView) {
+                LUNA_CORE_ERROR("Failed to resolve RHI image binding {}", imageWrite.binding);
+                return false;
+            }
+
+            const vk::Sampler sampler = registry.resolve_sampler(imageWrite.sampler);
+            if (imageWrite.type == luna::ResourceType::CombinedImageSampler && !sampler) {
+                LUNA_CORE_ERROR("Failed to resolve RHI sampler binding {}", imageWrite.binding);
+                return false;
+            }
+
+            writer.write_image(imageWrite.binding,
+                               imageView,
+                               sampler,
+                               to_vulkan_image_layout(imageWrite.type),
+                               to_vulkan_descriptor_type(imageWrite.type),
+                               imageWrite.firstArrayElement);
+            continue;
         }
 
-        const vk::Sampler sampler = registry.resolve_sampler(imageWrite.sampler);
-        if (imageWrite.type == luna::ResourceType::CombinedImageSampler && !sampler) {
-            LUNA_CORE_ERROR("Failed to resolve RHI sampler binding {}", imageWrite.binding);
-            return false;
+        std::vector<vk::DescriptorImageInfo> infos;
+        infos.reserve(imageWrite.elements.size());
+        for (const luna::ImageBindingElementWriteDesc& element : imageWrite.elements) {
+            luna::ImageViewHandle imageViewHandle = element.imageView;
+            if (!imageViewHandle.isValid() && element.image.isValid()) {
+                imageViewHandle = luna::ImageViewHandle::fromRaw(element.image.value);
+            }
+
+            const vk::ImageView imageView = registry.resolve_image_view(imageViewHandle);
+            if (!imageView) {
+                LUNA_CORE_ERROR("Failed to resolve RHI image binding {}", imageWrite.binding);
+                return false;
+            }
+
+            const vk::Sampler sampler = registry.resolve_sampler(element.sampler);
+            if (imageWrite.type == luna::ResourceType::CombinedImageSampler && !sampler) {
+                LUNA_CORE_ERROR("Failed to resolve RHI sampler binding {}", imageWrite.binding);
+                return false;
+            }
+
+            infos.push_back(vk::DescriptorImageInfo{
+                .sampler = sampler,
+                .imageView = imageView,
+                .imageLayout = to_vulkan_image_layout(imageWrite.type),
+            });
         }
 
-        writer.write_image(imageWrite.binding,
-                           imageView,
-                           sampler,
-                           to_vulkan_image_layout(imageWrite.type),
-                           to_vulkan_descriptor_type(imageWrite.type));
+        writer.write_images(
+            imageWrite.binding, infos, to_vulkan_descriptor_type(imageWrite.type), imageWrite.firstArrayElement);
     }
 
     writer.update_set(device, set);
@@ -481,19 +553,29 @@ void DescriptorWriter::write_image(uint32_t binding,
                                    vk::ImageView image,
                                    vk::Sampler sampler,
                                    vk::ImageLayout layout,
-                                   vk::DescriptorType type)
+                                   vk::DescriptorType type,
+                                   uint32_t arrayElement)
 {
-    vk::DescriptorImageInfo imageInfo{};
-    imageInfo.sampler = sampler;
-    imageInfo.imageView = image;
-    imageInfo.imageLayout = layout;
-    imageInfos.push_back(imageInfo);
+    const vk::DescriptorImageInfo imageInfo{
+        .sampler = sampler,
+        .imageView = image,
+        .imageLayout = layout,
+    };
+    write_images(binding, std::span<const vk::DescriptorImageInfo>(&imageInfo, 1), type, arrayElement);
+}
 
+void DescriptorWriter::write_images(uint32_t binding,
+                                    std::span<const vk::DescriptorImageInfo> infos,
+                                    vk::DescriptorType type,
+                                    uint32_t firstArrayElement)
+{
+    imageInfos.emplace_back(infos.begin(), infos.end());
     vk::WriteDescriptorSet write{};
     write.dstBinding = binding;
-    write.descriptorCount = 1;
+    write.dstArrayElement = firstArrayElement;
+    write.descriptorCount = static_cast<uint32_t>(imageInfos.back().size());
     write.descriptorType = type;
-    write.pImageInfo = &imageInfos.back();
+    write.pImageInfo = imageInfos.back().data();
     writes.push_back(write);
 }
 
@@ -501,19 +583,29 @@ void DescriptorWriter::write_buffer(uint32_t binding,
                                     vk::Buffer buffer,
                                     size_t size,
                                     size_t offset,
-                                    vk::DescriptorType type)
+                                    vk::DescriptorType type,
+                                    uint32_t arrayElement)
 {
-    vk::DescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = buffer;
-    bufferInfo.offset = static_cast<vk::DeviceSize>(offset);
-    bufferInfo.range = static_cast<vk::DeviceSize>(size);
-    bufferInfos.push_back(bufferInfo);
+    const vk::DescriptorBufferInfo bufferInfo{
+        .buffer = buffer,
+        .offset = static_cast<vk::DeviceSize>(offset),
+        .range = static_cast<vk::DeviceSize>(size),
+    };
+    write_buffers(binding, std::span<const vk::DescriptorBufferInfo>(&bufferInfo, 1), type, arrayElement);
+}
 
+void DescriptorWriter::write_buffers(uint32_t binding,
+                                     std::span<const vk::DescriptorBufferInfo> infos,
+                                     vk::DescriptorType type,
+                                     uint32_t firstArrayElement)
+{
+    bufferInfos.emplace_back(infos.begin(), infos.end());
     vk::WriteDescriptorSet write{};
     write.dstBinding = binding;
-    write.descriptorCount = 1;
+    write.dstArrayElement = firstArrayElement;
+    write.descriptorCount = static_cast<uint32_t>(bufferInfos.back().size());
     write.descriptorType = type;
-    write.pBufferInfo = &bufferInfos.back();
+    write.pBufferInfo = bufferInfos.back().data();
     writes.push_back(write);
 }
 

@@ -103,11 +103,20 @@ vk::RenderingInfo vkinit::rendering_info(vk::Extent2D renderExtent,
                                          const vk::RenderingAttachmentInfo* colorAttachment,
                                          const vk::RenderingAttachmentInfo* depthAttachment)
 {
+    const std::span<const vk::RenderingAttachmentInfo> attachments(
+        colorAttachment != nullptr ? colorAttachment : nullptr, colorAttachment != nullptr ? 1u : 0u);
+    return rendering_info(renderExtent, attachments, depthAttachment);
+}
+
+vk::RenderingInfo vkinit::rendering_info(vk::Extent2D renderExtent,
+                                         std::span<const vk::RenderingAttachmentInfo> colorAttachments,
+                                         const vk::RenderingAttachmentInfo* depthAttachment)
+{
     vk::RenderingInfo renderInfo{};
     renderInfo.renderArea = vk::Rect2D{vk::Offset2D{0, 0}, renderExtent};
     renderInfo.layerCount = 1;
-    renderInfo.colorAttachmentCount = colorAttachment == nullptr ? 0u : 1u;
-    renderInfo.pColorAttachments = colorAttachment;
+    renderInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size());
+    renderInfo.pColorAttachments = colorAttachments.empty() ? nullptr : colorAttachments.data();
     renderInfo.pDepthAttachment = depthAttachment;
     renderInfo.pStencilAttachment = nullptr;
     return renderInfo;
@@ -197,14 +206,17 @@ vk::DescriptorBufferInfo vkinit::buffer_info(vk::Buffer buffer, vk::DeviceSize o
 
 vk::ImageCreateInfo vkinit::image_create_info(vk::Format format,
                                               vk::ImageUsageFlags usageFlags,
-                                              vk::Extent3D extent)
+                                              vk::Extent3D extent,
+                                              vk::ImageType imageType,
+                                              uint32_t mipLevels,
+                                              uint32_t arrayLayers)
 {
     vk::ImageCreateInfo info{};
-    info.imageType = vk::ImageType::e2D;
+    info.imageType = imageType;
     info.format = format;
     info.extent = extent;
-    info.mipLevels = 1;
-    info.arrayLayers = 1;
+    info.mipLevels = mipLevels;
+    info.arrayLayers = arrayLayers;
     info.samples = vk::SampleCountFlagBits::e1;
     info.tiling = vk::ImageTiling::eOptimal;
     info.usage = usageFlags;
@@ -213,16 +225,21 @@ vk::ImageCreateInfo vkinit::image_create_info(vk::Format format,
 
 vk::ImageViewCreateInfo vkinit::imageview_create_info(vk::Format format,
                                                       vk::Image image,
-                                                      vk::ImageAspectFlags aspectFlags)
+                                                      vk::ImageAspectFlags aspectFlags,
+                                                      vk::ImageViewType viewType,
+                                                      uint32_t levelCount,
+                                                      uint32_t layerCount,
+                                                      uint32_t baseMipLevel,
+                                                      uint32_t baseArrayLayer)
 {
     vk::ImageViewCreateInfo info{};
-    info.viewType = vk::ImageViewType::e2D;
+    info.viewType = viewType;
     info.image = image;
     info.format = format;
-    info.subresourceRange.baseMipLevel = 0;
-    info.subresourceRange.levelCount = 1;
-    info.subresourceRange.baseArrayLayer = 0;
-    info.subresourceRange.layerCount = 1;
+    info.subresourceRange.baseMipLevel = baseMipLevel;
+    info.subresourceRange.levelCount = levelCount;
+    info.subresourceRange.baseArrayLayer = baseArrayLayer;
+    info.subresourceRange.layerCount = layerCount;
     info.subresourceRange.aspectMask = aspectFlags;
     return info;
 }

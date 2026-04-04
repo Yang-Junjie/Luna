@@ -69,6 +69,9 @@ vk::BufferUsageFlags to_vulkan_buffer_usage(luna::BufferUsage usage)
     if ((bits & static_cast<uint32_t>(luna::BufferUsage::Storage)) != 0) {
         flags |= vk::BufferUsageFlagBits::eStorageBuffer;
     }
+    if ((bits & static_cast<uint32_t>(luna::BufferUsage::Indirect)) != 0) {
+        flags |= vk::BufferUsageFlagBits::eIndirectBuffer;
+    }
 
     return flags;
 }
@@ -146,6 +149,79 @@ vk::SamplerAddressMode to_vulkan_sampler_address_mode(luna::SamplerAddressMode m
         default:
             return vk::SamplerAddressMode::eRepeat;
     }
+}
+
+vk::ImageType to_vulkan_image_type(luna::ImageType type)
+{
+    switch (type) {
+        case luna::ImageType::Image3D:
+            return vk::ImageType::e3D;
+        case luna::ImageType::Image2DArray:
+        case luna::ImageType::Image2D:
+        default:
+            return vk::ImageType::e2D;
+    }
+}
+
+vk::ImageViewType to_vulkan_image_view_type(luna::ImageType type)
+{
+    switch (type) {
+        case luna::ImageType::Image2DArray:
+            return vk::ImageViewType::e2DArray;
+        case luna::ImageType::Image3D:
+            return vk::ImageViewType::e3D;
+        case luna::ImageType::Image2D:
+        default:
+            return vk::ImageViewType::e2D;
+    }
+}
+
+uint32_t image_array_layer_count(const luna::ImageDesc& desc)
+{
+    return desc.type == luna::ImageType::Image2DArray ? desc.arrayLayers : 1u;
+}
+
+uint32_t image_upload_depth(const luna::ImageDesc& desc)
+{
+    return desc.type == luna::ImageType::Image3D ? desc.depth : 1u;
+}
+
+size_t image_base_level_data_size(const luna::ImageDesc& desc)
+{
+    const uint64_t texelCount = static_cast<uint64_t>(desc.width) * static_cast<uint64_t>(desc.height) *
+                                static_cast<uint64_t>(image_upload_depth(desc)) *
+                                static_cast<uint64_t>(image_array_layer_count(desc));
+    return static_cast<size_t>(texelCount * luna::pixel_format_bytes_per_pixel(desc.format));
+}
+
+void transition_image_subresource(vk::CommandBuffer cmd,
+                                  vk::Image image,
+                                  vk::ImageAspectFlags aspectMask,
+                                  vk::ImageLayout currentLayout,
+                                  vk::ImageLayout newLayout,
+                                  uint32_t baseMipLevel,
+                                  uint32_t levelCount,
+                                  uint32_t baseArrayLayer,
+                                  uint32_t layerCount)
+{
+    vk::ImageMemoryBarrier2 imageBarrier{};
+    imageBarrier.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    imageBarrier.srcAccessMask = vk::AccessFlagBits2::eMemoryWrite;
+    imageBarrier.dstStageMask = vk::PipelineStageFlagBits2::eAllCommands;
+    imageBarrier.dstAccessMask = vk::AccessFlagBits2::eMemoryWrite | vk::AccessFlagBits2::eMemoryRead;
+    imageBarrier.oldLayout = currentLayout;
+    imageBarrier.newLayout = newLayout;
+    imageBarrier.image = image;
+    imageBarrier.subresourceRange.aspectMask = aspectMask;
+    imageBarrier.subresourceRange.baseMipLevel = baseMipLevel;
+    imageBarrier.subresourceRange.levelCount = levelCount;
+    imageBarrier.subresourceRange.baseArrayLayer = baseArrayLayer;
+    imageBarrier.subresourceRange.layerCount = layerCount;
+
+    vk::DependencyInfo depInfo{};
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers = &imageBarrier;
+    cmd.pipelineBarrier2(&depInfo);
 }
 
 uint32_t pack_rgba8(float r, float g, float b, float a)
@@ -385,16 +461,22 @@ MaterialInstance GLTFMetallic_Roughness::write_material(vk::Device device,
 
     VulkanResourceBindingRegistry bindingRegistry;
     const luna::BufferHandle materialBuffer = bindingRegistry.register_buffer(resources.dataBuffer.buffer);
-    const luna::ImageHandle colorImage = bindingRegistry.register_image_view(resources.colorImage.imageView);
+    const luna::ImageViewHandle colorImage = bindingRegistry.register_image_view(resources.colorImage.imageView);
     const luna::SamplerHandle colorSampler = bindingRegistry.register_sampler(resources.colorSampler);
-    const luna::ImageHandle metalRoughImage = bindingRegistry.register_image_view(resources.metalRoughImage.imageView);
+    const luna::ImageViewHandle metalRoughImage = bindingRegistry.register_image_view(resources.metalRoughImage.imageView);
     const luna::SamplerHandle metalRoughSampler = bindingRegistry.register_sampler(resources.metalRoughSampler);
 
     luna::ResourceSetWriteDesc materialWrite{};
     materialWrite.buffers.push_back(
         {0, materialBuffer, resources.dataBufferOffset, sizeof(MaterialConstants), luna::ResourceType::UniformBuffer});
-    materialWrite.images.push_back({1, colorImage, colorSampler, luna::ResourceType::CombinedImageSampler});
-    materialWrite.images.push_back({2, metalRoughImage, metalRoughSampler, luna::ResourceType::CombinedImageSampler});
+    materialWrite.images.push_back({.binding = 1,
+                                    .imageView = colorImage,
+                                    .sampler = colorSampler,
+                                    .type = luna::ResourceType::CombinedImageSampler});
+    materialWrite.images.push_back({.binding = 2,
+                                    .imageView = metalRoughImage,
+                                    .sampler = metalRoughSampler,
+                                    .type = luna::ResourceType::CombinedImageSampler});
 
     const bool updated = update_resource_set(device, bindingRegistry, materialInstance.materialSet, materialWrite);
 
@@ -1906,15 +1988,191 @@ AllocatedBuffer VulkanEngine::create_buffer(const luna::BufferDesc& desc, const 
 
 AllocatedImage VulkanEngine::create_image(const luna::ImageDesc& desc, const void* initialData)
 {
+    AllocatedImage newImage{};
     const vk::Extent3D extent{desc.width, desc.height, desc.depth};
     const vk::Format format = to_vulkan_format(desc.format);
-    const vk::ImageUsageFlags usage = to_vulkan_image_usage(desc.usage);
-
-    if (initialData == nullptr) {
-        return create_image(extent, format, usage, desc.mipLevels > 1);
+    if (format == vk::Format::eUndefined) {
+        LUNA_CORE_ERROR("create_image rejected unsupported PixelFormat={}", static_cast<uint32_t>(desc.format));
+        return newImage;
     }
 
-    return create_image(const_cast<void*>(initialData), extent, format, usage, desc.mipLevels > 1);
+    const vk::ImageType imageType = to_vulkan_image_type(desc.type);
+    const vk::ImageViewType imageViewType = to_vulkan_image_view_type(desc.type);
+    const uint32_t layerCount = image_array_layer_count(desc);
+    const uint32_t uploadDepth = image_upload_depth(desc);
+    const vk::ImageAspectFlags aspectFlags =
+        luna::is_depth_format(desc.format) ? vk::ImageAspectFlagBits::eDepth : vk::ImageAspectFlagBits::eColor;
+
+    vk::ImageUsageFlags usage = to_vulkan_image_usage(desc.usage);
+    if (initialData != nullptr) {
+        usage |= vk::ImageUsageFlagBits::eTransferDst;
+    }
+    if (desc.mipLevels > 1) {
+        usage |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+
+    newImage.imageFormat = format;
+    newImage.imageExtent = extent;
+
+    vk::ImageCreateInfo imgInfo =
+        vkinit::image_create_info(format, usage, extent, imageType, desc.mipLevels, layerCount);
+
+    VmaAllocationCreateInfo allocinfo = {};
+    allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkImage rawImage = VK_NULL_HANDLE;
+    const VkResult createImageResult = vmaCreateImage(_allocator,
+                                                      reinterpret_cast<const VkImageCreateInfo*>(&imgInfo),
+                                                      &allocinfo,
+                                                      &rawImage,
+                                                      &newImage.allocation,
+                                                      nullptr);
+    if (createImageResult != VK_SUCCESS || rawImage == VK_NULL_HANDLE) {
+        LUNA_CORE_ERROR("Failed to create image '{}': {}",
+                        desc.debugName.empty() ? "<unnamed>" : std::string(desc.debugName),
+                        string_VkResult(createImageResult));
+        return {};
+    }
+    newImage.image = rawImage;
+
+    const uint32_t viewLayerCount = desc.type == luna::ImageType::Image2DArray ? desc.arrayLayers : 1u;
+    vk::ImageViewCreateInfo viewInfo =
+        vkinit::imageview_create_info(format, newImage.image, aspectFlags, imageViewType, desc.mipLevels, viewLayerCount);
+    const vk::Result createViewResult = _device.createImageView(&viewInfo, nullptr, &newImage.imageView);
+    if (createViewResult != vk::Result::eSuccess || !newImage.imageView) {
+        LUNA_CORE_ERROR("Failed to create image view '{}': {}",
+                        desc.debugName.empty() ? "<unnamed>" : std::string(desc.debugName),
+                        vk::to_string(createViewResult));
+        vmaDestroyImage(_allocator, static_cast<VkImage>(newImage.image), newImage.allocation);
+        return {};
+    }
+
+    if (initialData == nullptr) {
+        return newImage;
+    }
+
+    const size_t dataSize = image_base_level_data_size(desc);
+    if (dataSize == 0) {
+        LUNA_CORE_ERROR("Initial image data size is zero for '{}'",
+                        desc.debugName.empty() ? "<unnamed>" : std::string(desc.debugName));
+        destroy_image(newImage);
+        return {};
+    }
+
+    AllocatedBuffer uploadBuffer =
+        create_buffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+    std::memcpy(uploadBuffer.info.pMappedData, initialData, dataSize);
+
+    immediate_submit([&](vk::CommandBuffer cmd) {
+        transition_image_subresource(cmd,
+                                     newImage.image,
+                                     aspectFlags,
+                                     vk::ImageLayout::eUndefined,
+                                     vk::ImageLayout::eTransferDstOptimal,
+                                     0,
+                                     desc.mipLevels,
+                                     0,
+                                     viewLayerCount);
+
+        VkBufferImageCopy copyRegion{};
+        copyRegion.bufferOffset = 0;
+        copyRegion.bufferRowLength = 0;
+        copyRegion.bufferImageHeight = 0;
+        copyRegion.imageSubresource.aspectMask = static_cast<VkImageAspectFlags>(aspectFlags);
+        copyRegion.imageSubresource.mipLevel = 0;
+        copyRegion.imageSubresource.baseArrayLayer = 0;
+        copyRegion.imageSubresource.layerCount = viewLayerCount;
+        copyRegion.imageExtent = {desc.width, desc.height, uploadDepth};
+
+        cmd.copyBufferToImage(uploadBuffer.buffer,
+                              newImage.image,
+                              vk::ImageLayout::eTransferDstOptimal,
+                              1,
+                              reinterpret_cast<const vk::BufferImageCopy*>(&copyRegion));
+
+        if (desc.mipLevels > 1 && !luna::is_depth_format(desc.format)) {
+            int32_t mipWidth = static_cast<int32_t>(desc.width);
+            int32_t mipHeight = static_cast<int32_t>(desc.height);
+            int32_t mipDepth = static_cast<int32_t>(uploadDepth);
+
+            for (uint32_t mipLevel = 1; mipLevel < desc.mipLevels; ++mipLevel) {
+                transition_image_subresource(cmd,
+                                             newImage.image,
+                                             aspectFlags,
+                                             vk::ImageLayout::eTransferDstOptimal,
+                                             vk::ImageLayout::eTransferSrcOptimal,
+                                             mipLevel - 1,
+                                             1,
+                                             0,
+                                             viewLayerCount);
+
+                vk::ImageBlit2 blitRegion{};
+                blitRegion.srcOffsets[1] = vk::Offset3D{mipWidth, mipHeight, mipDepth};
+                blitRegion.dstOffsets[1] = vk::Offset3D{std::max(1, mipWidth / 2),
+                                                        std::max(1, mipHeight / 2),
+                                                        desc.type == luna::ImageType::Image3D ? std::max(1, mipDepth / 2) : 1};
+                blitRegion.srcSubresource.aspectMask = aspectFlags;
+                blitRegion.srcSubresource.mipLevel = mipLevel - 1;
+                blitRegion.srcSubresource.baseArrayLayer = 0;
+                blitRegion.srcSubresource.layerCount = viewLayerCount;
+                blitRegion.dstSubresource.aspectMask = aspectFlags;
+                blitRegion.dstSubresource.mipLevel = mipLevel;
+                blitRegion.dstSubresource.baseArrayLayer = 0;
+                blitRegion.dstSubresource.layerCount = viewLayerCount;
+
+                vk::BlitImageInfo2 blitInfo{};
+                blitInfo.srcImage = newImage.image;
+                blitInfo.srcImageLayout = vk::ImageLayout::eTransferSrcOptimal;
+                blitInfo.dstImage = newImage.image;
+                blitInfo.dstImageLayout = vk::ImageLayout::eTransferDstOptimal;
+                blitInfo.filter = vk::Filter::eLinear;
+                blitInfo.regionCount = 1;
+                blitInfo.pRegions = &blitRegion;
+                cmd.blitImage2(&blitInfo);
+
+                transition_image_subresource(cmd,
+                                             newImage.image,
+                                             aspectFlags,
+                                             vk::ImageLayout::eTransferSrcOptimal,
+                                             vk::ImageLayout::eShaderReadOnlyOptimal,
+                                             mipLevel - 1,
+                                             1,
+                                             0,
+                                             viewLayerCount);
+
+                mipWidth = std::max(1, mipWidth / 2);
+                mipHeight = std::max(1, mipHeight / 2);
+                if (desc.type == luna::ImageType::Image3D) {
+                    mipDepth = std::max(1, mipDepth / 2);
+                }
+            }
+
+            transition_image_subresource(cmd,
+                                         newImage.image,
+                                         aspectFlags,
+                                         vk::ImageLayout::eTransferDstOptimal,
+                                         vk::ImageLayout::eShaderReadOnlyOptimal,
+                                         desc.mipLevels - 1,
+                                         1,
+                                         0,
+                                         viewLayerCount);
+            return;
+        }
+
+        transition_image_subresource(cmd,
+                                     newImage.image,
+                                     aspectFlags,
+                                     vk::ImageLayout::eTransferDstOptimal,
+                                     vk::ImageLayout::eShaderReadOnlyOptimal,
+                                     0,
+                                     desc.mipLevels,
+                                     0,
+                                     viewLayerCount);
+    });
+
+    destroy_buffer(uploadBuffer);
+    return newImage;
 }
 
 vk::Sampler VulkanEngine::create_sampler(const luna::SamplerDesc& desc)

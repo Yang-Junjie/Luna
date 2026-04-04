@@ -11,6 +11,7 @@
 #include "GLFW/glfw3.h"
 
 #include <array>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -90,10 +91,114 @@ private:
     bool m_vsync = false;
 };
 
-bool is_depth_format(PixelFormat format)
+uint32_t max_mip_levels_for_desc(const ImageDesc& desc)
 {
-    return format == PixelFormat::D32Float;
+    uint32_t maxDimension = std::max(desc.width, desc.height);
+    if (desc.type == ImageType::Image3D) {
+        maxDimension = std::max(maxDimension, desc.depth);
+    }
+
+    uint32_t levels = 0;
+    do {
+        ++levels;
+        maxDimension >>= 1;
+    } while (maxDimension > 0);
+
+    return levels;
 }
+
+bool validate_image_desc(const ImageDesc& desc)
+{
+    if (desc.width == 0 || desc.height == 0 || desc.depth == 0 || desc.mipLevels == 0 || desc.arrayLayers == 0 ||
+        desc.format == PixelFormat::Undefined) {
+        return false;
+    }
+
+    switch (desc.type) {
+        case ImageType::Image2D:
+            return desc.depth == 1 && desc.arrayLayers == 1;
+        case ImageType::Image2DArray:
+            return desc.depth == 1;
+        case ImageType::Image3D:
+            return desc.arrayLayers == 1;
+        default:
+            return false;
+    }
+}
+
+vk::ImageAspectFlags to_vulkan_image_aspect_flags(ImageAspect aspect)
+{
+    switch (aspect) {
+        case ImageAspect::Depth:
+            return vk::ImageAspectFlagBits::eDepth;
+        case ImageAspect::Color:
+        default:
+            return vk::ImageAspectFlagBits::eColor;
+    }
+}
+
+vk::ImageViewType to_vulkan_image_view_type(ImageViewType type)
+{
+    switch (type) {
+        case ImageViewType::Image2DArray:
+            return vk::ImageViewType::e2DArray;
+        case ImageViewType::Image3D:
+            return vk::ImageViewType::e3D;
+        case ImageViewType::Image2D:
+        default:
+            return vk::ImageViewType::e2D;
+    }
+}
+
+ImageAspect default_image_aspect(const ImageDesc& desc)
+{
+    return luna::is_depth_format(desc.format) ? ImageAspect::Depth : ImageAspect::Color;
+}
+
+ImageViewType default_image_view_type(const ImageDesc& desc)
+{
+    switch (desc.type) {
+        case ImageType::Image2DArray:
+            return ImageViewType::Image2DArray;
+        case ImageType::Image3D:
+            return ImageViewType::Image3D;
+        case ImageType::Image2D:
+        default:
+            return ImageViewType::Image2D;
+    }
+}
+
+bool validate_image_view_desc(const ImageDesc& imageDesc, const ImageViewDesc& desc)
+{
+    if (!desc.image.isValid() || desc.mipCount == 0 || desc.layerCount == 0 || desc.baseMipLevel >= imageDesc.mipLevels ||
+        desc.baseMipLevel + desc.mipCount > imageDesc.mipLevels) {
+        return false;
+    }
+
+    const ImageAspect expectedAspect = default_image_aspect(imageDesc);
+    if (desc.aspect != expectedAspect) {
+        return false;
+    }
+
+    switch (imageDesc.type) {
+        case ImageType::Image2D:
+            return desc.type == ImageViewType::Image2D && desc.baseArrayLayer == 0 && desc.layerCount == 1;
+
+        case ImageType::Image2DArray:
+            if (desc.baseArrayLayer >= imageDesc.arrayLayers || desc.baseArrayLayer + desc.layerCount > imageDesc.arrayLayers) {
+                return false;
+            }
+            return (desc.type == ImageViewType::Image2D && desc.layerCount == 1) ||
+                   desc.type == ImageViewType::Image2DArray;
+
+        case ImageType::Image3D:
+            return desc.type == ImageViewType::Image3D && desc.baseArrayLayer == 0 && desc.layerCount == 1;
+
+        default:
+            return false;
+    }
+}
+
 
 PixelFormat from_vulkan_format(vk::Format format)
 {
@@ -104,8 +209,14 @@ PixelFormat from_vulkan_format(vk::Format format)
             return PixelFormat::RGBA8Unorm;
         case vk::Format::eR8G8B8A8Srgb:
             return PixelFormat::RGBA8Srgb;
+        case vk::Format::eR16G16Sfloat:
+            return PixelFormat::RG16Float;
         case vk::Format::eR16G16B16A16Sfloat:
             return PixelFormat::RGBA16Float;
+        case vk::Format::eR32Sfloat:
+            return PixelFormat::R32Float;
+        case vk::Format::eB10G11R11UfloatPack32:
+            return PixelFormat::R11G11B10Float;
         case vk::Format::eD32Sfloat:
             return PixelFormat::D32Float;
         default:
@@ -134,6 +245,113 @@ vk::ImageLayout to_vulkan_image_layout(luna::ImageLayout layout)
         default:
             return vk::ImageLayout::eUndefined;
     }
+}
+
+vk::PipelineStageFlags2 to_vulkan_pipeline_stages(PipelineStage stages)
+{
+    const uint32_t bits = static_cast<uint32_t>(stages);
+    if (bits == static_cast<uint32_t>(PipelineStage::AllCommands)) {
+        return vk::PipelineStageFlagBits2::eAllCommands;
+    }
+
+    vk::PipelineStageFlags2 flags{};
+    if ((bits & static_cast<uint32_t>(PipelineStage::Top)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eTopOfPipe;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::DrawIndirect)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eDrawIndirect;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::VertexInput)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eVertexInput;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::VertexShader)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eVertexShader;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::FragmentShader)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eFragmentShader;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::ComputeShader)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eComputeShader;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::ColorAttachmentOutput)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eColorAttachmentOutput;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::Transfer)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eTransfer;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::Host)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eHost;
+    }
+    if ((bits & static_cast<uint32_t>(PipelineStage::Bottom)) != 0) {
+        flags |= vk::PipelineStageFlagBits2::eBottomOfPipe;
+    }
+
+    return flags;
+}
+
+vk::AccessFlags2 to_vulkan_access_flags(ResourceAccess access)
+{
+    vk::AccessFlags2 flags{};
+    const uint32_t bits = static_cast<uint32_t>(access);
+
+    if ((bits & static_cast<uint32_t>(ResourceAccess::IndirectCommandRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eIndirectCommandRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::VertexBufferRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eVertexAttributeRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::IndexBufferRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eIndexRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::UniformRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eUniformRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::ShaderRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eShaderRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::ShaderWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eShaderWrite;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::ColorAttachmentRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eColorAttachmentRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::ColorAttachmentWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eColorAttachmentWrite;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::DepthStencilRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eDepthStencilAttachmentRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::DepthStencilWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eDepthStencilAttachmentWrite;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::TransferRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eTransferRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::TransferWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eTransferWrite;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::HostRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eHostRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::HostWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eHostWrite;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::MemoryRead)) != 0) {
+        flags |= vk::AccessFlagBits2::eMemoryRead;
+    }
+    if ((bits & static_cast<uint32_t>(ResourceAccess::MemoryWrite)) != 0) {
+        flags |= vk::AccessFlagBits2::eMemoryWrite;
+    }
+
+    return flags;
+}
+
+bool validate_stage_access_pair(PipelineStage stages, ResourceAccess access)
+{
+    if (stages == PipelineStage::None) {
+        return access == ResourceAccess::None;
+    }
+    return true;
 }
 
 vk::IndexType to_vulkan_index_type(IndexFormat format)
@@ -213,17 +431,23 @@ public:
     RHIResult beginRendering(const RenderingInfo& renderingInfo) override;
     RHIResult endRendering() override;
     RHIResult clearColor(const ClearColorValue& color) override;
+    RHIResult imageBarrier(const ImageBarrierInfo& barrierInfo) override;
+    RHIResult bufferBarrier(const BufferBarrierInfo& barrierInfo) override;
     RHIResult transitionImage(ImageHandle image, luna::ImageLayout newLayout) override;
+    RHIResult copyBuffer(const BufferCopyInfo& copyInfo) override;
     RHIResult copyImage(const ImageCopyInfo& copyInfo) override;
+    RHIResult copyBufferToImage(const BufferImageCopyInfo& copyInfo) override;
+    RHIResult copyImageToBuffer(const BufferImageCopyInfo& copyInfo) override;
     RHIResult bindGraphicsPipeline(PipelineHandle pipeline) override;
     RHIResult bindComputePipeline(PipelineHandle pipeline) override;
     RHIResult bindVertexBuffer(BufferHandle buffer, uint64_t offset) override;
     RHIResult bindIndexBuffer(BufferHandle buffer, IndexFormat indexFormat, uint64_t offset) override;
-    RHIResult bindResourceSet(ResourceSetHandle resourceSet) override;
+    RHIResult bindResourceSet(ResourceSetHandle resourceSet, std::span<const uint32_t> dynamicOffsets) override;
     RHIResult pushConstants(const void* data, uint32_t size, uint32_t offset, ShaderType visibility) override;
     RHIResult draw(const DrawArguments& arguments) override;
     RHIResult drawIndexed(const IndexedDrawArguments& arguments) override;
     RHIResult dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) override;
+    RHIResult dispatchIndirect(BufferHandle argumentsBuffer, uint64_t offset) override;
 
 private:
     VulkanRHIDevice& m_device;
@@ -367,16 +591,37 @@ RHIResult VulkanRHIDevice::writeBuffer(BufferHandle handle, const void* data, ui
                : RHIResult::InternalError;
 }
 
+RHIResult VulkanRHIDevice::readBuffer(BufferHandle handle, void* outData, uint64_t size, uint64_t offset)
+{
+    BufferResource* buffer = findBuffer(handle);
+    if (buffer == nullptr || outData == nullptr || size == 0) {
+        return RHIResult::InvalidArgument;
+    }
+
+    if (buffer->buffer.info.pMappedData == nullptr || offset + size > buffer->buffer.info.size) {
+        return RHIResult::InvalidArgument;
+    }
+
+    std::memcpy(outData, static_cast<const std::byte*>(buffer->buffer.info.pMappedData) + offset, static_cast<size_t>(size));
+    return RHIResult::Success;
+}
+
 RHIResult VulkanRHIDevice::createImage(const ImageDesc& desc, ImageHandle* outHandle, const void* initialData)
 {
-    if (!m_initialized || outHandle == nullptr || desc.width == 0 || desc.height == 0 ||
-        desc.format == PixelFormat::Undefined) {
+    if (!m_initialized || outHandle == nullptr || !validate_image_desc(desc) ||
+        desc.mipLevels > max_mip_levels_for_desc(desc) || (initialData != nullptr && luna::is_depth_format(desc.format))) {
         return RHIResult::InvalidArgument;
     }
 
     AllocatedImage image = m_engine.create_image(desc, initialData);
-    const ImageHandle handle = m_bindingRegistry.register_image_view(image.imageView);
-    if (!handle.isValid()) {
+    if (!image.image || !image.imageView) {
+        return RHIResult::InternalError;
+    }
+
+    const ImageHandle handle = ImageHandle::fromRaw(nextHandleValue(&m_nextImageId));
+    if (!handle.isValid() ||
+        !m_bindingRegistry.register_image_view(ImageViewHandle::fromRaw(handle.value), image.imageView)) {
+        m_engine.destroy_image(image);
         return RHIResult::InternalError;
     }
 
@@ -395,16 +640,94 @@ void VulkanRHIDevice::destroyImage(ImageHandle handle)
         return;
     }
 
+    std::vector<uint64_t> childViews;
+    childViews.reserve(m_imageViews.size());
+    for (const auto& [viewHandle, imageView] : m_imageViews) {
+        if (imageView.imageHandle == handle) {
+            childViews.push_back(viewHandle);
+        }
+    }
+    for (const uint64_t viewHandle : childViews) {
+        destroyImageView(ImageViewHandle::fromRaw(viewHandle));
+    }
+
     if (image->owned) {
         m_engine.destroy_image(image->image);
     }
 
-    m_bindingRegistry.unregister_image_view(handle);
+    m_bindingRegistry.unregister_image_view(ImageViewHandle::fromRaw(handle.value));
     m_images.erase(handle.value);
 
     if (handle == m_currentBackbufferHandle) {
         m_currentBackbufferHandle = {};
     }
+}
+
+RHIResult VulkanRHIDevice::createImageView(const ImageViewDesc& desc, ImageViewHandle* outHandle)
+{
+    if (!m_initialized || outHandle == nullptr) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const ImageResource* image = findImage(desc.image);
+    if (image == nullptr || !image->image.image) {
+        return RHIResult::InvalidArgument;
+    }
+
+    if (!validate_image_view_desc(image->desc, desc)) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const PixelFormat format = desc.format == PixelFormat::Undefined ? image->desc.format : desc.format;
+    if (format != image->desc.format) {
+        return RHIResult::Unsupported;
+    }
+
+    const vk::Format vkFormat = to_vulkan_format(format);
+    if (vkFormat == vk::Format::eUndefined) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::ImageViewCreateInfo viewInfo = vkinit::imageview_create_info(vkFormat,
+                                                                     image->image.image,
+                                                                     to_vulkan_image_aspect_flags(desc.aspect),
+                                                                     to_vulkan_image_view_type(desc.type),
+                                                                     desc.mipCount,
+                                                                     desc.layerCount,
+                                                                     desc.baseMipLevel,
+                                                                     desc.baseArrayLayer);
+
+    vk::ImageView view{};
+    const vk::Result result = m_engine._device.createImageView(&viewInfo, nullptr, &view);
+    if (result != vk::Result::eSuccess || !view) {
+        LUNA_CORE_ERROR("VulkanRHIDevice::createImageView failed: {}", vk::to_string(result));
+        return RHIResult::InternalError;
+    }
+
+    const ImageViewHandle handle = ImageViewHandle::fromRaw(nextHandleValue(&m_nextImageViewId));
+    if (!handle.isValid() || !m_bindingRegistry.register_image_view(handle, view)) {
+        m_engine._device.destroyImageView(view, nullptr);
+        return RHIResult::InternalError;
+    }
+
+    m_imageViews.insert_or_assign(handle.value, ImageViewResource{.desc = desc, .imageHandle = desc.image, .view = view});
+    *outHandle = handle;
+    return RHIResult::Success;
+}
+
+void VulkanRHIDevice::destroyImageView(ImageViewHandle handle)
+{
+    ImageViewResource* imageView = findImageView(handle);
+    if (imageView == nullptr) {
+        return;
+    }
+
+    if (m_engine._device && imageView->view) {
+        m_engine._device.destroyImageView(imageView->view, nullptr);
+    }
+
+    m_bindingRegistry.unregister_image_view(handle);
+    m_imageViews.erase(handle.value);
 }
 
 RHIResult VulkanRHIDevice::createSampler(const SamplerDesc& desc, SamplerHandle* outHandle)
@@ -565,15 +888,47 @@ RHIResult VulkanRHIDevice::createGraphicsPipeline(const GraphicsPipelineDesc& de
         return RHIResult::InvalidArgument;
     }
 
-    std::vector<vk::DescriptorSetLayout> setLayouts;
-    setLayouts.reserve(desc.resourceLayouts.size());
-    for (const ResourceLayoutHandle layoutHandle : desc.resourceLayouts) {
-        const ResourceLayoutResource* layout = findResourceLayout(layoutHandle);
-        if (layout == nullptr || !layout->layout) {
-            return RHIResult::InvalidArgument;
+    const auto collectSetLayouts = [&](std::span<const ResourceLayoutHandle> handles,
+                                       std::vector<vk::DescriptorSetLayout>* outSetLayouts) -> bool {
+        if (outSetLayouts == nullptr) {
+            return false;
         }
 
-        setLayouts.push_back(layout->layout);
+        std::vector<const ResourceLayoutResource*> layouts;
+        layouts.reserve(handles.size());
+        for (const ResourceLayoutHandle handle : handles) {
+            const ResourceLayoutResource* layout = findResourceLayout(handle);
+            if (layout == nullptr || !layout->layout) {
+                return false;
+            }
+            layouts.push_back(layout);
+        }
+
+        std::sort(layouts.begin(), layouts.end(), [](const ResourceLayoutResource* lhs, const ResourceLayoutResource* rhs) {
+            return lhs->desc.setIndex < rhs->desc.setIndex;
+        });
+        for (size_t index = 1; index < layouts.size(); ++index) {
+            if (layouts[index - 1]->desc.setIndex == layouts[index]->desc.setIndex) {
+                return false;
+            }
+        }
+        for (size_t index = 0; index < layouts.size(); ++index) {
+            if (layouts[index]->desc.setIndex != static_cast<uint32_t>(index)) {
+                return false;
+            }
+        }
+
+        outSetLayouts->clear();
+        outSetLayouts->reserve(layouts.size());
+        for (const ResourceLayoutResource* layout : layouts) {
+            outSetLayouts->push_back(layout->layout);
+        }
+        return true;
+    };
+
+    std::vector<vk::DescriptorSetLayout> setLayouts;
+    if (!collectSetLayouts(desc.resourceLayouts, &setLayouts)) {
+        return RHIResult::InvalidArgument;
     }
 
     vk::PushConstantRange pushConstantRange{};
@@ -618,15 +973,47 @@ RHIResult VulkanRHIDevice::createComputePipeline(const ComputePipelineDesc& desc
         return RHIResult::InvalidArgument;
     }
 
-    std::vector<vk::DescriptorSetLayout> setLayouts;
-    setLayouts.reserve(desc.resourceLayouts.size());
-    for (const ResourceLayoutHandle layoutHandle : desc.resourceLayouts) {
-        const ResourceLayoutResource* layout = findResourceLayout(layoutHandle);
-        if (layout == nullptr || !layout->layout) {
-            return RHIResult::InvalidArgument;
+    const auto collectSetLayouts = [&](std::span<const ResourceLayoutHandle> handles,
+                                       std::vector<vk::DescriptorSetLayout>* outSetLayouts) -> bool {
+        if (outSetLayouts == nullptr) {
+            return false;
         }
 
-        setLayouts.push_back(layout->layout);
+        std::vector<const ResourceLayoutResource*> layouts;
+        layouts.reserve(handles.size());
+        for (const ResourceLayoutHandle handle : handles) {
+            const ResourceLayoutResource* layout = findResourceLayout(handle);
+            if (layout == nullptr || !layout->layout) {
+                return false;
+            }
+            layouts.push_back(layout);
+        }
+
+        std::sort(layouts.begin(), layouts.end(), [](const ResourceLayoutResource* lhs, const ResourceLayoutResource* rhs) {
+            return lhs->desc.setIndex < rhs->desc.setIndex;
+        });
+        for (size_t index = 1; index < layouts.size(); ++index) {
+            if (layouts[index - 1]->desc.setIndex == layouts[index]->desc.setIndex) {
+                return false;
+            }
+        }
+        for (size_t index = 0; index < layouts.size(); ++index) {
+            if (layouts[index]->desc.setIndex != static_cast<uint32_t>(index)) {
+                return false;
+            }
+        }
+
+        outSetLayouts->clear();
+        outSetLayouts->reserve(layouts.size());
+        for (const ResourceLayoutResource* layout : layouts) {
+            outSetLayouts->push_back(layout->layout);
+        }
+        return true;
+    };
+
+    std::vector<vk::DescriptorSetLayout> setLayouts;
+    if (!collectSetLayouts(desc.resourceLayouts, &setLayouts)) {
+        return RHIResult::InvalidArgument;
     }
 
     vk::PushConstantRange pushConstantRange{};
@@ -888,44 +1275,60 @@ RHIResult VulkanRHIDevice::CommandContext::beginRendering(const RenderingInfo& r
         return RHIResult::InvalidArgument;
     }
 
-    const ColorAttachmentInfo& colorAttachment = renderingInfo.colorAttachments.front();
-    ImageResource* image = m_device.findImage(colorAttachment.image);
-    if (image == nullptr) {
-        return RHIResult::InvalidArgument;
+    std::vector<vk::RenderingAttachmentInfo> colorAttachmentInfos;
+    colorAttachmentInfos.reserve(renderingInfo.colorAttachments.size());
+
+    ImageHandle firstColorAttachment{};
+    vk::Extent2D fallbackExtent{};
+    for (size_t attachmentIndex = 0; attachmentIndex < renderingInfo.colorAttachments.size(); ++attachmentIndex) {
+        const ColorAttachmentInfo& colorAttachment = renderingInfo.colorAttachments[attachmentIndex];
+        ImageResource* image = m_device.findImage(colorAttachment.image);
+        if (image == nullptr || luna::is_depth_format(image->desc.format)) {
+            return RHIResult::InvalidArgument;
+        }
+
+        vk::ImageLayout currentLayout = image->layout;
+        if (colorAttachment.image == m_device.m_currentBackbufferHandle &&
+            m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
+            currentLayout =
+                static_cast<vk::ImageLayout>(m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex]);
+        }
+
+        vkutil::transition_image(
+            m_commandBuffer, image->image.image, currentLayout, vk::ImageLayout::eColorAttachmentOptimal);
+
+        image->layout = vk::ImageLayout::eColorAttachmentOptimal;
+        if (colorAttachment.image == m_device.m_currentBackbufferHandle &&
+            m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
+            m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex] =
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        }
+
+        vk::ClearValue clearValue{};
+        clearValue.color = vk::ClearColorValue(std::array<float, 4>{
+            colorAttachment.clearColor.r,
+            colorAttachment.clearColor.g,
+            colorAttachment.clearColor.b,
+            colorAttachment.clearColor.a,
+        });
+
+        vk::RenderingAttachmentInfo colorAttachmentInfo =
+            vkinit::attachment_info(image->image.imageView, &clearValue, vk::ImageLayout::eColorAttachmentOptimal);
+        colorAttachmentInfo.loadOp = vk::AttachmentLoadOp::eClear;
+        colorAttachmentInfo.storeOp = vk::AttachmentStoreOp::eStore;
+        colorAttachmentInfos.push_back(colorAttachmentInfo);
+
+        if (attachmentIndex == 0) {
+            firstColorAttachment = colorAttachment.image;
+            fallbackExtent = {image->desc.width, image->desc.height};
+        }
     }
-
-    vk::ImageLayout currentLayout = image->layout;
-    if (colorAttachment.image == m_device.m_currentBackbufferHandle &&
-        m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
-        currentLayout = static_cast<vk::ImageLayout>(m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex]);
-    }
-
-    vkutil::transition_image(m_commandBuffer, image->image.image, currentLayout, vk::ImageLayout::eColorAttachmentOptimal);
-
-    image->layout = vk::ImageLayout::eColorAttachmentOptimal;
-    if (colorAttachment.image == m_device.m_currentBackbufferHandle &&
-        m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
-        m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    }
-
-    vk::ClearValue clearValue{};
-    clearValue.color = vk::ClearColorValue(std::array<float, 4>{
-        colorAttachment.clearColor.r,
-        colorAttachment.clearColor.g,
-        colorAttachment.clearColor.b,
-        colorAttachment.clearColor.a,
-    });
-
-    vk::RenderingAttachmentInfo colorAttachmentInfo =
-        vkinit::attachment_info(image->image.imageView, &clearValue, vk::ImageLayout::eColorAttachmentOptimal);
-    colorAttachmentInfo.loadOp = vk::AttachmentLoadOp::eClear;
-    colorAttachmentInfo.storeOp = vk::AttachmentStoreOp::eStore;
 
     vk::RenderingAttachmentInfo depthAttachmentInfo{};
     const vk::RenderingAttachmentInfo* depthAttachmentPtr = nullptr;
     if (renderingInfo.depthAttachment.image.isValid()) {
         ImageResource* depthImage = m_device.findImage(renderingInfo.depthAttachment.image);
-        if (depthImage == nullptr || !is_depth_format(depthImage->desc.format)) {
+        if (depthImage == nullptr || !luna::is_depth_format(depthImage->desc.format)) {
             return RHIResult::InvalidArgument;
         }
 
@@ -941,11 +1344,11 @@ RHIResult VulkanRHIDevice::CommandContext::beginRendering(const RenderingInfo& r
 
     m_renderExtent = {renderingInfo.width, renderingInfo.height};
     if (m_renderExtent.width == 0 || m_renderExtent.height == 0) {
-        m_renderExtent = {image->desc.width, image->desc.height};
+        m_renderExtent = fallbackExtent;
     }
 
     const vk::RenderingInfo vkRenderingInfo =
-        vkinit::rendering_info(m_renderExtent, &colorAttachmentInfo, depthAttachmentPtr);
+        vkinit::rendering_info(m_renderExtent, std::span<const vk::RenderingAttachmentInfo>(colorAttachmentInfos), depthAttachmentPtr);
     m_commandBuffer.beginRendering(&vkRenderingInfo);
 
     const vk::Viewport viewport{0.0f,
@@ -959,7 +1362,7 @@ RHIResult VulkanRHIDevice::CommandContext::beginRendering(const RenderingInfo& r
     m_commandBuffer.setScissor(0, 1, &scissor);
 
     m_rendering = true;
-    m_currentAttachment = colorAttachment.image;
+    m_currentAttachment = firstColorAttachment;
     return RHIResult::Success;
 }
 
@@ -982,7 +1385,7 @@ RHIResult VulkanRHIDevice::CommandContext::clearColor(const ClearColorValue& col
 
     const ImageHandle targetHandle = m_currentAttachment.isValid() ? m_currentAttachment : m_device.m_currentBackbufferHandle;
     ImageResource* image = m_device.findImage(targetHandle);
-    if (image == nullptr || is_depth_format(image->desc.format)) {
+    if (image == nullptr || luna::is_depth_format(image->desc.format)) {
         return RHIResult::InvalidArgument;
     }
 
@@ -1024,33 +1427,120 @@ RHIResult VulkanRHIDevice::CommandContext::clearColor(const ClearColorValue& col
     return RHIResult::Success;
 }
 
-RHIResult VulkanRHIDevice::CommandContext::transitionImage(ImageHandle imageHandle, luna::ImageLayout newLayout)
+RHIResult VulkanRHIDevice::CommandContext::imageBarrier(const ImageBarrierInfo& barrierInfo)
 {
-    if (!m_commandBuffer || m_rendering) {
+    if (!m_commandBuffer || m_rendering || !barrierInfo.image.isValid() || barrierInfo.mipCount == 0 ||
+        barrierInfo.layerCount == 0 || barrierInfo.newLayout == ImageLayout::Undefined ||
+        !validate_stage_access_pair(barrierInfo.srcStage, barrierInfo.srcAccess) ||
+        !validate_stage_access_pair(barrierInfo.dstStage, barrierInfo.dstAccess)) {
         return RHIResult::InvalidArgument;
     }
 
-    ImageResource* image = m_device.findImage(imageHandle);
+    ImageResource* image = m_device.findImage(barrierInfo.image);
     if (image == nullptr) {
         return RHIResult::InvalidArgument;
     }
 
+    const uint32_t fullLayerCount = image->desc.type == ImageType::Image2DArray ? image->desc.arrayLayers : 1u;
+    if (barrierInfo.baseMipLevel != 0 || barrierInfo.baseArrayLayer != 0 || barrierInfo.mipCount != image->desc.mipLevels ||
+        barrierInfo.layerCount != fullLayerCount) {
+        return RHIResult::InvalidArgument;
+    }
+
     vk::ImageLayout currentLayout = image->layout;
-    if (imageHandle == m_device.m_currentBackbufferHandle &&
+    if (barrierInfo.image == m_device.m_currentBackbufferHandle &&
         m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
         currentLayout = static_cast<vk::ImageLayout>(m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex]);
     }
 
-    const vk::ImageLayout targetLayout = to_vulkan_image_layout(newLayout);
-    vkutil::transition_image(m_commandBuffer, image->image.image, currentLayout, targetLayout);
+    if (barrierInfo.oldLayout != ImageLayout::Undefined &&
+        currentLayout != to_vulkan_image_layout(barrierInfo.oldLayout)) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const vk::ImageLayout targetLayout = to_vulkan_image_layout(barrierInfo.newLayout);
+    vk::ImageMemoryBarrier2 barrier{};
+    barrier.srcStageMask = to_vulkan_pipeline_stages(barrierInfo.srcStage);
+    barrier.srcAccessMask = to_vulkan_access_flags(barrierInfo.srcAccess);
+    barrier.dstStageMask = to_vulkan_pipeline_stages(barrierInfo.dstStage);
+    barrier.dstAccessMask = to_vulkan_access_flags(barrierInfo.dstAccess);
+    barrier.oldLayout = currentLayout;
+    barrier.newLayout = targetLayout;
+    barrier.image = image->image.image;
+    barrier.subresourceRange.aspectMask = to_vulkan_image_aspect_flags(barrierInfo.aspect);
+    barrier.subresourceRange.baseMipLevel = barrierInfo.baseMipLevel;
+    barrier.subresourceRange.levelCount = barrierInfo.mipCount;
+    barrier.subresourceRange.baseArrayLayer = barrierInfo.baseArrayLayer;
+    barrier.subresourceRange.layerCount = barrierInfo.layerCount;
+
+    vk::DependencyInfo dependencyInfo{};
+    dependencyInfo.imageMemoryBarrierCount = 1;
+    dependencyInfo.pImageMemoryBarriers = &barrier;
+    m_commandBuffer.pipelineBarrier2(&dependencyInfo);
 
     image->layout = targetLayout;
-    if (imageHandle == m_device.m_currentBackbufferHandle &&
+    if (barrierInfo.image == m_device.m_currentBackbufferHandle &&
         m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
         m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex] = static_cast<VkImageLayout>(targetLayout);
     }
 
     return RHIResult::Success;
+}
+
+RHIResult VulkanRHIDevice::CommandContext::bufferBarrier(const BufferBarrierInfo& barrierInfo)
+{
+    if (!m_commandBuffer || m_rendering || !barrierInfo.buffer.isValid() ||
+        !validate_stage_access_pair(barrierInfo.srcStage, barrierInfo.srcAccess) ||
+        !validate_stage_access_pair(barrierInfo.dstStage, barrierInfo.dstAccess)) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const BufferResource* buffer = m_device.findBuffer(barrierInfo.buffer);
+    if (buffer == nullptr || !buffer->buffer.buffer || barrierInfo.offset > buffer->desc.size) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const uint64_t size = barrierInfo.size == 0 ? (buffer->desc.size - barrierInfo.offset) : barrierInfo.size;
+    if (size == 0 || barrierInfo.offset + size > buffer->desc.size) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::BufferMemoryBarrier2 barrier{};
+    barrier.srcStageMask = to_vulkan_pipeline_stages(barrierInfo.srcStage);
+    barrier.srcAccessMask = to_vulkan_access_flags(barrierInfo.srcAccess);
+    barrier.dstStageMask = to_vulkan_pipeline_stages(barrierInfo.dstStage);
+    barrier.dstAccessMask = to_vulkan_access_flags(barrierInfo.dstAccess);
+    barrier.buffer = buffer->buffer.buffer;
+    barrier.offset = static_cast<vk::DeviceSize>(barrierInfo.offset);
+    barrier.size = barrierInfo.size == 0 ? VK_WHOLE_SIZE : static_cast<vk::DeviceSize>(barrierInfo.size);
+
+    vk::DependencyInfo dependencyInfo{};
+    dependencyInfo.bufferMemoryBarrierCount = 1;
+    dependencyInfo.pBufferMemoryBarriers = &barrier;
+    m_commandBuffer.pipelineBarrier2(&dependencyInfo);
+    return RHIResult::Success;
+}
+
+RHIResult VulkanRHIDevice::CommandContext::transitionImage(ImageHandle imageHandle, luna::ImageLayout newLayout)
+{
+    ImageResource* image = m_device.findImage(imageHandle);
+    if (!m_commandBuffer || m_rendering || image == nullptr) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const uint32_t fullLayerCount = image->desc.type == ImageType::Image2DArray ? image->desc.arrayLayers : 1u;
+    return imageBarrier({.image = imageHandle,
+                         .oldLayout = ImageLayout::Undefined,
+                         .newLayout = newLayout,
+                         .srcStage = PipelineStage::AllCommands,
+                         .dstStage = PipelineStage::AllCommands,
+                         .srcAccess = ResourceAccess::MemoryWrite,
+                         .dstAccess = ResourceAccess::MemoryRead | ResourceAccess::MemoryWrite,
+                         .aspect = default_image_aspect(image->desc),
+                         .baseMipLevel = 0,
+                         .mipCount = image->desc.mipLevels,
+                         .baseArrayLayer = 0,
+                         .layerCount = fullLayerCount});
 }
 
 RHIResult VulkanRHIDevice::CommandContext::copyImage(const ImageCopyInfo& copyInfo)
@@ -1099,6 +1589,124 @@ RHIResult VulkanRHIDevice::CommandContext::copyImage(const ImageCopyInfo& copyIn
 
     vkutil::copy_image_to_image(
         m_commandBuffer, sourceImage->image.image, destinationImage->image.image, sourceExtent, destinationExtent);
+    return RHIResult::Success;
+}
+
+RHIResult VulkanRHIDevice::CommandContext::copyBuffer(const BufferCopyInfo& copyInfo)
+{
+    if (!m_commandBuffer || m_rendering || !copyInfo.source.isValid() || !copyInfo.destination.isValid() || copyInfo.size == 0) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const BufferResource* sourceBuffer = m_device.findBuffer(copyInfo.source);
+    const BufferResource* destinationBuffer = m_device.findBuffer(copyInfo.destination);
+    if (sourceBuffer == nullptr || destinationBuffer == nullptr || !sourceBuffer->buffer.buffer ||
+        !destinationBuffer->buffer.buffer || copyInfo.sourceOffset + copyInfo.size > sourceBuffer->desc.size ||
+        copyInfo.destinationOffset + copyInfo.size > destinationBuffer->desc.size) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::BufferCopy region{};
+    region.srcOffset = static_cast<vk::DeviceSize>(copyInfo.sourceOffset);
+    region.dstOffset = static_cast<vk::DeviceSize>(copyInfo.destinationOffset);
+    region.size = static_cast<vk::DeviceSize>(copyInfo.size);
+    m_commandBuffer.copyBuffer(sourceBuffer->buffer.buffer, destinationBuffer->buffer.buffer, 1, &region);
+    return RHIResult::Success;
+}
+
+RHIResult VulkanRHIDevice::CommandContext::copyBufferToImage(const BufferImageCopyInfo& copyInfo)
+{
+    if (!m_commandBuffer || m_rendering || !copyInfo.buffer.isValid() || !copyInfo.image.isValid()) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const BufferResource* buffer = m_device.findBuffer(copyInfo.buffer);
+    ImageResource* image = m_device.findImage(copyInfo.image);
+    if (buffer == nullptr || image == nullptr || !buffer->buffer.buffer || !image->image.image) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::ImageLayout imageLayout = image->layout;
+    if (copyInfo.image == m_device.m_currentBackbufferHandle &&
+        m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
+        imageLayout = static_cast<vk::ImageLayout>(m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex]);
+    }
+    if (imageLayout != vk::ImageLayout::eTransferDstOptimal) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const uint32_t extentWidth = copyInfo.imageExtentWidth > 0 ? copyInfo.imageExtentWidth : image->desc.width;
+    const uint32_t extentHeight = copyInfo.imageExtentHeight > 0 ? copyInfo.imageExtentHeight : image->desc.height;
+    const uint32_t extentDepth = copyInfo.imageExtentDepth > 0
+                                     ? copyInfo.imageExtentDepth
+                                     : (image->desc.type == ImageType::Image3D ? image->desc.depth : 1u);
+    if (extentWidth == 0 || extentHeight == 0 || extentDepth == 0) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::BufferImageCopy region{};
+    region.bufferOffset = static_cast<vk::DeviceSize>(copyInfo.bufferOffset);
+    region.bufferRowLength = copyInfo.bufferRowLength;
+    region.bufferImageHeight = copyInfo.bufferImageHeight;
+    region.imageSubresource.aspectMask = to_vulkan_image_aspect_flags(copyInfo.aspect);
+    region.imageSubresource.mipLevel = copyInfo.mipLevel;
+    region.imageSubresource.baseArrayLayer = copyInfo.baseArrayLayer;
+    region.imageSubresource.layerCount = copyInfo.layerCount;
+    region.imageOffset =
+        vk::Offset3D{static_cast<int32_t>(copyInfo.imageOffsetX),
+                     static_cast<int32_t>(copyInfo.imageOffsetY),
+                     static_cast<int32_t>(copyInfo.imageOffsetZ)};
+    region.imageExtent = vk::Extent3D{extentWidth, extentHeight, extentDepth};
+
+    m_commandBuffer.copyBufferToImage(buffer->buffer.buffer, image->image.image, vk::ImageLayout::eTransferDstOptimal, 1, &region);
+    return RHIResult::Success;
+}
+
+RHIResult VulkanRHIDevice::CommandContext::copyImageToBuffer(const BufferImageCopyInfo& copyInfo)
+{
+    if (!m_commandBuffer || m_rendering || !copyInfo.buffer.isValid() || !copyInfo.image.isValid()) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const BufferResource* buffer = m_device.findBuffer(copyInfo.buffer);
+    ImageResource* image = m_device.findImage(copyInfo.image);
+    if (buffer == nullptr || image == nullptr || !buffer->buffer.buffer || !image->image.image) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::ImageLayout imageLayout = image->layout;
+    if (copyInfo.image == m_device.m_currentBackbufferHandle &&
+        m_device.m_swapchainImageIndex < m_device.m_engine._swapchainImageLayouts.size()) {
+        imageLayout = static_cast<vk::ImageLayout>(m_device.m_engine._swapchainImageLayouts[m_device.m_swapchainImageIndex]);
+    }
+    if (imageLayout != vk::ImageLayout::eTransferSrcOptimal) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const uint32_t extentWidth = copyInfo.imageExtentWidth > 0 ? copyInfo.imageExtentWidth : image->desc.width;
+    const uint32_t extentHeight = copyInfo.imageExtentHeight > 0 ? copyInfo.imageExtentHeight : image->desc.height;
+    const uint32_t extentDepth = copyInfo.imageExtentDepth > 0
+                                     ? copyInfo.imageExtentDepth
+                                     : (image->desc.type == ImageType::Image3D ? image->desc.depth : 1u);
+    if (extentWidth == 0 || extentHeight == 0 || extentDepth == 0) {
+        return RHIResult::InvalidArgument;
+    }
+
+    vk::BufferImageCopy region{};
+    region.bufferOffset = static_cast<vk::DeviceSize>(copyInfo.bufferOffset);
+    region.bufferRowLength = copyInfo.bufferRowLength;
+    region.bufferImageHeight = copyInfo.bufferImageHeight;
+    region.imageSubresource.aspectMask = to_vulkan_image_aspect_flags(copyInfo.aspect);
+    region.imageSubresource.mipLevel = copyInfo.mipLevel;
+    region.imageSubresource.baseArrayLayer = copyInfo.baseArrayLayer;
+    region.imageSubresource.layerCount = copyInfo.layerCount;
+    region.imageOffset =
+        vk::Offset3D{static_cast<int32_t>(copyInfo.imageOffsetX),
+                     static_cast<int32_t>(copyInfo.imageOffsetY),
+                     static_cast<int32_t>(copyInfo.imageOffsetZ)};
+    region.imageExtent = vk::Extent3D{extentWidth, extentHeight, extentDepth};
+
+    m_commandBuffer.copyImageToBuffer(image->image.image, vk::ImageLayout::eTransferSrcOptimal, buffer->buffer.buffer, 1, &region);
     return RHIResult::Success;
 }
 
@@ -1172,7 +1780,8 @@ RHIResult VulkanRHIDevice::CommandContext::bindIndexBuffer(BufferHandle buffer,
     return RHIResult::Success;
 }
 
-RHIResult VulkanRHIDevice::CommandContext::bindResourceSet(ResourceSetHandle resourceSet)
+RHIResult VulkanRHIDevice::CommandContext::bindResourceSet(ResourceSetHandle resourceSet,
+                                                           std::span<const uint32_t> dynamicOffsets)
 {
     if (!m_commandBuffer || !m_boundPipelineLayout) {
         return RHIResult::NotReady;
@@ -1183,8 +1792,19 @@ RHIResult VulkanRHIDevice::CommandContext::bindResourceSet(ResourceSetHandle res
         return RHIResult::InvalidArgument;
     }
 
+    const ResourceLayoutResource* layout = m_device.findResourceLayout(resourceSetResource->layoutHandle);
+    if (layout == nullptr || !layout->layout) {
+        return RHIResult::InvalidArgument;
+    }
+
     m_commandBuffer.bindDescriptorSets(
-        m_boundPipelineBindPoint, m_boundPipelineLayout, 0, 1, &resourceSetResource->set, 0, nullptr);
+        m_boundPipelineBindPoint,
+        m_boundPipelineLayout,
+        layout->desc.setIndex,
+        1,
+        &resourceSetResource->set,
+        static_cast<uint32_t>(dynamicOffsets.size()),
+        dynamicOffsets.data());
     return RHIResult::Success;
 }
 
@@ -1236,6 +1856,21 @@ RHIResult VulkanRHIDevice::CommandContext::dispatch(uint32_t groupCountX, uint32
     return RHIResult::Success;
 }
 
+RHIResult VulkanRHIDevice::CommandContext::dispatchIndirect(BufferHandle argumentsBuffer, uint64_t offset)
+{
+    if (!m_commandBuffer || m_rendering || m_boundPipelineBindPoint != vk::PipelineBindPoint::eCompute) {
+        return RHIResult::InvalidArgument;
+    }
+
+    const BufferResource* buffer = m_device.findBuffer(argumentsBuffer);
+    if (buffer == nullptr || !buffer->buffer.buffer || offset + sizeof(VkDispatchIndirectCommand) > buffer->desc.size) {
+        return RHIResult::InvalidArgument;
+    }
+
+    m_commandBuffer.dispatchIndirect(buffer->buffer.buffer, static_cast<vk::DeviceSize>(offset));
+    return RHIResult::Success;
+}
+
 VulkanRHIDevice::BufferResource* VulkanRHIDevice::findBuffer(BufferHandle handle)
 {
     const auto it = m_buffers.find(handle.value);
@@ -1258,6 +1893,18 @@ const VulkanRHIDevice::ImageResource* VulkanRHIDevice::findImage(ImageHandle han
 {
     const auto it = m_images.find(handle.value);
     return it != m_images.end() ? &it->second : nullptr;
+}
+
+VulkanRHIDevice::ImageViewResource* VulkanRHIDevice::findImageView(ImageViewHandle handle)
+{
+    const auto it = m_imageViews.find(handle.value);
+    return it != m_imageViews.end() ? &it->second : nullptr;
+}
+
+const VulkanRHIDevice::ImageViewResource* VulkanRHIDevice::findImageView(ImageViewHandle handle) const
+{
+    const auto it = m_imageViews.find(handle.value);
+    return it != m_imageViews.end() ? &it->second : nullptr;
 }
 
 VulkanRHIDevice::SamplerResource* VulkanRHIDevice::findSampler(SamplerHandle handle)
@@ -1354,11 +2001,19 @@ void VulkanRHIDevice::destroyAllResources()
     }
     m_samplers.clear();
 
+    for (auto& [handle, imageView] : m_imageViews) {
+        if (m_engine._device && imageView.view) {
+            m_engine._device.destroyImageView(imageView.view, nullptr);
+        }
+        m_bindingRegistry.unregister_image_view(ImageViewHandle::fromRaw(handle));
+    }
+    m_imageViews.clear();
+
     for (auto& [handle, image] : m_images) {
         if (image.owned) {
             m_engine.destroy_image(image.image);
         }
-        m_bindingRegistry.unregister_image_view(ImageHandle::fromRaw(handle));
+        m_bindingRegistry.unregister_image_view(ImageViewHandle::fromRaw(handle));
     }
     m_images.clear();
     m_currentBackbufferHandle = {};
@@ -1381,14 +2036,15 @@ void VulkanRHIDevice::refreshBackbufferHandle()
     }
 
     if (m_currentBackbufferHandle.isValid()) {
-        m_bindingRegistry.unregister_image_view(m_currentBackbufferHandle);
+        m_bindingRegistry.unregister_image_view(ImageViewHandle::fromRaw(m_currentBackbufferHandle.value));
         m_images.erase(m_currentBackbufferHandle.value);
         m_currentBackbufferHandle = {};
     }
 
-    const ImageHandle handle =
-        m_bindingRegistry.register_image_view(m_engine._swapchainImageViews[m_swapchainImageIndex]);
-    if (!handle.isValid()) {
+    const ImageHandle handle = ImageHandle::fromRaw(nextHandleValue(&m_nextImageId));
+    if (!handle.isValid() ||
+        !m_bindingRegistry.register_image_view(ImageViewHandle::fromRaw(handle.value),
+                                               m_engine._swapchainImageViews[m_swapchainImageIndex])) {
         return;
     }
 

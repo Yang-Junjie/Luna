@@ -21,15 +21,15 @@ public:
     std::vector<vk::PipelineShaderStageCreateInfo> _shaderStages;
     std::vector<vk::VertexInputBindingDescription> _vertexInputBindings;
     std::vector<vk::VertexInputAttributeDescription> _vertexInputAttributes;
+    std::vector<vk::PipelineColorBlendAttachmentState> _colorBlendAttachments;
+    std::vector<vk::Format> _colorAttachmentFormats;
 
     vk::PipelineInputAssemblyStateCreateInfo _inputAssembly;
     vk::PipelineRasterizationStateCreateInfo _rasterizer;
-    vk::PipelineColorBlendAttachmentState _colorBlendAttachment;
     vk::PipelineMultisampleStateCreateInfo _multisampling;
     vk::PipelineLayout _pipelineLayout;
     vk::PipelineDepthStencilStateCreateInfo _depthStencil;
     vk::PipelineRenderingCreateInfo _renderInfo;
-    vk::Format _colorAttachmentformat;
 
     PipelineBuilder()
     {
@@ -62,7 +62,9 @@ public:
     }
     void set_multisampling_none();
     void disable_blending();
+    void disable_blending(uint32_t attachmentCount);
     void set_color_attachment_format(vk::Format format);
+    void set_color_attachment_formats(std::span<const vk::Format> formats);
     void set_color_attachment_format(VkFormat format)
     {
         set_color_attachment_format(static_cast<vk::Format>(format));

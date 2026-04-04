@@ -30,9 +30,12 @@ public:
     RHIResult createBuffer(const BufferDesc& desc, BufferHandle* outHandle, const void* initialData = nullptr) override;
     void destroyBuffer(BufferHandle handle) override;
     RHIResult writeBuffer(BufferHandle handle, const void* data, uint64_t size, uint64_t offset = 0) override;
+    RHIResult readBuffer(BufferHandle handle, void* outData, uint64_t size, uint64_t offset = 0) override;
 
     RHIResult createImage(const ImageDesc& desc, ImageHandle* outHandle, const void* initialData = nullptr) override;
     void destroyImage(ImageHandle handle) override;
+    RHIResult createImageView(const ImageViewDesc& desc, ImageViewHandle* outHandle) override;
+    void destroyImageView(ImageViewHandle handle) override;
 
     RHIResult createSampler(const SamplerDesc& desc, SamplerHandle* outHandle) override;
     void destroySampler(SamplerHandle handle) override;
@@ -82,6 +85,12 @@ private:
         bool owned = true;
     };
 
+    struct ImageViewResource {
+        ImageViewDesc desc{};
+        ImageHandle imageHandle{};
+        vk::ImageView view{};
+    };
+
     struct SamplerResource {
         SamplerDesc desc{};
         vk::Sampler sampler{};
@@ -119,6 +128,9 @@ private:
 
     ImageResource* findImage(ImageHandle handle);
     const ImageResource* findImage(ImageHandle handle) const;
+
+    ImageViewResource* findImageView(ImageViewHandle handle);
+    const ImageViewResource* findImageView(ImageViewHandle handle) const;
 
     SamplerResource* findSampler(SamplerHandle handle);
     const SamplerResource* findSampler(SamplerHandle handle) const;
@@ -163,9 +175,12 @@ private:
     uint64_t m_nextResourceLayoutId = 1;
     uint64_t m_nextResourceSetId = 1;
     uint64_t m_nextPipelineId = 1;
+    uint64_t m_nextImageId = 1;
+    uint64_t m_nextImageViewId = 1ull << 32;
 
     std::unordered_map<uint64_t, BufferResource> m_buffers;
     std::unordered_map<uint64_t, ImageResource> m_images;
+    std::unordered_map<uint64_t, ImageViewResource> m_imageViews;
     std::unordered_map<uint64_t, SamplerResource> m_samplers;
     std::unordered_map<uint64_t, ShaderResource> m_shaders;
     std::unordered_map<uint64_t, ResourceLayoutResource> m_resourceLayouts;
