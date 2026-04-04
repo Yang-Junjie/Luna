@@ -3,9 +3,11 @@
 #include "Core/application.h"
 #include "Core/input.h"
 #include "Core/layer.h"
-#include "Vulkan/vk_loader.h"
+#include "Core/log.h"
+#include "Renderer/SceneRenderPipeline.h"
 #include "imgui.h"
 
+#include <cmath>
 #include <glm/glm.hpp>
 
 #include <algorithm>
@@ -93,7 +95,13 @@ public:
             speed *= m_cameraBoostMultiplier;
         }
 
-        camera.position += movement * speed * static_cast<float>(dt);
+        if (glm::dot(movement, movement) > 0.0f) {
+            camera.position += movement * speed * static_cast<float>(dt);
+            if (!m_loggedCameraMove) {
+                LUNA_CORE_INFO("Editor camera moved");
+                m_loggedCameraMove = true;
+            }
+        }
     }
 
     void onImGuiRender() override
@@ -103,7 +111,12 @@ public:
         auto& effects = renderService.getBackgroundEffects();
 
         if (ImGui::Begin("background")) {
-            ImGui::SliderFloat("Render Scale", &renderService.getRenderScale(), 0.3f, 1.0f);
+            auto& renderScale = renderService.getRenderScale();
+            ImGui::SliderFloat("Render Scale", &renderScale, 0.3f, 1.0f);
+            if (ImGui::IsItemDeactivatedAfterEdit() && std::abs(renderScale - m_lastLoggedRenderScale) > 0.0001f) {
+                LUNA_CORE_INFO("Editor render scale -> {:.2f}", renderScale);
+                m_lastLoggedRenderScale = renderScale;
+            }
             ImGui::Separator();
 
             ImGui::Text("Camera Active: %s", m_cameraActive ? "Yes" : "No");
@@ -131,8 +144,13 @@ public:
                 currentEffectIndex = lastEffectIndex;
             }
 
-            ImGui::Text("Selected effect: %s", effects[static_cast<size_t>(currentEffectIndex)].name);
+            ImGui::Text("Selected effect: %s", effects[static_cast<size_t>(currentEffectIndex)].name.c_str());
             ImGui::SliderInt("Effect Index", &currentEffectIndex, 0, lastEffectIndex);
+            if (ImGui::IsItemDeactivatedAfterEdit() && currentEffectIndex != m_lastLoggedBackgroundEffect) {
+                LUNA_CORE_INFO("Editor background effect -> {}",
+                               effects[static_cast<size_t>(currentEffectIndex)].name);
+                m_lastLoggedBackgroundEffect = currentEffectIndex;
+            }
 
             ImGui::Separator();
 
@@ -151,7 +169,7 @@ public:
             if (!scene) {
                 ImGui::TextUnformatted("basicmesh scene not loaded.");
             } else {
-                std::vector<std::shared_ptr<Node>> editableNodes;
+                std::vector<std::shared_ptr<luna::SceneNode>> editableNodes;
                 editableNodes.reserve(3);
 
                 for (const auto& topNode : scene->topNodes) {
@@ -214,15 +232,15 @@ public:
     }
 
 private:
-    static void collectEditableNodes(const std::shared_ptr<Node>& node,
-                                     std::vector<std::shared_ptr<Node>>& outNodes,
+    static void collectEditableNodes(const std::shared_ptr<luna::SceneNode>& node,
+                                     std::vector<std::shared_ptr<luna::SceneNode>>& outNodes,
                                      size_t limit)
     {
         if (!node || outNodes.size() >= limit) {
             return;
         }
 
-        if (dynamic_cast<MeshNode*>(node.get()) != nullptr) {
+        if (dynamic_cast<luna::SceneMeshNode*>(node.get()) != nullptr) {
             outNodes.push_back(node);
             if (outNodes.size() >= limit) {
                 return;
@@ -251,6 +269,9 @@ private:
 
 private:
     bool m_cameraActive{false};
+    bool m_loggedCameraMove{false};
+    float m_lastLoggedRenderScale{1.0f};
+    int m_lastLoggedBackgroundEffect{-1};
     glm::vec2 m_lastMousePosition{0.0f, 0.0f};
     float m_cameraSpeed{5.0f};
     float m_cameraBoostMultiplier{4.0f};

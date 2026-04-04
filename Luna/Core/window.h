@@ -13,15 +13,18 @@ struct WindowProps {
     uint32_t width;
     uint32_t height;
     bool maximized = false;
+    bool visible = true;
 
     WindowProps(const std::string& title = "Luna",
                 uint32_t width = 1'600,
                 uint32_t height = 900,
-                bool maximized = false)
+                bool maximized = false,
+                bool visible = true)
         : title(title),
           width(width),
           height(height),
-          maximized(maximized)
+          maximized(maximized),
+          visible(visible)
     {}
 };
 

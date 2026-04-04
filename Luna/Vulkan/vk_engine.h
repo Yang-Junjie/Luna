@@ -11,6 +11,9 @@
 
 struct GLFWwindow;
 class VulkanEngine;
+namespace luna {
+class ImGuiLayer;
+}
 
 struct DeletionQueue {
     std::deque<std::function<void()>> deletors;
@@ -107,10 +110,11 @@ class VulkanEngine {
 public:
     using OverlayRenderFunction = std::function<void(vk::CommandBuffer, vk::ImageView, vk::Extent2D)>;
     using BeforePresentFunction = std::function<void()>;
-    enum class DemoMode : uint8_t {
+    enum class LegacyRendererMode : uint8_t {
         LegacyScene = 0,
         ClearColor,
-        Triangle
+        Triangle,
+        ComputeBackground
     };
 
     bool _isInitialized{false};
@@ -126,17 +130,25 @@ public:
     bool init(luna::Window& window);
     void cleanup();
     void draw(const OverlayRenderFunction& overlayRenderer = {}, const BeforePresentFunction& beforePresent = {});
-    void setDemoMode(DemoMode mode)
+    void drawImGui(luna::ImGuiLayer* imguiLayer);
+    void setLegacyRendererMode(LegacyRendererMode mode)
     {
-        m_demoMode = mode;
+        m_legacyRendererMode = mode;
     }
-    DemoMode getDemoMode() const
+    LegacyRendererMode getLegacyRendererMode() const
     {
-        return m_demoMode;
+        return m_legacyRendererMode;
     }
     void setDemoClearColor(vk::ClearColorValue clearColor)
     {
         m_demoClearColor = clearColor;
+    }
+    void setDemoClearColor(float r, float g, float b, float a)
+    {
+        m_demoClearColor.float32[0] = r;
+        m_demoClearColor.float32[1] = g;
+        m_demoClearColor.float32[2] = b;
+        m_demoClearColor.float32[3] = a;
     }
     void setTriangleShaderPaths(std::filesystem::path vertexShaderPath, std::filesystem::path fragmentShaderPath)
     {
@@ -274,6 +286,7 @@ public:
     vk::Sampler create_sampler(const luna::SamplerDesc& desc);
     void destroy_image(const AllocatedImage& image);
     void destroy_buffer(const AllocatedBuffer& buffer);
+    bool uploadBufferData(const AllocatedBuffer& buffer, const void* data, size_t size, size_t offset = 0);
     bool uploadTriangleVertices(std::span<const TriangleVertex> vertices);
     uint32_t getTriangleVertexCount() const
     {
@@ -287,6 +300,11 @@ public:
                                                                const std::filesystem::path& filePath);
 
 private:
+    bool uses_background_compute() const;
+    bool uses_scene_renderer() const;
+    void clear_draw_image(vk::CommandBuffer cmd);
+    void record_draw_pass(vk::CommandBuffer cmd);
+
     bool init_vulkan();
     bool init_swapchain();
     bool init_commands();
@@ -312,15 +330,15 @@ private:
     void update_draw_image_descriptors();
     vk::Extent2D get_framebuffer_extent() const;
 
-    void draw_background(vk::CommandBuffer cmd);
-    void draw_geometry(vk::CommandBuffer cmd);
-    void draw_triangle(vk::CommandBuffer cmd);
+    void record_compute_background(vk::CommandBuffer cmd);
+    void record_scene_geometry(vk::CommandBuffer cmd);
+    void record_triangle_geometry(vk::CommandBuffer cmd);
     void update_scene();
 
     void destroy_swapchain();
 
 private:
-    DemoMode m_demoMode = DemoMode::LegacyScene;
+    LegacyRendererMode m_legacyRendererMode = LegacyRendererMode::LegacyScene;
     vk::ClearColorValue m_demoClearColor = [] {
         vk::ClearColorValue value{};
         value.float32[0] = 0.08f;

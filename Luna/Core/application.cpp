@@ -18,7 +18,11 @@ Application::Application(const ApplicationSpecification& spec)
 
     s_instance = this;
     m_window = Window::create(WindowProps{
-        m_specification.name, m_specification.windowWidth, m_specification.windowHeight, m_specification.maximized});
+        m_specification.name,
+        m_specification.windowWidth,
+        m_specification.windowHeight,
+        m_specification.maximized,
+        true});
 
     if (m_window == nullptr) {
         LUNA_CORE_ERROR("Application window creation failed");
@@ -38,10 +42,16 @@ Application::Application(const ApplicationSpecification& spec)
     }
 
     if (m_specification.enableImGui) {
-        auto* nativeWindow = static_cast<GLFWwindow*>(m_window->getNativeWindow());
-        auto nativeBridge = m_renderService.getNativeVulkanBridge();
-        m_imGuiLayer = std::make_unique<ImGuiLayer>(
-            nativeWindow, *nativeBridge.engine, m_specification.enableMultiViewport);
+        m_imGuiLayer =
+            m_renderService.createImGuiLayer(m_window->getNativeWindow(), m_specification.enableMultiViewport);
+        if (m_imGuiLayer == nullptr) {
+            LUNA_CORE_ERROR("ImGui initialization failed because no compatible render overlay path is available");
+            m_renderService.shutdown();
+            m_window.reset();
+            s_instance = nullptr;
+            return;
+        }
+
         m_imGuiLayerRaw = m_imGuiLayer.get();
         m_imGuiLayer->onAttach();
 
@@ -124,17 +134,7 @@ void Application::renderFrame()
         m_imGuiLayer->end();
     }
 
-    m_renderService.draw(
-        [this](vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent) {
-            if (m_imGuiLayer != nullptr) {
-                m_imGuiLayer->render(commandBuffer, targetImageView, targetExtent);
-            }
-        },
-        [this]() {
-            if (m_imGuiLayer != nullptr) {
-                m_imGuiLayer->renderPlatformWindows();
-            }
-        });
+    m_renderService.draw(m_imGuiLayerRaw);
 }
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)

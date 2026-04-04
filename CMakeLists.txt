@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CTest)
+
 function(luna_configure_runtime_output target_name)
     set_target_properties(${target_name} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/Debug"
@@ -74,6 +76,11 @@ add_subdirectory(Luna)
 add_subdirectory(Editor)
 add_subdirectory(Samples/LunaRhiTriangle)
 add_subdirectory(Samples/LunaMinimalRhiTriangle)
+add_subdirectory(Samples/LegacyScene)
+add_subdirectory(Samples/RhiIndexedQuad)
+add_subdirectory(Samples/RhiOffscreenCopy)
+add_subdirectory(Samples/RhiComputeBackground)
+add_subdirectory(Samples/RhiPublicHeaders)
 
 
 add_executable(LunaApp Luna/Core/main.cpp)

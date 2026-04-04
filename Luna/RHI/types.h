@@ -16,7 +16,9 @@ enum class RHIResult : uint32_t {
 };
 
 enum class RHIBackend : uint32_t {
-    Vulkan = 1
+    Vulkan = 1,
+    D3D12 = 2,
+    Metal = 3
 };
 
 template <typename Tag> struct Handle {
@@ -46,6 +48,8 @@ using ImageHandle = Handle<struct ImageHandleTag>;
 using SamplerHandle = Handle<struct SamplerHandleTag>;
 using ShaderHandle = Handle<struct ShaderHandleTag>;
 using PipelineHandle = Handle<struct PipelineHandleTag>;
+using ResourceLayoutHandle = Handle<struct ResourceLayoutHandleTag>;
+using ResourceSetHandle = Handle<struct ResourceSetHandleTag>;
 using SwapchainHandle = Handle<struct SwapchainHandleTag>;
 
 constexpr std::string_view to_string(RHIResult result) noexcept
@@ -75,6 +79,10 @@ constexpr std::string_view to_string(RHIBackend backend) noexcept
     switch (backend) {
         case RHIBackend::Vulkan:
             return "Vulkan";
+        case RHIBackend::D3D12:
+            return "D3D12";
+        case RHIBackend::Metal:
+            return "Metal";
         default:
             return "Unknown";
     }
@@ -104,6 +112,14 @@ inline std::optional<RHIBackend> parse_rhi_backend(std::string_view name) noexce
 {
     if (iequals_ascii(name, "vulkan")) {
         return RHIBackend::Vulkan;
+    }
+
+    if (iequals_ascii(name, "d3d12")) {
+        return RHIBackend::D3D12;
+    }
+
+    if (iequals_ascii(name, "metal")) {
+        return RHIBackend::Metal;
     }
 
     return std::nullopt;

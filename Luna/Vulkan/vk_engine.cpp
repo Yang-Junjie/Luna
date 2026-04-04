@@ -1,6 +1,7 @@
 #include "vk_engine.h"
 
 #include "Core/Paths.h"
+#include "Imgui/ImGuiLayer.hpp"
 #include <Core/log.h>
 
 #define GLFW_INCLUDE_NONE
@@ -16,6 +17,7 @@
 #include <cmath>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -458,7 +460,7 @@ bool VulkanEngine::init(luna::Window& window)
 
 void VulkanEngine::init_default_data()
 {
-    if (m_demoMode != DemoMode::LegacyScene) {
+    if (m_legacyRendererMode != LegacyRendererMode::LegacyScene) {
         return;
     }
 
@@ -695,6 +697,53 @@ void VulkanEngine::cleanup()
     LUNA_CORE_INFO("RHI shutdown complete");
 }
 
+bool VulkanEngine::uses_background_compute() const
+{
+    return m_legacyRendererMode == LegacyRendererMode::LegacyScene ||
+           m_legacyRendererMode == LegacyRendererMode::ComputeBackground;
+}
+
+bool VulkanEngine::uses_scene_renderer() const
+{
+    return m_legacyRendererMode == LegacyRendererMode::LegacyScene;
+}
+
+void VulkanEngine::clear_draw_image(vk::CommandBuffer cmd)
+{
+    const vk::ImageSubresourceRange colorRange = vkinit::image_subresource_range(vk::ImageAspectFlagBits::eColor);
+    cmd.clearColorImage(_drawImage.image, vk::ImageLayout::eGeneral, &m_demoClearColor, 1, &colorRange);
+}
+
+void VulkanEngine::record_draw_pass(vk::CommandBuffer cmd)
+{
+    if (uses_scene_renderer()) {
+        update_scene();
+    }
+
+    vkutil::transition_image(cmd, _drawImage.image, _drawImageLayout, VK_IMAGE_LAYOUT_GENERAL);
+    _drawImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    if (uses_background_compute()) {
+        record_compute_background(cmd);
+    } else {
+        clear_draw_image(cmd);
+    }
+
+    if (m_legacyRendererMode != LegacyRendererMode::Triangle && !uses_scene_renderer()) {
+        return;
+    }
+
+    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    _drawImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    if (m_legacyRendererMode == LegacyRendererMode::Triangle) {
+        record_triangle_geometry(cmd);
+        return;
+    }
+
+    record_scene_geometry(cmd);
+}
+
 void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const BeforePresentFunction& beforePresent)
 {
     if (_device == VK_NULL_HANDLE || _swapchain == VK_NULL_HANDLE) {
@@ -752,27 +801,18 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     _drawExtent.height = std::max(
         1u, static_cast<uint32_t>(std::min(_swapchainExtent.height, _drawImage.imageExtent.height) * renderScale));
 
-    update_scene();
-
     VK_CHECK(cmd.begin(&cmdBeginInfo));
     if (!m_loggedBeginFramePass) {
         LUNA_CORE_INFO("BeginFrame PASS");
         m_loggedBeginFramePass = true;
     }
 
-    // transition our main draw image into general layout so we can write into it
-    vkutil::transition_image(cmd, _drawImage.image, _drawImageLayout, VK_IMAGE_LAYOUT_GENERAL);
-    _drawImageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    draw_background(cmd);
-
-    vkutil::transition_image(cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-    _drawImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    draw_geometry(cmd);
+    record_draw_pass(cmd);
 
     // transition the draw image and the swapchain image into their correct transfer layouts
-    vkutil::transition_image(
-        cmd, _drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    const VkImageLayout drawImageSourceLayout =
+        _drawImageLayout == VK_IMAGE_LAYOUT_GENERAL ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    vkutil::transition_image(cmd, _drawImage.image, drawImageSourceLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     _drawImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     vkutil::transition_image(cmd,
                              _swapchainImages[swapchainImageIndex],
@@ -842,7 +882,7 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     } else {
         if (!m_loggedPresentPass) {
             LUNA_CORE_INFO("Present PASS");
-            if (m_demoMode == DemoMode::LegacyScene) {
+            if (m_legacyRendererMode == LegacyRendererMode::LegacyScene) {
                 LUNA_CORE_INFO("Acquire/Present via RHI PASS");
             }
             m_loggedPresentPass = true;
@@ -853,6 +893,21 @@ void VulkanEngine::draw(const OverlayRenderFunction& overlayRenderer, const Befo
     }
 
     _frameNumber++;
+}
+
+void VulkanEngine::drawImGui(luna::ImGuiLayer* imguiLayer)
+{
+    if (imguiLayer == nullptr) {
+        draw();
+        return;
+    }
+
+    draw([imguiLayer](auto commandBuffer, auto targetImageView, auto targetExtent) {
+             imguiLayer->render(commandBuffer, targetImageView, targetExtent);
+         },
+         [imguiLayer]() {
+             imguiLayer->renderPlatformWindows();
+         });
 }
 
 bool VulkanEngine::init_vulkan()
@@ -1028,15 +1083,8 @@ bool VulkanEngine::create_swapchain(uint32_t width, uint32_t height)
     return true;
 }
 
-void VulkanEngine::draw_background(vk::CommandBuffer cmd)
+void VulkanEngine::record_compute_background(vk::CommandBuffer cmd)
 {
-    if (m_demoMode == DemoMode::ClearColor || m_demoMode == DemoMode::Triangle) {
-        const vk::ImageSubresourceRange colorRange =
-            vkinit::image_subresource_range(vk::ImageAspectFlagBits::eColor);
-        cmd.clearColorImage(_drawImage.image, vk::ImageLayout::eGeneral, &m_demoClearColor, 1, &colorRange);
-        return;
-    }
-
     ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
 
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, effect.pipeline);
@@ -1049,17 +1097,8 @@ void VulkanEngine::draw_background(vk::CommandBuffer cmd)
                  1);
 }
 
-void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
+void VulkanEngine::record_scene_geometry(vk::CommandBuffer cmd)
 {
-    if (m_demoMode == DemoMode::Triangle) {
-        draw_triangle(cmd);
-        return;
-    }
-
-    if (m_demoMode == DemoMode::ClearColor) {
-        return;
-    }
-
     // begin a render pass  connected to our draw image
     vk::RenderingAttachmentInfo colorAttachment =
         vkinit::attachment_info(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1171,7 +1210,7 @@ void VulkanEngine::draw_geometry(vk::CommandBuffer cmd)
     cmd.endRendering();
 }
 
-void VulkanEngine::draw_triangle(vk::CommandBuffer cmd)
+void VulkanEngine::record_triangle_geometry(vk::CommandBuffer cmd)
 {
     if (!_trianglePipeline || !m_triangleVertexBuffer.buffer || m_triangleVertexCount == 0) {
         return;
@@ -1358,7 +1397,7 @@ bool VulkanEngine::init_sync_structures()
 
 bool VulkanEngine::init_descriptors()
 {
-    if (m_demoMode != DemoMode::LegacyScene) {
+    if (!uses_background_compute()) {
         return true;
     }
 
@@ -1445,12 +1484,16 @@ bool VulkanEngine::init_descriptors()
 bool VulkanEngine::init_pipelines()
 {
     init_triangle_pipeline();
-    if (m_demoMode != DemoMode::LegacyScene) {
-        return true;
+
+    if (uses_scene_renderer()) {
+        init_mesh_pipeline();
     }
 
-    init_mesh_pipeline();
-    return init_background_pipelines();
+    if (uses_background_compute()) {
+        return init_background_pipelines();
+    }
+
+    return true;
 }
 
 void VulkanEngine::init_triangle_pipeline()
@@ -1676,7 +1719,7 @@ bool VulkanEngine::create_draw_resources(vk::Extent2D extent)
 
     LUNA_CORE_INFO(
         "Created draw image: {}x{}, format={}", extent.width, extent.height, string_VkFormat(_drawImage.imageFormat));
-    if (m_demoMode == DemoMode::LegacyScene) {
+    if (m_legacyRendererMode == LegacyRendererMode::LegacyScene) {
         LUNA_CORE_INFO("Offscreen color/depth images created via RHI: {}x{}", extent.width, extent.height);
     }
     return true;
@@ -1828,8 +1871,13 @@ void VulkanEngine::destroy_image(const AllocatedImage& image)
 
 AllocatedBuffer VulkanEngine::create_buffer(const luna::BufferDesc& desc, const void* initialData)
 {
+    luna::BufferUsage effectiveUsage = desc.usage;
+    if (initialData != nullptr) {
+        effectiveUsage = effectiveUsage | luna::BufferUsage::TransferDst;
+    }
+
     AllocatedBuffer buffer = create_buffer(
-        static_cast<size_t>(desc.size), to_vulkan_buffer_usage(desc.usage), to_vma_memory_usage(desc.memoryUsage));
+        static_cast<size_t>(desc.size), to_vulkan_buffer_usage(effectiveUsage), to_vma_memory_usage(desc.memoryUsage));
 
     if (initialData == nullptr || desc.size == 0) {
         return buffer;
@@ -1910,6 +1958,43 @@ AllocatedBuffer VulkanEngine::create_buffer(size_t allocSize, vk::BufferUsageFla
 void VulkanEngine::destroy_buffer(const AllocatedBuffer& buffer)
 {
     vmaDestroyBuffer(_allocator, static_cast<VkBuffer>(buffer.buffer), buffer.allocation);
+}
+
+bool VulkanEngine::uploadBufferData(const AllocatedBuffer& buffer, const void* data, size_t size, size_t offset)
+{
+    if (buffer.buffer == VK_NULL_HANDLE || buffer.allocation == VK_NULL_HANDLE || data == nullptr || size == 0) {
+        LUNA_CORE_ERROR("uploadBufferData requires a valid buffer and non-empty source data");
+        return false;
+    }
+
+    if (offset + size > buffer.info.size) {
+        LUNA_CORE_ERROR("uploadBufferData out of range: offset={} size={} capacity={}", offset, size, buffer.info.size);
+        return false;
+    }
+
+    if (buffer.info.pMappedData != nullptr) {
+        std::memcpy(static_cast<std::byte*>(buffer.info.pMappedData) + offset, data, size);
+        return true;
+    }
+
+    const luna::BufferDesc stagingDesc{
+        .size = size,
+        .usage = luna::BufferUsage::TransferSrc,
+        .memoryUsage = luna::MemoryUsage::Upload,
+        .debugName = "RHIUploadStagingBuffer",
+    };
+    AllocatedBuffer stagingBuffer = create_buffer(stagingDesc, data);
+
+    immediate_submit([&](vk::CommandBuffer cmd) {
+        vk::BufferCopy copy{};
+        copy.srcOffset = 0;
+        copy.dstOffset = static_cast<vk::DeviceSize>(offset);
+        copy.size = static_cast<vk::DeviceSize>(size);
+        cmd.copyBuffer(stagingBuffer.buffer, buffer.buffer, 1, &copy);
+    });
+
+    destroy_buffer(stagingBuffer);
+    return true;
 }
 
 bool VulkanEngine::uploadTriangleVertices(std::span<const TriangleVertex> vertices)
@@ -2023,7 +2108,7 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
     });
 
     destroy_buffer(staging);
-    if (m_demoMode == DemoMode::LegacyScene) {
+    if (m_legacyRendererMode == LegacyRendererMode::LegacyScene) {
         LUNA_CORE_INFO("Mesh buffers uploaded via RHI: vertices={}, indices={}", vertices.size(), indices.size());
     }
 

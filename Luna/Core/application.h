@@ -64,11 +64,6 @@ public:
         return m_renderService;
     }
 
-    VulkanEngine& getEngine()
-    {
-        return m_renderService.requireNativeVulkanEngine();
-    }
-
 protected:
     virtual void onInit() {}
 

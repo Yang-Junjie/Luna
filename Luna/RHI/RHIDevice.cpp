@@ -1,53 +1,55 @@
 #include "RHI/RHIDevice.h"
 
+#include "Vulkan/vk_rhi_device.h"
+
 namespace luna {
-namespace {
 
-class VulkanStubDevice final : public IRHIDevice {
-public:
-    RHIBackend getBackend() const override
-    {
-        return RHIBackend::Vulkan;
+RHICapabilities QueryRHICapabilities(RHIBackend backend) noexcept
+{
+    switch (backend) {
+        case RHIBackend::Vulkan:
+            return {
+                .backend = backend,
+                .implemented = true,
+                .supportsGraphics = true,
+                .supportsPresent = true,
+                .supportsDynamicRendering = true,
+                .supportsIndexedDraw = true,
+                .supportsResourceSets = true,
+                .framesInFlight = 2,
+            };
+        case RHIBackend::D3D12:
+        case RHIBackend::Metal:
+            return {
+                .backend = backend,
+                .implemented = false,
+                .supportsGraphics = true,
+                .supportsPresent = true,
+                .supportsDynamicRendering = true,
+                .supportsIndexedDraw = true,
+                .supportsResourceSets = true,
+                .framesInFlight = 2,
+            };
+        default:
+            return {
+                .backend = backend,
+                .implemented = false,
+            };
     }
+}
 
-    RHIResult init(const DeviceCreateInfo& createInfo) override
-    {
-        if (m_initialized) {
-            return RHIResult::InvalidArgument;
-        }
-
-        m_createInfo = createInfo;
-        m_initialized = true;
-        return RHIResult::Success;
-    }
-
-    void shutdown() override
-    {
-        m_initialized = false;
-    }
-
-    RHIResult beginFrame() override
-    {
-        return m_initialized ? RHIResult::Success : RHIResult::NotReady;
-    }
-
-    RHIResult endFrame() override
-    {
-        return m_initialized ? RHIResult::Success : RHIResult::NotReady;
-    }
-
-private:
-    bool m_initialized = false;
-    DeviceCreateInfo m_createInfo{};
-};
-
-} // namespace
+bool IsBackendImplemented(RHIBackend backend) noexcept
+{
+    return QueryRHICapabilities(backend).implemented;
+}
 
 std::unique_ptr<IRHIDevice> CreateRHIDevice(RHIBackend backend)
 {
     switch (backend) {
         case RHIBackend::Vulkan:
-            return std::make_unique<VulkanStubDevice>();
+            return std::make_unique<VulkanRHIDevice>();
+        case RHIBackend::D3D12:
+        case RHIBackend::Metal:
         default:
             return nullptr;
     }

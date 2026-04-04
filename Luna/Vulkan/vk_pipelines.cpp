@@ -1,6 +1,7 @@
 #include "vk_initializers.h"
 #include "vk_pipelines.h"
 
+#include <algorithm>
 #include <fstream>
 
 bool vkutil::load_shader_module(const char* filePath, vk::Device device, vk::ShaderModule* outShaderModule)
@@ -137,6 +138,65 @@ vk::Format to_vulkan_vertex_format(luna::VertexFormat format)
     }
 }
 
+uint32_t vertex_format_size(luna::VertexFormat format)
+{
+    switch (format) {
+        case luna::VertexFormat::Float2:
+            return sizeof(float) * 2;
+        case luna::VertexFormat::Float3:
+            return sizeof(float) * 3;
+        case luna::VertexFormat::Float4:
+            return sizeof(float) * 4;
+        case luna::VertexFormat::UByte4Norm:
+            return sizeof(uint8_t) * 4;
+        case luna::VertexFormat::Undefined:
+        default:
+            return 0;
+    }
+}
+
+bool validate_vertex_layout(const luna::GraphicsPipelineDesc& desc)
+{
+    if (desc.vertexLayout.attributes.empty()) {
+        return true;
+    }
+
+    if (desc.vertexLayout.stride == 0) {
+        LUNA_CORE_ERROR("GraphicsPipelineDesc vertex layout requires a non-zero stride when attributes are provided");
+        return false;
+    }
+
+    std::vector<uint32_t> seenLocations;
+    seenLocations.reserve(desc.vertexLayout.attributes.size());
+
+    for (const luna::VertexAttributeDesc& attribute : desc.vertexLayout.attributes) {
+        const uint32_t formatSize = vertex_format_size(attribute.format);
+        if (formatSize == 0) {
+            LUNA_CORE_ERROR("GraphicsPipelineDesc vertex attribute location={} uses an unsupported format={}",
+                            attribute.location,
+                            static_cast<uint32_t>(attribute.format));
+            return false;
+        }
+
+        if (std::find(seenLocations.begin(), seenLocations.end(), attribute.location) != seenLocations.end()) {
+            LUNA_CORE_ERROR("GraphicsPipelineDesc vertex attribute location={} is duplicated", attribute.location);
+            return false;
+        }
+        seenLocations.push_back(attribute.location);
+
+        if (attribute.offset + formatSize > desc.vertexLayout.stride) {
+            LUNA_CORE_ERROR("GraphicsPipelineDesc vertex attribute location={} exceeds stride: offset={} size={} stride={}",
+                            attribute.location,
+                            attribute.offset,
+                            formatSize,
+                            desc.vertexLayout.stride);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipelineDesc& desc, vk::PipelineLayout layout)
 {
     if (desc.vertexShader.filePath.empty() || desc.fragmentShader.filePath.empty()) {
@@ -146,6 +206,10 @@ vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipe
 
     if (desc.colorAttachments.empty()) {
         LUNA_CORE_ERROR("GraphicsPipelineDesc requires at least one color attachment");
+        return {};
+    }
+
+    if (!validate_vertex_layout(desc)) {
         return {};
     }
 
@@ -228,6 +292,12 @@ void PipelineBuilder::clear()
     _depthStencil = {};
     _renderInfo = {};
     _colorAttachmentformat = {};
+    _renderInfo.sType = vk::StructureType::ePipelineRenderingCreateInfo;
+    _renderInfo.viewMask = 0;
+    _renderInfo.colorAttachmentCount = 0;
+    _renderInfo.pColorAttachmentFormats = nullptr;
+    _renderInfo.depthAttachmentFormat = vk::Format::eUndefined;
+    _renderInfo.stencilAttachmentFormat = vk::Format::eUndefined;
     _shaderStages.clear();
     _vertexInputBindings.clear();
     _vertexInputAttributes.clear();
@@ -271,8 +341,9 @@ vk::Pipeline PipelineBuilder::build_pipeline(vk::Device device)
     pipelineInfo.pDynamicState = &dynamicInfo;
 
     vk::Pipeline newPipeline{};
-    if (device.createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &newPipeline) != vk::Result::eSuccess) {
-        fmt::println("failed to create pipeline");
+    const vk::Result result = device.createGraphicsPipelines({}, 1, &pipelineInfo, nullptr, &newPipeline);
+    if (result != vk::Result::eSuccess) {
+        LUNA_CORE_ERROR("Failed to create Vulkan graphics pipeline: {}", vk::to_string(result));
         return {};
     }
 

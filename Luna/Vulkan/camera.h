@@ -1,3 +1,5 @@
+#pragma once
+
 #include "vk_types.h"
 
 #include <glm/vec3.hpp>

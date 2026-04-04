@@ -112,6 +112,7 @@ void GLFWWindow::init(const WindowProps& props)
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_MAXIMIZED, props.maximized ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, props.visible ? GLFW_TRUE : GLFW_FALSE);
 
     m_window = glfwCreateWindow(
         static_cast<int>(props.width), static_cast<int>(props.height), props.title.c_str(), nullptr, nullptr);

@@ -171,13 +171,24 @@ struct GraphicsPipelineDesc {
     std::string_view debugName;
     ShaderDesc vertexShader;
     ShaderDesc fragmentShader;
+    std::vector<ResourceLayoutHandle> resourceLayouts;
     VertexBufferLayoutDesc vertexLayout;
     PrimitiveTopology topology = PrimitiveTopology::TriangleList;
     PolygonMode polygonMode = PolygonMode::Fill;
     CullMode cullMode = CullMode::Back;
     FrontFace frontFace = FrontFace::CounterClockwise;
+    uint32_t pushConstantSize = 0;
+    ShaderType pushConstantVisibility = ShaderType::AllGraphics;
     std::vector<ColorAttachmentDesc> colorAttachments;
     DepthStencilDesc depthStencil;
+};
+
+struct ComputePipelineDesc {
+    std::string_view debugName;
+    ShaderDesc computeShader;
+    std::vector<ResourceLayoutHandle> resourceLayouts;
+    uint32_t pushConstantSize = 0;
+    ShaderType pushConstantVisibility = ShaderType::Compute;
 };
 
 struct SwapchainDesc {

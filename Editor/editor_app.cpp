@@ -1,6 +1,7 @@
 #include "Editor/editor_app.h"
 
 #include "Editor/editor_layer.h"
+#include "Renderer/SceneRenderPipeline.h"
 
 namespace luna::editor {
 
@@ -10,6 +11,12 @@ EditorApp::EditorApp()
           .windowWidth = 1'700,
           .windowHeight = 900,
           .maximized = false,
+          .renderService =
+              {
+                  .applicationName = "Luna Editor",
+                  .backend = luna::RHIBackend::Vulkan,
+                  .renderPipeline = luna::CreateDefaultSceneRenderPipeline(),
+              },
       })
 {}
 

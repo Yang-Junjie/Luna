@@ -1,0 +1,57 @@
+set(RHI_INDEXED_QUAD_SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Shaders)
+set(RHI_INDEXED_QUAD_SHADER_OUTPUT_DIR ${PROJECT_BINARY_DIR}/Shaders/RhiIndexedQuad)
+
+set(RHI_INDEXED_QUAD_VERTEX_SHADER_SOURCE ${RHI_INDEXED_QUAD_SHADER_SOURCE_DIR}/quad.vert)
+set(RHI_INDEXED_QUAD_FRAGMENT_SHADER_SOURCE ${RHI_INDEXED_QUAD_SHADER_SOURCE_DIR}/quad.frag)
+set(RHI_INDEXED_QUAD_VERTEX_SHADER_OUTPUT ${RHI_INDEXED_QUAD_SHADER_OUTPUT_DIR}/quad.vert.spv)
+set(RHI_INDEXED_QUAD_FRAGMENT_SHADER_OUTPUT ${RHI_INDEXED_QUAD_SHADER_OUTPUT_DIR}/quad.frag.spv)
+
+add_custom_command(
+    OUTPUT ${RHI_INDEXED_QUAD_VERTEX_SHADER_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${RHI_INDEXED_QUAD_SHADER_OUTPUT_DIR}
+    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=vert ${RHI_INDEXED_QUAD_VERTEX_SHADER_SOURCE} -o ${RHI_INDEXED_QUAD_VERTEX_SHADER_OUTPUT}
+    DEPENDS ${RHI_INDEXED_QUAD_VERTEX_SHADER_SOURCE}
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT ${RHI_INDEXED_QUAD_FRAGMENT_SHADER_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${RHI_INDEXED_QUAD_SHADER_OUTPUT_DIR}
+    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=frag ${RHI_INDEXED_QUAD_FRAGMENT_SHADER_SOURCE} -o ${RHI_INDEXED_QUAD_FRAGMENT_SHADER_OUTPUT}
+    DEPENDS ${RHI_INDEXED_QUAD_FRAGMENT_SHADER_SOURCE}
+    VERBATIM
+)
+
+add_custom_target(
+    RhiIndexedQuadShaders
+    DEPENDS
+        ${RHI_INDEXED_QUAD_VERTEX_SHADER_OUTPUT}
+        ${RHI_INDEXED_QUAD_FRAGMENT_SHADER_OUTPUT}
+)
+
+add_executable(
+    RhiIndexedQuad
+    main.cpp
+)
+
+add_dependencies(RhiIndexedQuad RhiIndexedQuadShaders)
+
+target_include_directories(
+    RhiIndexedQuad
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(
+    RhiIndexedQuad
+    PRIVATE
+        LunaCore
+)
+
+target_compile_definitions(
+    RhiIndexedQuad
+    PRIVATE
+        RHI_INDEXED_QUAD_SHADER_ROOT="${PROJECT_BINARY_DIR}/Shaders/RhiIndexedQuad"
+)
+
+luna_configure_runtime_output(RhiIndexedQuad)
