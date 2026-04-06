@@ -29,3 +29,6 @@
 [submodule "third_party/vulkan-hpp"]
 	path = third_party/vulkan-hpp
 	url = https://github.com/KhronosGroup/Vulkan-Hpp.git
+[submodule "third_party/NVRHI"]
+	path = third_party/NVRHI
+	url = https://github.com/NVIDIA-RTX/NVRHI.git

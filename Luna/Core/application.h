@@ -2,14 +2,13 @@
 #include "Events/application_event.h"
 #include "Events/event.h"
 #include "Imgui/ImGuiLayer.hpp"
-#include "Renderer/RenderService.h"
 #include "layer.h"
 #include "layer_stack.h"
 #include "timestep.h"
 #include "window.h"
 
-#include <memory>
 #include <array>
+#include <memory>
 #include <string>
 
 namespace luna {
@@ -20,7 +19,6 @@ struct ApplicationSpecification {
     bool maximized = false;
     bool enableImGui = true;
     bool enableMultiViewport = false;
-    RenderServiceSpecification renderService;
 };
 
 class Application {
@@ -58,12 +56,6 @@ public:
         return m_initialized;
     }
 
-    // temporary
-    RenderService& getRenderService()
-    {
-        return m_renderService;
-    }
-
     Window& getWindow()
     {
         return *m_window;
@@ -89,7 +81,6 @@ private:
 
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
-    RenderService m_renderService;
 
     std::unique_ptr<ImGuiLayer> m_imGuiLayer;
     ImGuiLayer* m_imGuiLayerRaw = nullptr;

@@ -1,4 +1,5 @@
 #include "application.h"
+#include "log.h"
 
 #include <chrono>
 #include <GLFW/glfw3.h>
@@ -17,12 +18,11 @@ Application::Application(const ApplicationSpecification& spec)
     }
 
     s_instance = this;
-    m_window = Window::create(WindowProps{
-        m_specification.name,
-        m_specification.windowWidth,
-        m_specification.windowHeight,
-        m_specification.maximized,
-        true});
+    m_window = Window::create(WindowProps{m_specification.name,
+                                          m_specification.windowWidth,
+                                          m_specification.windowHeight,
+                                          m_specification.maximized,
+                                          true});
 
     if (m_window == nullptr) {
         LUNA_CORE_ERROR("Application window creation failed");
@@ -34,19 +34,11 @@ Application::Application(const ApplicationSpecification& spec)
         onEvent(event);
     });
 
-    if (!m_renderService.init(*m_window, m_specification.renderService)) {
-        LUNA_CORE_ERROR("Renderer initialization failed");
-        m_window.reset();
-        s_instance = nullptr;
-        return;
-    }
-
+    
     if (m_specification.enableImGui) {
         m_imGuiLayer =
-            m_renderService.createImGuiLayer(m_window->getNativeWindow(), m_specification.enableMultiViewport);
         if (m_imGuiLayer == nullptr) {
             LUNA_CORE_ERROR("ImGui initialization failed because no compatible render overlay path is available");
-            m_renderService.shutdown();
             m_window.reset();
             s_instance = nullptr;
             return;
@@ -59,7 +51,6 @@ Application::Application(const ApplicationSpecification& spec)
             LUNA_CORE_ERROR("ImGui initialization failed");
             m_imGuiLayer.reset();
             m_imGuiLayerRaw = nullptr;
-            m_renderService.shutdown();
             m_window.reset();
             s_instance = nullptr;
             return;
@@ -79,7 +70,6 @@ Application::~Application()
         m_imGuiLayerRaw = nullptr;
     }
 
-    m_renderService.shutdown();
     s_instance = nullptr;
 }
 
@@ -105,9 +95,6 @@ void Application::run()
             continue;
         }
 
-        if (m_renderService.is_swapchain_resize_requested()) {
-            m_renderService.resize_swapchain();
-        }
 
         onUpdate(m_timestep);
 
@@ -134,7 +121,6 @@ void Application::renderFrame()
         m_imGuiLayer->end();
     }
 
-    m_renderService.draw(m_imGuiLayerRaw);
 }
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
@@ -178,7 +164,7 @@ bool Application::onWindowResize(const WindowResizeEvent& event)
 {
     m_minimized = event.getWidth() == 0 || event.getHeight() == 0;
     if (!m_minimized) {
-        m_renderService.request_swapchain_resize();
+       
     }
     return false;
 }
