@@ -7,16 +7,12 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
-
-
 add_library(
     LunaCore
     STATIC
     Core/application.h
     Core/application.cpp
     Core/input.h
-    Imgui/ImGuiLayer.hpp
-    Imgui/ImGuiLayer.cpp
     Core/key_codes.h
     Core/layer.h
     Core/layer_stack.h
@@ -32,74 +28,29 @@ add_library(
     Events/event.h
     Events/key_event.h
     Events/mouse_event.h
+    ImGui/ImGuiLayer.hpp
+    ImGui/ImGuiLayer.cpp
     Platform/GLFWKeyCodes.hpp
     Platform/GLFWMouseCodes.hpp
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
-    ${VULKAN_PLATFORM_SOURCE}
+    Renderer/DeviceManager.hpp
+    Renderer/DeviceManager.cpp
+    Renderer/Vulkan/DeviceManager_VK.hpp
+    Renderer/Vulkan/DeviceManager_VK.cpp
+    Renderer/Vulkan/VulkanContext.hpp
+    Renderer/Vulkan/VulkanContext.cpp
+    Renderer/Vulkan/VulkanSwapchain.hpp
+    Renderer/Vulkan/VulkanSwapchain.cpp
+    Renderer/Vulkan/VulkanRenderer.hpp
+    Renderer/Vulkan/VulkanRenderer.cpp
     ${IMGUI_SOURCE}
 )
 
-set(LUNA_SCENE_SHADER_SOURCE_DIR ${PROJECT_SOURCE_DIR}/Shaders/Internal)
-set(LUNA_SCENE_SHADER_OUTPUT_DIR ${PROJECT_BINARY_DIR}/Shaders/Scene)
-
-set(LUNA_SCENE_MESH_VERTEX_SHADER_SOURCE ${LUNA_SCENE_SHADER_SOURCE_DIR}/scene_mesh.vert)
-set(LUNA_SCENE_MESH_FRAGMENT_SHADER_SOURCE ${LUNA_SCENE_SHADER_SOURCE_DIR}/scene_mesh.frag)
-set(LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_SOURCE ${LUNA_SCENE_SHADER_SOURCE_DIR}/scene_fullscreen.vert)
-set(LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_SOURCE ${LUNA_SCENE_SHADER_SOURCE_DIR}/scene_fullscreen.frag)
-
-set(LUNA_SCENE_MESH_VERTEX_SHADER_OUTPUT ${LUNA_SCENE_SHADER_OUTPUT_DIR}/scene_mesh.vert.spv)
-set(LUNA_SCENE_MESH_FRAGMENT_SHADER_OUTPUT ${LUNA_SCENE_SHADER_OUTPUT_DIR}/scene_mesh.frag.spv)
-set(LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_OUTPUT ${LUNA_SCENE_SHADER_OUTPUT_DIR}/scene_fullscreen.vert.spv)
-set(LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_OUTPUT ${LUNA_SCENE_SHADER_OUTPUT_DIR}/scene_fullscreen.frag.spv)
-
-add_custom_command(
-    OUTPUT ${LUNA_SCENE_MESH_VERTEX_SHADER_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_SCENE_SHADER_OUTPUT_DIR}
-    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=vert ${LUNA_SCENE_MESH_VERTEX_SHADER_SOURCE} -o ${LUNA_SCENE_MESH_VERTEX_SHADER_OUTPUT}
-    DEPENDS ${LUNA_SCENE_MESH_VERTEX_SHADER_SOURCE}
-    VERBATIM
-)
-
-add_custom_command(
-    OUTPUT ${LUNA_SCENE_MESH_FRAGMENT_SHADER_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_SCENE_SHADER_OUTPUT_DIR}
-    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=frag ${LUNA_SCENE_MESH_FRAGMENT_SHADER_SOURCE} -o ${LUNA_SCENE_MESH_FRAGMENT_SHADER_OUTPUT}
-    DEPENDS ${LUNA_SCENE_MESH_FRAGMENT_SHADER_SOURCE}
-    VERBATIM
-)
-
-add_custom_command(
-    OUTPUT ${LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_SCENE_SHADER_OUTPUT_DIR}
-    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=vert ${LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_SOURCE} -o ${LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_OUTPUT}
-    DEPENDS ${LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_SOURCE}
-    VERBATIM
-)
-
-add_custom_command(
-    OUTPUT ${LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNA_SCENE_SHADER_OUTPUT_DIR}
-    COMMAND ${Vulkan_GLSLC_EXECUTABLE} -fshader-stage=frag ${LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_SOURCE} -o ${LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_OUTPUT}
-    DEPENDS ${LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_SOURCE}
-    VERBATIM
-)
-
-add_custom_target(
-    LunaSceneShaders
-    DEPENDS
-        ${LUNA_SCENE_MESH_VERTEX_SHADER_OUTPUT}
-        ${LUNA_SCENE_MESH_FRAGMENT_SHADER_OUTPUT}
-        ${LUNA_SCENE_FULLSCREEN_VERTEX_SHADER_OUTPUT}
-        ${LUNA_SCENE_FULLSCREEN_FRAGMENT_SHADER_OUTPUT}
-)
-
-add_dependencies(LunaCore LunaSceneShaders)
-
 target_include_directories(
     LunaCore
-    SYSTEM PUBLIC
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${THIRD_PARTY_DIR}/imgui
         ${THIRD_PARTY_DIR}/spdlog/include
@@ -109,17 +60,11 @@ target_include_directories(
 )
 
 target_link_libraries(LunaCore 
-        PUBLIC
+    PUBLIC
         spdlog::spdlog
-        GPUOpen::VulkanMemoryAllocator
         Vulkan::Vulkan
         glfw
         vk-bootstrap::vk-bootstrap
-        stb::stb
-        fastgltf::fastgltf
-        simdjson::simdjson
-        nvrhi
-        nvrhi_vk
 )
 
 target_compile_definitions(
@@ -129,10 +74,6 @@ target_compile_definitions(
         LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
         LUNA_SHADER_ROOT="${PROJECT_SOURCE_DIR}/Shaders"
         LUNA_ASSET_ROOT="${PROJECT_SOURCE_DIR}/assets"
-        LUNA_SCENE_SHADER_ROOT="${PROJECT_BINARY_DIR}/Shaders/Scene"
         NOMINMAX
         WIN32_LEAN_AND_MEAN
-        VULKAN_HPP_DISABLE_ENHANCED_MODE
-        VULKAN_HPP_NO_CONSTRUCTORS
-        VULKAN_HPP_NO_EXCEPTIONS
 )

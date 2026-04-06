@@ -1,7 +1,6 @@
 #pragma once
 #include "Events/application_event.h"
 #include "Events/event.h"
-#include "Imgui/ImGuiLayer.hpp"
 #include "layer.h"
 #include "layer_stack.h"
 #include "timestep.h"
@@ -28,11 +27,6 @@ public:
 
     void pushLayer(std::unique_ptr<Layer> layer);
     void pushOverlay(std::unique_ptr<Layer> overlay);
-
-    ImGuiLayer* getImGuiLayer() const
-    {
-        return m_imGuiLayerRaw;
-    }
 
     void close()
     {
@@ -63,16 +57,27 @@ public:
 
 protected:
     virtual void onInit() {}
-
     virtual void onUpdate(Timestep) {}
-
     virtual void onShutdown() {}
+    virtual void onEventReceived(Event&) {}
+    virtual void onWindowResized(uint32_t, uint32_t) {}
+    virtual void onWindowMinimized(bool) {}
+
+    bool isMinimized() const
+    {
+        return m_minimized;
+    }
+
+    void failInitialization()
+    {
+        m_initialized = false;
+        m_running = false;
+    }
 
 private:
-    void onEvent(Event& event);
+    void handleEvent(Event& event);
     bool onWindowResize(const WindowResizeEvent& event);
     bool onWindowClose(const WindowCloseEvent& event);
-    void renderFrame();
 
 private:
     bool m_initialized = false;
@@ -82,8 +87,6 @@ private:
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
 
-    std::unique_ptr<ImGuiLayer> m_imGuiLayer;
-    ImGuiLayer* m_imGuiLayerRaw = nullptr;
     LayerStack m_layerStack;
 
     Timestep m_timestep;

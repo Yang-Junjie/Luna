@@ -31,45 +31,14 @@ Application::Application(const ApplicationSpecification& spec)
     }
 
     m_window->setEventCallback([this](Event& event) {
-        onEvent(event);
+        handleEvent(event);
     });
-
-    
-    if (m_specification.enableImGui) {
-        m_imGuiLayer =
-        if (m_imGuiLayer == nullptr) {
-            LUNA_CORE_ERROR("ImGui initialization failed because no compatible render overlay path is available");
-            m_window.reset();
-            s_instance = nullptr;
-            return;
-        }
-
-        m_imGuiLayerRaw = m_imGuiLayer.get();
-        m_imGuiLayer->onAttach();
-
-        if (!m_imGuiLayer->isInitialized()) {
-            LUNA_CORE_ERROR("ImGui initialization failed");
-            m_imGuiLayer.reset();
-            m_imGuiLayerRaw = nullptr;
-            m_window.reset();
-            s_instance = nullptr;
-            return;
-        }
-
-        LUNA_CORE_INFO("ImGui path=Renderer overlay");
-    }
 
     m_initialized = true;
 }
 
 Application::~Application()
 {
-    if (m_imGuiLayer != nullptr) {
-        m_imGuiLayer->onDetach();
-        m_imGuiLayer.reset();
-        m_imGuiLayerRaw = nullptr;
-    }
-
     s_instance = nullptr;
 }
 
@@ -102,25 +71,10 @@ void Application::run()
             layer->onUpdate(m_timestep);
         }
 
-        renderFrame();
         m_window->onUpdate();
     }
 
     onShutdown();
-}
-
-void Application::renderFrame()
-{
-    if (m_imGuiLayer != nullptr && m_imGuiLayer->isInitialized()) {
-        m_imGuiLayer->begin();
-
-        for (auto& layer : m_layerStack) {
-            layer->onImGuiRender();
-        }
-
-        m_imGuiLayer->end();
-    }
-
 }
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
@@ -137,7 +91,7 @@ void Application::pushOverlay(std::unique_ptr<Layer> overlay)
     rawOverlay->onAttach();
 }
 
-void Application::onEvent(Event& event)
+void Application::handleEvent(Event& event)
 {
     EventDispatcher dispatcher(event);
     dispatcher.dispatch<WindowCloseEvent>([this](WindowCloseEvent& e) {
@@ -147,9 +101,7 @@ void Application::onEvent(Event& event)
         return onWindowResize(e);
     });
 
-    if (m_imGuiLayer != nullptr) {
-        m_imGuiLayer->onEvent(event);
-    }
+    onEventReceived(event);
 
     for (auto it = m_layerStack.rbegin(); it != m_layerStack.rend(); ++it) {
         if (event.handled) {
@@ -162,9 +114,14 @@ void Application::onEvent(Event& event)
 
 bool Application::onWindowResize(const WindowResizeEvent& event)
 {
-    m_minimized = event.getWidth() == 0 || event.getHeight() == 0;
+    const bool minimized = event.getWidth() == 0 || event.getHeight() == 0;
+    if (m_minimized != minimized) {
+        m_minimized = minimized;
+        onWindowMinimized(m_minimized);
+    }
+
     if (!m_minimized) {
-       
+        onWindowResized(event.getWidth(), event.getHeight());
     }
     return false;
 }
