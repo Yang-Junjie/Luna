@@ -74,19 +74,31 @@ add_subdirectory(third_party/SPIRV-Cross EXCLUDE_FROM_ALL)
 
 add_subdirectory(Luna)
 add_subdirectory(Editor)
-add_subdirectory(Samples/LunaRhiTriangle)
 add_subdirectory(Samples/LunaMinimalRhiTriangle)
 add_subdirectory(Samples/LegacyScene)
-add_subdirectory(Samples/RhiIndexedQuad)
 add_subdirectory(Samples/RhiOffscreenCopy)
-add_subdirectory(Samples/RhiComputeBackground)
 add_subdirectory(Samples/RhiPublicHeaders)
 add_subdirectory(Samples/RhiImageLab)
 add_subdirectory(Samples/RhiImageViewLab)
 add_subdirectory(Samples/RhiBindingLab)
 add_subdirectory(Samples/RhiSyncLab)
+add_subdirectory(Samples/LunaRhiEnhancementSelftest)
+add_subdirectory(Samples/RhiSwapchainLab)
+add_subdirectory(Samples/RhiIblLab)
 
 
 add_executable(LunaApp Luna/Core/main.cpp)
 target_link_libraries(LunaApp PRIVATE LunaEditor)
 luna_configure_runtime_output(LunaApp)
+
+if(BUILD_TESTING)
+    add_test(
+        NAME LunaApp.selftest.phase3_editor_resize
+        COMMAND $<TARGET_FILE:LunaApp> --self-test=phase3_editor_resize
+    )
+    set_tests_properties(
+        LunaApp.selftest.phase3_editor_resize
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()

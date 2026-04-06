@@ -12,13 +12,21 @@ function(rhi_image_lab_compile_shader output_file shader_stage shader_source)
 endfunction()
 
 set(RHI_IMAGE_LAB_FULLSCREEN_VERTEX_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_fullscreen.vert)
+set(RHI_IMAGE_LAB_ATTACHMENT_SCENE_VERTEX_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_attachment_scene.vert)
+set(RHI_IMAGE_LAB_ATTACHMENT_COLOR_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_attachment_color.frag)
+set(RHI_IMAGE_LAB_ATTACHMENT_DEPTH_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_attachment_depth.frag)
 set(RHI_IMAGE_LAB_PRESENT_2D_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_present_2d.frag)
+set(RHI_IMAGE_LAB_PRESENT_DEPTH_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_present_depth.frag)
 set(RHI_IMAGE_LAB_PRESENT_ARRAY_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_present_array.frag)
 set(RHI_IMAGE_LAB_PRESENT_3D_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_present_3d.frag)
 set(RHI_IMAGE_LAB_MRT_FRAGMENT_SOURCE ${RHI_IMAGE_LAB_SHADER_SOURCE_DIR}/image_lab_mrt.frag)
 
 set(RHI_IMAGE_LAB_FULLSCREEN_VERTEX_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_fullscreen.vert.spv)
+set(RHI_IMAGE_LAB_ATTACHMENT_SCENE_VERTEX_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_attachment_scene.vert.spv)
+set(RHI_IMAGE_LAB_ATTACHMENT_COLOR_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_attachment_color.frag.spv)
+set(RHI_IMAGE_LAB_ATTACHMENT_DEPTH_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_attachment_depth.frag.spv)
 set(RHI_IMAGE_LAB_PRESENT_2D_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_present_2d.frag.spv)
+set(RHI_IMAGE_LAB_PRESENT_DEPTH_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_present_depth.frag.spv)
 set(RHI_IMAGE_LAB_PRESENT_ARRAY_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_present_array.frag.spv)
 set(RHI_IMAGE_LAB_PRESENT_3D_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_present_3d.frag.spv)
 set(RHI_IMAGE_LAB_MRT1_FRAGMENT_OUTPUT ${RHI_IMAGE_LAB_SHADER_OUTPUT_DIR}/image_lab_mrt_1.frag.spv)
@@ -33,9 +41,33 @@ rhi_image_lab_compile_shader(
 )
 
 rhi_image_lab_compile_shader(
+    ${RHI_IMAGE_LAB_ATTACHMENT_SCENE_VERTEX_OUTPUT}
+    vert
+    ${RHI_IMAGE_LAB_ATTACHMENT_SCENE_VERTEX_SOURCE}
+)
+
+rhi_image_lab_compile_shader(
+    ${RHI_IMAGE_LAB_ATTACHMENT_COLOR_FRAGMENT_OUTPUT}
+    frag
+    ${RHI_IMAGE_LAB_ATTACHMENT_COLOR_FRAGMENT_SOURCE}
+)
+
+rhi_image_lab_compile_shader(
+    ${RHI_IMAGE_LAB_ATTACHMENT_DEPTH_FRAGMENT_OUTPUT}
+    frag
+    ${RHI_IMAGE_LAB_ATTACHMENT_DEPTH_FRAGMENT_SOURCE}
+)
+
+rhi_image_lab_compile_shader(
     ${RHI_IMAGE_LAB_PRESENT_2D_FRAGMENT_OUTPUT}
     frag
     ${RHI_IMAGE_LAB_PRESENT_2D_FRAGMENT_SOURCE}
+)
+
+rhi_image_lab_compile_shader(
+    ${RHI_IMAGE_LAB_PRESENT_DEPTH_FRAGMENT_OUTPUT}
+    frag
+    ${RHI_IMAGE_LAB_PRESENT_DEPTH_FRAGMENT_SOURCE}
 )
 
 rhi_image_lab_compile_shader(
@@ -82,7 +114,11 @@ add_custom_target(
     RhiImageLabShaders
     DEPENDS
         ${RHI_IMAGE_LAB_FULLSCREEN_VERTEX_OUTPUT}
+        ${RHI_IMAGE_LAB_ATTACHMENT_SCENE_VERTEX_OUTPUT}
+        ${RHI_IMAGE_LAB_ATTACHMENT_COLOR_FRAGMENT_OUTPUT}
+        ${RHI_IMAGE_LAB_ATTACHMENT_DEPTH_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_LAB_PRESENT_2D_FRAGMENT_OUTPUT}
+        ${RHI_IMAGE_LAB_PRESENT_DEPTH_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_LAB_PRESENT_ARRAY_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_LAB_PRESENT_3D_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_LAB_MRT1_FRAGMENT_OUTPUT}
@@ -120,3 +156,15 @@ target_compile_definitions(
 )
 
 luna_configure_runtime_output(RhiImageLab)
+
+if(BUILD_TESTING)
+    add_test(
+        NAME RhiImageLab.selftest.phase5_smoke
+        COMMAND $<TARGET_FILE:RhiImageLab> --self-test=phase5_smoke
+    )
+    set_tests_properties(
+        RhiImageLab.selftest.phase5_smoke
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()

@@ -1,5 +1,6 @@
 #include "Core/application.h"
 #include "Core/log.h"
+#include "Editor/editor_app.h"
 
 #include <memory>
 
@@ -27,9 +28,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    int exitCode = 0;
     app->run();
+    if (auto* editorApp = dynamic_cast<luna::editor::EditorApp*>(app.get());
+        editorApp != nullptr && editorApp->isSelfTestMode() && !editorApp->selfTestPassed()) {
+        exitCode = 1;
+    }
+
     app.reset();
     LUNA_CORE_INFO("Application shutdown cleanly");
     luna::Logger::shutdown();
-    return 0;
+    return exitCode;
 }

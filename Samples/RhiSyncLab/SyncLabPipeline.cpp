@@ -2,7 +2,6 @@
 
 #include "Core/log.h"
 #include "RHI/CommandContext.h"
-#include "Vulkan/vk_rhi_device.h"
 
 #include <algorithm>
 #include <array>
@@ -121,6 +120,7 @@ struct RhiSyncLabRenderPipeline::Impl {
     luna::ImageHandle historyCurrentImage{};
     luna::ImageHandle historyImage{};
     luna::ImageHandle historyBarrierProbeImage{};
+    luna::ImageHandle subresourceProbeImage{};
 
     luna::BufferHandle readbackUploadBuffer{};
     luna::ImageHandle readbackImage{};
@@ -132,9 +132,7 @@ struct RhiSyncLabRenderPipeline::Impl {
     luna::ResourceLayoutHandle indirectArgsLayout{};
     luna::ResourceSetHandle indirectArgsSet{};
     luna::PipelineHandle indirectGeneratePipeline{};
-    luna::ResourceLayoutHandle indirectPaintLayout{};
-    luna::ResourceSetHandle indirectPaintSet{};
-    luna::PipelineHandle indirectPaintPipeline{};
+    luna::PipelineHandle indirectDrawPipeline{};
     luna::BufferHandle indirectArgsBuffer{};
     luna::ImageHandle indirectImage{};
     std::vector<luna::BufferHandle> indirectReadbackBuffers;
@@ -164,23 +162,18 @@ RhiSyncLabRenderPipeline::~RhiSyncLabRenderPipeline() = default;
 
 bool RhiSyncLabRenderPipeline::init(luna::IRHIDevice& device)
 {
-    m_vulkanDevice = dynamic_cast<luna::VulkanRHIDevice*>(&device);
-    if (m_vulkanDevice == nullptr) {
-        LUNA_CORE_ERROR("RhiSyncLab requires the Vulkan RHI backend");
-        return false;
-    }
-
+    (void)device;
     m_shaderRoot = std::filesystem::path{RHI_SYNC_LAB_SHADER_ROOT}.lexically_normal().generic_string();
     return true;
 }
 
 void RhiSyncLabRenderPipeline::shutdown(luna::IRHIDevice& device)
 {
+    destroy_subresource_resources(device);
     destroy_indirect_resources(device);
     destroy_readback_resources(device);
     destroy_history_resources(device);
     destroy_shared_resources(device);
-    m_vulkanDevice = nullptr;
 }
 
 bool RhiSyncLabRenderPipeline::render(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -200,6 +193,8 @@ bool RhiSyncLabRenderPipeline::render(luna::IRHIDevice& device, const luna::Fram
             return render_readback(device, frameContext);
         case Page::Indirect:
             return render_indirect(device, frameContext);
+        case Page::Subresource:
+            return render_subresource(device, frameContext);
         default:
             return false;
     }
@@ -243,9 +238,6 @@ bool RhiSyncLabRenderPipeline::ensure_shared_resources(luna::IRHIDevice& device,
     }
 
     if (m_impl->historyPreviewPipeline.isValid() || m_impl->singlePreviewPipeline.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         if (m_impl->historyPreviewPipeline.isValid()) {
             device.destroyPipeline(m_impl->historyPreviewPipeline);
             m_impl->historyPreviewPipeline = {};
@@ -371,8 +363,8 @@ bool RhiSyncLabRenderPipeline::ensure_readback_resources(luna::IRHIDevice& devic
 
         luna::BufferDesc uploadDesc{};
         uploadDesc.size = pixels.size();
-        uploadDesc.usage = luna::BufferUsage::TransferSrc;
-        uploadDesc.memoryUsage = luna::MemoryUsage::Upload;
+        uploadDesc.usage = luna::BufferUsage::TransferSrc | luna::BufferUsage::TransferDst;
+        uploadDesc.memoryUsage = luna::MemoryUsage::Default;
         uploadDesc.debugName = "RhiSyncLabReadbackUpload";
         if (device.createBuffer(uploadDesc, &m_impl->readbackUploadBuffer, pixels.data()) != luna::RHIResult::Success) {
             return false;
@@ -430,25 +422,18 @@ bool RhiSyncLabRenderPipeline::ensure_indirect_resources(luna::IRHIDevice& devic
     if (!m_impl->indirectArgsLayout.isValid()) {
         luna::ResourceLayoutDesc layoutDesc{};
         layoutDesc.debugName = "RhiSyncLabIndirectArgsLayout";
-        layoutDesc.bindings.push_back({0, luna::ResourceType::StorageBuffer, 1, luna::ShaderType::Compute});
+        layoutDesc.bindings.push_back({0,
+                                       luna::ResourceType::StorageBuffer,
+                                       1,
+                                       luna::ShaderType::Compute | luna::ShaderType::Vertex});
         if (device.createResourceLayout(layoutDesc, &m_impl->indirectArgsLayout) != luna::RHIResult::Success ||
             device.createResourceSet(m_impl->indirectArgsLayout, &m_impl->indirectArgsSet) != luna::RHIResult::Success) {
             return false;
         }
     }
 
-    if (!m_impl->indirectPaintLayout.isValid()) {
-        luna::ResourceLayoutDesc layoutDesc{};
-        layoutDesc.debugName = "RhiSyncLabIndirectPaintLayout";
-        layoutDesc.bindings.push_back({0, luna::ResourceType::StorageImage, 1, luna::ShaderType::Compute});
-        if (device.createResourceLayout(layoutDesc, &m_impl->indirectPaintLayout) != luna::RHIResult::Success ||
-            device.createResourceSet(m_impl->indirectPaintLayout, &m_impl->indirectPaintSet) != luna::RHIResult::Success) {
-            return false;
-        }
-    }
-
     if (!m_impl->indirectArgsBuffer.isValid()) {
-        const std::array<uint32_t, 4> initialArgs = {1u, 1u, 1u, 0u};
+        const std::array<uint32_t, 6> initialArgs = {3u, 1u, 0u, 0u, 1u, 1u};
         luna::BufferDesc bufferDesc{};
         bufferDesc.size = sizeof(initialArgs);
         bufferDesc.usage = luna::BufferUsage::Storage | luna::BufferUsage::Indirect | luna::BufferUsage::TransferSrc;
@@ -466,21 +451,15 @@ bool RhiSyncLabRenderPipeline::ensure_indirect_resources(luna::IRHIDevice& devic
     }
 
     if (!m_impl->indirectImage.isValid()) {
+        const std::vector<uint8_t> blackPixels(static_cast<size_t>(kIndirectImageSize) * kIndirectImageSize * 4u, 0u);
         luna::ImageDesc imageDesc{};
         imageDesc.width = kIndirectImageSize;
         imageDesc.height = kIndirectImageSize;
         imageDesc.depth = 1;
         imageDesc.format = luna::PixelFormat::RGBA8Unorm;
-        imageDesc.usage = luna::ImageUsage::Storage | luna::ImageUsage::Sampled;
+        imageDesc.usage = luna::ImageUsage::ColorAttachment | luna::ImageUsage::Sampled;
         imageDesc.debugName = "RhiSyncLabIndirectImage";
-        if (device.createImage(imageDesc, &m_impl->indirectImage) != luna::RHIResult::Success) {
-            return false;
-        }
-
-        luna::ResourceSetWriteDesc paintWrite{};
-        paintWrite.images.push_back(
-            {.binding = 0, .image = m_impl->indirectImage, .sampler = {}, .type = luna::ResourceType::StorageImage});
-        if (device.updateResourceSet(m_impl->indirectPaintSet, paintWrite) != luna::RHIResult::Success) {
+        if (device.createImage(imageDesc, &m_impl->indirectImage, blackPixels.data()) != luna::RHIResult::Success) {
             return false;
         }
 
@@ -505,14 +484,18 @@ bool RhiSyncLabRenderPipeline::ensure_indirect_resources(luna::IRHIDevice& devic
         }
     }
 
-    if (!m_impl->indirectPaintPipeline.isValid()) {
-        const std::string paintShaderPath = shader_path(m_shaderRoot, "sync_lab_paint_indirect.comp.spv");
-        luna::ComputePipelineDesc pipelineDesc{};
-        pipelineDesc.debugName = "RhiSyncLabPaintIndirect";
-        pipelineDesc.computeShader = {.stage = luna::ShaderType::Compute,
-                                      .filePath = paintShaderPath};
-        pipelineDesc.resourceLayouts = {m_impl->indirectPaintLayout};
-        if (device.createComputePipeline(pipelineDesc, &m_impl->indirectPaintPipeline) != luna::RHIResult::Success) {
+    if (!m_impl->indirectDrawPipeline.isValid()) {
+        const std::string vertexShaderPath = shader_path(m_shaderRoot, "sync_lab_indirect_draw.vert.spv");
+        const std::string fragmentShaderPath = shader_path(m_shaderRoot, "sync_lab_indirect_draw.frag.spv");
+        luna::GraphicsPipelineDesc pipelineDesc{};
+        pipelineDesc.debugName = "RhiSyncLabIndirectDraw";
+        pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
+        pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+        pipelineDesc.resourceLayouts = {m_impl->indirectArgsLayout};
+        pipelineDesc.cullMode = luna::CullMode::None;
+        pipelineDesc.frontFace = luna::FrontFace::Clockwise;
+        pipelineDesc.colorAttachments.push_back({luna::PixelFormat::RGBA8Unorm, false});
+        if (device.createGraphicsPipeline(pipelineDesc, &m_impl->indirectDrawPipeline) != luna::RHIResult::Success) {
             return false;
         }
     }
@@ -524,7 +507,7 @@ bool RhiSyncLabRenderPipeline::ensure_indirect_resources(luna::IRHIDevice& devic
     m_impl->indirectReadbackBuffers.assign(m_impl->framesInFlight, {});
     m_impl->indirectReadbackPending.assign(m_impl->framesInFlight, false);
     luna::BufferDesc readbackDesc{};
-    readbackDesc.size = sizeof(uint32_t) * 4;
+    readbackDesc.size = sizeof(uint32_t) * 6;
     readbackDesc.usage = luna::BufferUsage::TransferDst;
     readbackDesc.memoryUsage = luna::MemoryUsage::Readback;
     readbackDesc.debugName = "RhiSyncLabIndirectReadback";
@@ -536,6 +519,29 @@ bool RhiSyncLabRenderPipeline::ensure_indirect_resources(luna::IRHIDevice& devic
     }
 
     return true;
+}
+
+bool RhiSyncLabRenderPipeline::ensure_subresource_resources(luna::IRHIDevice& device)
+{
+    auto& subresource = m_state->subresource;
+    subresource.availableMipLevels = 4;
+    subresource.availableArrayLayers = 4;
+
+    if (m_impl->subresourceProbeImage.isValid()) {
+        return true;
+    }
+
+    luna::ImageDesc imageDesc{};
+    imageDesc.width = 64;
+    imageDesc.height = 64;
+    imageDesc.depth = 1;
+    imageDesc.mipLevels = subresource.availableMipLevels;
+    imageDesc.arrayLayers = subresource.availableArrayLayers;
+    imageDesc.type = luna::ImageType::Image2DArray;
+    imageDesc.format = luna::PixelFormat::RGBA8Unorm;
+    imageDesc.usage = luna::ImageUsage::Sampled | luna::ImageUsage::TransferSrc | luna::ImageUsage::TransferDst;
+    imageDesc.debugName = "RhiSyncLabSubresourceProbe";
+    return device.createImage(imageDesc, &m_impl->subresourceProbeImage) == luna::RHIResult::Success;
 }
 
 bool RhiSyncLabRenderPipeline::render_history_copy(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -710,9 +716,10 @@ bool RhiSyncLabRenderPipeline::render_readback(luna::IRHIDevice& device, const l
         }
 
         if (frameContext.commandContext->bufferBarrier({.buffer = m_impl->readbackUploadBuffer,
-                                                        .srcStage = luna::PipelineStage::Host,
+                                                        .srcStage = luna::PipelineStage::Host | luna::PipelineStage::Transfer,
                                                         .dstStage = luna::PipelineStage::Transfer,
-                                                        .srcAccess = luna::ResourceAccess::HostWrite,
+                                                        .srcAccess = luna::ResourceAccess::HostWrite |
+                                                                     luna::ResourceAccess::TransferWrite,
                                                         .dstAccess = luna::ResourceAccess::TransferRead}) != luna::RHIResult::Success ||
             frameContext.commandContext->imageBarrier({.image = m_impl->readbackImage,
                                                        .newLayout = luna::ImageLayout::TransferDst,
@@ -812,11 +819,11 @@ bool RhiSyncLabRenderPipeline::render_indirect(luna::IRHIDevice& device, const l
     auto& indirect = m_state->indirect;
     const size_t slot = frame_slot(frameContext.frameIndex, m_impl->indirectReadbackBuffers.size());
     if (slot < m_impl->indirectReadbackPending.size() && m_impl->indirectReadbackPending[slot]) {
-        std::array<uint32_t, 4> args{};
+        std::array<uint32_t, 6> args{};
         if (device.readBuffer(m_impl->indirectReadbackBuffers[slot], args.data(), sizeof(args), 0) != luna::RHIResult::Success) {
             return false;
         }
-        indirect.gpuArgs = {args[0], args[1], args[2]};
+        indirect.gpuArgs = {args[4], args[5], args[1]};
         m_impl->indirectReadbackPending[slot] = false;
         push_timeline(m_state, &m_impl->timelineSerial, "Indirect: CPU consumed GPU-generated args");
     }
@@ -829,34 +836,38 @@ bool RhiSyncLabRenderPipeline::render_indirect(luna::IRHIDevice& device, const l
         pushConstants.requested[1] = static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountY));
         pushConstants.requested[2] = 1u;
 
-        if (frameContext.commandContext->bindComputePipeline(m_impl->indirectGeneratePipeline) != luna::RHIResult::Success ||
+        if (frameContext.commandContext->beginDebugLabel("Indirect Generate Args") != luna::RHIResult::Success ||
+            frameContext.commandContext->bindComputePipeline(m_impl->indirectGeneratePipeline) != luna::RHIResult::Success ||
             frameContext.commandContext->bindResourceSet(m_impl->indirectArgsSet) != luna::RHIResult::Success ||
             frameContext.commandContext->pushConstants(
                 &pushConstants, sizeof(pushConstants), 0, luna::ShaderType::Compute) != luna::RHIResult::Success ||
             frameContext.commandContext->dispatch(1, 1, 1) != luna::RHIResult::Success ||
             frameContext.commandContext->bufferBarrier({.buffer = m_impl->indirectArgsBuffer,
                                                         .srcStage = luna::PipelineStage::ComputeShader,
-                                                        .dstStage = luna::PipelineStage::Transfer | luna::PipelineStage::DrawIndirect,
+                                                        .dstStage = luna::PipelineStage::Transfer | luna::PipelineStage::DrawIndirect |
+                                                                    luna::PipelineStage::VertexShader,
                                                         .srcAccess = luna::ResourceAccess::ShaderWrite,
                                                         .dstAccess = luna::ResourceAccess::TransferRead |
+                                                                     luna::ResourceAccess::ShaderRead |
                                                                      luna::ResourceAccess::IndirectCommandRead}) !=
                 luna::RHIResult::Success ||
             frameContext.commandContext->copyBuffer({m_impl->indirectArgsBuffer,
                                                     m_impl->indirectReadbackBuffers[slot],
                                                     0,
                                                     0,
-                                                    sizeof(uint32_t) * 4}) != luna::RHIResult::Success ||
+                                                    sizeof(uint32_t) * 6}) != luna::RHIResult::Success ||
             frameContext.commandContext->bufferBarrier({.buffer = m_impl->indirectReadbackBuffers[slot],
                                                         .srcStage = luna::PipelineStage::Transfer,
                                                         .dstStage = luna::PipelineStage::Host,
                                                         .srcAccess = luna::ResourceAccess::TransferWrite,
-                                                        .dstAccess = luna::ResourceAccess::HostRead}) != luna::RHIResult::Success) {
+                                                        .dstAccess = luna::ResourceAccess::HostRead}) != luna::RHIResult::Success ||
+            frameContext.commandContext->endDebugLabel() != luna::RHIResult::Success) {
             return false;
         }
 
         generatedThisFrame = true;
         m_impl->indirectReadbackPending[slot] = true;
-        indirect.status = "GPU generated a new indirect args buffer.";
+        indirect.status = "GPU generated drawIndirect args plus grid metadata.";
         LUNA_CORE_INFO("RhiSyncLab indirect args generated on GPU: requested=({}, {})",
                        indirect.desiredGroupCountX,
                        indirect.desiredGroupCountY);
@@ -865,48 +876,73 @@ bool RhiSyncLabRenderPipeline::render_indirect(luna::IRHIDevice& device, const l
 
     if (indirect.runRequested) {
         indirect.runRequested = false;
-        if (frameContext.commandContext->imageBarrier({.image = m_impl->indirectImage,
-                                                       .newLayout = luna::ImageLayout::General,
-                                                       .srcStage = luna::PipelineStage::FragmentShader,
-                                                       .dstStage = luna::PipelineStage::ComputeShader,
-                                                       .srcAccess = luna::ResourceAccess::ShaderRead,
-                                                       .dstAccess = luna::ResourceAccess::ShaderWrite,
-                                                       .aspect = luna::ImageAspect::Color}) != luna::RHIResult::Success ||
-            frameContext.commandContext->bindComputePipeline(m_impl->indirectPaintPipeline) != luna::RHIResult::Success ||
-            frameContext.commandContext->bindResourceSet(m_impl->indirectPaintSet) != luna::RHIResult::Success) {
+        const uint32_t directInstanceCount = static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountX)) *
+                                             static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountY));
+        if (!indirect.useIndirect) {
+            const std::array<uint32_t, 6> cpuArgs = {
+                3u,
+                directInstanceCount,
+                0u,
+                0u,
+                static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountX)),
+                static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountY)),
+            };
+            if (device.writeBuffer(m_impl->indirectArgsBuffer, cpuArgs.data(), sizeof(cpuArgs), 0) != luna::RHIResult::Success) {
+                return false;
+            }
+        }
+
+        if (frameContext.commandContext->beginDebugLabel("Indirect Draw Pass") != luna::RHIResult::Success ||
+            frameContext.commandContext->bufferBarrier({.buffer = m_impl->indirectArgsBuffer,
+                                                        .srcStage = indirect.useIndirect
+                                                                        ? (generatedThisFrame ? luna::PipelineStage::ComputeShader
+                                                                                              : luna::PipelineStage::AllCommands)
+                                                                        : (luna::PipelineStage::Host | luna::PipelineStage::Transfer),
+                                                        .dstStage = luna::PipelineStage::DrawIndirect |
+                                                                    luna::PipelineStage::VertexShader,
+                                                        .srcAccess = indirect.useIndirect
+                                                                         ? (generatedThisFrame ? luna::ResourceAccess::ShaderWrite
+                                                                                               : luna::ResourceAccess::MemoryWrite)
+                                                                         : (luna::ResourceAccess::HostWrite |
+                                                                            luna::ResourceAccess::TransferWrite),
+                                                        .dstAccess = luna::ResourceAccess::IndirectCommandRead |
+                                                                     luna::ResourceAccess::ShaderRead}) !=
+                luna::RHIResult::Success ||
+            frameContext.commandContext->beginRendering({.width = kIndirectImageSize,
+                                                         .height = kIndirectImageSize,
+                                                         .colorAttachments = {{m_impl->indirectImage,
+                                                                               luna::PixelFormat::RGBA8Unorm,
+                                                                               {0.02f, 0.03f, 0.05f, 1.0f}}}}) !=
+                luna::RHIResult::Success ||
+            frameContext.commandContext->bindGraphicsPipeline(m_impl->indirectDrawPipeline) != luna::RHIResult::Success ||
+            frameContext.commandContext->bindResourceSet(m_impl->indirectArgsSet) != luna::RHIResult::Success) {
             return false;
         }
 
-        const bool dispatchOk = indirect.useIndirect
-                                    ? frameContext.commandContext->dispatchIndirect(m_impl->indirectArgsBuffer, 0) ==
-                                          luna::RHIResult::Success
-                                    : frameContext.commandContext->dispatch(
-                                          static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountX)),
-                                          static_cast<uint32_t>(std::max(1, indirect.desiredGroupCountY)),
-                                          1) == luna::RHIResult::Success;
-        if (!dispatchOk ||
-            frameContext.commandContext->imageBarrier({.image = m_impl->indirectImage,
-                                                       .oldLayout = luna::ImageLayout::General,
-                                                       .newLayout = luna::ImageLayout::ShaderReadOnly,
-                                                       .srcStage = luna::PipelineStage::ComputeShader,
-                                                       .dstStage = luna::PipelineStage::FragmentShader,
-                                                       .srcAccess = luna::ResourceAccess::ShaderWrite,
-                                                       .dstAccess = luna::ResourceAccess::ShaderRead,
-                                                       .aspect = luna::ImageAspect::Color}) != luna::RHIResult::Success) {
+        const bool drawOk = indirect.useIndirect
+                                ? frameContext.commandContext->drawIndirect(m_impl->indirectArgsBuffer, 0) ==
+                                      luna::RHIResult::Success
+                                : frameContext.commandContext->draw({3, directInstanceCount, 0, 0}) ==
+                                      luna::RHIResult::Success;
+        if (!drawOk ||
+            frameContext.commandContext->endRendering() != luna::RHIResult::Success ||
+            frameContext.commandContext->transitionImage(m_impl->indirectImage, luna::ImageLayout::ShaderReadOnly) !=
+                luna::RHIResult::Success ||
+            frameContext.commandContext->endDebugLabel() != luna::RHIResult::Success) {
             return false;
         }
 
-        indirect.status = indirect.useIndirect ? "Indirect dispatch executed using GPU-generated args."
-                                               : "CPU direct dispatch executed for comparison.";
+        indirect.status = indirect.useIndirect ? "Graphics drawIndirect executed using GPU-generated args."
+                                               : "CPU direct draw executed for comparison.";
         LUNA_CORE_INFO("RhiSyncLab indirect run: path={}, requested=({}, {})",
-                       indirect.useIndirect ? "GPU indirect" : "CPU direct",
+                       indirect.useIndirect ? "GPU indirect draw" : "CPU direct draw",
                        indirect.desiredGroupCountX,
                        indirect.desiredGroupCountY);
         push_timeline(m_state,
                       &m_impl->timelineSerial,
-                      generatedThisFrame ? "Indirect: generated args + ran indirect dispatch"
-                                         : (indirect.useIndirect ? "Indirect: ran indirect dispatch"
-                                                                 : "Indirect: ran CPU direct dispatch"));
+                      generatedThisFrame ? "Indirect: generated args + ran indirect draw"
+                                         : (indirect.useIndirect ? "Indirect: ran indirect draw"
+                                                                 : "Indirect: ran CPU direct draw"));
     }
 
     return frameContext.commandContext->beginRendering({.width = frameContext.renderWidth,
@@ -918,6 +954,66 @@ bool RhiSyncLabRenderPipeline::render_indirect(luna::IRHIDevice& device, const l
            frameContext.commandContext->bindGraphicsPipeline(m_impl->singlePreviewPipeline) == luna::RHIResult::Success &&
            frameContext.commandContext->bindResourceSet(m_impl->indirectPreviewSet) == luna::RHIResult::Success &&
            frameContext.commandContext->draw({3, 1, 0, 0}) == luna::RHIResult::Success &&
+           frameContext.commandContext->endRendering() == luna::RHIResult::Success;
+}
+
+bool RhiSyncLabRenderPipeline::render_subresource(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
+{
+    if (!ensure_subresource_resources(device)) {
+        return false;
+    }
+
+    auto& subresource = m_state->subresource;
+    const int maxBaseMip = std::max(0, static_cast<int>(subresource.availableMipLevels) - 1);
+    const int maxBaseLayer = std::max(0, static_cast<int>(subresource.availableArrayLayers) - 1);
+    subresource.baseMipLevel = std::clamp(subresource.baseMipLevel, 0, maxBaseMip);
+    subresource.baseArrayLayer = std::clamp(subresource.baseArrayLayer, 0, maxBaseLayer);
+    subresource.mipCount = std::clamp(subresource.mipCount,
+                                      1,
+                                      static_cast<int>(subresource.availableMipLevels) - subresource.baseMipLevel);
+    subresource.layerCount = std::clamp(subresource.layerCount,
+                                        1,
+                                        static_cast<int>(subresource.availableArrayLayers) - subresource.baseArrayLayer);
+
+    std::ostringstream summary;
+    summary << "Range mip " << subresource.baseMipLevel << " .. "
+            << (subresource.baseMipLevel + subresource.mipCount - 1) << ", layer " << subresource.baseArrayLayer
+            << " .. " << (subresource.baseArrayLayer + subresource.layerCount - 1);
+    subresource.barrierSummary = summary.str();
+
+    if (subresource.runBarrierOnlyRequested) {
+        subresource.runBarrierOnlyRequested = false;
+        const luna::RHIResult result =
+            frameContext.commandContext->imageBarrier({.image = m_impl->subresourceProbeImage,
+                                                       .oldLayout = subresource.oldLayout,
+                                                       .newLayout = subresource.newLayout,
+                                                       .srcStage = subresource.srcStage,
+                                                       .dstStage = subresource.dstStage,
+                                                       .srcAccess = subresource.srcAccess,
+                                                       .dstAccess = subresource.dstAccess,
+                                                       .aspect = luna::ImageAspect::Color,
+                                                       .baseMipLevel = static_cast<uint32_t>(subresource.baseMipLevel),
+                                                       .mipCount = static_cast<uint32_t>(subresource.mipCount),
+                                                       .baseArrayLayer = static_cast<uint32_t>(subresource.baseArrayLayer),
+                                                       .layerCount = static_cast<uint32_t>(subresource.layerCount)});
+        subresource.status = result == luna::RHIResult::Success
+                                 ? "Accepted: exact subresource range barrier recorded successfully."
+                                 : "Rejected: selected subresource range barrier was not accepted.";
+        if (result == luna::RHIResult::Success) {
+            subresource.oldLayout = subresource.newLayout;
+            LUNA_CORE_INFO("RhiSyncLab subresource barrier accepted: {}", subresource.barrierSummary);
+        } else {
+            LUNA_CORE_ERROR("RhiSyncLab subresource barrier rejected: {}", subresource.barrierSummary);
+        }
+        push_timeline(m_state, &m_impl->timelineSerial, "Subresource: barrier-only probe");
+    }
+
+    return frameContext.commandContext->beginRendering({.width = frameContext.renderWidth,
+                                                        .height = frameContext.renderHeight,
+                                                        .colorAttachments = {{frameContext.backbuffer,
+                                                                              frameContext.backbufferFormat,
+                                                                              {0.03f, 0.05f, 0.08f, 1.0f}}}}) ==
+               luna::RHIResult::Success &&
            frameContext.commandContext->endRendering() == luna::RHIResult::Success;
 }
 
@@ -967,11 +1063,9 @@ void RhiSyncLabRenderPipeline::destroy_indirect_resources(luna::IRHIDevice& devi
     }
 
     if (m_impl->indirectGeneratePipeline.isValid()) device.destroyPipeline(m_impl->indirectGeneratePipeline);
-    if (m_impl->indirectPaintPipeline.isValid()) device.destroyPipeline(m_impl->indirectPaintPipeline);
+    if (m_impl->indirectDrawPipeline.isValid()) device.destroyPipeline(m_impl->indirectDrawPipeline);
     if (m_impl->indirectArgsSet.isValid()) device.destroyResourceSet(m_impl->indirectArgsSet);
-    if (m_impl->indirectPaintSet.isValid()) device.destroyResourceSet(m_impl->indirectPaintSet);
     if (m_impl->indirectArgsLayout.isValid()) device.destroyResourceLayout(m_impl->indirectArgsLayout);
-    if (m_impl->indirectPaintLayout.isValid()) device.destroyResourceLayout(m_impl->indirectPaintLayout);
     if (m_impl->indirectArgsBuffer.isValid()) device.destroyBuffer(m_impl->indirectArgsBuffer);
     if (m_impl->indirectImage.isValid()) device.destroyImage(m_impl->indirectImage);
     for (luna::BufferHandle& buffer : m_impl->indirectReadbackBuffers) {
@@ -981,15 +1075,23 @@ void RhiSyncLabRenderPipeline::destroy_indirect_resources(luna::IRHIDevice& devi
     }
 
     m_impl->indirectGeneratePipeline = {};
-    m_impl->indirectPaintPipeline = {};
+    m_impl->indirectDrawPipeline = {};
     m_impl->indirectArgsSet = {};
-    m_impl->indirectPaintSet = {};
     m_impl->indirectArgsLayout = {};
-    m_impl->indirectPaintLayout = {};
     m_impl->indirectArgsBuffer = {};
     m_impl->indirectImage = {};
     m_impl->indirectReadbackBuffers.clear();
     m_impl->indirectReadbackPending.clear();
+}
+
+void RhiSyncLabRenderPipeline::destroy_subresource_resources(luna::IRHIDevice& device)
+{
+    if (m_impl == nullptr) {
+        return;
+    }
+
+    if (m_impl->subresourceProbeImage.isValid()) device.destroyImage(m_impl->subresourceProbeImage);
+    m_impl->subresourceProbeImage = {};
 }
 
 } // namespace sync_lab

@@ -684,9 +684,6 @@ bool SceneRenderPipeline::ensure_size_dependent_resources(IRHIDevice& device,
 
     if (m_sceneColorImage.isValid() || m_sceneDepthImage.isValid() || m_backgroundImage.isValid() || m_scenePipeline.isValid() ||
         m_sceneFullscreenPipeline.isValid() || m_fullscreenPipeline.isValid()) {
-        if (device.waitIdle() != RHIResult::Success) {
-            return false;
-        }
     }
 
     if (m_sceneColorImage.isValid()) {

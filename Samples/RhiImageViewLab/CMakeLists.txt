@@ -12,16 +12,22 @@ function(rhi_image_view_lab_compile_shader output_file shader_stage shader_sourc
 endfunction()
 
 set(RHI_IMAGE_VIEW_LAB_FULLSCREEN_VERTEX_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_fullscreen.vert)
+set(RHI_IMAGE_VIEW_LAB_ATTACHMENT_VERTEX_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_attachment.vert)
+set(RHI_IMAGE_VIEW_LAB_ATTACHMENT_FRAGMENT_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_attachment.frag)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_2D_FRAGMENT_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_present_2d.frag)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_ARRAY_FRAGMENT_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_present_array.frag)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_3D_FRAGMENT_SOURCE ${RHI_IMAGE_VIEW_LAB_SHADER_SOURCE_DIR}/image_view_lab_present_3d.frag)
 
 set(RHI_IMAGE_VIEW_LAB_FULLSCREEN_VERTEX_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_fullscreen.vert.spv)
+set(RHI_IMAGE_VIEW_LAB_ATTACHMENT_VERTEX_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_attachment.vert.spv)
+set(RHI_IMAGE_VIEW_LAB_ATTACHMENT_FRAGMENT_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_attachment.frag.spv)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_2D_FRAGMENT_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_present_2d.frag.spv)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_ARRAY_FRAGMENT_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_present_array.frag.spv)
 set(RHI_IMAGE_VIEW_LAB_PRESENT_3D_FRAGMENT_OUTPUT ${RHI_IMAGE_VIEW_LAB_SHADER_OUTPUT_DIR}/image_view_lab_present_3d.frag.spv)
 
 rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_FULLSCREEN_VERTEX_OUTPUT} vert ${RHI_IMAGE_VIEW_LAB_FULLSCREEN_VERTEX_SOURCE})
+rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_ATTACHMENT_VERTEX_OUTPUT} vert ${RHI_IMAGE_VIEW_LAB_ATTACHMENT_VERTEX_SOURCE})
+rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_ATTACHMENT_FRAGMENT_OUTPUT} frag ${RHI_IMAGE_VIEW_LAB_ATTACHMENT_FRAGMENT_SOURCE})
 rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_PRESENT_2D_FRAGMENT_OUTPUT} frag ${RHI_IMAGE_VIEW_LAB_PRESENT_2D_FRAGMENT_SOURCE})
 rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_PRESENT_ARRAY_FRAGMENT_OUTPUT} frag ${RHI_IMAGE_VIEW_LAB_PRESENT_ARRAY_FRAGMENT_SOURCE})
 rhi_image_view_lab_compile_shader(${RHI_IMAGE_VIEW_LAB_PRESENT_3D_FRAGMENT_OUTPUT} frag ${RHI_IMAGE_VIEW_LAB_PRESENT_3D_FRAGMENT_SOURCE})
@@ -30,6 +36,8 @@ add_custom_target(
     RhiImageViewLabShaders
     DEPENDS
         ${RHI_IMAGE_VIEW_LAB_FULLSCREEN_VERTEX_OUTPUT}
+        ${RHI_IMAGE_VIEW_LAB_ATTACHMENT_VERTEX_OUTPUT}
+        ${RHI_IMAGE_VIEW_LAB_ATTACHMENT_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_VIEW_LAB_PRESENT_2D_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_VIEW_LAB_PRESENT_ARRAY_FRAGMENT_OUTPUT}
         ${RHI_IMAGE_VIEW_LAB_PRESENT_3D_FRAGMENT_OUTPUT}
@@ -64,3 +72,20 @@ target_compile_definitions(
 )
 
 luna_configure_runtime_output(RhiImageViewLab)
+
+if(BUILD_TESTING)
+    add_test(
+        NAME RhiImageViewLab.selftest.phase3_deferred_destroy
+        COMMAND $<TARGET_FILE:RhiImageViewLab> --self-test=phase3_deferred_destroy
+    )
+    add_test(
+        NAME RhiImageViewLab.selftest.phase5_subresource_preview
+        COMMAND $<TARGET_FILE:RhiImageViewLab> --self-test=phase5_subresource_preview
+    )
+    set_tests_properties(
+        RhiImageViewLab.selftest.phase3_deferred_destroy
+        RhiImageViewLab.selftest.phase5_subresource_preview
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()

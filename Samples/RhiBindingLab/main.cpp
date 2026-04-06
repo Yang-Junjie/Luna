@@ -8,8 +8,51 @@
 
 #include <algorithm>
 #include <memory>
+#include <string_view>
 
 namespace {
+
+struct CommandLineOptions {
+    bool runSelfTest = false;
+    std::string_view selfTestName = "phase3_descriptor_recycle";
+};
+
+struct SelfTestResult {
+    bool passed = false;
+};
+
+bool parse_arguments(int argc, char** argv, CommandLineOptions* options)
+{
+    if (options == nullptr) {
+        return false;
+    }
+
+    constexpr std::string_view kSelfTestPrefix = "--self-test=";
+    for (int index = 1; index < argc; ++index) {
+        const std::string_view argument = argv[index];
+        if (argument == "--self-test") {
+            options->runSelfTest = true;
+            continue;
+        }
+
+        if (argument.substr(0, kSelfTestPrefix.size()) == kSelfTestPrefix) {
+            const std::string_view selfTestName = argument.substr(kSelfTestPrefix.size());
+            if (selfTestName != "phase3_descriptor_recycle" && selfTestName != "phase5_layout_validation") {
+                LUNA_CORE_ERROR("Unknown self-test '{}'", argument.substr(kSelfTestPrefix.size()));
+                return false;
+            }
+
+            options->runSelfTest = true;
+            options->selfTestName = selfTestName;
+            continue;
+        }
+
+        LUNA_CORE_ERROR("Unknown argument '{}'", argument);
+        return false;
+    }
+
+    return true;
+}
 
 const char* page_label(binding_lab::Page page)
 {
@@ -160,6 +203,11 @@ private:
         auto& dynamicUniform = m_state->dynamicUniform;
         ImGui::SliderInt("Object Index", &dynamicUniform.objectIndex, 0, 3);
         ImGui::Text("Dynamic Offset: %u bytes", dynamicUniform.dynamicOffset);
+        ImGui::Text("Min UBO Alignment: %u", dynamicUniform.minUniformBufferOffsetAlignment);
+        ImGui::Text("Frames In Flight: %u", dynamicUniform.framesInFlight);
+        if (!dynamicUniform.limitsSummary.empty()) {
+            ImGui::TextWrapped("%s", dynamicUniform.limitsSummary.c_str());
+        }
         ImGui::TextWrapped("%s", dynamicUniform.status.empty() ? "Same set layout, different object data via dynamic offset."
                                                                : dynamicUniform.status.c_str());
     }
@@ -168,9 +216,145 @@ private:
     std::shared_ptr<binding_lab::State> m_state;
 };
 
+class RhiBindingLabSelfTestLayer final : public luna::Layer {
+public:
+    RhiBindingLabSelfTestLayer(std::shared_ptr<binding_lab::State> state,
+                               std::shared_ptr<SelfTestResult> result,
+                               std::string_view selfTestName)
+        : luna::Layer("RhiBindingLabSelfTestLayer"),
+          m_state(std::move(state)),
+          m_result(std::move(result)),
+          m_selfTestName(selfTestName)
+    {}
+
+    void onAttach() override
+    {
+        LUNA_CORE_INFO("RhiBindingLab self-test begin: {}", m_selfTestName);
+    }
+
+    void onUpdate(luna::Timestep) override
+    {
+        if (m_state == nullptr || m_result == nullptr) {
+            return;
+        }
+
+        if (m_selfTestName == "phase5_layout_validation") {
+            update_phase5_layout_validation();
+            return;
+        }
+
+        update_phase3_descriptor_recycle();
+    }
+
+private:
+    void update_phase3_descriptor_recycle()
+    {
+        m_state->page = binding_lab::Page::DescriptorArray;
+        auto& descriptorArray = m_state->descriptorArray;
+
+        if (!m_hasLastAlternate) {
+            m_lastAlternate = descriptorArray.slot2UsesAlternate;
+            m_hasLastAlternate = true;
+        } else if (descriptorArray.slot2UsesAlternate != m_lastAlternate) {
+            ++m_toggleCount;
+            m_lastAlternate = descriptorArray.slot2UsesAlternate;
+        }
+
+        ++m_frame;
+        if (m_frame >= 2 && m_frame <= 48 && (m_frame % 2) == 0) {
+            descriptorArray.textureIndex = (m_frame / 2) % 4;
+            descriptorArray.replaceSlotRequested = true;
+            ++m_requestedReplacements;
+        }
+
+        if (m_frame >= 60) {
+            finish();
+        }
+    }
+
+private:
+    void finish()
+    {
+        const auto& descriptorArray = m_state->descriptorArray;
+        const bool passed = m_requestedReplacements >= 20 && m_toggleCount >= 10 && !descriptorArray.status.empty();
+        m_result->passed = passed;
+
+        if (passed) {
+            LUNA_CORE_INFO("RhiBindingLab self-test PASS replacements={} toggles={} slot2='{}'",
+                           m_requestedReplacements,
+                           m_toggleCount,
+                           descriptorArray.slotLabels[2]);
+        } else {
+            LUNA_CORE_ERROR("RhiBindingLab self-test FAIL replacements={} toggles={} status='{}'",
+                            m_requestedReplacements,
+                            m_toggleCount,
+                            descriptorArray.status);
+        }
+
+        luna::Application::get().close();
+    }
+
+    void update_phase5_layout_validation()
+    {
+        m_state->page = binding_lab::Page::MultiSet;
+        auto& multiSet = m_state->multiSet;
+        multiSet.buildLayoutRequested = m_buildRequestPending;
+
+        ++m_frame;
+        if (m_frame == 2) {
+            m_buildRequestPending = true;
+            multiSet.buildLayoutRequested = true;
+        }
+
+        if (!m_buildValidated &&
+            multiSet.layoutStatus.find("reflection validation passed") != std::string::npos) {
+            m_buildValidated = true;
+            m_buildRequestPending = false;
+            multiSet.buildLayoutRequested = false;
+            if (!m_conflictRequestIssued) {
+                multiSet.conflictTestRequested = true;
+                m_conflictRequestIssued = true;
+            }
+        } else if (m_buildValidated &&
+                   multiSet.layoutStatus.find("Conflict rejected") != std::string::npos) {
+            m_conflictValidated = true;
+        }
+
+        if (m_frame >= 90 || (m_buildValidated && m_conflictValidated)) {
+            const bool passed = m_buildValidated && m_conflictValidated;
+            m_result->passed = passed;
+            if (passed) {
+                LUNA_CORE_INFO("RhiBindingLab phase 5 self-test PASS build='{}' conflict='{}'",
+                               multiSet.layoutStatus,
+                               multiSet.layoutStatus);
+            } else {
+                LUNA_CORE_ERROR("RhiBindingLab phase 5 self-test FAIL buildValidated={} conflictValidated={} status='{}'",
+                                m_buildValidated ? "true" : "false",
+                                m_conflictValidated ? "true" : "false",
+                                multiSet.layoutStatus);
+            }
+            luna::Application::get().close();
+        }
+    }
+
+private:
+    std::shared_ptr<binding_lab::State> m_state;
+    std::shared_ptr<SelfTestResult> m_result;
+    std::string_view m_selfTestName;
+    uint32_t m_frame = 0;
+    int m_requestedReplacements = 0;
+    int m_toggleCount = 0;
+    bool m_lastAlternate = false;
+    bool m_hasLastAlternate = false;
+    bool m_buildValidated = false;
+    bool m_conflictValidated = false;
+    bool m_buildRequestPending = false;
+    bool m_conflictRequestIssued = false;
+};
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
 #ifndef NDEBUG
     constexpr luna::Logger::Level kLogLevel = luna::Logger::Level::Trace;
@@ -180,7 +364,14 @@ int main()
 
     luna::Logger::init("logs/luna.log", kLogLevel);
 
+    CommandLineOptions options;
+    if (!parse_arguments(argc, argv, &options)) {
+        luna::Logger::shutdown();
+        return 1;
+    }
+
     std::shared_ptr<binding_lab::State> state = std::make_shared<binding_lab::State>();
+    std::shared_ptr<SelfTestResult> selfTestResult = std::make_shared<SelfTestResult>();
     std::shared_ptr<luna::IRenderPipeline> renderPipeline =
         std::make_shared<binding_lab::RhiBindingLabRenderPipeline>(state);
 
@@ -189,7 +380,7 @@ int main()
         .windowWidth = 1440,
         .windowHeight = 900,
         .maximized = false,
-        .enableImGui = true,
+        .enableImGui = !options.runSelfTest,
         .enableMultiViewport = false,
         .renderService =
             {
@@ -206,9 +397,13 @@ int main()
         return 1;
     }
 
-    app->pushLayer(std::make_unique<RhiBindingLabLayer>(state));
+    if (options.runSelfTest) {
+        app->pushLayer(std::make_unique<RhiBindingLabSelfTestLayer>(state, selfTestResult, options.selfTestName));
+    } else {
+        app->pushLayer(std::make_unique<RhiBindingLabLayer>(state));
+    }
     app->run();
     app.reset();
     luna::Logger::shutdown();
-    return 0;
+    return options.runSelfTest && !selfTestResult->passed ? 1 : 0;
 }

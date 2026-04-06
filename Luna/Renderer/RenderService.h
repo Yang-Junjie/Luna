@@ -4,11 +4,8 @@
 #include "RHI/RHIDevice.h"
 #include "RHI/Types.h"
 #include "Renderer/SceneRenderPipeline.h"
-#include "Vulkan/vk_engine.h"
 
-#include <array>
 #include <memory>
-#include <string>
 #include <string_view>
 
 namespace luna {
@@ -16,21 +13,11 @@ namespace luna {
 class ImGuiLayer;
 class IRenderPipeline;
 
-enum class LegacyRendererKind : uint8_t {
-    LegacyScene = 0,
-    ClearColor,
-    Triangle,
-    ComputeBackground
-};
-
 struct RenderServiceSpecification {
     std::string_view applicationName = "Luna";
     RHIBackend backend = RHIBackend::Vulkan;
+    SwapchainDesc swapchain{};
     std::shared_ptr<IRenderPipeline> renderPipeline;
-    LegacyRendererKind legacyRenderer = LegacyRendererKind::LegacyScene;
-    std::array<float, 4> demoClearColor{0.08f, 0.12f, 0.18f, 1.0f};
-    std::string triangleVertexShaderPath;
-    std::string triangleFragmentShaderPath;
 };
 
 class RenderService {
@@ -46,12 +33,21 @@ public:
     bool resize_swapchain();
 
     uint32_t getSwapchainImageCount() const;
-    bool uploadTriangleVertices(std::span<const TriangleVertex> vertices);
     float& getRenderScale();
     Camera& getMainCamera();
     std::vector<SceneBackgroundEffect>& getBackgroundEffects();
     int& getCurrentBackgroundEffect();
     std::shared_ptr<SceneDocument> findLoadedScene(std::string_view sceneName) const;
+    IRHIDevice* getRHIDevice()
+    {
+        return m_rhiDevice.get();
+    }
+
+    const IRHIDevice* getRHIDevice() const
+    {
+        return m_rhiDevice.get();
+    }
+
     RHIBackend getBackend() const
     {
         return m_backend;
@@ -69,8 +65,6 @@ private:
     bool m_loggedUnsupportedImGui = false;
     std::shared_ptr<IRenderPipeline> m_renderPipeline;
     std::unique_ptr<IRHIDevice> m_rhiDevice;
-    std::vector<SceneBackgroundEffect> m_legacyBackgroundEffects;
-    VulkanEngine m_vulkanEngine;
 };
 
 } // namespace luna

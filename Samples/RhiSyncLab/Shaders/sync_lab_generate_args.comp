@@ -4,9 +4,12 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
 layout(set = 0, binding = 0, std430) buffer IndirectArgs
 {
-    uint groupCountX;
-    uint groupCountY;
-    uint groupCountZ;
+    uint vertexCount;
+    uint instanceCount;
+    uint firstVertex;
+    uint firstInstance;
+    uint gridCountX;
+    uint gridCountY;
 } argsBuffer;
 
 layout(push_constant) uniform GenerateArgsParams
@@ -16,7 +19,10 @@ layout(push_constant) uniform GenerateArgsParams
 
 void main()
 {
-    argsBuffer.groupCountX = max(PushConstants.requested.x, 1u);
-    argsBuffer.groupCountY = max(PushConstants.requested.y, 1u);
-    argsBuffer.groupCountZ = 1u;
+    argsBuffer.vertexCount = 3u;
+    argsBuffer.instanceCount = max(PushConstants.requested.x, 1u) * max(PushConstants.requested.y, 1u);
+    argsBuffer.firstVertex = 0u;
+    argsBuffer.firstInstance = 0u;
+    argsBuffer.gridCountX = max(PushConstants.requested.x, 1u);
+    argsBuffer.gridCountY = max(PushConstants.requested.y, 1u);
 }

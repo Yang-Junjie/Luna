@@ -5,16 +5,17 @@
 #include <vulkan/vulkan.hpp>
 
 struct GLFWwindow;
-
-class VulkanEngine;
+class VulkanDeviceContext;
 
 namespace luna {
 
 class Event;
+class IRHIDevice;
+struct FrameContext;
 
 class ImGuiLayer final : public Layer {
 public:
-    ImGuiLayer(GLFWwindow* window, VulkanEngine& engine, bool enableMultiViewport);
+    ImGuiLayer(GLFWwindow* window, IRHIDevice& device, bool enableMultiViewport);
     ~ImGuiLayer() override = default;
 
     void onAttach() override;
@@ -25,6 +26,7 @@ public:
     void begin();
     void end();
 
+    bool render(IRHIDevice& device, const FrameContext& frameContext);
     void render(vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent);
     void renderPlatformWindows();
 
@@ -51,7 +53,8 @@ private:
     bool m_enableMultiViewport = false;
     vk::Format m_colorAttachmentFormat = vk::Format::eUndefined;
     GLFWwindow* m_window = nullptr;
-    VulkanEngine* m_engine = nullptr;
+    IRHIDevice* m_rhiDevice = nullptr;
+    VulkanDeviceContext* m_context = nullptr;
 };
 
 } // namespace luna

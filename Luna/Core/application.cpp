@@ -65,7 +65,7 @@ Application::Application(const ApplicationSpecification& spec)
             return;
         }
 
-        LUNA_CORE_INFO("ImGui path=Native Vulkan");
+        LUNA_CORE_INFO("ImGui path=Renderer overlay");
     }
 
     m_initialized = true;

@@ -4,6 +4,7 @@
 
 namespace vkutil {
 bool load_shader_module(const char* filePath, vk::Device device, vk::ShaderModule* outShaderModule);
+bool create_shader_module(std::span<const uint32_t> code, vk::Device device, vk::ShaderModule* outShaderModule);
 inline bool load_shader_module(const char* filePath, VkDevice device, VkShaderModule* outShaderModule)
 {
     vk::ShaderModule shaderModule{};
@@ -97,3 +98,8 @@ vk::Format to_vulkan_vertex_format(luna::VertexFormat format);
 vk::Pipeline build_graphics_pipeline(vk::Device device,
                                      const luna::GraphicsPipelineDesc& desc,
                                      vk::PipelineLayout layout);
+vk::Pipeline build_graphics_pipeline(vk::Device device,
+                                     const luna::GraphicsPipelineDesc& desc,
+                                     vk::PipelineLayout layout,
+                                     vk::ShaderModule vertexShader,
+                                     vk::ShaderModule fragmentShader);

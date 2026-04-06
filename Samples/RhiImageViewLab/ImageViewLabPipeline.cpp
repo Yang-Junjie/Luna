@@ -2,7 +2,6 @@
 
 #include "Core/log.h"
 #include "RHI/CommandContext.h"
-#include "Vulkan/vk_rhi_device.h"
 
 #include <algorithm>
 #include <array>
@@ -39,6 +38,50 @@ void write_rgba(std::vector<uint8_t>& pixels, size_t offset, float r, float g, f
     pixels[offset + 1] = to_u8(g);
     pixels[offset + 2] = to_u8(b);
     pixels[offset + 3] = to_u8(a);
+}
+
+uint32_t pack_rgba_u32(const uint8_t* bytes)
+{
+    return static_cast<uint32_t>(bytes[0]) |
+           (static_cast<uint32_t>(bytes[1]) << 8u) |
+           (static_cast<uint32_t>(bytes[2]) << 16u) |
+           (static_cast<uint32_t>(bytes[3]) << 24u);
+}
+
+uint32_t pack_rgba_u32(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+    const uint8_t bytes[] = {r, g, b, a};
+    return pack_rgba_u32(bytes);
+}
+
+uint32_t phase5_mip_stamp_pixel()
+{
+    return pack_rgba_u32(32u, 96u, 160u, 255u);
+}
+
+luna::ClearColorValue phase5_mip_stamp_clear_color()
+{
+    return {.r = 32.0f / 255.0f, .g = 96.0f / 255.0f, .b = 160.0f / 255.0f, .a = 1.0f};
+}
+
+uint32_t expected_mip_base_pixel()
+{
+    const float rings = 0.5f + 0.5f * std::sin(std::sqrt(0.5f) * 96.0f);
+    return pack_rgba_u32(255u, to_u8(rings), 0u, 255u);
+}
+
+uint32_t expected_array_layer_pixel(uint32_t layer)
+{
+    const std::array<std::array<float, 3>, 4> colors = {{
+        {0.90f, 0.18f, 0.16f},
+        {0.18f, 0.78f, 0.25f},
+        {0.16f, 0.34f, 0.92f},
+        {0.92f, 0.78f, 0.14f},
+    }};
+
+    const auto& color = colors[layer % colors.size()];
+    const float stripe = std::fmod(static_cast<float>(layer * 13u) * 0.12f, 1.0f);
+    return pack_rgba_u32(to_u8(color[0] * 0.45f), to_u8(color[1] * 0.45f), to_u8(color[2] * stripe), 255u);
 }
 
 std::string mip_view_label(const ViewRecord& view)
@@ -82,12 +125,7 @@ RhiImageViewLabRenderPipeline::RhiImageViewLabRenderPipeline(std::shared_ptr<Sta
 
 bool RhiImageViewLabRenderPipeline::init(luna::IRHIDevice& device)
 {
-    m_vulkanDevice = dynamic_cast<luna::VulkanRHIDevice*>(&device);
-    if (m_vulkanDevice == nullptr) {
-        LUNA_CORE_ERROR("RhiImageViewLab requires the Vulkan RHI backend");
-        return false;
-    }
-
+    (void)device;
     m_shaderRoot = std::filesystem::path{RHI_IMAGE_VIEW_LAB_SHADER_ROOT}.lexically_normal().generic_string();
     return true;
 }
@@ -98,8 +136,8 @@ void RhiImageViewLabRenderPipeline::shutdown(luna::IRHIDevice& device)
     destroy_array_source(device);
     destroy_volume_source(device);
     destroy_present_pipelines(device);
+    destroy_phase5_probe_resources(device);
     destroy_shared_resources(device);
-    m_vulkanDevice = nullptr;
 }
 
 bool RhiImageViewLabRenderPipeline::render(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -109,6 +147,9 @@ bool RhiImageViewLabRenderPipeline::render(luna::IRHIDevice& device, const luna:
     }
 
     if (!ensure_shared_resources(device) || !ensure_present_pipelines(device, frameContext.backbufferFormat)) {
+        return false;
+    }
+    if (!consume_phase5_probe_result(device, frameContext.frameIndex)) {
         return false;
     }
 
@@ -145,9 +186,6 @@ bool RhiImageViewLabRenderPipeline::ensure_shared_resources(luna::IRHIDevice& de
     }
 
     if (m_linearSampler.isValid() || !m_texture2DSets.empty() || !m_textureArraySets.empty() || !m_texture3DSets.empty()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_shared_resources(device);
     }
 
@@ -218,9 +256,6 @@ bool RhiImageViewLabRenderPipeline::ensure_present_pipelines(luna::IRHIDevice& d
     }
 
     if (m_present2DPipeline.isValid() || m_presentArrayPipeline.isValid() || m_present3DPipeline.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_present_pipelines(device);
     }
 
@@ -262,6 +297,121 @@ bool RhiImageViewLabRenderPipeline::ensure_present_pipelines(luna::IRHIDevice& d
     }
 
     m_presentBackbufferFormat = backbufferFormat;
+    return true;
+}
+
+bool RhiImageViewLabRenderPipeline::ensure_attachment_pipeline(luna::IRHIDevice& device)
+{
+    if (m_attachment2DPipeline.isValid()) {
+        return true;
+    }
+
+    const std::string vertexShaderPath = shader_path(m_shaderRoot, "image_view_lab_attachment.vert.spv");
+    const std::string fragmentShaderPath = shader_path(m_shaderRoot, "image_view_lab_attachment.frag.spv");
+
+    luna::GraphicsPipelineDesc pipelineDesc{};
+    pipelineDesc.debugName = "RhiImageViewLabAttachment2D";
+    pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
+    pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+    pipelineDesc.pushConstantSize = sizeof(PreviewPushConstants);
+    pipelineDesc.pushConstantVisibility = luna::ShaderType::AllGraphics;
+    pipelineDesc.cullMode = luna::CullMode::None;
+    pipelineDesc.frontFace = luna::FrontFace::Clockwise;
+    pipelineDesc.colorAttachments.push_back({luna::PixelFormat::RGBA8Unorm, false});
+    return device.createGraphicsPipeline(pipelineDesc, &m_attachment2DPipeline) == luna::RHIResult::Success;
+}
+
+bool RhiImageViewLabRenderPipeline::ensure_phase5_probe_resources(luna::IRHIDevice& device)
+{
+    if (m_framesInFlight == 0) {
+        m_framesInFlight = std::max(1u, device.getCapabilities().framesInFlight);
+    }
+
+    bool ready = m_phase5ProbeBuffers.size() == m_framesInFlight &&
+                 m_phase5ProbePendingKinds.size() == m_framesInFlight &&
+                 m_phase5ProbeExpectedPrimary.size() == m_framesInFlight &&
+                 m_phase5ProbeExpectedSecondary.size() == m_framesInFlight &&
+                 m_phase5ProbeSummaries.size() == m_framesInFlight;
+    if (ready) {
+        for (const luna::BufferHandle buffer : m_phase5ProbeBuffers) {
+            if (!buffer.isValid()) {
+                ready = false;
+                break;
+            }
+        }
+    }
+    if (ready) {
+        return true;
+    }
+
+    destroy_phase5_probe_resources(device);
+
+    m_phase5ProbeBuffers.assign(m_framesInFlight, {});
+    m_phase5ProbePendingKinds.assign(m_framesInFlight, Phase5ProbeKind::None);
+    m_phase5ProbeExpectedPrimary.assign(m_framesInFlight, 0u);
+    m_phase5ProbeExpectedSecondary.assign(m_framesInFlight, 0u);
+    m_phase5ProbeSummaries.assign(m_framesInFlight, {});
+
+    luna::BufferDesc readbackDesc{};
+    readbackDesc.size = sizeof(uint32_t) * 2u;
+    readbackDesc.usage = luna::BufferUsage::TransferDst;
+    readbackDesc.memoryUsage = luna::MemoryUsage::Readback;
+    readbackDesc.debugName = "RhiImageViewLabPhase5Probe";
+
+    for (uint32_t frame = 0; frame < m_framesInFlight; ++frame) {
+        if (device.createBuffer(readbackDesc, &m_phase5ProbeBuffers[frame]) != luna::RHIResult::Success) {
+            destroy_phase5_probe_resources(device);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool RhiImageViewLabRenderPipeline::consume_phase5_probe_result(luna::IRHIDevice& device, uint32_t frameIndex)
+{
+    if (m_phase5ProbePendingKinds.empty() || m_phase5ProbeBuffers.empty()) {
+        return true;
+    }
+
+    const size_t slot = frame_slot(frameIndex, m_phase5ProbeBuffers.size());
+    if (slot >= m_phase5ProbePendingKinds.size() || m_phase5ProbePendingKinds[slot] == Phase5ProbeKind::None) {
+        return true;
+    }
+
+    std::array<uint8_t, sizeof(uint32_t) * 2u> bytes{};
+    if (device.readBuffer(m_phase5ProbeBuffers[slot], bytes.data(), bytes.size(), 0) != luna::RHIResult::Success) {
+        return false;
+    }
+
+    auto& probe = m_state->phase5Probe;
+    probe.completed = m_phase5ProbePendingKinds[slot];
+    probe.ready = true;
+    probe.observedPrimary = pack_rgba_u32(bytes.data());
+    probe.observedSecondary = pack_rgba_u32(bytes.data() + sizeof(uint32_t));
+    probe.expectedPrimary = m_phase5ProbeExpectedPrimary[slot];
+    probe.expectedSecondary = m_phase5ProbeExpectedSecondary[slot];
+    probe.passed = probe.observedPrimary == probe.expectedPrimary &&
+                   probe.observedSecondary == probe.expectedSecondary;
+
+    std::ostringstream summary;
+    summary << m_phase5ProbeSummaries[slot]
+            << " primary=0x" << std::hex << std::uppercase << probe.observedPrimary
+            << " expectedPrimary=0x" << probe.expectedPrimary
+            << " secondary=0x" << probe.observedSecondary
+            << " expectedSecondary=0x" << probe.expectedSecondary;
+    probe.summary = summary.str();
+
+    if (probe.passed) {
+        LUNA_CORE_INFO("RhiImageViewLab phase 5 probe PASS {}", probe.summary);
+    } else {
+        LUNA_CORE_ERROR("RhiImageViewLab phase 5 probe FAIL {}", probe.summary);
+    }
+
+    m_phase5ProbePendingKinds[slot] = Phase5ProbeKind::None;
+    m_phase5ProbeExpectedPrimary[slot] = 0u;
+    m_phase5ProbeExpectedSecondary[slot] = 0u;
+    m_phase5ProbeSummaries[slot].clear();
     return true;
 }
 
@@ -334,6 +484,217 @@ bool RhiImageViewLabRenderPipeline::update_volume_texture_set(luna::IRHIDevice& 
     }
 
     m_bound3DViews[slot] = view;
+    return true;
+}
+
+bool RhiImageViewLabRenderPipeline::queue_phase5_mip_probe(luna::IRHIDevice& device,
+                                                           const luna::FrameContext& frameContext,
+                                                           const ViewRecord& selectedView)
+{
+    if (m_state->phase5Probe.request != Phase5ProbeKind::MipIsolation) {
+        return true;
+    }
+    if (!ensure_phase5_probe_resources(device)) {
+        return false;
+    }
+
+    const size_t slot = frame_slot(frameContext.frameIndex, m_phase5ProbeBuffers.size());
+    if (slot >= m_phase5ProbePendingKinds.size() || m_phase5ProbePendingKinds[slot] != Phase5ProbeKind::None) {
+        return true;
+    }
+
+    const uint32_t selectedMip = selectedView.desc.baseMipLevel;
+    if (frameContext.commandContext->imageBarrier({.image = m_mipImage,
+                                                   .newLayout = luna::ImageLayout::TransferSrc,
+                                                   .srcStage = luna::PipelineStage::AllCommands,
+                                                   .dstStage = luna::PipelineStage::Transfer,
+                                                   .srcAccess = luna::ResourceAccess::ShaderRead |
+                                                                luna::ResourceAccess::ColorAttachmentWrite |
+                                                                luna::ResourceAccess::TransferWrite,
+                                                   .dstAccess = luna::ResourceAccess::TransferRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = selectedMip,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->copyImageToBuffer({.buffer = m_phase5ProbeBuffers[slot],
+                                                        .image = m_mipImage,
+                                                        .bufferOffset = 0,
+                                                        .aspect = luna::ImageAspect::Color,
+                                                        .mipLevel = selectedMip,
+                                                        .baseArrayLayer = 0,
+                                                        .layerCount = 1,
+                                                        .imageExtentWidth = 1,
+                                                        .imageExtentHeight = 1,
+                                                        .imageExtentDepth = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_mipImage,
+                                                   .newLayout = luna::ImageLayout::TransferSrc,
+                                                   .srcStage = luna::PipelineStage::AllCommands,
+                                                   .dstStage = luna::PipelineStage::Transfer,
+                                                   .srcAccess = luna::ResourceAccess::ShaderRead |
+                                                                luna::ResourceAccess::ColorAttachmentWrite |
+                                                                luna::ResourceAccess::TransferWrite,
+                                                   .dstAccess = luna::ResourceAccess::TransferRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = 0,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->copyImageToBuffer({.buffer = m_phase5ProbeBuffers[slot],
+                                                        .image = m_mipImage,
+                                                        .bufferOffset = sizeof(uint32_t),
+                                                        .aspect = luna::ImageAspect::Color,
+                                                        .mipLevel = 0,
+                                                        .baseArrayLayer = 0,
+                                                        .layerCount = 1,
+                                                        .imageExtentWidth = 1,
+                                                        .imageExtentHeight = 1,
+                                                        .imageExtentDepth = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->bufferBarrier({.buffer = m_phase5ProbeBuffers[slot],
+                                                    .srcStage = luna::PipelineStage::Transfer,
+                                                    .dstStage = luna::PipelineStage::Host,
+                                                    .srcAccess = luna::ResourceAccess::TransferWrite,
+                                                    .dstAccess = luna::ResourceAccess::HostRead}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_mipImage,
+                                                   .oldLayout = luna::ImageLayout::TransferSrc,
+                                                   .newLayout = luna::ImageLayout::ShaderReadOnly,
+                                                   .srcStage = luna::PipelineStage::Transfer,
+                                                   .dstStage = luna::PipelineStage::FragmentShader,
+                                                   .srcAccess = luna::ResourceAccess::TransferRead,
+                                                   .dstAccess = luna::ResourceAccess::ShaderRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = selectedMip,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_mipImage,
+                                                   .oldLayout = luna::ImageLayout::TransferSrc,
+                                                   .newLayout = luna::ImageLayout::ShaderReadOnly,
+                                                   .srcStage = luna::PipelineStage::Transfer,
+                                                   .dstStage = luna::PipelineStage::FragmentShader,
+                                                   .srcAccess = luna::ResourceAccess::TransferRead,
+                                                   .dstAccess = luna::ResourceAccess::ShaderRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = 0,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success) {
+        return false;
+    }
+
+    m_phase5ProbePendingKinds[slot] = Phase5ProbeKind::MipIsolation;
+    m_phase5ProbeExpectedPrimary[slot] = phase5_mip_stamp_pixel();
+    m_phase5ProbeExpectedSecondary[slot] = expected_mip_base_pixel();
+    m_phase5ProbeSummaries[slot] = "Mip isolation probe";
+    m_state->phase5Probe.request = Phase5ProbeKind::None;
+    m_state->phase5Probe.ready = false;
+    return true;
+}
+
+bool RhiImageViewLabRenderPipeline::queue_phase5_array_probe(luna::IRHIDevice& device,
+                                                             const luna::FrameContext& frameContext,
+                                                             const ViewRecord& selectedView)
+{
+    if (m_state->phase5Probe.request != Phase5ProbeKind::ArrayLayerIsolation) {
+        return true;
+    }
+    if (!ensure_phase5_probe_resources(device)) {
+        return false;
+    }
+
+    const size_t slot = frame_slot(frameContext.frameIndex, m_phase5ProbeBuffers.size());
+    if (slot >= m_phase5ProbePendingKinds.size() || m_phase5ProbePendingKinds[slot] != Phase5ProbeKind::None) {
+        return true;
+    }
+
+    const uint32_t selectedLayer = selectedView.desc.baseArrayLayer +
+                                   (selectedView.desc.type == luna::ImageViewType::Image2DArray
+                                        ? static_cast<uint32_t>(std::max(m_state->array.previewLayer, 0))
+                                        : 0u);
+    const uint32_t selectedMip = selectedView.desc.baseMipLevel;
+
+    if (frameContext.commandContext->imageBarrier({.image = m_arrayImage,
+                                                   .newLayout = luna::ImageLayout::TransferSrc,
+                                                   .srcStage = luna::PipelineStage::AllCommands,
+                                                   .dstStage = luna::PipelineStage::Transfer,
+                                                   .srcAccess = luna::ResourceAccess::ShaderRead |
+                                                                luna::ResourceAccess::TransferWrite,
+                                                   .dstAccess = luna::ResourceAccess::TransferRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = selectedMip,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = selectedLayer,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->copyImageToBuffer({.buffer = m_phase5ProbeBuffers[slot],
+                                                        .image = m_arrayImage,
+                                                        .bufferOffset = 0,
+                                                        .aspect = luna::ImageAspect::Color,
+                                                        .mipLevel = selectedMip,
+                                                        .baseArrayLayer = selectedLayer,
+                                                        .layerCount = 1,
+                                                        .imageExtentWidth = 1,
+                                                        .imageExtentHeight = 1,
+                                                        .imageExtentDepth = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_arrayImage,
+                                                   .newLayout = luna::ImageLayout::TransferSrc,
+                                                   .srcStage = luna::PipelineStage::AllCommands,
+                                                   .dstStage = luna::PipelineStage::Transfer,
+                                                   .srcAccess = luna::ResourceAccess::ShaderRead |
+                                                                luna::ResourceAccess::TransferWrite,
+                                                   .dstAccess = luna::ResourceAccess::TransferRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = 0,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->copyImageToBuffer({.buffer = m_phase5ProbeBuffers[slot],
+                                                        .image = m_arrayImage,
+                                                        .bufferOffset = sizeof(uint32_t),
+                                                        .aspect = luna::ImageAspect::Color,
+                                                        .mipLevel = 0,
+                                                        .baseArrayLayer = 0,
+                                                        .layerCount = 1,
+                                                        .imageExtentWidth = 1,
+                                                        .imageExtentHeight = 1,
+                                                        .imageExtentDepth = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->bufferBarrier({.buffer = m_phase5ProbeBuffers[slot],
+                                                    .srcStage = luna::PipelineStage::Transfer,
+                                                    .dstStage = luna::PipelineStage::Host,
+                                                    .srcAccess = luna::ResourceAccess::TransferWrite,
+                                                    .dstAccess = luna::ResourceAccess::HostRead}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_arrayImage,
+                                                   .oldLayout = luna::ImageLayout::TransferSrc,
+                                                   .newLayout = luna::ImageLayout::ShaderReadOnly,
+                                                   .srcStage = luna::PipelineStage::Transfer,
+                                                   .dstStage = luna::PipelineStage::FragmentShader,
+                                                   .srcAccess = luna::ResourceAccess::TransferRead,
+                                                   .dstAccess = luna::ResourceAccess::ShaderRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = selectedMip,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = selectedLayer,
+                                                   .layerCount = 1}) != luna::RHIResult::Success ||
+        frameContext.commandContext->imageBarrier({.image = m_arrayImage,
+                                                   .oldLayout = luna::ImageLayout::TransferSrc,
+                                                   .newLayout = luna::ImageLayout::ShaderReadOnly,
+                                                   .srcStage = luna::PipelineStage::Transfer,
+                                                   .dstStage = luna::PipelineStage::FragmentShader,
+                                                   .srcAccess = luna::ResourceAccess::TransferRead,
+                                                   .dstAccess = luna::ResourceAccess::ShaderRead,
+                                                   .aspect = luna::ImageAspect::Color,
+                                                   .baseMipLevel = 0,
+                                                   .mipCount = 1,
+                                                   .baseArrayLayer = 0,
+                                                   .layerCount = 1}) != luna::RHIResult::Success) {
+        return false;
+    }
+
+    m_phase5ProbePendingKinds[slot] = Phase5ProbeKind::ArrayLayerIsolation;
+    m_phase5ProbeExpectedPrimary[slot] = expected_array_layer_pixel(selectedLayer);
+    m_phase5ProbeExpectedSecondary[slot] = expected_array_layer_pixel(0);
+    m_phase5ProbeSummaries[slot] = "Array layer isolation probe";
+    m_state->phase5Probe.request = Phase5ProbeKind::None;
+    m_state->phase5Probe.ready = false;
     return true;
 }
 
@@ -449,6 +810,139 @@ bool RhiImageViewLabRenderPipeline::create_mip_view_record(luna::IRHIDevice& dev
     return true;
 }
 
+luna::ImageViewHandle RhiImageViewLabRenderPipeline::ensure_mip_attachment_view(luna::IRHIDevice& device, uint32_t baseMip)
+{
+    for (const ViewRecord& view : m_mipAttachmentViews) {
+        if (view.desc.baseMipLevel == baseMip && view.handle.isValid()) {
+            return view.handle;
+        }
+    }
+
+    luna::ImageViewDesc desc{};
+    desc.image = m_mipImage;
+    desc.type = luna::ImageViewType::Image2D;
+    desc.aspect = luna::ImageAspect::Color;
+    desc.baseMipLevel = baseMip;
+    desc.mipCount = 1;
+    desc.baseArrayLayer = 0;
+    desc.layerCount = 1;
+    desc.debugName = "RhiImageViewLabMipAttachmentView";
+
+    ViewRecord record{};
+    record.desc = desc;
+    record.label = "Attachment Mip " + std::to_string(baseMip);
+    if (device.createImageView(desc, &record.handle) != luna::RHIResult::Success) {
+        return {};
+    }
+
+    m_mipAttachmentViews.push_back(record);
+    return record.handle;
+}
+
+bool RhiImageViewLabRenderPipeline::render_to_selected_mip_view(luna::IRHIDevice& device,
+                                                                const luna::FrameContext& frameContext)
+{
+    if (!ensure_attachment_pipeline(device) || m_state->mip.views.empty()) {
+        return false;
+    }
+
+    auto& mip = m_state->mip;
+    const ViewRecord& selectedView = mip.views[static_cast<size_t>(mip.selectedView)];
+    const luna::ImageViewHandle attachmentView = ensure_mip_attachment_view(device, selectedView.desc.baseMipLevel);
+    if (!attachmentView.isValid()) {
+        mip.status = "Render To Selected View failed: attachment view creation failed.";
+        return false;
+    }
+
+    const uint32_t targetWidth = std::max(1u, mip.width >> selectedView.desc.baseMipLevel);
+    const uint32_t targetHeight = std::max(1u, mip.height >> selectedView.desc.baseMipLevel);
+    const float phase = static_cast<float>(mip.renderStamp) * 0.31f + static_cast<float>(selectedView.desc.baseMipLevel) * 0.47f;
+
+    PreviewPushConstants pushConstants{};
+    pushConstants.params[0] = 0.35f * std::sin(phase);
+    pushConstants.params[1] = 0.28f * std::cos(phase * 0.83f);
+    pushConstants.params[2] = 0.88f;
+    pushConstants.params[3] = phase;
+
+    luna::RenderingInfo renderingInfo{};
+    renderingInfo.width = targetWidth;
+    renderingInfo.height = targetHeight;
+    luna::ColorAttachmentInfo colorAttachment{};
+    colorAttachment.format = luna::PixelFormat::RGBA8Unorm;
+    colorAttachment.clearColor = {0.02f, 0.02f, 0.025f, 1.0f};
+    colorAttachment.view = attachmentView;
+    colorAttachment.loadOp = luna::AttachmentLoadOp::Clear;
+    colorAttachment.storeOp = luna::AttachmentStoreOp::Store;
+    renderingInfo.colorAttachments.push_back(colorAttachment);
+
+    const bool renderOk =
+        frameContext.commandContext->beginRendering(renderingInfo) == luna::RHIResult::Success &&
+        frameContext.commandContext->bindGraphicsPipeline(m_attachment2DPipeline) == luna::RHIResult::Success &&
+        frameContext.commandContext->pushConstants(&pushConstants, sizeof(pushConstants), 0, luna::ShaderType::AllGraphics) ==
+            luna::RHIResult::Success &&
+        frameContext.commandContext->draw({3, 1, 0, 0}) == luna::RHIResult::Success &&
+        frameContext.commandContext->endRendering() == luna::RHIResult::Success &&
+        frameContext.commandContext->transitionImage(m_mipImage, luna::ImageLayout::ShaderReadOnly) == luna::RHIResult::Success;
+
+    if (!renderOk) {
+        mip.status = "Render To Selected View failed while recording commands.";
+        return false;
+    }
+
+    ++mip.renderStamp;
+    mip.previewLod = 0.0f;
+    std::ostringstream status;
+    status << "Rendered into selected view baseMip=" << selectedView.desc.baseMipLevel
+           << " via attachment ImageViewHandle. Switching selected view should only affect that mip range.";
+    mip.status = status.str();
+    return true;
+}
+
+bool RhiImageViewLabRenderPipeline::stamp_selected_mip_view_for_phase5(luna::IRHIDevice& device,
+                                                                       const luna::FrameContext& frameContext)
+{
+    if (m_state == nullptr || m_state->mip.views.empty()) {
+        return false;
+    }
+
+    auto& mip = m_state->mip;
+    const ViewRecord& selectedView = mip.views[static_cast<size_t>(mip.selectedView)];
+    const luna::ImageViewHandle attachmentView = ensure_mip_attachment_view(device, selectedView.desc.baseMipLevel);
+    if (!attachmentView.isValid()) {
+        mip.status = "Phase 5 probe stamp failed: attachment view creation failed.";
+        return false;
+    }
+
+    const uint32_t targetWidth = std::max(1u, mip.width >> selectedView.desc.baseMipLevel);
+    const uint32_t targetHeight = std::max(1u, mip.height >> selectedView.desc.baseMipLevel);
+
+    luna::RenderingInfo renderingInfo{};
+    renderingInfo.width = targetWidth;
+    renderingInfo.height = targetHeight;
+    luna::ColorAttachmentInfo colorAttachment{};
+    colorAttachment.format = luna::PixelFormat::RGBA8Unorm;
+    colorAttachment.clearColor = phase5_mip_stamp_clear_color();
+    colorAttachment.view = attachmentView;
+    colorAttachment.loadOp = luna::AttachmentLoadOp::Clear;
+    colorAttachment.storeOp = luna::AttachmentStoreOp::Store;
+    renderingInfo.colorAttachments.push_back(colorAttachment);
+
+    const bool ok =
+        frameContext.commandContext->beginRendering(renderingInfo) == luna::RHIResult::Success &&
+        frameContext.commandContext->endRendering() == luna::RHIResult::Success &&
+        frameContext.commandContext->transitionImage(m_mipImage, luna::ImageLayout::ShaderReadOnly) == luna::RHIResult::Success;
+    if (!ok) {
+        mip.status = "Phase 5 probe stamp failed while recording commands.";
+        return false;
+    }
+
+    std::ostringstream status;
+    status << "Phase 5 probe stamp wrote mip " << selectedView.desc.baseMipLevel
+           << " with a fixed isolation color.";
+    mip.status = status.str();
+    return true;
+}
+
 bool RhiImageViewLabRenderPipeline::create_array_view_record(luna::IRHIDevice& device,
                                                              luna::ImageViewType type,
                                                              uint32_t baseMip,
@@ -527,10 +1021,6 @@ bool RhiImageViewLabRenderPipeline::create_volume_view_record(luna::IRHIDevice& 
 
 void RhiImageViewLabRenderPipeline::destroy_view_records(luna::IRHIDevice& device, std::vector<ViewRecord>& views)
 {
-    if (!views.empty()) {
-        device.waitIdle();
-    }
-
     for (ViewRecord& view : views) {
         if (view.handle.isValid()) {
             device.destroyImageView(view.handle);
@@ -552,7 +1042,6 @@ void RhiImageViewLabRenderPipeline::erase_view_record(luna::IRHIDevice& device,
         return;
     }
 
-    device.waitIdle();
     device.destroyImageView(views[static_cast<size_t>(index)].handle);
     views.erase(views.begin() + index);
     *selectedIndex = views.empty() ? 0 : std::clamp(*selectedIndex, 0, static_cast<int>(views.size() - 1));
@@ -578,7 +1067,7 @@ bool RhiImageViewLabRenderPipeline::ensure_mip_source(luna::IRHIDevice& device)
         desc.arrayLayers = 1;
         desc.type = luna::ImageType::Image2D;
         desc.format = luna::PixelFormat::RGBA8Unorm;
-        desc.usage = luna::ImageUsage::Sampled;
+        desc.usage = luna::ImageUsage::Sampled | luna::ImageUsage::ColorAttachment;
         desc.debugName = "RhiImageViewLabMipSource";
         if (device.createImage(desc, &m_mipImage, pixels.data()) != luna::RHIResult::Success) {
             mip.status = "Create source image failed.";
@@ -720,6 +1209,19 @@ bool RhiImageViewLabRenderPipeline::render_mip_view(luna::IRHIDevice& device, co
     }
 
     auto& mip = m_state->mip;
+    if (mip.phase5StampRequested) {
+        mip.phase5StampRequested = false;
+        if (!stamp_selected_mip_view_for_phase5(device, frameContext)) {
+            return false;
+        }
+    }
+    if (mip.renderSelectedViewRequested) {
+        mip.renderSelectedViewRequested = false;
+        if (!render_to_selected_mip_view(device, frameContext)) {
+            return false;
+        }
+    }
+
     const ViewRecord& view = mip.views[static_cast<size_t>(mip.selectedView)];
     mip.previewLod = std::clamp(mip.previewLod, 0.0f, static_cast<float>(std::max(1u, view.desc.mipCount) - 1u));
 
@@ -727,7 +1229,11 @@ bool RhiImageViewLabRenderPipeline::render_mip_view(luna::IRHIDevice& device, co
         return false;
     }
 
-    return render_textured_2d_preview(frameContext, mip.previewLod);
+    if (!render_textured_2d_preview(frameContext, mip.previewLod)) {
+        return false;
+    }
+
+    return queue_phase5_mip_probe(device, frameContext, view);
 }
 
 bool RhiImageViewLabRenderPipeline::render_array_layer_view(luna::IRHIDevice& device,
@@ -746,14 +1252,20 @@ bool RhiImageViewLabRenderPipeline::render_array_layer_view(luna::IRHIDevice& de
         if (!update_2d_texture_set(device, frameContext.frameIndex, view.handle)) {
             return false;
         }
-        return render_textured_2d_preview(frameContext, array.previewLod);
+        if (!render_textured_2d_preview(frameContext, array.previewLod)) {
+            return false;
+        }
+        return queue_phase5_array_probe(device, frameContext, view);
     }
 
     array.previewLayer = std::clamp(array.previewLayer, 0, static_cast<int>(std::max(1u, view.desc.layerCount) - 1u));
     if (!update_array_texture_set(device, frameContext.frameIndex, view.handle)) {
         return false;
     }
-    return render_array_preview(frameContext, static_cast<float>(array.previewLayer), array.previewLod);
+    if (!render_array_preview(frameContext, static_cast<float>(array.previewLayer), array.previewLod)) {
+        return false;
+    }
+    return queue_phase5_array_probe(device, frameContext, view);
 }
 
 bool RhiImageViewLabRenderPipeline::render_slice_3d_view(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -813,18 +1325,35 @@ void RhiImageViewLabRenderPipeline::destroy_shared_resources(luna::IRHIDevice& d
 void RhiImageViewLabRenderPipeline::destroy_present_pipelines(luna::IRHIDevice& device)
 {
     if (m_present2DPipeline.isValid()) device.destroyPipeline(m_present2DPipeline);
+    if (m_attachment2DPipeline.isValid()) device.destroyPipeline(m_attachment2DPipeline);
     if (m_presentArrayPipeline.isValid()) device.destroyPipeline(m_presentArrayPipeline);
     if (m_present3DPipeline.isValid()) device.destroyPipeline(m_present3DPipeline);
 
     m_present2DPipeline = {};
+    m_attachment2DPipeline = {};
     m_presentArrayPipeline = {};
     m_present3DPipeline = {};
     m_presentBackbufferFormat = luna::PixelFormat::Undefined;
 }
 
+void RhiImageViewLabRenderPipeline::destroy_phase5_probe_resources(luna::IRHIDevice& device)
+{
+    for (luna::BufferHandle& buffer : m_phase5ProbeBuffers) {
+        if (buffer.isValid()) {
+            device.destroyBuffer(buffer);
+        }
+    }
+    m_phase5ProbeBuffers.clear();
+    m_phase5ProbePendingKinds.clear();
+    m_phase5ProbeExpectedPrimary.clear();
+    m_phase5ProbeExpectedSecondary.clear();
+    m_phase5ProbeSummaries.clear();
+}
+
 void RhiImageViewLabRenderPipeline::destroy_mip_source(luna::IRHIDevice& device)
 {
     destroy_view_records(device, m_state->mip.views);
+    destroy_view_records(device, m_mipAttachmentViews);
     if (m_mipImage.isValid()) {
         device.destroyImage(m_mipImage);
         m_mipImage = {};

@@ -8,10 +8,6 @@
 #include <string>
 #include <vector>
 
-namespace luna {
-class VulkanRHIDevice;
-}
-
 namespace image_lab {
 
 class RhiImageLabRenderPipeline final : public luna::IRenderPipeline {
@@ -25,6 +21,10 @@ public:
 private:
     bool ensure_shared_resources(luna::IRHIDevice& device);
     bool ensure_present_pipelines(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
+    bool ensure_attachment_ops_resources(luna::IRHIDevice& device,
+                                         uint32_t width,
+                                         uint32_t height,
+                                         luna::PixelFormat backbufferFormat);
     bool ensure_mrt_resources(luna::IRHIDevice& device,
                               uint32_t width,
                               uint32_t height,
@@ -32,12 +32,13 @@ private:
     bool ensure_mip_resources(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
     bool ensure_array3d_resources(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
 
-    bool render_format_probe(const luna::FrameContext& frameContext);
+    bool render_format_probe(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
+    bool render_attachment_ops(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
     bool render_mrt_preview(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
     bool render_mip_preview(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
     bool render_array3d_preview(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
 
-    void update_format_probe();
+    void update_format_probe(luna::IRHIDevice& device);
     bool update_four_texture_set(luna::IRHIDevice& device,
                                  uint32_t frameIndex,
                                  const std::array<luna::ImageHandle, 4>& images);
@@ -48,12 +49,14 @@ private:
                                     int previewIndex,
                                     float lod,
                                     int activeTextureCount);
+    bool render_depth_preview(const luna::FrameContext& frameContext);
     bool render_array_preview_pass(const luna::FrameContext& frameContext, float layer);
     bool render_volume_preview_pass(const luna::FrameContext& frameContext, float slice);
     bool render_placeholder(const luna::FrameContext& frameContext, const std::array<float, 4>& clearColor);
 
     void destroy_shared_resources(luna::IRHIDevice& device);
     void destroy_present_pipelines(luna::IRHIDevice& device);
+    void destroy_attachment_ops_resources(luna::IRHIDevice& device);
     void destroy_mrt_resources(luna::IRHIDevice& device);
     void destroy_mip_resources(luna::IRHIDevice& device);
     void destroy_array3d_resources(luna::IRHIDevice& device);
@@ -65,7 +68,6 @@ private:
 
 private:
     std::shared_ptr<State> m_state;
-    luna::VulkanRHIDevice* m_vulkanDevice = nullptr;
     std::string m_shaderRoot;
     uint32_t m_framesInFlight = 0;
 
@@ -81,9 +83,17 @@ private:
     std::vector<luna::ImageHandle> m_volumeTextureSetImages;
 
     luna::PipelineHandle m_present2DPipeline{};
+    luna::PipelineHandle m_presentDepthPipeline{};
     luna::PipelineHandle m_presentArrayPipeline{};
     luna::PipelineHandle m_presentVolumePipeline{};
     luna::PixelFormat m_presentBackbufferFormat = luna::PixelFormat::Undefined;
+
+    luna::PipelineHandle m_attachmentColorPipeline{};
+    luna::PipelineHandle m_attachmentDepthPipeline{};
+    luna::ImageHandle m_attachmentColorImage{};
+    luna::ImageHandle m_attachmentDepthImage{};
+    uint32_t m_attachmentWidth = 0;
+    uint32_t m_attachmentHeight = 0;
 
     luna::PipelineHandle m_mrtPipeline{};
     std::array<luna::ImageHandle, 4> m_mrtImages{};

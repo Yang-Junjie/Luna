@@ -64,6 +64,11 @@ public:
         return m_renderService;
     }
 
+    Window& getWindow()
+    {
+        return *m_window;
+    }
+
 protected:
     virtual void onInit() {}
 

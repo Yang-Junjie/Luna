@@ -9,8 +9,51 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <string_view>
 
 namespace {
+
+struct CommandLineOptions {
+    bool runSelfTest = false;
+    std::string_view selfTestName = "phase3_upload_ring";
+};
+
+struct SelfTestResult {
+    bool passed = false;
+};
+
+bool parse_arguments(int argc, char** argv, CommandLineOptions* options)
+{
+    if (options == nullptr) {
+        return false;
+    }
+
+    constexpr std::string_view kSelfTestPrefix = "--self-test=";
+    for (int index = 1; index < argc; ++index) {
+        const std::string_view argument = argv[index];
+        if (argument == "--self-test") {
+            options->runSelfTest = true;
+            continue;
+        }
+
+        if (argument.substr(0, kSelfTestPrefix.size()) == kSelfTestPrefix) {
+            const std::string_view selfTestName = argument.substr(kSelfTestPrefix.size());
+            if (selfTestName != "phase3_upload_ring" && selfTestName != "phase5_subresource_barrier") {
+                LUNA_CORE_ERROR("Unknown self-test '{}'", argument.substr(kSelfTestPrefix.size()));
+                return false;
+            }
+
+            options->runSelfTest = true;
+            options->selfTestName = selfTestName;
+            continue;
+        }
+
+        LUNA_CORE_ERROR("Unknown argument '{}'", argument);
+        return false;
+    }
+
+    return true;
+}
 
 const char* page_label(sync_lab::Page page)
 {
@@ -21,6 +64,8 @@ const char* page_label(sync_lab::Page page)
             return "Readback";
         case sync_lab::Page::Indirect:
             return "Indirect";
+        case sync_lab::Page::Subresource:
+            return "Subresource";
         default:
             return "Unknown";
     }
@@ -157,6 +202,8 @@ public:
         draw_page_button(sync_lab::Page::Readback);
         ImGui::SameLine();
         draw_page_button(sync_lab::Page::Indirect);
+        ImGui::SameLine();
+        draw_page_button(sync_lab::Page::Subresource);
 
         ImGui::Separator();
         switch (m_state->page) {
@@ -168,6 +215,9 @@ public:
                 break;
             case sync_lab::Page::Indirect:
                 draw_indirect();
+                break;
+            case sync_lab::Page::Subresource:
+                draw_subresource();
                 break;
         }
 
@@ -187,7 +237,7 @@ private:
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.38f, 0.58f, 1.0f));
         }
 
-        if (ImGui::Button(page_label(page), ImVec2(186.0f, 0.0f))) {
+        if (ImGui::Button(page_label(page), ImVec2(140.0f, 0.0f))) {
             if (m_state->page != page) {
                 LUNA_CORE_INFO("RhiSyncLab page switched to {}", page_label(page));
             }
@@ -289,7 +339,7 @@ private:
         auto& indirect = m_state->indirect;
         ImGui::SliderInt("Group Count X", &indirect.desiredGroupCountX, 1, 32);
         ImGui::SliderInt("Group Count Y", &indirect.desiredGroupCountY, 1, 32);
-        ImGui::Checkbox("Use Indirect Dispatch", &indirect.useIndirect);
+        ImGui::Checkbox("Use Indirect Draw", &indirect.useIndirect);
         if (ImGui::Button("Generate Args On GPU")) {
             indirect.generateArgsRequested = true;
         }
@@ -299,8 +349,58 @@ private:
         }
 
         ImGui::Text("GPU Args: (%u, %u, %u)", indirect.gpuArgs[0], indirect.gpuArgs[1], indirect.gpuArgs[2]);
-        ImGui::TextWrapped("%s", indirect.status.empty() ? "Generate indirect args on GPU, then compare indirect dispatch with CPU direct dispatch."
+        ImGui::TextWrapped("%s", indirect.status.empty() ? "Generate drawIndirect args on GPU, then compare GPU indirect draw with CPU direct draw."
                                                          : indirect.status.c_str());
+    }
+
+    void draw_subresource()
+    {
+        auto& subresource = m_state->subresource;
+        ImGui::Text("Probe Image: mipLevels=%u, arrayLayers=%u",
+                    subresource.availableMipLevels,
+                    subresource.availableArrayLayers);
+
+        const int maxBaseMip = std::max(0, static_cast<int>(subresource.availableMipLevels) - 1);
+        const int maxBaseLayer = std::max(0, static_cast<int>(subresource.availableArrayLayers) - 1);
+        ImGui::SliderInt("Base Mip", &subresource.baseMipLevel, 0, maxBaseMip);
+        ImGui::SliderInt("Mip Count",
+                         &subresource.mipCount,
+                         1,
+                         static_cast<int>(subresource.availableMipLevels) - subresource.baseMipLevel);
+        ImGui::SliderInt("Base Layer", &subresource.baseArrayLayer, 0, maxBaseLayer);
+        ImGui::SliderInt("Layer Count",
+                         &subresource.layerCount,
+                         1,
+                         static_cast<int>(subresource.availableArrayLayers) - subresource.baseArrayLayer);
+        draw_enum_combo("Old Layout",
+                        &subresource.oldLayout,
+                        std::array<luna::ImageLayout, 5>{
+                            luna::ImageLayout::Undefined,
+                            luna::ImageLayout::ShaderReadOnly,
+                            luna::ImageLayout::TransferSrc,
+                            luna::ImageLayout::TransferDst,
+                            luna::ImageLayout::General,
+                        },
+                        layout_label);
+        draw_enum_combo("New Layout",
+                        &subresource.newLayout,
+                        std::array<luna::ImageLayout, 4>{
+                            luna::ImageLayout::TransferDst,
+                            luna::ImageLayout::TransferSrc,
+                            luna::ImageLayout::ShaderReadOnly,
+                            luna::ImageLayout::General,
+                        },
+                        layout_label);
+        if (ImGui::Button("Run Barrier Only")) {
+            subresource.runBarrierOnlyRequested = true;
+        }
+
+        ImGui::TextWrapped("%s",
+                           subresource.barrierSummary.empty() ? "Choose a non-zero mip/layer range to test true subresource tracking."
+                                                              : subresource.barrierSummary.c_str());
+        ImGui::TextWrapped("%s",
+                           subresource.status.empty() ? "Expected result: the selected mip/layer range is Accepted with an exact range summary."
+                                                       : subresource.status.c_str());
     }
 
     void draw_timeline()
@@ -326,9 +426,141 @@ private:
     std::shared_ptr<sync_lab::State> m_state;
 };
 
+class RhiSyncLabSelfTestLayer final : public luna::Layer {
+public:
+    RhiSyncLabSelfTestLayer(std::shared_ptr<sync_lab::State> state,
+                            std::shared_ptr<SelfTestResult> result,
+                            std::string_view selfTestName)
+        : luna::Layer("RhiSyncLabSelfTestLayer"),
+          m_state(std::move(state)),
+          m_result(std::move(result)),
+          m_selfTestName(selfTestName)
+    {}
+
+    void onAttach() override
+    {
+        LUNA_CORE_INFO("RhiSyncLab self-test begin: {}", m_selfTestName);
+    }
+
+    void onUpdate(luna::Timestep) override
+    {
+        if (m_state == nullptr || m_result == nullptr) {
+            return;
+        }
+
+        if (m_selfTestName == "phase5_subresource_barrier") {
+            update_phase5_subresource_barrier();
+            return;
+        }
+
+        update_phase3_upload_ring();
+    }
+
+private:
+    void update_phase3_upload_ring()
+    {
+        m_state->page = sync_lab::Page::Readback;
+        auto& readback = m_state->readback;
+
+        if (readback.hasReadbackData) {
+            if (!m_hasLastPixel || readback.pixels[0] != m_lastFirstPixel) {
+                ++m_readbackUpdates;
+                m_lastFirstPixel = readback.pixels[0];
+                m_hasLastPixel = true;
+            }
+        }
+
+        ++m_frame;
+        const uint32_t cycle = (m_frame - 1) / 6;
+        const uint32_t phase = (m_frame - 1) % 6;
+        if (m_frame <= 48 && phase == 0) {
+            static constexpr std::array<int, 6> kRegions = {0, 2, 4, 6, 8, 12};
+            readback.regionX = kRegions[cycle % kRegions.size()];
+            readback.regionY = kRegions[(cycle + 2) % kRegions.size()];
+            readback.copyBufferToImageRequested = true;
+            ++m_copyBufferToImageCount;
+        } else if (m_frame <= 48 && phase == 2) {
+            readback.copyImageToBufferRequested = true;
+            ++m_copyImageToBufferCount;
+        }
+
+        if (m_frame >= 64) {
+            finish();
+        }
+    }
+
+private:
+    void finish()
+    {
+        const auto& readback = m_state->readback;
+        const bool passed =
+            m_copyBufferToImageCount >= 8 && m_copyImageToBufferCount >= 8 && m_readbackUpdates >= 4 && readback.hasReadbackData;
+        m_result->passed = passed;
+
+        if (passed) {
+            LUNA_CORE_INFO("RhiSyncLab self-test PASS copyBufferToImage={} copyImageToBuffer={} readbackUpdates={} firstPixel=0x{:08X}",
+                           m_copyBufferToImageCount,
+                           m_copyImageToBufferCount,
+                           m_readbackUpdates,
+                           readback.pixels[0]);
+        } else {
+            LUNA_CORE_ERROR("RhiSyncLab self-test FAIL copyBufferToImage={} copyImageToBuffer={} readbackUpdates={} hasReadback={}",
+                            m_copyBufferToImageCount,
+                            m_copyImageToBufferCount,
+                            m_readbackUpdates,
+                            readback.hasReadbackData ? "true" : "false");
+        }
+
+        luna::Application::get().close();
+    }
+
+    void update_phase5_subresource_barrier()
+    {
+        m_state->page = sync_lab::Page::Subresource;
+        auto& subresource = m_state->subresource;
+        subresource.baseMipLevel = 1;
+        subresource.mipCount = 1;
+        subresource.baseArrayLayer = 2;
+        subresource.layerCount = 1;
+
+        ++m_frame;
+        if (m_frame == 2) {
+            subresource.runBarrierOnlyRequested = true;
+        }
+
+        if (subresource.status.find("Accepted") != std::string::npos) {
+            m_result->passed = true;
+            LUNA_CORE_INFO("RhiSyncLab phase 5 self-test PASS summary='{}' status='{}'",
+                           subresource.barrierSummary,
+                           subresource.status);
+            luna::Application::get().close();
+            return;
+        }
+
+        if (m_frame >= 60) {
+            m_result->passed = false;
+            LUNA_CORE_ERROR("RhiSyncLab phase 5 self-test FAIL summary='{}' status='{}'",
+                            subresource.barrierSummary,
+                            subresource.status);
+            luna::Application::get().close();
+        }
+    }
+
+private:
+    std::shared_ptr<sync_lab::State> m_state;
+    std::shared_ptr<SelfTestResult> m_result;
+    std::string_view m_selfTestName;
+    uint32_t m_frame = 0;
+    uint32_t m_lastFirstPixel = 0;
+    int m_copyBufferToImageCount = 0;
+    int m_copyImageToBufferCount = 0;
+    int m_readbackUpdates = 0;
+    bool m_hasLastPixel = false;
+};
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
 #ifndef NDEBUG
     constexpr luna::Logger::Level kLogLevel = luna::Logger::Level::Trace;
@@ -338,7 +570,14 @@ int main()
 
     luna::Logger::init("logs/luna.log", kLogLevel);
 
+    CommandLineOptions options;
+    if (!parse_arguments(argc, argv, &options)) {
+        luna::Logger::shutdown();
+        return 1;
+    }
+
     std::shared_ptr<sync_lab::State> state = std::make_shared<sync_lab::State>();
+    std::shared_ptr<SelfTestResult> selfTestResult = std::make_shared<SelfTestResult>();
     std::shared_ptr<luna::IRenderPipeline> renderPipeline = std::make_shared<sync_lab::RhiSyncLabRenderPipeline>(state);
 
     luna::ApplicationSpecification specification{
@@ -346,7 +585,7 @@ int main()
         .windowWidth = 1440,
         .windowHeight = 900,
         .maximized = false,
-        .enableImGui = true,
+        .enableImGui = !options.runSelfTest,
         .enableMultiViewport = false,
         .renderService =
             {
@@ -363,9 +602,13 @@ int main()
         return 1;
     }
 
-    app->pushLayer(std::make_unique<RhiSyncLabLayer>(state));
+    if (options.runSelfTest) {
+        app->pushLayer(std::make_unique<RhiSyncLabSelfTestLayer>(state, selfTestResult, options.selfTestName));
+    } else {
+        app->pushLayer(std::make_unique<RhiSyncLabLayer>(state));
+    }
     app->run();
     app.reset();
     luna::Logger::shutdown();
-    return 0;
+    return options.runSelfTest && !selfTestResult->passed ? 1 : 0;
 }

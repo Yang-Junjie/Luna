@@ -8,10 +8,6 @@
 #include <string>
 #include <vector>
 
-namespace luna {
-class VulkanRHIDevice;
-}
-
 namespace image_view_lab {
 
 class RhiImageViewLabRenderPipeline final : public luna::IRenderPipeline {
@@ -25,10 +21,13 @@ public:
 private:
     bool ensure_shared_resources(luna::IRHIDevice& device);
     bool ensure_present_pipelines(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
+    bool ensure_attachment_pipeline(luna::IRHIDevice& device);
+    bool ensure_phase5_probe_resources(luna::IRHIDevice& device);
 
     bool ensure_mip_source(luna::IRHIDevice& device);
     bool ensure_array_source(luna::IRHIDevice& device);
     bool ensure_volume_source(luna::IRHIDevice& device);
+    bool consume_phase5_probe_result(luna::IRHIDevice& device, uint32_t frameIndex);
 
     bool render_mip_view(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
     bool render_array_layer_view(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
@@ -41,8 +40,17 @@ private:
     bool update_2d_texture_set(luna::IRHIDevice& device, uint32_t frameIndex, luna::ImageViewHandle view);
     bool update_array_texture_set(luna::IRHIDevice& device, uint32_t frameIndex, luna::ImageViewHandle view);
     bool update_volume_texture_set(luna::IRHIDevice& device, uint32_t frameIndex, luna::ImageViewHandle view);
+    bool queue_phase5_mip_probe(luna::IRHIDevice& device,
+                                const luna::FrameContext& frameContext,
+                                const ViewRecord& selectedView);
+    bool queue_phase5_array_probe(luna::IRHIDevice& device,
+                                  const luna::FrameContext& frameContext,
+                                  const ViewRecord& selectedView);
 
     bool create_mip_view_record(luna::IRHIDevice& device, uint32_t baseMip, uint32_t mipCount, bool selectNewView);
+    luna::ImageViewHandle ensure_mip_attachment_view(luna::IRHIDevice& device, uint32_t baseMip);
+    bool render_to_selected_mip_view(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
+    bool stamp_selected_mip_view_for_phase5(luna::IRHIDevice& device, const luna::FrameContext& frameContext);
     bool create_array_view_record(luna::IRHIDevice& device,
                                   luna::ImageViewType type,
                                   uint32_t baseMip,
@@ -56,6 +64,7 @@ private:
     void erase_view_record(luna::IRHIDevice& device, std::vector<ViewRecord>& views, int index, int* selectedIndex);
     void destroy_shared_resources(luna::IRHIDevice& device);
     void destroy_present_pipelines(luna::IRHIDevice& device);
+    void destroy_phase5_probe_resources(luna::IRHIDevice& device);
     void destroy_mip_source(luna::IRHIDevice& device);
     void destroy_array_source(luna::IRHIDevice& device);
     void destroy_volume_source(luna::IRHIDevice& device);
@@ -66,7 +75,6 @@ private:
 
 private:
     std::shared_ptr<State> m_state;
-    luna::VulkanRHIDevice* m_vulkanDevice = nullptr;
     std::string m_shaderRoot;
     uint32_t m_framesInFlight = 0;
 
@@ -82,11 +90,18 @@ private:
     std::vector<luna::ImageViewHandle> m_bound3DViews;
 
     luna::PipelineHandle m_present2DPipeline{};
+    luna::PipelineHandle m_attachment2DPipeline{};
     luna::PipelineHandle m_presentArrayPipeline{};
     luna::PipelineHandle m_present3DPipeline{};
     luna::PixelFormat m_presentBackbufferFormat = luna::PixelFormat::Undefined;
+    std::vector<luna::BufferHandle> m_phase5ProbeBuffers;
+    std::vector<Phase5ProbeKind> m_phase5ProbePendingKinds;
+    std::vector<uint32_t> m_phase5ProbeExpectedPrimary;
+    std::vector<uint32_t> m_phase5ProbeExpectedSecondary;
+    std::vector<std::string> m_phase5ProbeSummaries;
 
     luna::ImageHandle m_mipImage{};
+    std::vector<ViewRecord> m_mipAttachmentViews;
     luna::ImageHandle m_arrayImage{};
     luna::ImageHandle m_volumeImage{};
 };

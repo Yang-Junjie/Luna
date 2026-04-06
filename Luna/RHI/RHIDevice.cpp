@@ -55,4 +55,16 @@ std::unique_ptr<IRHIDevice> CreateRHIDevice(RHIBackend backend)
     }
 }
 
+std::vector<std::unique_ptr<IRHIAdapter>> EnumerateRHIAdapters(RHIBackend backend)
+{
+    switch (backend) {
+        case RHIBackend::Vulkan:
+            return EnumerateVulkanAdapters();
+        case RHIBackend::D3D12:
+        case RHIBackend::Metal:
+        default:
+            return {};
+    }
+}
+
 } // namespace luna

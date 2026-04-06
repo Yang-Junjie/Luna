@@ -8,10 +8,6 @@
 #include <string>
 #include <vector>
 
-namespace luna {
-class VulkanRHIDevice;
-}
-
 namespace binding_lab {
 
 class RhiBindingLabRenderPipeline final : public luna::IRenderPipeline {
@@ -23,6 +19,7 @@ public:
     bool render(luna::IRHIDevice& device, const luna::FrameContext& frameContext) override;
 
 private:
+    bool ensure_shader_handles(luna::IRHIDevice& device);
     bool ensure_shared_resources(luna::IRHIDevice& device);
     bool ensure_multi_set_resources(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
     bool ensure_descriptor_array_resources(luna::IRHIDevice& device, luna::PixelFormat backbufferFormat);
@@ -42,13 +39,18 @@ private:
     void destroy_descriptor_array_resources(luna::IRHIDevice& device);
     void destroy_dynamic_uniform_resources(luna::IRHIDevice& device);
     void destroy_shared_resources(luna::IRHIDevice& device);
+    void destroy_shader_handles(luna::IRHIDevice& device);
 
     std::vector<uint8_t> build_texture_pixels(uint32_t width, uint32_t height, int variant) const;
 
 private:
     std::shared_ptr<State> m_state;
-    luna::VulkanRHIDevice* m_vulkanDevice = nullptr;
     std::string m_shaderRoot;
+    luna::ShaderHandle m_fullscreenVertexShader{};
+    luna::ShaderHandle m_probeFragmentShader{};
+    luna::ShaderHandle m_multiSetFragmentShader{};
+    luna::ShaderHandle m_descriptorArrayFragmentShader{};
+    luna::ShaderHandle m_dynamicUniformFragmentShader{};
 
     luna::SamplerHandle m_linearSampler{};
     luna::ImageHandle m_dummyTexture{};

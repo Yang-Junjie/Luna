@@ -2,7 +2,9 @@
 
 #include "Core/log.h"
 #include "Events/event.h"
-#include "Vulkan/vk_engine.h"
+#include "RHI/RHIDevice.h"
+#include "Vulkan/vk_device_context.h"
+#include "Vulkan/vk_rhi_device.h"
 #include "Vulkan/vk_types.h"
 
 #include <imgui.h>
@@ -20,11 +22,11 @@ constexpr uint32_t kImGuiDescriptorPoolSize = 64;
 
 } // namespace
 
-ImGuiLayer::ImGuiLayer(GLFWwindow* window, VulkanEngine& engine, bool enableMultiViewport)
+ImGuiLayer::ImGuiLayer(GLFWwindow* window, IRHIDevice& device, bool enableMultiViewport)
     : Layer("ImGuiLayer"),
       m_enableMultiViewport(enableMultiViewport),
       m_window(window),
-      m_engine(&engine)
+      m_rhiDevice(&device)
 {}
 
 void ImGuiLayer::onAttach()
@@ -33,8 +35,17 @@ void ImGuiLayer::onAttach()
         return;
     }
 
-    if (m_window == nullptr || m_engine == nullptr || !m_engine->_device ||
-        m_engine->_swapchainImageFormat == vk::Format::eUndefined) {
+    if (m_context == nullptr && m_rhiDevice != nullptr) {
+        auto* vulkanDevice = dynamic_cast<VulkanRHIDevice*>(m_rhiDevice);
+        if (vulkanDevice == nullptr) {
+            LUNA_CORE_ERROR("ImGui overlay currently requires the Vulkan RHI backend");
+            return;
+        }
+        m_context = &vulkanDevice->getDeviceContext();
+    }
+
+    if (m_window == nullptr || m_context == nullptr || !m_context->_device ||
+        m_context->_swapchainImageFormat == vk::Format::eUndefined) {
         LUNA_CORE_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
         return;
     }
@@ -66,16 +77,16 @@ void ImGuiLayer::onAttach()
         return;
     }
 
-    m_colorAttachmentFormat = m_engine->getSwapchainImageFormat();
-    const uint32_t imageCount = m_engine->getSwapchainImageCount();
+    m_colorAttachmentFormat = m_context->getSwapchainImageFormat();
+    const uint32_t imageCount = m_context->getSwapchainImageCount();
 
     ImGui_ImplVulkan_InitInfo initInfo{};
     initInfo.ApiVersion = VK_API_VERSION_1_3;
-    initInfo.Instance = static_cast<VkInstance>(m_engine->_instance);
-    initInfo.PhysicalDevice = static_cast<VkPhysicalDevice>(m_engine->_chosenGPU);
-    initInfo.Device = static_cast<VkDevice>(m_engine->_device);
-    initInfo.QueueFamily = m_engine->_graphicsQueueFamily;
-    initInfo.Queue = static_cast<VkQueue>(m_engine->_graphicsQueue);
+    initInfo.Instance = static_cast<VkInstance>(m_context->_instance);
+    initInfo.PhysicalDevice = static_cast<VkPhysicalDevice>(m_context->_chosenGPU);
+    initInfo.Device = static_cast<VkDevice>(m_context->_device);
+    initInfo.QueueFamily = m_context->_graphicsQueueFamily;
+    initInfo.Queue = static_cast<VkQueue>(m_context->_graphicsQueue);
     initInfo.DescriptorPoolSize = kImGuiDescriptorPoolSize;
     initInfo.MinImageCount = imageCount;
     initInfo.ImageCount = imageCount;
@@ -114,8 +125,8 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    if (m_engine != nullptr && m_engine->_device) {
-        VK_CHECK(m_engine->_device.waitIdle());
+    if (m_context != nullptr && m_context->_device) {
+        VK_CHECK(m_context->_device.waitIdle());
     }
 
     ImGui_ImplVulkan_Shutdown();
@@ -160,6 +171,17 @@ void ImGuiLayer::end()
     }
 
     ImGui::Render();
+}
+
+bool ImGuiLayer::render(IRHIDevice& device, const FrameContext& frameContext)
+{
+    (void)frameContext;
+    auto* vulkanDevice = dynamic_cast<VulkanRHIDevice*>(&device);
+    if (!m_attached || vulkanDevice == nullptr) {
+        return false;
+    }
+
+    return vulkanDevice->renderOverlay(*this) == RHIResult::Success;
 }
 
 void ImGuiLayer::render(vk::CommandBuffer commandBuffer, vk::ImageView targetImageView, vk::Extent2D targetExtent)

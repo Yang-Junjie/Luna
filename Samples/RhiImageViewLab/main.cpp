@@ -9,8 +9,55 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace {
+
+struct CommandLineOptions {
+    bool runSelfTest = false;
+    std::string selfTestName = "phase3_deferred_destroy";
+};
+
+struct SelfTestResult {
+    bool passed = false;
+};
+
+bool parse_arguments(int argc, char** argv, CommandLineOptions* options)
+{
+    if (options == nullptr) {
+        return false;
+    }
+
+    constexpr std::array<std::string_view, 2> kSelfTestNames = {
+        "phase3_deferred_destroy",
+        "phase5_subresource_preview",
+    };
+    constexpr std::string_view kSelfTestPrefix = "--self-test=";
+    for (int index = 1; index < argc; ++index) {
+        const std::string_view argument = argv[index];
+        if (argument == "--self-test") {
+            options->runSelfTest = true;
+            continue;
+        }
+
+        if (argument.substr(0, kSelfTestPrefix.size()) == kSelfTestPrefix) {
+            const std::string_view selfTestName = argument.substr(kSelfTestPrefix.size());
+            if (std::find(kSelfTestNames.begin(), kSelfTestNames.end(), selfTestName) == kSelfTestNames.end()) {
+                LUNA_CORE_ERROR("Unknown self-test '{}'", argument.substr(kSelfTestPrefix.size()));
+                return false;
+            }
+
+            options->runSelfTest = true;
+            options->selfTestName = std::string(selfTestName);
+            continue;
+        }
+
+        LUNA_CORE_ERROR("Unknown argument '{}'", argument);
+        return false;
+    }
+
+    return true;
+}
 
 const char* page_label(image_view_lab::Page page)
 {
@@ -160,6 +207,10 @@ private:
         if (ImGui::Button("Create View")) {
             mip.createViewRequested = true;
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Render To Selected View")) {
+            mip.renderSelectedViewRequested = true;
+        }
 
         const int selectedView = std::clamp(mip.selectedView, 0, std::max(0, static_cast<int>(mip.views.size()) - 1));
         if (!mip.views.empty()) {
@@ -171,7 +222,7 @@ private:
         }
 
         draw_view_list(mip.views, &mip.selectedView, &mip.deleteView);
-        ImGui::TextWrapped("%s", mip.status.empty() ? "Create single mip or mip range views from one source image."
+        ImGui::TextWrapped("%s", mip.status.empty() ? "Create single mip or mip range views from one source image, then render into the selected view."
                                                     : mip.status.c_str());
     }
 
@@ -275,9 +326,312 @@ private:
     std::shared_ptr<image_view_lab::State> m_state;
 };
 
+class RhiImageViewLabSelfTestLayer final : public luna::Layer {
+public:
+    RhiImageViewLabSelfTestLayer(std::shared_ptr<image_view_lab::State> state,
+                                 std::shared_ptr<SelfTestResult> result,
+                                 std::string selfTestName)
+        : luna::Layer("RhiImageViewLabSelfTestLayer"),
+          m_state(std::move(state)),
+          m_result(std::move(result)),
+          m_selfTestName(std::move(selfTestName))
+    {}
+
+    void onAttach() override
+    {
+        LUNA_CORE_INFO("RhiImageViewLab self-test begin: {}", m_selfTestName);
+    }
+
+    void onUpdate(luna::Timestep) override
+    {
+        if (m_state == nullptr || m_result == nullptr) {
+            return;
+        }
+
+        if (m_selfTestName == "phase5_subresource_preview") {
+            update_phase5_subresource_preview();
+            return;
+        }
+
+        update_phase3_deferred_destroy();
+    }
+
+private:
+    void update_phase3_deferred_destroy()
+    {
+        m_state->page = image_view_lab::Page::MipView;
+        auto& mip = m_state->mip;
+
+        if (!m_hasPreviousViewCount) {
+            m_previousViewCount = mip.views.size();
+            m_hasPreviousViewCount = true;
+        } else {
+            if (mip.views.size() > m_previousViewCount) {
+                m_createdViews += static_cast<int>(mip.views.size() - m_previousViewCount);
+            } else if (mip.views.size() < m_previousViewCount) {
+                m_deletedViews += static_cast<int>(m_previousViewCount - mip.views.size());
+            }
+            m_previousViewCount = mip.views.size();
+        }
+
+        ++m_frame;
+        switch (m_frame) {
+            case 2:
+                request_create(2, 1);
+                break;
+            case 4:
+                request_delete_selected();
+                break;
+            case 6:
+                request_create(3, 1);
+                break;
+            case 8:
+                request_delete_selected();
+                break;
+            case 10:
+                mip.recreateImageRequested = true;
+                m_recreateIssued = true;
+                break;
+            case 12:
+                request_create(1, 2);
+                break;
+            case 14:
+                request_delete_selected();
+                break;
+            case 16:
+                request_create(0, 1);
+                break;
+            default:
+                break;
+        }
+
+        if (m_frame >= 40) {
+            finish_phase3();
+        }
+    }
+
+    void update_phase5_subresource_preview()
+    {
+        ++m_frame;
+        switch (m_phase5Step) {
+            case 0:
+                m_state->page = image_view_lab::Page::MipView;
+                if (!m_state->mip.views.empty()) {
+                    const uint32_t maxMip = std::max(1u, m_state->mip.mipLevels);
+                    m_phase5MipTarget = std::min(2u, maxMip - 1u);
+                    m_state->mip.createBaseMip = m_phase5MipTarget;
+                    m_state->mip.createMipCount = 1;
+                    m_state->mip.createViewRequested = true;
+                    m_phase5Step = 1;
+                }
+                break;
+            case 1:
+                m_state->page = image_view_lab::Page::MipView;
+                if (select_mip_view(m_phase5MipTarget, 1u)) {
+                    reset_phase5_probe();
+                    m_state->mip.phase5StampRequested = true;
+                    m_state->phase5Probe.request = image_view_lab::Phase5ProbeKind::MipIsolation;
+                    m_phase5Step = 2;
+                }
+                break;
+            case 2:
+                m_state->page = image_view_lab::Page::MipView;
+                if (consume_phase5_probe(image_view_lab::Phase5ProbeKind::MipIsolation, &m_phase5MipSummary)) {
+                    m_phase5MipPassed = m_state->phase5Probe.passed;
+                    if (!m_phase5MipPassed) {
+                        finish_phase5();
+                        return;
+                    }
+
+                    m_state->page = image_view_lab::Page::ArrayLayerView;
+                    m_phase5ArrayLayerTarget = std::min(2u, std::max(1u, m_state->array.arrayLayers) - 1u);
+                    m_state->array.createType = luna::ImageViewType::Image2D;
+                    m_state->array.createBaseMip = 0;
+                    m_state->array.createMipCount = 1;
+                    m_state->array.createBaseLayer = m_phase5ArrayLayerTarget;
+                    m_state->array.createLayerCount = 1;
+                    m_state->array.createViewRequested = true;
+                    m_phase5Step = 3;
+                }
+                break;
+            case 3:
+                m_state->page = image_view_lab::Page::ArrayLayerView;
+                if (select_array_view(m_phase5ArrayLayerTarget)) {
+                    reset_phase5_probe();
+                    m_state->phase5Probe.request = image_view_lab::Phase5ProbeKind::ArrayLayerIsolation;
+                    m_phase5Step = 4;
+                }
+                break;
+            case 4:
+                m_state->page = image_view_lab::Page::ArrayLayerView;
+                if (consume_phase5_probe(image_view_lab::Phase5ProbeKind::ArrayLayerIsolation, &m_phase5ArraySummary)) {
+                    m_phase5ArrayPassed = m_state->phase5Probe.passed;
+                    finish_phase5();
+                }
+                break;
+            default:
+                break;
+        }
+
+        if (m_frame >= 180) {
+            m_phase5FailureReason = "timeout while waiting for subresource preview probe results";
+            finish_phase5();
+        }
+    }
+
+    void request_create(uint32_t baseMip, uint32_t mipCount)
+    {
+        if (m_state == nullptr) {
+            return;
+        }
+
+        auto& mip = m_state->mip;
+        const uint32_t maxMip = std::max(1u, mip.mipLevels);
+        mip.createBaseMip = std::min(baseMip, maxMip - 1u);
+        mip.createMipCount = std::max(1u, std::min(mipCount, maxMip - mip.createBaseMip));
+        mip.createViewRequested = true;
+    }
+
+    void request_delete_selected()
+    {
+        if (m_state == nullptr) {
+            return;
+        }
+
+        auto& mip = m_state->mip;
+        if (mip.views.size() <= 1) {
+            return;
+        }
+
+        mip.selectedView = static_cast<int>(mip.views.size() - 1);
+        mip.deleteView = mip.selectedView;
+    }
+
+    bool select_mip_view(uint32_t baseMip, uint32_t mipCount)
+    {
+        auto& mip = m_state->mip;
+        for (int index = 0; index < static_cast<int>(mip.views.size()); ++index) {
+            const auto& view = mip.views[static_cast<size_t>(index)];
+            if (view.desc.baseMipLevel == baseMip && view.desc.mipCount == mipCount) {
+                mip.selectedView = index;
+                mip.previewLod = 0.0f;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool select_array_view(uint32_t baseLayer)
+    {
+        auto& array = m_state->array;
+        for (int index = 0; index < static_cast<int>(array.views.size()); ++index) {
+            const auto& view = array.views[static_cast<size_t>(index)];
+            if (view.desc.type == luna::ImageViewType::Image2D &&
+                view.desc.baseArrayLayer == baseLayer &&
+                view.desc.layerCount == 1 &&
+                view.desc.baseMipLevel == 0 &&
+                view.desc.mipCount == 1) {
+                array.selectedView = index;
+                array.previewLayer = 0;
+                array.previewLod = 0.0f;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void reset_phase5_probe()
+    {
+        m_state->phase5Probe = {};
+    }
+
+    bool consume_phase5_probe(image_view_lab::Phase5ProbeKind expectedKind, std::string* summary)
+    {
+        const auto& probe = m_state->phase5Probe;
+        if (!probe.ready || probe.completed != expectedKind) {
+            return false;
+        }
+
+        if (summary != nullptr) {
+            *summary = probe.summary;
+        }
+        return true;
+    }
+
+    void finish_phase3()
+    {
+        auto& mip = m_state->mip;
+        const bool passed = m_recreateIssued && m_createdViews >= 4 && m_deletedViews >= 3 && !mip.views.empty();
+        m_result->passed = passed;
+
+        if (passed) {
+            LUNA_CORE_INFO("RhiImageViewLab self-test PASS createdViews={} deletedViews={} finalViews={}",
+                           m_createdViews,
+                           m_deletedViews,
+                           mip.views.size());
+        } else {
+            LUNA_CORE_ERROR("RhiImageViewLab self-test FAIL createdViews={} deletedViews={} recreated={} finalViews={}",
+                            m_createdViews,
+                            m_deletedViews,
+                            m_recreateIssued ? "true" : "false",
+                            mip.views.size());
+        }
+
+        luna::Application::get().close();
+    }
+
+    void finish_phase5()
+    {
+        if (!m_phase5FailureReason.empty()) {
+            m_result->passed = false;
+            LUNA_CORE_ERROR("RhiImageViewLab phase 5 self-test FAIL reason='{}' mip='{}' array='{}'",
+                            m_phase5FailureReason,
+                            m_phase5MipSummary,
+                            m_phase5ArraySummary);
+            luna::Application::get().close();
+            return;
+        }
+
+        const bool passed = m_phase5MipPassed && m_phase5ArrayPassed;
+        m_result->passed = passed;
+        if (passed) {
+            LUNA_CORE_INFO("RhiImageViewLab phase 5 self-test PASS mip='{}' array='{}'",
+                           m_phase5MipSummary,
+                           m_phase5ArraySummary);
+        } else {
+            LUNA_CORE_ERROR("RhiImageViewLab phase 5 self-test FAIL mipPassed={} arrayPassed={} mip='{}' array='{}'",
+                            m_phase5MipPassed ? "true" : "false",
+                            m_phase5ArrayPassed ? "true" : "false",
+                            m_phase5MipSummary,
+                            m_phase5ArraySummary);
+        }
+
+        luna::Application::get().close();
+    }
+
+private:
+    std::shared_ptr<image_view_lab::State> m_state;
+    std::shared_ptr<SelfTestResult> m_result;
+    std::string m_selfTestName;
+    uint32_t m_frame = 0;
+    size_t m_previousViewCount = 0;
+    int m_createdViews = 0;
+    int m_deletedViews = 0;
+    bool m_hasPreviousViewCount = false;
+    bool m_recreateIssued = false;
+    int m_phase5Step = 0;
+    uint32_t m_phase5MipTarget = 0;
+    uint32_t m_phase5ArrayLayerTarget = 0;
+    bool m_phase5MipPassed = false;
+    bool m_phase5ArrayPassed = false;
+    std::string m_phase5MipSummary;
+    std::string m_phase5ArraySummary;
+    std::string m_phase5FailureReason;
+};
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
 #ifndef NDEBUG
     constexpr luna::Logger::Level kLogLevel = luna::Logger::Level::Trace;
@@ -287,7 +641,14 @@ int main()
 
     luna::Logger::init("logs/luna.log", kLogLevel);
 
+    CommandLineOptions options;
+    if (!parse_arguments(argc, argv, &options)) {
+        luna::Logger::shutdown();
+        return 1;
+    }
+
     std::shared_ptr<image_view_lab::State> state = std::make_shared<image_view_lab::State>();
+    std::shared_ptr<SelfTestResult> selfTestResult = std::make_shared<SelfTestResult>();
     std::shared_ptr<luna::IRenderPipeline> renderPipeline =
         std::make_shared<image_view_lab::RhiImageViewLabRenderPipeline>(state);
 
@@ -296,7 +657,7 @@ int main()
         .windowWidth = 1440,
         .windowHeight = 900,
         .maximized = false,
-        .enableImGui = true,
+        .enableImGui = !options.runSelfTest,
         .enableMultiViewport = false,
         .renderService =
             {
@@ -313,9 +674,13 @@ int main()
         return 1;
     }
 
-    app->pushLayer(std::make_unique<RhiImageViewLabLayer>(state));
+    if (options.runSelfTest) {
+        app->pushLayer(std::make_unique<RhiImageViewLabSelfTestLayer>(state, selfTestResult, options.selfTestName));
+    } else {
+        app->pushLayer(std::make_unique<RhiImageViewLabLayer>(state));
+    }
     app->run();
     app.reset();
     luna::Logger::shutdown();
-    return 0;
+    return options.runSelfTest && !selfTestResult->passed ? 1 : 0;
 }

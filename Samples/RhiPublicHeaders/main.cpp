@@ -31,13 +31,24 @@ int main()
     renderingInfo.height = 720;
     renderingInfo.colorAttachments.push_back(
         {.image = luna::ImageHandle::fromRaw(1), .format = luna::PixelFormat::BGRA8Unorm, .clearColor = {}});
+    renderingInfo.colorAttachments.back().loadOp = luna::AttachmentLoadOp::Load;
+    renderingInfo.colorAttachments.back().storeOp = luna::AttachmentStoreOp::Store;
 
     luna::IndexedDrawArguments indexedDraw{};
     indexedDraw.indexCount = 3;
 
+    luna::Viewport viewport{};
+    viewport.width = 1280.0f;
+    viewport.height = 720.0f;
+
+    luna::ScissorRect scissor{};
+    scissor.width = 1280;
+    scissor.height = 720;
+
     const bool ok = deviceInfo.backend == luna::RHIBackend::Vulkan && bufferDesc.size == 256 &&
                     imageViewDesc.mipCount == 1 &&
                     resourceLayoutDesc.bindings.size() == 1 && renderingInfo.colorAttachments.size() == 1 &&
-                    indexedDraw.indexCount == 3;
+                    renderingInfo.colorAttachments.front().loadOp == luna::AttachmentLoadOp::Load &&
+                    viewport.width == 1280.0f && scissor.width == 1280 && indexedDraw.indexCount == 3;
     return ok ? 0 : 1;
 }

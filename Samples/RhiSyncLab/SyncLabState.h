@@ -12,7 +12,8 @@ namespace sync_lab {
 enum class Page : uint8_t {
     HistoryCopy = 0,
     Readback,
-    Indirect
+    Indirect,
+    Subresource
 };
 
 struct TimelineEntry {
@@ -58,11 +59,30 @@ struct IndirectState {
     std::string status;
 };
 
+struct SubresourceState {
+    bool runBarrierOnlyRequested = true;
+    int baseMipLevel = 1;
+    int mipCount = 1;
+    int baseArrayLayer = 1;
+    int layerCount = 1;
+    uint32_t availableMipLevels = 4;
+    uint32_t availableArrayLayers = 4;
+    luna::ImageLayout oldLayout = luna::ImageLayout::Undefined;
+    luna::ImageLayout newLayout = luna::ImageLayout::TransferDst;
+    luna::PipelineStage srcStage = luna::PipelineStage::None;
+    luna::PipelineStage dstStage = luna::PipelineStage::Transfer;
+    luna::ResourceAccess srcAccess = luna::ResourceAccess::None;
+    luna::ResourceAccess dstAccess = luna::ResourceAccess::TransferWrite;
+    std::string barrierSummary;
+    std::string status;
+};
+
 struct State {
-    Page page = Page::HistoryCopy;
+    Page page = Page::Indirect;
     HistoryCopyState history;
     ReadbackState readback;
     IndirectState indirect;
+    SubresourceState subresource;
     std::vector<TimelineEntry> timeline;
 };
 

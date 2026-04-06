@@ -68,3 +68,20 @@ target_compile_definitions(
 )
 
 luna_configure_runtime_output(RhiBindingLab)
+
+if(BUILD_TESTING)
+    add_test(
+        NAME RhiBindingLab.selftest.phase3_descriptor_recycle
+        COMMAND $<TARGET_FILE:RhiBindingLab> --self-test=phase3_descriptor_recycle
+    )
+    add_test(
+        NAME RhiBindingLab.selftest.phase5_layout_validation
+        COMMAND $<TARGET_FILE:RhiBindingLab> --self-test=phase5_layout_validation
+    )
+    set_tests_properties(
+        RhiBindingLab.selftest.phase3_descriptor_recycle
+        RhiBindingLab.selftest.phase5_layout_validation
+        PROPERTIES
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    )
+endif()

@@ -1,53 +1,35 @@
 #pragma once
 
-#include "Descriptors.h"
-#include "ResourceLayout.h"
-#include "Shader.h"
+#include "RHIAdapter.h"
+#include "RHIQueue.h"
+#include "RHISwapchain.h"
 
 #include <memory>
-#include <string_view>
+#include <vector>
 
 namespace luna {
-
-class IRHICommandContext;
-
-struct DeviceCreateInfo {
-    std::string_view applicationName = "Luna";
-    RHIBackend backend = RHIBackend::Vulkan;
-    void* nativeWindow = nullptr;
-    SwapchainDesc swapchain;
-    bool enableValidation = false;
-};
-
-struct RHICapabilities {
-    RHIBackend backend = RHIBackend::Vulkan;
-    bool implemented = false;
-    bool supportsGraphics = false;
-    bool supportsPresent = false;
-    bool supportsDynamicRendering = false;
-    bool supportsIndexedDraw = false;
-    bool supportsResourceSets = false;
-    uint32_t framesInFlight = 0;
-};
-
-struct FrameContext {
-    uint32_t frameIndex = 0;
-    uint32_t renderWidth = 0;
-    uint32_t renderHeight = 0;
-    ImageHandle backbuffer{};
-    PixelFormat backbufferFormat = PixelFormat::Undefined;
-    IRHICommandContext* commandContext = nullptr;
-};
 
 class IRHIDevice {
 public:
     virtual ~IRHIDevice() = default;
 
+    virtual DeviceHandle getHandle() const = 0;
     virtual RHIBackend getBackend() const = 0;
     virtual RHICapabilities getCapabilities() const = 0;
+    virtual RHIDeviceLimits getDeviceLimits() const = 0;
+    virtual RHIFormatSupport queryFormatSupport(PixelFormat format) const = 0;
+    virtual RHISwapchainState getSwapchainState() const = 0;
+    virtual IRHISurface* getPrimarySurface() = 0;
+    virtual const IRHISurface* getPrimarySurface() const = 0;
+    virtual IRHISwapchain* getPrimarySwapchain() = 0;
+    virtual const IRHISwapchain* getPrimarySwapchain() const = 0;
+    virtual IRHICommandQueue* getCommandQueue(RHIQueueType queueType) = 0;
+    virtual const IRHICommandQueue* getCommandQueue(RHIQueueType queueType) const = 0;
     virtual RHIResult init(const DeviceCreateInfo& createInfo) = 0;
     virtual RHIResult waitIdle() = 0;
     virtual void shutdown() = 0;
+    virtual RHIResult createCommandList(RHIQueueType queueType, std::unique_ptr<IRHICommandList>* outCommandList) = 0;
+    virtual RHIResult createFence(std::unique_ptr<IRHIFence>* outFence, bool signaled = false) = 0;
     virtual RHIResult createBuffer(const BufferDesc& desc, BufferHandle* outHandle, const void* initialData = nullptr) = 0;
     virtual void destroyBuffer(BufferHandle handle) = 0;
     virtual RHIResult writeBuffer(BufferHandle handle,
@@ -80,5 +62,6 @@ public:
 RHICapabilities QueryRHICapabilities(RHIBackend backend) noexcept;
 bool IsBackendImplemented(RHIBackend backend) noexcept;
 std::unique_ptr<IRHIDevice> CreateRHIDevice(RHIBackend backend);
+std::vector<std::unique_ptr<IRHIAdapter>> EnumerateRHIAdapters(RHIBackend backend);
 
 } // namespace luna

@@ -11,8 +11,19 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
 set(RHI_SOURCE
     RHI/Types.h
     RHI/Shader.h
+    RHI/DescriptorEnums.h
+    RHI/ResourceDescriptors.h
+    RHI/PipelineDescriptors.h
+    RHI/ImageContracts.h
     RHI/Descriptors.h
+    RHI/CommandTypes.h
+    RHI/CommandBarriers.h
+    RHI/CommandRendering.h
     RHI/CommandContext.h
+    RHI/RHIDeviceTypes.h
+    RHI/RHIQueue.h
+    RHI/RHISwapchain.h
+    RHI/RHIAdapter.h
     RHI/RHIDevice.h
     RHI/RHIDevice.cpp
     RHI/ResourceLayout.h)
@@ -23,16 +34,27 @@ set(VULKAN_BACKEND_SOURCE
     Vulkan/vk_initializers.h
     Vulkan/vk_images.h
     Vulkan/vk_images.cpp 
+    Vulkan/vk_descriptor_layouts.h
+    Vulkan/vk_descriptor_allocators.h
+    Vulkan/vk_resource_bindings.h
     Vulkan/vk_descriptors.h
     Vulkan/vk_descriptors.cpp
+    Vulkan/detail/vk_descriptors_layouts.inl
+    Vulkan/detail/vk_descriptors_bindings.inl
+    Vulkan/detail/vk_descriptors_allocators.inl
+    Vulkan/detail/vk_descriptors_writer.inl
     Vulkan/vk_pipelines.h
     Vulkan/vk_pipelines.cpp
-    Vulkan/vk_engine.h
-    Vulkan/vk_engine.cpp
-    Vulkan/vk_loader.h
-    Vulkan/vk_loader.cpp
+    Vulkan/vk_engine_types.h
+    Vulkan/vk_device_context.h
+    Vulkan/vk_device_context.cpp
     Vulkan/vk_rhi_device.h
     Vulkan/vk_rhi_device.cpp
+    Vulkan/detail/vk_rhi_device_classes.inl
+    Vulkan/detail/vk_rhi_device_device.inl
+    Vulkan/detail/vk_rhi_device_frame.inl
+    Vulkan/detail/vk_rhi_device_command_context.inl
+    Vulkan/detail/vk_rhi_device_tail.inl
     Vulkan/vk_shader.cpp
     Vulkan/vk_shader.h
     Vulkan/camera.cpp

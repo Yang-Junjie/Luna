@@ -2,7 +2,6 @@
 
 #include "Core/log.h"
 #include "RHI/CommandContext.h"
-#include "Vulkan/vk_rhi_device.h"
 
 #include <algorithm>
 #include <array>
@@ -71,14 +70,35 @@ RhiBindingLabRenderPipeline::RhiBindingLabRenderPipeline(std::shared_ptr<State> 
 
 bool RhiBindingLabRenderPipeline::init(luna::IRHIDevice& device)
 {
-    m_vulkanDevice = dynamic_cast<luna::VulkanRHIDevice*>(&device);
-    if (m_vulkanDevice == nullptr) {
-        LUNA_CORE_ERROR("RhiBindingLab requires the Vulkan RHI backend");
-        return false;
-    }
-
     m_shaderRoot = std::filesystem::path{RHI_BINDING_LAB_SHADER_ROOT}.lexically_normal().generic_string();
-    return true;
+    return ensure_shader_handles(device);
+}
+
+bool RhiBindingLabRenderPipeline::ensure_shader_handles(luna::IRHIDevice& device)
+{
+    const auto ensure_shader = [&](std::string_view fileName,
+                                   luna::ShaderType stage,
+                                   luna::ShaderHandle* handle) -> bool {
+        if (handle == nullptr) {
+            return false;
+        }
+        if (handle->isValid()) {
+            return true;
+        }
+
+        const std::string filePath = shader_path(m_shaderRoot, fileName);
+        return device.createShader({.stage = stage, .filePath = filePath}, handle) == luna::RHIResult::Success;
+    };
+
+    return ensure_shader("binding_lab_fullscreen.vert.spv", luna::ShaderType::Vertex, &m_fullscreenVertexShader) &&
+           ensure_shader("binding_lab_probe.frag.spv", luna::ShaderType::Fragment, &m_probeFragmentShader) &&
+           ensure_shader("binding_lab_multiset.frag.spv", luna::ShaderType::Fragment, &m_multiSetFragmentShader) &&
+           ensure_shader("binding_lab_descriptor_array.frag.spv",
+                         luna::ShaderType::Fragment,
+                         &m_descriptorArrayFragmentShader) &&
+           ensure_shader("binding_lab_dynamic_uniform.frag.spv",
+                         luna::ShaderType::Fragment,
+                         &m_dynamicUniformFragmentShader);
 }
 
 void RhiBindingLabRenderPipeline::shutdown(luna::IRHIDevice& device)
@@ -88,7 +108,7 @@ void RhiBindingLabRenderPipeline::shutdown(luna::IRHIDevice& device)
     destroy_descriptor_array_resources(device);
     destroy_dynamic_uniform_resources(device);
     destroy_shared_resources(device);
-    m_vulkanDevice = nullptr;
+    destroy_shader_handles(device);
 }
 
 bool RhiBindingLabRenderPipeline::render(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -115,6 +135,10 @@ bool RhiBindingLabRenderPipeline::render(luna::IRHIDevice& device, const luna::F
 
 bool RhiBindingLabRenderPipeline::ensure_shared_resources(luna::IRHIDevice& device)
 {
+    if (!ensure_shader_handles(device)) {
+        return false;
+    }
+
     if (m_linearSampler.isValid() && m_dummyTexture.isValid()) {
         return true;
     }
@@ -195,19 +219,13 @@ bool RhiBindingLabRenderPipeline::build_probe_pipeline(luna::IRHIDevice& device,
     if (multiSet.includeSet2) selectedLayouts.push_back(m_objectLayout);
 
     if (m_probePipeline.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_probe_pipeline(device);
     }
 
-    const std::string vertexShaderPath = shader_path(m_shaderRoot, "binding_lab_fullscreen.vert.spv");
-    const std::string fragmentShaderPath = shader_path(m_shaderRoot, "binding_lab_probe.frag.spv");
-
     luna::GraphicsPipelineDesc pipelineDesc{};
     pipelineDesc.debugName = "RhiBindingLabProbePipeline";
-    pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
-    pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+    pipelineDesc.vertexShaderHandle = m_fullscreenVertexShader;
+    pipelineDesc.fragmentShaderHandle = m_multiSetFragmentShader;
     pipelineDesc.resourceLayouts = selectedLayouts;
     pipelineDesc.cullMode = luna::CullMode::None;
     pipelineDesc.frontFace = luna::FrontFace::Clockwise;
@@ -216,14 +234,17 @@ bool RhiBindingLabRenderPipeline::build_probe_pipeline(luna::IRHIDevice& device,
     const luna::RHIResult result = device.createGraphicsPipeline(pipelineDesc, &m_probePipeline);
     std::ostringstream status;
     if (result != luna::RHIResult::Success) {
-        status << "Build Pipeline Layout failed: selected set composition is invalid.";
+        status << "Build Pipeline Layout failed: reflection/layout validation rejected the selected sets.";
         multiSet.layoutStatus = status.str();
         return false;
     }
 
-    status << "Pipeline layout build success: ";
+    status << "Build Pipeline Layout success: reflection validation passed. ";
+    status << "Reused shader handles VS=" << m_fullscreenVertexShader.value << ", FS=" << m_multiSetFragmentShader.value
+           << ". ";
+    status << "Active sets: ";
     if (selectedLayouts.empty()) {
-        status << "no descriptor sets";
+        status << "none";
     } else {
         bool first = true;
         if (multiSet.includeSet0) {
@@ -268,13 +289,10 @@ bool RhiBindingLabRenderPipeline::run_conflict_probe(luna::IRHIDevice& device, l
         return false;
     }
 
-    const std::string vertexShaderPath = shader_path(m_shaderRoot, "binding_lab_fullscreen.vert.spv");
-    const std::string fragmentShaderPath = shader_path(m_shaderRoot, "binding_lab_probe.frag.spv");
-
     luna::GraphicsPipelineDesc pipelineDesc{};
     pipelineDesc.debugName = "RhiBindingLabConflictProbe";
-    pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
-    pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+    pipelineDesc.vertexShaderHandle = m_fullscreenVertexShader;
+    pipelineDesc.fragmentShaderHandle = m_multiSetFragmentShader;
     pipelineDesc.resourceLayouts = {first, second};
     pipelineDesc.cullMode = luna::CullMode::None;
     pipelineDesc.frontFace = luna::FrontFace::Clockwise;
@@ -290,7 +308,7 @@ bool RhiBindingLabRenderPipeline::run_conflict_probe(luna::IRHIDevice& device, l
 
     multiSet.layoutStatus = result == luna::RHIResult::Success
                                 ? "Conflict probe unexpectedly succeeded."
-                                : "Conflict probe rejected duplicate set index as expected.";
+                                : "Conflict rejected: duplicate set index was blocked by reflection/layout validation.";
     return result != luna::RHIResult::Success;
 }
 
@@ -422,22 +440,16 @@ bool RhiBindingLabRenderPipeline::ensure_multi_set_resources(luna::IRHIDevice& d
     }
 
     if (m_multiSetPipeline.isValid() && m_multiSetBackbufferFormat != backbufferFormat) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         device.destroyPipeline(m_multiSetPipeline);
         m_multiSetPipeline = {};
         m_multiSetBackbufferFormat = luna::PixelFormat::Undefined;
     }
 
     if (!m_multiSetPipeline.isValid()) {
-        const std::string vertexShaderPath = shader_path(m_shaderRoot, "binding_lab_fullscreen.vert.spv");
-        const std::string fragmentShaderPath = shader_path(m_shaderRoot, "binding_lab_multiset.frag.spv");
-
         luna::GraphicsPipelineDesc pipelineDesc{};
         pipelineDesc.debugName = "RhiBindingLabMultiSet";
-        pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
-        pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+        pipelineDesc.vertexShaderHandle = m_fullscreenVertexShader;
+        pipelineDesc.fragmentShaderHandle = m_multiSetFragmentShader;
         pipelineDesc.resourceLayouts = {m_globalLayout, m_materialLayout, m_objectLayout};
         pipelineDesc.cullMode = luna::CullMode::None;
         pipelineDesc.frontFace = luna::FrontFace::Clockwise;
@@ -534,22 +546,16 @@ bool RhiBindingLabRenderPipeline::ensure_descriptor_array_resources(luna::IRHIDe
     }
 
     if (m_descriptorArrayPipeline.isValid() && m_descriptorArrayBackbufferFormat != backbufferFormat) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         device.destroyPipeline(m_descriptorArrayPipeline);
         m_descriptorArrayPipeline = {};
         m_descriptorArrayBackbufferFormat = luna::PixelFormat::Undefined;
     }
 
     if (!m_descriptorArrayPipeline.isValid()) {
-        const std::string vertexShaderPath = shader_path(m_shaderRoot, "binding_lab_fullscreen.vert.spv");
-        const std::string fragmentShaderPath = shader_path(m_shaderRoot, "binding_lab_descriptor_array.frag.spv");
-
         luna::GraphicsPipelineDesc pipelineDesc{};
         pipelineDesc.debugName = "RhiBindingLabDescriptorArray";
-        pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
-        pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+        pipelineDesc.vertexShaderHandle = m_fullscreenVertexShader;
+        pipelineDesc.fragmentShaderHandle = m_descriptorArrayFragmentShader;
         pipelineDesc.resourceLayouts = {m_descriptorArrayLayout};
         pipelineDesc.pushConstantSize = sizeof(ArrayPushConstants);
         pipelineDesc.pushConstantVisibility = luna::ShaderType::Fragment;
@@ -577,27 +583,40 @@ bool RhiBindingLabRenderPipeline::update_descriptor_array_set(luna::IRHIDevice& 
     auto& descriptorArray = m_state->descriptorArray;
     descriptorArray.textureIndex = std::clamp(descriptorArray.textureIndex, 0, 3);
 
+    const auto write_descriptor_array_set = [&](luna::ResourceSetHandle resourceSet) -> bool {
+        luna::ImageBindingWriteDesc imageWrite{};
+        imageWrite.binding = 0;
+        imageWrite.type = luna::ResourceType::CombinedImageSampler;
+        imageWrite.elements.push_back({.image = m_descriptorArrayTextures[0], .sampler = m_linearSampler});
+        imageWrite.elements.push_back({.image = m_descriptorArrayTextures[1], .sampler = m_linearSampler});
+        imageWrite.elements.push_back(
+            {.image = descriptorArray.slot2UsesAlternate ? m_descriptorArrayAlternateTexture : m_descriptorArrayTextures[2],
+             .sampler = m_linearSampler});
+        imageWrite.elements.push_back({.image = m_descriptorArrayTextures[3], .sampler = m_linearSampler});
+
+        luna::ResourceSetWriteDesc writeDesc{};
+        writeDesc.images.push_back(std::move(imageWrite));
+        return device.updateResourceSet(resourceSet, writeDesc) == luna::RHIResult::Success;
+    };
+
     if (descriptorArray.replaceSlotRequested) {
         descriptorArray.replaceSlotRequested = false;
         descriptorArray.slot2UsesAlternate = !descriptorArray.slot2UsesAlternate;
 
-        if (device.waitIdle() != luna::RHIResult::Success) {
+        luna::ResourceSetHandle replacementSet{};
+        if (device.createResourceSet(m_descriptorArrayLayout, &replacementSet) != luna::RHIResult::Success) {
             return false;
         }
 
-        luna::ImageBindingWriteDesc imageWrite{};
-        imageWrite.binding = 0;
-        imageWrite.type = luna::ResourceType::CombinedImageSampler;
-        imageWrite.firstArrayElement = 2;
-        imageWrite.elements.push_back(
-            {.image = descriptorArray.slot2UsesAlternate ? m_descriptorArrayAlternateTexture : m_descriptorArrayTextures[2],
-             .sampler = m_linearSampler});
-
-        luna::ResourceSetWriteDesc writeDesc{};
-        writeDesc.images.push_back(std::move(imageWrite));
-        if (device.updateResourceSet(m_descriptorArraySet, writeDesc) != luna::RHIResult::Success) {
+        if (!write_descriptor_array_set(replacementSet)) {
+            device.destroyResourceSet(replacementSet);
             return false;
         }
+
+        if (m_descriptorArraySet.isValid()) {
+            device.destroyResourceSet(m_descriptorArraySet);
+        }
+        m_descriptorArraySet = replacementSet;
     }
 
     descriptorArray.slotLabels[0] = kOriginalLabels[0];
@@ -619,6 +638,9 @@ bool RhiBindingLabRenderPipeline::ensure_dynamic_uniform_resources(luna::IRHIDev
 {
     auto& dynamicUniform = m_state->dynamicUniform;
     dynamicUniform.objectIndex = std::clamp(dynamicUniform.objectIndex, 0, 3);
+    const luna::RHIDeviceLimits limits = device.getDeviceLimits();
+    dynamicUniform.minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment;
+    dynamicUniform.framesInFlight = limits.framesInFlight;
 
     if (!m_dynamicUniformLayout.isValid()) {
         luna::ResourceLayoutDesc desc{};
@@ -631,10 +653,8 @@ bool RhiBindingLabRenderPipeline::ensure_dynamic_uniform_resources(luna::IRHIDev
     }
 
     if (m_dynamicUniformStride == 0) {
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(m_vulkanDevice->getEngine()._chosenGPU, &properties);
         m_dynamicUniformStride = align_up(static_cast<uint32_t>(sizeof(DynamicObjectData)),
-                                          properties.limits.minUniformBufferOffsetAlignment);
+                                          limits.minUniformBufferOffsetAlignment);
         if (m_dynamicUniformStride == 0) {
             m_dynamicUniformStride = static_cast<uint32_t>(sizeof(DynamicObjectData));
         }
@@ -688,22 +708,16 @@ bool RhiBindingLabRenderPipeline::ensure_dynamic_uniform_resources(luna::IRHIDev
     }
 
     if (m_dynamicUniformPipeline.isValid() && m_dynamicUniformBackbufferFormat != backbufferFormat) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         device.destroyPipeline(m_dynamicUniformPipeline);
         m_dynamicUniformPipeline = {};
         m_dynamicUniformBackbufferFormat = luna::PixelFormat::Undefined;
     }
 
     if (!m_dynamicUniformPipeline.isValid()) {
-        const std::string vertexShaderPath = shader_path(m_shaderRoot, "binding_lab_fullscreen.vert.spv");
-        const std::string fragmentShaderPath = shader_path(m_shaderRoot, "binding_lab_dynamic_uniform.frag.spv");
-
         luna::GraphicsPipelineDesc pipelineDesc{};
         pipelineDesc.debugName = "RhiBindingLabDynamicUniform";
-        pipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = vertexShaderPath};
-        pipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = fragmentShaderPath};
+        pipelineDesc.vertexShaderHandle = m_fullscreenVertexShader;
+        pipelineDesc.fragmentShaderHandle = m_dynamicUniformFragmentShader;
         pipelineDesc.resourceLayouts = {m_dynamicUniformLayout};
         pipelineDesc.cullMode = luna::CullMode::None;
         pipelineDesc.frontFace = luna::FrontFace::Clockwise;
@@ -721,6 +735,11 @@ bool RhiBindingLabRenderPipeline::ensure_dynamic_uniform_resources(luna::IRHIDev
     status << "Object Index=" << dynamicUniform.objectIndex << ", Dynamic Offset=" << dynamicUniform.dynamicOffset
            << " bytes.";
     dynamicUniform.status = status.str();
+
+    std::ostringstream limitsSummary;
+    limitsSummary << "minUniformBufferOffsetAlignment=" << dynamicUniform.minUniformBufferOffsetAlignment
+                  << ", framesInFlight=" << dynamicUniform.framesInFlight;
+    dynamicUniform.limitsSummary = limitsSummary.str();
     return true;
 }
 
@@ -888,6 +907,21 @@ void RhiBindingLabRenderPipeline::destroy_shared_resources(luna::IRHIDevice& dev
 
     m_dummyTexture = {};
     m_linearSampler = {};
+}
+
+void RhiBindingLabRenderPipeline::destroy_shader_handles(luna::IRHIDevice& device)
+{
+    if (m_dynamicUniformFragmentShader.isValid()) device.destroyShader(m_dynamicUniformFragmentShader);
+    if (m_descriptorArrayFragmentShader.isValid()) device.destroyShader(m_descriptorArrayFragmentShader);
+    if (m_multiSetFragmentShader.isValid()) device.destroyShader(m_multiSetFragmentShader);
+    if (m_probeFragmentShader.isValid()) device.destroyShader(m_probeFragmentShader);
+    if (m_fullscreenVertexShader.isValid()) device.destroyShader(m_fullscreenVertexShader);
+
+    m_dynamicUniformFragmentShader = {};
+    m_descriptorArrayFragmentShader = {};
+    m_multiSetFragmentShader = {};
+    m_probeFragmentShader = {};
+    m_fullscreenVertexShader = {};
 }
 
 } // namespace binding_lab

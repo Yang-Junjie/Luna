@@ -45,6 +45,9 @@ struct DescriptorArrayState {
 struct DynamicUniformState {
     int objectIndex = 0;
     uint32_t dynamicOffset = 0;
+    uint32_t minUniformBufferOffsetAlignment = 0;
+    uint32_t framesInFlight = 0;
+    std::string limitsSummary;
     std::string status;
 };
 

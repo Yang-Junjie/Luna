@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RHI/Descriptors.h"
+#include "RHI/CommandContext.h"
 
 #include <array>
 #include <algorithm>
@@ -11,9 +11,15 @@ namespace image_lab {
 
 enum class Page : uint8_t {
     FormatProbe = 0,
+    AttachmentOps,
     MRTPreview,
     MipPreview,
     Array3DPreview
+};
+
+enum class AttachmentMode : uint8_t {
+    ColorOnly = 0,
+    DepthOnly
 };
 
 enum class ArrayPreviewMode : uint8_t {
@@ -74,6 +80,18 @@ struct MrtPreviewState {
     std::string status;
 };
 
+struct AttachmentOpsState {
+    AttachmentMode mode = AttachmentMode::ColorOnly;
+    luna::AttachmentLoadOp colorLoadOp = luna::AttachmentLoadOp::Clear;
+    luna::AttachmentStoreOp colorStoreOp = luna::AttachmentStoreOp::Store;
+    luna::AttachmentLoadOp depthLoadOp = luna::AttachmentLoadOp::Clear;
+    luna::AttachmentStoreOp depthStoreOp = luna::AttachmentStoreOp::Store;
+    float viewportScale = 1.0f;
+    int scissorInset = 0;
+    uint32_t renderTick = 0;
+    std::string status;
+};
+
 struct MipPreviewState {
     uint32_t width = 256;
     uint32_t height = 256;
@@ -98,8 +116,9 @@ struct Array3DPreviewState {
 };
 
 struct State {
-    Page page = Page::FormatProbe;
+    Page page = Page::AttachmentOps;
     FormatProbeState formatProbe;
+    AttachmentOpsState attachmentOps;
     MrtPreviewState mrt;
     MipPreviewState mip;
     Array3DPreviewState array3d;

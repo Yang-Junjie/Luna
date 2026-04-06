@@ -32,6 +32,25 @@ bool vkutil::load_shader_module(const char* filePath, vk::Device device, vk::Sha
     return true;
 }
 
+bool vkutil::create_shader_module(std::span<const uint32_t> code, vk::Device device, vk::ShaderModule* outShaderModule)
+{
+    if (code.empty() || outShaderModule == nullptr) {
+        return false;
+    }
+
+    vk::ShaderModuleCreateInfo createInfo{};
+    createInfo.pCode = code.data();
+    createInfo.codeSize = code.size() * sizeof(uint32_t);
+
+    vk::ShaderModule shaderModule{};
+    if (device.createShaderModule(&createInfo, nullptr, &shaderModule) != vk::Result::eSuccess) {
+        return false;
+    }
+
+    *outShaderModule = shaderModule;
+    return true;
+}
+
 vk::Format to_vulkan_format(luna::PixelFormat format)
 {
     switch (format) {
@@ -203,35 +222,23 @@ bool validate_vertex_layout(const luna::GraphicsPipelineDesc& desc)
     return true;
 }
 
-vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipelineDesc& desc, vk::PipelineLayout layout)
+vk::Pipeline build_graphics_pipeline(vk::Device device,
+                                     const luna::GraphicsPipelineDesc& desc,
+                                     vk::PipelineLayout layout,
+                                     vk::ShaderModule vertexShader,
+                                     vk::ShaderModule fragmentShader)
 {
-    if (desc.vertexShader.filePath.empty() || desc.fragmentShader.filePath.empty()) {
+    if (!vertexShader || !fragmentShader) {
         LUNA_CORE_ERROR("GraphicsPipelineDesc requires both vertex and fragment shaders");
         return {};
     }
 
-    if (desc.colorAttachments.empty()) {
-        LUNA_CORE_ERROR("GraphicsPipelineDesc requires at least one color attachment");
+    if (desc.colorAttachments.empty() && desc.depthStencil.format == luna::PixelFormat::Undefined) {
+        LUNA_CORE_ERROR("GraphicsPipelineDesc requires at least one render attachment");
         return {};
     }
 
     if (!validate_vertex_layout(desc)) {
-        return {};
-    }
-
-    const std::string vertexShaderPath{desc.vertexShader.filePath};
-    const std::string fragmentShaderPath{desc.fragmentShader.filePath};
-
-    vk::ShaderModule vertexShader{};
-    if (!vkutil::load_shader_module(vertexShaderPath.c_str(), device, &vertexShader)) {
-        LUNA_CORE_ERROR("Failed to load pipeline vertex shader '{}'", vertexShaderPath);
-        return {};
-    }
-
-    vk::ShaderModule fragmentShader{};
-    if (!vkutil::load_shader_module(fragmentShaderPath.c_str(), device, &fragmentShader)) {
-        device.destroyShaderModule(vertexShader, nullptr);
-        LUNA_CORE_ERROR("Failed to load pipeline fragment shader '{}'", fragmentShaderPath);
         return {};
     }
 
@@ -269,8 +276,6 @@ vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipe
         if (format == vk::Format::eUndefined) {
             LUNA_CORE_ERROR("GraphicsPipelineDesc contains an unsupported color attachment format={}",
                             static_cast<uint32_t>(colorAttachment.format));
-            device.destroyShaderModule(vertexShader, nullptr);
-            device.destroyShaderModule(fragmentShader, nullptr);
             return {};
         }
 
@@ -303,13 +308,39 @@ vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipe
 
     vk::Pipeline pipeline = pipelineBuilder.build_pipeline(device);
 
-    device.destroyShaderModule(vertexShader, nullptr);
-    device.destroyShaderModule(fragmentShader, nullptr);
-
     if (pipeline && !desc.debugName.empty()) {
         LUNA_CORE_INFO("{} created via RHI", desc.debugName);
     }
 
+    return pipeline;
+}
+
+vk::Pipeline build_graphics_pipeline(vk::Device device, const luna::GraphicsPipelineDesc& desc, vk::PipelineLayout layout)
+{
+    if (desc.vertexShader.filePath.empty() || desc.fragmentShader.filePath.empty()) {
+        LUNA_CORE_ERROR("GraphicsPipelineDesc requires both vertex and fragment shaders");
+        return {};
+    }
+
+    const std::string vertexShaderPath{desc.vertexShader.filePath};
+    const std::string fragmentShaderPath{desc.fragmentShader.filePath};
+
+    vk::ShaderModule vertexShader{};
+    if (!vkutil::load_shader_module(vertexShaderPath.c_str(), device, &vertexShader)) {
+        LUNA_CORE_ERROR("Failed to load pipeline vertex shader '{}'", vertexShaderPath);
+        return {};
+    }
+
+    vk::ShaderModule fragmentShader{};
+    if (!vkutil::load_shader_module(fragmentShaderPath.c_str(), device, &fragmentShader)) {
+        device.destroyShaderModule(vertexShader, nullptr);
+        LUNA_CORE_ERROR("Failed to load pipeline fragment shader '{}'", fragmentShaderPath);
+        return {};
+    }
+
+    const vk::Pipeline pipeline = build_graphics_pipeline(device, desc, layout, vertexShader, fragmentShader);
+    device.destroyShaderModule(vertexShader, nullptr);
+    device.destroyShaderModule(fragmentShader, nullptr);
     return pipeline;
 }
 

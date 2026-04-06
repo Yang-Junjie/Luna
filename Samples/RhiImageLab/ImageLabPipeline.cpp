@@ -2,8 +2,6 @@
 
 #include "Core/log.h"
 #include "RHI/CommandContext.h"
-#include "Vulkan/vk_pipelines.h"
-#include "Vulkan/vk_rhi_device.h"
 
 #include <algorithm>
 #include <array>
@@ -35,54 +33,30 @@ std::string join_formats(const std::array<luna::PixelFormat, 4>& formats, int co
     return builder.str();
 }
 
-std::string format_mapping_label(luna::PixelFormat format)
+const char* attachment_mode_name(AttachmentMode mode)
 {
-    const vk::Format vkFormat = to_vulkan_format(format);
-    return vkFormat == vk::Format::eUndefined ? "vk::Format::eUndefined" : vk::to_string(vkFormat);
+    switch (mode) {
+        case AttachmentMode::DepthOnly:
+            return "Depth Only";
+        case AttachmentMode::ColorOnly:
+        default:
+            return "Color Only";
+    }
 }
 
-bool probe_image_format_support(luna::VulkanRHIDevice& device,
-                                luna::PixelFormat format,
-                                std::string* outMapping,
-                                std::string* outDetails,
-                                bool* outAccepted)
+bool is_probe_accepted(luna::PixelFormat format, const luna::RHIFormatSupport& support)
 {
-    if (outMapping == nullptr || outDetails == nullptr || outAccepted == nullptr) {
-        return false;
-    }
+    return luna::is_depth_format(format) ? support.depthStencilAttachment : support.sampled && support.colorAttachment;
+}
 
-    const vk::Format vkFormat = to_vulkan_format(format);
-    *outMapping = format_mapping_label(format);
-    if (vkFormat == vk::Format::eUndefined) {
-        *outAccepted = false;
-        *outDetails = "Backend mapping is undefined.";
-        return true;
-    }
-
-    const VkImageUsageFlags usage = luna::is_depth_format(format)
-                                        ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                                        : VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageFormatProperties properties{};
-    const VkResult result = vkGetPhysicalDeviceImageFormatProperties(static_cast<VkPhysicalDevice>(device.getEngine()._chosenGPU),
-                                                                     static_cast<VkFormat>(vkFormat),
-                                                                     VK_IMAGE_TYPE_2D,
-                                                                     VK_IMAGE_TILING_OPTIMAL,
-                                                                     usage,
-                                                                     0,
-                                                                     &properties);
-    *outAccepted = result == VK_SUCCESS;
-
+std::string build_format_support_details(const luna::RHIFormatSupport& support)
+{
     std::ostringstream builder;
-    if (result == VK_SUCCESS) {
-        builder << "Accepted by Vulkan backend. maxExtent=" << properties.maxExtent.width << "x"
-                << properties.maxExtent.height << "x" << properties.maxExtent.depth << ", maxMipLevels="
-                << properties.maxMipLevels << ", maxArrayLayers=" << properties.maxArrayLayers;
-    } else {
-        builder << "Rejected by Vulkan backend probe: " << vk::to_string(static_cast<vk::Result>(result));
-    }
-    *outDetails = builder.str();
-    return true;
+    builder << "sampled=" << (support.sampled ? "yes" : "no") << ", colorAttachment="
+            << (support.colorAttachment ? "yes" : "no") << ", depthStencilAttachment="
+            << (support.depthStencilAttachment ? "yes" : "no") << ", storage="
+            << (support.storage ? "yes" : "no");
+    return builder.str();
 }
 
 uint8_t to_u8(float value)
@@ -116,24 +90,19 @@ RhiImageLabRenderPipeline::RhiImageLabRenderPipeline(std::shared_ptr<State> stat
 
 bool RhiImageLabRenderPipeline::init(luna::IRHIDevice& device)
 {
-    m_vulkanDevice = dynamic_cast<luna::VulkanRHIDevice*>(&device);
-    if (m_vulkanDevice == nullptr) {
-        LUNA_CORE_ERROR("RhiImageLab requires the Vulkan RHI backend");
-        return false;
-    }
-
+    (void)device;
     m_shaderRoot = std::filesystem::path{RHI_IMAGE_LAB_SHADER_ROOT}.lexically_normal().generic_string();
     return true;
 }
 
 void RhiImageLabRenderPipeline::shutdown(luna::IRHIDevice& device)
 {
+    destroy_attachment_ops_resources(device);
     destroy_mrt_resources(device);
     destroy_mip_resources(device);
     destroy_array3d_resources(device);
     destroy_present_pipelines(device);
     destroy_shared_resources(device);
-    m_vulkanDevice = nullptr;
 }
 
 bool RhiImageLabRenderPipeline::render(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
@@ -147,6 +116,8 @@ bool RhiImageLabRenderPipeline::render(luna::IRHIDevice& device, const luna::Fra
     }
 
     switch (m_state->page) {
+        case Page::AttachmentOps:
+            return render_attachment_ops(device, frameContext);
         case Page::MRTPreview:
             return render_mrt_preview(device, frameContext);
         case Page::MipPreview:
@@ -155,7 +126,7 @@ bool RhiImageLabRenderPipeline::render(luna::IRHIDevice& device, const luna::Fra
             return render_array3d_preview(device, frameContext);
         case Page::FormatProbe:
         default:
-            return render_format_probe(frameContext);
+            return render_format_probe(device, frameContext);
     }
 }
 
@@ -183,9 +154,6 @@ bool RhiImageLabRenderPipeline::ensure_shared_resources(luna::IRHIDevice& device
     if (m_linearSampler.isValid() || m_presentTextureLayout.isValid() || m_arrayTextureLayout.isValid() ||
         m_volumeTextureLayout.isValid() || !m_presentTextureSets.empty() || !m_arrayTextureSets.empty() ||
         !m_volumeTextureSets.empty()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_shared_resources(device);
     }
 
@@ -253,20 +221,19 @@ bool RhiImageLabRenderPipeline::ensure_present_pipelines(luna::IRHIDevice& devic
         return false;
     }
 
-    if (m_presentBackbufferFormat == backbufferFormat && m_present2DPipeline.isValid() && m_presentArrayPipeline.isValid() &&
-        m_presentVolumePipeline.isValid()) {
+    if (m_presentBackbufferFormat == backbufferFormat && m_present2DPipeline.isValid() && m_presentDepthPipeline.isValid() &&
+        m_presentArrayPipeline.isValid() && m_presentVolumePipeline.isValid()) {
         return true;
     }
 
-    if (m_present2DPipeline.isValid() || m_presentArrayPipeline.isValid() || m_presentVolumePipeline.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
+    if (m_present2DPipeline.isValid() || m_presentDepthPipeline.isValid() || m_presentArrayPipeline.isValid() ||
+        m_presentVolumePipeline.isValid()) {
         destroy_present_pipelines(device);
     }
 
     const std::string vertexShaderPath = shader_path(m_shaderRoot, "image_lab_fullscreen.vert.spv");
     const std::string present2DFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_present_2d.frag.spv");
+    const std::string presentDepthFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_present_depth.frag.spv");
     const std::string presentArrayFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_present_array.frag.spv");
     const std::string presentVolumeFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_present_3d.frag.spv");
 
@@ -281,6 +248,14 @@ bool RhiImageLabRenderPipeline::ensure_present_pipelines(luna::IRHIDevice& devic
     present2DDesc.frontFace = luna::FrontFace::Clockwise;
     present2DDesc.colorAttachments.push_back({backbufferFormat, false});
     if (device.createGraphicsPipeline(present2DDesc, &m_present2DPipeline) != luna::RHIResult::Success) {
+        return false;
+    }
+
+    luna::GraphicsPipelineDesc presentDepthDesc = present2DDesc;
+    presentDepthDesc.debugName = "RhiImageLabPresentDepth";
+    presentDepthDesc.resourceLayouts = {m_arrayTextureLayout};
+    presentDepthDesc.fragmentShader.filePath = presentDepthFragmentShaderPath;
+    if (device.createGraphicsPipeline(presentDepthDesc, &m_presentDepthPipeline) != luna::RHIResult::Success) {
         return false;
     }
 
@@ -304,24 +279,209 @@ bool RhiImageLabRenderPipeline::ensure_present_pipelines(luna::IRHIDevice& devic
     return true;
 }
 
-bool RhiImageLabRenderPipeline::render_format_probe(const luna::FrameContext& frameContext)
+bool RhiImageLabRenderPipeline::ensure_attachment_ops_resources(luna::IRHIDevice& device,
+                                                                uint32_t width,
+                                                                uint32_t height,
+                                                                luna::PixelFormat)
 {
-    update_format_probe();
+    const bool needsRebuild = !m_attachmentColorPipeline.isValid() || !m_attachmentDepthPipeline.isValid() ||
+                              !m_attachmentColorImage.isValid() || !m_attachmentDepthImage.isValid() ||
+                              m_attachmentWidth != width || m_attachmentHeight != height;
+    if (!needsRebuild) {
+        return true;
+    }
+
+    if (m_attachmentColorPipeline.isValid() || m_attachmentDepthPipeline.isValid() || m_attachmentColorImage.isValid() ||
+        m_attachmentDepthImage.isValid()) {
+        destroy_attachment_ops_resources(device);
+    }
+
+    const std::vector<uint8_t> blackPixels(static_cast<size_t>(width) * static_cast<size_t>(height) * 4u, 0u);
+    luna::ImageDesc colorDesc{};
+    colorDesc.width = width;
+    colorDesc.height = height;
+    colorDesc.depth = 1;
+    colorDesc.mipLevels = 1;
+    colorDesc.arrayLayers = 1;
+    colorDesc.type = luna::ImageType::Image2D;
+    colorDesc.format = luna::PixelFormat::RGBA8Unorm;
+    colorDesc.usage = luna::ImageUsage::ColorAttachment | luna::ImageUsage::Sampled;
+    colorDesc.debugName = "RhiImageLabAttachmentOpsColor";
+    if (device.createImage(colorDesc, &m_attachmentColorImage, blackPixels.data()) != luna::RHIResult::Success) {
+        destroy_attachment_ops_resources(device);
+        return false;
+    }
+
+    luna::ImageDesc depthDesc = colorDesc;
+    depthDesc.format = luna::PixelFormat::D32Float;
+    depthDesc.usage = luna::ImageUsage::DepthStencilAttachment | luna::ImageUsage::Sampled;
+    depthDesc.debugName = "RhiImageLabAttachmentOpsDepth";
+    if (device.createImage(depthDesc, &m_attachmentDepthImage) != luna::RHIResult::Success) {
+        destroy_attachment_ops_resources(device);
+        return false;
+    }
+
+    const std::string sceneVertexShaderPath = shader_path(m_shaderRoot, "image_lab_attachment_scene.vert.spv");
+    const std::string sceneColorFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_attachment_color.frag.spv");
+    const std::string sceneDepthFragmentShaderPath = shader_path(m_shaderRoot, "image_lab_attachment_depth.frag.spv");
+
+    luna::GraphicsPipelineDesc colorPipelineDesc{};
+    colorPipelineDesc.debugName = "RhiImageLabAttachmentColor";
+    colorPipelineDesc.vertexShader = {.stage = luna::ShaderType::Vertex, .filePath = sceneVertexShaderPath};
+    colorPipelineDesc.fragmentShader = {.stage = luna::ShaderType::Fragment, .filePath = sceneColorFragmentShaderPath};
+    colorPipelineDesc.pushConstantSize = sizeof(PreviewPushConstants);
+    colorPipelineDesc.pushConstantVisibility = luna::ShaderType::AllGraphics;
+    colorPipelineDesc.cullMode = luna::CullMode::None;
+    colorPipelineDesc.frontFace = luna::FrontFace::Clockwise;
+    colorPipelineDesc.colorAttachments.push_back({colorDesc.format, false});
+    if (device.createGraphicsPipeline(colorPipelineDesc, &m_attachmentColorPipeline) != luna::RHIResult::Success) {
+        destroy_attachment_ops_resources(device);
+        return false;
+    }
+
+    luna::GraphicsPipelineDesc depthPipelineDesc = colorPipelineDesc;
+    depthPipelineDesc.debugName = "RhiImageLabAttachmentDepth";
+    depthPipelineDesc.fragmentShader.filePath = sceneDepthFragmentShaderPath;
+    depthPipelineDesc.colorAttachments.clear();
+    depthPipelineDesc.depthStencil = {
+        luna::PixelFormat::D32Float,
+        true,
+        true,
+        luna::CompareOp::LessOrEqual,
+    };
+    if (device.createGraphicsPipeline(depthPipelineDesc, &m_attachmentDepthPipeline) != luna::RHIResult::Success) {
+        destroy_attachment_ops_resources(device);
+        return false;
+    }
+
+    m_attachmentWidth = width;
+    m_attachmentHeight = height;
+    return true;
+}
+
+bool RhiImageLabRenderPipeline::render_format_probe(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
+{
+    update_format_probe(device);
     return render_placeholder(frameContext, {0.08f, 0.09f, 0.11f, 1.0f});
 }
 
-void RhiImageLabRenderPipeline::update_format_probe()
+bool RhiImageLabRenderPipeline::render_attachment_ops(luna::IRHIDevice& device, const luna::FrameContext& frameContext)
 {
-    if (m_state == nullptr || m_vulkanDevice == nullptr || !m_state->formatProbe.probeRequested) {
+    if (!ensure_attachment_ops_resources(device, frameContext.renderWidth, frameContext.renderHeight, frameContext.backbufferFormat)) {
+        return render_placeholder(frameContext, {0.08f, 0.07f, 0.05f, 1.0f});
+    }
+
+    auto& ops = m_state->attachmentOps;
+    ops.viewportScale = std::clamp(ops.viewportScale, 0.2f, 1.0f);
+    const int maxInset = std::max(0, static_cast<int>(std::min(m_attachmentWidth, m_attachmentHeight) / 2u) - 1);
+    ops.scissorInset = std::clamp(ops.scissorInset, 0, maxInset);
+
+    const float phase = static_cast<float>(ops.renderTick) * 0.13f;
+    PreviewPushConstants pushConstants{};
+    pushConstants.params[0] = 0.52f * std::sin(phase);
+    pushConstants.params[1] = 0.38f * std::cos(phase * 0.71f);
+    pushConstants.params[2] = 0.92f;
+    pushConstants.params[3] = phase;
+
+    luna::RenderingInfo renderingInfo{};
+    renderingInfo.width = m_attachmentWidth;
+    renderingInfo.height = m_attachmentHeight;
+    if (ops.mode == AttachmentMode::ColorOnly) {
+        renderingInfo.colorAttachments.push_back({
+            m_attachmentColorImage,
+            luna::PixelFormat::RGBA8Unorm,
+            {0.02f, 0.02f, 0.025f, 1.0f},
+            {},
+            ops.colorLoadOp,
+            ops.colorStoreOp,
+        });
+    } else {
+        renderingInfo.depthAttachment = {
+            m_attachmentDepthImage,
+            luna::PixelFormat::D32Float,
+            1.0f,
+            {},
+            ops.depthLoadOp,
+            ops.depthStoreOp,
+        };
+    }
+
+    const float viewportWidth = static_cast<float>(m_attachmentWidth) * ops.viewportScale;
+    const float viewportHeight = static_cast<float>(m_attachmentHeight) * ops.viewportScale;
+    const luna::Viewport viewport{
+        (static_cast<float>(m_attachmentWidth) - viewportWidth) * 0.5f,
+        (static_cast<float>(m_attachmentHeight) - viewportHeight) * 0.5f,
+        viewportWidth,
+        viewportHeight,
+        0.0f,
+        1.0f,
+    };
+    const luna::ScissorRect scissor{
+        ops.scissorInset,
+        ops.scissorInset,
+        std::max(1u, m_attachmentWidth - static_cast<uint32_t>(ops.scissorInset * 2)),
+        std::max(1u, m_attachmentHeight - static_cast<uint32_t>(ops.scissorInset * 2)),
+    };
+
+    const luna::PipelineHandle scenePipeline =
+        ops.mode == AttachmentMode::ColorOnly ? m_attachmentColorPipeline : m_attachmentDepthPipeline;
+    const bool renderOk =
+        frameContext.commandContext->beginRendering(renderingInfo) == luna::RHIResult::Success &&
+        frameContext.commandContext->setViewport(viewport) == luna::RHIResult::Success &&
+        frameContext.commandContext->setScissor(scissor) == luna::RHIResult::Success &&
+        frameContext.commandContext->bindGraphicsPipeline(scenePipeline) == luna::RHIResult::Success &&
+        frameContext.commandContext->pushConstants(&pushConstants, sizeof(pushConstants), 0, luna::ShaderType::AllGraphics) ==
+            luna::RHIResult::Success &&
+        frameContext.commandContext->draw({3, 1, 0, 0}) == luna::RHIResult::Success &&
+        frameContext.commandContext->endRendering() == luna::RHIResult::Success;
+    if (!renderOk) {
+        return false;
+    }
+
+    ++ops.renderTick;
+
+    bool previewOk = false;
+    if (ops.mode == AttachmentMode::ColorOnly) {
+        if (frameContext.commandContext->transitionImage(m_attachmentColorImage, luna::ImageLayout::ShaderReadOnly) !=
+                luna::RHIResult::Success ||
+            !update_four_texture_set(device, frameContext.frameIndex, fill_image_array(m_attachmentColorImage))) {
+            return false;
+        }
+        previewOk = render_textured_2d_preview(frameContext, 0, 0, 0.0f, 1);
+    } else {
+        if (frameContext.commandContext->transitionImage(m_attachmentDepthImage, luna::ImageLayout::ShaderReadOnly) !=
+                luna::RHIResult::Success ||
+            !update_array_texture_set(device, frameContext.frameIndex, m_attachmentDepthImage)) {
+            return false;
+        }
+        previewOk = render_depth_preview(frameContext);
+    }
+
+    std::ostringstream status;
+    status << "Mode=" << attachment_mode_name(ops.mode) << ", viewportScale=" << ops.viewportScale
+           << ", scissorInset=" << ops.scissorInset << ", tick=" << ops.renderTick << ", color "
+           << luna::to_string(ops.colorLoadOp) << "/" << luna::to_string(ops.colorStoreOp) << ", depth "
+           << luna::to_string(ops.depthLoadOp) << "/" << luna::to_string(ops.depthStoreOp);
+    if (ops.mode == AttachmentMode::ColorOnly) {
+        status << ". Load keeps previous triangle trails, Clear/Discard resets to the current frame.";
+    } else {
+        status << ". Depth-only preview is sampling the D32 attachment.";
+    }
+    ops.status = status.str();
+    return previewOk;
+}
+
+void RhiImageLabRenderPipeline::update_format_probe(luna::IRHIDevice& device)
+{
+    if (m_state == nullptr || !m_state->formatProbe.probeRequested) {
         return;
     }
 
     m_state->formatProbe.probeRequested = false;
-    probe_image_format_support(*m_vulkanDevice,
-                               m_state->formatProbe.selectedFormat,
-                               &m_state->formatProbe.backendMapping,
-                               &m_state->formatProbe.details,
-                               &m_state->formatProbe.accepted);
+    const luna::RHIFormatSupport support = device.queryFormatSupport(m_state->formatProbe.selectedFormat);
+    m_state->formatProbe.backendMapping = std::string(support.backendFormatName);
+    m_state->formatProbe.details = build_format_support_details(support);
+    m_state->formatProbe.accepted = is_probe_accepted(m_state->formatProbe.selectedFormat, support);
 }
 
 bool RhiImageLabRenderPipeline::update_four_texture_set(luna::IRHIDevice& device,
@@ -433,6 +593,27 @@ bool RhiImageLabRenderPipeline::render_textured_2d_preview(const luna::FrameCont
     return ok;
 }
 
+bool RhiImageLabRenderPipeline::render_depth_preview(const luna::FrameContext& frameContext)
+{
+    PreviewPushConstants pushConstants{};
+    const bool ok =
+        frameContext.commandContext->beginRendering({.width = frameContext.renderWidth,
+                                                     .height = frameContext.renderHeight,
+                                                     .colorAttachments = {{frameContext.backbuffer,
+                                                                           frameContext.backbufferFormat,
+                                                                           {0.025f, 0.025f, 0.03f, 1.0f}}}}) ==
+            luna::RHIResult::Success &&
+        frameContext.commandContext->bindGraphicsPipeline(m_presentDepthPipeline) == luna::RHIResult::Success &&
+        frameContext.commandContext->bindResourceSet(
+            m_arrayTextureSets[frame_slot(frameContext.frameIndex, m_arrayTextureSets.size())]) == luna::RHIResult::Success &&
+        frameContext.commandContext->pushConstants(
+            &pushConstants, sizeof(pushConstants), 0, luna::ShaderType::Fragment) == luna::RHIResult::Success &&
+        frameContext.commandContext->draw({3, 1, 0, 0}) == luna::RHIResult::Success &&
+        frameContext.commandContext->endRendering() == luna::RHIResult::Success;
+
+    return ok;
+}
+
 bool RhiImageLabRenderPipeline::render_array_preview_pass(const luna::FrameContext& frameContext, float layer)
 {
     PreviewPushConstants pushConstants{};
@@ -518,9 +699,6 @@ bool RhiImageLabRenderPipeline::ensure_mrt_resources(luna::IRHIDevice& device,
     }
 
     if (m_mrtPipeline.isValid() || m_mrtImages[0].isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_mrt_resources(device);
     }
 
@@ -590,9 +768,6 @@ bool RhiImageLabRenderPipeline::ensure_mip_resources(luna::IRHIDevice& device, l
     }
 
     if (m_mipImage.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_mip_resources(device);
     }
 
@@ -645,9 +820,6 @@ bool RhiImageLabRenderPipeline::ensure_array3d_resources(luna::IRHIDevice& devic
     }
 
     if (m_array3dImage.isValid()) {
-        if (device.waitIdle() != luna::RHIResult::Success) {
-            return false;
-        }
         destroy_array3d_resources(device);
     }
 
@@ -924,13 +1096,38 @@ void RhiImageLabRenderPipeline::destroy_shared_resources(luna::IRHIDevice& devic
 void RhiImageLabRenderPipeline::destroy_present_pipelines(luna::IRHIDevice& device)
 {
     if (m_present2DPipeline.isValid()) device.destroyPipeline(m_present2DPipeline);
+    if (m_presentDepthPipeline.isValid()) device.destroyPipeline(m_presentDepthPipeline);
     if (m_presentArrayPipeline.isValid()) device.destroyPipeline(m_presentArrayPipeline);
     if (m_presentVolumePipeline.isValid()) device.destroyPipeline(m_presentVolumePipeline);
 
     m_present2DPipeline = {};
+    m_presentDepthPipeline = {};
     m_presentArrayPipeline = {};
     m_presentVolumePipeline = {};
     m_presentBackbufferFormat = luna::PixelFormat::Undefined;
+}
+
+void RhiImageLabRenderPipeline::destroy_attachment_ops_resources(luna::IRHIDevice& device)
+{
+    if (m_attachmentColorPipeline.isValid()) {
+        device.destroyPipeline(m_attachmentColorPipeline);
+        m_attachmentColorPipeline = {};
+    }
+    if (m_attachmentDepthPipeline.isValid()) {
+        device.destroyPipeline(m_attachmentDepthPipeline);
+        m_attachmentDepthPipeline = {};
+    }
+    if (m_attachmentColorImage.isValid()) {
+        device.destroyImage(m_attachmentColorImage);
+        m_attachmentColorImage = {};
+    }
+    if (m_attachmentDepthImage.isValid()) {
+        device.destroyImage(m_attachmentDepthImage);
+        m_attachmentDepthImage = {};
+    }
+
+    m_attachmentWidth = 0;
+    m_attachmentHeight = 0;
 }
 
 void RhiImageLabRenderPipeline::destroy_mrt_resources(luna::IRHIDevice& device)
