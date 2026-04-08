@@ -1,14 +1,14 @@
 #pragma once
 
-#include "Core/key_codes.h"
+#include "Core/KeyCodes.h"
 
 #include <GLFW/glfw3.h>
 
 namespace luna {
 
-inline KeyCode GLFWKeyCodeToLunaKeyCode(int keyCode)
+inline KeyCode glfwKeyCodeToLunaKeyCode(int key_code)
 {
-    switch (keyCode) {
+    switch (key_code) {
         case GLFW_KEY_A:
             return KeyCode::A;
         case GLFW_KEY_B:
@@ -94,7 +94,7 @@ inline KeyCode GLFWKeyCodeToLunaKeyCode(int keyCode)
     }
 }
 
-inline KeyCode GLFWCharCodeToLunaKeyCode(unsigned int codepoint)
+inline KeyCode glfwCharCodeToLunaKeyCode(unsigned int codepoint)
 {
     if (codepoint >= 'a' && codepoint <= 'z') {
         codepoint = codepoint - 'a' + 'A';
@@ -160,9 +160,9 @@ inline KeyCode GLFWCharCodeToLunaKeyCode(unsigned int codepoint)
     }
 }
 
-inline int LunaKeyCodeToGLFWKeyCode(KeyCode keyCode)
+inline int lunaKeyCodeToGlfwKeyCode(KeyCode key_code)
 {
-    switch (keyCode) {
+    switch (key_code) {
         case KeyCode::A:
             return GLFW_KEY_A;
         case KeyCode::B:
@@ -249,3 +249,4 @@ inline int LunaKeyCodeToGLFWKeyCode(KeyCode keyCode)
 }
 
 } // namespace luna
+

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/application.h"
+#include "Core/Application.h"
 
 namespace luna::editor {
 
@@ -13,3 +13,4 @@ protected:
 };
 
 } // namespace luna::editor
+

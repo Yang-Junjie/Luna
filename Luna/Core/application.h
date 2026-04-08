@@ -1,12 +1,12 @@
 #pragma once
-#include "Events/application_event.h"
-#include "Events/event.h"
+#include "Events/ApplicationEvent.h"
+#include "Events/Event.h"
 #include "Imgui/ImGuiLayer.hpp"
-#include "layer.h"
-#include "layer_stack.h"
-#include "timestep.h"
-#include "Vulkan/vk_engine.h"
-#include "window.h"
+#include "Layer.h"
+#include "LayerStack.h"
+#include "Timestep.h"
+#include "Vulkan/VkEngine.h"
+#include "Window.h"
 
 #include <memory>
 #include <string>
@@ -14,10 +14,10 @@
 namespace luna {
 
 struct ApplicationSpecification {
-    std::string name = "Luna";
-    uint32_t windowWidth = 1'600, windowHeight = 900;
-    bool maximized = false;
-    bool enableMultiViewport = false;
+    std::string m_name = "Luna";
+    uint32_t m_window_width = 1'600, m_window_height = 900;
+    bool m_maximized = false;
+    bool m_enable_multi_viewport = false;
 };
 
 class Application {
@@ -30,7 +30,7 @@ public:
 
     ImGuiLayer* getImGuiLayer() const
     {
-        return m_imGuiLayerRaw;
+        return m_im_gui_layer_raw;
     }
 
     void close()
@@ -42,7 +42,7 @@ public:
 
     static Application& get()
     {
-        return *s_instance;
+        return *m_s_instance;
     }
 
     Timestep getTimestep() const
@@ -83,14 +83,15 @@ private:
     std::unique_ptr<Window> m_window;
     VulkanEngine m_engine;
 
-    std::unique_ptr<ImGuiLayer> m_imGuiLayer;
-    ImGuiLayer* m_imGuiLayerRaw = nullptr;
-    LayerStack m_layerStack;
+    std::unique_ptr<ImGuiLayer> m_im_gui_layer;
+    ImGuiLayer* m_im_gui_layer_raw = nullptr;
+    LayerStack m_layer_stack;
 
     Timestep m_timestep;
-    float m_lastFrameTime = 0.0f;
-    static Application* s_instance;
+    float m_last_frame_time = 0.0f;
+    static Application* m_s_instance;
 };
 
 Application* createApplication(int argc, char** argv);
 } // namespace luna
+

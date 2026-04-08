@@ -1,4 +1,4 @@
-#include "log.h"
+#include "Log.h"
 
 #include <exception>
 #include <filesystem>
@@ -68,117 +68,117 @@ void Logger::init(const std::string& log_file, Level level)
 {
     shutdown();
 
-    s_logFile = log_file;
-    s_level = level;
+    m_s_log_file = log_file;
+    m_s_level = level;
 
     try {
-        s_sinks.clear();
+        m_s_sinks.clear();
 
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_formatter(makeFormatter("%^[%T.%e] [%n] [%*]%$ %v"));
-        s_sinks.push_back(console_sink);
+        m_s_sinks.push_back(console_sink);
 
-        if (!s_logFile.empty()) {
-            const std::filesystem::path log_path{s_logFile};
+        if (!m_s_log_file.empty()) {
+            const std::filesystem::path log_path{m_s_log_file};
             if (log_path.has_parent_path()) {
                 std::filesystem::create_directories(log_path.parent_path());
             }
 
             auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_path.string(), true);
             file_sink->set_formatter(makeFormatter("[%Y-%m-%d %H:%M:%S.%e] [%P:%t] [%n] [%*] %v"));
-            s_sinks.push_back(std::move(file_sink));
+            m_s_sinks.push_back(std::move(file_sink));
         }
 
         const auto spdlog_level = toSpdlogLevel(level);
-        for (const auto& sink : s_sinks) {
+        for (const auto& sink : m_s_sinks) {
             sink->set_level(spdlog_level);
         }
 
-        s_coreLogger = std::make_shared<spdlog::logger>("LunaCore", s_sinks.begin(), s_sinks.end());
-        s_runtimeLogger = std::make_shared<spdlog::logger>("Runtime", s_sinks.begin(), s_sinks.end());
-        s_editorLogger = std::make_shared<spdlog::logger>("Editor", s_sinks.begin(), s_sinks.end());
+        m_s_core_logger = std::make_shared<spdlog::logger>("LunaCore", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_runtime_logger = std::make_shared<spdlog::logger>("Runtime", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_editor_logger = std::make_shared<spdlog::logger>("Editor", m_s_sinks.begin(), m_s_sinks.end());
 
-        configureLogger(s_coreLogger, spdlog_level);
-        configureLogger(s_runtimeLogger, spdlog_level);
-        configureLogger(s_editorLogger, spdlog_level);
+        configureLogger(m_s_core_logger, spdlog_level);
+        configureLogger(m_s_runtime_logger, spdlog_level);
+        configureLogger(m_s_editor_logger, spdlog_level);
 
-        spdlog::register_logger(s_coreLogger);
-        spdlog::register_logger(s_runtimeLogger);
-        spdlog::register_logger(s_editorLogger);
+        spdlog::register_logger(m_s_core_logger);
+        spdlog::register_logger(m_s_runtime_logger);
+        spdlog::register_logger(m_s_editor_logger);
 
-        s_initialized = true;
+        m_s_initialized = true;
 
-        if (s_logFile.empty()) {
-            s_coreLogger->info("Logger initialized (console only)");
+        if (m_s_log_file.empty()) {
+            m_s_core_logger->info("Logger initialized (console only)");
         } else {
-            s_coreLogger->info("Logger initialized, output file: {}", s_logFile);
+            m_s_core_logger->info("Logger initialized, output file: {}", m_s_log_file);
         }
     } catch (const std::exception& ex) {
-        s_initialized = false;
-        s_sinks.clear();
-        s_coreLogger.reset();
-        s_runtimeLogger.reset();
-        s_editorLogger.reset();
+        m_s_initialized = false;
+        m_s_sinks.clear();
+        m_s_core_logger.reset();
+        m_s_runtime_logger.reset();
+        m_s_editor_logger.reset();
         std::cerr << "Logger initialization failed: " << ex.what() << '\n';
     }
 }
 
 void Logger::shutdown()
 {
-    if (!s_initialized) {
+    if (!m_s_initialized) {
         return;
     }
 
-    if (s_coreLogger) {
-        s_coreLogger->info("Logger shutdown");
-        s_coreLogger->flush();
+    if (m_s_core_logger) {
+        m_s_core_logger->info("Logger shutdown");
+        m_s_core_logger->flush();
     }
 
-    if (s_runtimeLogger) {
-        s_runtimeLogger->flush();
+    if (m_s_runtime_logger) {
+        m_s_runtime_logger->flush();
     }
 
-    if (s_editorLogger) {
-        s_editorLogger->flush();
+    if (m_s_editor_logger) {
+        m_s_editor_logger->flush();
     }
 
     spdlog::drop("LunaCore");
     spdlog::drop("Runtime");
     spdlog::drop("Editor");
 
-    s_coreLogger.reset();
-    s_runtimeLogger.reset();
-    s_editorLogger.reset();
-    s_sinks.clear();
-    s_initialized = false;
+    m_s_core_logger.reset();
+    m_s_runtime_logger.reset();
+    m_s_editor_logger.reset();
+    m_s_sinks.clear();
+    m_s_initialized = false;
 }
 
 bool Logger::isInitialized()
 {
-    return s_initialized;
+    return m_s_initialized;
 }
 
 void Logger::setLevel(Level level)
 {
-    s_level = level;
-    if (!s_initialized) {
+    m_s_level = level;
+    if (!m_s_initialized) {
         return;
     }
 
     const auto spdlog_level = toSpdlogLevel(level);
 
-    for (const auto& sink : s_sinks) {
+    for (const auto& sink : m_s_sinks) {
         sink->set_level(spdlog_level);
     }
 
-    configureLogger(s_coreLogger, spdlog_level);
-    configureLogger(s_runtimeLogger, spdlog_level);
-    configureLogger(s_editorLogger, spdlog_level);
+    configureLogger(m_s_core_logger, spdlog_level);
+    configureLogger(m_s_runtime_logger, spdlog_level);
+    configureLogger(m_s_editor_logger, spdlog_level);
 }
 
 Logger::Level Logger::getLevel()
 {
-    return s_level;
+    return m_s_level;
 }
 
 const std::shared_ptr<spdlog::logger>& Logger::get(Type type)
@@ -186,13 +186,13 @@ const std::shared_ptr<spdlog::logger>& Logger::get(Type type)
     ensureInitialized();
     switch (type) {
         case Type::Core:
-            return s_coreLogger;
+            return m_s_core_logger;
         case Type::Runtime:
-            return s_runtimeLogger;
+            return m_s_runtime_logger;
         case Type::Editor:
-            return s_editorLogger;
+            return m_s_editor_logger;
         default:
-            return s_coreLogger;
+            return m_s_core_logger;
     }
 }
 
@@ -213,25 +213,25 @@ const std::shared_ptr<spdlog::logger>& Logger::editor()
 
 void Logger::flush()
 {
-    if (!s_initialized) {
+    if (!m_s_initialized) {
         return;
     }
 
-    if (s_coreLogger) {
-        s_coreLogger->flush();
+    if (m_s_core_logger) {
+        m_s_core_logger->flush();
     }
-    if (s_runtimeLogger) {
-        s_runtimeLogger->flush();
+    if (m_s_runtime_logger) {
+        m_s_runtime_logger->flush();
     }
-    if (s_editorLogger) {
-        s_editorLogger->flush();
+    if (m_s_editor_logger) {
+        m_s_editor_logger->flush();
     }
 }
 
 void Logger::ensureInitialized()
 {
-    if (!s_initialized) {
-        init(s_logFile, s_level);
+    if (!m_s_initialized) {
+        init(m_s_log_file, m_s_level);
     }
 }
 
@@ -268,3 +268,4 @@ spdlog::level::level_enum Logger::toSpdlogLevel(Level level)
 }
 
 } // namespace luna
+

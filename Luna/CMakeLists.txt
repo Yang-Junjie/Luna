@@ -9,51 +9,51 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
 
 set(RHI_SOURCE
-    RHI/types.h
-    RHI/shader.h
-    RHI/resource_layout.h)
+    Renderer/Types.h
+    Renderer/Shader.h
+    Renderer/ResourceLayout.h)
 
 set(VULKAN_BACKEND_SOURCE 
-    Vulkan/vk_types.h
-    Vulkan/vk_initializers.cpp
-    Vulkan/vk_initializers.h
-    Vulkan/vk_images.h
-    Vulkan/vk_images.cpp 
-    Vulkan/vk_descriptors.h
-    Vulkan/vk_descriptors.cpp
-    Vulkan/vk_pipelines.h
-    Vulkan/vk_pipelines.cpp
-    Vulkan/vk_engine.h
-    Vulkan/vk_engine.cpp
-    Vulkan/vk_loader.h
-    Vulkan/vk_loader.cpp
-    Vulkan/vk_shader.cpp
-    Vulkan/vk_shader.h
-    Vulkan/camera.cpp
-    Vulkan/camera.h)
+    Vulkan/VkTypes.h
+    Vulkan/VkInitializers.cpp
+    Vulkan/VkInitializers.h
+    Vulkan/VkImages.h
+    Vulkan/VkImages.cpp 
+    Vulkan/VkDescriptors.h
+    Vulkan/VkDescriptors.cpp
+    Vulkan/VkPipelines.h
+    Vulkan/VkPipelines.cpp
+    Vulkan/VkEngine.h
+    Vulkan/VkEngine.cpp
+    Vulkan/VkLoader.h
+    Vulkan/VkLoader.cpp
+    Vulkan/VkShader.cpp
+    Vulkan/VkShader.h
+    Vulkan/Camera.cpp
+    Vulkan/Camera.h)
 
 add_library(
     LunaCore
     STATIC
-    Core/application.h
-    Core/application.cpp
-    Core/input.h
+    Core/Application.h
+    Core/Application.cpp
+    Core/Input.h
     Imgui/ImGuiLayer.hpp
     Imgui/ImGuiLayer.cpp
-    Core/key_codes.h
-    Core/layer.h
-    Core/layer_stack.h
-    Core/layer_stack.cpp
-    Core/log.h
-    Core/log.cpp
-    Core/mouse_codes.h
-    Core/timestep.h
-    Core/window.h
-    Core/window.cpp
-    Events/application_event.h
-    Events/event.h
-    Events/key_event.h
-    Events/mouse_event.h
+    Core/KeyCodes.h
+    Core/Layer.h
+    Core/LayerStack.h
+    Core/LayerStack.cpp
+    Core/Log.h
+    Core/Log.cpp
+    Core/MouseCodes.h
+    Core/Timestep.h
+    Core/Window.h
+    Core/Window.cpp
+    Events/ApplicationEvent.h
+    Events/Event.h
+    Events/KeyEvent.h
+    Events/MouseEvent.h
     Platform/GLFWKeyCodes.hpp
     Platform/GLFWMouseCodes.hpp
     Platform/GLFWWindow.hpp
@@ -96,3 +96,4 @@ target_compile_definitions(
         VULKAN_HPP_NO_CONSTRUCTORS
         VULKAN_HPP_NO_EXCEPTIONS
 )
+

@@ -1,8 +1,8 @@
 add_library(
     LunaEditor
     STATIC
-    editor_app.h
-    editor_app.cpp
+    EditorApp.h
+    EditorApp.cpp
 )
 
 target_include_directories(
@@ -16,3 +16,4 @@ target_link_libraries(
     PUBLIC
         LunaCore
 )
+

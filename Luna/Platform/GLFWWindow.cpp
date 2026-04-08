@@ -1,7 +1,7 @@
-#include "Core/log.h"
-#include "Events/application_event.h"
-#include "Events/key_event.h"
-#include "Events/mouse_event.h"
+#include "Core/Log.h"
+#include "Events/ApplicationEvent.h"
+#include "Events/KeyEvent.h"
+#include "Events/MouseEvent.h"
 #include "Platform/GLFWKeyCodes.hpp"
 #include "Platform/GLFWMouseCodes.hpp"
 #include "Platform/GLFWWindow.hpp"
@@ -10,8 +10,8 @@ namespace luna {
 
 namespace {
 
-uint32_t s_glfwWindowCount = 0;
-GLFWwindow* s_activeWindow = nullptr;
+uint32_t s_glfw_window_count = 0;
+GLFWwindow* s_active_window = nullptr;
 
 void glfwErrorCallback(int error, const char* description)
 {
@@ -32,7 +32,7 @@ GLFWWindow::~GLFWWindow()
 
 GLFWwindow* GLFWWindow::getActiveNativeWindow()
 {
-    return s_activeWindow;
+    return s_active_window;
 }
 
 void GLFWWindow::onUpdate()
@@ -87,22 +87,22 @@ void GLFWWindow::setMinimized()
 
 void GLFWWindow::setVSync(bool enabled)
 {
-    m_data.vSync = enabled;
+    m_data.m_v_sync = enabled;
 }
 
 bool GLFWWindow::isVSync() const
 {
-    return m_data.vSync;
+    return m_data.m_v_sync;
 }
 
 void GLFWWindow::init(const WindowProps& props)
 {
-    m_data.title = props.title;
-    m_data.width = props.width;
-    m_data.height = props.height;
-    m_data.vSync = false;
+    m_data.m_title = props.m_title;
+    m_data.m_width = props.m_width;
+    m_data.m_height = props.m_height;
+    m_data.m_v_sync = false;
 
-    if (s_glfwWindowCount == 0) {
+    if (s_glfw_window_count == 0) {
         glfwSetErrorCallback(glfwErrorCallback);
         if (!glfwInit()) {
             LUNA_CORE_ERROR("Failed to initialize GLFW");
@@ -111,70 +111,70 @@ void GLFWWindow::init(const WindowProps& props)
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_MAXIMIZED, props.maximized ? GLFW_TRUE : GLFW_FALSE);
+    glfwWindowHint(GLFW_MAXIMIZED, props.m_maximized ? GLFW_TRUE : GLFW_FALSE);
 
     m_window = glfwCreateWindow(
-        static_cast<int>(props.width), static_cast<int>(props.height), props.title.c_str(), nullptr, nullptr);
+        static_cast<int>(props.m_width), static_cast<int>(props.m_height), props.m_title.c_str(), nullptr, nullptr);
     if (m_window == nullptr) {
-        if (s_glfwWindowCount == 0) {
+        if (s_glfw_window_count == 0) {
             glfwTerminate();
         }
 
-        LUNA_CORE_ERROR("Failed to create GLFW window '{}'", props.title);
+        LUNA_CORE_ERROR("Failed to create GLFW window '{}'", props.m_title);
         return;
     }
 
-    ++s_glfwWindowCount;
-    s_activeWindow = m_window;
+    ++s_glfw_window_count;
+    s_active_window = m_window;
 
     int width = 0;
     int height = 0;
     glfwGetWindowSize(m_window, &width, &height);
-    m_data.width = static_cast<uint32_t>(width);
-    m_data.height = static_cast<uint32_t>(height);
+    m_data.m_width = static_cast<uint32_t>(width);
+    m_data.m_height = static_cast<uint32_t>(height);
 
     glfwSetWindowUserPointer(m_window, &m_data);
 
     glfwSetWindowSizeCallback(m_window, [](GLFWwindow* window, int width, int height) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        data.width = static_cast<uint32_t>(width);
-        data.height = static_cast<uint32_t>(height);
+        data.m_width = static_cast<uint32_t>(width);
+        data.m_height = static_cast<uint32_t>(height);
 
-        if (data.eventCallback) {
-            WindowResizeEvent event(data.width, data.height);
-            data.eventCallback(event);
+        if (data.m_event_callback) {
+            WindowResizeEvent event(data.m_width, data.m_height);
+            data.m_event_callback(event);
         }
     });
 
     glfwSetWindowCloseCallback(m_window, [](GLFWwindow* window) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (data.eventCallback) {
+        if (data.m_event_callback) {
             WindowCloseEvent event;
-            data.eventCallback(event);
+            data.m_event_callback(event);
         }
     });
 
     glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int, int action, int) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (!data.eventCallback) {
+        if (!data.m_event_callback) {
             return;
         }
 
-        const KeyCode lunaKey = GLFWKeyCodeToLunaKeyCode(key);
+        const KeyCode luna_key = glfwKeyCodeToLunaKeyCode(key);
         switch (action) {
             case GLFW_PRESS: {
-                KeyPressedEvent event(lunaKey, false);
-                data.eventCallback(event);
+                KeyPressedEvent event(luna_key, false);
+                data.m_event_callback(event);
                 break;
             }
             case GLFW_REPEAT: {
-                KeyPressedEvent event(lunaKey, true);
-                data.eventCallback(event);
+                KeyPressedEvent event(luna_key, true);
+                data.m_event_callback(event);
                 break;
             }
             case GLFW_RELEASE: {
-                KeyReleasedEvent event(lunaKey);
-                data.eventCallback(event);
+                KeyReleasedEvent event(luna_key);
+                data.m_event_callback(event);
                 break;
             }
             default:
@@ -184,35 +184,35 @@ void GLFWWindow::init(const WindowProps& props)
 
     glfwSetCharCallback(m_window, [](GLFWwindow* window, unsigned int codepoint) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (!data.eventCallback) {
+        if (!data.m_event_callback) {
             return;
         }
 
-        const KeyCode lunaKey = GLFWCharCodeToLunaKeyCode(codepoint);
-        if (lunaKey == KeyCode::None) {
+        const KeyCode luna_key = glfwCharCodeToLunaKeyCode(codepoint);
+        if (luna_key == KeyCode::None) {
             return;
         }
 
-        KeyTypedEvent event(lunaKey);
-        data.eventCallback(event);
+        KeyTypedEvent event(luna_key);
+        data.m_event_callback(event);
     });
 
     glfwSetMouseButtonCallback(m_window, [](GLFWwindow* window, int button, int action, int) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (!data.eventCallback) {
+        if (!data.m_event_callback) {
             return;
         }
 
-        const MouseCode lunaButton = GLFWMouseCodeToLunaMouseCode(button);
+        const MouseCode luna_button = glfwMouseCodeToLunaMouseCode(button);
         switch (action) {
             case GLFW_PRESS: {
-                MouseButtonPressedEvent event(lunaButton);
-                data.eventCallback(event);
+                MouseButtonPressedEvent event(luna_button);
+                data.m_event_callback(event);
                 break;
             }
             case GLFW_RELEASE: {
-                MouseButtonReleasedEvent event(lunaButton);
-                data.eventCallback(event);
+                MouseButtonReleasedEvent event(luna_button);
+                data.m_event_callback(event);
                 break;
             }
             default:
@@ -220,27 +220,27 @@ void GLFWWindow::init(const WindowProps& props)
         }
     });
 
-    glfwSetScrollCallback(m_window, [](GLFWwindow* window, double xOffset, double yOffset) {
+    glfwSetScrollCallback(m_window, [](GLFWwindow* window, double x_offset, double y_offset) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (!data.eventCallback) {
+        if (!data.m_event_callback) {
             return;
         }
 
-        MouseScrolledEvent event(static_cast<float>(xOffset), static_cast<float>(yOffset));
-        data.eventCallback(event);
+        MouseScrolledEvent event(static_cast<float>(x_offset), static_cast<float>(y_offset));
+        data.m_event_callback(event);
     });
 
-    glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double xPos, double yPos) {
+    glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double x_pos, double y_pos) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
-        if (!data.eventCallback) {
+        if (!data.m_event_callback) {
             return;
         }
 
-        MouseMovedEvent event(static_cast<float>(xPos), static_cast<float>(yPos));
-        data.eventCallback(event);
+        MouseMovedEvent event(static_cast<float>(x_pos), static_cast<float>(y_pos));
+        data.m_event_callback(event);
     });
 
-    LUNA_CORE_INFO("Created GLFW window '{}' ({}x{})", m_data.title, m_data.width, m_data.height);
+    LUNA_CORE_INFO("Created GLFW window '{}' ({}x{})", m_data.m_title, m_data.m_width, m_data.m_height);
 }
 
 void GLFWWindow::shutdown()
@@ -249,22 +249,23 @@ void GLFWWindow::shutdown()
         return;
     }
 
-    LUNA_CORE_INFO("Destroying GLFW window '{}'", m_data.title);
+    LUNA_CORE_INFO("Destroying GLFW window '{}'", m_data.m_title);
 
-    if (s_activeWindow == m_window) {
-        s_activeWindow = nullptr;
+    if (s_active_window == m_window) {
+        s_active_window = nullptr;
     }
 
     glfwDestroyWindow(m_window);
     m_window = nullptr;
 
-    if (s_glfwWindowCount > 0) {
-        --s_glfwWindowCount;
+    if (s_glfw_window_count > 0) {
+        --s_glfw_window_count;
     }
 
-    if (s_glfwWindowCount == 0) {
+    if (s_glfw_window_count == 0) {
         glfwTerminate();
     }
 }
 
 } // namespace luna
+

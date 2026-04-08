@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/window.h"
+#include "Core/Window.h"
 
 #include <GLFW/glfw3.h>
 
@@ -15,17 +15,17 @@ public:
 
     uint32_t getWidth() const override
     {
-        return m_data.width;
+        return m_data.m_width;
     }
 
     uint32_t getHeight() const override
     {
-        return m_data.height;
+        return m_data.m_height;
     }
 
     void setEventCallback(const EventCallbackFn& callback) override
     {
-        m_data.eventCallback = callback;
+        m_data.m_event_callback = callback;
     }
 
     void getWindowPos(int* x, int* y) const override;
@@ -51,11 +51,11 @@ private:
 
 private:
     struct WindowData {
-        std::string title;
-        uint32_t width = 0;
-        uint32_t height = 0;
-        bool vSync = false;
-        EventCallbackFn eventCallback;
+        std::string m_title;
+        uint32_t m_width = 0;
+        uint32_t m_height = 0;
+        bool m_v_sync = false;
+        EventCallbackFn m_event_callback;
     };
 
     GLFWwindow* m_window = nullptr;
@@ -63,3 +63,4 @@ private:
 };
 
 } // namespace luna
+

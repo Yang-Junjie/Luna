@@ -57,6 +57,6 @@ public:
 
 private:
     std::vector<std::unique_ptr<Layer>> m_layers;
-    unsigned int m_layerInsertIndex = 0;
+    unsigned int m_layer_insert_index = 0;
 };
 } // namespace luna

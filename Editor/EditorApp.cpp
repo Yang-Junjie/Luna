@@ -1,15 +1,15 @@
-#include "Editor/editor_app.h"
+#include "Editor/EditorApp.h"
 
-#include "Editor/editor_layer.h"
+#include "Editor/EditorLayer.h"
 
 namespace luna::editor {
 
 EditorApp::EditorApp()
     : Application(ApplicationSpecification{
-          .name = "Luna Editor",
-          .windowWidth = 1'700,
-          .windowHeight = 900,
-          .maximized = false,
+          .m_name = "Luna Editor",
+          .m_window_width = 1'700,
+          .m_window_height = 900,
+          .m_maximized = false,
       })
 {}
 
@@ -28,3 +28,4 @@ Application* createApplication(int, char**)
 }
 
 } // namespace luna
+

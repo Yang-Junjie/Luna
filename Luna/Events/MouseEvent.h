@@ -1,6 +1,6 @@
-﻿#pragma once
-#include "Core/mouse_codes.h"
-#include "event.h"
+#pragma once
+#include "Core/MouseCodes.h"
+#include "Event.h"
 
 #include <sstream>
 #include <string>
@@ -9,24 +9,24 @@ namespace luna {
 class MouseMovedEvent : public Event {
 public:
     MouseMovedEvent(const float x, const float y)
-        : m_mouseX(x),
-          m_mouseY(y)
+        : m_mouse_x(x),
+          m_mouse_y(y)
     {}
 
     float getX() const
     {
-        return m_mouseX;
+        return m_mouse_x;
     }
 
     float getY() const
     {
-        return m_mouseY;
+        return m_mouse_y;
     }
 
     std::string toString() const override
     {
         std::stringstream ss;
-        ss << "MouseMovedEvent: " << m_mouseX << ", " << m_mouseY;
+        ss << "MouseMovedEvent: " << m_mouse_x << ", " << m_mouse_y;
         return ss.str();
     }
 
@@ -52,24 +52,24 @@ public:
     }
 
 private:
-    float m_mouseX, m_mouseY;
+    float m_mouse_x, m_mouse_y;
 };
 
 class MouseScrolledEvent : public Event {
 public:
-    MouseScrolledEvent(const float xOffset, const float yOffset)
-        : m_xOffset(xOffset),
-          m_yOffset(yOffset)
+    MouseScrolledEvent(const float x_offset, const float y_offset)
+        : m_x_offset(x_offset),
+          m_y_offset(y_offset)
     {}
 
     float getXOffset() const
     {
-        return m_xOffset;
+        return m_x_offset;
     }
 
     float getYOffset() const
     {
-        return m_yOffset;
+        return m_y_offset;
     }
 
     std::string toString() const override
@@ -101,7 +101,7 @@ public:
     }
 
 private:
-    float m_xOffset, m_yOffset;
+    float m_x_offset, m_y_offset;
 };
 
 class MouseButtonEvent : public Event {
@@ -184,3 +184,4 @@ public:
     }
 };
 } // namespace luna
+

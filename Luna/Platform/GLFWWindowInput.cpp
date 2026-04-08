@@ -1,4 +1,4 @@
-#include "Core/input.h"
+#include "Core/Input.h"
 #include "Platform/GLFWKeyCodes.hpp"
 #include "Platform/GLFWMouseCodes.hpp"
 #include "Platform/GLFWWindow.hpp"
@@ -37,7 +37,7 @@ bool Input::isKeyPressed(KeyCode key)
         return false;
     }
 
-    const int state = glfwGetKey(window, LunaKeyCodeToGLFWKeyCode(key));
+    const int state = glfwGetKey(window, lunaKeyCodeToGlfwKeyCode(key));
     return state == GLFW_PRESS || state == GLFW_REPEAT;
 }
 
@@ -48,7 +48,7 @@ bool Input::isMouseButtonPressed(MouseCode button)
         return false;
     }
 
-    return glfwGetMouseButton(window, LunaMouseCodeToGLFWMouseCode(button)) == GLFW_PRESS;
+    return glfwGetMouseButton(window, lunaMouseCodeToGlfwMouseCode(button)) == GLFW_PRESS;
 }
 
 glm::vec2 Input::getMousePosition()
@@ -58,11 +58,11 @@ glm::vec2 Input::getMousePosition()
         return {0.0f, 0.0f};
     }
 
-    double xPos = 0.0;
-    double yPos = 0.0;
-    glfwGetCursorPos(window, &xPos, &yPos);
+    double x_pos = 0.0;
+    double y_pos = 0.0;
+    glfwGetCursorPos(window, &x_pos, &y_pos);
 
-    return {static_cast<float>(xPos), static_cast<float>(yPos)};
+    return {static_cast<float>(x_pos), static_cast<float>(y_pos)};
 }
 
 void Input::setCursorMode(CursorMode mode)
@@ -106,3 +106,4 @@ float Input::getMouseY()
 }
 
 } // namespace luna
+

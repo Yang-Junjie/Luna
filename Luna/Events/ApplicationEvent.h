@@ -1,5 +1,5 @@
-﻿#pragma once
-#include "event.h"
+#pragma once
+#include "Event.h"
 
 #include <sstream>
 
@@ -152,3 +152,4 @@ public:
     }
 };
 } // namespace luna
+

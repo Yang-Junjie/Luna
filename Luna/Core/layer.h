@@ -1,5 +1,5 @@
-﻿#pragma once
-#include "timestep.h"
+#pragma once
+#include "Timestep.h"
 
 #include <string>
 
@@ -33,3 +33,4 @@ protected:
     std::string m_name;
 };
 } // namespace luna
+

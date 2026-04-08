@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 
-#include "Core/key_codes.h"
-#include "Core/mouse_codes.h"
+#include "Core/KeyCodes.h"
+#include "Core/MouseCodes.h"
 
 #include <glm/glm.hpp>
 
@@ -25,3 +25,4 @@ public:
     static float getMouseY();
 };
 } // namespace luna
+

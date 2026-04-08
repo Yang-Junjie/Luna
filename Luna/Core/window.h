@@ -1,5 +1,5 @@
 #pragma once
-#include "Events/event.h"
+#include "Events/Event.h"
 
 #include <cstdint>
 
@@ -9,19 +9,19 @@
 
 namespace luna {
 struct WindowProps {
-    std::string title;
-    uint32_t width;
-    uint32_t height;
-    bool maximized = false;
+    std::string m_title;
+    uint32_t m_width;
+    uint32_t m_height;
+    bool m_maximized = false;
 
     WindowProps(const std::string& title = "Luna",
                 uint32_t width = 1'600,
                 uint32_t height = 900,
                 bool maximized = false)
-        : title(title),
-          width(width),
-          height(height),
-          maximized(maximized)
+        : m_title(title),
+          m_width(width),
+          m_height(height),
+          m_maximized(maximized)
     {}
 };
 
@@ -53,3 +53,4 @@ public:
     static std::unique_ptr<Window> create(const WindowProps& props = WindowProps());
 };
 } // namespace luna
+

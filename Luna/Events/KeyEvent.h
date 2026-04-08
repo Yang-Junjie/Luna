@@ -1,6 +1,6 @@
-﻿#pragma once
-#include "Core/key_codes.h"
-#include "event.h"
+#pragma once
+#include "Core/KeyCodes.h"
+#include "Event.h"
 
 #include <sstream>
 
@@ -9,7 +9,7 @@ class KeyEvent : public Event {
 public:
     KeyCode getKeyCode() const
     {
-        return m_keyCode;
+        return m_key_code;
     }
 
     virtual int getCategoryFlags() const override
@@ -19,29 +19,29 @@ public:
     }
 
 protected:
-    KeyEvent(const KeyCode keycode)
-        : m_keyCode(keycode)
+    KeyEvent(const KeyCode key_code)
+        : m_key_code(key_code)
     {}
 
-    KeyCode m_keyCode;
+    KeyCode m_key_code;
 };
 
 class KeyPressedEvent : public KeyEvent {
 public:
-    KeyPressedEvent(const KeyCode keycode, bool isRepeat = false)
-        : KeyEvent(keycode),
-          m_isRepeat(isRepeat)
+    KeyPressedEvent(const KeyCode key_code, bool is_repeat = false)
+        : KeyEvent(key_code),
+          m_is_repeat(is_repeat)
     {}
 
     bool isRepeat() const
     {
-        return m_isRepeat;
+        return m_is_repeat;
     }
 
     std::string toString() const override
     {
         std::stringstream ss;
-        ss << "KeyPressedEvent: " << static_cast<int>(m_keyCode) << " (repeat = " << m_isRepeat << ")";
+        ss << "KeyPressedEvent: " << static_cast<int>(m_key_code) << " (repeat = " << m_is_repeat << ")";
         return ss.str();
     }
 
@@ -61,19 +61,19 @@ public:
     }
 
 private:
-    bool m_isRepeat;
+    bool m_is_repeat;
 };
 
 class KeyReleasedEvent : public KeyEvent {
 public:
-    KeyReleasedEvent(const KeyCode keycode)
-        : KeyEvent(keycode)
+    KeyReleasedEvent(const KeyCode key_code)
+        : KeyEvent(key_code)
     {}
 
     std::string toString() const override
     {
         std::stringstream ss;
-        ss << "KeyReleasedEvent: " << static_cast<int>(m_keyCode);
+        ss << "KeyReleasedEvent: " << static_cast<int>(m_key_code);
         return ss.str();
     }
 
@@ -95,14 +95,14 @@ public:
 
 class KeyTypedEvent : public KeyEvent {
 public:
-    KeyTypedEvent(const KeyCode keycode)
-        : KeyEvent(keycode)
+    KeyTypedEvent(const KeyCode key_code)
+        : KeyEvent(key_code)
     {}
 
     std::string toString() const override
     {
         std::stringstream ss;
-        ss << "KeyTypedEvent: " << static_cast<int>(m_keyCode);
+        ss << "KeyTypedEvent: " << static_cast<int>(m_key_code);
         return ss.str();
     }
 
@@ -122,3 +122,4 @@ public:
     }
 };
 } // namespace luna
+

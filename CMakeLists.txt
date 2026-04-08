@@ -61,5 +61,6 @@ add_subdirectory(Luna)
 add_subdirectory(Editor)
 
 
-add_executable(LunaApp Luna/Core/main.cpp)
+add_executable(LunaApp Luna/Core/Main.cpp)
 target_link_libraries(LunaApp PRIVATE LunaEditor)
+

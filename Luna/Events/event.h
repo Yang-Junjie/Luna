@@ -37,7 +37,7 @@ class Event {
 public:
     virtual ~Event() = default;
 
-    bool handled = false;
+    bool m_handled = false;
 
     virtual EventType getEventType() const = 0;
     virtual const char* getName() const = 0;
@@ -64,7 +64,7 @@ public:
     bool dispatch(const F& func)
     {
         if (m_event.getEventType() == T::getStaticType()) {
-            m_event.handled |= func(static_cast<T&>(m_event));
+            m_event.m_handled |= func(static_cast<T&>(m_event));
             return true;
         }
 

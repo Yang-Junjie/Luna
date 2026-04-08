@@ -48,13 +48,13 @@ private:
     static spdlog::level::level_enum toSpdlogLevel(Level level);
 
 private:
-    static inline bool s_initialized = false;
-    static inline Level s_level = Level::Info;
-    static inline std::string s_logFile;
-    static inline std::vector<spdlog::sink_ptr> s_sinks;
-    static inline std::shared_ptr<spdlog::logger> s_coreLogger;
-    static inline std::shared_ptr<spdlog::logger> s_runtimeLogger;
-    static inline std::shared_ptr<spdlog::logger> s_editorLogger;
+    static inline bool m_s_initialized = false;
+    static inline Level m_s_level = Level::Info;
+    static inline std::string m_s_log_file;
+    static inline std::vector<spdlog::sink_ptr> m_s_sinks;
+    static inline std::shared_ptr<spdlog::logger> m_s_core_logger;
+    static inline std::shared_ptr<spdlog::logger> m_s_runtime_logger;
+    static inline std::shared_ptr<spdlog::logger> m_s_editor_logger;
 };
 
 } // namespace luna

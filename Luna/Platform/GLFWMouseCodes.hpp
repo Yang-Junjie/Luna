@@ -1,14 +1,14 @@
 #pragma once
 
-#include "Core/mouse_codes.h"
+#include "Core/MouseCodes.h"
 
 #include <GLFW/glfw3.h>
 
 namespace luna {
 
-inline MouseCode GLFWMouseCodeToLunaMouseCode(int mouseCode)
+inline MouseCode glfwMouseCodeToLunaMouseCode(int mouse_code)
 {
-    switch (mouseCode) {
+    switch (mouse_code) {
         case GLFW_MOUSE_BUTTON_1:
             return MouseCode::Left;
         case GLFW_MOUSE_BUTTON_2:
@@ -24,9 +24,9 @@ inline MouseCode GLFWMouseCodeToLunaMouseCode(int mouseCode)
     }
 }
 
-inline int LunaMouseCodeToGLFWMouseCode(MouseCode mouseCode)
+inline int lunaMouseCodeToGlfwMouseCode(MouseCode mouse_code)
 {
-    switch (mouseCode) {
+    switch (mouse_code) {
         case MouseCode::Left:
             return GLFW_MOUSE_BUTTON_1;
         case MouseCode::Right:
@@ -43,3 +43,4 @@ inline int LunaMouseCodeToGLFWMouseCode(MouseCode mouseCode)
 }
 
 } // namespace luna
+

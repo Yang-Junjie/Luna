@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/log.h"
+#include "Core/Log.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -18,52 +18,52 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
-inline vk::Result to_vk_result(vk::Result result)
+inline vk::Result toVkResult(vk::Result result)
 {
     return result;
 }
 
-inline vk::Result to_vk_result(VkResult result)
+inline vk::Result toVkResult(VkResult result)
 {
     return static_cast<vk::Result>(result);
 }
 
-inline vk::Extent2D to_vk(VkExtent2D extent)
+inline vk::Extent2D toVk(VkExtent2D extent)
 {
     return vk::Extent2D{extent.width, extent.height};
 }
 
-inline vk::Extent3D to_vk(VkExtent3D extent)
+inline vk::Extent3D toVk(VkExtent3D extent)
 {
     return vk::Extent3D{extent.width, extent.height, extent.depth};
 }
 
-inline vk::Offset2D to_vk(VkOffset2D offset)
+inline vk::Offset2D toVk(VkOffset2D offset)
 {
     return vk::Offset2D{offset.x, offset.y};
 }
 
-inline vk::Offset3D to_vk(VkOffset3D offset)
+inline vk::Offset3D toVk(VkOffset3D offset)
 {
     return vk::Offset3D{offset.x, offset.y, offset.z};
 }
 
-inline std::string string_VkResult(VkResult result)
+inline std::string stringVkResult(VkResult result)
 {
     return vk::to_string(static_cast<vk::Result>(result));
 }
 
-inline std::string string_VkResult(vk::Result result)
+inline std::string stringVkResult(vk::Result result)
 {
     return vk::to_string(result);
 }
 
-inline std::string string_VkFormat(VkFormat format)
+inline std::string stringVkFormat(VkFormat format)
 {
     return vk::to_string(static_cast<vk::Format>(format));
 }
 
-inline std::string string_VkFormat(vk::Format format)
+inline std::string stringVkFormat(vk::Format format)
 {
     return vk::to_string(format);
 }
@@ -71,7 +71,7 @@ inline std::string string_VkFormat(vk::Format format)
 #define VK_CHECK(x)                                                                            \
     do {                                                                                       \
         const auto err__ = (x);                                                                \
-        const vk::Result vkErr__ = to_vk_result(err__);                                        \
+        const vk::Result vkErr__ = toVkResult(err__);                                          \
         if (vkErr__ != vk::Result::eSuccess) {                                                 \
             LUNA_CORE_FATAL("Vulkan call failed: {} returned {}", #x, vk::to_string(vkErr__)); \
             std::abort();                                                                      \
@@ -79,49 +79,49 @@ inline std::string string_VkFormat(vk::Format format)
     } while (0)
 
 struct AllocatedImage {
-    vk::Image image{};
-    vk::ImageView imageView{};
-    VmaAllocation allocation{VK_NULL_HANDLE};
-    vk::Extent3D imageExtent{};
-    vk::Format imageFormat{vk::Format::eUndefined};
+    vk::Image m_image{};
+    vk::ImageView m_image_view{};
+    VmaAllocation m_allocation{VK_NULL_HANDLE};
+    vk::Extent3D m_image_extent{};
+    vk::Format m_image_format{vk::Format::eUndefined};
 };
 
 struct AllocatedBuffer {
-    vk::Buffer buffer{};
-    VmaAllocation allocation;
-    VmaAllocationInfo info;
+    vk::Buffer m_buffer{};
+    VmaAllocation m_allocation;
+    VmaAllocationInfo m_info;
 };
 
 struct Vertex {
 
-    glm::vec3 position;
-    float uv_x;
-    glm::vec3 normal;
-    float uv_y;
-    glm::vec4 color;
+    glm::vec3 m_position;
+    float m_uv_x;
+    glm::vec3 m_normal;
+    float m_uv_y;
+    glm::vec4 m_color;
 };
 
 // holds the resources needed for a mesh
 struct GPUMeshBuffers {
 
-    AllocatedBuffer indexBuffer;
-    AllocatedBuffer vertexBuffer;
-    vk::DeviceAddress vertexBufferAddress{};
+    AllocatedBuffer m_index_buffer;
+    AllocatedBuffer m_vertex_buffer;
+    vk::DeviceAddress m_vertex_buffer_address{};
 };
 
 // push constants for our mesh object draws
 struct GPUDrawPushConstants {
-    glm::mat4 worldMatrix;
-    vk::DeviceAddress vertexBuffer{};
+    glm::mat4 m_world_matrix;
+    vk::DeviceAddress m_vertex_buffer{};
 };
 
 struct GPUSceneData {
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::mat4 viewproj;
-    glm::vec4 ambientColor;
-    glm::vec4 sunlightDirection;
-    glm::vec4 sunlightColor;
+    glm::mat4 m_view;
+    glm::mat4 m_proj;
+    glm::mat4 m_viewproj;
+    glm::vec4 m_ambient_color;
+    glm::vec4 m_sunlight_direction;
+    glm::vec4 m_sunlight_color;
 };
 
 enum class MaterialPass : uint8_t {
@@ -131,12 +131,13 @@ enum class MaterialPass : uint8_t {
 };
 
 struct MaterialPipeline {
-    vk::Pipeline pipeline{};
-    vk::PipelineLayout layout{};
+    vk::Pipeline m_pipeline{};
+    vk::PipelineLayout m_layout{};
 };
 
 struct MaterialInstance {
-    MaterialPipeline* pipeline{nullptr};
-    vk::DescriptorSet materialSet{};
-    MaterialPass passType{MaterialPass::MainColor};
+    MaterialPipeline* m_pipeline{nullptr};
+    vk::DescriptorSet m_material_set{};
+    MaterialPass m_pass_type{MaterialPass::MainColor};
 };
+

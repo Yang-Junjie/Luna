@@ -1,17 +1,17 @@
-#include "Core/application.h"
-#include "Core/log.h"
+#include "Core/Application.h"
+#include "Core/Log.h"
 
 #include <memory>
 
 int main(int argc, char** argv)
 {
 #ifndef NDEBUG
-    constexpr luna::Logger::Level kLogLevel = luna::Logger::Level::Trace;
+    constexpr luna::Logger::Level k_log_level = luna::Logger::Level::Trace;
 #else
-    constexpr luna::Logger::Level kLogLevel = luna::Logger::Level::Info;
+    constexpr luna::Logger::Level k_log_level = luna::Logger::Level::Info;
 #endif
 
-    luna::Logger::init("logs/luna.log", kLogLevel);
+    luna::Logger::init("logs/luna.log", k_log_level);
     LUNA_CORE_INFO("Application starting");
 
     std::unique_ptr<luna::Application> app(luna::createApplication(argc, argv));
@@ -33,3 +33,4 @@ int main(int argc, char** argv)
     luna::Logger::shutdown();
     return 0;
 }
+
