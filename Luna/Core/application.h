@@ -66,6 +66,14 @@ protected:
 
     virtual void onUpdate(Timestep) {}
 
+    virtual void onRender(FrameRenderContext& render_context);
+
+    virtual void onOverlayRender(RenderCommandList& command_list,
+                                 const luna::vkcore::ImageView& target_image_view,
+                                 luna::render::Extent2D target_extent);
+
+    virtual void onBeforePresent();
+
     virtual void onShutdown() {}
 
 private:

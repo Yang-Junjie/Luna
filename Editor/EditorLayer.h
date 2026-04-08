@@ -3,7 +3,7 @@
 #include "Core/Application.h"
 #include "Core/Input.h"
 #include "Core/Layer.h"
-#include "Vulkan/VkLoader.h"
+#include "Renderer/VkLoader.h"
 #include "imgui.h"
 
 #include <glm/glm.hpp>

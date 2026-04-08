@@ -1,6 +1,6 @@
 #pragma once
-#include "VkDescriptors.h"
-#include "VkTypes.h"
+#include "Vulkan/VkDescriptors.h"
+#include "Vulkan/VkTypes.h"
 
 #include <filesystem>
 #include <glm/gtc/quaternion.hpp>
@@ -81,8 +81,8 @@ public:
     std::unordered_map<std::string, std::shared_ptr<MeshAsset>> m_meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> m_nodes;
     std::vector<std::shared_ptr<Node>> m_top_nodes;
-    std::vector<AllocatedImage> m_images;
-    std::vector<vk::Sampler> m_samplers;
+    std::vector<std::optional<AllocatedImage>> m_images;
+    std::vector<AllocatedSampler> m_samplers;
     std::vector<AllocatedBuffer> m_material_data_buffers;
     std::vector<std::shared_ptr<MaterialInstance>> m_materials;
     DescriptorAllocator m_material_descriptor_pool;

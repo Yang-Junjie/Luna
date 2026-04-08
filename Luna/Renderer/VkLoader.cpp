@@ -1,5 +1,5 @@
 #include "VkLoader.h"
-#include "VkEngine.h"
+#include "Vulkan/VkEngine.h"
 
 #include <stb_image.h>
 
@@ -17,6 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/trigonometric.hpp>
+#include <utility>
 
 namespace {
 
@@ -213,9 +214,9 @@ std::optional<AllocatedImage> loadImageFromDataSource(VulkanEngine* engine,
         AllocatedImage image =
             engine->createImage(
                 pixels,
-                vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-                format,
-                vk::ImageUsageFlagBits::eSampled);
+                luna::render::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                fromVk(format),
+                luna::render::ImageUsage::Sampled);
         stbi_image_free(pixels);
         return image;
     };
@@ -231,9 +232,9 @@ std::optional<AllocatedImage> loadImageFromDataSource(VulkanEngine* engine,
             if (pixels != nullptr) {
                 AllocatedImage image = engine->createImage(
                     pixels,
-                    vk::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
-                    format,
-                    vk::ImageUsageFlagBits::eSampled);
+                    luna::render::Extent3D{static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1},
+                    fromVk(format),
+                    luna::render::ImageUsage::Sampled);
                 stbi_image_free(pixels);
                 return image;
             }
@@ -248,7 +249,7 @@ std::optional<AllocatedImage> loadImageFromDataSource(VulkanEngine* engine,
     return decode_memory(bytes.data(), bytes.size());
 }
 
-vk::Sampler createSampler(VulkanEngine* engine, const fastgltf::Sampler& sampler)
+AllocatedSampler createSampler(VulkanEngine* engine, const fastgltf::Sampler& sampler)
 {
     vk::SamplerCreateInfo sampler_info{};
     sampler_info.magFilter =
@@ -263,8 +264,9 @@ vk::Sampler createSampler(VulkanEngine* engine, const fastgltf::Sampler& sampler
     sampler_info.minLod = 0.0f;
     sampler_info.maxLod = VK_LOD_CLAMP_NONE;
 
-    vk::Sampler new_sampler{};
-    VK_CHECK(engine->m_device.createSampler(&sampler_info, nullptr, &new_sampler));
+    AllocatedSampler new_sampler;
+    VK_CHECK(new_sampler.create(engine->getDeviceHandle(), sampler_info) ? vk::Result::eSuccess
+                                                                         : vk::Result::eErrorInitializationFailed);
     return new_sampler;
 }
 
@@ -298,6 +300,51 @@ glm::vec3 quaternionToEulerDegrees(const glm::quat& q)
 
     return glm::degrees(glm::vec3(static_cast<float>(roll_x), static_cast<float>(pitch_y), static_cast<float>(yaw_z)));
 }
+
+struct LoadedGltfReleasePack {
+    std::vector<std::shared_ptr<MeshAsset>> m_meshes;
+    std::vector<AllocatedBuffer> m_material_buffers;
+    std::vector<AllocatedSampler> m_samplers;
+    std::vector<std::optional<AllocatedImage>> m_images;
+    vk::Device m_device{};
+    vk::DescriptorPool m_material_descriptor_pool{};
+
+    void release()
+    {
+        for (const auto& mesh : m_meshes) {
+            if (!mesh) {
+                continue;
+            }
+
+            mesh->m_mesh_buffers.m_index_buffer.reset();
+            mesh->m_mesh_buffers.m_vertex_buffer.reset();
+        }
+
+        for (AllocatedBuffer& buffer : m_material_buffers) {
+            buffer.reset();
+        }
+
+        for (AllocatedSampler& sampler : m_samplers) {
+            sampler.reset();
+        }
+
+        for (auto& image : m_images) {
+            if (image.has_value()) {
+                image->reset();
+            }
+        }
+
+        if (m_device != VK_NULL_HANDLE && m_material_descriptor_pool != VK_NULL_HANDLE) {
+            m_device.destroyDescriptorPool(m_material_descriptor_pool, nullptr);
+            m_material_descriptor_pool = VK_NULL_HANDLE;
+        }
+
+        m_meshes.clear();
+        m_material_buffers.clear();
+        m_samplers.clear();
+        m_images.clear();
+    }
+};
 
 } // namespace
 
@@ -348,7 +395,7 @@ void MeshNode::draw(const glm::mat4& top_matrix, DrawContext& ctx)
             RenderObject draw;
             draw.m_index_count = surface.m_count;
             draw.m_first_index = surface.m_start_index;
-            draw.m_index_buffer = m_mesh->m_mesh_buffers.m_index_buffer.m_buffer;
+            draw.m_index_buffer = m_mesh->m_mesh_buffers.m_index_buffer.get();
             draw.m_material = surface.m_material;
             draw.m_transform = node_matrix;
             draw.m_vertex_buffer_address = m_mesh->m_mesh_buffers.m_vertex_buffer_address;
@@ -388,41 +435,25 @@ void LoadedGLTF::draw(const glm::mat4& top_matrix, DrawContext& ctx)
 void LoadedGLTF::clearAll()
 {
     if (m_creator != nullptr) {
+        auto release_pack = std::make_shared<LoadedGltfReleasePack>();
+        release_pack->m_device = m_creator->getDeviceHandle();
+        release_pack->m_material_descriptor_pool = m_material_descriptor_pool.m_pool;
+        m_material_descriptor_pool.m_pool = VK_NULL_HANDLE;
+
+        release_pack->m_meshes.reserve(m_meshes.size());
         for (auto& [_, mesh] : m_meshes) {
-            if (!mesh) {
-                continue;
-            }
-
-            m_creator->destroyBuffer(mesh->m_mesh_buffers.m_index_buffer);
-            m_creator->destroyBuffer(mesh->m_mesh_buffers.m_vertex_buffer);
-        }
-
-        for (auto& buffer : m_material_data_buffers) {
-            if (buffer.m_buffer && buffer.m_allocation != VK_NULL_HANDLE) {
-                m_creator->destroyBuffer(buffer);
+            if (mesh) {
+                release_pack->m_meshes.push_back(std::move(mesh));
             }
         }
 
-        for (const vk::Sampler sampler : m_samplers) {
-            if (!sampler || sampler == m_creator->m_default_sampler_linear ||
-                sampler == m_creator->m_default_sampler_nearest) {
-                continue;
-            }
+        release_pack->m_material_buffers = std::move(m_material_data_buffers);
+        release_pack->m_samplers = std::move(m_samplers);
+        release_pack->m_images = std::move(m_images);
 
-            m_creator->m_device.destroySampler(sampler, nullptr);
-        }
-
-        for (const auto& image : m_images) {
-            if (!image.m_image || image.m_image == m_creator->m_white_image.m_image ||
-                image.m_image == m_creator->m_black_image.m_image || image.m_image == m_creator->m_grey_image.m_image ||
-                image.m_image == m_creator->m_error_checkerboard_image.m_image) {
-                continue;
-            }
-
-            m_creator->destroyImage(image);
-        }
-
-        m_material_descriptor_pool.destroyPool(m_creator->m_device);
+        m_creator->deferRelease([release_pack]() mutable {
+            release_pack->release();
+        });
     }
 
     m_top_nodes.clear();
@@ -432,6 +463,7 @@ void LoadedGLTF::clearAll()
     m_material_data_buffers.clear();
     m_samplers.clear();
     m_images.clear();
+    m_creator = nullptr;
 }
 
 std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const std::filesystem::path& file_path)
@@ -476,12 +508,11 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
     scene->m_images.resize(gltf.images.size());
     for (size_t image_index = 0; image_index < gltf.images.size(); image_index++) {
         const auto& image = gltf.images[image_index];
-        const auto loaded_image =
+        auto loaded_image =
             loadImageFromDataSource(engine, gltf, image.data, file_path.parent_path(), vk::Format::eR8G8B8A8Srgb);
         if (loaded_image.has_value()) {
-            scene->m_images[image_index] = loaded_image.value();
+            scene->m_images[image_index] = std::move(loaded_image.value());
         } else {
-            scene->m_images[image_index] = engine->m_error_checkerboard_image;
             LUNA_CORE_WARN("Falling back to error texture for glTF image {}", image_index);
         }
     }
@@ -492,7 +523,7 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
             {vk::DescriptorType::eCombinedImageSampler, 2.0f},
         };
         scene->m_material_descriptor_pool.initPool(
-            engine->m_device, std::max(1u, static_cast<uint32_t>(gltf.materials.size())), material_pool_ratios);
+            engine->getDeviceHandle(), std::max(1u, static_cast<uint32_t>(gltf.materials.size())), material_pool_ratios);
     }
 
     scene->m_materials.resize(gltf.materials.size());
@@ -509,42 +540,49 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
                       0.0f);
 
         AllocatedBuffer material_buffer =
-            engine->createBuffer(
-                sizeof(MaterialConstants), vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_CPU_TO_GPU);
-        std::memcpy(material_buffer.m_info.pMappedData, &constants, sizeof(MaterialConstants));
-        scene->m_material_data_buffers.push_back(material_buffer);
+            engine->createBuffer(sizeof(MaterialConstants),
+                                 luna::render::BufferUsage::Uniform,
+                                 luna::render::MemoryUsage::CpuToGpu);
+        std::memcpy(material_buffer.getMappedData(), &constants, sizeof(MaterialConstants));
+        scene->m_material_data_buffers.push_back(std::move(material_buffer));
 
         MaterialResources resources{};
-        resources.m_data_buffer = scene->m_material_data_buffers.back();
+        resources.m_data_buffer = &scene->m_material_data_buffers.back();
 
-        resources.m_color_image = engine->m_white_image;
-        resources.m_color_sampler = engine->m_default_sampler_linear;
+        resources.m_color_image = &engine->m_white_image;
+        resources.m_color_sampler = &engine->m_default_sampler_linear;
         if (gltf_material.pbrData.baseColorTexture.has_value()) {
             const auto& texture_info = gltf_material.pbrData.baseColorTexture.value();
             if (texture_info.textureIndex < gltf.textures.size()) {
                 const auto& texture = gltf.textures[texture_info.textureIndex];
                 if (texture.imageIndex.has_value() && texture.imageIndex.value() < scene->m_images.size() &&
-                    scene->m_images[texture.imageIndex.value()].m_image) {
-                    resources.m_color_image = scene->m_images[texture.imageIndex.value()];
+                    scene->m_images[texture.imageIndex.value()].has_value() &&
+                    scene->m_images[texture.imageIndex.value()]->isValid()) {
+                    resources.m_color_image = &scene->m_images[texture.imageIndex.value()].value();
+                } else {
+                    resources.m_color_image = &engine->m_error_checkerboard_image;
                 }
                 if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < scene->m_samplers.size()) {
-                    resources.m_color_sampler = scene->m_samplers[texture.samplerIndex.value()];
+                    resources.m_color_sampler = &scene->m_samplers[texture.samplerIndex.value()];
                 }
             }
         }
 
-        resources.m_metal_rough_image = engine->m_white_image;
-        resources.m_metal_rough_sampler = engine->m_default_sampler_linear;
+        resources.m_metal_rough_image = &engine->m_white_image;
+        resources.m_metal_rough_sampler = &engine->m_default_sampler_linear;
         if (gltf_material.pbrData.metallicRoughnessTexture.has_value()) {
             const auto& texture_info = gltf_material.pbrData.metallicRoughnessTexture.value();
             if (texture_info.textureIndex < gltf.textures.size()) {
                 const auto& texture = gltf.textures[texture_info.textureIndex];
                 if (texture.imageIndex.has_value() && texture.imageIndex.value() < scene->m_images.size() &&
-                    scene->m_images[texture.imageIndex.value()].m_image) {
-                    resources.m_metal_rough_image = scene->m_images[texture.imageIndex.value()];
+                    scene->m_images[texture.imageIndex.value()].has_value() &&
+                    scene->m_images[texture.imageIndex.value()]->isValid()) {
+                    resources.m_metal_rough_image = &scene->m_images[texture.imageIndex.value()].value();
+                } else {
+                    resources.m_metal_rough_image = &engine->m_error_checkerboard_image;
                 }
                 if (texture.samplerIndex.has_value() && texture.samplerIndex.value() < scene->m_samplers.size()) {
-                    resources.m_metal_rough_sampler = scene->m_samplers[texture.samplerIndex.value()];
+                    resources.m_metal_rough_sampler = &scene->m_samplers[texture.samplerIndex.value()];
                 }
             }
         }
@@ -553,7 +591,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, const 
             gltf_material.alphaMode == fastgltf::AlphaMode::Blend ? MaterialPass::Transparent : MaterialPass::MainColor;
         scene->m_materials[material_index] =
             std::make_shared<MaterialInstance>(
-                engine->m_metal_rough_material.writeMaterial(engine->m_device, pass, resources, scene->m_material_descriptor_pool));
+                engine->m_metal_rough_material.writeMaterial(
+                    engine->getDeviceHandle(), pass, resources, scene->m_material_descriptor_pool));
     }
 
     std::vector<std::shared_ptr<MeshAsset>> meshes_by_index;

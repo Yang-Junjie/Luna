@@ -33,8 +33,8 @@ void ImGuiLayer::onAttach()
         return;
     }
 
-    if (m_window == nullptr || m_engine == nullptr || !m_engine->m_device ||
-        m_engine->m_swapchain_image_format == vk::Format::eUndefined) {
+    if (m_window == nullptr || m_engine == nullptr || !m_engine->hasDevice() ||
+        m_engine->getSwapchainImageFormat() == luna::render::PixelFormat::Undefined) {
         LUNA_CORE_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
         return;
     }
@@ -71,11 +71,11 @@ void ImGuiLayer::onAttach()
 
     ImGui_ImplVulkan_InitInfo init_info{};
     init_info.ApiVersion = VK_API_VERSION_1_3;
-    init_info.Instance = static_cast<VkInstance>(m_engine->m_instance);
-    init_info.PhysicalDevice = static_cast<VkPhysicalDevice>(m_engine->m_chosen_gpu);
-    init_info.Device = static_cast<VkDevice>(m_engine->m_device);
-    init_info.QueueFamily = m_engine->m_graphics_queue_family;
-    init_info.Queue = static_cast<VkQueue>(m_engine->m_graphics_queue);
+    init_info.Instance = static_cast<VkInstance>(m_engine->getInstanceHandle());
+    init_info.PhysicalDevice = static_cast<VkPhysicalDevice>(m_engine->getPhysicalDeviceHandle());
+    init_info.Device = static_cast<VkDevice>(m_engine->getDeviceHandle());
+    init_info.QueueFamily = m_engine->getGraphicsQueueFamily();
+    init_info.Queue = static_cast<VkQueue>(m_engine->getGraphicsQueueHandle());
     init_info.DescriptorPoolSize = k_im_gui_descriptor_pool_size;
     init_info.MinImageCount = image_count;
     init_info.ImageCount = image_count;
@@ -91,7 +91,7 @@ void ImGuiLayer::onAttach()
     VkPipelineRenderingCreateInfo pipeline_rendering_info{};
     pipeline_rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipeline_rendering_info.colorAttachmentCount = 1;
-    const VkFormat color_attachment_format = static_cast<VkFormat>(m_color_attachment_format);
+    const VkFormat color_attachment_format = static_cast<VkFormat>(toVk(m_color_attachment_format));
     pipeline_rendering_info.pColorAttachmentFormats = &color_attachment_format;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_info;
     init_info.PipelineInfoForViewports.PipelineRenderingCreateInfo = pipeline_rendering_info;
@@ -114,15 +114,15 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    if (m_engine != nullptr && m_engine->m_device) {
-        VK_CHECK(m_engine->m_device.waitIdle());
+    if (m_engine != nullptr && m_engine->hasDevice()) {
+        VK_CHECK(m_engine->getDeviceHandle().waitIdle());
     }
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
-    m_color_attachment_format = vk::Format::eUndefined;
+    m_color_attachment_format = luna::render::PixelFormat::Undefined;
     m_attached = false;
 }
 
@@ -162,7 +162,9 @@ void ImGuiLayer::end()
     ImGui::Render();
 }
 
-void ImGuiLayer::render(vk::CommandBuffer command_buffer, vk::ImageView target_image_view, vk::Extent2D target_extent)
+void ImGuiLayer::render(RenderCommandList& command_list,
+                        const luna::vkcore::ImageView& target_image_view,
+                        luna::render::Extent2D target_extent)
 {
     if (!m_attached) {
         return;
@@ -173,21 +175,25 @@ void ImGuiLayer::render(vk::CommandBuffer command_buffer, vk::ImageView target_i
         return;
     }
 
+    if (!command_list.isValid()) {
+        return;
+    }
+
     vk::RenderingAttachmentInfo color_attachment{};
-    color_attachment.imageView = target_image_view;
+    color_attachment.imageView = target_image_view.get();
     color_attachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
     color_attachment.loadOp = vk::AttachmentLoadOp::eLoad;
     color_attachment.storeOp = vk::AttachmentStoreOp::eStore;
 
     vk::RenderingInfo rendering_info{};
-    rendering_info.renderArea.extent = target_extent;
+    rendering_info.renderArea.extent = toVk(target_extent);
     rendering_info.layerCount = 1;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attachment;
 
-    command_buffer.beginRendering(&rendering_info);
-    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(command_buffer));
-    command_buffer.endRendering();
+    command_list.m_handle.beginRendering(&rendering_info);
+    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(command_list.m_handle));
+    command_list.m_handle.endRendering();
 }
 
 void ImGuiLayer::renderPlatformWindows()

@@ -119,16 +119,38 @@ void Application::renderFrame()
     }
 
     m_engine.draw(
-        [this](vk::CommandBuffer command_buffer, vk::ImageView target_image_view, vk::Extent2D target_extent) {
-            if (m_im_gui_layer != nullptr) {
-                m_im_gui_layer->render(command_buffer, target_image_view, target_extent);
-            }
+        [this](FrameRenderContext& render_context) {
+            onRender(render_context);
+        },
+        [this](RenderCommandList& command_list,
+               const luna::vkcore::ImageView& target_image_view,
+               luna::render::Extent2D target_extent) {
+            onOverlayRender(command_list, target_image_view, target_extent);
         },
         [this]() {
-            if (m_im_gui_layer != nullptr) {
-                m_im_gui_layer->renderPlatformWindows();
-            }
+            onBeforePresent();
         });
+}
+
+void Application::onRender(FrameRenderContext& render_context)
+{
+    m_engine.recordDefaultScene(render_context);
+}
+
+void Application::onOverlayRender(RenderCommandList& command_list,
+                                  const luna::vkcore::ImageView& target_image_view,
+                                  luna::render::Extent2D target_extent)
+{
+    if (m_im_gui_layer != nullptr) {
+        m_im_gui_layer->render(command_list, target_image_view, target_extent);
+    }
+}
+
+void Application::onBeforePresent()
+{
+    if (m_im_gui_layer != nullptr) {
+        m_im_gui_layer->renderPlatformWindows();
+    }
 }
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)

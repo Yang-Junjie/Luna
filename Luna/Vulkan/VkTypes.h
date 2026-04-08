@@ -1,6 +1,10 @@
 #pragma once
 
 #include "Core/Log.h"
+#include "Renderer/RenderTypes.h"
+#include "VkBuffer.h"
+#include "VkImage.h"
+#include "VkSampler.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -15,7 +19,6 @@
 #include <span>
 #include <string>
 #include <vector>
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
 inline vk::Result toVkResult(vk::Result result)
@@ -33,7 +36,17 @@ inline vk::Extent2D toVk(VkExtent2D extent)
     return vk::Extent2D{extent.width, extent.height};
 }
 
+inline vk::Extent2D toVk(luna::render::Extent2D extent)
+{
+    return vk::Extent2D{extent.width, extent.height};
+}
+
 inline vk::Extent3D toVk(VkExtent3D extent)
+{
+    return vk::Extent3D{extent.width, extent.height, extent.depth};
+}
+
+inline vk::Extent3D toVk(luna::render::Extent3D extent)
 {
     return vk::Extent3D{extent.width, extent.height, extent.depth};
 }
@@ -68,6 +81,153 @@ inline std::string stringVkFormat(vk::Format format)
     return vk::to_string(format);
 }
 
+inline luna::render::Extent2D fromVk(vk::Extent2D extent)
+{
+    return {extent.width, extent.height};
+}
+
+inline luna::render::Extent3D fromVk(vk::Extent3D extent)
+{
+    return {extent.width, extent.height, extent.depth};
+}
+
+inline vk::Format toVk(luna::render::PixelFormat format)
+{
+    switch (format) {
+        case luna::render::PixelFormat::R8G8B8A8Unorm:
+            return vk::Format::eR8G8B8A8Unorm;
+        case luna::render::PixelFormat::R16G16B16A16Sfloat:
+            return vk::Format::eR16G16B16A16Sfloat;
+        case luna::render::PixelFormat::D32Sfloat:
+            return vk::Format::eD32Sfloat;
+        case luna::render::PixelFormat::Undefined:
+        default:
+            return vk::Format::eUndefined;
+    }
+}
+
+inline luna::render::PixelFormat fromVk(vk::Format format)
+{
+    switch (format) {
+        case vk::Format::eR8G8B8A8Unorm:
+            return luna::render::PixelFormat::R8G8B8A8Unorm;
+        case vk::Format::eR16G16B16A16Sfloat:
+            return luna::render::PixelFormat::R16G16B16A16Sfloat;
+        case vk::Format::eD32Sfloat:
+            return luna::render::PixelFormat::D32Sfloat;
+        case vk::Format::eUndefined:
+        default:
+            return luna::render::PixelFormat::Undefined;
+    }
+}
+
+inline vk::ImageLayout toVk(luna::render::ImageLayout layout)
+{
+    switch (layout) {
+        case luna::render::ImageLayout::General:
+            return vk::ImageLayout::eGeneral;
+        case luna::render::ImageLayout::ColorAttachment:
+            return vk::ImageLayout::eColorAttachmentOptimal;
+        case luna::render::ImageLayout::DepthAttachment:
+            return vk::ImageLayout::eDepthAttachmentOptimal;
+        case luna::render::ImageLayout::TransferSrc:
+            return vk::ImageLayout::eTransferSrcOptimal;
+        case luna::render::ImageLayout::TransferDst:
+            return vk::ImageLayout::eTransferDstOptimal;
+        case luna::render::ImageLayout::ShaderReadOnly:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case luna::render::ImageLayout::Present:
+            return vk::ImageLayout::ePresentSrcKHR;
+        case luna::render::ImageLayout::Undefined:
+        default:
+            return vk::ImageLayout::eUndefined;
+    }
+}
+
+inline luna::render::ImageLayout fromVk(vk::ImageLayout layout)
+{
+    switch (layout) {
+        case vk::ImageLayout::eGeneral:
+            return luna::render::ImageLayout::General;
+        case vk::ImageLayout::eColorAttachmentOptimal:
+            return luna::render::ImageLayout::ColorAttachment;
+        case vk::ImageLayout::eDepthAttachmentOptimal:
+            return luna::render::ImageLayout::DepthAttachment;
+        case vk::ImageLayout::eTransferSrcOptimal:
+            return luna::render::ImageLayout::TransferSrc;
+        case vk::ImageLayout::eTransferDstOptimal:
+            return luna::render::ImageLayout::TransferDst;
+        case vk::ImageLayout::eShaderReadOnlyOptimal:
+            return luna::render::ImageLayout::ShaderReadOnly;
+        case vk::ImageLayout::ePresentSrcKHR:
+            return luna::render::ImageLayout::Present;
+        case vk::ImageLayout::eUndefined:
+        default:
+            return luna::render::ImageLayout::Undefined;
+    }
+}
+
+inline vk::BufferUsageFlags toVk(luna::render::BufferUsage usage)
+{
+    vk::BufferUsageFlags flags{};
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::TransferSrc)) {
+        flags |= vk::BufferUsageFlagBits::eTransferSrc;
+    }
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::TransferDst)) {
+        flags |= vk::BufferUsageFlagBits::eTransferDst;
+    }
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::Uniform)) {
+        flags |= vk::BufferUsageFlagBits::eUniformBuffer;
+    }
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::Index)) {
+        flags |= vk::BufferUsageFlagBits::eIndexBuffer;
+    }
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::Storage)) {
+        flags |= vk::BufferUsageFlagBits::eStorageBuffer;
+    }
+    if (luna::render::hasFlag(usage, luna::render::BufferUsage::ShaderDeviceAddress)) {
+        flags |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+    }
+    return flags;
+}
+
+inline vk::ImageUsageFlags toVk(luna::render::ImageUsage usage)
+{
+    vk::ImageUsageFlags flags{};
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::TransferSrc)) {
+        flags |= vk::ImageUsageFlagBits::eTransferSrc;
+    }
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::TransferDst)) {
+        flags |= vk::ImageUsageFlagBits::eTransferDst;
+    }
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::Sampled)) {
+        flags |= vk::ImageUsageFlagBits::eSampled;
+    }
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::Storage)) {
+        flags |= vk::ImageUsageFlagBits::eStorage;
+    }
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::ColorAttachment)) {
+        flags |= vk::ImageUsageFlagBits::eColorAttachment;
+    }
+    if (luna::render::hasFlag(usage, luna::render::ImageUsage::DepthStencilAttachment)) {
+        flags |= vk::ImageUsageFlagBits::eDepthStencilAttachment;
+    }
+    return flags;
+}
+
+inline VmaMemoryUsage toVk(luna::render::MemoryUsage usage)
+{
+    switch (usage) {
+        case luna::render::MemoryUsage::CpuOnly:
+            return VMA_MEMORY_USAGE_CPU_ONLY;
+        case luna::render::MemoryUsage::CpuToGpu:
+            return VMA_MEMORY_USAGE_CPU_TO_GPU;
+        case luna::render::MemoryUsage::GpuOnly:
+        default:
+            return VMA_MEMORY_USAGE_GPU_ONLY;
+    }
+}
+
 #define VK_CHECK(x)                                                                            \
     do {                                                                                       \
         const auto err__ = (x);                                                                \
@@ -78,19 +238,9 @@ inline std::string stringVkFormat(vk::Format format)
         }                                                                                      \
     } while (0)
 
-struct AllocatedImage {
-    vk::Image m_image{};
-    vk::ImageView m_image_view{};
-    VmaAllocation m_allocation{VK_NULL_HANDLE};
-    vk::Extent3D m_image_extent{};
-    vk::Format m_image_format{vk::Format::eUndefined};
-};
-
-struct AllocatedBuffer {
-    vk::Buffer m_buffer{};
-    VmaAllocation m_allocation;
-    VmaAllocationInfo m_info;
-};
+using AllocatedImage = luna::vkcore::Image;
+using AllocatedBuffer = luna::vkcore::Buffer;
+using AllocatedSampler = luna::vkcore::Sampler;
 
 struct Vertex {
 

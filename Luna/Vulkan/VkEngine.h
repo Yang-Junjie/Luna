@@ -1,47 +1,21 @@
 #pragma once
 
 #include "Core/Window.h"
-#include "Camera.h"
+#include "Renderer/Camera.h"
+#include "Renderer/RenderContext.h"
+#include "Renderer/VkLoader.h"
+#include "VkContext.h"
+#include "VkDeferredRelease.h"
 #include "VkDescriptors.h"
-#include "VkLoader.h"
+#include "VkFrameContext.h"
+#include "VkRenderTarget.h"
 #include "VkTypes.h"
+#include "VkVMAAllocator.h"
 
 #include <unordered_map>
 
 struct GLFWwindow;
 class VulkanEngine;
-
-struct DeletionQueue {
-    std::deque<std::function<void()>> m_deletors;
-
-    // TODO(Yang) : need to be optimalized, because the std::funcation is too slow
-    void pushFunction(std::function<void()>&& function)
-    {
-        m_deletors.push_back(function);
-    }
-
-    void flush()
-    {
-        // reverse iterate the deletion queue to execute all the functions
-        for (auto it = m_deletors.rbegin(); it != m_deletors.rend(); it++) {
-            (*it)(); // call functors
-        }
-
-        m_deletors.clear();
-    }
-};
-
-struct FrameData {
-    vk::Semaphore m_swapchain_semaphore{};
-    vk::Semaphore m_render_semaphore{};
-    vk::Fence m_render_fence{};
-
-    vk::CommandPool m_command_pool{};
-    vk::CommandBuffer m_main_command_buffer{};
-    DescriptorAllocatorGrowable m_frame_descriptors;
-
-    DeletionQueue m_deletion_queue;
-};
 
 struct ImmediateSubmitContext {
     vk::Fence m_fence{};
@@ -74,11 +48,11 @@ struct MaterialConstants {
 };
 
 struct MaterialResources {
-    AllocatedImage m_color_image;
-    vk::Sampler m_color_sampler{};
-    AllocatedImage m_metal_rough_image;
-    vk::Sampler m_metal_rough_sampler{};
-    AllocatedBuffer m_data_buffer;
+    const AllocatedImage* m_color_image{nullptr};
+    const AllocatedSampler* m_color_sampler{nullptr};
+    const AllocatedImage* m_metal_rough_image{nullptr};
+    const AllocatedSampler* m_metal_rough_sampler{nullptr};
+    const AllocatedBuffer* m_data_buffer{nullptr};
     uint32_t m_data_buffer_offset{0};
 };
 
@@ -99,7 +73,9 @@ struct GltfMetallicRoughness {
 
 class VulkanEngine {
 public:
-    using OverlayRenderFunction = std::function<void(vk::CommandBuffer, vk::ImageView, vk::Extent2D)>;
+    using RenderFunction = std::function<void(FrameRenderContext&)>;
+    using OverlayRenderFunction =
+        std::function<void(RenderCommandList&, const luna::vkcore::ImageView&, luna::render::Extent2D)>;
     using BeforePresentFunction = std::function<void()>;
 
     bool m_is_initialized{false};
@@ -114,7 +90,9 @@ public:
 
     bool init(luna::Window& window_ref);
     void cleanup();
-    void draw(const OverlayRenderFunction& overlay_renderer = {}, const BeforePresentFunction& before_present = {});
+    void draw(const RenderFunction& render_function = {},
+              const OverlayRenderFunction& overlay_renderer = {},
+              const BeforePresentFunction& before_present = {});
     void requestSwapchainResize()
     {
         m_resize_requested = true;
@@ -127,18 +105,98 @@ public:
 
     uint32_t getSwapchainImageCount() const
     {
-        return static_cast<uint32_t>(m_swapchain_images.size());
+        return m_swapchain_context.getImageCount();
     }
 
-    vk::Format getSwapchainImageFormat() const
+    luna::render::PixelFormat getSwapchainImageFormat() const
     {
-        return m_swapchain_image_format;
+        return fromVk(m_swapchain_context.getImageFormat());
     }
 
-    FrameData m_frames[frame_overlap];
+    luna::render::Extent2D getSwapchainExtent() const
+    {
+        return fromVk(m_swapchain_context.getExtent());
+    }
+
+    bool hasDevice() const
+    {
+        return m_device != VK_NULL_HANDLE;
+    }
+
+    vk::Instance getInstanceHandle() const
+    {
+        return m_instance;
+    }
+
+    vk::PhysicalDevice getPhysicalDeviceHandle() const
+    {
+        return m_chosen_gpu;
+    }
+
+    vk::Device getDeviceHandle() const
+    {
+        return m_device;
+    }
+
+    vk::Queue getGraphicsQueueHandle() const
+    {
+        return m_graphics_queue;
+    }
+
+    uint32_t getGraphicsQueueFamily() const
+    {
+        return m_graphics_queue_family;
+    }
+
+    const luna::vkcore::Instance& getInstanceContext() const
+    {
+        return m_instance_context;
+    }
+
+    const luna::vkcore::PhysicalDevice& getPhysicalDeviceContext() const
+    {
+        return m_physical_device_context;
+    }
+
+    const luna::vkcore::Device& getDeviceContext() const
+    {
+        return m_device_context;
+    }
+
+    const luna::vkcore::Queue& getGraphicsQueueContext() const
+    {
+        return m_graphics_queue_context;
+    }
+
+    const luna::vkcore::Swapchain& getSwapchainContext() const
+    {
+        return m_swapchain_context;
+    }
+
+    luna::vkcore::Swapchain& getSwapchainContext()
+    {
+        return m_swapchain_context;
+    }
+
+    const luna::vkcore::RenderTarget& getRenderTarget() const
+    {
+        return m_render_target;
+    }
+
+    luna::vkcore::RenderTarget& getRenderTarget()
+    {
+        return m_render_target;
+    }
+
+    vk::DeviceSize getUniformBufferAlignment() const
+    {
+        return m_uniform_buffer_alignment;
+    }
+
+    luna::vkcore::FrameContext m_frames[frame_overlap];
     ImmediateSubmitContext m_imm_context;
 
-    FrameData& getCurrentFrame()
+    luna::vkcore::FrameContext& getCurrentFrame()
     {
         return m_frames[m_frame_number % frame_overlap];
     }
@@ -160,31 +218,22 @@ public:
         return m_current_background_effect;
     }
 
-    vk::Instance m_instance{};
-    vk::DebugUtilsMessengerEXT m_debug_messenger{};
-    vk::PhysicalDevice m_chosen_gpu{};
-    vk::Device m_device{};
-    vk::SurfaceKHR m_surface{};
-    vk::Queue m_graphics_queue{};
-    uint32_t m_graphics_queue_family{0};
+    AllocatedImage createImage(luna::render::Extent3D size,
+                                luna::render::PixelFormat format,
+                                luna::render::ImageUsage usage,
+                                bool mipmapped = false);
+    AllocatedImage createImage(void* data,
+                                luna::render::Extent3D size,
+                                luna::render::PixelFormat format,
+                                luna::render::ImageUsage usage,
+                                bool mipmapped = false);
+    AllocatedBuffer createBuffer(size_t alloc_size, luna::render::BufferUsage usage, luna::render::MemoryUsage memory_usage);
+    luna::vkcore::ReleaseQueue m_shutdown_release;
+    luna::vkcore::DeferredRelease m_deferred_release;
 
-    vk::SwapchainKHR m_swapchain{};
-    vk::Format m_swapchain_image_format{vk::Format::eUndefined};
-
-    std::vector<vk::Image> m_swapchain_images;
-    std::vector<vk::ImageView> m_swapchain_image_views;
-    std::vector<VkImageLayout> m_swapchain_image_layouts;
-    vk::Extent2D m_swapchain_extent{};
-
-    DeletionQueue m_main_deletion_queue;
-
-    VmaAllocator m_allocator{VK_NULL_HANDLE};
-
-    AllocatedImage m_draw_image;
-    AllocatedImage m_depth_image;
+    luna::vkcore::VMAAllocator m_allocator;
+    luna::vkcore::RenderTarget m_render_target;
     vk::Extent2D m_draw_extent{};
-    VkImageLayout m_draw_image_layout{VK_IMAGE_LAYOUT_UNDEFINED};
-    VkImageLayout m_depth_image_layout{VK_IMAGE_LAYOUT_UNDEFINED};
 
     DescriptorAllocator m_global_descriptor_allocator;
 
@@ -199,8 +248,8 @@ public:
     AllocatedImage m_black_image;
     AllocatedImage m_grey_image;
     AllocatedImage m_error_checkerboard_image;
-    vk::Sampler m_default_sampler_linear{};
-    vk::Sampler m_default_sampler_nearest{};
+    AllocatedSampler m_default_sampler_linear;
+    AllocatedSampler m_default_sampler_nearest;
 
     vk::Pipeline m_gradient_pipeline{};
     vk::PipelineLayout m_gradient_pipeline_layout{};
@@ -219,6 +268,49 @@ public:
     GPUSceneData m_scene_data{};
     Camera m_main_camera;
 
+    void destroyImage(AllocatedImage& image);
+    void destroyBuffer(AllocatedBuffer& buffer);
+    void deferRelease(std::function<void()>&& function);
+    void immediateSubmit(const std::function<void(RenderCommandList&)>& function);
+    void recordDefaultScene(FrameRenderContext& render_context);
+
+    GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+    friend class LoadedGLTF;
+    friend std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
+                                                               const std::filesystem::path& file_path);
+
+private:
+    luna::vkcore::Instance m_instance_context;
+    luna::vkcore::PhysicalDevice m_physical_device_context;
+    luna::vkcore::Device m_device_context;
+    luna::vkcore::Queue m_graphics_queue_context;
+    luna::vkcore::Swapchain m_swapchain_context;
+
+    vk::Instance m_instance{};
+    vk::DebugUtilsMessengerEXT m_debug_messenger{};
+    vk::PhysicalDevice m_chosen_gpu{};
+    vk::Device m_device{};
+    vk::SurfaceKHR m_surface{};
+    vk::Queue m_graphics_queue{};
+    uint32_t m_graphics_queue_family{0};
+    vk::DeviceSize m_uniform_buffer_alignment{1};
+
+    bool initVulkan();
+    bool initSwapchain();
+    bool initCommands();
+    bool initSyncStructures();
+    bool initDescriptors();
+    bool initPipelines();
+    bool initBackgroundPipelines();
+    void initTrianglePipeline();
+    void initMeshPipeline();
+    void initDefaultData();
+
+    bool createSwapchain(uint32_t width, uint32_t height);
+    bool createRenderTarget(vk::Extent2D extent);
+    void destroyRenderTarget();
+
     AllocatedImage createImage(vk::Extent3D size,
                                 vk::Format format,
                                 vk::ImageUsageFlags usage,
@@ -232,8 +324,7 @@ public:
     }
     AllocatedImage createImage(
         void* data, vk::Extent3D size, vk::Format format, vk::ImageUsageFlags usage, bool mipmapped = false);
-    AllocatedImage createImage(
-        void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false)
+    AllocatedImage createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false)
     {
         return createImage(data,
                             toVk(size),
@@ -241,37 +332,12 @@ public:
                             static_cast<vk::ImageUsageFlags>(usage),
                             mipmapped);
     }
-    void destroyImage(const AllocatedImage& image);
-    void destroyBuffer(const AllocatedBuffer& buffer);
-
-    GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
-
-    friend class LoadedGLTF;
-    friend std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine,
-                                                               const std::filesystem::path& file_path);
-
-private:
-    bool initVulkan();
-    bool initSwapchain();
-    bool initCommands();
-    bool initSyncStructures();
-    bool initDescriptors();
-    bool initPipelines();
-    bool initBackgroundPipelines();
-    void initTrianglePipeline();
-    void initMeshPipeline();
-    void initDefaultData();
-
-    bool createSwapchain(uint32_t width, uint32_t height);
-    bool createDrawResources(vk::Extent2D extent);
-    void destroyDrawResources();
-
     AllocatedBuffer createBuffer(size_t alloc_size, vk::BufferUsageFlags usage, VmaMemoryUsage memory_usage);
     AllocatedBuffer createBuffer(size_t alloc_size, VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
     {
         return createBuffer(alloc_size, static_cast<vk::BufferUsageFlags>(usage), memory_usage);
     }
-    void immediateSubmit(const std::function<void(vk::CommandBuffer cmd)>& function);
+    void immediateSubmitVk(const std::function<void(vk::CommandBuffer cmd)>& function);
 
     void updateDrawImageDescriptors();
     vk::Extent2D getFramebufferExtent() const;
@@ -280,6 +346,8 @@ private:
     void drawGeometry(vk::CommandBuffer cmd);
     void updateScene();
 
+    void destroyImageImmediate(AllocatedImage& image);
+    void destroyBufferImmediate(AllocatedBuffer& buffer);
     void destroySwapchain();
 };
 

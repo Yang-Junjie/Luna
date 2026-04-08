@@ -11,10 +11,45 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
 set(RHI_SOURCE
     Renderer/Types.h
     Renderer/Shader.h
-    Renderer/ResourceLayout.h)
+    Renderer/RenderTypes.h
+    Renderer/RenderContext.h
+    Renderer/RenderContext.cpp
+    Renderer/Camera.h
+    Renderer/Camera.cpp
+    Renderer/VkLoader.h
+    Renderer/VkLoader.cpp)
 
 set(VULKAN_BACKEND_SOURCE 
     Vulkan/VkTypes.h
+    Vulkan/VkContext.h
+    Vulkan/VkDeferredRelease.h
+    Vulkan/VkDeferredRelease.cpp
+    Vulkan/VkTransientArena.h
+    Vulkan/VkTransientArena.cpp
+    Vulkan/VkFrameContext.h
+    Vulkan/VkFrameContext.cpp
+    Vulkan/VkBuffer.h
+    Vulkan/VkBuffer.cpp
+    Vulkan/VkImageView.h
+    Vulkan/VkImageView.cpp
+    Vulkan/VkImage.h
+    Vulkan/VkImage.cpp
+    Vulkan/VkSampler.h
+    Vulkan/VkSampler.cpp
+    Vulkan/VkRenderTarget.h
+    Vulkan/VkRenderTarget.cpp
+    Vulkan/VkVMAAllocator.h
+    Vulkan/VkVMAAllocator.cpp
+    Vulkan/VkInstance.h
+    Vulkan/VkInstance.cpp
+    Vulkan/VkPhysicalDevice.h
+    Vulkan/VkPhysicalDevice.cpp
+    Vulkan/VkDevice.h
+    Vulkan/VkDevice.cpp
+    Vulkan/VkQueue.h
+    Vulkan/VkQueue.cpp
+    Vulkan/VkSwapchain.h
+    Vulkan/VkSwapchain.cpp
     Vulkan/VkInitializers.cpp
     Vulkan/VkInitializers.h
     Vulkan/VkImages.h
@@ -25,12 +60,9 @@ set(VULKAN_BACKEND_SOURCE
     Vulkan/VkPipelines.cpp
     Vulkan/VkEngine.h
     Vulkan/VkEngine.cpp
-    Vulkan/VkLoader.h
-    Vulkan/VkLoader.cpp
     Vulkan/VkShader.cpp
     Vulkan/VkShader.h
-    Vulkan/Camera.cpp
-    Vulkan/Camera.h)
+)
 
 add_library(
     LunaCore

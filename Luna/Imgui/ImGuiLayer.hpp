@@ -1,8 +1,7 @@
 #pragma once
 
 #include "Core/Layer.h"
-
-#include <vulkan/vulkan.hpp>
+#include "Renderer/RenderContext.h"
 
 struct GLFWwindow;
 
@@ -25,7 +24,9 @@ public:
     void begin();
     void end();
 
-    void render(vk::CommandBuffer command_buffer, vk::ImageView target_image_view, vk::Extent2D target_extent);
+    void render(RenderCommandList& command_list,
+                const luna::vkcore::ImageView& target_image_view,
+                luna::render::Extent2D target_extent);
     void renderPlatformWindows();
 
     void blockEvents(bool block)
@@ -49,7 +50,7 @@ private:
     bool m_block_events = true;
     bool m_attached = false;
     bool m_enable_multi_viewport = false;
-    vk::Format m_color_attachment_format = vk::Format::eUndefined;
+    luna::render::PixelFormat m_color_attachment_format = luna::render::PixelFormat::Undefined;
     GLFWwindow* m_window = nullptr;
     VulkanEngine* m_engine = nullptr;
 };
