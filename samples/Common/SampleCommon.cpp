@@ -45,7 +45,9 @@ void UploadedTexture::uploadIfNeeded(VulkanAbstractionLayer::CommandBuffer& comm
         VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION,
         VulkanAbstractionLayer::ImageUsage::SHADER_READ);
 
-    m_staging_buffer = {};
+    // Keep the staging buffer alive for the lifetime of the sample object.
+    // The upload copy is recorded into the current frame command buffer, so
+    // destroying the source buffer here invalidates the commands before submit.
     m_uploaded = true;
 }
 
