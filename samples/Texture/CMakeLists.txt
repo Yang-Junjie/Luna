@@ -3,6 +3,7 @@ add_library(
     STATIC
     TextureApp.h
     TextureApp.cpp
+    TextureLayer.h
     TextureRenderPass.h
     TextureRenderPass.cpp
     Shaders/TexturedQuad.vert
@@ -18,7 +19,13 @@ target_include_directories(
 target_link_libraries(
     LunaTextureSample
     PUBLIC
-        LunaSampleCommon
+        LunaCore
+)
+
+target_compile_definitions(
+    LunaTextureSample
+    PUBLIC
+        LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
 )
 
 add_executable(TextureSample ${PROJECT_SOURCE_DIR}/Luna/Core/Main.cpp)

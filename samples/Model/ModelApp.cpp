@@ -1,6 +1,6 @@
 #include "samples/Model/ModelApp.h"
 
-#include "samples/Common/SampleCameraLayer.h"
+#include "samples/Model/ModelLayer.h"
 #include "samples/Model/ModelRenderPass.h"
 
 namespace luna::samples::model {
@@ -18,11 +18,7 @@ ModelApp::ModelApp()
 
 void ModelApp::onInit()
 {
-    pushLayer(std::make_unique<luna::samples::SampleCameraLayer>(luna::samples::SampleCameraLayerOptions{
-        .m_title = "Model",
-        .m_description = "Loads assets/basicmesh.glb, uploads its materials, and renders the mesh with depth testing.",
-        .m_initial_position = glm::vec3{0.0f, 0.5f, 4.5f},
-    }));
+    pushLayer(std::make_unique<ModelLayer>());
 }
 
 } // namespace luna::samples::model

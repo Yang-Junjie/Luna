@@ -1,6 +1,6 @@
 #include "samples/Triangle/TriangleApp.h"
 
-#include "samples/Common/SampleCameraLayer.h"
+#include "samples/Triangle/TriangleLayer.h"
 #include "samples/Triangle/TriangleRenderPass.h"
 
 namespace luna::samples::triangle {
@@ -18,11 +18,7 @@ TriangleApp::TriangleApp()
 
 void TriangleApp::onInit()
 {
-    pushLayer(std::make_unique<luna::samples::SampleCameraLayer>(luna::samples::SampleCameraLayerOptions{
-        .m_title = "Triangle",
-        .m_description = "Minimal triangle sample built with the same Application + Layer architecture as Editor.",
-        .m_initial_position = glm::vec3{0.0f, 0.0f, 2.5f},
-    }));
+    pushLayer(std::make_unique<TriangleLayer>());
 }
 
 } // namespace luna::samples::triangle

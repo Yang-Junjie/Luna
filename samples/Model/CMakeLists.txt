@@ -3,6 +3,7 @@ add_library(
     STATIC
     ModelApp.h
     ModelApp.cpp
+    ModelLayer.h
     ModelRenderPass.h
     ModelRenderPass.cpp
     Shaders/Model.vert
@@ -18,7 +19,13 @@ target_include_directories(
 target_link_libraries(
     LunaModelSample
     PUBLIC
-        LunaSampleCommon
+        LunaCore
+)
+
+target_compile_definitions(
+    LunaModelSample
+    PUBLIC
+        LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
 )
 
 add_executable(ModelSample ${PROJECT_SOURCE_DIR}/Luna/Core/Main.cpp)

@@ -1,6 +1,6 @@
 #include "samples/Texture/TextureApp.h"
 
-#include "samples/Common/SampleCameraLayer.h"
+#include "samples/Texture/TextureLayer.h"
 #include "samples/Texture/TextureRenderPass.h"
 
 namespace luna::samples::texture {
@@ -18,11 +18,7 @@ TextureApp::TextureApp()
 
 void TextureApp::onInit()
 {
-    pushLayer(std::make_unique<luna::samples::SampleCameraLayer>(luna::samples::SampleCameraLayerOptions{
-        .m_title = "Texture",
-        .m_description = "Loads assets/head.jpg and renders it on a textured quad.",
-        .m_initial_position = glm::vec3{0.0f, 0.0f, 2.2f},
-    }));
+    pushLayer(std::make_unique<TextureLayer>());
 }
 
 } // namespace luna::samples::texture

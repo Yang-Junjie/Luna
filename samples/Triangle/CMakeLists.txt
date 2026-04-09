@@ -3,6 +3,7 @@ add_library(
     STATIC
     TriangleApp.h
     TriangleApp.cpp
+    TriangleLayer.h
     TriangleRenderPass.h
     TriangleRenderPass.cpp
     Shaders/Triangle.vert
@@ -18,7 +19,13 @@ target_include_directories(
 target_link_libraries(
     LunaTriangleSample
     PUBLIC
-        LunaSampleCommon
+        LunaCore
+)
+
+target_compile_definitions(
+    LunaTriangleSample
+    PUBLIC
+        LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
 )
 
 add_executable(TriangleSample ${PROJECT_SOURCE_DIR}/Luna/Core/Main.cpp)

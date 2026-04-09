@@ -7,31 +7,20 @@
 #include "imgui.h"
 
 #include <algorithm>
-#include <string>
 
-namespace luna::samples {
+namespace luna::samples::model {
 
-struct SampleCameraLayerOptions {
-    std::string m_title;
-    std::string m_description;
-    glm::vec3 m_initial_position{0.0f, 0.0f, 3.0f};
-    float m_camera_speed{5.0f};
-    float m_camera_boost_multiplier{4.0f};
-    float m_mouse_sensitivity{0.003f};
-};
-
-class SampleCameraLayer final : public Layer {
+class ModelLayer final : public Layer {
 public:
-    explicit SampleCameraLayer(SampleCameraLayerOptions options)
-        : Layer("SampleCameraLayer"),
-          m_options(std::move(options))
+    ModelLayer()
+        : Layer("ModelLayer")
     {}
 
     void onAttach() override
     {
         auto& camera = Application::get().getRenderer().getMainCamera();
-        camera.m_position = m_options.m_initial_position;
-        camera.m_pitch = 0.0f;
+        camera.m_position = glm::vec3{0.0f, 0.5f, 4.5f};
+        camera.m_pitch = -0.15f;
         camera.m_yaw = 0.0f;
         m_last_mouse_position = Input::getMousePosition();
     }
@@ -64,8 +53,8 @@ public:
         const glm::vec2 mouse_delta = mouse_position - m_last_mouse_position;
         m_last_mouse_position = mouse_position;
 
-        camera.m_yaw += mouse_delta.x * m_options.m_mouse_sensitivity;
-        camera.m_pitch -= mouse_delta.y * m_options.m_mouse_sensitivity;
+        camera.m_yaw += mouse_delta.x * m_mouse_sensitivity;
+        camera.m_pitch -= mouse_delta.y * m_mouse_sensitivity;
         camera.m_pitch = std::clamp(camera.m_pitch, -1.5f, 1.5f);
 
         const glm::mat4 camera_rotation = camera.getRotationMatrix();
@@ -74,32 +63,20 @@ public:
         const glm::vec3 up = glm::vec3(0, 1, 0);
 
         glm::vec3 movement{0.0f};
-        if (Input::isKeyPressed(KeyCode::W)) {
-            movement += forward;
-        }
-        if (Input::isKeyPressed(KeyCode::S)) {
-            movement -= forward;
-        }
-        if (Input::isKeyPressed(KeyCode::D)) {
-            movement += right;
-        }
-        if (Input::isKeyPressed(KeyCode::A)) {
-            movement -= right;
-        }
-        if (Input::isKeyPressed(KeyCode::E)) {
-            movement += up;
-        }
-        if (Input::isKeyPressed(KeyCode::Q)) {
-            movement -= up;
-        }
+        if (Input::isKeyPressed(KeyCode::W)) movement += forward;
+        if (Input::isKeyPressed(KeyCode::S)) movement -= forward;
+        if (Input::isKeyPressed(KeyCode::D)) movement += right;
+        if (Input::isKeyPressed(KeyCode::A)) movement -= right;
+        if (Input::isKeyPressed(KeyCode::E)) movement += up;
+        if (Input::isKeyPressed(KeyCode::Q)) movement -= up;
 
         if (glm::dot(movement, movement) > 0.0f) {
             movement = glm::normalize(movement);
         }
 
-        float speed = m_options.m_camera_speed;
+        float speed = m_camera_speed;
         if (Input::isKeyPressed(KeyCode::LeftShift) || Input::isKeyPressed(KeyCode::RightShift)) {
-            speed *= m_options.m_camera_boost_multiplier;
+            speed *= m_camera_boost_multiplier;
         }
 
         camera.m_position += movement * speed * static_cast<float>(dt);
@@ -107,19 +84,12 @@ public:
 
     void onImGuiRender() override
     {
-        auto& renderer = Application::get().getRenderer();
-        const auto& camera = renderer.getMainCamera();
-
-        if (ImGui::Begin("Sample")) {
-            ImGui::TextUnformatted(m_options.m_title.c_str());
-            if (!m_options.m_description.empty()) {
-                ImGui::Separator();
-                ImGui::TextWrapped("%s", m_options.m_description.c_str());
-            }
+        const auto& camera = Application::get().getRenderer().getMainCamera();
+        if (ImGui::Begin("Model")) {
+            ImGui::TextUnformatted("Asset: assets/basicmesh.glb");
             ImGui::Separator();
             ImGui::Text("Camera Active: %s", m_camera_active ? "Yes" : "No");
             ImGui::Text("Position: %.2f %.2f %.2f", camera.m_position.x, camera.m_position.y, camera.m_position.z);
-            ImGui::Text("Pitch/Yaw: %.2f %.2f", camera.m_pitch, camera.m_yaw);
             ImGui::TextUnformatted("Hold RMB to look around. WASD move, Q/E vertical, Shift boost.");
         }
         ImGui::End();
@@ -139,9 +109,11 @@ private:
     }
 
 private:
-    SampleCameraLayerOptions m_options;
     bool m_camera_active{false};
     glm::vec2 m_last_mouse_position{0.0f, 0.0f};
+    float m_camera_speed{5.0f};
+    float m_camera_boost_multiplier{4.0f};
+    float m_mouse_sensitivity{0.003f};
 };
 
-} // namespace luna::samples
+} // namespace luna::samples::model
