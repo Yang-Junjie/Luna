@@ -18,6 +18,7 @@ struct ApplicationSpecification {
     uint32_t m_window_width = 1'600, m_window_height = 900;
     bool m_maximized = false;
     bool m_enable_multi_viewport = false;
+    VulkanRenderer::RenderGraphBuilderCallback m_render_graph_builder;
 };
 
 class Application {

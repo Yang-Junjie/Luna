@@ -32,7 +32,7 @@ Application::Application(const ApplicationSpecification& spec)
         onEvent(event);
     });
 
-    if (!m_renderer.init(*m_window)) {
+    if (!m_renderer.init(*m_window, m_specification.m_render_graph_builder)) {
         LUNA_CORE_ERROR("Renderer initialization failed");
         m_window.reset();
         m_s_instance = nullptr;

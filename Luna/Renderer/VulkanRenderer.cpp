@@ -16,6 +16,8 @@
 
 namespace {
 
+using RenderGraphBuildInfo = luna::VulkanRenderer::RenderGraphBuildInfo;
+
 class ClearColorPass final : public VulkanAbstractionLayer::RenderPass {
 public:
     ClearColorPass(VulkanAbstractionLayer::Format format, uint32_t width, uint32_t height, const glm::vec4* clear_color)
@@ -44,6 +46,23 @@ private:
     const glm::vec4* m_clear_color{nullptr};
 };
 
+std::unique_ptr<VulkanAbstractionLayer::RenderGraph> buildDefaultRenderGraph(
+    const RenderGraphBuildInfo& build_info, const glm::vec4* clear_color)
+{
+    VulkanAbstractionLayer::RenderGraphBuilder builder;
+    builder.AddRenderPass(
+               "clear",
+               std::make_unique<ClearColorPass>(
+                   build_info.m_surface_format,
+                   build_info.m_framebuffer_width,
+                   build_info.m_framebuffer_height,
+                   clear_color))
+        .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
+        .SetOutputName("scene_color");
+
+    return builder.Build();
+}
+
 } // namespace
 
 namespace luna {
@@ -55,12 +74,13 @@ VulkanRenderer::~VulkanRenderer()
     shutdown();
 }
 
-bool VulkanRenderer::init(Window& window)
+bool VulkanRenderer::init(Window& window, RenderGraphBuilderCallback render_graph_builder)
 {
     shutdown();
 
     m_window = &window;
     m_native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
+    m_render_graph_builder = std::move(render_graph_builder);
     if (m_native_window == nullptr) {
         LUNA_CORE_ERROR("Cannot initialize Vulkan renderer without a GLFW window");
         return false;
@@ -228,14 +248,17 @@ void VulkanRenderer::rebuildRenderGraph()
         return;
     }
 
-    VulkanAbstractionLayer::RenderGraphBuilder builder;
-    builder.AddRenderPass(
-               "clear",
-               std::make_unique<ClearColorPass>(m_context->GetSurfaceFormat(), extent.width, extent.height, &m_clear_color))
-        .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
-        .SetOutputName("scene_color");
+    const RenderGraphBuildInfo build_info{
+        .m_surface_format = m_context->GetSurfaceFormat(),
+        .m_framebuffer_width = extent.width,
+        .m_framebuffer_height = extent.height,
+    };
 
-    m_render_graph = builder.Build();
+    if (m_render_graph_builder) {
+        m_render_graph = m_render_graph_builder(build_info);
+    } else {
+        m_render_graph = buildDefaultRenderGraph(build_info, &m_clear_color);
+    }
 }
 
 vk::Extent2D VulkanRenderer::getFramebufferExtent() const

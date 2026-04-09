@@ -34,6 +34,8 @@ set(VAL_SOURCE
     Vulkan/DescriptorBinding.cpp
     Vulkan/DescriptorCache.h
     Vulkan/DescriptorCache.cpp
+    Vulkan/GraphicShader.h
+    Vulkan/GraphicShader.cpp
     Vulkan/Image.h
     Vulkan/Image.cpp
     Vulkan/Pipeline.h
