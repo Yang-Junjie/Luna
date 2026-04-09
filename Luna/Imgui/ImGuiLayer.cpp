@@ -2,29 +2,16 @@
 
 #include "Core/Log.h"
 #include "Events/Event.h"
-#include "Vulkan/VkEngine.h"
-#include "Vulkan/VkTypes.h"
+#include "Imgui/ImGuiContext.h"
 
 #include <imgui.h>
-#include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
-#include <GLFW/glfw3.h>
-
-#include <cstdlib>
 
 namespace luna {
 
-namespace {
-
-constexpr uint32_t k_im_gui_descriptor_pool_size = 64;
-
-} // namespace
-
-ImGuiLayer::ImGuiLayer(GLFWwindow* window, VulkanEngine& engine, bool enable_multi_viewport)
+ImGuiLayer::ImGuiLayer(VulkanRenderer& renderer, bool enable_multi_viewport)
     : Layer("ImGuiLayer"),
       m_enable_multi_viewport(enable_multi_viewport),
-      m_window(window),
-      m_engine(&engine)
+      m_renderer(&renderer)
 {}
 
 void ImGuiLayer::onAttach()
@@ -33,8 +20,7 @@ void ImGuiLayer::onAttach()
         return;
     }
 
-    if (m_window == nullptr || m_engine == nullptr || !m_engine->hasDevice() ||
-        m_engine->getSwapchainImageFormat() == luna::render::PixelFormat::Undefined) {
+    if (m_renderer == nullptr || !m_renderer->isInitialized() || m_renderer->getNativeWindow() == nullptr) {
         LUNA_CORE_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
         return;
     }
@@ -60,52 +46,9 @@ void ImGuiLayer::onAttach()
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    if (!ImGui_ImplGlfw_InitForVulkan(m_window, true)) {
-        LUNA_CORE_ERROR("Failed to initialize ImGui GLFW backend for Vulkan");
-        ImGui::DestroyContext();
-        return;
-    }
-
-    m_color_attachment_format = m_engine->getSwapchainImageFormat();
-    const uint32_t image_count = m_engine->getSwapchainImageCount();
-
-    ImGui_ImplVulkan_InitInfo init_info{};
-    init_info.ApiVersion = VK_API_VERSION_1_3;
-    init_info.Instance = static_cast<VkInstance>(m_engine->getInstanceHandle());
-    init_info.PhysicalDevice = static_cast<VkPhysicalDevice>(m_engine->getPhysicalDeviceHandle());
-    init_info.Device = static_cast<VkDevice>(m_engine->getDeviceHandle());
-    init_info.QueueFamily = m_engine->getGraphicsQueueFamily();
-    init_info.Queue = static_cast<VkQueue>(m_engine->getGraphicsQueueHandle());
-    init_info.DescriptorPoolSize = k_im_gui_descriptor_pool_size;
-    init_info.MinImageCount = image_count;
-    init_info.ImageCount = image_count;
-    init_info.MinAllocationSize = 1024 * 1024;
-    init_info.UseDynamicRendering = true;
-    init_info.CheckVkResultFn = &ImGuiLayer::checkVulkanResult;
-    init_info.PipelineInfoMain.Subpass = 0;
-    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    init_info.PipelineInfoForViewports.Subpass = 0;
-    init_info.PipelineInfoForViewports.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    init_info.PipelineInfoForViewports.SwapChainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkPipelineRenderingCreateInfo pipeline_rendering_info{};
-    pipeline_rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    pipeline_rendering_info.colorAttachmentCount = 1;
-    const VkFormat color_attachment_format = static_cast<VkFormat>(toVk(m_color_attachment_format));
-    pipeline_rendering_info.pColorAttachmentFormats = &color_attachment_format;
-    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_info;
-    init_info.PipelineInfoForViewports.PipelineRenderingCreateInfo = pipeline_rendering_info;
-
-    if (!ImGui_ImplVulkan_Init(&init_info)) {
-        LUNA_CORE_ERROR("Failed to initialize ImGui Vulkan backend");
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-        return;
-    }
-
-    ImGui_ImplGlfw_SetCallbacksChainForAllWindows(true);
+    VulkanAbstractionLayer::ImGuiVulkanContext::Init(m_renderer->getNativeWindow(), m_renderer->getImGuiRenderPass());
     m_attached = true;
-    LUNA_CORE_INFO("Initialized ImGui for Vulkan");
+    LUNA_CORE_INFO("Initialized ImGui for VulkanAbstractionLayer");
 }
 
 void ImGuiLayer::onDetach()
@@ -114,15 +57,7 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    if (m_engine != nullptr && m_engine->hasDevice()) {
-        VK_CHECK(m_engine->getDeviceHandle().waitIdle());
-    }
-
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-
-    m_color_attachment_format = luna::render::PixelFormat::Undefined;
+    VulkanAbstractionLayer::ImGuiVulkanContext::Destroy();
     m_attached = false;
 }
 
@@ -143,9 +78,7 @@ void ImGuiLayer::begin()
         return;
     }
 
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+    VulkanAbstractionLayer::ImGuiVulkanContext::StartFrame();
 
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
@@ -158,42 +91,6 @@ void ImGuiLayer::end()
     if (!m_attached) {
         return;
     }
-
-    ImGui::Render();
-}
-
-void ImGuiLayer::render(RenderCommandList& command_list,
-                        const luna::vkcore::ImageView& target_image_view,
-                        luna::render::Extent2D target_extent)
-{
-    if (!m_attached) {
-        return;
-    }
-
-    ImDrawData* draw_data = ImGui::GetDrawData();
-    if (draw_data == nullptr || draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f) {
-        return;
-    }
-
-    if (!command_list.isValid()) {
-        return;
-    }
-
-    vk::RenderingAttachmentInfo color_attachment{};
-    color_attachment.imageView = target_image_view.get();
-    color_attachment.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    color_attachment.loadOp = vk::AttachmentLoadOp::eLoad;
-    color_attachment.storeOp = vk::AttachmentStoreOp::eStore;
-
-    vk::RenderingInfo rendering_info{};
-    rendering_info.renderArea.extent = toVk(target_extent);
-    rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachments = &color_attachment;
-
-    command_list.m_handle.beginRendering(&rendering_info);
-    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(command_list.m_handle));
-    command_list.m_handle.endRendering();
 }
 
 void ImGuiLayer::renderPlatformWindows()
@@ -214,20 +111,6 @@ bool ImGuiLayer::viewportsEnabled() const
 
     const ImGuiIO& io = ImGui::GetIO();
     return (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) != 0;
-}
-
-void ImGuiLayer::checkVulkanResult(VkResult result)
-{
-    if (result == VK_SUCCESS) {
-        return;
-    }
-
-    if (result < 0) {
-        LUNA_CORE_FATAL("ImGui Vulkan backend error: {}", vk::to_string(static_cast<vk::Result>(result)));
-        std::abort();
-    }
-
-    LUNA_CORE_WARN("ImGui Vulkan backend warning: {}", vk::to_string(static_cast<vk::Result>(result)));
 }
 
 void ImGuiLayer::setImGuiWidgetStyle()
@@ -290,4 +173,3 @@ void ImGuiLayer::setDarkThemeColors()
 }
 
 } // namespace luna
-

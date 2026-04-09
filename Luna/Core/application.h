@@ -4,8 +4,8 @@
 #include "Imgui/ImGuiLayer.hpp"
 #include "Layer.h"
 #include "LayerStack.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Timestep.h"
-#include "Vulkan/VkEngine.h"
 #include "Window.h"
 
 #include <memory>
@@ -55,10 +55,9 @@ public:
         return m_initialized;
     }
 
-    // temporary
-    VulkanEngine& getEngine()
+    VulkanRenderer& getRenderer()
     {
-        return m_engine;
+        return m_renderer;
     }
 
 protected:
@@ -66,13 +65,7 @@ protected:
 
     virtual void onUpdate(Timestep) {}
 
-    virtual void onRender(FrameRenderContext& render_context);
-
-    virtual void onOverlayRender(RenderCommandList& command_list,
-                                 const luna::vkcore::ImageView& target_image_view,
-                                 luna::render::Extent2D target_extent);
-
-    virtual void onBeforePresent();
+    virtual void onRender();
 
     virtual void onShutdown() {}
 
@@ -89,7 +82,7 @@ private:
 
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
-    VulkanEngine m_engine;
+    VulkanRenderer m_renderer;
 
     std::unique_ptr<ImGuiLayer> m_im_gui_layer;
     ImGuiLayer* m_im_gui_layer_raw = nullptr;

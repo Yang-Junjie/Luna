@@ -1,11 +1,7 @@
 #pragma once
 
 #include "Core/Layer.h"
-#include "Renderer/RenderContext.h"
-
-struct GLFWwindow;
-
-class VulkanEngine;
+#include "Renderer/VulkanRenderer.h"
 
 namespace luna {
 
@@ -13,7 +9,7 @@ class Event;
 
 class ImGuiLayer final : public Layer {
 public:
-    ImGuiLayer(GLFWwindow* window, VulkanEngine& engine, bool enable_multi_viewport);
+    ImGuiLayer(VulkanRenderer& renderer, bool enable_multi_viewport);
     ~ImGuiLayer() override = default;
 
     void onAttach() override;
@@ -24,9 +20,6 @@ public:
     void begin();
     void end();
 
-    void render(RenderCommandList& command_list,
-                const luna::vkcore::ImageView& target_image_view,
-                luna::render::Extent2D target_extent);
     void renderPlatformWindows();
 
     void blockEvents(bool block)
@@ -42,7 +35,6 @@ public:
     bool viewportsEnabled() const;
 
 private:
-    static void checkVulkanResult(VkResult result);
     void setImGuiWidgetStyle();
     void setDarkThemeColors();
 
@@ -50,9 +42,7 @@ private:
     bool m_block_events = true;
     bool m_attached = false;
     bool m_enable_multi_viewport = false;
-    luna::render::PixelFormat m_color_attachment_format = luna::render::PixelFormat::Undefined;
-    GLFWwindow* m_window = nullptr;
-    VulkanEngine* m_engine = nullptr;
+    VulkanRenderer* m_renderer = nullptr;
 };
 
 } // namespace luna

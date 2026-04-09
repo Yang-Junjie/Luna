@@ -1,5 +1,7 @@
 #include "Application.h"
 
+#include "Core/Log.h"
+
 #include <chrono>
 #include <GLFW/glfw3.h>
 #include <thread>
@@ -30,15 +32,14 @@ Application::Application(const ApplicationSpecification& spec)
         onEvent(event);
     });
 
-    if (!m_engine.init(*m_window)) {
+    if (!m_renderer.init(*m_window)) {
         LUNA_CORE_ERROR("Renderer initialization failed");
         m_window.reset();
         m_s_instance = nullptr;
         return;
     }
 
-    auto* native_window = static_cast<GLFWwindow*>(m_window->getNativeWindow());
-    m_im_gui_layer = std::make_unique<ImGuiLayer>(native_window, m_engine, m_specification.m_enable_multi_viewport);
+    m_im_gui_layer = std::make_unique<ImGuiLayer>(m_renderer, m_specification.m_enable_multi_viewport);
     m_im_gui_layer_raw = m_im_gui_layer.get();
     m_im_gui_layer->onAttach();
 
@@ -46,7 +47,7 @@ Application::Application(const ApplicationSpecification& spec)
         LUNA_CORE_ERROR("ImGui initialization failed");
         m_im_gui_layer.reset();
         m_im_gui_layer_raw = nullptr;
-        m_engine.cleanup();
+        m_renderer.shutdown();
         m_window.reset();
         m_s_instance = nullptr;
         return;
@@ -63,7 +64,7 @@ Application::~Application()
         m_im_gui_layer_raw = nullptr;
     }
 
-    m_engine.cleanup();
+    m_renderer.shutdown();
     m_s_instance = nullptr;
 }
 
@@ -87,10 +88,6 @@ void Application::run()
             m_window->onUpdate();
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             continue;
-        }
-
-        if (m_engine.isSwapchainResizeRequested()) {
-            m_engine.resizeSwapchain();
         }
 
         onUpdate(m_timestep);
@@ -118,40 +115,27 @@ void Application::renderFrame()
         m_im_gui_layer->end();
     }
 
-    m_engine.draw(
-        [this](FrameRenderContext& render_context) {
-            onRender(render_context);
-        },
-        [this](RenderCommandList& command_list,
-               const luna::vkcore::ImageView& target_image_view,
-               luna::render::Extent2D target_extent) {
-            onOverlayRender(command_list, target_image_view, target_extent);
-        },
-        [this]() {
-            onBeforePresent();
-        });
-}
-
-void Application::onRender(FrameRenderContext& render_context)
-{
-    m_engine.recordDefaultScene(render_context);
-}
-
-void Application::onOverlayRender(RenderCommandList& command_list,
-                                  const luna::vkcore::ImageView& target_image_view,
-                                  luna::render::Extent2D target_extent)
-{
-    if (m_im_gui_layer != nullptr) {
-        m_im_gui_layer->render(command_list, target_image_view, target_extent);
+    if (!m_renderer.isRenderingEnabled()) {
+        return;
     }
-}
 
-void Application::onBeforePresent()
-{
+    m_renderer.startFrame();
+    onRender();
+
+    for (auto& layer : m_layer_stack) {
+        layer->onRender();
+    }
+
+    m_renderer.renderFrame();
+
     if (m_im_gui_layer != nullptr) {
         m_im_gui_layer->renderPlatformWindows();
     }
+
+    m_renderer.endFrame();
 }
+
+void Application::onRender() {}
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
 {
@@ -194,7 +178,7 @@ bool Application::onWindowResize(const WindowResizeEvent& event)
 {
     m_minimized = event.getWidth() == 0 || event.getHeight() == 0;
     if (!m_minimized) {
-        m_engine.requestSwapchainResize();
+        m_renderer.requestResize();
     }
     return false;
 }

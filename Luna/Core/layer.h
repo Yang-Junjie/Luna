@@ -24,6 +24,8 @@ public:
 
     virtual void onImGuiRender() {}
 
+    virtual void onRender() {}
+
     const std::string& getName() const
     {
         return m_name;

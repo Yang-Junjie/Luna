@@ -8,61 +8,56 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
 
-set(RHI_SOURCE
-    Renderer/Types.h
-    Renderer/Shader.h
-    Renderer/RenderTypes.h
-    Renderer/RenderContext.h
-    Renderer/RenderContext.cpp
+set(RENDERER_SOURCE
     Renderer/Camera.h
     Renderer/Camera.cpp
-    Renderer/VkLoader.h
-    Renderer/VkLoader.cpp)
+    Renderer/ImageLoader.h
+    Renderer/ImageLoader.cpp
+    Renderer/ModelLoader.h
+    Renderer/ModelLoader.cpp
+    Renderer/RenderGraph.h
+    Renderer/RenderGraph.cpp
+    Renderer/RenderGraphBuilder.h
+    Renderer/RenderGraphBuilder.cpp
+    Renderer/ShaderLoader.h
+    Renderer/ShaderLoader.cpp
+    Renderer/VulkanRenderer.h
+    Renderer/VulkanRenderer.cpp)
 
-set(VULKAN_BACKEND_SOURCE 
-    Vulkan/VkTypes.h
-    Vulkan/VkContext.h
-    Vulkan/VkDeferredRelease.h
-    Vulkan/VkDeferredRelease.cpp
-    Vulkan/VkTransientArena.h
-    Vulkan/VkTransientArena.cpp
-    Vulkan/VkFrameContext.h
-    Vulkan/VkFrameContext.cpp
-    Vulkan/VkBuffer.h
-    Vulkan/VkBuffer.cpp
-    Vulkan/VkImageView.h
-    Vulkan/VkImageView.cpp
-    Vulkan/VkImage.h
-    Vulkan/VkImage.cpp
-    Vulkan/VkSampler.h
-    Vulkan/VkSampler.cpp
-    Vulkan/VkRenderTarget.h
-    Vulkan/VkRenderTarget.cpp
-    Vulkan/VkVMAAllocator.h
-    Vulkan/VkVMAAllocator.cpp
-    Vulkan/VkInstance.h
-    Vulkan/VkInstance.cpp
-    Vulkan/VkPhysicalDevice.h
-    Vulkan/VkPhysicalDevice.cpp
-    Vulkan/VkDevice.h
-    Vulkan/VkDevice.cpp
-    Vulkan/VkQueue.h
-    Vulkan/VkQueue.cpp
-    Vulkan/VkSwapchain.h
-    Vulkan/VkSwapchain.cpp
-    Vulkan/VkInitializers.cpp
-    Vulkan/VkInitializers.h
-    Vulkan/VkImages.h
-    Vulkan/VkImages.cpp 
-    Vulkan/VkDescriptors.h
-    Vulkan/VkDescriptors.cpp
-    Vulkan/VkPipelines.h
-    Vulkan/VkPipelines.cpp
-    Vulkan/VkEngine.h
-    Vulkan/VkEngine.cpp
-    Vulkan/VkShader.cpp
-    Vulkan/VkShader.h
-)
+set(VAL_SOURCE
+    Vulkan/ArrayUtils.h
+    Vulkan/Buffer.h
+    Vulkan/Buffer.cpp
+    Vulkan/CommandBuffer.h
+    Vulkan/CommandBuffer.cpp
+    Vulkan/DescriptorBinding.h
+    Vulkan/DescriptorBinding.cpp
+    Vulkan/DescriptorCache.h
+    Vulkan/DescriptorCache.cpp
+    Vulkan/Image.h
+    Vulkan/Image.cpp
+    Vulkan/Pipeline.h
+    Vulkan/Pipeline.cpp
+    Vulkan/RenderPass.h
+    Vulkan/RenderPass.cpp
+    Vulkan/Sampler.h
+    Vulkan/Sampler.cpp
+    Vulkan/Shader.h
+    Vulkan/ShaderReflection.h
+    Vulkan/ShaderReflection.cpp
+    Vulkan/StageBuffer.h
+    Vulkan/StageBuffer.cpp
+    Vulkan/VirtualFrame.h
+    Vulkan/VirtualFrame.cpp
+    Vulkan/VulkanContext.h
+    Vulkan/VulkanContext.cpp
+    Vulkan/VulkanMemoryAllocator.h
+    Vulkan/VulkanMemoryAllocator.cpp
+    Vulkan/VulkanSurface.h
+    Vulkan/VulkanSurface.cpp
+    Imgui/ImGuiContext.h
+    Imgui/ImGuiContext.cpp
+    Imgui/ImGuiRenderPass.h)
 
 add_library(
     LunaCore
@@ -91,8 +86,8 @@ add_library(
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
-    ${RHI_SOURCE}
-    ${VULKAN_BACKEND_SOURCE}
+    ${RENDERER_SOURCE}
+    ${VAL_SOURCE}
     ${IMGUI_SOURCE}
 )
 
@@ -105,27 +100,27 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/vkbootstrap/src
+        ${PROJECT_SOURCE_DIR}
 )
 
 target_link_libraries(LunaCore 
         PUBLIC
         spdlog::spdlog
+        fastgltf::fastgltf
+        glslang::glslang
+        glslang::glslang-default-resource-limits
+        glslang::SPIRV
         GPUOpen::VulkanMemoryAllocator
         Vulkan::Vulkan
         glfw
-        vk-bootstrap::vk-bootstrap
-        stb::stb
-        fastgltf::fastgltf
-        simdjson::simdjson
         spirv-cross-core
+        stb::stb
 )
 
 target_compile_definitions(
     LunaCore
     PUBLIC
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
-        VULKAN_HPP_DISABLE_ENHANCED_MODE
-        VULKAN_HPP_NO_CONSTRUCTORS
-        VULKAN_HPP_NO_EXCEPTIONS
+        GLM_ENABLE_EXPERIMENTAL
 )
 
