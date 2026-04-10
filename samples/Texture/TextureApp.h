@@ -9,6 +9,7 @@ public:
     TextureApp();
 
 protected:
+    VulkanRenderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
 };
 

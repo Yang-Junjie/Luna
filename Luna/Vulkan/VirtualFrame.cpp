@@ -1,20 +1,20 @@
 // Copyright(c) 2021, #Momo
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 // list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
 // and /or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -29,160 +29,155 @@
 #include "VirtualFrame.h"
 #include "VulkanContext.h"
 
-namespace VulkanAbstractionLayer
+namespace luna::val {
+void VirtualFrameProvider::Init(size_t frameCount, size_t stageBufferSize)
 {
-    void VirtualFrameProvider::Init(size_t frameCount, size_t stageBufferSize)
-    {
-        auto& vulkanContext = GetCurrentVulkanContext();
-        this->virtualFrames.reserve(frameCount);
+    auto& vulkanContext = GetCurrentVulkanContext();
+    this->virtualFrames.reserve(frameCount);
 
-        vk::CommandBufferAllocateInfo commandBufferAllocateInfo;
-        commandBufferAllocateInfo
-            .setCommandPool(vulkanContext.GetCommandPool())
-            .setCommandBufferCount((uint32_t)frameCount)
-            .setLevel(vk::CommandBufferLevel::ePrimary);
-        
-        auto commandBuffers = vulkanContext.GetDevice().allocateCommandBuffers(commandBufferAllocateInfo);
+    vk::CommandBufferAllocateInfo commandBufferAllocateInfo;
+    commandBufferAllocateInfo.setCommandPool(vulkanContext.GetCommandPool())
+        .setCommandBufferCount((uint32_t) frameCount)
+        .setLevel(vk::CommandBufferLevel::ePrimary);
 
-        for (size_t i = 0; i < frameCount; i++)
-        {
-            auto imageAvailableSemaphore = vulkanContext.GetDevice().createSemaphore(vk::SemaphoreCreateInfo{ });
-            auto fence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{ vk::FenceCreateFlagBits::eSignaled });
+    auto commandBuffers = vulkanContext.GetDevice().allocateCommandBuffers(commandBufferAllocateInfo);
 
-            this->virtualFrames.push_back(VirtualFrame{
-                CommandBuffer{ commandBuffers[i] },
-                StageBuffer(stageBufferSize),
-                imageAvailableSemaphore,
-                fence,
-            });
-        }
-    }
+    for (size_t i = 0; i < frameCount; i++) {
+        auto imageAvailableSemaphore = vulkanContext.GetDevice().createSemaphore(vk::SemaphoreCreateInfo{});
+        auto fence = vulkanContext.GetDevice().createFence(vk::FenceCreateInfo{vk::FenceCreateFlagBits::eSignaled});
 
-    void VirtualFrameProvider::Destroy()
-    {
-        auto& vulkanContext = GetCurrentVulkanContext();
-        for (const auto& virtualFrame : this->virtualFrames)
-        {
-            if((bool)virtualFrame.ImageAvailableSemaphore) vulkanContext.GetDevice().destroySemaphore(virtualFrame.ImageAvailableSemaphore);
-            if((bool)virtualFrame.CommandQueueFence) vulkanContext.GetDevice().destroyFence(virtualFrame.CommandQueueFence);
-        }
-        this->virtualFrames.clear();
-    }
-
-    void VirtualFrameProvider::StartFrame()
-    {
-        auto& vulkanContext = GetCurrentVulkanContext();
-        auto& frame = this->GetCurrentFrame();
-
-        vk::Result waitFenceResult = vulkanContext.GetDevice().waitForFences(frame.CommandQueueFence, false, UINT64_MAX);
-        assert(waitFenceResult == vk::Result::eSuccess);
-        vulkanContext.GetDevice().resetFences(frame.CommandQueueFence);
-
-        auto acquireNextImage = vulkanContext.GetDevice().acquireNextImageKHR(
-            vulkanContext.GetSwapchain(), UINT64_MAX, frame.ImageAvailableSemaphore);
-        assert(acquireNextImage.result == vk::Result::eSuccess || acquireNextImage.result == vk::Result::eSuboptimalKHR);
-        this->presentImageIndex = acquireNextImage.value;
-
-        frame.Commands.Begin();
-
-        this->isFrameRunning = true;
-    }
-
-    void VirtualFrameProvider::EndFrame()
-    {
-        auto& frame = this->GetCurrentFrame();
-        auto& vulkanContext = GetCurrentVulkanContext();
-
-        auto lastPresentImageUsage = vulkanContext.GetSwapchainImageUsage(this->presentImageIndex);
-        // reset present swapchain usage
-        auto& presentImage = vulkanContext.AcquireSwapchainImage(this->presentImageIndex, ImageUsage::UNKNOWN);
-
-        auto subresourceRange = GetDefaultImageSubresourceRange(presentImage);
-
-        // here we assume that present image is not written directly, but transfered from other image
-        vk::ImageMemoryBarrier presentImageTransferDstToPresent;
-        presentImageTransferDstToPresent
-            .setSrcAccessMask(ImageUsageToAccessFlags(lastPresentImageUsage))
-            .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
-            .setOldLayout(ImageUsageToImageLayout(lastPresentImageUsage))
-            .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
-            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
-            .setImage(presentImage.GetNativeHandle())
-            .setSubresourceRange(subresourceRange);
-
-        frame.Commands.GetNativeHandle().pipelineBarrier(
-            ImageUsageToPipelineStage(lastPresentImageUsage),
-            vk::PipelineStageFlagBits::eBottomOfPipe,
-            { }, // dependency flags
-            { }, // memory barriers
-            { }, // buffer barriers
-            presentImageTransferDstToPresent
-        );
-
-        frame.Commands.End();
-
-        frame.StagingBuffer.Flush();
-        frame.StagingBuffer.Reset();
-
-        const vk::Semaphore& renderFinishedSemaphore =
-            vulkanContext.GetSwapchainRenderFinishedSemaphore(this->presentImageIndex);
-        std::array waitDstStageMask = { (vk::PipelineStageFlags)vk::PipelineStageFlagBits::eTransfer };
-
-        vk::SubmitInfo submitInfo;
-        submitInfo
-            .setWaitSemaphores(frame.ImageAvailableSemaphore)
-            .setWaitDstStageMask(waitDstStageMask)
-            .setSignalSemaphores(renderFinishedSemaphore)
-            .setCommandBuffers(frame.Commands.GetNativeHandle());
-
-        GetCurrentVulkanContext().GetGraphicsQueue().submit(std::array{ submitInfo }, frame.CommandQueueFence);
-
-        vk::PresentInfoKHR presentInfo;
-        presentInfo
-            .setWaitSemaphores(renderFinishedSemaphore)
-            .setSwapchains(vulkanContext.GetSwapchain())
-            .setImageIndices(this->presentImageIndex);
-
-        auto presetSucceeded = vulkanContext.GetPresentQueue().presentKHR(presentInfo);
-        assert(presetSucceeded == vk::Result::eSuccess || presetSucceeded == vk::Result::eSuboptimalKHR);
-
-        this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
-        this->isFrameRunning = false;
-    }
-
-    VirtualFrame& VirtualFrameProvider::GetCurrentFrame()
-    {
-        return this->virtualFrames[this->currentFrame];
-    }
-
-    VirtualFrame& VirtualFrameProvider::GetNextFrame()
-    {
-        return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
-    }
-
-    const VirtualFrame& VirtualFrameProvider::GetCurrentFrame() const
-    {
-        return this->virtualFrames[this->currentFrame];
-    }
-
-    const VirtualFrame& VirtualFrameProvider::GetNextFrame() const
-    {
-        return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
-    }
-
-    bool VirtualFrameProvider::IsFrameRunning() const
-    {
-        return this->isFrameRunning;
-    }
-
-    size_t VirtualFrameProvider::GetFrameCount() const
-    {
-        return this->virtualFrames.size();
-    }
-
-    uint32_t VirtualFrameProvider::GetPresentImageIndex() const
-    {
-        return this->presentImageIndex;
+        this->virtualFrames.push_back(VirtualFrame{
+            CommandBuffer{commandBuffers[i]},
+            StageBuffer(stageBufferSize),
+            imageAvailableSemaphore,
+            fence,
+        });
     }
 }
+
+void VirtualFrameProvider::Destroy()
+{
+    auto& vulkanContext = GetCurrentVulkanContext();
+    for (const auto& virtualFrame : this->virtualFrames) {
+        if ((bool) virtualFrame.ImageAvailableSemaphore) {
+            vulkanContext.GetDevice().destroySemaphore(virtualFrame.ImageAvailableSemaphore);
+        }
+        if ((bool) virtualFrame.CommandQueueFence) {
+            vulkanContext.GetDevice().destroyFence(virtualFrame.CommandQueueFence);
+        }
+    }
+    this->virtualFrames.clear();
+}
+
+void VirtualFrameProvider::StartFrame()
+{
+    auto& vulkanContext = GetCurrentVulkanContext();
+    auto& frame = this->GetCurrentFrame();
+
+    vk::Result waitFenceResult = vulkanContext.GetDevice().waitForFences(frame.CommandQueueFence, false, UINT64_MAX);
+    assert(waitFenceResult == vk::Result::eSuccess);
+    vulkanContext.GetDevice().resetFences(frame.CommandQueueFence);
+
+    auto acquireNextImage = vulkanContext.GetDevice().acquireNextImageKHR(
+        vulkanContext.GetSwapchain(), UINT64_MAX, frame.ImageAvailableSemaphore);
+    assert(acquireNextImage.result == vk::Result::eSuccess || acquireNextImage.result == vk::Result::eSuboptimalKHR);
+    this->presentImageIndex = acquireNextImage.value;
+
+    frame.Commands.Begin();
+
+    this->isFrameRunning = true;
+}
+
+void VirtualFrameProvider::EndFrame()
+{
+    auto& frame = this->GetCurrentFrame();
+    auto& vulkanContext = GetCurrentVulkanContext();
+
+    auto lastPresentImageUsage = vulkanContext.GetSwapchainImageUsage(this->presentImageIndex);
+    // reset present swapchain usage
+    auto& presentImage = vulkanContext.AcquireSwapchainImage(this->presentImageIndex, ImageUsage::UNKNOWN);
+
+    auto subresourceRange = GetDefaultImageSubresourceRange(presentImage);
+
+    // here we assume that present image is not written directly, but transfered from other image
+    vk::ImageMemoryBarrier presentImageTransferDstToPresent;
+    presentImageTransferDstToPresent.setSrcAccessMask(ImageUsageToAccessFlags(lastPresentImageUsage))
+        .setDstAccessMask(vk::AccessFlagBits::eMemoryRead)
+        .setOldLayout(ImageUsageToImageLayout(lastPresentImageUsage))
+        .setNewLayout(vk::ImageLayout::ePresentSrcKHR)
+        .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+        .setImage(presentImage.GetNativeHandle())
+        .setSubresourceRange(subresourceRange);
+
+    frame.Commands.GetNativeHandle().pipelineBarrier(ImageUsageToPipelineStage(lastPresentImageUsage),
+                                                     vk::PipelineStageFlagBits::eBottomOfPipe,
+                                                     {}, // dependency flags
+                                                     {}, // memory barriers
+                                                     {}, // buffer barriers
+                                                     presentImageTransferDstToPresent);
+
+    frame.Commands.End();
+
+    frame.StagingBuffer.Flush();
+    frame.StagingBuffer.Reset();
+
+    const vk::Semaphore& renderFinishedSemaphore =
+        vulkanContext.GetSwapchainRenderFinishedSemaphore(this->presentImageIndex);
+    std::array waitDstStageMask = {(vk::PipelineStageFlags) vk::PipelineStageFlagBits::eTransfer};
+
+    vk::SubmitInfo submitInfo;
+    submitInfo.setWaitSemaphores(frame.ImageAvailableSemaphore)
+        .setWaitDstStageMask(waitDstStageMask)
+        .setSignalSemaphores(renderFinishedSemaphore)
+        .setCommandBuffers(frame.Commands.GetNativeHandle());
+
+    GetCurrentVulkanContext().GetGraphicsQueue().submit(std::array{submitInfo}, frame.CommandQueueFence);
+
+    vk::PresentInfoKHR presentInfo;
+    presentInfo.setWaitSemaphores(renderFinishedSemaphore)
+        .setSwapchains(vulkanContext.GetSwapchain())
+        .setImageIndices(this->presentImageIndex);
+
+    auto presetSucceeded = vulkanContext.GetPresentQueue().presentKHR(presentInfo);
+    assert(presetSucceeded == vk::Result::eSuccess || presetSucceeded == vk::Result::eSuboptimalKHR);
+
+    this->currentFrame = (this->currentFrame + 1) % this->virtualFrames.size();
+    this->isFrameRunning = false;
+}
+
+VirtualFrame& VirtualFrameProvider::GetCurrentFrame()
+{
+    return this->virtualFrames[this->currentFrame];
+}
+
+VirtualFrame& VirtualFrameProvider::GetNextFrame()
+{
+    return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
+}
+
+const VirtualFrame& VirtualFrameProvider::GetCurrentFrame() const
+{
+    return this->virtualFrames[this->currentFrame];
+}
+
+const VirtualFrame& VirtualFrameProvider::GetNextFrame() const
+{
+    return this->virtualFrames[(this->currentFrame + 1) % this->virtualFrames.size()];
+}
+
+bool VirtualFrameProvider::IsFrameRunning() const
+{
+    return this->isFrameRunning;
+}
+
+size_t VirtualFrameProvider::GetFrameCount() const
+{
+    return this->virtualFrames.size();
+}
+
+uint32_t VirtualFrameProvider::GetPresentImageIndex() const
+{
+    return this->presentImageIndex;
+}
+} // namespace luna::val

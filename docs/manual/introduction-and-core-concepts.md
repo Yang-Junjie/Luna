@@ -70,13 +70,13 @@ graph TD
 | Window | 平台窗口抽象 | `luna::Window` |
 | GLFWWindow | 当前平台窗口实现 | `luna::GLFWWindow` |
 | VulkanRenderer | 引擎侧渲染入口 | `luna::VulkanRenderer` |
-| VulkanContext | Vulkan 实例、设备、交换链与命令对象的管理器 | `VulkanAbstractionLayer::VulkanContext` |
-| RenderPass | 一个渲染/计算通道的逻辑接口 | `VulkanAbstractionLayer::RenderPass` |
-| RenderGraph | 由多个 Pass 和附件构成的执行图 | `VulkanAbstractionLayer::RenderGraph` |
-| Pipeline | Pass 声明阶段生成的资源与输出描述 | `VulkanAbstractionLayer::Pipeline` |
-| DescriptorBinding | 资源名到 descriptor 写入的绑定规则 | `VulkanAbstractionLayer::DescriptorBinding` |
-| ResolveInfo | 运行时资源名解析表 | `VulkanAbstractionLayer::ResolveInfo` |
-| StageBuffer | 每帧上传到 GPU 的暂存缓冲区 | `VulkanAbstractionLayer::StageBuffer` |
+| VulkanContext | Vulkan 实例、设备、交换链与命令对象的管理器 | `luna::val::VulkanContext` |
+| RenderPass | 一个渲染/计算通道的逻辑接口 | `luna::val::RenderPass` |
+| RenderGraph | 由多个 Pass 和附件构成的执行图 | `luna::val::RenderGraph` |
+| Pipeline | Pass 声明阶段生成的资源与输出描述 | `luna::val::Pipeline` |
+| DescriptorBinding | 资源名到 descriptor 写入的绑定规则 | `luna::val::DescriptorBinding` |
+| ResolveInfo | 运行时资源名解析表 | `luna::val::ResolveInfo` |
+| StageBuffer | 每帧上传到 GPU 的暂存缓冲区 | `luna::val::StageBuffer` |
 | Virtual Frame | 一套独立的命令缓冲、信号量、Fence 与 staging 资源 | `VirtualFrame` |
 | Shader Reflection | 从 SPIR-V 反推输入属性和描述符布局 | `ShaderLoader` + `ShaderReflection` |
 
@@ -87,7 +87,7 @@ graph TD
 - `LunaCore` 提供运行时基础设施。
 - `LunaEditor` 只是一个使用 `LunaCore` 的前端壳。
 
-### 2. VulkanAbstractionLayer 是“引擎内部库”
+### 2. luna::val 是“引擎内部库”
 
 虽然命名看起来像独立库，但它直接编译进 `LunaCore`，不是单独发布的外部二进制。
 

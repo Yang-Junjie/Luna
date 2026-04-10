@@ -18,7 +18,6 @@ struct ApplicationSpecification {
     uint32_t m_window_width = 1'600, m_window_height = 900;
     bool m_maximized = false;
     bool m_enable_multi_viewport = false;
-    VulkanRenderer::RenderGraphBuilderCallback m_render_graph_builder;
 };
 
 class Application {
@@ -26,12 +25,14 @@ public:
     explicit Application(const ApplicationSpecification& spec);
     virtual ~Application();
 
+    bool initialize();
+
     void pushLayer(std::unique_ptr<Layer> layer);
     void pushOverlay(std::unique_ptr<Layer> overlay);
 
     ImGuiLayer* getImGuiLayer() const
     {
-        return m_im_gui_layer_raw;
+        return m_imgui_layer_raw;
     }
 
     void close()
@@ -62,11 +63,14 @@ public:
     }
 
 protected:
+    virtual VulkanRenderer::InitializationOptions getRendererInitializationOptions()
+    {
+        return {};
+    }
+
     virtual void onInit() {}
 
     virtual void onUpdate(Timestep) {}
-
-    virtual void onRender();
 
     virtual void onShutdown() {}
 
@@ -85,8 +89,8 @@ private:
     std::unique_ptr<Window> m_window;
     VulkanRenderer m_renderer;
 
-    std::unique_ptr<ImGuiLayer> m_im_gui_layer;
-    ImGuiLayer* m_im_gui_layer_raw = nullptr;
+    std::unique_ptr<ImGuiLayer> m_imgui_layer;
+    ImGuiLayer* m_imgui_layer_raw = nullptr;
     LayerStack m_layer_stack;
 
     Timestep m_timestep;
@@ -96,4 +100,3 @@ private:
 
 Application* createApplication(int argc, char** argv);
 } // namespace luna
-

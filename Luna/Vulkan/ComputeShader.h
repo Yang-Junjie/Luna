@@ -1,20 +1,20 @@
 // Copyright(c) 2021, #Momo
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 // list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
 // and /or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -30,28 +30,27 @@
 
 #include "Shader.h"
 
-namespace VulkanAbstractionLayer
-{
-    class ComputeShader : public Shader
-    {
-        vk::ShaderModule computeShader;
-        std::vector<ShaderUniforms> shaderUniforms;
+namespace luna::val {
+class ComputeShader : public Shader {
+    vk::ShaderModule computeShader;
+    std::vector<ShaderUniforms> shaderUniforms;
 
-        void Destroy();
-    public:
-        ComputeShader() = default;
-        ComputeShader(const ShaderData& computeData);
-        ~ComputeShader();
+    void Destroy();
 
-        void Init(const ShaderData& computeData);
+public:
+    ComputeShader() = default;
+    ComputeShader(const ShaderData& computeData);
+    ~ComputeShader();
 
-        ComputeShader(const ComputeShader& other) = delete;
-        ComputeShader(ComputeShader&& other) noexcept;
-        ComputeShader& operator=(const ComputeShader& other) = delete;
-        ComputeShader& operator=(ComputeShader&& other) noexcept;
+    void Init(const ShaderData& computeData);
 
-        ArrayView<const TypeSPIRV> GetInputAttributes() const override;
-        ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
-        virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
-    };
-}
+    ComputeShader(const ComputeShader& other) = delete;
+    ComputeShader(ComputeShader&& other) noexcept;
+    ComputeShader& operator=(const ComputeShader& other) = delete;
+    ComputeShader& operator=(ComputeShader&& other) noexcept;
+
+    ArrayView<const TypeSPIRV> GetInputAttributes() const override;
+    ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
+    virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
+};
+} // namespace luna::val

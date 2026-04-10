@@ -130,10 +130,10 @@ Application* createApplication(int, char**) {
 当前 `VulkanRenderer::rebuildRenderGraph()` 已经是最好的示范。你可以仿照它添加新 pass:
 
 ```cpp
-VulkanAbstractionLayer::RenderGraphBuilder builder;
+luna::val::RenderGraphBuilder builder;
 builder
     .AddRenderPass("clear", std::make_unique<MyClearPass>())
-    .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
+    .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
     .SetOutputName("scene_color");
 
 auto graph = builder.Build();

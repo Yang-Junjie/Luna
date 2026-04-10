@@ -1,5 +1,4 @@
 #include "Application.h"
-
 #include "Core/Log.h"
 
 #include <chrono>
@@ -19,58 +18,77 @@ Application::Application(const ApplicationSpecification& spec)
     }
 
     m_s_instance = this;
-    m_window = Window::create(WindowProps{
-        m_specification.m_name, m_specification.m_window_width, m_specification.m_window_height, m_specification.m_maximized});
+}
+
+Application::~Application()
+{
+    if (m_imgui_layer != nullptr) {
+        m_imgui_layer->onDetach();
+        m_imgui_layer.reset();
+        m_imgui_layer_raw = nullptr;
+    }
+
+    m_renderer.shutdown();
+    m_window.reset();
+    m_initialized = false;
+    m_s_instance = nullptr;
+}
+
+bool Application::initialize()
+{
+    if (m_initialized) {
+        return true;
+    }
+
+    if (m_s_instance != this) {
+        LUNA_CORE_ERROR("Cannot initialize application because another instance already exists");
+        return false;
+    }
+
+    m_running = true;
+    m_minimized = false;
+    m_last_frame_time = 0.0f;
+
+    m_window = Window::create(WindowProps{m_specification.m_name,
+                                          m_specification.m_window_width,
+                                          m_specification.m_window_height,
+                                          m_specification.m_maximized});
 
     if (m_window == nullptr) {
         LUNA_CORE_ERROR("Application window creation failed");
-        m_s_instance = nullptr;
-        return;
+        return false;
     }
 
     m_window->setEventCallback([this](Event& event) {
         onEvent(event);
     });
 
-    if (!m_renderer.init(*m_window, m_specification.m_render_graph_builder)) {
+    if (!m_renderer.init(*m_window, getRendererInitializationOptions())) {
         LUNA_CORE_ERROR("Renderer initialization failed");
         m_window.reset();
-        m_s_instance = nullptr;
-        return;
+        return false;
     }
 
-    m_im_gui_layer = std::make_unique<ImGuiLayer>(m_renderer, m_specification.m_enable_multi_viewport);
-    m_im_gui_layer_raw = m_im_gui_layer.get();
-    m_im_gui_layer->onAttach();
+    m_imgui_layer = std::make_unique<ImGuiLayer>(m_renderer, m_specification.m_enable_multi_viewport);
+    m_imgui_layer_raw = m_imgui_layer.get();
+    m_imgui_layer->onAttach();
 
-    if (!m_im_gui_layer->isInitialized()) {
+    if (!m_imgui_layer->isInitialized()) {
         LUNA_CORE_ERROR("ImGui initialization failed");
-        m_im_gui_layer.reset();
-        m_im_gui_layer_raw = nullptr;
+        m_imgui_layer.reset();
+        m_imgui_layer_raw = nullptr;
         m_renderer.shutdown();
         m_window.reset();
-        m_s_instance = nullptr;
-        return;
+        return false;
     }
 
     m_initialized = true;
-}
-
-Application::~Application()
-{
-    if (m_im_gui_layer != nullptr) {
-        m_im_gui_layer->onDetach();
-        m_im_gui_layer.reset();
-        m_im_gui_layer_raw = nullptr;
-    }
-
-    m_renderer.shutdown();
-    m_s_instance = nullptr;
+    return true;
 }
 
 void Application::run()
 {
-    if (!m_initialized) {
+    if (!m_initialized && !initialize()) {
         LUNA_CORE_ERROR("Cannot run application because initialization failed");
         return;
     }
@@ -105,14 +123,14 @@ void Application::run()
 
 void Application::renderFrame()
 {
-    if (m_im_gui_layer != nullptr && m_im_gui_layer->isInitialized()) {
-        m_im_gui_layer->begin();
+    if (m_imgui_layer != nullptr && m_imgui_layer->isInitialized()) {
+        m_imgui_layer->begin();
 
         for (auto& layer : m_layer_stack) {
             layer->onImGuiRender();
         }
 
-        m_im_gui_layer->end();
+        m_imgui_layer->end();
     }
 
     if (!m_renderer.isRenderingEnabled()) {
@@ -120,7 +138,6 @@ void Application::renderFrame()
     }
 
     m_renderer.startFrame();
-    onRender();
 
     for (auto& layer : m_layer_stack) {
         layer->onRender();
@@ -128,14 +145,12 @@ void Application::renderFrame()
 
     m_renderer.renderFrame();
 
-    if (m_im_gui_layer != nullptr) {
-        m_im_gui_layer->renderPlatformWindows();
+    if (m_imgui_layer != nullptr) {
+        m_imgui_layer->renderPlatformWindows();
     }
 
     m_renderer.endFrame();
 }
-
-void Application::onRender() {}
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
 {
@@ -161,8 +176,8 @@ void Application::onEvent(Event& event)
         return onWindowResize(e);
     });
 
-    if (m_im_gui_layer != nullptr) {
-        m_im_gui_layer->onEvent(event);
+    if (m_imgui_layer != nullptr) {
+        m_imgui_layer->onEvent(event);
     }
 
     for (auto it = m_layer_stack.rbegin(); it != m_layer_stack.rend(); ++it) {
@@ -198,4 +213,3 @@ bool Application::onWindowClose(const WindowCloseEvent&)
 }
 
 } // namespace luna
-

@@ -146,10 +146,10 @@ auto& commands = m_context->GetCurrentCommandBuffer();
 m_render_graph->Execute(commands);
 m_render_graph->Present(
     commands,
-    m_context->AcquireCurrentSwapchainImage(VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION));
+    m_context->AcquireCurrentSwapchainImage(luna::val::ImageUsage::TRANSFER_DISTINATION));
 ```
 
-## 类名: `VulkanAbstractionLayer::RenderGraphBuilder`
+## 类名: `luna::val::RenderGraphBuilder`
 
 - **继承/实现**: 无
 - **简述**: 按声明式方式构建 RenderGraph，并自动推导附件分配和资源屏障。
@@ -183,7 +183,7 @@ m_render_graph->Present(
 6. 生成 pipeline barrier 回调
 7. 产出 `RenderGraph`
 
-## 类名: `VulkanAbstractionLayer::RenderGraph`
+## 类名: `luna::val::RenderGraph`
 
 - **继承/实现**: 无
 - **简述**: 执行已经构建完成的图，串联每个节点的资源解析、屏障、pass 执行与呈现。
@@ -205,7 +205,7 @@ m_render_graph->Present(
 | `const RenderGraphNode&` | `GetNodeByName(const std::string& name) const` | 按名称取节点 |
 | `const Image&` | `GetAttachmentByName(const std::string& name) const` | 按名称取附件 |
 
-## 类名: `VulkanAbstractionLayer::VulkanContext`
+## 类名: `luna::val::VulkanContext`
 
 - **继承/实现**: 无
 - **简述**: Vulkan 实例、设备、交换链、队列、描述符池、虚拟帧和即时命令提交的中心对象。
@@ -233,7 +233,7 @@ m_render_graph->Present(
 | `const Image&` | `AcquireCurrentSwapchainImage(ImageUsage::Bits usage)` | 获取当前交换链图像 |
 | `DescriptorCache&` | `GetDescriptorCache()` | 获取 descriptor 缓存 |
 
-## 类名: `VulkanAbstractionLayer::RenderPass`
+## 类名: `luna::val::RenderPass`
 
 - **继承/实现**: 基类接口
 - **简述**: 声明渲染/计算通道行为的抽象接口。
@@ -257,7 +257,7 @@ void SetupPipeline(PipelineState pipeline) override {
 }
 ```
 
-## 类名: `VulkanAbstractionLayer::CommandBuffer`
+## 类名: `luna::val::CommandBuffer`
 
 - **继承/实现**: 无
 - **简述**: 对原生 `vk::CommandBuffer` 的轻量封装。
@@ -279,7 +279,7 @@ void SetupPipeline(PipelineState pipeline) override {
 | `void` | `GenerateMipLevels(...)` | 生成 mipmap |
 | `void` | `TransferLayout(...)` | 图像 layout 变更 |
 
-## 类名: `VulkanAbstractionLayer::DescriptorBinding`
+## 类名: `luna::val::DescriptorBinding`
 
 - **继承/实现**: 无
 - **简述**: 把资源名字和 descriptor binding 规则连接起来，并在每帧写入 descriptor set。
@@ -310,7 +310,7 @@ binding.Resolve(resolve);
 binding.Write(descriptorSet);
 ```
 
-## 类名: `VulkanAbstractionLayer::ShaderLoader`
+## 类名: `luna::val::ShaderLoader`
 
 - **继承/实现**: 无
 - **简述**: 负责着色器编译、SPIR-V 读取和反射。
@@ -324,7 +324,7 @@ binding.Write(descriptorSet);
 | `ShaderData` | `LoadFromBinary(std::vector<uint32_t> bytecode)` | 从内存中的 SPIR-V 反射 |
 | `ShaderData` | `LoadFromSource(const std::string& code, ShaderType type, ShaderLanguage language)` | 从源码字符串编译并反射 |
 
-## 类名: `VulkanAbstractionLayer::ModelLoader`
+## 类名: `luna::val::ModelLoader`
 
 - **继承/实现**: 无
 - **简述**: 负责 OBJ 与 glTF/GLB 模型导入。
@@ -337,7 +337,7 @@ binding.Write(descriptorSet);
 | `ModelData` | `LoadFromGltf(const std::string& filepath)` | 导入 glTF/GLB |
 | `ModelData` | `Load(const std::string& filepath)` | 按扩展名自动选择导入器 |
 
-## 类名: `VulkanAbstractionLayer::ImageLoader`
+## 类名: `luna::val::ImageLoader`
 
 - **继承/实现**: 无
 - **简述**: 负责普通图片、DDS、zlib 包装 DDS 以及立方体贴图读取。

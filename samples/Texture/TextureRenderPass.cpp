@@ -1,15 +1,13 @@
-#include "samples/Texture/TextureRenderPass.h"
-
 #include "Imgui/ImGuiRenderPass.h"
 #include "Renderer/ImageLoader.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/ShaderLoader.h"
+#include "samples/Texture/TextureRenderPass.h"
 #include "Vulkan/GraphicShader.h"
-
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <filesystem>
 #include <functional>
+#include <glm/gtc/matrix_transform.hpp>
 #include <memory>
 
 namespace {
@@ -25,32 +23,27 @@ struct MeshPushConstants {
 };
 
 struct UploadedTexture {
-    VulkanAbstractionLayer::Image m_image;
-    VulkanAbstractionLayer::Sampler m_sampler;
-    VulkanAbstractionLayer::Buffer m_staging_buffer;
+    luna::val::Image m_image;
+    luna::val::Sampler m_sampler;
+    luna::val::Buffer m_staging_buffer;
     bool m_uploaded{false};
 
-    void uploadIfNeeded(VulkanAbstractionLayer::CommandBuffer& commands)
+    void uploadIfNeeded(luna::val::CommandBuffer& commands)
     {
         if (m_uploaded) {
             return;
         }
 
-        commands.CopyBufferToImage(
-            VulkanAbstractionLayer::BufferInfo{std::cref(m_staging_buffer), 0},
-            VulkanAbstractionLayer::ImageInfo{std::cref(m_image), VulkanAbstractionLayer::ImageUsage::UNKNOWN, 0, 0});
+        commands.CopyBufferToImage(luna::val::BufferInfo{std::cref(m_staging_buffer), 0},
+                                   luna::val::ImageInfo{std::cref(m_image), luna::val::ImageUsage::UNKNOWN, 0, 0});
 
         if (m_image.GetMipLevelCount() > 1) {
             commands.GenerateMipLevels(
-                m_image,
-                VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION,
-                VulkanAbstractionLayer::BlitFilter::LINEAR);
+                m_image, luna::val::ImageUsage::TRANSFER_DISTINATION, luna::val::BlitFilter::LINEAR);
         }
 
         commands.TransferLayout(
-            m_image,
-            VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION,
-            VulkanAbstractionLayer::ImageUsage::SHADER_READ);
+            m_image, luna::val::ImageUsage::TRANSFER_DISTINATION, luna::val::ImageUsage::SHADER_READ);
         m_uploaded = true;
     }
 };
@@ -60,99 +53,79 @@ std::filesystem::path projectRoot()
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-std::shared_ptr<VulkanAbstractionLayer::GraphicShader> loadGraphicsShader(
-    const std::filesystem::path& vertex_path,
-    const std::filesystem::path& fragment_path)
+std::shared_ptr<luna::val::GraphicShader> loadGraphicsShader(const std::filesystem::path& vertex_path,
+                                                             const std::filesystem::path& fragment_path)
 {
-    auto shader = std::make_shared<VulkanAbstractionLayer::GraphicShader>();
-    shader->Init(
-        VulkanAbstractionLayer::ShaderLoader::LoadFromSourceFile(
-            vertex_path.string(),
-            VulkanAbstractionLayer::ShaderType::VERTEX,
-            VulkanAbstractionLayer::ShaderLanguage::GLSL),
-        VulkanAbstractionLayer::ShaderLoader::LoadFromSourceFile(
-            fragment_path.string(),
-            VulkanAbstractionLayer::ShaderType::FRAGMENT,
-            VulkanAbstractionLayer::ShaderLanguage::GLSL));
+    auto shader = std::make_shared<luna::val::GraphicShader>();
+    shader->Init(luna::val::ShaderLoader::LoadFromSourceFile(
+                     vertex_path.string(), luna::val::ShaderType::VERTEX, luna::val::ShaderLanguage::GLSL),
+                 luna::val::ShaderLoader::LoadFromSourceFile(
+                     fragment_path.string(), luna::val::ShaderType::FRAGMENT, luna::val::ShaderLanguage::GLSL));
     return shader;
 }
 
-UploadedTexture createTexture(const VulkanAbstractionLayer::ImageData& image_data)
+UploadedTexture createTexture(const luna::val::ImageData& image_data)
 {
     UploadedTexture texture{
-        .m_image = VulkanAbstractionLayer::Image(
-            image_data.Width,
-            image_data.Height,
-            image_data.ImageFormat,
-            VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION |
-                VulkanAbstractionLayer::ImageUsage::SHADER_READ |
-                VulkanAbstractionLayer::ImageUsage::TRANSFER_SOURCE,
-            VulkanAbstractionLayer::MemoryUsage::GPU_ONLY,
-            VulkanAbstractionLayer::ImageOptions::MIPMAPS),
-        .m_sampler = VulkanAbstractionLayer::Sampler(
-            VulkanAbstractionLayer::Sampler::MinFilter::LINEAR,
-            VulkanAbstractionLayer::Sampler::MagFilter::LINEAR,
-            VulkanAbstractionLayer::Sampler::AddressMode::REPEAT,
-            VulkanAbstractionLayer::Sampler::MipFilter::LINEAR),
-        .m_staging_buffer = VulkanAbstractionLayer::Buffer(
-            image_data.ByteData.size(),
-            VulkanAbstractionLayer::BufferUsage::TRANSFER_SOURCE,
-            VulkanAbstractionLayer::MemoryUsage::CPU_TO_GPU),
+        .m_image = luna::val::Image(image_data.Width,
+                                    image_data.Height,
+                                    image_data.ImageFormat,
+                                    luna::val::ImageUsage::TRANSFER_DISTINATION | luna::val::ImageUsage::SHADER_READ |
+                                        luna::val::ImageUsage::TRANSFER_SOURCE,
+                                    luna::val::MemoryUsage::GPU_ONLY,
+                                    luna::val::ImageOptions::MIPMAPS),
+        .m_sampler = luna::val::Sampler(luna::val::Sampler::MinFilter::LINEAR,
+                                        luna::val::Sampler::MagFilter::LINEAR,
+                                        luna::val::Sampler::AddressMode::REPEAT,
+                                        luna::val::Sampler::MipFilter::LINEAR),
+        .m_staging_buffer = luna::val::Buffer(
+            image_data.ByteData.size(), luna::val::BufferUsage::TRANSFER_SOURCE, luna::val::MemoryUsage::CPU_TO_GPU),
     };
 
     texture.m_staging_buffer.CopyData(image_data.ByteData.data(), image_data.ByteData.size(), 0);
     return texture;
 }
 
-class TextureRenderPass final : public VulkanAbstractionLayer::RenderPass {
+class TextureRenderPass final : public luna::val::RenderPass {
 public:
     explicit TextureRenderPass(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
         : m_surface_format(build_info.m_surface_format),
           m_width(build_info.m_framebuffer_width),
           m_height(build_info.m_framebuffer_height),
-          m_shader(loadGraphicsShader(
-              projectRoot() / "samples" / "Texture" / "Shaders" / "TexturedQuad.vert",
-              projectRoot() / "samples" / "Texture" / "Shaders" / "TexturedQuad.frag")),
+          m_shader(loadGraphicsShader(projectRoot() / "samples" / "Texture" / "Shaders" / "TexturedQuad.vert",
+                                      projectRoot() / "samples" / "Texture" / "Shaders" / "TexturedQuad.frag")),
           m_vertex_buffer(
-              sizeof(k_vertices),
-              VulkanAbstractionLayer::BufferUsage::VERTEX_BUFFER,
-              VulkanAbstractionLayer::MemoryUsage::CPU_TO_GPU),
-          m_index_buffer(
-              sizeof(k_indices),
-              VulkanAbstractionLayer::BufferUsage::INDEX_BUFFER,
-              VulkanAbstractionLayer::MemoryUsage::CPU_TO_GPU),
+              sizeof(k_vertices), luna::val::BufferUsage::VERTEX_BUFFER, luna::val::MemoryUsage::CPU_TO_GPU),
+          m_index_buffer(sizeof(k_indices), luna::val::BufferUsage::INDEX_BUFFER, luna::val::MemoryUsage::CPU_TO_GPU),
           m_texture(createTexture(
-              VulkanAbstractionLayer::ImageLoader::LoadImageFromFile((projectRoot() / "assets" / "head.jpg").string())))
+              luna::val::ImageLoader::LoadImageFromFile((projectRoot() / "assets" / "head.jpg").string())))
     {
         m_vertex_buffer.CopyData(reinterpret_cast<const uint8_t*>(k_vertices), sizeof(k_vertices), 0);
         m_index_buffer.CopyData(reinterpret_cast<const uint8_t*>(k_indices), sizeof(k_indices), 0);
     }
 
-    void SetupPipeline(VulkanAbstractionLayer::PipelineState pipeline) override
+    void SetupPipeline(luna::val::PipelineState pipeline) override
     {
         pipeline.Shader = m_shader;
         pipeline.VertexBindings = {
-            {VulkanAbstractionLayer::VertexBinding::Rate::PER_VERTEX, VulkanAbstractionLayer::VertexBinding::BindingRangeAll}};
+            {luna::val::VertexBinding::Rate::PER_VERTEX, luna::val::VertexBinding::BindingRangeAll}};
         pipeline.DescriptorBindings.Bind(
-            0,
-            "albedo_texture",
-            m_texture.m_sampler,
-            VulkanAbstractionLayer::UniformType::COMBINED_IMAGE_SAMPLER);
+            0, "albedo_texture", m_texture.m_sampler, luna::val::UniformType::COMBINED_IMAGE_SAMPLER);
         pipeline.DeclareAttachment("scene_color", m_surface_format, m_width, m_height);
-        pipeline.AddOutputAttachment("scene_color", VulkanAbstractionLayer::ClearColor{0.05f, 0.07f, 0.10f, 1.0f});
+        pipeline.AddOutputAttachment("scene_color", luna::val::ClearColor{0.05f, 0.07f, 0.10f, 1.0f});
     }
 
-    void ResolveResources(VulkanAbstractionLayer::ResolveState resolve) override
+    void ResolveResources(luna::val::ResolveState resolve) override
     {
         resolve.Resolve("albedo_texture", m_texture.m_image);
     }
 
-    void BeforeRender(VulkanAbstractionLayer::RenderPassState state) override
+    void BeforeRender(luna::val::RenderPassState state) override
     {
         m_texture.uploadIfNeeded(state.Commands);
     }
 
-    void OnRender(VulkanAbstractionLayer::RenderPassState state) override
+    void OnRender(luna::val::RenderPassState state) override
     {
         const auto& scene_color = state.GetAttachment("scene_color");
 
@@ -178,12 +151,12 @@ private:
     static constexpr uint32_t k_indices[] = {0, 1, 2, 2, 3, 0};
 
 private:
-    VulkanAbstractionLayer::Format m_surface_format{VulkanAbstractionLayer::Format::UNDEFINED};
+    luna::val::Format m_surface_format{luna::val::Format::UNDEFINED};
     uint32_t m_width{0};
     uint32_t m_height{0};
-    std::shared_ptr<VulkanAbstractionLayer::GraphicShader> m_shader;
-    VulkanAbstractionLayer::Buffer m_vertex_buffer;
-    VulkanAbstractionLayer::Buffer m_index_buffer;
+    std::shared_ptr<luna::val::GraphicShader> m_shader;
+    luna::val::Buffer m_vertex_buffer;
+    luna::val::Buffer m_index_buffer;
     UploadedTexture m_texture;
 };
 
@@ -191,12 +164,12 @@ private:
 
 namespace luna::samples::texture {
 
-std::unique_ptr<VulkanAbstractionLayer::RenderGraph> buildTextureRenderGraph(
-    const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
+std::unique_ptr<luna::val::RenderGraph>
+    buildTextureRenderGraph(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
 {
-    VulkanAbstractionLayer::RenderGraphBuilder builder;
+    luna::val::RenderGraphBuilder builder;
     builder.AddRenderPass("texture", std::make_unique<TextureRenderPass>(build_info))
-        .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
+        .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
         .SetOutputName("scene_color");
     return builder.Build();
 }

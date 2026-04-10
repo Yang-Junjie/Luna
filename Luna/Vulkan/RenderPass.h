@@ -1,20 +1,20 @@
 // Copyright(c) 2021, #Momo
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 // list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
 // and /or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -28,47 +28,46 @@
 
 #pragma once
 
-#include "Pipeline.h"
 #include "CommandBuffer.h"
+#include "Pipeline.h"
 
-namespace VulkanAbstractionLayer
-{
-    class RenderGraph;
+namespace luna::val {
+class RenderGraph;
 
-    struct PassNative
-    {
-        vk::RenderPass RenderPassHandle;
-        vk::DescriptorSet DescriptorSet;
-        vk::Framebuffer Framebuffer;
-        vk::Pipeline Pipeline;
-        vk::PipelineLayout PipelineLayout;
-        vk::PipelineBindPoint PipelineType = { };
-        vk::Rect2D RenderArea = { };
-        std::vector<vk::ClearValue> ClearValues;
-    };
+struct PassNative {
+    vk::RenderPass RenderPassHandle;
+    vk::DescriptorSet DescriptorSet;
+    vk::Framebuffer Framebuffer;
+    vk::Pipeline Pipeline;
+    vk::PipelineLayout PipelineLayout;
+    vk::PipelineBindPoint PipelineType = {};
+    vk::Rect2D RenderArea = {};
+    std::vector<vk::ClearValue> ClearValues;
+};
 
-    struct RenderPassState
-    {
-        RenderGraph& Graph;
-        CommandBuffer& Commands;
-        const PassNative& Pass;
+struct RenderPassState {
+    RenderGraph& Graph;
+    CommandBuffer& Commands;
+    const PassNative& Pass;
 
-        const Image& GetAttachment(const std::string& name);
-    };
+    const Image& GetAttachment(const std::string& name);
+};
 
-    using PipelineState = Pipeline&;
-    using ResolveState = ResolveInfo&;
+using PipelineState = Pipeline&;
+using ResolveState = ResolveInfo&;
 
-    class RenderPass
-    {
-    public:
-        virtual ~RenderPass() = default;
+class RenderPass {
+public:
+    virtual ~RenderPass() = default;
 
-        virtual void SetupPipeline(PipelineState state) { }
-        virtual void ResolveResources(ResolveState resolve) { }
+    virtual void SetupPipeline(PipelineState state) {}
 
-        virtual void BeforeRender(RenderPassState state) { }
-        virtual void OnRender(RenderPassState state) { }
-        virtual void AfterRender(RenderPassState state) { }
-    };
-}
+    virtual void ResolveResources(ResolveState resolve) {}
+
+    virtual void BeforeRender(RenderPassState state) {}
+
+    virtual void OnRender(RenderPassState state) {}
+
+    virtual void AfterRender(RenderPassState state) {}
+};
+} // namespace luna::val

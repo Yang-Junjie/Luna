@@ -4,13 +4,13 @@
 
 #include <memory>
 
-namespace VulkanAbstractionLayer {
+namespace luna::val {
 class RenderGraph;
 }
 
 namespace luna::samples::texture {
 
-std::unique_ptr<VulkanAbstractionLayer::RenderGraph> buildTextureRenderGraph(
-    const luna::VulkanRenderer::RenderGraphBuildInfo& build_info);
+std::unique_ptr<luna::val::RenderGraph>
+    buildTextureRenderGraph(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info);
 
 } // namespace luna::samples::texture

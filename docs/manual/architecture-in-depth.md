@@ -39,7 +39,7 @@ graph TD
         RP[RenderPass]
     end
 
-    subgraph VulkanAbstractionLayer
+    subgraph luna::val
         VC[VulkanContext]
         VF[VirtualFrameProvider]
         DC[DescriptorCache]

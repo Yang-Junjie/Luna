@@ -1,20 +1,20 @@
 // Copyright(c) 2021, #Momo
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 // list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
 // and /or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -28,56 +28,51 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <vector>
-
 #include "Renderer/ImageLoader.h"
 #include "Vulkan/ShaderReflection.h"
 #include "Vulkan/VectorMath.h"
 
-namespace VulkanAbstractionLayer
-{
-    struct ModelData
-    {
-        struct Vertex
-        {
-            Vector3 Position{ 0.0f, 0.0f, 0.0f };
-            Vector2 TexCoord{ 0.0f, 0.0f };
-            Vector3 Normal{ 0.0f, 0.0f, 0.0f };
-            Vector3 Tangent{ 0.0f, 0.0f, 0.0f };
-            Vector3 Bitangent{ 0.0f, 0.0f, 0.0f };
-        };
+#include <cstdint>
 
-        struct Material
-        {
-            std::string Name;
-            ImageData AlbedoTexture;
-            ImageData NormalTexture;
-            ImageData MetallicRoughness;
-            float RoughnessScale = 1.0f;
-            float MetallicScale = 1.0f;
-        };
+#include <string>
+#include <vector>
 
-        using Index = uint32_t;
-
-        struct Shape
-        {
-            std::string Name;
-            std::vector<Vertex> Vertices;
-            std::vector<Index> Indices;
-            uint32_t MaterialIndex = -1;
-        };
-
-        std::vector<Shape> Shapes;
-        std::vector<Material> Materials;
+namespace luna::val {
+struct ModelData {
+    struct Vertex {
+        Vector3 Position{0.0f, 0.0f, 0.0f};
+        Vector2 TexCoord{0.0f, 0.0f};
+        Vector3 Normal{0.0f, 0.0f, 0.0f};
+        Vector3 Tangent{0.0f, 0.0f, 0.0f};
+        Vector3 Bitangent{0.0f, 0.0f, 0.0f};
     };
 
-    class ModelLoader
-    {
-    public:
-        static ModelData LoadFromObj(const std::string& filepath);
-        static ModelData LoadFromGltf(const std::string& filepath);
-        static ModelData Load(const std::string& filepath);
+    struct Material {
+        std::string Name;
+        ImageData AlbedoTexture;
+        ImageData NormalTexture;
+        ImageData MetallicRoughness;
+        float RoughnessScale = 1.0f;
+        float MetallicScale = 1.0f;
     };
-}
+
+    using Index = uint32_t;
+
+    struct Shape {
+        std::string Name;
+        std::vector<Vertex> Vertices;
+        std::vector<Index> Indices;
+        uint32_t MaterialIndex = -1;
+    };
+
+    std::vector<Shape> Shapes;
+    std::vector<Material> Materials;
+};
+
+class ModelLoader {
+public:
+    static ModelData LoadFromObj(const std::string& filepath);
+    static ModelData LoadFromGltf(const std::string& filepath);
+    static ModelData Load(const std::string& filepath);
+};
+} // namespace luna::val

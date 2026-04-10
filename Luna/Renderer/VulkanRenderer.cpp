@@ -1,63 +1,57 @@
-#include "Renderer/VulkanRenderer.h"
-
 #include "Core/Log.h"
 #include "Core/Window.h"
-
 #include "Imgui/ImGuiRenderPass.h"
 #include "Renderer/RenderGraph.h"
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Vulkan/VulkanContext.h"
 #include "Vulkan/VulkanSurface.h"
 
-#include <GLFW/glfw3.h>
-
 #include <algorithm>
+#include <GLFW/glfw3.h>
 #include <vector>
 
 namespace {
 
 using RenderGraphBuildInfo = luna::VulkanRenderer::RenderGraphBuildInfo;
 
-class ClearColorPass final : public VulkanAbstractionLayer::RenderPass {
+class ClearColorPass final : public luna::val::RenderPass {
 public:
-    ClearColorPass(VulkanAbstractionLayer::Format format, uint32_t width, uint32_t height, const glm::vec4* clear_color)
+    ClearColorPass(luna::val::Format format, uint32_t width, uint32_t height, const glm::vec4* clear_color)
         : m_format(format),
           m_width(width),
           m_height(height),
           m_clear_color(clear_color)
     {}
 
-    void SetupPipeline(VulkanAbstractionLayer::PipelineState pipeline) override
+    void SetupPipeline(luna::val::PipelineState pipeline) override
     {
         pipeline.DeclareAttachment("scene_color", m_format, m_width, m_height);
-        pipeline.AddOutputAttachment(
-            "scene_color",
-            VulkanAbstractionLayer::ClearColor{
-                m_clear_color != nullptr ? m_clear_color->x : 0.0f,
-                m_clear_color != nullptr ? m_clear_color->y : 0.0f,
-                m_clear_color != nullptr ? m_clear_color->z : 0.0f,
-                m_clear_color != nullptr ? m_clear_color->w : 1.0f});
+        pipeline.AddOutputAttachment("scene_color",
+                                     luna::val::ClearColor{m_clear_color != nullptr ? m_clear_color->x : 0.0f,
+                                                           m_clear_color != nullptr ? m_clear_color->y : 0.0f,
+                                                           m_clear_color != nullptr ? m_clear_color->z : 0.0f,
+                                                           m_clear_color != nullptr ? m_clear_color->w : 1.0f});
     }
 
 private:
-    VulkanAbstractionLayer::Format m_format{VulkanAbstractionLayer::Format::UNDEFINED};
+    luna::val::Format m_format{luna::val::Format::UNDEFINED};
     uint32_t m_width{0};
     uint32_t m_height{0};
     const glm::vec4* m_clear_color{nullptr};
 };
 
-std::unique_ptr<VulkanAbstractionLayer::RenderGraph> buildDefaultRenderGraph(
-    const RenderGraphBuildInfo& build_info, const glm::vec4* clear_color)
+std::unique_ptr<luna::val::RenderGraph> buildDefaultRenderGraph(const RenderGraphBuildInfo& build_info,
+                                                                const glm::vec4* clear_color)
 {
-    VulkanAbstractionLayer::RenderGraphBuilder builder;
-    builder.AddRenderPass(
-               "clear",
-               std::make_unique<ClearColorPass>(
-                   build_info.m_surface_format,
-                   build_info.m_framebuffer_width,
-                   build_info.m_framebuffer_height,
-                   clear_color))
-        .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
+    luna::val::RenderGraphBuilder builder;
+    builder
+        .AddRenderPass("clear",
+                       std::make_unique<ClearColorPass>(build_info.m_surface_format,
+                                                        build_info.m_framebuffer_width,
+                                                        build_info.m_framebuffer_height,
+                                                        clear_color))
+        .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
         .SetOutputName("scene_color");
 
     return builder.Build();
@@ -74,13 +68,13 @@ VulkanRenderer::~VulkanRenderer()
     shutdown();
 }
 
-bool VulkanRenderer::init(Window& window, RenderGraphBuilderCallback render_graph_builder)
+bool VulkanRenderer::init(Window& window, InitializationOptions options)
 {
     shutdown();
 
     m_window = &window;
     m_native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
-    m_render_graph_builder = std::move(render_graph_builder);
+    m_initialization_options = std::move(options);
     if (m_native_window == nullptr) {
         LUNA_CORE_ERROR("Cannot initialize Vulkan renderer without a GLFW window");
         return false;
@@ -95,7 +89,7 @@ bool VulkanRenderer::init(Window& window, RenderGraphBuilderCallback render_grap
 
     std::vector<const char*> required_extensions(extensions, extensions + extension_count);
 
-    VulkanAbstractionLayer::VulkanContextCreateOptions create_options{};
+    luna::val::VulkanContextCreateOptions create_options{};
     create_options.VulkanApiMajorVersion = 1;
     create_options.VulkanApiMinorVersion = 3;
     create_options.Extensions = required_extensions;
@@ -111,19 +105,19 @@ bool VulkanRenderer::init(Window& window, RenderGraphBuilderCallback render_grap
     create_options.ApplicationName = "Luna";
     create_options.EngineName = "Luna";
 
-    m_context = std::make_unique<VulkanAbstractionLayer::VulkanContext>(create_options);
-    VulkanAbstractionLayer::SetCurrentVulkanContext(*m_context);
+    m_context = std::make_unique<luna::val::VulkanContext>(create_options);
+    luna::val::SetCurrentVulkanContext(*m_context);
 
-    VulkanAbstractionLayer::ContextInitializeOptions init_options{};
+    luna::val::ContextInitializeOptions init_options{};
     init_options.VirtualFrameCount = 2;
     init_options.ErrorCallback = create_options.ErrorCallback;
     init_options.InfoCallback = create_options.InfoCallback;
 
-    const auto& surface = VulkanAbstractionLayer::CreateWindowSurface(m_native_window, *m_context);
+    const auto& surface = luna::val::CreateWindowSurface(m_native_window, *m_context);
     m_context->InitializeContext(surface, init_options);
 
     if (!m_context->IsRenderingEnabled()) {
-        LUNA_CORE_ERROR("VulkanAbstractionLayer failed to initialize rendering");
+        LUNA_CORE_ERROR("luna::val failed to initialize rendering");
         shutdown();
         return false;
     }
@@ -143,6 +137,7 @@ void VulkanRenderer::shutdown()
     m_context.reset();
     m_window = nullptr;
     m_native_window = nullptr;
+    m_initialization_options = {};
     m_initialized = false;
     m_resize_requested = false;
     m_frame_started = false;
@@ -192,8 +187,8 @@ void VulkanRenderer::renderFrame()
 
     auto& commands = m_context->GetCurrentCommandBuffer();
     m_render_graph->Execute(commands);
-    m_render_graph->Present(
-        commands, m_context->AcquireCurrentSwapchainImage(VulkanAbstractionLayer::ImageUsage::TRANSFER_DISTINATION));
+    m_render_graph->Present(commands,
+                            m_context->AcquireCurrentSwapchainImage(luna::val::ImageUsage::TRANSFER_DISTINATION));
 }
 
 void VulkanRenderer::endFrame()
@@ -254,8 +249,8 @@ void VulkanRenderer::rebuildRenderGraph()
         .m_framebuffer_height = extent.height,
     };
 
-    if (m_render_graph_builder) {
-        m_render_graph = m_render_graph_builder(build_info);
+    if (m_initialization_options.m_render_graph_builder) {
+        m_render_graph = m_initialization_options.m_render_graph_builder(build_info);
     } else {
         m_render_graph = buildDefaultRenderGraph(build_info, &m_clear_color);
     }
@@ -284,7 +279,7 @@ void VulkanRenderer::handlePendingResize()
         return;
     }
 
-    (void)m_context->GetDevice().waitIdle();
+    (void) m_context->GetDevice().waitIdle();
     m_context->RecreateSwapchain(extent.width, extent.height);
     rebuildRenderGraph();
     m_resize_requested = false;

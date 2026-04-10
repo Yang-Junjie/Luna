@@ -9,6 +9,7 @@ public:
     ModelApp();
 
 protected:
+    VulkanRenderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
 };
 

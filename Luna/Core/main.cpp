@@ -21,7 +21,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!app->isInitialized()) {
+    if (!app->initialize()) {
         LUNA_CORE_FATAL("Application initialization failed");
         luna::Logger::shutdown();
         return 1;

@@ -1,20 +1,20 @@
 // Copyright(c) 2021, #Momo
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met :
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this
 // list of conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice,
 // this list of conditions and the following disclaimer in the documentation
 // and /or other materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -30,34 +30,35 @@
 
 #include "Shader.h"
 
-namespace VulkanAbstractionLayer
-{
-    class GraphicShader : public Shader
-    {
-        vk::ShaderModule vertexShader;
-        vk::ShaderModule fragmentShader;
-        vk::ShaderModule tessControlShader;
-        vk::ShaderModule tessEvalShader;
-        std::vector<ShaderUniforms> shaderUniforms;
-        std::vector<TypeSPIRV> inputAttributes;
+namespace luna::val {
+class GraphicShader : public Shader {
+    vk::ShaderModule vertexShader;
+    vk::ShaderModule fragmentShader;
+    vk::ShaderModule tessControlShader;
+    vk::ShaderModule tessEvalShader;
+    std::vector<ShaderUniforms> shaderUniforms;
+    std::vector<TypeSPIRV> inputAttributes;
 
-        void Destroy();
-    public:
-        GraphicShader() = default;
-        GraphicShader(const ShaderData& vertex, const ShaderData& fragment);
-        GraphicShader(const ShaderData& vertex, const ShaderData& tessControl, const ShaderData& tessEval, const ShaderData& fragment);
-        ~GraphicShader();
+    void Destroy();
 
-        void Init(const ShaderData& vertex, const ShaderData& fragment);
+public:
+    GraphicShader() = default;
+    GraphicShader(const ShaderData& vertex, const ShaderData& fragment);
+    GraphicShader(const ShaderData& vertex,
+                  const ShaderData& tessControl,
+                  const ShaderData& tessEval,
+                  const ShaderData& fragment);
+    ~GraphicShader();
 
-        GraphicShader(const GraphicShader& other) = delete;
-        GraphicShader(GraphicShader&& other) noexcept;
-        GraphicShader& operator=(const GraphicShader& other) = delete;
-        GraphicShader& operator=(GraphicShader&& other) noexcept;
+    void Init(const ShaderData& vertex, const ShaderData& fragment);
 
+    GraphicShader(const GraphicShader& other) = delete;
+    GraphicShader(GraphicShader&& other) noexcept;
+    GraphicShader& operator=(const GraphicShader& other) = delete;
+    GraphicShader& operator=(GraphicShader&& other) noexcept;
 
-        ArrayView<const TypeSPIRV> GetInputAttributes() const override;
-        ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
-        virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
-    };
-}
+    ArrayView<const TypeSPIRV> GetInputAttributes() const override;
+    ArrayView<const ShaderUniforms> GetShaderUniforms() const override;
+    virtual const vk::ShaderModule& GetNativeShader(ShaderType type) const override;
+};
+} // namespace luna::val

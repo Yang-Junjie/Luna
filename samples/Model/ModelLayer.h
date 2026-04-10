@@ -63,12 +63,24 @@ public:
         const glm::vec3 up = glm::vec3(0, 1, 0);
 
         glm::vec3 movement{0.0f};
-        if (Input::isKeyPressed(KeyCode::W)) movement += forward;
-        if (Input::isKeyPressed(KeyCode::S)) movement -= forward;
-        if (Input::isKeyPressed(KeyCode::D)) movement += right;
-        if (Input::isKeyPressed(KeyCode::A)) movement -= right;
-        if (Input::isKeyPressed(KeyCode::E)) movement += up;
-        if (Input::isKeyPressed(KeyCode::Q)) movement -= up;
+        if (Input::isKeyPressed(KeyCode::W)) {
+            movement += forward;
+        }
+        if (Input::isKeyPressed(KeyCode::S)) {
+            movement -= forward;
+        }
+        if (Input::isKeyPressed(KeyCode::D)) {
+            movement += right;
+        }
+        if (Input::isKeyPressed(KeyCode::A)) {
+            movement -= right;
+        }
+        if (Input::isKeyPressed(KeyCode::E)) {
+            movement += up;
+        }
+        if (Input::isKeyPressed(KeyCode::Q)) {
+            movement -= up;
+        }
 
         if (glm::dot(movement, movement) > 0.0f) {
             movement = glm::normalize(movement);
@@ -86,7 +98,7 @@ public:
     {
         const auto& camera = Application::get().getRenderer().getMainCamera();
         if (ImGui::Begin("Model")) {
-            ImGui::TextUnformatted("Asset: assets/basicmesh.glb");
+            ImGui::TextUnformatted("Asset: assets/material_sphere/material_sphere.obj");
             ImGui::Separator();
             ImGui::Text("Camera Active: %s", m_camera_active ? "Yes" : "No");
             ImGui::Text("Position: %.2f %.2f %.2f", camera.m_position.x, camera.m_position.y, camera.m_position.z);

@@ -1,14 +1,12 @@
-#include "samples/Triangle/TriangleRenderPass.h"
-
 #include "Imgui/ImGuiRenderPass.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/ShaderLoader.h"
+#include "samples/Triangle/TriangleRenderPass.h"
 #include "Vulkan/GraphicShader.h"
 
+#include <filesystem>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
-
-#include <filesystem>
 #include <memory>
 
 namespace {
@@ -28,50 +26,40 @@ std::filesystem::path projectRoot()
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-std::shared_ptr<VulkanAbstractionLayer::GraphicShader> loadGraphicsShader(
-    const std::filesystem::path& vertex_path,
-    const std::filesystem::path& fragment_path)
+std::shared_ptr<luna::val::GraphicShader> loadGraphicsShader(const std::filesystem::path& vertex_path,
+                                                             const std::filesystem::path& fragment_path)
 {
-    auto shader = std::make_shared<VulkanAbstractionLayer::GraphicShader>();
-    shader->Init(
-        VulkanAbstractionLayer::ShaderLoader::LoadFromSourceFile(
-            vertex_path.string(),
-            VulkanAbstractionLayer::ShaderType::VERTEX,
-            VulkanAbstractionLayer::ShaderLanguage::GLSL),
-        VulkanAbstractionLayer::ShaderLoader::LoadFromSourceFile(
-            fragment_path.string(),
-            VulkanAbstractionLayer::ShaderType::FRAGMENT,
-            VulkanAbstractionLayer::ShaderLanguage::GLSL));
+    auto shader = std::make_shared<luna::val::GraphicShader>();
+    shader->Init(luna::val::ShaderLoader::LoadFromSourceFile(
+                     vertex_path.string(), luna::val::ShaderType::VERTEX, luna::val::ShaderLanguage::GLSL),
+                 luna::val::ShaderLoader::LoadFromSourceFile(
+                     fragment_path.string(), luna::val::ShaderType::FRAGMENT, luna::val::ShaderLanguage::GLSL));
     return shader;
 }
 
-class TriangleRenderPass final : public VulkanAbstractionLayer::RenderPass {
+class TriangleRenderPass final : public luna::val::RenderPass {
 public:
     explicit TriangleRenderPass(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
         : m_surface_format(build_info.m_surface_format),
           m_width(build_info.m_framebuffer_width),
           m_height(build_info.m_framebuffer_height),
-          m_shader(loadGraphicsShader(
-              projectRoot() / "samples" / "Triangle" / "Shaders" / "Triangle.vert",
-              projectRoot() / "samples" / "Triangle" / "Shaders" / "Triangle.frag")),
-          m_vertex_buffer(
-              sizeof(k_vertices),
-              VulkanAbstractionLayer::BufferUsage::VERTEX_BUFFER,
-              VulkanAbstractionLayer::MemoryUsage::CPU_TO_GPU)
+          m_shader(loadGraphicsShader(projectRoot() / "samples" / "Triangle" / "Shaders" / "Triangle.vert",
+                                      projectRoot() / "samples" / "Triangle" / "Shaders" / "Triangle.frag")),
+          m_vertex_buffer(sizeof(k_vertices), luna::val::BufferUsage::VERTEX_BUFFER, luna::val::MemoryUsage::CPU_TO_GPU)
     {
         m_vertex_buffer.CopyData(reinterpret_cast<const uint8_t*>(k_vertices), sizeof(k_vertices), 0);
     }
 
-    void SetupPipeline(VulkanAbstractionLayer::PipelineState pipeline) override
+    void SetupPipeline(luna::val::PipelineState pipeline) override
     {
         pipeline.Shader = m_shader;
         pipeline.VertexBindings = {
-            {VulkanAbstractionLayer::VertexBinding::Rate::PER_VERTEX, VulkanAbstractionLayer::VertexBinding::BindingRangeAll}};
+            {luna::val::VertexBinding::Rate::PER_VERTEX, luna::val::VertexBinding::BindingRangeAll}};
         pipeline.DeclareAttachment("scene_color", m_surface_format, m_width, m_height);
-        pipeline.AddOutputAttachment("scene_color", VulkanAbstractionLayer::ClearColor{0.08f, 0.10f, 0.14f, 1.0f});
+        pipeline.AddOutputAttachment("scene_color", luna::val::ClearColor{0.08f, 0.10f, 0.14f, 1.0f});
     }
 
-    void OnRender(VulkanAbstractionLayer::RenderPassState state) override
+    void OnRender(luna::val::RenderPassState state) override
     {
         const auto& scene_color = state.GetAttachment("scene_color");
 
@@ -94,23 +82,23 @@ private:
     };
 
 private:
-    VulkanAbstractionLayer::Format m_surface_format{VulkanAbstractionLayer::Format::UNDEFINED};
+    luna::val::Format m_surface_format{luna::val::Format::UNDEFINED};
     uint32_t m_width{0};
     uint32_t m_height{0};
-    std::shared_ptr<VulkanAbstractionLayer::GraphicShader> m_shader;
-    VulkanAbstractionLayer::Buffer m_vertex_buffer;
+    std::shared_ptr<luna::val::GraphicShader> m_shader;
+    luna::val::Buffer m_vertex_buffer;
 };
 
 } // namespace
 
 namespace luna::samples::triangle {
 
-std::unique_ptr<VulkanAbstractionLayer::RenderGraph> buildTriangleRenderGraph(
-    const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
+std::unique_ptr<luna::val::RenderGraph>
+    buildTriangleRenderGraph(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
 {
-    VulkanAbstractionLayer::RenderGraphBuilder builder;
+    luna::val::RenderGraphBuilder builder;
     builder.AddRenderPass("triangle", std::make_unique<TriangleRenderPass>(build_info))
-        .AddRenderPass("imgui", std::make_unique<VulkanAbstractionLayer::ImGuiRenderPass>("scene_color"))
+        .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
         .SetOutputName("scene_color");
     return builder.Build();
 }

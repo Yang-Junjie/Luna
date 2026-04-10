@@ -1,8 +1,7 @@
-#include "Imgui/ImGuiLayer.hpp"
-
 #include "Core/Log.h"
 #include "Events/Event.h"
 #include "Imgui/ImGuiContext.h"
+#include "Imgui/ImGuiLayer.hpp"
 
 #include <imgui.h>
 
@@ -46,9 +45,9 @@ void ImGuiLayer::onAttach()
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    VulkanAbstractionLayer::ImGuiVulkanContext::Init(m_renderer->getNativeWindow(), m_renderer->getImGuiRenderPass());
+    luna::val::ImGuiVulkanContext::Init(m_renderer->getNativeWindow(), m_renderer->getImGuiRenderPass());
     m_attached = true;
-    LUNA_CORE_INFO("Initialized ImGui for VulkanAbstractionLayer");
+    LUNA_CORE_INFO("Initialized ImGui for luna::val");
 }
 
 void ImGuiLayer::onDetach()
@@ -57,7 +56,7 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    VulkanAbstractionLayer::ImGuiVulkanContext::Destroy();
+    luna::val::ImGuiVulkanContext::Destroy();
     m_attached = false;
 }
 
@@ -78,7 +77,7 @@ void ImGuiLayer::begin()
         return;
     }
 
-    VulkanAbstractionLayer::ImGuiVulkanContext::StartFrame();
+    luna::val::ImGuiVulkanContext::StartFrame();
 
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {

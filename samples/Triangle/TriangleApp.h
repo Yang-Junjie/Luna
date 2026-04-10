@@ -9,6 +9,7 @@ public:
     TriangleApp();
 
 protected:
+    VulkanRenderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
 };
 

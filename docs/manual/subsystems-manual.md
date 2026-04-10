@@ -125,23 +125,23 @@ graph LR
 ### 常用场景代码示例
 
 ```cpp
-class MyPass final : public VulkanAbstractionLayer::RenderPass {
+class MyPass final : public luna::val::RenderPass {
 public:
     void SetupPipeline(PipelineState pipeline) override {
         pipeline.DeclareAttachment(
             "my_color",
-            VulkanAbstractionLayer::Format::R8G8B8A8_UNORM,
+            luna::val::Format::R8G8B8A8_UNORM,
             0,
             0);
         pipeline.AddOutputAttachment(
             "my_color",
-            VulkanAbstractionLayer::ClearColor{0.1f, 0.2f, 0.3f, 1.0f});
+            luna::val::ClearColor{0.1f, 0.2f, 0.3f, 1.0f});
     }
 };
 ```
 
 ```cpp
-VulkanAbstractionLayer::RenderGraphBuilder builder;
+luna::val::RenderGraphBuilder builder;
 builder
     .AddRenderPass("my_pass", std::make_unique<MyPass>())
     .SetOutputName("my_color");
@@ -185,15 +185,15 @@ graph TD
 ### 常用场景代码示例
 
 ```cpp
-auto image = VulkanAbstractionLayer::ImageLoader::LoadImageFromFile("assets/head.jpg");
-auto model = VulkanAbstractionLayer::ModelLoader::Load("assets/basicmesh.glb");
+auto image = luna::val::ImageLoader::LoadImageFromFile("assets/head.jpg");
+auto model = luna::val::ModelLoader::Load("assets/basicmesh.glb");
 ```
 
 ```cpp
-auto shader = VulkanAbstractionLayer::ShaderLoader::LoadFromSourceFile(
+auto shader = luna::val::ShaderLoader::LoadFromSourceFile(
     "Shaders/Internal/mesh.vert",
-    VulkanAbstractionLayer::ShaderType::VERTEX,
-    VulkanAbstractionLayer::ShaderLanguage::GLSL);
+    luna::val::ShaderType::VERTEX,
+    luna::val::ShaderLanguage::GLSL);
 ```
 
 ## 模块 E 教程: ImGui 与编辑器集成

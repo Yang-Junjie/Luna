@@ -29,7 +29,7 @@ Luna 是一个基于 C++20、GLFW、ImGui 和 Vulkan 的渲染基础设施项目
 
 - 一个编辑器壳 `LunaEditor`
 - 一个通用引擎核心库 `LunaCore`
-- 一套内嵌的 `VulkanAbstractionLayer`
+- 一套内嵌的 `luna::val`
 - 一条最小渲染路径: `clear -> imgui -> present`
 
 换句话说，Luna 已经完成了“引擎骨架”和“渲染框架”的大部分基础设施，但默认应用尚未把 `ModelLoader`、`ShaderLoader`、复杂场景绘制等功能接进每帧渲染图中。这不是缺点，而是理解源码时必须接受的事实: 代码库的重心目前是“打底层能力”，不是“交付完整内容管线”。

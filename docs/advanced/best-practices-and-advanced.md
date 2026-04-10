@@ -45,7 +45,7 @@ Luna 使用 `VirtualFrameProvider` 管理多帧资源。每个虚拟帧都拥有
 - 离屏渲染
 
 ```cpp
-class ShadowPass final : public VulkanAbstractionLayer::RenderPass {
+class ShadowPass final : public luna::val::RenderPass {
 public:
     void SetupPipeline(PipelineState pipeline) override;
     void ResolveResources(ResolveState resolve) override;

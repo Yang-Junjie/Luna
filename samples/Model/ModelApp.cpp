@@ -1,5 +1,4 @@
 #include "samples/Model/ModelApp.h"
-
 #include "samples/Model/ModelLayer.h"
 #include "samples/Model/ModelRenderPass.h"
 
@@ -12,9 +11,14 @@ ModelApp::ModelApp()
           .m_window_height = 900,
           .m_maximized = false,
           .m_enable_multi_viewport = false,
-          .m_render_graph_builder = buildModelRenderGraph,
       })
 {}
+
+VulkanRenderer::InitializationOptions ModelApp::getRendererInitializationOptions()
+{
+    VulkanRenderer::InitializationOptions options{.m_render_graph_builder = buildModelRenderGraph};
+    return options;
+}
 
 void ModelApp::onInit()
 {

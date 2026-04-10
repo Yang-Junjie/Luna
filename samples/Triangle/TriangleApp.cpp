@@ -1,5 +1,4 @@
 #include "samples/Triangle/TriangleApp.h"
-
 #include "samples/Triangle/TriangleLayer.h"
 #include "samples/Triangle/TriangleRenderPass.h"
 
@@ -12,9 +11,14 @@ TriangleApp::TriangleApp()
           .m_window_height = 720,
           .m_maximized = false,
           .m_enable_multi_viewport = false,
-          .m_render_graph_builder = buildTriangleRenderGraph,
       })
 {}
+
+VulkanRenderer::InitializationOptions TriangleApp::getRendererInitializationOptions()
+{
+    VulkanRenderer::InitializationOptions options{.m_render_graph_builder = buildTriangleRenderGraph};
+    return options;
+}
 
 void TriangleApp::onInit()
 {
