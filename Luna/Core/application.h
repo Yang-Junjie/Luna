@@ -5,6 +5,7 @@
 #include "Layer.h"
 #include "LayerStack.h"
 #include "Renderer/VulkanRenderer.h"
+#include "TaskSystem.h"
 #include "Timestep.h"
 #include "Window.h"
 
@@ -62,6 +63,16 @@ public:
         return m_renderer;
     }
 
+    TaskSystem& getTaskSystem()
+    {
+        return m_task_system;
+    }
+
+    const TaskSystem& getTaskSystem() const
+    {
+        return m_task_system;
+    }
+
 protected:
     virtual VulkanRenderer::InitializationOptions getRendererInitializationOptions()
     {
@@ -88,6 +99,7 @@ private:
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
     VulkanRenderer m_renderer;
+    TaskSystem m_task_system;
 
     std::unique_ptr<ImGuiLayer> m_imgui_layer;
     ImGuiLayer* m_imgui_layer_raw = nullptr;

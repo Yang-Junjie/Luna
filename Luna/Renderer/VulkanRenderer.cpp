@@ -133,14 +133,17 @@ bool VulkanRenderer::init(Window& window, InitializationOptions options)
 
 void VulkanRenderer::shutdown()
 {
+    if (!m_initialized) {
+        return;
+    }
     m_render_graph.reset();
     m_context.reset();
     m_window = nullptr;
     m_native_window = nullptr;
     m_initialization_options = {};
-    m_initialized = false;
     m_resize_requested = false;
     m_frame_started = false;
+    m_initialized = false;
 }
 
 bool VulkanRenderer::isInitialized() const

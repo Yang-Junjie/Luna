@@ -76,6 +76,8 @@ add_library(
     Core/Log.h
     Core/Log.cpp
     Core/MouseCodes.h
+    Core/TaskSystem.h
+    Core/TaskSystem.cpp
     Core/Timestep.h
     Core/Window.h
     Core/Window.cpp
@@ -115,6 +117,7 @@ target_link_libraries(LunaCore
         GPUOpen::VulkanMemoryAllocator
         Vulkan::Vulkan
         glfw
+        enkiTS
         spirv-cross-core
         stb::stb
 )

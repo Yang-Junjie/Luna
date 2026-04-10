@@ -6,3 +6,4 @@ cmake-build-debug-mingw/
 Experimental/
 logs/
 Tests/
+/DesignTarget.md

@@ -28,6 +28,7 @@ Application::~Application()
         m_imgui_layer_raw = nullptr;
     }
 
+    m_task_system.shutdown();
     m_renderer.shutdown();
     m_window.reset();
     m_initialized = false;
@@ -42,6 +43,11 @@ bool Application::initialize()
 
     if (m_s_instance != this) {
         LUNA_CORE_ERROR("Cannot initialize application because another instance already exists");
+        return false;
+    }
+
+    if (!m_task_system.initialize()) {
+        LUNA_CORE_ERROR("Task system initialization failed");
         return false;
     }
 
@@ -104,6 +110,7 @@ void Application::run()
         m_last_frame_time = time;
 
         if (m_minimized) {
+            m_task_system.waitForAll();
             m_window->onUpdate();
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             continue;
@@ -114,6 +121,8 @@ void Application::run()
         for (auto& layer : m_layer_stack) {
             layer->onUpdate(m_timestep);
         }
+
+        m_task_system.waitForAll();
 
         renderFrame();
         m_window->onUpdate();

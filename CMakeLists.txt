@@ -50,11 +50,17 @@ set(SPIRV_CROSS_ENABLE_GLSL OFF CACHE BOOL "" FORCE)
 set(SPIRV_CROSS_ENABLE_REFLECT OFF CACHE BOOL "" FORCE)
 set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
 
+set(ENKITS_BUILD_C_INTERFACE OFF CACHE BOOL "" FORCE)
+set(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(ENKITS_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(ENKITS_INSTALL OFF CACHE BOOL "" FORCE)
+
 set(VULKAN_HPP_DISABLE_ENHANCED_MODE ON CACHE BOOL "" FORCE)
 set(VULKAN_HPP_NO_CONSTRUCTORS ON CACHE BOOL "" FORCE)
 set(VULKAN_HPP_NO_EXCEPTIONS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(third_party/glfw)
+add_subdirectory(third_party/enkiTS)
 add_subdirectory(third_party/spdlog)
 add_subdirectory(third_party/VMA)
 add_subdirectory(third_party/stb)
@@ -70,4 +76,3 @@ add_subdirectory(samples)
 
 add_executable(LunaApp Luna/Core/Main.cpp)
 target_link_libraries(LunaApp PRIVATE LunaEditor)
-
