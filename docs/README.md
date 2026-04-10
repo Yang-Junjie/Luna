@@ -13,6 +13,7 @@ Luna 是一个基于 C++20、GLFW、ImGui 和 Vulkan 的渲染基础设施项目
 | Manual | [manual/architecture-in-depth.md](./manual/architecture-in-depth.md) | 系统总览、目录结构、生命周期、设计模式 |
 | Manual | [manual/getting-started.md](./manual/getting-started.md) | 环境准备、构建、运行、最小示例 |
 | Manual | [manual/building-an-application-with-rendergraph.md](./manual/building-an-application-with-rendergraph.md) | 如何基于现有框架组装应用并接入自定义 RenderGraph |
+| Manual | [manual/job-system-manual.md](./manual/job-system-manual.md) | TaskSystem、TaskHandle、ResourceLoadQueue 的使用方法与线程边界 |
 | Manual | [manual/subsystems-manual.md](./manual/subsystems-manual.md) | 应用层、平台层、渲染层、资源层、ImGui 集成详解 |
 | Reference | [reference/class-and-api-reference.md](./reference/class-and-api-reference.md) | 核心类与 API 参考 |
 | Advanced | [advanced/best-practices-and-advanced.md](./advanced/best-practices-and-advanced.md) | 性能、扩展、二次开发建议 |
@@ -46,6 +47,7 @@ docs/
 │  ├─ architecture-in-depth.md
 │  ├─ getting-started.md
 │  ├─ building-an-application-with-rendergraph.md
+│  ├─ job-system-manual.md
 │  └─ subsystems-manual.md
 ├─ reference/
 │  └─ class-and-api-reference.md

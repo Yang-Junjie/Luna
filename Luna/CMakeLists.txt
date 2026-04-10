@@ -76,8 +76,6 @@ add_library(
     Core/Log.h
     Core/Log.cpp
     Core/MouseCodes.h
-    Core/TaskSystem.h
-    Core/TaskSystem.cpp
     Core/Timestep.h
     Core/Window.h
     Core/Window.cpp
@@ -90,6 +88,12 @@ add_library(
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
+    JobSystem/ResourceLoadQueue.h
+    JobSystem/TaskHandle.h
+    JobSystem/TaskHandle.cpp
+    JobSystem/TaskHandleState.h
+    JobSystem/TaskSystem.h
+    JobSystem/TaskSystem.cpp
     ${RENDERER_SOURCE}
     ${VAL_SOURCE}
     ${IMGUI_SOURCE}
