@@ -45,10 +45,6 @@ bool Application::initialize()
         return false;
     }
 
-    m_running = true;
-    m_minimized = false;
-    m_last_frame_time = 0.0f;
-
     m_window = Window::create(WindowProps{m_specification.m_name,
                                           m_specification.m_window_width,
                                           m_specification.m_window_height,
@@ -83,6 +79,9 @@ bool Application::initialize()
     }
 
     m_initialized = true;
+    m_minimized = false;
+    m_last_frame_time = 0.0f;
+
     return true;
 }
 
@@ -93,10 +92,12 @@ void Application::run()
         return;
     }
 
+    m_running = true;
+    m_last_frame_time = static_cast<float>(glfwGetTime());
+
     onInit();
 
     auto* native_window = static_cast<GLFWwindow*>(m_window->getNativeWindow());
-    m_last_frame_time = static_cast<float>(glfwGetTime());
     while (m_running && native_window != nullptr && !glfwWindowShouldClose(native_window)) {
         const float time = static_cast<float>(glfwGetTime());
         m_timestep = time - m_last_frame_time;
@@ -118,6 +119,7 @@ void Application::run()
         m_window->onUpdate();
     }
 
+    m_running = false;
     onShutdown();
 }
 

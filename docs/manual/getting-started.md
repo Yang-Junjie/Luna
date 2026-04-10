@@ -141,6 +141,10 @@ auto graph = builder.Build();
 
 关键点不是“如何手写 Vulkan 命令”，而是“如何声明附件、资源依赖与输出关系”。
 
+如果你准备做一个真正独立的应用，而不是只在默认编辑器里试验一个 pass，下一步应继续阅读:
+
+- [使用现有框架与 RenderGraph 构建应用](./building-an-application-with-rendergraph.md)
+
 ## 常见启动问题
 
 | 现象 | 原因 | 解决方式 |
