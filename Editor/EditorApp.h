@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Core/Application.h"
+#include "Editor/EditorRegistry.h"
+#include "Plugin/ServiceRegistry.h"
 
 namespace luna::editor {
 
@@ -10,6 +12,10 @@ public:
 
 protected:
     void onInit() override;
+
+private:
+    luna::ServiceRegistry m_service_registry;
+    luna::editor::EditorRegistry m_editor_registry;
 };
 
 } // namespace luna::editor

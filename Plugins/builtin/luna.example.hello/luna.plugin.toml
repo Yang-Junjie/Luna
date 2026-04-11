@@ -1,0 +1,10 @@
+id = "luna.example.hello"
+name = "Hello Plugin"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "LunaExampleHelloPlugin"
+entry = "luna_register_luna_example_hello"
+hosts = ["editor"]
+
+[dependencies]

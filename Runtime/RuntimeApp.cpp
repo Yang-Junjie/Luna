@@ -1,26 +1,23 @@
-#include "Editor/EditorApp.h"
+#include "Runtime/RuntimeApp.h"
 
-#include "Editor/EditorShellLayer.h"
 #include "Plugin/PluginBootstrap.h"
 #include "Plugin/PluginRegistry.h"
 
-namespace luna::editor {
+namespace luna::runtime {
 
-EditorApp::EditorApp()
+RuntimeApp::RuntimeApp()
     : Application(ApplicationSpecification{
-          .m_name = "Luna Editor",
-          .m_window_width = 1'700,
+          .m_name = "Luna Runtime",
+          .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
       })
 {}
 
-void EditorApp::onInit()
+void RuntimeApp::onInit()
 {
-    luna::PluginRegistry plugin_registry(m_service_registry, &m_editor_registry);
+    luna::PluginRegistry plugin_registry(m_service_registry);
     luna::registerResolvedPlugins(plugin_registry);
-
-    pushOverlay(std::make_unique<EditorShellLayer>(m_editor_registry));
 
     for (const auto& layer : plugin_registry.layers()) {
         if (!layer.m_factory) {
@@ -40,14 +37,13 @@ void EditorApp::onInit()
     }
 }
 
-} // namespace luna::editor
+} // namespace luna::runtime
 
 namespace luna {
 
 Application* createApplication(int, char**)
 {
-    return new editor::EditorApp();
+    return new runtime::RuntimeApp();
 }
 
 } // namespace luna
-

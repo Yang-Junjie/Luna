@@ -1,0 +1,10 @@
+id = "luna.editor.core"
+name = "Builtin Editor Core"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "LunaBuiltinEditorCorePlugin"
+entry = "luna_register_luna_editor_core"
+hosts = ["editor"]
+
+[dependencies]

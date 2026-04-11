@@ -3,21 +3,18 @@
 #include "Core/Application.h"
 #include "Core/Input.h"
 #include "Core/Layer.h"
-#include "Renderer/Camera.h"
 #include "imgui.h"
 
 #include <glm/glm.hpp>
 
 #include <algorithm>
-#include <string>
-#include <vector>
 
 namespace luna::editor {
 
-class EditorLayer final : public Layer {
+class EditorCameraControllerLayer final : public Layer {
 public:
-    EditorLayer()
-        : Layer("EditorLayer")
+    EditorCameraControllerLayer()
+        : Layer("EditorCameraControllerLayer")
     {}
 
     void onAttach() override
@@ -95,28 +92,6 @@ public:
         camera.m_position += movement * speed * static_cast<float>(dt);
     }
 
-    void onRender() override {}
-
-    void onImGuiRender() override
-    {
-        auto& renderer = luna::Application::get().getRenderer();
-
-        if (ImGui::Begin("Renderer")) {
-            ImGui::ColorEdit4("Clear Color", &renderer.getClearColor().x);
-            ImGui::Separator();
-
-            ImGui::Text("Camera Active: %s", m_camera_active ? "Yes" : "No");
-            ImGui::Text("Position: %.2f %.2f %.2f",
-                        renderer.getMainCamera().m_position.x,
-                        renderer.getMainCamera().m_position.y,
-                        renderer.getMainCamera().m_position.z);
-            ImGui::Text("Pitch/Yaw: %.2f %.2f", renderer.getMainCamera().m_pitch, renderer.getMainCamera().m_yaw);
-            ImGui::TextUnformatted("Hold RMB to look around. WASD move, Q/E vertical, Shift boost.");
-        }
-
-        ImGui::End();
-    }
-
 private:
     void setCameraActive(bool active)
     {
@@ -139,4 +114,3 @@ private:
 };
 
 } // namespace luna::editor
-

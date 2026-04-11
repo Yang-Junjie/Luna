@@ -1,0 +1,10 @@
+id = "luna.example.imgui_demo"
+name = "ImGui Demo Plugin"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "LunaExampleImGuiDemoPlugin"
+entry = "luna_register_luna_example_imgui_demo"
+hosts = ["editor"]
+
+[dependencies]

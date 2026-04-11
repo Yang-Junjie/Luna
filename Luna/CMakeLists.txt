@@ -79,6 +79,10 @@ add_library(
     Core/Timestep.h
     Core/Window.h
     Core/Window.cpp
+    Plugin/PluginBootstrap.h
+    Plugin/PluginRegistry.h
+    Plugin/PluginRegistry.cpp
+    Plugin/ServiceRegistry.h
     Events/ApplicationEvent.h
     Events/Event.h
     Events/KeyEvent.h

@@ -38,3 +38,9 @@
 [submodule "third_party/enkiTS"]
 	path = third_party/enkiTS
 	url = https://github.com/dougbinks/enkiTS.git
+[submodule "third_party/tomlplusplus"]
+	path = third_party/tomlplusplus
+	url = https://github.com/marzer/tomlplusplus.git
+[submodule "third_party/entt"]
+	path = third_party/entt
+	url = https://github.com/skypjack/entt.git
