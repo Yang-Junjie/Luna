@@ -113,9 +113,10 @@ public:
 
 private:
     ResourceLoadHandle(TaskHandle task_handle, std::shared_ptr<detail::ResourceLoadState<Resource>> state)
-        : m_task(std::move(task_handle)),
-          m_state(std::move(state))
-    {}
+        : m_task(std::move(task_handle))
+        , m_state(std::move(state))
+    {
+    }
 
 private:
     TaskHandle m_task;
@@ -128,7 +129,8 @@ class ResourceLoadQueue {
 public:
     explicit ResourceLoadQueue(TaskSystem& task_system)
         : m_task_system(task_system)
-    {}
+    {
+    }
 
     template <typename LoadFunction>
     auto submitLoad(LoadFunction&& load_function,
@@ -140,9 +142,7 @@ public:
     }
 
     template <typename LoadFunction>
-    auto submitLoad(LoadFunction&& load_function,
-                    const std::vector<TaskHandle>& dependencies,
-                    ResourceLoadQueueDesc desc = {})
+    auto submitLoad(LoadFunction&& load_function, const std::vector<TaskHandle>& dependencies, ResourceLoadQueueDesc desc = {})
         -> ResourceLoadHandle<std::invoke_result_t<std::decay_t<LoadFunction>>>
     {
         using Resource = std::invoke_result_t<std::decay_t<LoadFunction>>;

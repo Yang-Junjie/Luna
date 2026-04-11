@@ -2,9 +2,8 @@
 #include "JobSystem/ResourceLoadQueue.h"
 #include "JobSystem/TaskSystem.h"
 
-#include <cstdlib>
-
 #include <atomic>
+#include <cstdlib>
 #include <limits>
 #include <optional>
 #include <string>
@@ -52,7 +51,7 @@ int main()
     auto parallel_task = task_system.submitParallel(
         [&](enki::TaskSetPartition range, uint32_t) {
             for (uint32_t index = range.start; index < range.end; ++index) {
-                (void) index;
+                (void)index;
                 parallel_counter.fetch_add(1, std::memory_order_relaxed);
             }
         },

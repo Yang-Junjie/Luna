@@ -68,8 +68,9 @@ public:
     TaskHandle submit(std::function<void()> function,
                       TaskSubmitDesc desc = {},
                       std::initializer_list<TaskHandle> dependencies = {});
-    TaskHandle
-        submit(std::function<void()> function, const std::vector<TaskHandle>& dependencies, TaskSubmitDesc desc = {});
+    TaskHandle submit(std::function<void()> function,
+                      const std::vector<TaskHandle>& dependencies,
+                      TaskSubmitDesc desc = {});
     TaskHandle submitParallel(std::function<void(enki::TaskSetPartition, uint32_t)> function,
                               TaskSubmitDesc desc,
                               std::initializer_list<TaskHandle> dependencies = {});
@@ -90,8 +91,8 @@ public:
     const enki::TaskScheduler& getScheduler() const;
 
 private:
-    std::vector<std::shared_ptr<detail::TaskCompletionState>>
-        collectDependencyStates(const std::vector<TaskHandle>& dependencies) const;
+    std::vector<std::shared_ptr<detail::TaskCompletionState>> collectDependencyStates(
+        const std::vector<TaskHandle>& dependencies) const;
     TaskHandle submitManagedTask(std::shared_ptr<detail::ManagedTaskBase> task_state,
                                  TaskTarget target,
                                  const std::vector<TaskHandle>& dependencies);

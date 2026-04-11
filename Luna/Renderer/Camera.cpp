@@ -17,3 +17,4 @@ glm::mat4 Camera::getRotationMatrix() const
 
     return glm::mat4_cast(yaw_rotation) * glm::mat4_cast(pitch_rotation);
 }
+

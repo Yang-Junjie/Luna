@@ -25,3 +25,4 @@ public:
     static float getMouseY();
 };
 } // namespace luna
+

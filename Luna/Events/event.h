@@ -60,7 +60,8 @@ public:
         : m_event(event)
     {}
 
-    template <typename T, typename F> bool dispatch(const F& func)
+    template <typename T, typename F>
+    bool dispatch(const F& func)
     {
         if (m_event.getEventType() == T::getStaticType()) {
             m_event.m_handled |= func(static_cast<T&>(m_event));

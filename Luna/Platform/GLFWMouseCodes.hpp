@@ -43,3 +43,4 @@ inline int lunaMouseCodeToGlfwMouseCode(MouseCode mouse_code)
 }
 
 } // namespace luna
+

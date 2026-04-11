@@ -33,3 +33,4 @@ int main(int argc, char** argv)
     luna::Logger::shutdown();
     return 0;
 }
+

@@ -15,7 +15,6 @@ public:
     void onAttach() override;
     void onDetach() override;
     void onEvent(Event& event) override;
-
     void onImGuiRender() override {}
 
     void begin();
@@ -47,3 +46,4 @@ private:
 };
 
 } // namespace luna
+

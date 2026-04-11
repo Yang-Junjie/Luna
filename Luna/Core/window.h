@@ -53,3 +53,4 @@ public:
     static std::unique_ptr<Window> create(const WindowProps& props = WindowProps());
 };
 } // namespace luna
+

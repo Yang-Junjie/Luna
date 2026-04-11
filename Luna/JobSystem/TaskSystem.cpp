@@ -1,10 +1,10 @@
-#include "Core/Log.h"
-#include "JobSystem/TaskHandleState.h"
 #include "JobSystem/TaskSystem.h"
 
-#include <cassert>
+#include "Core/Log.h"
+#include "JobSystem/TaskHandleState.h"
 
 #include <algorithm>
+#include <cassert>
 #include <system_error>
 
 namespace luna {
@@ -96,8 +96,8 @@ struct ParallelFunctionTask final : ManagedTaskBase, enki::ITaskSet {
 
 struct PinnedFunctionTask final : ManagedTaskBase, enki::IPinnedTask {
     explicit PinnedFunctionTask(std::function<void()> function_in, const TaskSubmitDesc& desc)
-        : function(std::move(function_in)),
-          target(desc.target)
+        : function(std::move(function_in))
+        , target(desc.target)
     {
         m_Priority = desc.priority;
     }
@@ -134,7 +134,8 @@ struct PinnedFunctionTask final : ManagedTaskBase, enki::IPinnedTask {
 
 TaskCompletionState::TaskCompletionState(TaskTarget target_in)
     : m_target(target_in)
-{}
+{
+}
 
 void TaskCompletionState::bind(TaskSystem& task_system, const enki::ICompletable* dependency)
 {
@@ -221,11 +222,12 @@ PendingLaunch::PendingLaunch(TaskSystem& task_system,
                              std::shared_ptr<ManagedTaskBase> task_state,
                              std::shared_ptr<TaskCompletionState> completion_state,
                              uint32_t dependency_count)
-    : m_task_system(&task_system),
-      m_task_state(std::move(task_state)),
-      m_completion_state(std::move(completion_state)),
-      m_remaining_dependencies(dependency_count)
-{}
+    : m_task_system(&task_system)
+    , m_task_state(std::move(task_state))
+    , m_completion_state(std::move(completion_state))
+    , m_remaining_dependencies(dependency_count)
+{
+}
 
 void PendingLaunch::dependencyResolved(bool dependency_failed)
 {
@@ -286,7 +288,8 @@ TaskSystem::ExternalThreadScope::~ExternalThreadScope()
 
 TaskSystem::ExternalThreadScope::ExternalThreadScope(TaskSystem* task_system)
     : m_task_system(task_system)
-{}
+{
+}
 
 TaskSystem::ExternalThreadScope::ExternalThreadScope(ExternalThreadScope&& other) noexcept
     : m_task_system(other.m_task_system)
@@ -379,8 +382,7 @@ bool TaskSystem::initialize(const TaskSystemConfig& config)
     m_initialized = true;
 
     if (Logger::isInitialized()) {
-        LUNA_CORE_INFO("Task system initialized with {} worker threads, {} IO threads, {} external slots ({} total "
-                       "registered threads)",
+        LUNA_CORE_INFO("Task system initialized with {} worker threads, {} IO threads, {} external slots ({} total registered threads)",
                        m_config.worker_thread_count,
                        m_config.io_thread_count,
                        m_config.external_thread_count,
@@ -553,8 +555,9 @@ TaskHandle TaskSystem::submit(std::function<void()> function,
     return submit(std::move(function), std::vector<TaskHandle>(dependencies), desc);
 }
 
-TaskHandle
-    TaskSystem::submit(std::function<void()> function, const std::vector<TaskHandle>& dependencies, TaskSubmitDesc desc)
+TaskHandle TaskSystem::submit(std::function<void()> function,
+                              const std::vector<TaskHandle>& dependencies,
+                              TaskSubmitDesc desc)
 {
     std::shared_ptr<detail::ManagedTaskBase> task_state;
     if (desc.target == TaskTarget::Worker) {
@@ -637,20 +640,17 @@ TaskSystem::ExternalThreadScope TaskSystem::registerExternalThread()
     }
 
     if (m_config.external_thread_count == 0) {
-        reportTaskSystemFailure(
-            "TaskSystem::registerExternalThread requires TaskSystemConfig::external_thread_count > 0");
+        reportTaskSystemFailure("TaskSystem::registerExternalThread requires TaskSystemConfig::external_thread_count > 0");
         return {};
     }
 
     if (isCurrentThreadRegistered()) {
-        reportTaskSystemFailure(
-            "TaskSystem::registerExternalThread was called from a thread that is already registered with enkiTS");
+        reportTaskSystemFailure("TaskSystem::registerExternalThread was called from a thread that is already registered with enkiTS");
         return {};
     }
 
     if (!m_scheduler->RegisterExternalTaskThread()) {
-        reportTaskSystemFailure(
-            "TaskSystem::registerExternalThread failed because no external thread slots are available");
+        reportTaskSystemFailure("TaskSystem::registerExternalThread failed because no external thread slots are available");
         return {};
     }
 
@@ -667,8 +667,8 @@ const enki::TaskScheduler& TaskSystem::getScheduler() const
     return *m_scheduler;
 }
 
-std::vector<std::shared_ptr<detail::TaskCompletionState>>
-    TaskSystem::collectDependencyStates(const std::vector<TaskHandle>& dependencies) const
+std::vector<std::shared_ptr<detail::TaskCompletionState>> TaskSystem::collectDependencyStates(
+    const std::vector<TaskHandle>& dependencies) const
 {
     std::vector<std::shared_ptr<detail::TaskCompletionState>> states;
     states.reserve(dependencies.size());
@@ -697,8 +697,7 @@ TaskHandle TaskSystem::submitManagedTask(std::shared_ptr<detail::ManagedTaskBase
     }
 
     if (target == TaskTarget::Worker && !canSubmitWorkerTasksFromCurrentThread()) {
-        reportTaskSystemFailure("Worker task submission requires the calling thread to be the application thread, an "
-                                "enkiTS worker, or a registered external task thread");
+        reportTaskSystemFailure("Worker task submission requires the calling thread to be the application thread, an enkiTS worker, or a registered external task thread");
         return {};
     }
 
@@ -718,8 +717,8 @@ TaskHandle TaskSystem::submitManagedTask(std::shared_ptr<detail::ManagedTaskBase
         return TaskHandle(std::move(completion_state));
     }
 
-    auto pending_launch = std::make_shared<detail::PendingLaunch>(
-        *this, task_state, completion_state, static_cast<uint32_t>(dependency_states.size()));
+    auto pending_launch =
+        std::make_shared<detail::PendingLaunch>(*this, task_state, completion_state, static_cast<uint32_t>(dependency_states.size()));
 
     for (const auto& dependency_state : dependency_states) {
         dependency_state->addPendingLaunch(pending_launch);
@@ -755,8 +754,7 @@ bool TaskSystem::requireSchedulerApiThread(const char* operation) const
     }
 
     if (Logger::isInitialized()) {
-        LUNA_CORE_ERROR("{} requires the calling thread to be the application thread, an enkiTS worker, or a "
-                        "registered external task thread",
+        LUNA_CORE_ERROR("{} requires the calling thread to be the application thread, an enkiTS worker, or a registered external task thread",
                         operation);
     }
 
@@ -772,7 +770,8 @@ void TaskSystem::deregisterExternalThread()
 
     const uint32_t thread_number = m_scheduler->GetThreadNum();
     const uint32_t first_external = getFirstIOThreadNumber();
-    const uint32_t external_thread_limit = first_external + m_config.io_thread_count + m_config.external_thread_count;
+    const uint32_t external_thread_limit =
+        first_external + m_config.io_thread_count + m_config.external_thread_count;
 
     if (thread_number < first_external || thread_number >= external_thread_limit) {
         return;
