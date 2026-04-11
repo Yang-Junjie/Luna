@@ -1,5 +1,4 @@
 #include "JobSystem/TaskHandle.h"
-
 #include "JobSystem/TaskHandleState.h"
 #include "JobSystem/TaskSystem.h"
 
@@ -10,8 +9,7 @@ namespace luna {
 
 TaskHandle::TaskHandle(std::shared_ptr<detail::TaskCompletionState> state)
     : m_state(std::move(state))
-{
-}
+{}
 
 bool TaskHandle::isValid() const
 {

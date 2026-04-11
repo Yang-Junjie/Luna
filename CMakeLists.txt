@@ -74,5 +74,3 @@ add_subdirectory(Editor)
 add_subdirectory(samples)
 
 
-add_executable(LunaApp Luna/Core/Main.cpp)
-target_link_libraries(LunaApp PRIVATE LunaEditor)

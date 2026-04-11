@@ -35,6 +35,7 @@ struct TaskCompletionState final : enki::ICompletable {
     TaskTarget target() const;
 
 protected:
+    // when all dependencies are complete, this will be automatically called by task system
     void OnDependenciesComplete(enki::TaskScheduler* scheduler, uint32_t thread_number) override;
 
 private:

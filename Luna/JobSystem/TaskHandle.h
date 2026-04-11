@@ -3,6 +3,7 @@
 #include "TaskScheduler.h"
 
 #include <cstdint>
+
 #include <functional>
 #include <memory>
 
@@ -13,7 +14,7 @@ class TaskSystem;
 namespace detail {
 struct ManagedTaskBase;
 struct TaskCompletionState;
-}
+} // namespace detail
 
 enum class TaskTarget : uint8_t {
     Worker,
@@ -45,9 +46,8 @@ public:
     TaskStatus status() const;
     void wait(TaskSystem& task_system) const;
 
-    TaskHandle then(TaskSystem& task_system,
-                    std::function<void()> function,
-                    TaskSubmitDesc desc = {}) const;
+    // Used to build DAGs of dependent tasks
+    TaskHandle then(TaskSystem& task_system, std::function<void()> function, TaskSubmitDesc desc = {}) const;
     TaskHandle thenParallel(TaskSystem& task_system,
                             std::function<void(enki::TaskSetPartition, uint32_t)> function,
                             TaskSubmitDesc desc) const;
