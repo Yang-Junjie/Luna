@@ -4,9 +4,10 @@
 #include "Renderer/ImageLoader.h"
 #include "Renderer/ModelLoader.h"
 
-#include <atomic>
 #include <cstdint>
 #include <cstdlib>
+
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -92,10 +93,10 @@ std::vector<uint8_t> readWholeFile(const std::filesystem::path& path)
 
 uint64_t computeChecksum(const std::vector<uint8_t>& bytes)
 {
-    uint64_t checksum = 1469598103934665603ull;
+    uint64_t checksum = 1'469'598'103'934'665'603ull;
     for (uint8_t byte : bytes) {
         checksum ^= byte;
-        checksum *= 1099511628211ull;
+        checksum *= 1'099'511'628'211ull;
     }
     return checksum;
 }
@@ -174,8 +175,10 @@ int main()
         [texture_path_string = texture_path.string()]() {
             return luna::val::ImageLoader::LoadImageFromFile(texture_path_string);
         },
-        [&registry, &task_system, &queued_texture_commit_thread, texture_name = std::string("queue/") + texture_path.filename().string()](
-            luna::val::ImageData image) {
+        [&registry,
+         &task_system,
+         &queued_texture_commit_thread,
+         texture_name = std::string("queue/") + texture_path.filename().string()](luna::val::ImageData image) {
             queued_texture_commit_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
             registry.addTexture(makeTextureSummary(texture_name, image, computeChecksum(image.ByteData)));
         });
@@ -194,17 +197,20 @@ int main()
         },
         {.target = luna::TaskTarget::IO});
 
-    auto worker_task = io_task.then(
-        task_system,
-        [&task_system, &staged_worker_thread, raw_file, prepared_texture]() {
-            staged_worker_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
-            prepared_texture->Image = luna::val::ImageLoader::LoadImageFromMemory(raw_file->Bytes.data(), raw_file->Bytes.size());
-            prepared_texture->Checksum = computeChecksum(prepared_texture->Image.ByteData);
-        });
+    auto worker_task = io_task.then(task_system, [&task_system, &staged_worker_thread, raw_file, prepared_texture]() {
+        staged_worker_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
+        prepared_texture->Image =
+            luna::val::ImageLoader::LoadImageFromMemory(raw_file->Bytes.data(), raw_file->Bytes.size());
+        prepared_texture->Checksum = computeChecksum(prepared_texture->Image.ByteData);
+    });
 
     auto staged_texture_task = worker_task.then(
         task_system,
-        [&registry, &task_system, &staged_commit_thread, prepared_texture, texture_name = std::string("manual/") + texture_path.filename().string()]() {
+        [&registry,
+         &task_system,
+         &staged_commit_thread,
+         prepared_texture,
+         texture_name = std::string("manual/") + texture_path.filename().string()]() {
             staged_commit_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
             registry.addTexture(makeTextureSummary(texture_name, prepared_texture->Image, prepared_texture->Checksum));
         },
@@ -222,18 +228,19 @@ int main()
         return fail("submitLoad() for the model did not return a valid handle");
     }
 
-    auto all_done = task_system.whenAll({queued_texture_task, staged_texture_task, model_handle.task()}).then(
-        task_system,
-        [&]() {
-            final_barrier_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
+    auto all_done =
+        task_system.whenAll({queued_texture_task, staged_texture_task, model_handle.task()})
+            .then(task_system,
+                  [&]() {
+                      final_barrier_thread.store(task_system.getScheduler().GetThreadNum(), std::memory_order_release);
 
-            if (auto model = model_handle.take()) {
-                registry.addModel(makeModelSummary(model_path.filename().string(), *model));
-            }
+                      if (auto model = model_handle.take()) {
+                          registry.addModel(makeModelSummary(model_path.filename().string(), *model));
+                      }
 
-            logRegistry(registry);
-        },
-        {.target = luna::TaskTarget::MainThread});
+                      logRegistry(registry);
+                  },
+                  {.target = luna::TaskTarget::MainThread});
 
     all_done.wait(task_system);
 

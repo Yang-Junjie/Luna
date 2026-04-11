@@ -47,4 +47,3 @@ void LayerStack::popOverlay(Layer* overlay)
     }
 }
 } // namespace luna
-

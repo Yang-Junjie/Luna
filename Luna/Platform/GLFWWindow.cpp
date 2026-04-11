@@ -268,4 +268,3 @@ void GLFWWindow::shutdown()
 }
 
 } // namespace luna
-

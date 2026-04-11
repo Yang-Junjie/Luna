@@ -249,4 +249,3 @@ inline int lunaKeyCodeToGlfwKeyCode(KeyCode key_code)
 }
 
 } // namespace luna
-

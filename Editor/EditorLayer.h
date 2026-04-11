@@ -3,12 +3,11 @@
 #include "Core/Application.h"
 #include "Core/Input.h"
 #include "Core/Layer.h"
-#include "Renderer/Camera.h"
 #include "imgui.h"
-
-#include <glm/glm.hpp>
+#include "Renderer/Camera.h"
 
 #include <algorithm>
+#include <glm/glm.hpp>
 #include <string>
 #include <vector>
 
@@ -139,4 +138,3 @@ private:
 };
 
 } // namespace luna::editor
-

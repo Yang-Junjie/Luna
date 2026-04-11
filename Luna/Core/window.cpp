@@ -14,4 +14,3 @@ std::unique_ptr<Window> Window::create(const WindowProps& props)
     return window;
 }
 } // namespace luna
-

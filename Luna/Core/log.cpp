@@ -268,4 +268,3 @@ spdlog::level::level_enum Logger::toSpdlogLevel(Level level)
 }
 
 } // namespace luna
-

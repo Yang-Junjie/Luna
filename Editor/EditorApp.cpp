@@ -1,5 +1,4 @@
 #include "Editor/EditorApp.h"
-
 #include "Editor/EditorLayer.h"
 
 namespace luna::editor {
@@ -28,4 +27,3 @@ Application* createApplication(int, char**)
 }
 
 } // namespace luna
-
