@@ -1,372 +1,346 @@
 # Luna 插件系统当前状态与后续路线
 
-## 1. 本文档的目的
+## 1. 这份文档回答什么问题
 
-本文档不再解释“插件系统应该如何设计”，而是明确回答下面这些现实问题:
+这份文档不讨论“理想中的插件系统应该有多强”，而是回答下面这些现实问题:
 
-- 当前到底已经实现了什么
-- 当前哪些东西只是骨架
-- 当前明确缺了什么
-- 下一步最合理的工程推进顺序是什么
+- 当前到底哪些能力已经稳定可用
+- 哪些字段或机制只是保留位
+- 哪些扩展点明确还没有做
+- 下一阶段最值得投入的方向是什么
 
-如果你准备继续开发这套系统，这份文档比抽象愿景更重要。
+## 2. 当前成熟度判断
 
-## 2. 当前已经真正工作的部分
+如果要给当前插件系统一个准确定位，最合适的说法是:
 
-下面这些内容不是设计稿，而是当前仓库里已经打通的链路。
+> Luna 已经有一个可靠的源码插件系统骨架，但还没有形成完整插件生态。
 
-### 2.1 本地 Bundle 驱动插件选择
+这个判断里有两个关键词:
 
-当前已有:
+- `可靠`
+- `骨架`
 
-- `Bundles/EditorDefault/luna.bundle.toml`
-- `Bundles/RuntimeDefault/luna.bundle.toml`
+也就是说:
 
-它们分别决定编辑器宿主和运行时宿主启用哪些插件。
+- 最小链路已经打通，确实能工作
+- 但远程来源、版本治理、更多扩展点仍然缺失
 
-当前默认 Bundle 已经接入:
+## 3. 当前能力成熟度矩阵
 
-- `luna.editor.core`
-- `luna.example.hello`
-- `luna.example.imgui_demo`
+| 能力域 | 当前状态 | 说明 |
+| --- | --- | --- |
+| Bundle 选择插件 | 稳定可用 | 已用于 `editor` / `runtime` profile |
+| manifest 扫描与校验 | 稳定可用 | `sync.py` 已处理缺失、重复、host 不匹配等情况 |
+| 构建接入 | 稳定可用 | `PluginList.cmake` 已进入宿主 target |
+| 启动时注册 | 稳定可用 | `ResolvedPlugins.cpp` -> `registerResolvedPlugins()` |
+| Layer / Overlay 扩展 | 稳定可用 | 已被 runtime / editor shell 真实使用 |
+| Panel / Command 扩展 | 稳定可用 | 已被 `luna.editor.core` 和示例插件真实使用 |
+| ImGui 请求 | 稳定可用 | `luna.editor.shell`、`luna.imgui` 都可触发 |
+| `ServiceRegistry` 共享服务 | 初级可用 | 基础容器已经有，但默认服务还不多 |
+| `sdk` / `kind` 元数据治理 | 半实现 | 字段存在，但还没有强校验与策略 |
+| 版本求解 | 未实现 | 依赖 value 目前只是字符串 |
+| 远程插件同步 | 未实现 | 当前只扫本地目录 |
+| RenderGraph 插件协议 | 未实现 | 还没有 render registry / render contribution |
+| 二进制插件 / 热重载 | 未实现 | 当前完全没有这条链路 |
 
-当前默认 runtime Bundle 已经接入:
+## 4. 当前已经真正落地的部分
 
-- `luna.runtime.core`
+### 4.1 单宿主 + 多 Bundle 组合
 
-### 2.2 本地插件 manifest 扫描
+当前已经稳定落地的不是“双宿主”，而是:
 
-`Tools/luna/sync.py` 当前会扫描:
+- 单一宿主 `LunaApp`
+- 多套 Bundle 组合
 
-- `Plugins/builtin`
-- `Plugins/external`
+默认组合如下:
 
-中的所有 `luna.plugin.toml`。
+| Bundle | 当前启用插件 |
+| --- | --- |
+| `EditorDefault` | `luna.editor.shell`、`luna.editor.core`、`luna.example.hello`、`luna.example.imgui_demo` |
+| `RuntimeDefault` | `luna.runtime.core` |
 
-### 2.3 依赖拓扑排序
+### 4.2 插件已经进入真实构建图
 
-当前已经支持:
+这不是文档层的概念，而是构建层的现实:
 
-- 读取 `dependencies` 的 key
-- 递归解析依赖
-- 检测循环依赖
+- `sync.py` 生成 `PluginList.cmake`
+- `App/CMakeLists.txt` include 这个生成文件
+- `LunaAppHost` 链接选中的插件 target
 
-### 2.4 host 兼容校验
+这意味着插件已经不是“源码目录里的一堆普通文件”，而是真正参与宿主装配的模块。
 
-当前已经支持:
+### 4.3 默认 builtin plugins 已经证明链路有效
 
-- Bundle 声明 `host`
-- 插件声明 `hosts`
-- `sync.py` 校验两者是否兼容
+当前仓库里，下面这些插件都已经是“真正在工作”的插件，而不是演示用伪代码:
 
-### 2.5 生成中间文件
+| 插件 | 作用 |
+| --- | --- |
+| `luna.editor.shell` | 请求 ImGui，并把 `EditorShellLayer` 作为 overlay 注入宿主 |
+| `luna.editor.core` | 注册默认编辑器相机控制、Renderer 面板与 Reset Camera 命令 |
+| `luna.example.hello` | 注册 Hello 示例面板 |
+| `luna.example.imgui_demo` | 注册 Dear ImGui Demo 面板 |
+| `luna.runtime.core` | 注册 runtime clear color 动画层 |
+| `luna.imgui` | 提供独立的 ImGui 请求插件，当前不在默认 editor bundle 中 |
 
-当前已经稳定生成:
+## 5. 当前“半实现”的部分
 
-- `Plugins/Generated/editor/PluginList.cmake`
-- `Plugins/Generated/editor/ResolvedPlugins.h`
-- `Plugins/Generated/editor/ResolvedPlugins.cpp`
-- `Plugins/Generated/runtime/PluginList.cmake`
-- `Plugins/Generated/runtime/ResolvedPlugins.h`
-- `Plugins/Generated/runtime/ResolvedPlugins.cpp`
-- `luna.editor.lock`
-- `luna.runtime.lock`
+下面这些机制已经出现了，但还没有形成完整治理能力。
 
-### 2.6 宿主显式注册插件
+### 5.1 `sdk`
 
-当前 `EditorApp` 已经通过:
+当前现状:
 
-- `registerResolvedPlugins(plugin_registry)`
+- Bundle 有 `sdk`
+- 插件 manifest 有 `sdk`
+- lock file 会记录 `sdk`
 
-来装配插件贡献。
+当前缺失:
 
-当前 `RuntimeApp` 也已经通过同样的显式注册流程装配 runtime plugins。
-
-### 2.7 运行时注册表骨架
-
-当前已经有:
-
-- `ServiceRegistry`
-- `PluginRegistry`
-- `EditorRegistry`
-
-### 2.8 编辑器扩展点的最小链路
-
-当前编辑器插件已经能贡献:
-
-- Layer
-- Overlay
-- Panel
-- Command
-
-### 2.9 多个真正工作的 builtin plugins
-
-当前已有:
-
-- `Plugins/builtin/luna.editor.core`
-- `Plugins/builtin/luna.example.hello`
-- `Plugins/builtin/luna.example.imgui_demo`
-- `Plugins/builtin/luna.runtime.core`
-
-其中:
-
-- `luna.editor.core` 是默认编辑器基础能力插件
-- `luna.example.hello` 是最小 Panel 示例插件
-- `luna.example.imgui_demo` 是 Dear ImGui Demo 面板示例插件
-- `luna.runtime.core` 是最小 runtime Layer 示例插件
-
-## 3. 当前只是“保留位”或“半实现”的部分
-
-这些字段或机制已经出现了，但还没有完全长成最终形态。
-
-### 3.1 `sdk`
-
-当前:
-
-- Bundle 里有 `sdk`
-- 插件里有 `sdk`
-- host 对应的 lock file 会记录 `sdk`
-
-但当前还没有真正做:
-
-- Bundle SDK 与插件 SDK 的兼容校验
+- Bundle 与插件的兼容性判断
 - 升级策略
-- 破坏性变更检查
+- break-change 协议
 
-### 3.2 `kind`
+### 5.2 `kind`
 
-当前:
+当前现状:
 
-- manifest 里有 `kind`
-- host 对应的 lock file 会记录它
+- 每个插件都有 `kind`
+- lock file 会记录它
 
-但当前还没有真正根据 `kind` 分流不同解析或装配逻辑。
+当前缺失:
 
-### 3.3 `dependencies` 的版本字符串
+- 基于 `kind` 的装配分流
+- 更强的语义约束
 
-当前:
+### 5.3 `dependencies` 的版本值
 
-- `dependencies` 的 value 必须是字符串
+当前现状:
 
-但当前:
+- 依赖 key 已参与拓扑排序
+- 依赖 value 必须是字符串
 
-- 不做 semver 求解
-- 不做版本区间匹配
-- 不做冲突裁决
+当前缺失:
 
-### 3.4 `ServiceRegistry`
+- semver 求解
+- 区间匹配
+- 冲突裁决
 
-当前它已经存在，但还没有在默认编辑器里注册太多真实 service。
+### 5.4 `ServiceRegistry`
 
-因此目前它更像“基础设施预留位”，而不是“已经承载复杂共享对象的完整容器”。
+当前它已经是可用基础设施，但还没有真正承载一组丰富的共享上下文。
 
-## 4. 当前明确还没有实现的部分
+所以当前最准确的评价是:
 
-下面这些能力当前没有，不要误以为已经支持。
+- 基础设计正确
+- 使用规模还很小
 
-### 4.1 远程插件下载
+## 6. 当前明确没有做的部分
 
-当前 `sync.py` 不会:
+### 6.1 远程插件来源
 
-- clone GitHub 仓库
+`sync.py` 当前不会:
+
+- clone Git 仓库
+- checkout revision
 - fetch 更新
-- checkout 指定 revision
+- 缓存来源
 
-它只扫描当前工作区里已经存在的本地目录。
+它只处理当前工作区里已经存在的本地插件目录。
 
-### 4.2 完整 lock file
+### 6.2 完整 lock file
 
-当前 lock file 还没有:
+当前 `luna.lock` 更像“解析结果摘要”，还不是完整锁文件体系。
 
-- Git URL
+它缺少:
+
+- 来源 URL
 - revision
-- 校验信息
+- 哈希或校验信息
 - 来源类型
 
-它们现在更像“本地解析结果摘要”。
+### 6.3 更细粒度的 editor 扩展点
 
-### 4.3 `optional_dependencies`
-
-当前没有实现可选依赖逻辑。
-
-### 4.4 Render 插件注册表
-
-当前没有:
-
-- `RenderRegistry`
-- `RenderFeature`
-- Render phase 注入
-
-### 4.5 Asset 插件注册表
-
-当前没有:
-
-- `AssetRegistry`
-- importer 扩展点
-- 虚拟文件系统挂载注册
-
-### 4.6 Inspector / Menu / Toolbar 扩展点
-
-当前只有:
+当前 editor 侧只有两类正式贡献:
 
 - Panel
 - Command
 
-还没有更细粒度的编辑器扩展协议。
+还没有:
 
-### 4.7 二进制插件
+- menu item registry
+- toolbar item registry
+- inspector provider
+- dock layout contribution
 
-当前完全没有这条链路。
+### 6.4 RenderGraph 方向的正式插件协议
 
-### 4.8 热重载
+当前没有:
 
-当前完全没有，也不应该优先做。
+- render registry
+- render feature registry
+- render graph contribution
+- render pass injection protocol
 
-## 5. 当前系统的真实边界
+这意味着当前插件系统虽然能访问 renderer 状态，但仍然不能被定义为“正式支持渲染主路径扩展”。
 
-理解这条边界非常重要。
+### 6.5 二进制插件与热重载
 
-### 5.1 现在已经是插件系统
+当前完全没有:
 
-因为它已经具备:
+- 动态装载协议
+- 卸载协议
+- ABI 稳定层
+- 运行时重载
 
-- 插件元数据
-- 插件选择
-- 插件构建图接入
-- 插件注册入口
-- 插件运行时贡献
+这不是缺一两个接口就能补出来的能力，而是一整条独立工程路线。
 
-### 5.2 但它还不是完整生态系统
+## 7. 当前最关键的现实边界
 
-因为它还缺:
+### 7.1 `Samples/Model` 能做出来，不等于插件系统已经支持它
 
-- 下载
-- 安装
-- 升级
-- 版本求解
-- 多宿主大规模验证
-- 更多注册表
+这是当前最容易被误解的点。
 
-所以最准确的说法是:
+仓库中已经有:
 
-> Luna 当前已经有一个可工作的插件系统骨架，但还没有形成完整插件生态。
+- `RenderGraphBuilder`
+- 自定义 `RenderPass`
+- `Samples/Model`
 
-## 6. 当前最值得保持的设计选择
+但这条能力链当前是通过:
 
-下面这些方向，当前看是正确的，后面最好继续坚持。
+- 自定义 `Application`
+- 在 renderer 初始化前提供 `m_render_graph_builder`
 
-### 6.1 显式注册优先
+来接入的。
 
-`ResolvedPlugins.cpp` 明确列出所有插件入口，这比静态自动注册更透明。
+插件系统当前则是:
 
-### 6.2 插件是单独目标
+- renderer 初始化完成后
+- 才进入插件注册阶段
 
-插件作为独立 CMake target 参与构建，这是非常重要的边界。
+因此当前最准确的结论是:
 
-### 6.3 宿主框架与插件实现分离
+| 问题 | 当前答案 |
+| --- | --- |
+| 插件能访问 renderer 基本状态吗 | 能 |
+| 插件能改 clear color / 相机吗 | 能 |
+| 插件能像 `Samples/Model` 那样正式替换 RenderGraph 吗 | 不能，当前没有正式协议 |
 
-- `Editor/` 是宿主框架
-- `Plugins/...` 是具体插件
+### 7.2 `Editor/` 不应该重新长回“大而全”
 
-### 6.4 工具层优先用 Python
+插件系统真正有价值的前提是:
 
-`sync.py` 这种“读配置、扫目录、生成文件”的工具，用 Python 明显比 C++ 更高效。
+- `Editor/` 保持 framework 身份
+- 具体功能继续迁移到 `Plugins/`
 
-## 7. 当前最明显的风险点
+如果后面继续把大量具体工具逻辑直接写回 `Editor/`，那整个插件系统的价值会被迅速稀释。
 
-### 7.1 元数据字段看起来很多，但真正生效的不多
+## 8. 当前最值得坚持的设计选择
 
-如果继续加字段却不让它们真正参与逻辑，manifest 会越来越像“看起来很完整”的假接口。
+### 8.1 显式注册优先
 
-### 7.2 `Editor/` 可能再次长回“大杂烩”
+`ResolvedPlugins.cpp` 显式列出所有入口，这比静态全局自动注册更透明、更容易调试。
 
-如果后面继续把面板、工具、工作流逻辑直接写回 `Editor/`，那插件系统的边界会很快失效。
+### 8.2 插件作为独立 target
 
-### 7.3 `sync.py` 可能变成无结构大脚本
+插件不是宿主里的普通源码文件，而是独立构建目标。  
+这是后续做依赖治理、模块化边界和 profile 组合的前提。
 
-当前脚本还小，后面如果继续扩功能，最好拆成:
+### 8.3 Bundle 属于宿主装配层
 
-- manifest parsing
-- dependency resolve
-- file generation
-- validation
+插件组合属于宿主层决策。  
+因此 `PluginList.cmake` 由 `App/CMakeLists.txt` 消费，是当前正确的分层结果。
 
-而不是无限往一个文件里堆。
+### 8.4 工具链优先用 Python
 
-## 8. 下一阶段最合理的推进顺序
+`sync.py` / `build.py` 这种配置解析、目录扫描、文件生成工作，用 Python 比用 C++ 更高效也更易维护。  
+这个方向不应该倒退。
 
-如果按“工程收益最大、复杂度最可控”的顺序推进，我建议这样做。
+## 9. 下一阶段最合理的推进顺序
 
-### Phase 1: 做强当前最小链路
+### Phase 1: 把当前最小链路做“更可靠”
 
-建议优先补:
+优先项:
 
-- `optional_dependencies`
 - 更严格的 `sdk` 校验
-- 更严格的 `kind` / `host` 校验
-- 更明确的错误输出
-- `sync.py` 的 `validate` / `resolve` / `sync` 子命令拆分
+- 更清晰的诊断输出
+- 对 `kind` 与 `host` 做更明确约束
+- 继续整理 `sync.py` 的内部结构
 
 原因:
 
-- 这些都基于当前已经存在的最小骨架
-- 收益高，风险低
+- 风险低
+- 立刻提升可维护性
+- 不会破坏当前已工作的插件链路
 
-### Phase 2: 新增几个真正的 builtin plugin
+### Phase 2: 增加更多真实插件
 
-建议优先拆:
+建议方向:
 
 - `luna.viewport`
 - `luna.asset.browser`
 - `luna.scene.editor`
+- `luna.inspector`
 
 原因:
 
-- 只有插件数量变多，依赖解析、Bundle、注册表这套体系的价值才会真正体现出来
+- 插件数量一多，当前这套 Bundle / registry / dependency 设计的价值才会真正体现出来
 
-### Phase 3: 扩大 EditorRegistry
+### Phase 3: 扩大 `EditorRegistry`
 
-建议逐步加入:
+建议新增:
 
-- Menu item
-- Toolbar item
-- Inspector provider
-- Dock layout contribution
+- menu item
+- toolbar item
+- inspector provider
+- dock contribution
 
-### Phase 4: 扩展更多注册表
+原因:
 
-后续再考虑:
+- 这是 editor 方向最自然的下一步
+- 相比渲染协议，复杂度更可控
 
-- `RenderRegistry`
-- `AssetRegistry`
-- `ProjectTemplateRegistry`
+### Phase 4: 让 `ServiceRegistry` 真正承载共享上下文
 
-### Phase 5: 远程插件同步
+建议逐步接入:
 
-只有当前本地插件体系稳定后，才值得继续做:
+- ProjectContext
+- SceneContext
+- SelectionService
+- AssetDatabase
 
-- Git 下载
-- revision 锁定
-- 更完整的 lock file
+原因:
 
-## 9. 当前不建议优先做的方向
+- 这会直接决定后续插件之间的协作质量
 
-下面这些方向当前都不应该排在前面:
+### Phase 5: 设计正式的渲染扩展协议
+
+建议前提:
+
+- 先明确宿主到底开放哪些渲染扩展点
+- 再定义独立 registry
+- 最后再考虑如何插件化
+
+也就是说，不建议直接把 RenderGraph 细节硬塞进现在的 `PluginRegistry`。
+
+## 10. 当前不建议优先做的方向
+
+下面这些方向现在都不应该排在前面:
 
 - 二进制插件
 - 插件热重载
-- GUI 插件商店
+- GUI 插件市场
 - 复杂版本求解器
-- 跨平台发布工具链
+- 跨仓库分发体系
 
-因为这些方向会把复杂度迅速拉高，但对当前“把宿主和插件边界做实”帮助有限。
+原因不是它们永远不重要，而是:
 
-## 10. 当前一句话判断
+- 当前边界和扩展协议还不够成熟
+- 先做这些会显著放大复杂度
+- 对把宿主/插件结构做稳帮助不大
 
-如果你问“Luna 现在有插件系统吗”，答案是:
+## 11. 一句话结论
 
-> 有，而且最小链路已经打通。
+如果你现在问“Luna 的插件系统到了哪一步”，最准确的回答是:
 
-如果你问“Luna 现在有成熟插件生态吗”，答案是:
-
-> 还没有，当前阶段更准确的定位是一个可靠的插件系统骨架。
+> 它已经可靠地进入了构建、装配和运行时注册链路，足以继续承载 editor/runtime 方向的功能扩展；但正式的渲染扩展协议、资产扩展协议和完整生态治理还没有开始。

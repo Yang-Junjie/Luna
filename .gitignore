@@ -7,3 +7,4 @@ Experimental/
 logs/
 Tests/
 /DesignTarget.md
+__pycache__/

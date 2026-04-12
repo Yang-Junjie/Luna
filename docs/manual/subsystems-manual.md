@@ -1,236 +1,349 @@
 # 第四部分: 子系统解析
 
-## 模块 A 教程: 应用运行时与层系统
+> **提示 (Note):**
+> 本文档不追求把每个类逐行讲完，而是回答“这个子系统解决什么问题、它和其他子系统如何交互、我该怎么正确扩展它”。
 
-### 模块架构图
+## 子系统 A: App 与 Plugin Host
+
+### 子系统目标
+
+这个子系统负责把“程序能跑起来”这件事落地，包括:
+
+- 创建窗口
+- 初始化 renderer
+- 管理主循环
+- 承载插件注册与 layer 装配
+
+### 架构图
 
 ```mermaid
 graph TD
-    A[main] --> B[Application]
-    B --> C[Window]
-    B --> D[VulkanRenderer]
-    B --> E[ImGuiLayer]
-    B --> F[LayerStack]
-    F --> G[Layer]
-    F --> H[Overlay]
+    MAIN[Main.cpp] --> APP[Application]
+    APP --> LUNAAPP[LunaApp]
+    LUNAAPP --> SR[ServiceRegistry]
+    LUNAAPP --> ER[EditorRegistry]
+    LUNAAPP --> PR[PluginRegistry]
+    PR --> LS[LayerStack]
+    APP --> WIN[Window]
+    APP --> VR[VulkanRenderer]
 ```
 
-### 原理解释
+### 核心对象
 
-`Application` 是整个项目的中控器。它把不同子系统组合到一起:
-
-- `Window` 负责原生窗口
-- `VulkanRenderer` 负责帧渲染
-- `ImGuiLayer` 负责 GUI 帧生命周期
-- `LayerStack` 负责承载业务逻辑
-
-`LayerStack` 内部用一个插入索引区分普通 Layer 和 Overlay:
-
-- 普通 Layer 插入到前半段
-- Overlay 永远追加到末尾
+| 对象 | 作用 |
+| --- | --- |
+| `Application` | 定义窗口、事件、ImGui、渲染器与主循环骨架 |
+| `LunaApp` | 当前正式宿主，负责插件装配 |
+| `LayerStack` | 管理普通层与 overlay |
+| `PluginRegistry` | 插件注册期的贡献入口 |
+| `ServiceRegistry` | 为宿主与插件共享服务预留的容器 |
 
 ### 初始化过程
 
-```cpp
-void EditorApp::onInit() {
-    pushLayer(std::make_unique<EditorLayer>());
-}
-```
-
-### 常用场景代码示例
-
-```cpp
-class GameplayLayer final : public luna::Layer {
-public:
-    GameplayLayer() : Layer("GameplayLayer") {}
-
-    void onUpdate(luna::Timestep dt) override {
-        // 这里写游戏或工具逻辑
-    }
-};
-```
-
-## 模块 B 教程: 平台窗口、事件与输入系统
-
-### 模块架构图
-
 ```mermaid
-graph LR
-    GLFW[GLFW callbacks] --> GW[GLFWWindow]
-    GW --> EVT[Event objects]
-    EVT --> APP[Application::onEvent]
-    APP --> IMG[ImGuiLayer]
-    APP --> LS[LayerStack reverse dispatch]
-    GW --> INPUT[Input static API]
+sequenceDiagram
+    participant Base as Application
+    participant Host as LunaApp
+    participant Window as Window
+    participant Renderer as VulkanRenderer
+    participant Plugins as registerResolvedPlugins()
+
+    Base->>Window: create()
+    Base->>Renderer: init()
+    Base->>Host: onInit()
+    Host->>Plugins: registerResolvedPlugins()
+    Host->>Base: enableImGui() if requested
+    Host->>Base: pushLayer()/pushOverlay()
 ```
 
-### 原理解释
+### 你可以怎么扩展它
 
-Luna 把 GLFW 适配成两条并行路径:
-
-1. 回调转为 `Event` 对象，进入事件系统
-2. `Input` 静态接口从当前活动窗口即时查询状态
-
-### 常用场景代码示例
+#### 场景 1: 新增一个运行时 Layer
 
 ```cpp
-if (luna::Input::isKeyPressed(luna::KeyCode::W)) {
-    // 前进
-}
-```
-
-```cpp
-void onEvent(luna::Event& event) override {
-    luna::EventDispatcher dispatcher(event);
-    dispatcher.dispatch<luna::WindowResizeEvent>([](auto& e) {
-        return false;
+extern "C" void luna_register_my_runtime(luna::PluginRegistry& registry)
+{
+    registry.addLayer("my.runtime.layer", [] {
+        return std::make_unique<MyRuntimeLayer>();
     });
 }
 ```
 
-## 模块 C 教程: 渲染器与 RenderGraph
+#### 场景 2: 在宿主里新增一个共享服务
 
-### 模块架构图
-
-```mermaid
-graph TD
-    VR[VulkanRenderer] --> VC[VulkanContext]
-    VR --> RGB[RenderGraphBuilder]
-    RGB --> RP1[RenderPass A]
-    RGB --> RP2[RenderPass B]
-    RGB --> RG[RenderGraph]
-    RG --> DB[DescriptorBinding]
-    RG --> CMD[CommandBuffer]
-    VC --> VF[VirtualFrameProvider]
-    VC --> DC[DescriptorCache]
-```
-
-### 原理解释
-
-`VulkanRenderer` 的职责不是写死所有绘制逻辑，而是:
-
-1. 初始化 `VulkanContext`
-2. 根据窗口尺寸构建或重建 RenderGraph
-3. 驱动一帧的开始、执行、呈现和结束
-
-当前默认 RenderGraph 非常简单:
-
-```mermaid
-graph LR
-    A[ClearColorPass] --> B[scene_color]
-    B --> C[ImGuiRenderPass]
-    C --> D[Present to swapchain]
-```
-
-### 常用场景代码示例
-
-```cpp
-class MyPass final : public luna::val::RenderPass {
-public:
-    void SetupPipeline(PipelineState pipeline) override {
-        pipeline.DeclareAttachment(
-            "my_color",
-            luna::val::Format::R8G8B8A8_UNORM,
-            0,
-            0);
-        pipeline.AddOutputAttachment(
-            "my_color",
-            luna::val::ClearColor{0.1f, 0.2f, 0.3f, 1.0f});
-    }
-};
-```
-
-```cpp
-luna::val::RenderGraphBuilder builder;
-builder
-    .AddRenderPass("my_pass", std::make_unique<MyPass>())
-    .SetOutputName("my_color");
-
-auto graph = builder.Build();
-```
+当前 `LunaApp` 已经注册了 `EditorRegistry`。  
+未来如果要让插件共享项目对象、场景对象、资产数据库，最自然的路径就是继续走 `ServiceRegistry`。
 
 > **警告 (Warning):**
-> `RenderGraphBuilder` 依赖 pass 声明来推导资源使用状态。如果你绕过它直接手工改 layout，同步关系就会变得不可靠。
+> 现在不要把具体业务逻辑继续塞回 `App/LunaApp.cpp`。  
+> `LunaApp` 应该保持“装配宿主”的角色，而不是重新长回大杂烩。
 
-## 模块 D 教程: 资源导入与着色器工具链
+## 子系统 B: Editor Framework
 
-### 模块架构图
+### 子系统目标
 
-```mermaid
-graph TD
-    ShaderSource[GLSL/HLSL Source] --> SL[ShaderLoader]
-    SPV[SPIR-V Binary] --> SL
-    SL --> REFLECT[SPIRV-Cross Reflection]
-    REFLECT --> SD[ShaderData]
+这个子系统负责把 ImGui + registry + menu + panel 生命周期组织成一个 editor shell。
 
-    OBJ[obj] --> ML[ModelLoader]
-    GLTF[gltf/glb] --> ML
-    IMG[ImageLoader] --> ML
-    ML --> MD[ModelData]
-
-    TEX[png/jpg/dds/zlib] --> IMG
-    IMG --> ID[ImageData/CubemapData]
-```
-
-### 原理解释
-
-这一层目前更像“工具箱”而不是“运行时场景系统”:
-
-| 工具 | 输入 | 输出 |
-| --- | --- | --- |
-| `ShaderLoader` | 源码或 SPIR-V | `ShaderData` |
-| `ModelLoader` | `.obj`, `.gltf`, `.glb` | `ModelData` |
-| `ImageLoader` | 图片文件或内存块 | `ImageData`, `CubemapData` |
-
-### 常用场景代码示例
-
-```cpp
-auto image = luna::val::ImageLoader::LoadImageFromFile("assets/head.jpg");
-auto model = luna::val::ModelLoader::Load("assets/basicmesh.glb");
-```
-
-```cpp
-auto shader = luna::val::ShaderLoader::LoadFromSourceFile(
-    "Shaders/Internal/mesh.vert",
-    luna::val::ShaderType::VERTEX,
-    luna::val::ShaderLanguage::GLSL);
-```
-
-## 模块 E 教程: ImGui 与编辑器集成
-
-### 模块架构图
+### 架构图
 
 ```mermaid
 graph TD
-    APP[Application] --> IL[ImGuiLayer]
-    IL --> IVC[ImGuiVulkanContext]
-    IVC --> BACKEND[imgui_impl_glfw + imgui_impl_vulkan]
-    APP --> EL[EditorLayer]
-    EL --> UI[Renderer Panel]
+    PR[PluginRegistry] --> ER[EditorRegistry]
+    ER --> ES[EditorShellLayer]
+    ES --> PANELS[Panel instances]
+    ES --> MENU[Panels / Commands menu]
+    PANELDEF[EditorPanel subclasses] --> ER
 ```
 
-### 原理解释
+### 核心对象
 
-这里有两个层次:
+| 对象 | 作用 |
+| --- | --- |
+| `EditorPanel` | Panel 的最小接口 |
+| `EditorRegistry` | 注册 panel 与 command |
+| `EditorShellLayer` | 运行时实例化 panel 并渲染主菜单栏 |
 
-- `ImGuiLayer` 负责引擎级别的 ImGui 生命周期
-- `EditorLayer` 负责具体的编辑器窗口内容
+### 当前已经支持的 editor 扩展协议
 
-### 常用场景代码示例
+| 能力 | 当前是否支持 |
+| --- | --- |
+| Panel 注册 | 支持 |
+| Command 注册 | 支持 |
+| Menu item registry | 不支持 |
+| Toolbar item registry | 不支持 |
+| Inspector provider | 不支持 |
+
+### 一个 editor panel 插件的最小链路
 
 ```cpp
-void onImGuiRender() override {
-    if (ImGui::Begin("Tools")) {
-        ImGui::TextUnformatted("Custom editor tool");
+class HelloPanel final : public luna::editor::EditorPanel {
+public:
+    void onImGuiRender() override
+    {
+        ImGui::TextUnformatted("Hello.");
     }
-    ImGui::End();
+};
+
+extern "C" void luna_register_my_editor(luna::PluginRegistry& registry)
+{
+    registry.requestImGui();
+    registry.editor().addPanel<HelloPanel>("my.hello", "Hello");
 }
 ```
 
-```cpp
-Application::get().getImGuiLayer()->blockEvents(true);
+### 当前的边界为什么合理
+
+当前 editor framework 已经做到了:
+
+- 宿主只负责承载 editor shell
+- 具体 editor 功能在插件里实现
+
+这让后续继续演进:
+
+- Asset Browser
+- Scene Editor
+- Inspector
+- Toolbar
+
+都可以继续保持在 `Plugins/` 下，而不是重新塞回 `Editor/`。
+
+## 子系统 C: Renderer 与 RenderGraph
+
+### 子系统目标
+
+这个子系统负责把“一帧 GPU 工作”组织成明确的 RenderGraph，而不是把 Vulkan 命令直接散落在业务层。
+
+### 架构图
+
+```mermaid
+graph TD
+    VR[VulkanRenderer] --> RGB[RenderGraphBuilder]
+    RGB --> RG[RenderGraph]
+    RG --> NODE[RenderGraphNode]
+    NODE --> RP[RenderPass]
+    NODE --> DB[DescriptorBinding]
+    RG --> ATT[Named attachments]
+    VR --> VC[VulkanContext]
 ```
 
-## 子系统关系总结
+### 关键流程
 
-> `Application` 负责驱动，`Platform` 负责感知输入，`Renderer` 负责组织 GPU 工作，`Vulkan` 负责落地资源和命令，`Editor` 与 `ImGui` 负责把这些能力呈现成可交互工具。
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Renderer as VulkanRenderer
+    participant Context as VulkanContext
+    participant Graph as RenderGraph
+    participant Pass as RenderPass
+
+    App->>Renderer: startFrame()
+    Renderer->>Context: StartFrame()
+    App->>Renderer: renderFrame()
+    Renderer->>Graph: Execute(commandBuffer)
+    Graph->>Pass: ResolveResources()
+    Graph->>Pass: BeforeRender()
+    Graph->>Pass: OnRender()
+    Graph->>Pass: AfterRender()
+    Renderer->>Graph: Present(...)
+    App->>Renderer: endFrame()
+```
+
+### `RenderGraphBuilder` 的价值
+
+它主要解决三件事:
+
+1. 帮你从 pass 声明推导资源依赖
+2. 帮你分配附件图像
+3. 帮你自动生成 Vulkan 屏障与原生 render pass / framebuffer
+
+### 当前默认宿主的渲染现实
+
+默认 `LunaApp` 使用的是一张很小的默认图:
+
+- clear
+- optional imgui
+- present
+
+所以:
+
+- renderer 底座已经很强
+- 默认宿主表现还很克制
+
+### 当前最重要的限制
+
+虽然插件中的 Layer/Panel 可以直接访问:
+
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+```
+
+但当前插件系统**还没有**正式的:
+
+- `RenderGraphContribution`
+- `RenderFeatureRegistry`
+- `RenderPass` 注入协议
+
+因此 `Samples/Model` 那种完整自定义渲染路径，当前仍然是宿主级扩展，而不是插件级扩展。
+
+## 子系统 D: Asset 导入与资源工具
+
+### 子系统目标
+
+把磁盘上的 shader / model / image 资源转成 renderer 可以消费的数据。
+
+### 架构图
+
+```mermaid
+graph TD
+    FILES[磁盘资源] --> SH[ShaderLoader]
+    FILES --> ML[ModelLoader]
+    FILES --> IL[ImageLoader]
+    SH --> GS[GraphicShader / ShaderData]
+    ML --> MD[ModelData]
+    IL --> ID[ImageData]
+```
+
+### 当前已经可用的导入器
+
+| 导入器 | 输入 | 输出 |
+| --- | --- | --- |
+| `ShaderLoader` | GLSL / SPIR-V | `ShaderData` |
+| `ModelLoader` | OBJ / glTF / GLB | `ModelData` |
+| `ImageLoader` | 常见图片 / DDS | `ImageData` |
+
+### 使用场景示例
+
+```cpp
+const auto model = luna::val::ModelLoader::Load("assets/material_sphere/material_sphere.obj");
+auto shader = std::make_shared<luna::val::GraphicShader>();
+shader->Init(
+    luna::val::ShaderLoader::LoadFromSourceFile("Model.vert", luna::val::ShaderType::VERTEX, luna::val::ShaderLanguage::GLSL),
+    luna::val::ShaderLoader::LoadFromSourceFile("Model.frag", luna::val::ShaderType::FRAGMENT, luna::val::ShaderLanguage::GLSL));
+```
+
+### 当前还没形成什么
+
+当前有“导入能力”，但还没有“正式资产系统”。
+
+也就是说，现在还没有:
+
+- `AssetRegistry`
+- importer 插件注册
+- 统一资产数据库
+- 预览图 registry
+
+这是下一阶段很值得做的一块。
+
+## 子系统 E: JobSystem
+
+### 子系统目标
+
+提供可组合的任务调度能力，而不是把一切后台工作塞进 ad-hoc 线程。
+
+### 架构图
+
+```mermaid
+graph TD
+    TS[TaskSystem] --> TH[TaskHandle]
+    TS --> SCH[enki::TaskScheduler]
+    TS --> IO[IO threads]
+    TS --> EXT[External thread registration]
+```
+
+### 当前暴露给上层的核心能力
+
+| 能力 | 对应 API |
+| --- | --- |
+| 提交普通任务 | `submit(...)` |
+| 提交并行任务 | `submitParallel(...)` |
+| 任务依赖 | `then(...)`, `whenAll(...)` |
+| 主线程 / IO 目标选择 | `TaskSubmitDesc::target` |
+| 外部线程注册 | `registerExternalThread()` |
+
+### 使用场景示例
+
+```cpp
+auto& tasks = luna::Application::get().getTaskSystem();
+
+auto a = tasks.submit([] {
+    // do work
+});
+
+auto b = a.then(tasks, [] {
+    // run after a
+});
+
+b.wait(tasks);
+```
+
+更多细节请直接阅读:
+
+- [job-system-manual.md](./job-system-manual.md)
+
+## 子系统之间如何协作
+
+```mermaid
+graph LR
+    Host[Application / LunaApp] --> Plugins[PluginRegistry]
+    Plugins --> Editor[EditorRegistry]
+    Host --> Renderer[VulkanRenderer]
+    Host --> Tasks[TaskSystem]
+    Renderer --> Assets[ShaderLoader / ModelLoader / ImageLoader]
+    Renderer --> Vulkan[VulkanContext]
+    Editor --> ImGui[EditorShellLayer + ImGui]
+```
+
+### 当前最有价值的协作关系
+
+| 关系 | 价值 |
+| --- | --- |
+| `LunaApp -> PluginRegistry -> LayerStack` | 把宿主与插件装配彻底串起来 |
+| `EditorRegistry -> EditorShellLayer` | 把 editor 功能从宿主代码中剥离出来 |
+| `VulkanRenderer -> RenderGraph -> VulkanContext` | 把“图组织”与“原生资源”分层 |
+| `TaskSystem -> Application` | 让宿主天然具备后台任务能力 |
+
+## 一句话总结
+
+Luna 当前的子系统布局已经非常清楚:
+
+> App 子系统负责生命周期，Plugin 子系统负责扩展声明，Editor 子系统负责 UI 壳层，Renderer 子系统负责帧组织，Vulkan 子系统负责原生资源，Asset 与 JobSystem 负责支撑能力。

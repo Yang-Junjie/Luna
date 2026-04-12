@@ -5,6 +5,7 @@ sdk = "0.1"
 kind = "editor"
 cmake_target = "LunaExampleImGuiDemoPlugin"
 entry = "luna_register_luna_example_imgui_demo"
-hosts = ["editor"]
+hosts = ["app"]
 
 [dependencies]
+"luna.editor.shell" = "0.1"

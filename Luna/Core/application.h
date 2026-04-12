@@ -18,6 +18,7 @@ struct ApplicationSpecification {
     std::string m_name = "Luna";
     uint32_t m_window_width = 1'600, m_window_height = 900;
     bool m_maximized = false;
+    bool m_enable_imgui = true;
     bool m_enable_multi_viewport = false;
 };
 
@@ -84,6 +85,8 @@ protected:
     virtual void onUpdate(Timestep) {}
 
     virtual void onShutdown() {}
+
+    bool enableImGui(bool enable_multi_viewport = false);
 
 private:
     void onEvent(Event& event);

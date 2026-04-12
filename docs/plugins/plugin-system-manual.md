@@ -1,741 +1,524 @@
 # Luna 插件系统手册
 
-## 1. 文档范围
+> **提示 (Note):**
+> 这份手册描述的是 Luna 当前仓库中已经实现、已经验证、已经进入构建链路的插件系统。
+> 它不是“未来完整插件生态”的设计稿，而是“现在这套系统到底怎么工作”的实现手册。
 
-本文档描述的是 Luna 当前仓库里已经落地的插件系统骨架，而不是未来的理想设计。
+## 1. 一句话定义
 
-当前实现的关键词是:
+Luna 当前的插件系统本质上是:
 
-- 本地源码插件
-- Bundle 驱动的插件选择
-- Python `sync.py` 生成构建文件
-- CMake 接入插件目标
-- 宿主启动时显式注册
+> 本地源码插件 + Bundle 选择 + `sync.py` 生成构建输入 + 宿主启动时显式注册
 
-当前没有实现的内容，例如 GitHub 下载、版本求解、二进制插件、热重载、插件市场，不在本文档的“已实现能力”范围内。
+它当前不是:
 
-## 2. 插件系统解决的问题
+- 二进制 DLL 插件系统
+- 热重载插件系统
+- 远程下载与版本求解生态
 
-Luna 希望避免把所有编辑器功能、工具逻辑、工作流能力全部写死在一个单体应用里。
+## 2. 插件系统当前解决什么问题
 
-因此，当前插件系统要解决的核心问题不是“动态加载一个 DLL”，而是:
+Luna 当前要解决的核心问题，不是“如何动态加载一个库”，而是下面四件更基础也更关键的事:
 
-1. 让宿主程序根据 Bundle 决定启用哪些插件。
-2. 让插件以源码形式参与当前工程构建。
-3. 让插件通过显式注册，把自己的能力挂到宿主上。
-4. 让同一套底层框架被组装成不同应用形态。
+1. 让宿主根据 Bundle 决定启用哪些插件。
+2. 让插件以源码模块的形式稳定进入 CMake 构建图。
+3. 让插件通过显式入口函数声明自己的贡献。
+4. 让同一个 `LunaApp` 通过不同插件组合表现成 runtime 或 editor。
 
-## 3. 当前系统中的几个核心术语
+## 3. 当前能力边界总表
 
-### 3.1 Host
+| 能力 | 当前状态 | 说明 |
+| --- | --- | --- |
+| 本地插件扫描 | 已实现 | 扫描 `Plugins/builtin` 与 `Plugins/external` |
+| Bundle 驱动插件选择 | 已实现 | `luna.bundle.toml` 决定启用列表 |
+| 依赖拓扑排序 | 已实现 | 按 `dependencies` 的 key 解析 |
+| host 兼容校验 | 已实现 | Bundle `host` 对插件 `hosts` |
+| 生成 `PluginList.cmake` | 已实现 | 供宿主 target 引入插件目标 |
+| 生成 `ResolvedPlugins.cpp` | 已实现 | 显式聚合插件入口 |
+| 启动时注册插件 | 已实现 | `LunaApp::onInit()` 调用 `registerResolvedPlugins()` |
+| `Layer` / `Overlay` 贡献 | 已实现 | 通过 `PluginRegistry` |
+| `Panel` / `Command` 贡献 | 已实现 | 通过 `EditorRegistry` |
+| ImGui 请求 | 已实现 | `PluginRegistry::requestImGui()` |
+| RenderGraph 正式插件注入 | 未实现 | 当前没有 render registry |
+| 二进制插件 / 动态加载 | 未实现 | 当前全部源码编译 |
+| 热重载 | 未实现 | 当前没有运行时卸载/重载协议 |
 
-宿主程序。
+## 4. 核心术语
 
-当前已经真正接入插件链路的宿主有两个:
+| 术语 | 含义 | 当前实现 |
+| --- | --- | --- |
+| Host | 负责生命周期与装配的应用宿主 | `LunaApp` |
+| Bundle | 一份启用插件清单 | `Bundles/*/luna.bundle.toml` |
+| Plugin | 带 manifest、CMake、源码和入口函数的模块 | `Plugins/builtin/*`、`Plugins/external/*` |
+| Generated Files | `sync.py` 生成的构建与注册中间文件 | `PluginList.cmake`、`ResolvedPlugins.*`、`luna.lock` |
+| Contribution | 插件提交给宿主的能力声明 | `Layer`、`Overlay`、`Panel`、`Command`、ImGui request |
 
-- 编辑器宿主 `LunaEditorApp`
-- 运行时宿主 `LunaRuntimeApp`
-
-### 3.2 Plugin
-
-一个带 manifest、带 CMake、带源码目录的本地源码模块。
-
-插件现在最重要的特征有两个:
-
-- 有 `luna.plugin.toml`
-- 有一个显式注册入口函数
-
-### 3.3 Bundle
-
-一份决定“启用哪些插件”的清单。
-
-当前默认 Bundle 有两份:
-
-```text
-Bundles/EditorDefault/luna.bundle.toml
-Bundles/RuntimeDefault/luna.bundle.toml
-```
-
-### 3.4 Generated Files
-
-`sync.py` 根据 Bundle 和插件 manifest 生成出来的构建与注册中间文件。
-
-当前包括:
-
-- `Plugins/Generated/editor/PluginList.cmake`
-- `Plugins/Generated/editor/ResolvedPlugins.h`
-- `Plugins/Generated/editor/ResolvedPlugins.cpp`
-- `Plugins/Generated/runtime/PluginList.cmake`
-- `Plugins/Generated/runtime/ResolvedPlugins.h`
-- `Plugins/Generated/runtime/ResolvedPlugins.cpp`
-- `luna.editor.lock`
-- `luna.runtime.lock`
-
-### 3.5 Contribution
-
-插件注册给宿主的能力。
-
-按当前实现，已经支持的贡献类型是:
-
-- Layer
-- Overlay
-- Editor Panel
-- Editor Command
-
-其中:
-
-- `Layer` / `Overlay` 可用于 runtime host 和 editor host
-- `Editor Panel` / `Editor Command` 只属于 editor host
-
-## 4. 当前目录布局
-
-当前插件系统相关目录如下:
+## 5. 物理目录布局
 
 ```text
 Luna/
+├─ App/
+│  ├─ CMakeLists.txt
+│  └─ LunaApp.cpp
 ├─ Bundles/
-│  ├─ EditorDefault/
-│  │  └─ luna.bundle.toml
-│  └─ RuntimeDefault/
-│     └─ luna.bundle.toml
+│  ├─ EditorDefault/luna.bundle.toml
+│  └─ RuntimeDefault/luna.bundle.toml
+├─ Editor/
+│  ├─ EditorPanel.h
+│  ├─ EditorRegistry.h/.cpp
+│  └─ EditorShellLayer.h/.cpp
+├─ Luna/
+│  └─ Plugin/
+│     ├─ PluginBootstrap.h
+│     ├─ PluginRegistry.h/.cpp
+│     └─ ServiceRegistry.h
 ├─ Plugins/
 │  ├─ builtin/
+│  │  ├─ luna.imgui/
+│  │  ├─ luna.editor.shell/
 │  │  ├─ luna.editor.core/
-│  │  │  ├─ luna.plugin.toml
-│  │  │  ├─ CMakeLists.txt
-│  │  │  └─ src/
 │  │  ├─ luna.example.hello/
-│  │  │  ├─ luna.plugin.toml
-│  │  │  ├─ CMakeLists.txt
-│  │  │  └─ src/
 │  │  ├─ luna.example.imgui_demo/
-│  │  │  ├─ luna.plugin.toml
-│  │  │  ├─ CMakeLists.txt
-│  │  │  └─ src/
 │  │  └─ luna.runtime.core/
-│  │     ├─ luna.plugin.toml
-│  │     ├─ CMakeLists.txt
-│  │     └─ src/
 │  ├─ external/
 │  └─ Generated/
-│     ├─ editor/
-│     │  ├─ PluginList.cmake
-│     │  ├─ ResolvedPlugins.h
-│     │  └─ ResolvedPlugins.cpp
-│     └─ runtime/
-│        ├─ PluginList.cmake
-│        ├─ ResolvedPlugins.h
-│        └─ ResolvedPlugins.cpp
-├─ Tools/
-│  └─ luna/
-│     └─ sync.py
-├─ Editor/
-│  ├─ EditorApp.*
-│  ├─ EditorRegistry.*
-│  ├─ EditorPanel.h
-│  └─ EditorShellLayer.*
-├─ Runtime/
-│  └─ RuntimeApp.*
-└─ Luna/
-   └─ Plugin/
-      ├─ PluginRegistry.*
-      ├─ PluginBootstrap.h
-      └─ ServiceRegistry.h
+└─ Tools/
+   └─ luna/
+      ├─ sync.py
+      └─ build.py
 ```
 
-## 5. 当前系统的职责分层
+### 当前各层职责
 
-### 5.1 `Luna/Plugin/`
+| 路径 | 角色 |
+| --- | --- |
+| `App/` | 宿主 target，接入 generated 文件，装配插件贡献 |
+| `Editor/` | editor framework，不是具体插件 |
+| `Luna/Plugin/` | 运行时注册表与服务容器 |
+| `Plugins/` | 具体插件实现 |
+| `Tools/luna/` | Bundle 解析、生成文件、构建驱动 |
 
-这一层是运行时插件基础设施。
+## 6. 插件系统的两条主链路
 
-主要对象:
+插件系统可以拆成两条链路看:
 
-- `ServiceRegistry`
-- `PluginRegistry`
-- `PluginBootstrap`
+1. 构建期链路
+2. 运行时链路
 
-职责:
-
-- 持有运行时服务
-- 收集插件注册的 Layer / Overlay
-- 向宿主暴露统一注册入口
-
-### 5.2 `Editor/`
-
-这一层是“编辑器宿主框架”，不是某个具体插件。
-
-主要对象:
-
-- `EditorRegistry`
-- `EditorPanel`
-- `EditorShellLayer`
-- `EditorApp`
-
-职责:
-
-- 定义编辑器侧可扩展接口
-- 管理 Panel / Command 的注册结果
-- 创建编辑器壳并驱动这些贡献
-
-### 5.3 `Runtime/`
-
-这一层是运行时宿主框架。
-
-当前主要对象:
-
-- `RuntimeApp`
-
-职责:
-
-- 创建 runtime host
-- 装配只依赖 `Layer` / `Overlay` 的 runtime plugins
-- 不暴露 editor 专属扩展点
-
-### 5.4 `Plugins/builtin/...`
-
-这一层是具体插件实现。
-
-当前已经有多个真正工作的内置插件:
-
-- `luna.editor.core`
-- `luna.example.hello`
-- `luna.example.imgui_demo`
-- `luna.runtime.core`
-
-其中:
-
-- `luna.editor.core` 负责默认编辑器基础能力
-- `luna.example.hello` 是最小 Panel 示例插件
-- `luna.example.imgui_demo` 是 Dear ImGui Demo 面板示例插件
-- `luna.runtime.core` 负责最小 runtime Layer 示例
-
-### 5.5 `Tools/luna/sync.py`
-
-这是构建前的生成工具。
-
-职责:
-
-- 读取 Bundle
-- 扫描插件 manifest
-- 解析依赖
-- 生成 CMake 插件接入清单
-- 生成注册函数聚合文件
-- 生成当前锁文件
-
-## 6. 构建期工作流
-
-当前构建期流程如下:
+### 6.1 构建期链路
 
 ```mermaid
 flowchart TD
-    A[luna.bundle.toml] --> B[sync.py]
-    C[luna.plugin.toml files] --> B
-    B --> D[Generated/editor or runtime/PluginList.cmake]
-    B --> E[Generated/editor or runtime/ResolvedPlugins.cpp]
-    B --> F[luna.editor.lock or luna.runtime.lock]
-    D --> G[Host CMakeLists.txt]
-    E --> G
-    G --> H[LunaEditor or LunaRuntime target]
-    H --> I[LunaEditorApp or LunaRuntimeApp]
+    Bundle[luna.bundle.toml] --> Sync[sync.py]
+    PluginManifest[luna.plugin.toml files] --> Sync
+    Sync --> PluginList[PluginList.cmake]
+    Sync --> Resolved[ResolvedPlugins.h/.cpp]
+    Sync --> Lock[luna.lock]
+    PluginList --> AppCMake[App/CMakeLists.txt]
+    Resolved --> AppCMake
+    AppCMake --> Host[LunaAppHost]
+    Host --> Exe[LunaApp]
 ```
 
-### 6.1 第一步: 读取 Bundle
-
-当前默认 Bundle 文件是:
-
-```text
-Bundles/EditorDefault/luna.bundle.toml
-Bundles/RuntimeDefault/luna.bundle.toml
-```
-
-它至少提供:
-
-- `id`
-- `name`
-- `version`
-- `sdk`
-- `host`
-- `[plugins].enabled`
-
-当前 editor Bundle 内容表示:
-
-- 宿主类型是 `editor`
-- 启用插件列表里包含:
-  - `luna.editor.core`
-  - `luna.example.hello`
-  - `luna.example.imgui_demo`
-
-当前 runtime Bundle 内容表示:
-
-- 宿主类型是 `runtime`
-- 启用插件列表里包含:
-  - `luna.runtime.core`
-
-### 6.2 第二步: 扫描插件 manifest
-
-`sync.py` 会扫描下面两个目录:
-
-- `Plugins/builtin`
-- `Plugins/external`
-
-扫描规则很简单:
-
-- 递归查找所有 `luna.plugin.toml`
-- 读出 `id`、`cmake_target`、`entry`、`hosts`、`dependencies` 等字段
-- 用 `id` 建一个插件表
-
-### 6.3 第三步: 解析依赖
-
-当前依赖解析是一个最小实现:
-
-- 依赖来自 `dependencies` 表的 key
-- 依赖值必须是字符串，但当前不会真正做版本求解
-- 采用 DFS 拓扑排序
-- 支持循环依赖检测
-- 如果 Bundle 里引用了不存在的插件，会直接失败
-- 如果插件声明的 `hosts` 不包含 Bundle 的 `host`，会直接失败
-
-也就是说，当前 `dependencies` 的值更多是“格式保留位”，真正起作用的是依赖 key 本身。
-
-### 6.4 第四步: 生成文件
-
-`sync.py` 会生成四类文件。
-
-#### 6.4.1 `PluginList.cmake`
-
-作用:
-
-- 告诉 CMake 需要 `add_subdirectory()` 哪些插件目录
-- 告诉 `LunaEditor` 需要链接哪些插件 target
-
-当前生成文件会按宿主分别写到:
-
-- `Plugins/Generated/editor/PluginList.cmake`
-- `Plugins/Generated/runtime/PluginList.cmake`
-
-当前生成文件类似:
-
-```cmake
-set(LUNA_PLUGIN_TARGETS "")
-if(NOT TARGET LunaBuiltinEditorCorePlugin)
-    add_subdirectory("${PROJECT_SOURCE_DIR}/Plugins/builtin/luna.editor.core" "${PROJECT_BINARY_DIR}/plugins/luna_editor_core")
-endif()
-list(APPEND LUNA_PLUGIN_TARGETS LunaBuiltinEditorCorePlugin)
-```
-
-#### 6.4.2 `ResolvedPlugins.h/.cpp`
-
-作用:
-
-- 将所有选中的插件入口函数聚合在一个翻译单元里
-- 避免运行时去做动态查找
-- 保持插件注册顺序完全显式
-
-当前生成结果的核心形式是:
-
-```cpp
-extern "C" void luna_register_luna_editor_core(luna::PluginRegistry& registry);
-
-void registerResolvedPlugins(PluginRegistry& registry)
-{
-    luna_register_luna_editor_core(registry);
-}
-```
-
-#### 6.4.3 lock file
-
-作用:
-
-- 记录这次 `sync.py` 解析出来的插件快照
-- 作为当前工作区的“已解析结果摘要”
-
-当前 editor host 和 runtime host 分别生成:
-
-- `luna.editor.lock`
-- `luna.runtime.lock`
-
-它们还不是完整 lock system，因为它们没有记录 Git revision、来源 URL、校验信息。
-
-#### 6.4.4 这些文件不是手写配置
-
-当前原则是:
-
-- `Bundle` 和 `plugin manifest` 是手写输入
-- `Generated` 目录和 lock file 是工具输出
-
-因此不要手工维护 `Plugins/Generated/*.cmake` 或 `ResolvedPlugins.cpp`。
-
-### 6.5 当前需要手工执行 `sync.py`
-
-当前顶层 `CMakeLists.txt` 不会在配置阶段自动帮你执行 `sync.py`。
-
-因此当前推荐流程是先手工同步插件解析结果，再做 CMake 配置与编译:
-
-```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml --generated-dir Plugins/Generated/editor --lock-file luna.editor.lock
-cmake -S . -B build
-cmake --build build --config Debug --target LunaEditorApp
-```
-
-如果你要同步 runtime host，则执行:
-
-```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/RuntimeDefault/luna.bundle.toml --generated-dir Plugins/Generated/runtime --lock-file luna.runtime.lock
-cmake -S . -B build
-cmake --build build --config Debug --target LunaRuntimeApp
-```
-
-如果你改了 Bundle 或任意 `luna.plugin.toml`，就需要重新执行对应 host 的 `sync.py`，否则对应的 `Plugins/Generated/<host>` 和 lock file 不会刷新。
-
-## 7. 运行时工作流
-
-当前 editor host 的运行时流程如下:
+### 6.2 运行时链路
 
 ```mermaid
 sequenceDiagram
     participant Main as main()
-    participant App as EditorApp
-    participant PR as PluginRegistry
-    participant ER as EditorRegistry
-    participant GP as registerResolvedPlugins()
-    participant P as luna.editor.core
-    participant Shell as EditorShellLayer
+    participant Base as Application
+    participant Host as LunaApp
+    participant Services as ServiceRegistry
+    participant Editor as EditorRegistry
+    participant Plugins as registerResolvedPlugins()
+    participant Registry as PluginRegistry
+    participant Layers as LayerStack
 
-    Main->>App: createApplication()
-    Main->>App: run()
-    App->>PR: construct PluginRegistry
-    App->>GP: registerResolvedPlugins(PR)
-    GP->>P: luna_register_luna_editor_core(PR)
-    P->>PR: addLayer(...)
-    P->>ER: addPanel(...), addCommand(...)
-    App->>Shell: pushOverlay(EditorShellLayer)
-    App->>App: instantiate plugin-contributed layers
-    Shell->>ER: build panel instances
-    Shell->>Shell: render menu + panels every frame
+    Main->>Base: initialize()
+    Base->>Base: create window + init renderer
+    Main->>Base: run()
+    Base->>Host: onInit()
+    Host->>Services: create / fill shared services
+    Host->>Editor: create editor registry
+    Host->>Registry: construct PluginRegistry
+    Host->>Plugins: registerResolvedPlugins(registry)
+    Plugins->>Registry: addLayer / addOverlay / requestImGui / editor()
+    Host->>Base: enableImGui() if requested
+    Host->>Layers: pushLayer / pushOverlay
 ```
 
-### 7.1 `main()` 只知道宿主
+## 7. Bundle 是如何描述插件组合的
 
-`Luna/Core/Main.cpp` 并不知道有哪些插件。
+### 7.1 当前 Bundle 文件
 
-它只做:
+当前默认 Bundle 有两份:
 
-- 初始化日志
-- 调用 `createApplication()`
-- 初始化应用
-- 进入主循环
+- `Bundles/EditorDefault/luna.bundle.toml`
+- `Bundles/RuntimeDefault/luna.bundle.toml`
 
-### 7.2 `EditorApp::onInit()` 是插件装配入口
+它们不是两个不同宿主，而是同一个 `LunaApp` 的两种插件组合。
 
-当前编辑器宿主在初始化时会做三件关键事:
+### 7.2 Bundle 字段表
 
-1. 创建 `PluginRegistry`
-2. 调用 `registerResolvedPlugins(plugin_registry)`
-3. 根据注册结果组装 `EditorShellLayer` 与 Layer 贡献
+| 字段 | 类型 | 当前作用 |
+| --- | --- | --- |
+| `id` | string | 元数据，写入解析结果 |
+| `name` | string | 元数据 |
+| `version` | string | 元数据 |
+| `sdk` | string | 写入 lock file，当前不做严格兼容求解 |
+| `host` | string | 参与 host 兼容校验 |
+| `[plugins].enabled` | string array | 决定最终启用哪些插件 |
 
-这意味着:
+### 7.3 默认 Bundle 的真实内容
 
-- 插件不是直接操作 `main()`
-- 插件也不是自己 new 一个宿主
-- 宿主统一控制“何时注册、何时装配”
+| Bundle | 当前启用插件 | 结果 |
+| --- | --- | --- |
+| `EditorDefault` | `luna.editor.shell`、`luna.editor.core`、`luna.example.hello`、`luna.example.imgui_demo` | 启用 editor shell、默认编辑器能力和两个示例面板 |
+| `RuntimeDefault` | `luna.runtime.core` | 启用最小 runtime Layer 示例 |
 
-### 7.3 `registerResolvedPlugins()` 只是一个聚合函数
+> **提示 (Note):**
+> 仓库里还存在一个 `luna.imgui` 插件。
+> 它是一个独立的“请求启用 ImGui”的通用插件，但它当前**不在默认 editor bundle 里**。
+> 当前默认 editor 之所以有 ImGui，是因为 `luna.editor.shell` 自己调用了 `requestImGui()`。
 
-它本身不包含插件逻辑。
+## 8. 插件 manifest 是如何描述插件的
 
-它只是把各个插件的注册入口按顺序调起来。
+### 8.1 一个典型 manifest
 
-### 7.4 插件注册阶段不等于对象实例化阶段
+```toml
+id = "luna.example.hello"
+name = "Hello Plugin"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "LunaExampleHelloPlugin"
+entry = "luna_register_luna_example_hello"
+hosts = ["app"]
 
-当前实现里这两者是分开的:
-
-- 插件先在注册阶段提交工厂函数、面板定义、命令定义
-- 宿主随后再根据这些注册信息创建真正的对象
-
-这样做的好处是:
-
-- 宿主统一掌控对象生命周期
-- 插件只负责声明贡献，不负责接管应用骨架
-- 后面更容易继续加依赖、顺序、过滤和调试能力
-
-### 7.5 `RuntimeApp::onInit()` 也是插件装配入口
-
-runtime 宿主会做两件关键事:
-
-1. 创建不带 `EditorRegistry` 的 `PluginRegistry`
-2. 调用 `registerResolvedPlugins(plugin_registry)` 并实例化 runtime Layer / Overlay
-
-当前 runtime host 不提供 editor 专属的 Panel / Command 扩展点。
-
-## 8. 当前三个核心注册表
-
-### 8.1 `ServiceRegistry`
-
-职责:
-
-- 提供一个按类型索引的服务容器
-- 支持 `emplace`、`add`、`get`、`has`
-
-当前特点:
-
-- 结构已经存在
-- 还没有太多真实 service 接进去
-- 当前 builtin editor plugin 没有实际用到它
-
-它的意义更偏“为后续插件共享运行时对象预留基础设施”。
-
-### 8.2 `PluginRegistry`
-
-职责:
-
-- 暴露插件可注册的核心运行时接口
-- 当前主要支持 Layer / Overlay 贡献
-- 持有对 `ServiceRegistry` 和可选 `EditorRegistry` 的访问入口
-
-当前已经支持:
-
-- `addLayer(id, factory)`
-- `addOverlay(id, factory)`
-- `editor()`
-- `services()`
-
-当前不支持:
-
-- Render feature registry
-- Asset importer registry
-- Project template registry
-- Inspector registry
-- Toolbar registry
-- Menu registry
-
-这些都还没有做出来。
-
-### 8.3 `EditorRegistry`
-
-这是编辑器宿主框架提供的扩展点容器。
-
-当前已经支持:
-
-- `addPanel(...)`
-- `addCommand(...)`
-- `invokeCommand(...)`
-
-也就是说，当前编辑器插件主要可以做两类事:
-
-- 给编辑器加一个 Panel
-- 给编辑器加一个 Command
-
-runtime host 当前没有单独的 `RuntimeRegistry`，因此它目前主要复用 `PluginRegistry` 里的 `Layer` / `Overlay` 贡献能力。
-
-## 9. `EditorShellLayer` 是当前编辑器插件系统的中枢
-
-`EditorShellLayer` 的职责非常关键。
-
-它不是某个插件，而是宿主里专门用于承载编辑器扩展点的那一层。
-
-当前它负责:
-
-- 在 `onAttach()` 时根据 `EditorRegistry` 创建 Panel 实例
-- 在 `onDetach()` 时销毁这些 Panel
-- 在 `onImGuiRender()` 中渲染主菜单栏
-- 通过 `Panels` 菜单开关 Panel 可见性
-- 通过 `Commands` 菜单触发已注册命令
-
-这意味着当前架构已经明确地把“编辑器宿主框架”和“具体插件功能”分开了:
-
-- `EditorShellLayer` 负责承载
-- 插件负责贡献
-
-## 10. 当前 builtin plugins 是怎么接进来的
-
-当前 editor Bundle 里接入的 builtin plugins 是:
-
-```text
-Plugins/builtin/luna.editor.core
-Plugins/builtin/luna.example.hello
-Plugins/builtin/luna.example.imgui_demo
+[dependencies]
+"luna.editor.shell" = "0.1"
 ```
 
-它们都是独立参与构建的插件目标，而不是 `Editor/` 目录里的普通源文件。
+### 8.2 manifest 字段表
 
-其中 `luna.editor.core` 的注册函数会提交:
+| 字段 | 类型 | 当前作用 |
+| --- | --- | --- |
+| `id` | string | 必须唯一；作为插件主键 |
+| `name` | string | 显示用元数据 |
+| `version` | string | 写入 lock file |
+| `sdk` | string | 写入 lock file；当前不做严格版本兼容判断 |
+| `kind` | string | 记录插件类别；当前不驱动复杂分支逻辑 |
+| `cmake_target` | string | 写入 `PluginList.cmake` |
+| `entry` | string | 写入 `ResolvedPlugins.cpp` |
+| `hosts` | string array | 与 Bundle `host` 做兼容校验 |
+| `[dependencies]` 的 key | table keys | 参与依赖拓扑排序 |
+| `[dependencies]` 的 value | string | 当前只要求是字符串，不做 semver 求解 |
 
-- 一个相机控制 Layer
-- 一个 `Renderer` Panel
-- 一个 `Reset Camera` Command
+### 8.3 `entry` 为什么必须和代码一致
 
-`luna.example.hello` 会提交一个最小 `Hello` Panel。
+`sync.py` 不会去分析 C++ AST。  
+它只会把 manifest 里的 `entry` 文本直接写进生成文件。
 
-`luna.example.imgui_demo` 会提交一个 `ImGui Demo` Panel，用来控制并显示 Dear ImGui 的 Demo 窗口。
+所以你必须保证下面两者完全一致:
 
-当前 runtime Bundle 里接入的 builtin plugin 是:
+- manifest 里的 `entry = "luna_register_xxx"`
+- 代码里的 `extern "C" void luna_register_xxx(luna::PluginRegistry&)`
 
-```text
-Plugins/builtin/luna.runtime.core
-```
+## 9. `sync.py` 构建期到底做了什么
 
-它会提交一个 runtime Layer，用来演示 runtime host 下不依赖 editor 接口的插件装配方式。
+### 9.1 步骤一: 读取 Bundle
 
-这说明当前插件系统已经不是“假文档、真硬编码”，而是 editor / runtime 两条最小链路都已经打通。
+`sync.py` 首先读取:
 
-## 11. 当前插件编译与链接关系
+- Bundle 基本元数据
+- `host`
+- `[plugins].enabled`
 
-当前编辑器相关 target 分成两层:
+### 9.2 步骤二: 扫描所有插件 manifest
 
-### 11.1 `LunaEditorFramework`
+扫描范围固定为:
 
-这是给编辑器插件依赖的宿主框架库。
+- `Plugins/builtin`
+- `Plugins/external`
 
-它提供:
+脚本会递归查找所有 `luna.plugin.toml`。
 
-- `EditorPanel`
-- `EditorRegistry`
-- `EditorShellLayer`
+### 9.3 步骤三: 解析依赖与 host 兼容性
 
-编辑器插件应当依赖它，而不是把自己的逻辑塞回 `Editor/` 目录。
+当前解析策略是:
 
-### 11.2 `LunaEditor`
+- 依赖来源于 `[dependencies]` 的 key
+- 通过 DFS 做拓扑排序
+- 检测循环依赖
+- 检查插件 `hosts` 是否包含 Bundle `host`
 
-这是最终编辑器宿主库。
+这条链路当前已经能稳定处理:
 
-它负责:
+- 缺失插件
+- 重复插件 id
+- host 不匹配
+- 依赖环
 
-- 定义 `EditorApp`
-- 包含生成出来的 `ResolvedPlugins.cpp`
-- 链接所有选中的插件目标
+### 9.4 步骤四: 生成中间文件
 
-### 11.3 `LunaEditorApp`
+`sync.py` 会生成四类输出:
 
-这是最终可执行程序。
-
-### 11.4 `LunaRuntime`
-
-这是最终运行时宿主库。
-
-它负责:
-
-- 定义 `RuntimeApp`
-- 包含 runtime host 生成出来的 `ResolvedPlugins.cpp`
-- 链接所有选中的 runtime 插件目标
-
-### 11.5 `LunaRuntimeApp`
-
-这是最终运行时可执行程序。
-
-## 12. 当前 manifest 字段中哪些真的起作用
-
-当前 `luna.plugin.toml` 里常见字段包括:
-
-- `id`
-- `name`
-- `version`
-- `sdk`
-- `kind`
-- `cmake_target`
-- `entry`
-- `hosts`
-- `dependencies`
-
-但它们的“实际作用程度”目前并不一样:
-
-| 字段 | 当前作用 |
+| 文件 | 作用 |
 | --- | --- |
-| `id` | 真正参与解析，必须唯一 |
-| `cmake_target` | 真正参与 CMake 生成 |
-| `entry` | 真正参与 `ResolvedPlugins.cpp` 生成 |
-| `hosts` | 真正参与 Bundle host 校验 |
-| `dependencies` 的 key | 真正参与依赖拓扑排序 |
-| `dependencies` 的 value | 当前只校验是字符串，还不做版本求解 |
-| `sdk` | 当前写入 lock file，但不做严格兼容校验 |
-| `kind` | 当前主要是记录信息，没有驱动分支逻辑 |
+| `PluginList.cmake` | 把选中的插件目录加入 CMake 构建图，并收集 target |
+| `ResolvedPlugins.h` | 声明 `registerResolvedPlugins()` |
+| `ResolvedPlugins.cpp` | 聚合并按顺序调用所有插件入口 |
+| `luna.lock` | 记录本次解析结果摘要 |
 
-这个区别非常重要，写插件时不要误以为所有字段都已经完整生效。
+### 9.5 `PluginList.cmake` 为什么由 `App/CMakeLists.txt` 使用
 
-## 13. 当前 Bundle 字段中哪些真的起作用
+这是一个很重要的设计点。
 
-当前 `luna.bundle.toml` 里:
+当前 `PluginList.cmake` 被 `App/CMakeLists.txt` include，而不是被 `LunaCore` 使用，原因是:
 
-- `host` 会影响 host 兼容校验
-- `[plugins].enabled` 会决定最终启用哪些插件
+- 选中哪些插件，本质上是“宿主组合”问题
+- `LunaCore` 应该保持底层框架库，不应感知具体 bundle 组合
+- `LunaAppHost` 才是“把宿主和选中插件真正链接到一起”的地方
 
-其他字段目前主要是元数据保留位。
+换句话说:
 
-## 14. 当前系统的优点
+- `LunaCore` 负责底层能力
+- `LunaEditorFramework` 负责 editor 扩展框架
+- `LunaAppHost` 负责最终插件装配
 
-当前这版骨架已经具备几个非常重要的优点:
+这条分层是合理的，后面也应该继续保持。
 
-### 14.1 注册顺序显式
+## 10. `build.py` 与 `sync.py` 的关系
 
-没有依赖静态初始化魔法，所有插件入口都汇总到 `ResolvedPlugins.cpp`。
+### 10.1 `sync.py` 是底层生成器
 
-### 14.2 构建图透明
+它负责:
 
-插件通过 `PluginList.cmake` 明确加入构建图，不是偷偷混进宿主源码。
+- 读取 Bundle
+- 扫描 manifest
+- 生成中间文件
 
-### 14.3 宿主和插件边界开始清晰
+### 10.2 `build.py` 是推荐入口
 
-- `Editor/` 是宿主框架
-- `Plugins/...` 是具体插件
+它负责串联:
 
-### 14.4 未来可渐进扩展
+1. `sync.py`
+2. `cmake -S ... -B ...`
+3. `cmake --build ...`
 
-当前这条链路已经足够支撑后续新增:
+并把输出隔离到:
 
-- RenderRegistry
-- AssetRegistry
-- Project template
-- 更多 host 类型
+- `build/profiles/editor`
+- `build/profiles/runtime`
+- 自定义 profile 目录
 
-## 15. 当前系统的局限
+### 10.3 推荐命令
 
-当前局限同样需要明确认识:
+```powershell
+python Tools\luna\build.py editor
+python Tools\luna\build.py runtime
+python Tools\luna\build.py all
+```
 
-### 15.1 还不是完整包管理系统
+如果你只想刷新解析结果，不编译:
 
-`sync.py` 只扫描本地目录，不负责:
+```powershell
+python Tools\luna\build.py editor --sync-only
+```
 
-- clone GitHub 仓库
-- 更新插件版本
-- 缓存远程依赖
+如果你要直接使用底层生成器:
 
-### 15.2 还没有版本求解器
+```powershell
+python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml
+```
 
-依赖版本字符串现在没有真正参与求解。
+## 11. 运行时注册表是如何协作的
 
-### 15.3 还没有丰富扩展点
+### 11.1 `ServiceRegistry`
 
-当前只有:
+这是一个按类型索引的共享服务容器。
 
-- Layer / Overlay
-- Editor Panel
-- Editor Command
+当前公开能力:
 
-### 15.4 多宿主已经落地，但 runtime 仍是轻量版本
+| API | 作用 |
+| --- | --- |
+| `emplace<Service>(...)` | 原位创建并注册服务 |
+| `add<Service>(shared_ptr)` | 注册一个现成服务实例 |
+| `has<Service>()` | 判断服务是否存在 |
+| `get<Service>()` | 获取已注册服务 |
 
-当前已经有:
+当前默认宿主已经把 `EditorRegistry` 作为 service 注册进去。
 
-- `editor` 宿主链路
-- `runtime` 宿主链路
+### 11.2 `PluginRegistry`
 
-但当前 runtime host 还是轻量版本，因为底层应用生命周期仍然共享同一套 ImGui 初始化与渲染框架。
+这是插件注册期的总入口。
 
-## 16. 当前推荐的使用姿势
+当前公开能力:
 
-基于当前实现，推荐的工作方式是:
+| API | 作用 |
+| --- | --- |
+| `services()` | 访问 `ServiceRegistry` |
+| `hasEditorRegistry()` | 判断 editor registry 是否可用 |
+| `requestImGui()` | 请求宿主启用 ImGui |
+| `requestsMultiViewport()` | 查询是否请求了多视口 |
+| `editor()` | 获取 `EditorRegistry` |
+| `addLayer(id, factory)` | 注册普通 Layer |
+| `addOverlay(id, factory)` | 注册 Overlay |
 
-1. 把编辑器具体功能写成 `Plugins/builtin/...` 或 `Plugins/external/...`
-2. 用 `luna.plugin.toml` 描述插件元数据
-3. 把插件加入某个 Bundle 的 `[plugins].enabled`
-4. 对 editor host 或 runtime host 手工执行对应的 `python Tools/luna/sync.py --project-root . --bundle ... --generated-dir ... --lock-file ...`
-5. 再执行 CMake 配置与构建
+### 11.3 `EditorRegistry`
 
-不要手工维护 `Plugins/Generated` 目录。
+这是 editor framework 的扩展点容器。
 
-## 17. 当前一句话结论
+当前公开能力:
 
-Luna 当前插件系统已经实现的本质是:
+| API | 作用 |
+| --- | --- |
+| `addPanel(...)` | 注册一个 Panel |
+| `addCommand(...)` | 注册一个 Command |
+| `invokeCommand(id)` | 触发命令 |
+| `panels()` | 枚举当前注册的 panel 定义 |
+| `commands()` | 枚举当前注册的命令定义 |
 
-> 用 Bundle 选择插件，用 `sync.py` 生成构建与注册中间文件，用宿主在启动时显式注册插件贡献，再由宿主框架统一承载这些贡献。
+### 11.4 `EditorShellLayer` 的实际作用
 
-这已经足够作为下一阶段继续演进的可靠骨架，但它还远不是完整生态系统。
+`EditorShellLayer` 不是一个插件扩展点容器，而是承载这些扩展点的运行时壳层。
+
+它当前负责:
+
+- 在 `onAttach()` 时实例化所有已注册 Panel
+- 在 `onImGuiRender()` 中渲染主菜单栏
+- 通过 `Panels` 菜单控制窗口开关
+- 通过 `Commands` 菜单触发命令
+
+## 12. 当前默认 builtin plugins 各自做什么
+
+| 插件 | 当前作用 |
+| --- | --- |
+| `luna.imgui` | 仅请求启用 ImGui |
+| `luna.editor.shell` | 请求 ImGui，并注册 `EditorShellLayer` overlay |
+| `luna.editor.core` | 提供相机控制 Layer、Renderer Panel、Reset Camera Command |
+| `luna.example.hello` | 提供最小 Hello Panel 示例 |
+| `luna.example.imgui_demo` | 提供 Dear ImGui Demo Panel 示例 |
+| `luna.runtime.core` | 提供最小 runtime Layer 示例 |
+
+## 13. 插件当前可以做什么，不能做什么
+
+### 13.1 当前正式支持的能力
+
+```cpp
+extern "C" void luna_register_example(luna::PluginRegistry& registry)
+{
+    registry.addLayer("example.layer", [] {
+        return std::make_unique<MyLayer>();
+    });
+
+    registry.requestImGui();
+
+    if (registry.hasEditorRegistry()) {
+        registry.editor().addCommand("example.command", "Do Thing", [] {
+            doThing();
+        });
+    }
+}
+```
+
+通过这套 API，插件已经能稳定实现:
+
+- runtime layer
+- overlay
+- editor panel
+- editor command
+- ImGui 请求
+
+### 13.2 当前支持“访问 renderer 状态”，但不支持“正式扩展 renderer 协议”
+
+插件中的 `Layer` 或 `Panel` 可以这样做:
+
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+auto& camera = renderer.getMainCamera();
+renderer.getClearColor().x = 0.25f;
+```
+
+这足够完成:
+
+- 相机控制
+- clear color 调整
+- 显示 renderer 基本状态
+
+但当前仍然**不正式支持**:
+
+- 在插件注册阶段替换 renderer 初始化参数
+- 向活动宿主注入新的 RenderGraph builder
+- 把自定义 `RenderPass` 正式接入当前 `LunaApp`
+
+> **警告 (Warning):**
+> `Samples/Model` 证明的是 Luna 的 renderer 很强，不是当前插件系统已经具备 RenderGraph 插件协议。
+
+## 14. 默认 editor 与 runtime 为什么只是“组合差异”
+
+```mermaid
+graph LR
+    RuntimeBundle[Runtime bundle] --> RuntimePlugin[luna.runtime.core]
+    EditorBundle[Editor bundle] --> Shell[luna.editor.shell]
+    EditorBundle --> Core[luna.editor.core]
+    EditorBundle --> Hello[luna.example.hello]
+    EditorBundle --> Demo[luna.example.imgui_demo]
+    RuntimePlugin --> Host[LunaApp]
+    Shell --> Host
+    Core --> Host
+    Hello --> Host
+    Demo --> Host
+```
+
+当前不存在:
+
+- `RuntimeApp`
+- `EditorApp`
+
+只有:
+
+- 一个 `LunaApp`
+- 不同的 Bundle 组合
+
+## 15. 新插件最推荐的三种写法
+
+### 15.1 Editor Panel 插件
+
+适合:
+
+- 属性面板
+- 调试窗口
+- 统计窗口
+
+### 15.2 Editor Command 插件
+
+适合:
+
+- 一次性工具动作
+- 资源处理入口
+- 调试开关
+
+### 15.3 Runtime Layer 插件
+
+适合:
+
+- 输入逻辑
+- 相机逻辑
+- 调试渲染控制
+- 运行时行为演示
+
+## 16. 当前最常见的错误
+
+| 问题 | 原因 | 处理方式 |
+| --- | --- | --- |
+| manifest 改了但构建结果没变 | 没重新跑 `sync.py` / `build.py` | 重新 sync 或直接重建 profile |
+| `entry` 找不到 | manifest 与实际函数名不一致 | 保持 `entry` 与 `extern "C"` 函数一致 |
+| panel 注册成功但界面没出现 | Bundle 没启用 `luna.editor.shell` | 给 editor panel 插件声明并启用 shell 依赖 |
+| host 校验失败 | `hosts` 与 Bundle `host` 不匹配 | 统一为当前宿主支持的 `app` |
+| 把生成文件手工改乱 | 误把 generated 文件当源码 | 删除 generated 输出，重新 sync |
+
+## 17. 一句话总结
+
+Luna 当前插件系统的工作方式可以概括为:
+
+> Bundle 负责选插件，`sync.py` 负责把“选中结果”转成构建文件和注册代码，`LunaApp` 负责在启动时显式调用这些入口，再由 registry 把贡献变成真实运行时行为。

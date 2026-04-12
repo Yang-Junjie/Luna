@@ -4,29 +4,35 @@
 
 ### 环境要求
 
-根据 `CMakeLists.txt` 和本地构建缓存，Luna 的基础要求如下:
+根据顶层 `CMakeLists.txt` 与当前实际构建链路，Luna 的基础要求如下:
 
 | 项目 | 要求 |
 | --- | --- |
 | CMake | 3.16 或更高 |
 | C++ 编译器 | 支持 C++20 |
-| 图形 API | Vulkan SDK |
-| 平台库 | GLFW |
-| GUI | ImGui docking 分支 |
-| 日志 | spdlog |
-| 资源解析 | fastgltf、tinyobjloader、stb、tinyddsloader |
-| Shader 工具 | glslang、SPIRV-Cross |
+| Vulkan SDK | 必需 |
+| Python | 3.11 或更高，建议 3.13；用于 `sync.py` / `build.py` |
+| 平台 | 当前主要在 Windows + GLFW 路径上验证 |
 
-当前仓库在本机快照中已经验证过以下一组构建环境:
+### 当前直接依赖的第三方库
 
-| 组件 | 观测值 |
+| 类别 | 组件 |
 | --- | --- |
-| 生成器 | Ninja |
-| C++ 编译器 | Clang++ |
-| Vulkan SDK | 1.4.328.1 |
-| 平台 | Windows |
+| 窗口 / 输入 | GLFW |
+| GUI | Dear ImGui |
+| 日志 | spdlog |
+| Vulkan 内存 | VMA |
+| glTF | fastgltf |
+| OBJ | tinyobjloader |
+| 图片 | stb、tinyddsloader |
+| 任务系统 | enkiTS |
+| Shader 工具链 | glslang、SPIRV-Cross |
+| JSON / TOML 辅助 | simdjson、tomlplusplus |
 
-### 获取源码
+> **提示 (Note):**
+> 如果你只是想构建和运行当前仓库，不需要额外安装这些依赖的系统包管理版本；仓库已经通过 `third_party/` 和 `add_subdirectory()` 管理大部分依赖。
+
+## 获取源码
 
 ```powershell
 git clone <your-repo-url> Luna
@@ -34,123 +40,201 @@ cd Luna
 git submodule update --init --recursive
 ```
 
-### 配置与构建
+## 推荐构建方式
+
+当前推荐直接使用:
+
+- `Tools/luna/build.py`
+
+而不是手工维护 `Plugins/Generated`。
+
+### 构建 editor profile
 
 ```powershell
-cmake -S . -B build
-cmake --build build --config Debug
+python Tools\luna\build.py editor
 ```
 
-生成的可执行文件是:
-
-```text
-build/LunaApp.exe
-```
-
-### 运行
+### 构建 runtime profile
 
 ```powershell
-.\build\LunaApp.exe
+python Tools\luna\build.py runtime
 ```
 
-首次运行时，你应该看到:
+### 一次性构建两套 profile
 
-- 一个 GLFW 创建的原生窗口
-- Vulkan 初始化的渲染上下文
-- ImGui DockSpace
-- 一个名为 `Renderer` 的面板
-- 鼠标右键 + `WASD/QE/Shift` 控制的自由摄像机
+```powershell
+python Tools\luna\build.py all
+```
 
-> **提示 (Note):**
-> 当前默认场景没有真正的网格绘制。你看到的核心可见结果是清屏颜色和 ImGui 面板，这是符合源码现状的。
+### 构建产物位置
 
-## 你的第一个 Luna 实体
+| Profile | 生成目录 | 可执行文件 |
+| --- | --- | --- |
+| `editor` | `build/profiles/editor/` | `build/profiles/editor/App/Debug/LunaApp.exe` |
+| `runtime` | `build/profiles/runtime/` | `build/profiles/runtime/App/Debug/LunaApp.exe` |
 
-对于当前仓库，最简单的“Hello World”不是写一个完整渲染 pass，而是写一个自己的 `Layer`，并让它在 ImGui 面板中输出内容。
+### `build.py` 实际做了什么
 
-### 示例 1: 最小自定义 Layer
+```mermaid
+flowchart TD
+    A[build.py editor] --> B[sync.py parse bundle]
+    B --> C[write generated files into build/profiles/editor/generated]
+    C --> D[cmake -S . -B build/profiles/editor -DLUNA_GENERATED_DIR=...]
+    D --> E[cmake --build ... --target LunaApp]
+```
+
+## 手工构建方式
+
+如果你想单独控制底层步骤，也可以直接手工执行。
+
+### 只做生成
+
+```powershell
+python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml
+```
+
+### 再做 CMake 配置与构建
+
+```powershell
+cmake -S . -B build -DLUNA_GENERATED_DIR="${PWD}/Plugins/Generated"
+cmake --build build --config Debug --target LunaApp
+```
+
+> **警告 (Warning):**
+> raw `sync.py` 默认会把生成文件写到源码树里的 `Plugins/Generated`。  
+> 日常开发更推荐 `build.py` 的 profile 隔离输出。
+
+## 运行程序
+
+### 运行 editor
+
+```powershell
+.\build\profiles\editor\App\Debug\LunaApp.exe
+```
+
+### 运行 runtime
+
+```powershell
+.\build\profiles\runtime\App\Debug\LunaApp.exe
+```
+
+## 首次运行时你应该看到什么
+
+### Editor
+
+- 原生系统窗口
+- Dear ImGui 主菜单栏
+- 内置 `Renderer` 面板
+- `Hello` 示例面板
+- `ImGui Demo` 示例面板
+- 鼠标右键 + `WASD/QE/Shift` 的自由摄像机控制
+
+### Runtime
+
+- 原生系统窗口
+- 无 editor shell
+- 默认 clear color 动态变化的 runtime 示例层
+
+## 你的第一个 Luna 插件
+
+当前最适合初学者的 Hello World 不是“自己写一整套 RenderGraph”，而是“先写一个最小 editor panel 插件”。
+
+### 第一步: 定义一个 Panel
 
 ```cpp
-#include "Core/Layer.h"
+#include "Editor/EditorPanel.h"
 #include "imgui.h"
 
-class HelloLayer final : public luna::Layer {
+class HelloPanel final : public luna::editor::EditorPanel {
 public:
-    HelloLayer() : Layer("HelloLayer") {}
-
-    void onImGuiRender() override {
-        ImGui::Begin("Hello");
-        ImGui::TextUnformatted("Hello from Luna.");
-        ImGui::End();
+    void onImGuiRender() override
+    {
+        ImGui::TextUnformatted("Hello from a Luna plugin.");
     }
 };
 ```
 
-### 示例 2: 在应用中挂载 Layer
+### 第二步: 在注册函数里把它挂到 EditorRegistry
 
 ```cpp
-#include "Core/Application.h"
-#include <memory>
+#include "Editor/EditorRegistry.h"
+#include "Plugin/PluginRegistry.h"
 
-class HelloApp final : public luna::Application {
-public:
-    HelloApp()
-        : Application(luna::ApplicationSpecification{
-              .m_name = "Hello Luna",
-              .m_window_width = 1280,
-              .m_window_height = 720,
-          }) {}
-
-protected:
-    void onInit() override {
-        pushLayer(std::make_unique<HelloLayer>());
+extern "C" void luna_register_my_hello(luna::PluginRegistry& registry)
+{
+    if (!registry.hasEditorRegistry()) {
+        return;
     }
-};
 
-namespace luna {
-Application* createApplication(int, char**) {
-    return new HelloApp();
-}
+    registry.editor().addPanel<HelloPanel>("my.hello", "Hello");
 }
 ```
 
-### 这个示例为什么有效
+### 第三步: 提供 manifest
 
-因为 `Application::run()` 已经帮你做了下面这些事:
+```toml
+id = "my.hello"
+name = "My Hello Plugin"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "MyHelloPlugin"
+entry = "luna_register_my_hello"
+hosts = ["app"]
 
-1. 驱动窗口消息循环
-2. 计算 `Timestep`
-3. 调用每个 Layer 的 `onUpdate()`
-4. 开启 ImGui 帧
-5. 调用每个 Layer 的 `onImGuiRender()`
-6. 驱动渲染器执行 RenderGraph
-
-## 第一个渲染扩展点: 新增 RenderPass
-
-当前 `VulkanRenderer::rebuildRenderGraph()` 已经是最好的示范。你可以仿照它添加新 pass:
-
-```cpp
-luna::val::RenderGraphBuilder builder;
-builder
-    .AddRenderPass("clear", std::make_unique<MyClearPass>())
-    .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
-    .SetOutputName("scene_color");
-
-auto graph = builder.Build();
+[dependencies]
+"luna.editor.shell" = "0.1"
 ```
 
-关键点不是“如何手写 Vulkan 命令”，而是“如何声明附件、资源依赖与输出关系”。
+> **提示 (Note):**
+> 对当前最小 panel 插件来说，依赖 `luna.editor.shell` 就够了。
+> `luna.imgui` 是一个独立的 ImGui 请求插件，但它不会替你承载 panel UI。
 
-如果你准备做一个真正独立的应用，而不是只在默认编辑器里试验一个 pass，下一步应继续阅读:
+### 第四步: 把插件加入 Bundle 并重新构建
+
+```powershell
+python Tools\luna\build.py editor
+```
+
+这个最小链路已经足够让你理解:
+
+- 插件目录结构
+- manifest
+- 注册函数
+- `EditorRegistry`
+- Bundle 装配流程
+
+更完整的步骤请继续阅读:
+
+- [编写你的第一个插件](../plugins/writing-your-first-plugin.md)
+
+## 什么时候不该从插件起步
+
+如果你的目标是:
+
+- 自定义整个 RenderGraph
+- 自定义 renderer 初始化参数
+- 做出像 `Samples/Model` 那样的完整自定义渲染路径
+
+那么当前更适合从“自定义宿主应用”起步，而不是从插件起步。  
+原因是当前插件系统还没有正式的渲染图扩展协议。
+
+对应文档:
 
 - [使用现有框架与 RenderGraph 构建应用](./building-an-application-with-rendergraph.md)
 
-## 常见启动问题
+## 常见问题
 
-| 现象 | 原因 | 解决方式 |
+| 现象 | 常见原因 | 解决方式 |
 | --- | --- | --- |
-| CMake 找不到 Vulkan | 未安装 Vulkan SDK 或环境变量未配置 | 安装 Vulkan SDK 并重新打开终端 |
-| 子模块目录为空 | 未拉取递归子模块 | 执行 `git submodule update --init --recursive` |
-| 程序闪退 | Vulkan validation layer 或设备初始化失败 | 先检查 `logs/luna.log` |
-| 窗口创建失败 | GLFW 初始化失败或平台环境异常 | 检查图形驱动与系统权限 |
-| 启动后黑屏但无 UI | ImGui 初始化失败或 RenderGraph 构建失败 | 查看日志中的 `ImGui` / `VAL` 输出 |
+| `sync.py: argument --bundle: expected one argument` | `--bundle` 后面漏了路径 | 补完整 bundle 路径 |
+| CMake 找不到 Vulkan | Vulkan SDK 未安装或环境未刷新 | 安装 Vulkan SDK，重开终端 |
+| `LunaApp` 运行但没有 editor UI | 当前构建的是 runtime profile | 构建并运行 `editor` profile |
+| 插件改了但没生效 | 没重新执行 `build.py` / `sync.py` | 重新构建对应 profile |
+| 改了 Bundle 后 build 还是旧内容 | 还在运行旧 build 目录 | 确认你启动的是对应 profile 的 `LunaApp.exe` |
+
+## 快速继续阅读
+
+- 想理解宿主怎么工作: [架构设计深度剖析](./architecture-in-depth.md)
+- 想写插件: [插件系统手册](../plugins/plugin-system-manual.md)
+- 想做 RenderGraph 自定义宿主: [使用现有框架与 RenderGraph 构建应用](./building-an-application-with-rendergraph.md)

@@ -4,19 +4,20 @@
 #include "Editor/EditorRegistry.h"
 #include "Plugin/ServiceRegistry.h"
 
-namespace luna::editor {
+#include <memory>
 
-class EditorApp final : public Application {
+namespace luna::app {
+
+class LunaApp final : public Application {
 public:
-    EditorApp();
+    LunaApp();
 
 protected:
     void onInit() override;
 
 private:
     luna::ServiceRegistry m_service_registry;
-    luna::editor::EditorRegistry m_editor_registry;
+    std::shared_ptr<luna::editor::EditorRegistry> m_editor_registry;
 };
 
-} // namespace luna::editor
-
+} // namespace luna::app

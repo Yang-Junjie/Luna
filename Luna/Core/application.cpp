@@ -71,23 +71,48 @@ bool Application::initialize()
         return false;
     }
 
-    m_imgui_layer = std::make_unique<ImGuiLayer>(m_renderer, m_specification.m_enable_multi_viewport);
-    m_imgui_layer_raw = m_imgui_layer.get();
-    m_imgui_layer->onAttach();
-
-    if (!m_imgui_layer->isInitialized()) {
-        LUNA_CORE_ERROR("ImGui initialization failed");
-        m_imgui_layer.reset();
-        m_imgui_layer_raw = nullptr;
-        m_renderer.shutdown();
-        m_window.reset();
-        return false;
-    }
-
     m_initialized = true;
     m_minimized = false;
     m_last_frame_time = 0.0f;
 
+    if (m_specification.m_enable_imgui && !enableImGui(m_specification.m_enable_multi_viewport)) {
+        LUNA_CORE_ERROR("ImGui initialization failed");
+        m_renderer.shutdown();
+        m_window.reset();
+        m_initialized = false;
+        return false;
+    }
+
+    return true;
+}
+
+bool Application::enableImGui(bool enable_multi_viewport)
+{
+    if (!m_initialized) {
+        m_specification.m_enable_imgui = true;
+        m_specification.m_enable_multi_viewport = enable_multi_viewport;
+        return true;
+    }
+
+    if (m_imgui_layer != nullptr && m_imgui_layer->isInitialized()) {
+        return true;
+    }
+
+    m_renderer.setImGuiEnabled(true);
+
+    m_imgui_layer = std::make_unique<ImGuiLayer>(m_renderer, enable_multi_viewport);
+    m_imgui_layer_raw = m_imgui_layer.get();
+    m_imgui_layer->onAttach();
+
+    if (!m_imgui_layer->isInitialized()) {
+        m_imgui_layer.reset();
+        m_imgui_layer_raw = nullptr;
+        m_renderer.setImGuiEnabled(false);
+        return false;
+    }
+
+    m_specification.m_enable_imgui = true;
+    m_specification.m_enable_multi_viewport = enable_multi_viewport;
     return true;
 }
 

@@ -1,0 +1,10 @@
+id = "luna.imgui"
+name = "ImGui Support"
+version = "0.1.0"
+sdk = "0.1"
+kind = "host"
+cmake_target = "LunaImGuiPlugin"
+entry = "luna_register_luna_imgui"
+hosts = ["app"]
+
+[dependencies]

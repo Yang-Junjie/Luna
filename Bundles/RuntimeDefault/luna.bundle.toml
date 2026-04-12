@@ -2,7 +2,7 @@ id = "luna.bundle.runtime-default"
 name = "Runtime Default"
 version = "0.1.0"
 sdk = "0.1"
-host = "runtime"
+host = "app"
 
 [plugins]
 enabled = [

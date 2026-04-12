@@ -43,9 +43,11 @@ public:
 
     bool isInitialized() const;
     bool isRenderingEnabled() const;
+    bool isImGuiEnabled() const;
 
     void requestResize();
     bool isResizeRequested() const;
+    void setImGuiEnabled(bool enabled);
 
     void startFrame();
     void renderFrame();
@@ -74,6 +76,7 @@ private:
     Camera m_main_camera{};
     glm::vec4 m_clear_color{0.10f, 0.10f, 0.12f, 1.0f};
     bool m_initialized{false};
+    bool m_imgui_enabled{false};
     bool m_resize_requested{false};
     bool m_frame_started{false};
 };

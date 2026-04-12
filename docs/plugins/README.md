@@ -11,9 +11,9 @@
 - Luna 现在的插件系统到底已经实现到了什么程度
 - `Bundle -> sync.py -> Generated -> CMake -> 宿主 -> 注册表 -> 运行时` 这条链路到底怎么工作
 - `Editor/` 和 `Plugins/builtin/...` 的职责边界是什么
-- `Runtime/` 和 `Editor/` 现在分别承担什么宿主职责
+- `App/`、`Editor/` 和 `Plugins/builtin/...` 的职责边界是什么
 - 新插件应该怎么组织目录、怎么写 manifest、怎么写注册函数、怎么接入 Bundle
-- 为什么会生成 host 专属的 `PluginList.cmake`、`ResolvedPlugins.cpp` 和 lock 文件
+- 为什么会生成 `PluginList.cmake`、`ResolvedPlugins.cpp` 和 `luna.lock`
 - 当前哪些功能只是骨架，哪些功能已经真的工作
 
 ## 文档导航
@@ -46,23 +46,27 @@ Luna 当前的插件系统本质上是:
 - 生成插件 CMake 接入清单和注册代码
 - 构建宿主并在启动时注册插件贡献
 
-这条链路已经打通，当前默认例子是:
+这条链路已经打通。当前仓库中的 builtin 插件包括:
 
-- Bundle: `Bundles/EditorDefault/luna.bundle.toml`
-- Bundle: `Bundles/RuntimeDefault/luna.bundle.toml`
+- 插件: `Plugins/builtin/luna.imgui`
+- 插件: `Plugins/builtin/luna.editor.shell`
 - 插件: `Plugins/builtin/luna.editor.core`
 - 插件: `Plugins/builtin/luna.example.hello`
 - 插件: `Plugins/builtin/luna.example.imgui_demo`
 - 插件: `Plugins/builtin/luna.runtime.core`
-- 宿主: `LunaEditorApp`
-- 宿主: `LunaRuntimeApp`
+- 宿主: `LunaApp`
+
+当前默认 bundle 组合则是:
+
+- `Bundles/EditorDefault/luna.bundle.toml`
+- `Bundles/RuntimeDefault/luna.bundle.toml`
 
 ## 当前最重要的边界
 
 请先记住这条边界，它决定了后面整个插件系统是否会长歪:
 
+- `App/` 负责通用宿主与插件装配
 - `Editor/` 负责“编辑器宿主框架与扩展点”
-- `Runtime/` 负责“运行时宿主框架”
 - `Plugins/...` 负责“具体插件实现与能力贡献”
 
 也就是说:

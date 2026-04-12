@@ -1,0 +1,11 @@
+id = "luna.editor.shell"
+name = "Editor Shell"
+version = "0.1.0"
+sdk = "0.1"
+kind = "editor"
+cmake_target = "LunaEditorShellPlugin"
+entry = "luna_register_luna_editor_shell"
+hosts = ["app"]
+
+[dependencies]
+"luna.imgui" = "0.1"

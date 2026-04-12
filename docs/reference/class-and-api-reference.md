@@ -1,145 +1,309 @@
 # 第五部分: 类与 API 参考手册
 
 > **提示 (Note):**
-> 本节聚焦核心类，而不是机械罗列所有类型。属性表优先列出外部开发者真正需要知道的公有状态或概念状态。
+> 本节不是“所有类型的穷举索引”，而是当前对二次开发最重要的一组核心类参考。  
+> 表格中的“属性”优先列出外部开发者真正需要理解的状态或配置，而不是机械复制全部私有成员。
+
+## 类名: `luna::ApplicationSpecification`
+
+- **继承/实现**: 无
+- **简述**: 应用宿主的基础配置结构，决定窗口标题、尺寸以及 ImGui 开关。
+
+### 属性 (Properties)
+
+| 类型 | 名称 | 默认值 | 描述 |
+| --- | --- | --- | --- |
+| `std::string` | `m_name` | `"Luna"` | 窗口标题 |
+| `uint32_t` | `m_window_width` | `1600` | 初始窗口宽度 |
+| `uint32_t` | `m_window_height` | `900` | 初始窗口高度 |
+| `bool` | `m_maximized` | `false` | 是否启动即最大化 |
+| `bool` | `m_enable_imgui` | `true` | 是否默认启用 ImGui |
+| `bool` | `m_enable_multi_viewport` | `false` | 是否启用 ImGui 多视口 |
 
 ## 类名: `luna::Application`
 
 - **继承/实现**: 无
-- **简述**: Luna 的应用宿主，负责窗口、事件、主循环、ImGui 与渲染器生命周期。
+- **简述**: 应用主循环与生命周期的模板方法宿主。
 
 ### 属性 (Properties)
 
 | 类型 | 名称 | 默认值 | 描述 |
 | --- | --- | --- | --- |
-| `ApplicationSpecification` | `m_specification` | `{ name=Luna, 1600x900 }` | 应用名、窗口大小、多视口等配置 |
-| `bool` | `m_initialized` | `false` | 初始化是否成功 |
+| `bool` | `m_initialized` | `false` | 是否已完成 `initialize()` |
 | `bool` | `m_running` | `true` | 主循环是否继续 |
-| `VulkanRenderer` | `m_renderer` | 内部构造 | 当前应用绑定的渲染器 |
+| `ApplicationSpecification` | `m_specification` | 见默认值 | 应用配置 |
+| `VulkanRenderer` | `m_renderer` | 默认构造 | 当前宿主绑定的渲染器 |
+| `TaskSystem` | `m_task_system` | 默认构造 | 当前宿主的任务系统 |
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `pushLayer(std::unique_ptr<Layer> layer)` | 压入普通层并调用 `onAttach()` |
-| `void` | `pushOverlay(std::unique_ptr<Layer> overlay)` | 压入覆盖层并调用 `onAttach()` |
+| `bool` | `initialize()` | 创建窗口、初始化 renderer 与 task system |
 | `void` | `run()` | 启动主循环 |
 | `void` | `close()` | 请求关闭应用 |
-| `ImGuiLayer*` | `getImGuiLayer() const` | 获取 ImGui 层 |
-| `VulkanRenderer&` | `getRenderer()` | 获取渲染器 |
-| `bool` | `isInitialized() const` | 判断初始化是否成功 |
-| `static Application&` | `get()` | 获取全局应用实例 |
+| `void` | `pushLayer(std::unique_ptr<Layer> layer)` | 添加普通层并调用 `onAttach()` |
+| `void` | `pushOverlay(std::unique_ptr<Layer> overlay)` | 添加 overlay 并调用 `onAttach()` |
+| `ImGuiLayer*` | `getImGuiLayer() const` | 获取当前 ImGui 层 |
+| `Timestep` | `getTimestep() const` | 获取上一帧时间步长 |
+| `bool` | `isInitialized() const` | 查询初始化状态 |
+| `VulkanRenderer&` | `getRenderer()` | 获取 renderer |
+| `TaskSystem&` | `getTaskSystem()` | 获取 task system |
+| `static Application&` | `get()` | 获取当前全局应用实例 |
+| `bool` | `enableImGui(bool enable_multi_viewport = false)` | 在初始化前后启用 ImGui |
 
 ### 方法详细说明
 
-#### `run()`
+#### `initialize()`
 
-这是模板方法模式的核心实现。它完成:
+`initialize()` 的职责是:
 
-1. 调用 `onInit()`
-2. 进入 while 主循环
-3. 计算 `Timestep`
-4. 依次调用应用钩子和各层更新
-5. 开启 ImGui 帧
-6. 驱动渲染器执行一帧
-7. 收尾时调用 `onShutdown()`
+1. 初始化 `TaskSystem`
+2. 创建 `Window`
+3. 初始化 `VulkanRenderer`
+4. 根据配置启用 ImGui
 
 ```cpp
 class MyApp final : public luna::Application {
 public:
-    MyApp() : Application({ .m_name = "My App" }) {}
-
-protected:
-    void onInit() override {
-        pushLayer(std::make_unique<MyLayer>());
-    }
+    MyApp()
+        : Application(luna::ApplicationSpecification{
+              .m_name = "My App",
+              .m_window_width = 1280,
+              .m_window_height = 720,
+          })
+    {}
 };
 ```
+
+#### `run()`
+
+`run()` 固定了整个应用主循环骨架。  
+子类只通过 `onInit()`、`onUpdate()`、`onShutdown()` 这几个钩子插入行为。
 
 ## 类名: `luna::Layer`
 
 - **继承/实现**: 无
-- **简述**: 业务逻辑层的统一接口。
+- **简述**: LayerStack 中的统一逻辑单元接口。
 
 ### 属性 (Properties)
 
 | 类型 | 名称 | 默认值 | 描述 |
 | --- | --- | --- | --- |
-| `std::string` | `m_name` | `"Layer"` | 当前 Layer 的逻辑名称 |
+| `std::string` | `m_name` | `"Layer"` | 层名称 |
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `onAttach()` | 层被挂载时调用 |
-| `void` | `onDetach()` | 层被移除时调用 |
-| `void` | `onUpdate(Timestep dt)` | 每帧更新 |
+| `void` | `onAttach()` | 层挂载时调用 |
+| `void` | `onDetach()` | 层卸载时调用 |
+| `void` | `onUpdate(Timestep dt)` | 每帧逻辑更新 |
 | `void` | `onEvent(Event& event)` | 事件回调 |
-| `void` | `onImGuiRender()` | ImGui 绘制 |
-| `void` | `onRender()` | 渲染阶段逻辑 |
-| `const std::string&` | `getName() const` | 获取名称 |
+| `void` | `onImGuiRender()` | ImGui UI 绘制 |
+| `void` | `onRender()` | 渲染阶段逻辑钩子 |
+| `const std::string&` | `getName() const` | 获取层名 |
 
 ### 方法详细说明
 
 #### `onImGuiRender()`
 
-用于绘制本层的编辑器或调试 UI:
-
 ```cpp
-void onImGuiRender() override {
-    ImGui::Begin("Stats");
-    ImGui::TextUnformatted("Hello from a custom layer.");
-    ImGui::End();
-}
+class StatsLayer final : public luna::Layer {
+public:
+    StatsLayer() : Layer("StatsLayer") {}
+
+    void onImGuiRender() override
+    {
+        ImGui::Begin("Stats");
+        ImGui::TextUnformatted("Hello from Luna.");
+        ImGui::End();
+    }
+};
 ```
 
-## 类名: `luna::VulkanRenderer`
+## 类名: `luna::ServiceRegistry`
 
 - **继承/实现**: 无
-- **简述**: 引擎侧渲染入口，负责 Vulkan 上下文初始化、RenderGraph 构建与每帧执行。
-
-### 属性 (Properties)
-
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `Window*` | `m_window` | `nullptr` | 绑定窗口 |
-| `GLFWwindow*` | `m_native_window` | `nullptr` | 原生 GLFW 句柄 |
-| `std::unique_ptr<VulkanContext>` | `m_context` | `nullptr` | Vulkan 上下文 |
-| `std::unique_ptr<RenderGraph>` | `m_render_graph` | `nullptr` | 当前渲染图 |
-| `Camera` | `m_main_camera` | 默认构造 | 主摄像机 |
-| `glm::vec4` | `m_clear_color` | `(0.10, 0.10, 0.12, 1.0)` | 清屏颜色 |
+- **简述**: 按类型索引共享服务对象的轻量服务容器。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `bool` | `init(Window& window)` | 初始化渲染器 |
-| `void` | `shutdown()` | 释放渲染器资源 |
-| `void` | `requestResize()` | 请求交换链重建 |
-| `void` | `startFrame()` | 启动一帧 |
-| `void` | `renderFrame()` | 执行 RenderGraph 并 present |
-| `void` | `endFrame()` | 结束一帧 |
-| `bool` | `isInitialized() const` | 判断渲染器是否初始化 |
-| `bool` | `isRenderingEnabled() const` | 判断当前帧是否可渲染 |
-| `Camera&` | `getMainCamera()` | 访问主摄像机 |
-| `glm::vec4&` | `getClearColor()` | 访问清屏颜色 |
+| `Service&` | `emplace< Service >(Args&&...)` | 原位构造并注册服务 |
+| `Interface&` | `emplaceAs< Interface, Service >(Args&&...)` | 以接口类型注册派生服务 |
+| `Service&` | `add(std::shared_ptr<Service> service)` | 注册已有共享对象 |
+| `bool` | `has< Service >() const` | 判断服务是否已注册 |
+| `Service&` | `get< Service >() const` | 获取服务实例 |
 
 ### 方法详细说明
 
-#### `init(Window& window)`
+```cpp
+auto& services = registry.services();
+services.emplace<MyProjectService>(project_path);
 
-该方法会:
+if (services.has<MyProjectService>()) {
+    auto& project = services.get<MyProjectService>();
+}
+```
 
-1. 查询 GLFW 所需 Vulkan 实例扩展
-2. 创建 `VulkanContext`
-3. 创建窗口 Surface
-4. 初始化虚拟帧和交换链
-5. 设置主摄像机默认位置
-6. 构建默认 RenderGraph
+## 类名: `luna::PluginRegistry`
+
+- **继承/实现**: 无
+- **简述**: 插件注册阶段的核心扩展入口。
+
+### 属性 (Properties)
+
+| 类型 | 名称 | 默认值 | 描述 |
+| --- | --- | --- | --- |
+| `bool` | `m_imgui_requested` | `false` | 是否有插件请求启用 ImGui |
+| `bool` | `m_enable_multi_viewport` | `false` | 是否请求启用多视口 |
+| `std::vector<LayerContribution>` | `m_layers` | 空 | Layer / Overlay 贡献列表 |
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `ServiceRegistry&` | `services()` | 获取服务容器 |
+| `bool` | `hasEditorRegistry() const` | 判断当前宿主是否提供 editor registry |
+| `void` | `requestImGui(bool enable_multi_viewport = false)` | 请求启用 ImGui |
+| `bool` | `isImGuiRequested() const` | 查询 ImGui 请求状态 |
+| `bool` | `requestsMultiViewport() const` | 查询多视口请求状态 |
+| `editor::EditorRegistry&` | `editor()` | 获取 editor registry |
+| `void` | `addLayer(std::string id, LayerFactory factory)` | 注册普通层 |
+| `void` | `addOverlay(std::string id, LayerFactory factory)` | 注册 overlay |
+| `const std::vector<LayerContribution>&` | `layers() const` | 获取当前所有 layer 贡献 |
+
+### 方法详细说明
+
+#### `requestImGui()`
+
+```cpp
+extern "C" void luna_register_my_plugin(luna::PluginRegistry& registry)
+{
+    registry.requestImGui();
+}
+```
+
+#### 当前能力边界
+
+`PluginRegistry` 当前主要负责:
+
+- Layer / Overlay
+- ImGui request
+- editor registry access
+- service access
+
+它当前**不负责**:
+
+- RenderGraph builder 注入
+- RenderPass registry
+- Asset importer registry
+
+## 类名: `luna::editor::EditorRegistry`
+
+- **继承/实现**: 无
+- **简述**: editor shell 的 panel 与 command 注册表。
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `void` | `addPanel(std::string id, std::string display_name, PanelFactory factory, bool open_by_default = true)` | 注册 panel |
+| `void` | `addPanel<PanelT>(std::string id, std::string display_name, bool open_by_default = true)` | 注册默认构造 panel |
+| `void` | `addCommand(std::string id, std::string display_name, CommandCallback callback)` | 注册命令 |
+| `bool` | `invokeCommand(const std::string& id) const` | 触发命令 |
+| `const std::vector<PanelRegistration>&` | `panels() const` | 获取 panel 定义 |
+| `const std::vector<CommandRegistration>&` | `commands() const` | 获取命令定义 |
+
+### 方法详细说明
+
+```cpp
+registry.editor().addPanel<MyPanel>("my.panel", "My Panel", true);
+registry.editor().addCommand("my.reset", "Reset Something", [] {
+    // do reset
+});
+```
+
+## 类名: `luna::editor::EditorPanel`
+
+- **继承/实现**: 无
+- **简述**: editor panel 的最小生命周期接口。
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `void` | `onAttach()` | 面板创建后调用 |
+| `void` | `onDetach()` | 面板销毁前调用 |
+| `void` | `onImGuiRender()` | 面板内容绘制 |
+
+## 类名: `luna::editor::EditorShellLayer`
+
+- **继承/实现**: `luna::Layer`
+- **简述**: 把 `EditorRegistry` 中注册的 panel 与 command 变成实际 UI 的承载层。
+
+### 属性 (Properties)
+
+| 类型 | 名称 | 默认值 | 描述 |
+| --- | --- | --- | --- |
+| `EditorRegistry&` | `m_registry` | 构造传入 | 当前 editor registry |
+| `std::vector<PanelInstance>` | `m_panels` | 空 | 当前已实例化 panel 列表 |
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `void` | `onAttach()` | 根据 registry 创建 panel 实例 |
+| `void` | `onDetach()` | 释放 panel 实例 |
+| `void` | `onImGuiRender()` | 渲染主菜单栏与所有已打开 panel |
+
+## 类名: `luna::VulkanRenderer`
+
+- **继承/实现**: 无
+- **简述**: 渲染入口对象，持有 `VulkanContext`、活动 `RenderGraph` 与主摄像机。
+
+### 属性 (Properties)
+
+| 类型 | 名称 | 默认值 | 描述 |
+| --- | --- | --- | --- |
+| `Camera` | `m_main_camera` | 默认构造 | 当前主摄像机 |
+| `glm::vec4` | `m_clear_color` | `(0.10, 0.10, 0.12, 1.0)` | 当前 clear color |
+| `bool` | `m_imgui_enabled` | `false` | 是否启用 ImGui pass |
+| `bool` | `m_resize_requested` | `false` | 是否等待处理 resize |
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `bool` | `init(Window& window, InitializationOptions options = {})` | 初始化 renderer |
+| `void` | `shutdown()` | 销毁 renderer 资源 |
+| `bool` | `isInitialized() const` | 查询初始化状态 |
+| `bool` | `isRenderingEnabled() const` | 查询当前帧是否可渲染 |
+| `bool` | `isImGuiEnabled() const` | 查询是否启用 ImGui pass |
+| `void` | `requestResize()` | 请求下一帧处理 resize |
+| `bool` | `isResizeRequested() const` | 查询 resize 标记 |
+| `void` | `setImGuiEnabled(bool enabled)` | 打开或关闭 ImGui pass |
+| `void` | `startFrame()` | 开始一帧 |
+| `void` | `renderFrame()` | 执行 RenderGraph |
+| `void` | `endFrame()` | 结束一帧 |
+| `GLFWwindow*` | `getNativeWindow() const` | 获取原生窗口句柄 |
+| `const vk::RenderPass&` | `getImGuiRenderPass() const` | 获取 ImGui render pass |
+| `Camera&` | `getMainCamera()` | 获取主摄像机 |
+| `glm::vec4&` | `getClearColor()` | 获取 clear color |
+
+### 方法详细说明
+
+#### `InitializationOptions`
+
+`VulkanRenderer::InitializationOptions` 当前最重要的字段是:
+
+| 类型 | 名称 | 描述 |
+| --- | --- | --- |
+| `RenderGraphBuilderCallback` | `m_render_graph_builder` | 在初始化阶段自定义活动 RenderGraph |
 
 #### `renderFrame()`
-
-当前实现会执行整张图并把输出图像 blit 到交换链图像:
 
 ```cpp
 auto& commands = m_context->GetCurrentCommandBuffer();
@@ -149,229 +313,168 @@ m_render_graph->Present(
     m_context->AcquireCurrentSwapchainImage(luna::val::ImageUsage::TRANSFER_DISTINATION));
 ```
 
+#### 重要说明
+
+当前 `VulkanRenderer` 对 renderer 自定义的正式入口是初始化阶段。  
+因此它更适合由宿主 `Application` 子类接入，而不是由当前插件系统动态替换。
+
 ## 类名: `luna::val::RenderGraphBuilder`
 
 - **继承/实现**: 无
-- **简述**: 按声明式方式构建 RenderGraph，并自动推导附件分配和资源屏障。
-
-### 属性 (Properties)
-
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `std::vector<RenderPassReference>` | `renderPassReferences` | 空 | Pass 注册表 |
-| `std::string` | `outputName` | 空字符串 | 最终输出附件名 |
+- **简述**: 根据 pass 声明构建 `RenderGraph` 的构建器。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `RenderGraphBuilder&` | `AddRenderPass(const std::string& name, std::unique_ptr<RenderPass> renderPass)` | 注册一个 pass |
+| `RenderGraphBuilder&` | `AddRenderPass(const std::string& name, std::unique_ptr<RenderPass> renderPass)` | 注册 pass |
 | `RenderGraphBuilder&` | `SetOutputName(const std::string& name)` | 指定最终输出附件 |
-| `std::unique_ptr<RenderGraph>` | `Build()` | 构建执行图 |
+| `std::unique_ptr<RenderGraph>` | `Build()` | 构建可执行图 |
 
 ### 方法详细说明
 
-#### `Build()`
+```cpp
+luna::val::RenderGraphBuilder builder;
+builder
+    .AddRenderPass("main", std::make_unique<MyPass>())
+    .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
+    .SetOutputName("scene_color");
 
-这是渲染架构的关键入口。它会:
-
-1. 调用每个 pass 的 `SetupPipeline()`
-2. 收集 descriptor 依赖并补全资源依赖
-3. 计算所有资源的初始/最终 usage
-4. 分配附件图像
-5. 构建原生 RenderPass、Framebuffer、Pipeline
-6. 生成 pipeline barrier 回调
-7. 产出 `RenderGraph`
+auto graph = builder.Build();
+```
 
 ## 类名: `luna::val::RenderGraph`
 
 - **继承/实现**: 无
-- **简述**: 执行已经构建完成的图，串联每个节点的资源解析、屏障、pass 执行与呈现。
-
-### 属性 (Properties)
-
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `std::vector<RenderGraphNode>` | `nodes` | 构造传入 | 图节点 |
-| `std::unordered_map<std::string, Image>` | `attachments` | 构造传入 | 命名附件表 |
-| `std::string` | `outputName` | 构造传入 | 最终输出附件 |
+- **简述**: 已完成构建的渲染执行图。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `Execute(CommandBuffer& commandBuffer)` | 执行所有 pass |
-| `void` | `Present(CommandBuffer& commandBuffer, const Image& presentImage)` | 执行最终呈现 |
-| `const RenderGraphNode&` | `GetNodeByName(const std::string& name) const` | 按名称取节点 |
-| `const Image&` | `GetAttachmentByName(const std::string& name) const` | 按名称取附件 |
+| `void` | `Execute(CommandBuffer& commandBuffer)` | 执行所有图节点 |
+| `void` | `Present(CommandBuffer& commandBuffer, const Image& presentImage)` | 把输出附件呈现到交换链图像 |
+| `const RenderGraphNode&` | `GetNodeByName(const std::string& name) const` | 按名称获取节点 |
+| `RenderGraphNode&` | `GetNodeByName(const std::string& name)` | 按名称获取可写节点 |
+| `const Image&` | `GetAttachmentByName(const std::string& name) const` | 获取命名附件 |
+
+## 类名: `luna::val::RenderPass`
+
+- **继承/实现**: 抽象基类
+- **简述**: RenderGraph 中单个渲染/计算通道的逻辑接口。
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `void` | `SetupPipeline(PipelineState state)` | 声明附件、依赖、shader、descriptor |
+| `void` | `ResolveResources(ResolveState resolve)` | 解析命名资源 |
+| `void` | `BeforeRender(RenderPassState state)` | pass 开始前钩子 |
+| `void` | `OnRender(RenderPassState state)` | 真正记录绘制或计算命令 |
+| `void` | `AfterRender(RenderPassState state)` | pass 结束后钩子 |
+
+### 方法详细说明
+
+```cpp
+class MyPass final : public luna::val::RenderPass {
+public:
+    void SetupPipeline(luna::val::PipelineState pipeline) override
+    {
+        pipeline.DeclareAttachment("scene_color", luna::val::Format::R8G8B8A8_UNORM, 0, 0);
+        pipeline.AddOutputAttachment("scene_color", luna::val::ClearColor{0, 0, 0, 1});
+    }
+};
+```
 
 ## 类名: `luna::val::VulkanContext`
 
 - **继承/实现**: 无
-- **简述**: Vulkan 实例、设备、交换链、队列、描述符池、虚拟帧和即时命令提交的中心对象。
-
-### 属性 (Properties)
-
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `vk::Instance` | `instance` | 空 | Vulkan 实例 |
-| `vk::Device` | `device` | 空 | 逻辑设备 |
-| `vk::SwapchainKHR` | `swapchain` | 空 | 交换链 |
-| `DescriptorCache` | `descriptorCache` | 默认构造 | descriptor 池与布局分配器 |
-| `VirtualFrameProvider` | `virtualFrames` | 默认构造 | 多帧并行资源容器 |
+- **简述**: Vulkan 实例、逻辑设备、交换链、命令池、descriptor cache 与虚拟帧的中心对象。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options)` | 完成设备与交换链初始化 |
+| `void` | `InitializeContext(const WindowSurface& surface, const ContextInitializeOptions& options)` | 创建设备与交换链 |
 | `void` | `RecreateSwapchain(uint32_t surfaceWidth, uint32_t surfaceHeight)` | 重建交换链 |
-| `void` | `StartFrame()` | 开始虚拟帧 |
-| `void` | `EndFrame()` | 结束虚拟帧 |
-| `CommandBuffer&` | `GetCurrentCommandBuffer()` | 获取当前帧命令缓冲 |
-| `StageBuffer&` | `GetCurrentStageBuffer()` | 获取当前帧暂存缓冲 |
+| `void` | `StartFrame()` | 开始当前虚拟帧 |
+| `void` | `EndFrame()` | 提交并结束当前虚拟帧 |
+| `bool` | `IsRenderingEnabled() const` | 查询渲染开关 |
 | `const Image&` | `AcquireCurrentSwapchainImage(ImageUsage::Bits usage)` | 获取当前交换链图像 |
-| `DescriptorCache&` | `GetDescriptorCache()` | 获取 descriptor 缓存 |
+| `CommandBuffer&` | `GetCurrentCommandBuffer()` | 获取当前命令缓冲 |
+| `StageBuffer&` | `GetCurrentStageBuffer()` | 获取当前 stage buffer |
+| `DescriptorCache&` | `GetDescriptorCache()` | 获取 descriptor cache |
+| `const vk::Device&` | `GetDevice() const` | 获取逻辑设备 |
+| `uint32_t` | `GetAPIVersion() const` | 获取 Vulkan API 版本 |
 
-## 类名: `luna::val::RenderPass`
+## 类名: `luna::TaskSystem`
 
-- **继承/实现**: 基类接口
-- **简述**: 声明渲染/计算通道行为的抽象接口。
+- **继承/实现**: 无
+- **简述**: 基于 enkiTS 的任务系统包装器，支持 worker / IO / main-thread 目标和任务依赖。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `SetupPipeline(PipelineState state)` | 声明附件、依赖、Shader、descriptor |
-| `void` | `ResolveResources(ResolveState resolve)` | 将逻辑资源名解析为运行时资源 |
-| `void` | `BeforeRender(RenderPassState state)` | 开始 pass 前钩子 |
-| `void` | `OnRender(RenderPassState state)` | 真正记录绘制/Dispatch 命令 |
-| `void` | `AfterRender(RenderPassState state)` | pass 收尾钩子 |
+| `bool` | `initialize(const TaskSystemConfig& config = {})` | 初始化任务系统 |
+| `void` | `shutdown()` | 关闭任务系统 |
+| `bool` | `isInitialized() const` | 查询状态 |
+| `TaskHandle` | `submit(std::function<void()> function, TaskSubmitDesc desc = {}, std::initializer_list<TaskHandle> dependencies = {})` | 提交普通任务 |
+| `TaskHandle` | `submitParallel(std::function<void(enki::TaskSetPartition, uint32_t)> function, TaskSubmitDesc desc, std::initializer_list<TaskHandle> dependencies = {})` | 提交并行任务 |
+| `TaskHandle` | `whenAll(std::initializer_list<TaskHandle> dependencies)` | 组合依赖任务 |
+| `void` | `waitForAll()` | 等待所有任务完成 |
+| `void` | `waitForTask(const enki::ICompletable* task)` | 等待底层 enki task |
+| `bool` | `submitIOJob(enki::IPinnedTask* task)` | 提交 IO pinned job |
+| `bool` | `submitMainThreadJob(enki::IPinnedTask* task)` | 提交主线程 pinned job |
+| `ExternalThreadScope` | `registerExternalThread()` | 为外部线程注册 task system 上下文 |
 
 ### 方法详细说明
 
 ```cpp
-void SetupPipeline(PipelineState pipeline) override {
-    pipeline.DeclareAttachment("scene_color", Format::R8G8B8A8_UNORM, 0, 0);
-    pipeline.AddOutputAttachment("scene_color", ClearColor{0, 0, 0, 1});
-}
+auto& tasks = luna::Application::get().getTaskSystem();
+
+auto load = tasks.submit([] {
+    // background work
+});
+
+auto finalize = load.then(tasks, [] {
+    // execute after load
+});
+
+finalize.wait(tasks);
 ```
 
-## 类名: `luna::val::CommandBuffer`
+## 类名: `luna::TaskHandle`
 
 - **继承/实现**: 无
-- **简述**: 对原生 `vk::CommandBuffer` 的轻量封装。
+- **简述**: 代表一个可等待、可组合的异步任务句柄。
 
 ### 方法 (Methods)
 
 | 返回类型 | 方法名(参数列表) | 描述 |
 | --- | --- | --- |
-| `void` | `Begin()` | 开始记录 |
-| `void` | `End()` | 结束记录 |
-| `void` | `BeginPass(const PassNative& renderPass)` | 开始 render pass |
-| `void` | `EndPass(const PassNative& renderPass)` | 结束 render pass |
-| `void` | `Draw(...)` | 非索引绘制 |
-| `void` | `DrawIndexed(...)` | 索引绘制 |
-| `void` | `Dispatch(uint32_t x, uint32_t y, uint32_t z)` | 计算着色器调度 |
-| `void` | `CopyBuffer(...)` | Buffer 拷贝 |
-| `void` | `CopyBufferToImage(...)` | 上传图片 |
-| `void` | `BlitImage(...)` | 图像 blit |
-| `void` | `GenerateMipLevels(...)` | 生成 mipmap |
-| `void` | `TransferLayout(...)` | 图像 layout 变更 |
+| `bool` | `isValid() const` | 句柄是否有效 |
+| `bool` | `isComplete() const` | 是否已完成 |
+| `bool` | `hasFailed() const` | 是否失败 |
+| `TaskStatus` | `status() const` | 查询状态 |
+| `void` | `wait(TaskSystem& task_system) const` | 阻塞等待 |
+| `TaskHandle` | `then(TaskSystem& task_system, std::function<void()> function, TaskSubmitDesc desc = {}) const` | 在当前任务之后再提交一个任务 |
+| `TaskHandle` | `thenParallel(TaskSystem& task_system, std::function<void(enki::TaskSetPartition, uint32_t)> function, TaskSubmitDesc desc) const` | 在当前任务之后提交并行任务 |
 
-## 类名: `luna::val::DescriptorBinding`
+## 当前 API 参考的使用建议
 
-- **继承/实现**: 无
-- **简述**: 把资源名字和 descriptor binding 规则连接起来，并在每帧写入 descriptor set。
+### 什么时候看 Reference，什么时候看 Manual
 
-### 属性 (Properties)
+| 需求 | 更适合看哪里 |
+| --- | --- |
+| 想知道整体链路与职责边界 | `manual/` |
+| 想知道某个类有哪些方法 | `reference/` |
+| 想知道当前插件能不能做某件事 | `plugins/` |
 
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `ResolveOptions` | `options` | `RESOLVE_EACH_FRAME` | descriptor 写入策略 |
+### 当前最重要的 API 事实
 
-### 方法 (Methods)
-
-| 返回类型 | 方法名(参数列表) | 描述 |
-| --- | --- | --- |
-| `DescriptorBinding&` | `Bind(uint32_t binding, const std::string& name, UniformType type)` | 绑定命名 Buffer 或 Image |
-| `DescriptorBinding&` | `Bind(uint32_t binding, const std::string& name, const Sampler& sampler, UniformType type)` | 绑定命名 Image + Sampler |
-| `DescriptorBinding&` | `Bind(uint32_t binding, const Sampler& sampler, UniformType type)` | 绑定纯 Sampler |
-| `void` | `SetOptions(ResolveOptions options)` | 设置 descriptor 写入策略 |
-| `void` | `Resolve(const ResolveInfo& resolveInfo)` | 解析命名资源 |
-| `void` | `Write(const vk::DescriptorSet& descriptorSet)` | 把解析结果写入 descriptor set |
-
-### 方法详细说明
-
-```cpp
-binding.Bind(0, "scene_color", UniformType::SAMPLED_IMAGE);
-resolve.Resolve("scene_color", image);
-binding.Resolve(resolve);
-binding.Write(descriptorSet);
-```
-
-## 类名: `luna::val::ShaderLoader`
-
-- **继承/实现**: 无
-- **简述**: 负责着色器编译、SPIR-V 读取和反射。
-
-### 方法 (Methods)
-
-| 返回类型 | 方法名(参数列表) | 描述 |
-| --- | --- | --- |
-| `ShaderData` | `LoadFromSourceFile(const std::string& filepath, ShaderType type, ShaderLanguage language)` | 从源码文件编译并反射 |
-| `ShaderData` | `LoadFromBinaryFile(const std::string& filepath)` | 从 SPIR-V 文件读取并反射 |
-| `ShaderData` | `LoadFromBinary(std::vector<uint32_t> bytecode)` | 从内存中的 SPIR-V 反射 |
-| `ShaderData` | `LoadFromSource(const std::string& code, ShaderType type, ShaderLanguage language)` | 从源码字符串编译并反射 |
-
-## 类名: `luna::val::ModelLoader`
-
-- **继承/实现**: 无
-- **简述**: 负责 OBJ 与 glTF/GLB 模型导入。
-
-### 方法 (Methods)
-
-| 返回类型 | 方法名(参数列表) | 描述 |
-| --- | --- | --- |
-| `ModelData` | `LoadFromObj(const std::string& filepath)` | 导入 OBJ |
-| `ModelData` | `LoadFromGltf(const std::string& filepath)` | 导入 glTF/GLB |
-| `ModelData` | `Load(const std::string& filepath)` | 按扩展名自动选择导入器 |
-
-## 类名: `luna::val::ImageLoader`
-
-- **继承/实现**: 无
-- **简述**: 负责普通图片、DDS、zlib 包装 DDS 以及立方体贴图读取。
-
-### 方法 (Methods)
-
-| 返回类型 | 方法名(参数列表) | 描述 |
-| --- | --- | --- |
-| `ImageData` | `LoadImageFromFile(const std::string& filepath)` | 从文件加载图片 |
-| `ImageData` | `LoadImageFromMemory(const uint8_t* data, std::size_t size, const std::string& mimeType = {})` | 从内存加载图片 |
-| `CubemapData` | `LoadCubemapImageFromFile(const std::string& filepath)` | 从单张十字排布图片生成 cubemap |
-
-## 类名: `luna::ImGuiLayer`
-
-- **继承/实现**: `luna::Layer`
-- **简述**: 管理 ImGui 生命周期、DockSpace、多视口以及事件拦截。
-
-### 属性 (Properties)
-
-| 类型 | 名称 | 默认值 | 描述 |
-| --- | --- | --- | --- |
-| `bool` | `m_block_events` | `true` | 是否阻止 ImGui 捕获到的事件继续下发 |
-| `bool` | `m_attached` | `false` | ImGui 是否已初始化 |
-| `bool` | `m_enable_multi_viewport` | `false` | 是否启用多视口 |
-
-### 方法 (Methods)
-
-| 返回类型 | 方法名(参数列表) | 描述 |
-| --- | --- | --- |
-| `void` | `onAttach()` | 初始化 ImGui |
-| `void` | `onDetach()` | 销毁 ImGui |
-| `void` | `onEvent(Event& event)` | 处理事件捕获 |
-| `void` | `begin()` | 开启 ImGui 帧 |
-| `void` | `end()` | 结束逻辑帧 |
-| `void` | `renderPlatformWindows()` | 渲染平台窗口 |
-| `void` | `blockEvents(bool block)` | 开关事件拦截 |
-| `bool` | `isInitialized() const` | 判断初始化状态 |
+- `Application` 是宿主骨架
+- `PluginRegistry` 是当前插件正式扩展入口
+- `EditorRegistry` 是 editor 扩展点容器
+- `VulkanRenderer` 是宿主控制的渲染器
+- `RenderGraphBuilder` 是当前自定义渲染图的正式入口，但主要由宿主使用

@@ -41,6 +41,22 @@ public:
         return m_editor_registry != nullptr;
     }
 
+    void requestImGui(bool enable_multi_viewport = false)
+    {
+        m_imgui_requested = true;
+        m_enable_multi_viewport = m_enable_multi_viewport || enable_multi_viewport;
+    }
+
+    bool isImGuiRequested() const
+    {
+        return m_imgui_requested;
+    }
+
+    bool requestsMultiViewport() const
+    {
+        return m_enable_multi_viewport;
+    }
+
     editor::EditorRegistry& editor();
     const editor::EditorRegistry& editor() const;
 
@@ -58,6 +74,8 @@ private:
 private:
     ServiceRegistry& m_services;
     editor::EditorRegistry* m_editor_registry = nullptr;
+    bool m_imgui_requested = false;
+    bool m_enable_multi_viewport = false;
     std::vector<LayerContribution> m_layers;
 };
 

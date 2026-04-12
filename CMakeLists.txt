@@ -71,5 +71,5 @@ add_subdirectory(third_party/SPIRV-Cross EXCLUDE_FROM_ALL)
 
 add_subdirectory(Luna)
 add_subdirectory(Editor)
-add_subdirectory(Runtime)
+add_subdirectory(App)
 add_subdirectory(samples)

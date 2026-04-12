@@ -1,241 +1,211 @@
 # 编写你的第一个 Luna 插件
 
-## 1. 先明确当前适用范围
+> **提示 (Note):**
+> 本文档讲的是“按当前仓库状态，写一个真正能工作的插件”。
+> 目标不是抽象讲插件理论，而是把你从目录创建、manifest、CMake、注册函数一路带到能在 `LunaApp` 里看到结果。
 
-本文档讨论的是“按 Luna 当前代码状态写一个可工作的插件”。
+## 1. 先选一个合适的插件目标
 
-这意味着:
+如果你是第一次写 Luna 插件，最推荐的入门目标不是渲染主路径，而是下面三类:
 
-- 插件以源码形式存在于工作区
-- 你通过 Bundle 启用它
-- 你运行 `python Tools/luna/sync.py` 生成中间文件
-- 你再通过 CMake 编译整个宿主
+| 插件类型 | 当前推荐度 | 说明 |
+| --- | --- | --- |
+| Editor Panel | 很高 | 最容易验证，也最能体现插件装配价值 |
+| Editor Command | 很高 | 逻辑简单，生命周期最清晰 |
+| Runtime Layer | 高 | 适合做运行时行为与交互演示 |
 
-当前最适合写的插件类型是:
+当前**不推荐**把第一个插件做成:
 
-- 编辑器 Panel 插件
-- 编辑器 Command 插件
-- 提供 Layer / Overlay 的插件
-- 运行时 Layer 插件
-
-仓库里当前已经有两个可直接参考的示例插件:
-
-- `Plugins/builtin/luna.example.hello`
-- `Plugins/builtin/luna.example.imgui_demo`
-
-如果你想看 runtime host 下的最小插件，也可以直接打开:
-
-- `Plugins/builtin/luna.runtime.core`
-
-当前不建议你一开始就写:
-
+- RenderGraph 深度注入插件
+- RenderPass 注入插件
 - 远程下载插件
 - 二进制插件
-- RenderGraph 深度注入插件
-- Asset importer / project template 的复杂插件
 
-因为这些扩展点还没有完整落地。
+原因很简单: 这些扩展点当前还没有正式协议。
 
-## 2. 当前推荐的最小目标
+## 2. 本文示例会做什么
 
-如果你是第一次给 Luna 写插件，建议目标定成:
+本文会带你做一个最小 editor panel 插件:
 
-> 给编辑器增加一个新 Panel，或者给编辑器增加一个 Command
+- 插件 id: `com.example.hello_panel`
+- 贡献一个 `Hello Panel`
+- 加入 editor bundle
+- 通过 `build.py` 编译
+- 启动后在 editor shell 中看到面板
 
-这是当前代码里最稳定、最容易成功、最能体现插件系统价值的路径。
+```mermaid
+flowchart LR
+    A[创建插件目录] --> B[写 luna.plugin.toml]
+    B --> C[写 CMakeLists.txt]
+    C --> D[实现 Panel 与注册函数]
+    D --> E[加入 Bundle]
+    E --> F[运行 build.py]
+    F --> G[在 LunaApp 中看到面板]
+```
 
-## 3. 你需要准备什么
+## 3. 先理解一条现实边界
 
-至少需要:
+Panel 插件要真正显示出来，需要的不只是 ImGui 本身，还需要 editor shell 负责承载窗口。
 
-- 一个插件目录
-- 一个 `luna.plugin.toml`
-- 一个 `CMakeLists.txt`
-- 一个注册函数
-- 至少一个具体贡献对象，例如 Panel 或 Layer
-- 一个启用了该插件的 Bundle
-- 一个支持 `tomllib` 的 Python 版本，建议 Python 3.11 或更新版本
+所以当前 editor panel 插件应当依赖:
 
-## 4. 当前最小目录模板
+- `luna.editor.shell`
 
-建议新插件先按这个结构起步:
+而不是只依赖:
+
+- `luna.imgui`
+
+`luna.imgui` 只是一个“请求启用 ImGui”的通用插件。  
+它本身不会替你创建 `Panels` 菜单，也不会替你实例化 `EditorPanel`。
+
+## 4. 创建目录结构
+
+建议先建成下面这样:
 
 ```text
 Plugins/
-└─ builtin/
-   └─ luna.example.hello/
+└─ external/
+   └─ com.example.hello_panel/
       ├─ luna.plugin.toml
       ├─ CMakeLists.txt
       └─ src/
-         ├─ HelloPlugin.cpp
          ├─ HelloPanel.h
-         └─ HelloPanel.cpp
+         ├─ HelloPanel.cpp
+         └─ HelloPanelPlugin.cpp
 ```
 
-如果你想做外部插件，也可以放到:
+如果你就是要做仓库内置插件，也可以放到 `Plugins/builtin/`。  
+但作为第一次练手，放进 `Plugins/external/` 更不容易和现有 builtin 插件混淆。
 
-```text
-Plugins/external/luna.example.hello
-```
+## 5. 编写 `luna.plugin.toml`
 
-当前 `sync.py` 会同时扫描 `builtin` 和 `external`。
-
-如果你想先看一个真实而不是文档里的模板，可以直接打开:
-
-- `Plugins/builtin/luna.example.hello`
-- `Plugins/builtin/luna.example.imgui_demo`
-
-## 5. 第一步: 写 `luna.plugin.toml`
-
-一个最小编辑器插件 manifest 可以写成这样:
+把 manifest 写成下面这样:
 
 ```toml
-id = "luna.example.hello"
-name = "Hello Plugin"
+id = "com.example.hello_panel"
+name = "Hello Panel"
 version = "0.1.0"
 sdk = "0.1"
 kind = "editor"
-cmake_target = "LunaExampleHelloPlugin"
-entry = "luna_register_luna_example_hello"
-hosts = ["editor"]
+cmake_target = "ComExampleHelloPanelPlugin"
+entry = "luna_register_com_example_hello_panel"
+hosts = ["app"]
 
 [dependencies]
+"luna.editor.shell" = "0.1"
 ```
 
-注意:
+### 5.1 逐字段说明
 
-- `luna.example.hello` 现在已经是仓库里的真实示例插件 id
-- 如果你在写自己的新插件，应当复制这个模板并改成你自己的唯一 id
+| 字段 | 作用 |
+| --- | --- |
+| `id` | 插件唯一标识，不能和仓库内任何其他插件重复 |
+| `name` | 显示用名字 |
+| `version` | 插件版本，当前主要写入 lock file |
+| `sdk` | 面向的 Luna SDK 版本，当前还没有严格兼容求解 |
+| `kind` | 插件类别，建议 editor 插件写 `editor` |
+| `cmake_target` | 插件静态库 target 名 |
+| `entry` | 插件入口函数名，必须和 C++ 代码保持一致 |
+| `hosts` | 当前宿主兼容列表；对当前仓库应写 `["app"]` |
+| `[dependencies]` | 依赖插件清单；这里依赖 `luna.editor.shell` |
 
-### 5.1 字段解释
+### 5.2 为什么依赖 `luna.editor.shell`
 
-- `id`
-  - 插件唯一标识
-  - 在整个工作区里必须唯一
+因为当前 panel 插件显示链路是:
 
-- `name`
-  - 给人看的名字
-  - 当前主要是元数据
+```mermaid
+graph TD
+    Plugin[你的 Panel 插件] --> EditorRegistry[EditorRegistry.addPanel]
+    ShellPlugin[luna.editor.shell] --> Overlay[EditorShellLayer]
+    EditorRegistry --> Overlay
+    Overlay --> Window[ImGui panel windows]
+```
 
-- `version`
-  - 插件版本
-  - 当前写入 lock file
+没有 `luna.editor.shell`，你的 panel 定义即使注册成功，也没有人负责把它变成真正的窗口。
 
-- `sdk`
-  - 目标 SDK 版本
-  - 当前还没有严格版本校验
-
-- `kind`
-  - 插件类别
-  - 当前更多是信息字段
-
-- `cmake_target`
-  - 插件的 CMake target 名称
-  - `sync.py` 会把它写进 `PluginList.cmake`
-
-- `entry`
-  - 插件注册函数名
-  - `sync.py` 会把它写进 `ResolvedPlugins.cpp`
-
-- `hosts`
-  - 允许该插件被哪些宿主使用
-  - 当前 `sync.py` 会根据 Bundle 的 `host` 做校验
-
-- `[dependencies]`
-  - 依赖的其他插件
-  - 当前 key 会参与依赖拓扑排序，value 只要求是字符串
-
-## 6. 第二步: 写插件的 `CMakeLists.txt`
-
-如果这是一个给当前编辑器宿主使用的插件，最小 CMake 可以写成这样:
+## 6. 编写 `CMakeLists.txt`
 
 ```cmake
 add_library(
-    LunaExampleHelloPlugin
+    ComExampleHelloPanelPlugin
     STATIC
     luna.plugin.toml
-    src/HelloPlugin.cpp
     src/HelloPanel.h
     src/HelloPanel.cpp
+    src/HelloPanelPlugin.cpp
 )
 
 target_include_directories(
-    LunaExampleHelloPlugin
+    ComExampleHelloPanelPlugin
     PUBLIC
         ${PROJECT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(
-    LunaExampleHelloPlugin
+    ComExampleHelloPanelPlugin
     PUBLIC
         LunaEditorFramework
 )
 ```
 
-### 6.1 为什么编辑器插件要链接 `LunaEditorFramework`
+### 6.1 为什么 editor 插件链接 `LunaEditorFramework`
 
-因为当前编辑器插件最常用到的接口都在这里:
+因为当前 editor 扩展协议都定义在这个框架库里，包括:
 
 - `EditorPanel`
 - `EditorRegistry`
-- `EditorShellLayer` 所依赖的扩展协议
+- `EditorShellLayer` 的运行时承载协议
 
-如果你只是写一个纯 Layer 插件，也通常仍然会链接 `LunaEditorFramework`，因为当前生成链路是挂在编辑器宿主上的。
+如果你写的是纯 runtime 插件，不依赖 editor 接口，那么链接 `LunaCore` 就够了。
 
-如果你写的是纯 runtime 插件，并且不依赖 `EditorRegistry` / `EditorPanel` 这些编辑器接口，那么直接链接 `LunaCore` 就够了。当前 `Plugins/builtin/luna.runtime.core` 就是这个模式。
+## 7. 实现 Panel 类
 
-## 7. 第三步: 写一个 Panel
-
-先定义一个最小 Panel:
+### 7.1 `HelloPanel.h`
 
 ```cpp
 #pragma once
 
 #include "Editor/EditorPanel.h"
 
-namespace luna::example {
+namespace example {
 
 class HelloPanel final : public luna::editor::EditorPanel {
 public:
     void onImGuiRender() override;
 };
 
-} // namespace luna::example
+} // namespace example
 ```
 
-然后实现它:
+### 7.2 `HelloPanel.cpp`
 
 ```cpp
 #include "HelloPanel.h"
 
 #include "imgui.h"
 
-namespace luna::example {
+namespace example {
 
 void HelloPanel::onImGuiRender()
 {
-    ImGui::TextUnformatted("Hello from plugin.");
+    ImGui::TextUnformatted("Hello from com.example.hello_panel");
 }
 
-} // namespace luna::example
+} // namespace example
 ```
 
-### 7.1 `EditorPanel` 的最小要求
+### 7.3 当前 `EditorPanel` 的最小生命周期
 
-当前 `EditorPanel` 很简单:
+| 方法 | 是否必须 | 作用 |
+| --- | --- | --- |
+| `onAttach()` | 可选 | 面板实例被创建后调用 |
+| `onDetach()` | 可选 | 面板销毁前调用 |
+| `onImGuiRender()` | 必须 | 绘制窗口内容 |
 
-- 可以覆写 `onAttach()`
-- 可以覆写 `onDetach()`
-- 必须实现 `onImGuiRender()`
+## 8. 实现插件注册函数
 
-如果你的 Panel 没有复杂状态，这个接口已经够用。
-
-## 8. 第四步: 写插件注册函数
-
-这是当前最重要的一步。
-
-你的插件必须提供一个和 manifest 里 `entry` 对应的函数，例如:
+### 8.1 `HelloPanelPlugin.cpp`
 
 ```cpp
 #include "HelloPanel.h"
@@ -243,319 +213,175 @@ void HelloPanel::onImGuiRender()
 #include "Editor/EditorRegistry.h"
 #include "Plugin/PluginRegistry.h"
 
-extern "C" void luna_register_luna_example_hello(luna::PluginRegistry& registry)
+extern "C" void luna_register_com_example_hello_panel(luna::PluginRegistry& registry)
 {
     if (!registry.hasEditorRegistry()) {
         return;
     }
 
-    auto& editor_registry = registry.editor();
-    editor_registry.addPanel<luna::example::HelloPanel>(
-        "luna.example.hello.panel",
-        "Hello",
+    registry.editor().addPanel<example::HelloPanel>(
+        "com.example.hello_panel.panel",
+        "Hello Panel",
         true);
 }
 ```
 
-### 8.1 为什么要用 `extern "C"`
+### 8.2 为什么要写 `extern "C"`
 
-当前 `sync.py` 只是把入口名按字符串写进生成文件。
+因为 `sync.py` 会把 manifest 里的 `entry` 直接写到 `ResolvedPlugins.cpp` 中。
 
 使用 `extern "C"` 的好处是:
 
 - 避免 C++ 名字改编
-- 入口名和 manifest 保持一一对应
-- 生成文件里更容易直接声明和调用
+- 入口名保持稳定
+- 和 generated 代码直接一一对应
 
-### 8.2 为什么不要依赖静态自动注册
+### 8.3 为什么要检查 `hasEditorRegistry()`
 
-当前 Luna 的方向是:
+当前 `LunaApp` 默认会创建 `EditorRegistry`，但这个检查仍然值得保留:
 
-- 插件注册顺序显式
-- 入口函数显式
-- 生成文件显式
+- 它表达了“这是 editor 扩展”的意图
+- 为后续更明确的宿主区分保留兼容空间
 
-这比靠静态全局对象构造自动注册更稳、更容易调试。
+## 9. 把插件加入 Bundle
 
-## 9. 第五步: 如果你要注册 Layer
-
-如果插件想注册一个普通 Layer，可以这样写:
-
-```cpp
-registry.addLayer("luna.example.runtime_layer", [] {
-    return std::make_unique<MyLayer>();
-});
-```
-
-如果想注册 Overlay:
-
-```cpp
-registry.addOverlay("luna.example.overlay", [] {
-    return std::make_unique<MyOverlayLayer>();
-});
-```
-
-### 9.1 当前 Layer 贡献的装配方式
-
-`EditorApp` 会在插件注册完成后遍历 `plugin_registry.layers()`，然后:
-
-- 如果是 `overlay`，调用 `pushOverlay()`
-- 否则调用 `pushLayer()`
-
-因此，插件不需要也不应该自己直接操纵宿主的主循环。
-
-## 10. 第六步: 把插件加入 Bundle
-
-你的插件不会自动生效。
-
-你必须把它加到某个 Bundle 的 `[plugins].enabled` 里。
-
-例如修改:
+编辑:
 
 ```text
 Bundles/EditorDefault/luna.bundle.toml
 ```
 
-让它变成:
+把你的插件 id 加进 `[plugins].enabled`:
 
 ```toml
 [plugins]
 enabled = [
+  "luna.editor.shell",
   "luna.editor.core",
   "luna.example.hello",
+  "luna.example.imgui_demo",
+  "com.example.hello_panel",
 ]
 ```
 
-如果你写的是 runtime 插件，就把它加入 runtime Bundle，例如:
+## 10. 生成并构建
 
-```text
-Bundles/RuntimeDefault/luna.bundle.toml
-```
-
-## 11. 第七步: 运行 `sync.py`
-
-在项目根目录执行:
+当前最推荐的方式是直接使用构建工具:
 
 ```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml --generated-dir Plugins/Generated/editor --lock-file luna.editor.lock
+python Tools\luna\build.py editor
 ```
 
-这一步当前必须手工执行。
+它会自动完成:
 
-如果你改了 Bundle 或任意插件 manifest，就要重新执行一次 `sync.py`，这样才会刷新:
+1. 解析 Bundle
+2. 扫描插件 manifest
+3. 生成 `PluginList.cmake`、`ResolvedPlugins.*`、`luna.lock`
+4. 配置 CMake
+5. 构建 `LunaApp`
 
-- `Plugins/Generated/editor/PluginList.cmake`
-- `Plugins/Generated/editor/ResolvedPlugins.h`
-- `Plugins/Generated/editor/ResolvedPlugins.cpp`
-- `luna.editor.lock`
-
-执行完成后，当前会生成:
-
-- `Plugins/Generated/editor/PluginList.cmake`
-- `Plugins/Generated/editor/ResolvedPlugins.h`
-- `Plugins/Generated/editor/ResolvedPlugins.cpp`
-- `luna.editor.lock`
-
-如果你在同步 runtime Bundle，对应命令是:
+### 10.1 如果你只想先验证生成
 
 ```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/RuntimeDefault/luna.bundle.toml --generated-dir Plugins/Generated/runtime --lock-file luna.runtime.lock
+python Tools\luna\build.py editor --sync-only
 ```
 
-### 11.1 如果你不运行 `sync.py` 会怎样
-
-如果你改了 Bundle 或 manifest，但没有重新运行 `sync.py`，那么:
-
-- 新插件不会被加入 `PluginList.cmake`
-- 新入口不会被写进 `ResolvedPlugins.cpp`
-- CMake 和运行时都看不到你的新插件
-
-这是当前最常见的错误之一。
-
-## 12. 第八步: 重新配置并编译
-
-当前默认建议流程:
+### 10.2 如果你坚持手工走底层流程
 
 ```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml --generated-dir Plugins/Generated/editor --lock-file luna.editor.lock
-cmake -S . -B build
-cmake --build build --config Debug --target LunaEditorApp
+python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.bundle.toml
+cmake -S . -B build -DLUNA_GENERATED_DIR="${PWD}/Plugins/Generated"
+cmake --build build --config Debug --target LunaApp
 ```
 
-如果你换了别的 Bundle，就把 `--bundle` 改成对应路径:
+## 11. 运行后怎么验证
+
+启动 editor profile:
 
 ```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/YourBundle/luna.bundle.toml --generated-dir Plugins/Generated/editor --lock-file luna.editor.lock
-cmake -S . -B build
-cmake --build build --config Debug --target LunaEditorApp
+.\build\profiles\editor\App\Debug\LunaApp.exe
 ```
 
-如果你要编 runtime 宿主，则使用:
+验证路径:
 
-```powershell
-python Tools\luna\sync.py --project-root . --bundle Bundles/RuntimeDefault/luna.bundle.toml --generated-dir Plugins/Generated/runtime --lock-file luna.runtime.lock
-cmake -S . -B build
-cmake --build build --config Debug --target LunaRuntimeApp
-```
+1. 看窗口顶部是否出现 editor 主菜单栏。
+2. 打开 `Panels` 菜单。
+3. 确认 `Hello Panel` 出现在列表中。
+4. 打开后确认窗口里显示 `Hello from com.example.hello_panel`。
 
-## 13. 第九步: 验证插件是否生效
+## 12. 如果你想做一个 Runtime Layer 插件
 
-如果你写的是 Panel 插件，最直接的验证方式是:
+Runtime 插件要简单得多，因为它不依赖 editor shell。
 
-- 启动编辑器
-- 查看菜单栏里的 `Panels`
-- 查看你的 Panel 是否出现
-
-如果你写的是 Command 插件:
-
-- 查看菜单栏里的 `Commands`
-- 点击后观察效果是否触发
-
-如果你写的是 Layer:
-
-- 看 Layer 的更新逻辑、渲染逻辑或日志是否生效
-
-## 14. 一个完整的最小示例
-
-下面这个插件只做一件事: 给编辑器增加一个 `Hello` 面板。
-
-### `luna.plugin.toml`
-
-```toml
-id = "luna.example.hello"
-name = "Hello Plugin"
-version = "0.1.0"
-sdk = "0.1"
-kind = "editor"
-cmake_target = "LunaExampleHelloPlugin"
-entry = "luna_register_luna_example_hello"
-hosts = ["editor"]
-
-[dependencies]
-```
-
-### `HelloPanel.h`
+### 12.1 最小注册函数
 
 ```cpp
-#pragma once
-
-#include "Editor/EditorPanel.h"
-
-namespace luna::example {
-
-class HelloPanel final : public luna::editor::EditorPanel {
-public:
-    void onImGuiRender() override;
-};
-
-} // namespace luna::example
-```
-
-### `HelloPanel.cpp`
-
-```cpp
-#include "HelloPanel.h"
-
-#include "imgui.h"
-
-namespace luna::example {
-
-void HelloPanel::onImGuiRender()
+extern "C" void luna_register_com_example_runtime(luna::PluginRegistry& registry)
 {
-    ImGui::TextUnformatted("Hello from luna.example.hello");
-}
-
-} // namespace luna::example
-```
-
-### `HelloPlugin.cpp`
-
-```cpp
-#include "HelloPanel.h"
-
-#include "Editor/EditorRegistry.h"
-#include "Plugin/PluginRegistry.h"
-
-extern "C" void luna_register_luna_example_hello(luna::PluginRegistry& registry)
-{
-    if (!registry.hasEditorRegistry()) {
-        return;
-    }
-
-    registry.editor().addPanel<luna::example::HelloPanel>(
-        "luna.example.hello.panel",
-        "Hello",
-        true);
+    registry.addLayer("com.example.runtime.layer", [] {
+        return std::make_unique<MyRuntimeLayer>();
+    });
 }
 ```
 
-## 15. 当前支持的插件写法模式
+### 12.2 什么时候适合写 Runtime Layer
 
-### 15.1 只注册 Panel
+适合:
 
-最简单、最推荐的入门方式。
+- 相机或输入逻辑
+- 调试动画
+- 运行时行为验证
+- clear color、相机位置、调试参数等状态修改
 
-### 15.2 只注册 Command
+## 13. 当前插件能碰 renderer 到什么程度
 
-适合做快捷功能或动作入口。
+### 13.1 当前可以做的
 
-### 15.3 注册 Layer
+插件里的 `Layer` / `Panel` 可以直接访问 renderer 状态:
 
-适合做大粒度运行时逻辑，例如:
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+auto& color = renderer.getClearColor();
+color.x = 0.2f;
+```
+
+这足够做:
 
 - 相机控制
-- 调试绘制
-- 大型工具层
+- clear color 调整
+- 读取 renderer 统计和状态
 
-### 15.4 Panel + Command + Layer 混合
+### 13.2 当前不要试图做的
 
-当前 builtin 插件 `luna.editor.core` 就是这种组合。
+不要把第一个插件写成下面这些东西:
 
-## 16. 当前最常见的错误
+- RenderGraph builder 注入
+- RenderPass 注册
+- 活动宿主 RenderGraph 替换
 
-### 16.1 `id` 重复
+因为当前正式注入点仍然在宿主 `Application` 初始化阶段，而不是插件注册阶段。
 
-如果两个插件用了相同 `id`，`sync.py` 会失败。
+## 14. 常见错误
 
-### 16.2 `entry` 和实际函数名不一致
+| 现象 | 原因 | 解决方式 |
+| --- | --- | --- |
+| `entry` 找不到 | manifest 与函数名不一致 | 让 `entry` 与 `extern "C"` 函数完全一致 |
+| 插件目录存在但没有生效 | 没加入 Bundle | 把插件 id 写进 `[plugins].enabled` |
+| Bundle 改了但构建还是旧的 | 没重新 sync | 重新运行 `build.py` 或 `sync.py` |
+| Panel 注册了但界面没出现 | 没启用 `luna.editor.shell` | 给 panel 插件添加 shell 依赖并启用 |
+| 链接时报 editor 相关符号缺失 | 没链接 `LunaEditorFramework` | 修正插件 CMake |
 
-manifest 里写的是一个名字，代码里实现的是另一个名字，编译或链接阶段就会出问题。
+## 15. 真实示例应该看哪些目录
 
-### 16.3 忘记把插件加入 Bundle
-
-插件目录存在，并不代表插件会被启用。
-
-### 16.4 改了 Bundle 但没重新运行 `sync.py`
-
-这是最常见的问题。
-
-### 16.5 编辑器插件没有链接 `LunaEditorFramework`
-
-如果你的插件需要 `EditorRegistry`、`EditorPanel`，就应该链接 `LunaEditorFramework`。
-
-### 16.6 `hosts = ["editor"]` 写错
-
-当前 Bundle 默认 host 是 `editor`，如果插件 host 不匹配，`sync.py` 会直接失败。
-
-## 17. 当前不建议你做的事
-
-当前不建议你在新插件里做下面这些事:
-
-- 直接改 `EditorApp` 来实现插件逻辑
-- 依赖静态全局对象做自动注册
-- 手工编辑 `Plugins/Generated/ResolvedPlugins.cpp`
-- 手工编辑 `Plugins/Generated/PluginList.cmake`
-- 把具体插件代码继续塞回 `Editor/`
-
-## 18. 当前一句话建议
-
-如果你现在要写一个 Luna 插件，最稳妥的路线是:
-
-> 先写一个 editor host 下的 Panel 或 Command 插件，把 manifest、CMake、注册函数、Bundle、`sync.py` 这条最小链路跑通，再继续往更复杂的能力扩展。
-
-如果你想先对照真实代码，再回来看文档，优先看:
+如果你希望对照当前仓库里的真实实现，优先看:
 
 - `Plugins/builtin/luna.example.hello`
 - `Plugins/builtin/luna.example.imgui_demo`
 - `Plugins/builtin/luna.editor.core`
 - `Plugins/builtin/luna.runtime.core`
+
+## 16. 一句话总结
+
+你写第一个 Luna 插件时，最稳妥的路径是:
+
+> 先做一个 editor panel 或 runtime layer，把 manifest、CMake、注册函数、Bundle、`build.py` 这条链路跑通，再继续扩展更复杂的能力。

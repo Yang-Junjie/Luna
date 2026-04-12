@@ -34,6 +34,16 @@ public:
                                                            m_clear_color != nullptr ? m_clear_color->w : 1.0f});
     }
 
+    void BeforeRender(luna::val::RenderPassState state) override
+    {
+        if (m_clear_color == nullptr) {
+            return;
+        }
+
+        state.SetColorClearValue(
+            0, luna::val::ClearColor{m_clear_color->x, m_clear_color->y, m_clear_color->z, m_clear_color->w});
+    }
+
 private:
     luna::val::Format m_format{luna::val::Format::UNDEFINED};
     uint32_t m_width{0};
@@ -42,17 +52,21 @@ private:
 };
 
 std::unique_ptr<luna::val::RenderGraph> buildDefaultRenderGraph(const RenderGraphBuildInfo& build_info,
-                                                                const glm::vec4* clear_color)
+                                                                const glm::vec4* clear_color,
+                                                                bool include_imgui_pass)
 {
     luna::val::RenderGraphBuilder builder;
-    builder
-        .AddRenderPass("clear",
-                       std::make_unique<ClearColorPass>(build_info.m_surface_format,
-                                                        build_info.m_framebuffer_width,
-                                                        build_info.m_framebuffer_height,
-                                                        clear_color))
-        .AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"))
-        .SetOutputName("scene_color");
+    builder.AddRenderPass("clear",
+                          std::make_unique<ClearColorPass>(build_info.m_surface_format,
+                                                           build_info.m_framebuffer_width,
+                                                           build_info.m_framebuffer_height,
+                                                           clear_color));
+
+    if (include_imgui_pass) {
+        builder.AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"));
+    }
+
+    builder.SetOutputName("scene_color");
 
     return builder.Build();
 }
@@ -157,6 +171,11 @@ bool VulkanRenderer::isRenderingEnabled() const
     return isInitialized() && m_context->IsRenderingEnabled() && extent.width > 0 && extent.height > 0;
 }
 
+bool VulkanRenderer::isImGuiEnabled() const
+{
+    return m_imgui_enabled;
+}
+
 void VulkanRenderer::requestResize()
 {
     m_resize_requested = true;
@@ -165,6 +184,18 @@ void VulkanRenderer::requestResize()
 bool VulkanRenderer::isResizeRequested() const
 {
     return m_resize_requested;
+}
+
+void VulkanRenderer::setImGuiEnabled(bool enabled)
+{
+    if (m_imgui_enabled == enabled) {
+        return;
+    }
+
+    m_imgui_enabled = enabled;
+    if (m_initialized) {
+        rebuildRenderGraph();
+    }
 }
 
 void VulkanRenderer::startFrame()
@@ -255,7 +286,7 @@ void VulkanRenderer::rebuildRenderGraph()
     if (m_initialization_options.m_render_graph_builder) {
         m_render_graph = m_initialization_options.m_render_graph_builder(build_info);
     } else {
-        m_render_graph = buildDefaultRenderGraph(build_info, &m_clear_color);
+        m_render_graph = buildDefaultRenderGraph(build_info, &m_clear_color, m_imgui_enabled);
     }
 }
 

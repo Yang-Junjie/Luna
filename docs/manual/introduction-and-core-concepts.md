@@ -2,105 +2,229 @@
 
 ## 关于 Luna
 
-Luna 解决的问题不是“如何快速做一个成品游戏”，而是“如何用一套相对整洁、可扩展的 C++ 架构，把窗口系统、输入事件、ImGui、Vulkan 和资源加载能力整合成一个可以继续演进的引擎底座”。
+Luna 解决的不是“如何最快做一个成品编辑器”，而是下面这类更底层的问题:
 
-从代码结构反推，它的核心目标包括:
+- 如何用一套清晰的 C++20 架构管理窗口、输入、主循环与渲染器生命周期
+- 如何把 Vulkan 上下文、RenderGraph、资源导入能力组织成可继续扩展的底座
+- 如何在**同一个宿主程序**里，通过不同插件组合得到 `runtime` 与 `editor` 形态
+- 如何在不引入动态 DLL 复杂度的前提下，先把源码级插件系统做扎实
 
-| 目标 | 说明 |
-| --- | --- |
-| 统一应用生命周期 | 通过 `Application` 管理窗口、主循环、层系统、ImGui 和渲染器 |
-| 解耦平台与业务 | `Window` 是抽象接口，当前实现由 `GLFWWindow` 提供 |
-| 抽象 Vulkan 复杂度 | `VulkanContext`、`RenderGraph`、`DescriptorBinding`、`StageBuffer` 等对象屏蔽大部分模板化 Vulkan 代码 |
-| 提供编辑器宿主 | `EditorApp` 和 `EditorLayer` 构成默认前端壳 |
-| 准备资源导入能力 | `ShaderLoader`、`ModelLoader`、`ImageLoader` 已具备独立使用价值 |
+当前代码库最核心的工程目标可以概括为:
 
-### 核心特性
-
-| 特性 | 当前状态 | 说明 |
+| 目标 | 当前状态 | 说明 |
 | --- | --- | --- |
-| C++20 工程化构建 | 已实现 | 顶层 CMake 统一管理 |
-| GLFW 窗口与输入 | 已实现 | 键盘、鼠标、滚轮、窗口事件完整桥接 |
-| Layer/Overlay 模型 | 已实现 | 支持从业务层插入更新、渲染、ImGui 绘制逻辑 |
-| ImGui Docking 集成 | 已实现 | 支持 DockSpace，预留多视口选项 |
-| Vulkan 上下文与交换链 | 已实现 | 包括设备选择、交换链重建、虚拟帧管理 |
-| RenderGraph | 已实现 | 能够声明通道、附件、依赖和屏障 |
-| Shader 编译与反射 | 已实现 | 基于 glslang + SPIRV-Cross |
-| 图片导入 | 已实现 | 支持常见图片、DDS、zlib 包装 DDS、立方体贴图 |
-| 模型导入 | 已实现 | 支持 OBJ 和 glTF/GLB |
-| 实际场景渲染 | 部分实现 | 默认编辑器当前只做清屏和 ImGui 通道 |
+| 单一应用宿主 | 已实现 | `LunaApp` 是当前唯一正式宿主 |
+| Bundle 驱动装配 | 已实现 | `editor` / `runtime` 都由 Bundle 选择插件 |
+| 层系统与事件系统 | 已实现 | `Application + LayerStack + Event` 已稳定运行 |
+| Vulkan 渲染底座 | 已实现 | `VulkanContext + RenderGraph + DescriptorBinding` 已可用 |
+| 编辑器壳层 | 已实现 | `luna.editor.shell + editor plugins` 组合成 editor；`luna.imgui` 可供其他 bundle 独立请求 ImGui |
+| 资源导入能力 | 已实现 | `ShaderLoader`、`ModelLoader`、`ImageLoader` 可独立使用 |
+| 正式渲染插件扩展点 | 未实现 | 当前插件系统还不能正式贡献 RenderGraph / RenderPass |
 
-> **警告 (Warning):**
-> 当前默认 `VulkanRenderer::rebuildRenderGraph()` 只构建了 `clear` 和 `imgui` 两个 pass。这意味着资源加载器虽然已经可用，但还没有被默认编辑器路径消费。
+> **提示 (Note):**
+> Luna 当前更像“可扩展引擎骨架 + 源码插件宿主”，而不是“功能齐全的内容创作平台”。
 
-## Luna 的工作方式
+## Luna 当前到底是什么
 
-下面这张图可以把 Luna 的“当前现实”讲清楚:
+如果只看最终效果，很容易误以为 Luna 已经是“编辑器程序 + runtime 程序 + 插件市场”的完整体系。  
+从源码反推，这个判断并不准确。
+
+当前更准确的模型是:
 
 ```mermaid
 graph TD
-    A[LunaApp main] --> B[createApplication]
-    B --> C[EditorApp]
-    C --> D[Application]
-    D --> E[GLFW Window]
-    D --> F[VulkanRenderer]
-    D --> G[ImGuiLayer]
-    D --> H[LayerStack]
-    H --> I[EditorLayer]
-    F --> J[RenderGraph]
-    J --> K[Clear Pass]
-    J --> L[ImGui Pass]
+    B1[Bundles/EditorDefault] --> S[Tools/luna/sync.py]
+    B2[Bundles/RuntimeDefault] --> S
+    P[Plugins/builtin + Plugins/external] --> S
+    S --> G[Generated PluginList + ResolvedPlugins + lock]
+    G --> H[LunaAppHost]
+    H --> A[LunaApp]
+    A --> PR[PluginRegistry]
+    A --> SR[ServiceRegistry]
+    A --> ER[EditorRegistry]
+    A --> VR[VulkanRenderer]
+    PR --> LS[Layer / Overlay contributions]
+    PR --> IMG[ImGui request]
+    ER --> ES[EditorShellLayer]
 ```
 
-这不是一个“一切都往 `main()` 里堆”的项目。它的主干是:
+换句话说:
 
-1. `main()` 只负责初始化日志和创建应用实例。
-2. `Application` 接手窗口、事件、主循环和渲染。
-3. `EditorApp` 在 `onInit()` 中向层栈压入 `EditorLayer`。
-4. `EditorLayer` 只实现编辑器侧的交互逻辑，例如自由摄像机控制和 ImGui 面板。
-5. `VulkanRenderer` 提供当前帧的渲染执行能力。
+1. `Bundle` 决定启用哪些插件。
+2. `sync.py` 与 `build.py` 生成构建输入。
+3. `LunaApp` 启动后显式注册插件。
+4. 插件通过注册表贡献 `Layer`、`Panel`、`Command` 等能力。
+5. 渲染器负责执行默认 RenderGraph 或宿主在初始化阶段提供的自定义图。
+
+## 当前核心特性
+
+| 特性 | 当前状态 | 说明 |
+| --- | --- | --- |
+| CMake 工程化构建 | 已实现 | 顶层 `CMakeLists.txt` 统一管理 |
+| Windows + GLFW 原生窗口 | 已实现 | 事件桥接完整 |
+| Layer / Overlay 机制 | 已实现 | 普通层与覆盖层都可由插件贡献 |
+| ImGui 可选启用 | 已实现 | 由插件通过 `requestImGui()` 请求 |
+| Editor shell 插件化 | 已实现 | `Editor/` 只保留框架，具体能力在 `Plugins/` |
+| Vulkan RenderGraph | 已实现 | 支持声明 pass、附件、依赖、descriptor 解析 |
+| Model / Shader / Image 导入 | 已实现 | `Samples/Model` 已证明渲染链可跑复杂样例 |
+| Bundle profile 隔离构建 | 已实现 | `Tools/luna/build.py` 支持 `editor/runtime/all/custom` |
+| 插件热重载 / DLL 加载 | 未实现 | 当前不是二进制插件系统 |
+
+> **警告 (Warning):**
+> “插件能访问某个类”不等于“插件系统正式支持这个扩展点”。  
+> 例如插件当前可以在自己的 `Layer` 中访问 `Application::get().getRenderer()`，但这不意味着插件已经可以正式替换活动宿主的 RenderGraph。
+
+## 你需要先建立的几个心智模型
+
+### 1. `LunaApp` 是宿主，不是功能集合
+
+`LunaApp` 的职责主要是:
+
+- 创建服务注册表
+- 创建 `EditorRegistry`
+- 注册选中的插件
+- 根据插件请求决定是否启用 ImGui
+- 把插件贡献的 `Layer` / `Overlay` 实例化并压入层栈
+
+它不应该继续承载大量具体业务。
+
+### 2. `Editor/` 是框架层，不是旧应用入口
+
+当前 `Editor/` 目录提供的是:
+
+- `EditorPanel`
+- `EditorRegistry`
+- `EditorShellLayer`
+
+也就是说:
+
+- `Editor/` 负责定义 editor 扩展协议
+- `Plugins/builtin/...` 负责提供具体 editor 功能
+
+### 3. Bundle 是“应用组合”，不是“项目配置杂项”
+
+当前两个默认 Bundle:
+
+- `Bundles/EditorDefault/luna.bundle.toml`
+- `Bundles/RuntimeDefault/luna.bundle.toml`
+
+它们真正表达的是:
+
+- 同一宿主使用哪组插件组合启动
+
+而不是:
+
+- 两套互不相关的程序入口
+
+### 4. RenderGraph 目前仍由宿主控制
+
+RenderGraph 在当前系统中的正式接入点是:
+
+- `Application::getRendererInitializationOptions()`
+- `VulkanRenderer::InitializationOptions::m_render_graph_builder`
+
+这意味着:
+
+- `Samples/Model` 这种能力当前是“宿主级扩展”
+- 还不是“插件级扩展”
+
+### 5. 插件系统已经可用，但扩展点还不够多
+
+当前正式支持的贡献类型主要是:
+
+- Layer
+- Overlay
+- Editor Panel
+- Editor Command
+- ImGui request
+
+后续如果要继续演进，重点应该是继续增加受支持的 registry，而不是先去做二进制插件市场。
 
 ## 核心术语表
 
-| 术语 | 含义 | 在 Luna 中对应 |
+| 术语 | 含义 | Luna 中的对应 |
 | --- | --- | --- |
-| Application | 应用宿主，管理运行生命周期 | `luna::Application` |
-| Layer | 一个可插拔的逻辑单元 | `luna::Layer` |
-| Overlay | 位于普通层之上的 Layer | `LayerStack::pushOverlay()` |
-| Event | 窗口、键盘、鼠标等消息对象 | `luna::Event` 及其子类 |
-| Window | 平台窗口抽象 | `luna::Window` |
-| GLFWWindow | 当前平台窗口实现 | `luna::GLFWWindow` |
-| VulkanRenderer | 引擎侧渲染入口 | `luna::VulkanRenderer` |
-| VulkanContext | Vulkan 实例、设备、交换链与命令对象的管理器 | `luna::val::VulkanContext` |
-| RenderPass | 一个渲染/计算通道的逻辑接口 | `luna::val::RenderPass` |
-| RenderGraph | 由多个 Pass 和附件构成的执行图 | `luna::val::RenderGraph` |
-| Pipeline | Pass 声明阶段生成的资源与输出描述 | `luna::val::Pipeline` |
-| DescriptorBinding | 资源名到 descriptor 写入的绑定规则 | `luna::val::DescriptorBinding` |
-| ResolveInfo | 运行时资源名解析表 | `luna::val::ResolveInfo` |
-| StageBuffer | 每帧上传到 GPU 的暂存缓冲区 | `luna::val::StageBuffer` |
-| Virtual Frame | 一套独立的命令缓冲、信号量、Fence 与 staging 资源 | `VirtualFrame` |
-| Shader Reflection | 从 SPIR-V 反推输入属性和描述符布局 | `ShaderLoader` + `ShaderReflection` |
+| Host | 负责应用生命周期与插件装配的宿主程序 | `LunaApp` |
+| Bundle | 决定启用哪些插件的一份清单 | `luna.bundle.toml` |
+| Plugin | 带 manifest、CMake、源码和注册函数的源码模块 | `Plugins/builtin/...` |
+| Layer | 每帧参与更新/事件/渲染/ImGui 的逻辑单元 | `luna::Layer` |
+| Overlay | 位于普通层之后的 Layer | `pushOverlay()` |
+| ServiceRegistry | 按类型索引的共享服务容器 | `luna::ServiceRegistry` |
+| PluginRegistry | 插件注册期的贡献入口 | `luna::PluginRegistry` |
+| EditorRegistry | Editor 侧扩展点容器 | `luna::editor::EditorRegistry` |
+| Editor Panel | 由 editor shell 承载的 ImGui 面板 | `luna::editor::EditorPanel` |
+| RenderPass | 一个渲染/计算通道的逻辑描述接口 | `luna::val::RenderPass` |
+| RenderGraph | 由多个 pass 与命名附件组成的执行图 | `luna::val::RenderGraph` |
+| RenderGraphBuilder | 根据 pass 声明构建执行图的构建器 | `luna::val::RenderGraphBuilder` |
+| Virtual Frame | 一套独立的命令缓冲、同步对象和 staging 资源 | `VirtualFrameProvider` |
+| Profile | 一组隔离的生成文件与 build 目录 | `build/profiles/editor` 等 |
 
-## 读懂这套源码前需要建立的心智模型
+## 当前默认 editor 与 runtime 有什么区别
 
-### 1. LunaCore 与 LunaEditor 是上下层关系
+```mermaid
+graph LR
+    R[Runtime Bundle] --> RP[luna.runtime.core]
+    E[Editor Bundle] --> ES[luna.editor.shell]
+    E --> EC[luna.editor.core]
+    E --> EX1[luna.example.hello]
+    E --> EX2[luna.example.imgui_demo]
+    RP --> A[LunaApp]
+    ES --> A
+    EC --> A
+    EX1 --> A
+    EX2 --> A
+```
 
-- `LunaCore` 提供运行时基础设施。
-- `LunaEditor` 只是一个使用 `LunaCore` 的前端壳。
+差异本质上不是“程序骨架不同”，而是:
 
-### 2. luna::val 是“引擎内部库”
+| 组合 | 当前效果 |
+| --- | --- |
+| `runtime` | 一个带最小 runtime layer 的纯宿主窗口 |
+| `editor` | 启用 ImGui，并装配 editor shell、面板和命令 |
 
-虽然命名看起来像独立库，但它直接编译进 `LunaCore`，不是单独发布的外部二进制。
+> **提示 (Note):**
+> `luna.imgui` 是一个真实存在的 builtin 插件，但它当前不在默认 `EditorDefault` bundle 中。
+> 默认 editor 之所以会启用 ImGui，是因为 `luna.editor.shell` 在注册阶段调用了 `requestImGui()`。
 
-### 3. RenderGraph 是当前渲染架构的中心
+## 目前最容易被误解的几个点
 
-Luna 不是直接在业务层写 Vulkan 命令，而是先声明资源、附件和通道，再由 `RenderGraphBuilder` 推导同步与依赖。
+### 1. `Renderer` 可以被插件访问，但不是正式渲染扩展协议
 
-### 4. 资源导入层已具备独立价值
+当前插件里的 `Layer` / `Panel` 可以直接使用:
 
-即使默认编辑器还没真正加载模型绘制，`ModelLoader`、`ImageLoader` 和 `ShaderLoader` 已经是一套可直接复用的能力集合。
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+auto& camera = renderer.getMainCamera();
+renderer.getClearColor().x = 0.2f;
+```
+
+这已经足够做:
+
+- 相机控制
+- clear color 调试
+- 读取 renderer 基本状态
+
+但还不够做:
+
+- 把新 `RenderPass` 注册进当前宿主的 RenderGraph
+- 替换 renderer 初始化阶段的自定义图构建器
+
+### 2. `Samples/Model` 说明 renderer 很强，不说明插件系统已经支持它
+
+`Samples/Model` 通过自定义 `Application` 子类，在初始化阶段注入 `RenderGraphBuilderCallback`。  
+这是一个**宿主级**能力，不是当前插件系统的正式扩展点。
+
+### 3. `sync.py` 和 `build.py` 的角色不同
+
+| 工具 | 角色 |
+| --- | --- |
+| `sync.py` | 解析 Bundle 与插件 manifest，生成中间文件 |
+| `build.py` | 串联 `sync -> cmake configure -> cmake build` 并为 profile 隔离输出目录 |
+
+日常推荐入口是 `build.py`，不是直接手工维护 `Plugins/Generated`。
 
 ## 最小认知总结
 
-如果你只记住一句话，那么应该是:
+如果你只记住一句话，那应该是:
 
-> Luna 当前是一套“围绕 RenderGraph 组织的 Vulkan 编辑器基础框架”，而不是已经完成场景系统、材质系统和实体系统的完整引擎。
+> Luna 当前是一套“单宿主 + Bundle 组装 + 源码插件 + Vulkan RenderGraph 底座”的应用框架；它已经非常适合继续扩展 editor/runtime 系统，但正式的渲染插件协议还没有落地。

@@ -2,10 +2,11 @@ id = "luna.bundle.editor-default"
 name = "Editor Default"
 version = "0.1.0"
 sdk = "0.1"
-host = "editor"
+host = "app"
 
 [plugins]
 enabled = [
+  "luna.editor.shell",
   "luna.editor.core",
   "luna.example.hello",
   "luna.example.imgui_demo",

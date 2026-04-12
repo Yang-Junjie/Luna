@@ -1,80 +1,146 @@
 # Luna Wiki
 
-Luna 是一个基于 C++20、GLFW、ImGui 和 Vulkan 的渲染基础设施项目。按照当前代码快照来看，它已经具备一套清晰的应用生命周期、层系统、事件输入桥接、Vulkan 上下文管理、RenderGraph 框架，以及着色器/模型/图片导入能力；当前默认编辑器运行时则聚焦于一个最小可工作的渲染闭环: 清屏 + ImGui 编辑器界面 + 自由摄像机控制。
+Luna 是一个基于 C++20、GLFW、ImGui 与 Vulkan 的可扩展应用框架。它当前的重心不是“交付一个完整游戏编辑器”，而是把下面几件事稳定地组合在一起:
+
+- 单一应用宿主 `LunaApp`
+- 基于 Bundle 的源码插件装配
+- `Layer` / `Overlay` 生命周期
+- Vulkan 上下文与 RenderGraph
+- 基础资源导入能力
+- Editor shell 这类可选上层功能
 
 > **提示 (Note):**
-> 本文档基于 `F:\Beisent\Luna` 源码逆向整理，而不是基于外部产品说明书。凡是“当前已实现/尚未接线”的描述，均以仓库中的实际代码为准。
+> 这套文档以 `F:\Beisent\Luna` 当前源码为准。凡是“已经支持”“还未支持”“推荐这样做”的描述，都基于仓库中的真实实现，不基于理想设计稿。
 
-## 文档导航
+## 当前架构一句话总结
+
+Luna 当前更准确的定位是:
+
+> 一个通过 Bundle 选择插件、通过 `build.py + sync.py` 生成构建输入、最终装配成 runtime 或 editor 形态的单宿主 Vulkan 应用框架。
+
+这意味着:
+
+- `editor` 和 `runtime` 不是两个独立程序架构，而是同一个 `LunaApp` 的两种插件组合。
+- 插件系统已经能稳定承载 `Layer`、`Panel`、`Command` 和 ImGui 请求。
+- 渲染器已经提供 `RenderGraph` 能力，但当前插件系统**还不能**把自定义 RenderGraph 作为正式扩展点接入活动宿主。
+
+## 文档地图
 
 | 类型 | 文档 | 说明 |
 | --- | --- | --- |
-| Manual | [manual/introduction-and-core-concepts.md](./manual/introduction-and-core-concepts.md) | 项目定位、目标、核心术语 |
-| Manual | [manual/architecture-in-depth.md](./manual/architecture-in-depth.md) | 系统总览、目录结构、生命周期、设计模式 |
-| Manual | [manual/getting-started.md](./manual/getting-started.md) | 环境准备、构建、运行、最小示例 |
-| Manual | [manual/building-an-application-with-rendergraph.md](./manual/building-an-application-with-rendergraph.md) | 如何基于现有框架组装应用并接入自定义 RenderGraph |
-| Manual | [manual/job-system-manual.md](./manual/job-system-manual.md) | TaskSystem、TaskHandle、ResourceLoadQueue 的使用方法与线程边界 |
-| Manual | [manual/subsystems-manual.md](./manual/subsystems-manual.md) | 应用层、平台层、渲染层、资源层、ImGui 集成详解 |
-| Plugins | [plugins/README.md](./plugins/README.md) | 插件系统文档导航与阅读入口 |
-| Plugins | [plugins/plugin-system-manual.md](./plugins/plugin-system-manual.md) | 插件系统总览、构建期流程、运行时流程、生成文件与注册表说明 |
-| Plugins | [plugins/writing-your-first-plugin.md](./plugins/writing-your-first-plugin.md) | 如何编写一个新的 Luna 插件并将其接入 Bundle 与构建系统 |
-| Plugins | [plugins/builtin-editor-core-plugin-walkthrough.md](./plugins/builtin-editor-core-plugin-walkthrough.md) | 对当前内置插件 `luna.editor.core` 的逐文件讲解 |
-| Plugins | [plugins/current-status-and-roadmap.md](./plugins/current-status-and-roadmap.md) | 当前插件系统已实现能力、限制与后续路线 |
-| Advanced | [advanced/job-system-source-map.md](./advanced/job-system-source-map.md) | JobSystem 目录地图、核心对象关系、与 enkiTS 的分层 |
-| Advanced | [advanced/job-system-task-lifecycle.md](./advanced/job-system-task-lifecycle.md) | 从 `submit()` 到完成通知的完整任务生命周期 |
-| Advanced | [advanced/job-system-thread-model.md](./advanced/job-system-thread-model.md) | 主线程、worker、IO、external 线程的职责与注册边界 |
-| Advanced | [advanced/job-system-resource-loading-pipeline.md](./advanced/job-system-resource-loading-pipeline.md) | `ResourceLoadQueue` 如何把 JobSystem 组织成资源加载流水线 |
+| Manual | [manual/introduction-and-core-concepts.md](./manual/introduction-and-core-concepts.md) | 项目定位、核心术语、当前能力边界 |
+| Manual | [manual/architecture-in-depth.md](./manual/architecture-in-depth.md) | 系统总览、目录结构、生命周期、设计模式与耦合关系 |
+| Manual | [manual/getting-started.md](./manual/getting-started.md) | 环境准备、构建、运行、最小插件示例 |
+| Manual | [manual/building-an-application-with-rendergraph.md](./manual/building-an-application-with-rendergraph.md) | 如何像 `Samples/Model` 那样通过自定义宿主接入 RenderGraph |
+| Manual | [manual/subsystems-manual.md](./manual/subsystems-manual.md) | App/Plugin Host、Editor、Renderer、Asset、JobSystem 等子系统讲解 |
+| Manual | [manual/job-system-manual.md](./manual/job-system-manual.md) | JobSystem 的独立使用手册 |
+| Plugins | [plugins/README.md](./plugins/README.md) | 插件系统文档导航 |
+| Plugins | [plugins/plugin-system-manual.md](./plugins/plugin-system-manual.md) | 插件构建期与运行时工作流、生成文件、注册表说明 |
+| Plugins | [plugins/writing-your-first-plugin.md](./plugins/writing-your-first-plugin.md) | 从零编写一个 Luna 插件 |
+| Plugins | [plugins/builtin-editor-core-plugin-walkthrough.md](./plugins/builtin-editor-core-plugin-walkthrough.md) | `luna.editor.core` 逐文件讲解 |
+| Plugins | [plugins/current-status-and-roadmap.md](./plugins/current-status-and-roadmap.md) | 插件系统现状、局限与下一阶段路线 |
 | Reference | [reference/class-and-api-reference.md](./reference/class-and-api-reference.md) | 核心类与 API 参考 |
-| Advanced | [advanced/best-practices-and-advanced.md](./advanced/best-practices-and-advanced.md) | 性能、扩展、二次开发建议 |
+| Advanced | [advanced/job-system-source-map.md](./advanced/job-system-source-map.md) | JobSystem 目录地图与对象关系 |
+| Advanced | [advanced/job-system-task-lifecycle.md](./advanced/job-system-task-lifecycle.md) | 任务生命周期 |
+| Advanced | [advanced/job-system-thread-model.md](./advanced/job-system-thread-model.md) | 线程模型 |
+| Advanced | [advanced/job-system-resource-loading-pipeline.md](./advanced/job-system-resource-loading-pipeline.md) | 资源加载流水线 |
+| Advanced | [advanced/best-practices-and-advanced.md](./advanced/best-practices-and-advanced.md) | 性能、扩展与二次开发建议 |
 
 ## 推荐阅读路径
 
-1. 初次接触 Luna: 先读“简介与核心概念”与“快速入门”。
-2. 准备从零组装一个新应用: 接着读“使用现有框架与 RenderGraph 构建应用”。
-3. 需要修改运行时框架: 再读“架构设计深度剖析”。
-4. 需要理解 JobSystem 的实现细节: 先读“JobSystem 源码地图”，再按顺序读“任务生命周期”“线程模型”“资源加载流水线”。
-5. 需要新增渲染通道或资源类型: 重点读“子系统解析”和“最佳实践与进阶”。
-6. 需要理解当前插件系统: 先读“插件系统文档导航”，再读“插件系统手册”和“内置编辑器核心插件逐文件讲解”。
-7. 准备写新插件: 接着读“编写你的第一个 Luna 插件”。
-8. 需要查类和函数: 直接跳到 API 参考。
+### 路线 A: 第一次接触 Luna
 
-## 当前架构结论
+1. 读 [简介与核心概念](./manual/introduction-and-core-concepts.md)
+2. 读 [快速入门](./manual/getting-started.md)
+3. 启动 `editor` 和 `runtime` 两个 profile
 
-从源码来看，Luna 当前更准确的定位是:
+### 路线 B: 准备扩展编辑器
 
-- 一个编辑器壳 `LunaEditor`
-- 一个运行时壳 `LunaRuntime`
-- 一个通用引擎核心库 `LunaCore`
-- 一套内嵌的 `luna::val`
-- 一条最小渲染路径: `clear -> imgui -> present`
-- 一套已经打通最小链路的源码插件系统骨架: `Bundle -> sync.py -> Generated(host-specific) -> 宿主显式注册`
+1. 读 [架构设计深度剖析](./manual/architecture-in-depth.md)
+2. 读 [插件系统手册](./plugins/plugin-system-manual.md)
+3. 读 [编写你的第一个插件](./plugins/writing-your-first-plugin.md)
+4. 对照 [luna.editor.core walkthrough](./plugins/builtin-editor-core-plugin-walkthrough.md)
 
-换句话说，Luna 已经完成了“引擎骨架”和“渲染框架”的大部分基础设施，但默认应用尚未把 `ModelLoader`、`ShaderLoader`、复杂场景绘制等功能接进每帧渲染图中。这不是缺点，而是理解源码时必须接受的事实: 代码库的重心目前是“打底层能力”，不是“交付完整内容管线”。
+### 路线 C: 准备做渲染/资源方向开发
+
+1. 读 [架构设计深度剖析](./manual/architecture-in-depth.md)
+2. 读 [子系统解析](./manual/subsystems-manual.md)
+3. 读 [使用现有框架与 RenderGraph 构建应用](./manual/building-an-application-with-rendergraph.md)
+4. 读 [类与 API 参考](./reference/class-and-api-reference.md)
+
+### 路线 D: 准备修改底层任务系统
+
+1. 读 [job-system-manual.md](./manual/job-system-manual.md)
+2. 读 `advanced/` 目录下四篇 JobSystem 深入文档
+
+## 当前代码库的几个关键事实
+
+### 1. 单宿主已经落地
+
+当前真正的应用入口是:
+
+- `Luna/Core/Main.cpp`
+- `App/LunaApp.cpp`
+
+不是旧的 `EditorApp` / `RuntimeApp` 双宿主模型。
+
+### 2. 插件已经进入“可用骨架”阶段
+
+当前已经打通:
+
+- `Bundle -> sync.py -> Generated -> CMake -> registerResolvedPlugins() -> PluginRegistry`
+
+这条链路已经足够支撑继续新增 editor/runtime 插件。
+
+### 3. Renderer 能力强于当前插件扩展协议
+
+仓库中已经有:
+
+- `RenderGraphBuilder`
+- 自定义 `RenderPass`
+- `Samples/Model`
+
+但这些能力现在主要通过**宿主或样例应用**接入，而不是通过正式插件 API 注入当前 `LunaApp`。
+
+### 4. 文档会明确区分“已经支持”和“技术上能硬做”
+
+例如:
+
+- 插件里的 `Layer` 可以直接访问 `Application::get().getRenderer()`
+- 但这不等于插件系统已经正式支持“RenderGraph 贡献”
+
+后面的章节会刻意把这种边界讲清楚，避免把“源码同仓可访问”误写成“稳定扩展点”。
 
 ## 仓库文档结构
 
 ```text
-docs/
+Docs/
 ├─ README.md
-├─ advanced/
-│  ├─ best-practices-and-advanced.md
-│  ├─ job-system-resource-loading-pipeline.md
-│  ├─ job-system-source-map.md
-│  ├─ job-system-task-lifecycle.md
-│  └─ job-system-thread-model.md
 ├─ manual/
-│  ├─ architecture-in-depth.md
-│  ├─ building-an-application-with-rendergraph.md
-│  ├─ getting-started.md
 │  ├─ introduction-and-core-concepts.md
-│  ├─ job-system-manual.md
-│  └─ subsystems-manual.md
+│  ├─ architecture-in-depth.md
+│  ├─ getting-started.md
+│  ├─ building-an-application-with-rendergraph.md
+│  ├─ subsystems-manual.md
+│  └─ job-system-manual.md
 ├─ plugins/
 │  ├─ README.md
 │  ├─ plugin-system-manual.md
 │  ├─ writing-your-first-plugin.md
 │  ├─ builtin-editor-core-plugin-walkthrough.md
 │  └─ current-status-and-roadmap.md
-└─ reference/
-   └─ class-and-api-reference.md
+├─ reference/
+│  └─ class-and-api-reference.md
+└─ advanced/
+   ├─ best-practices-and-advanced.md
+   ├─ job-system-source-map.md
+   ├─ job-system-task-lifecycle.md
+   ├─ job-system-thread-model.md
+   └─ job-system-resource-loading-pipeline.md
 ```
+
+## 下一步该读什么
+
+- 如果你只想先把程序跑起来，直接去看 [快速入门](./manual/getting-started.md)。
+- 如果你已经在写插件，直接去看 [插件系统手册](./plugins/plugin-system-manual.md)。
+- 如果你现在关心“为什么 `Samples/Model` 能做到，而插件暂时做不到”，直接去看 [使用现有框架与 RenderGraph 构建应用](./manual/building-an-application-with-rendergraph.md)。

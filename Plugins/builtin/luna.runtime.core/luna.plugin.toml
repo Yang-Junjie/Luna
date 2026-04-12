@@ -5,6 +5,6 @@ sdk = "0.1"
 kind = "runtime"
 cmake_target = "LunaRuntimeCorePlugin"
 entry = "luna_register_luna_runtime_core"
-hosts = ["runtime"]
+hosts = ["app"]
 
 [dependencies]

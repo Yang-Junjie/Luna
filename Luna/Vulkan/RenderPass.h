@@ -31,6 +31,8 @@
 #include "CommandBuffer.h"
 #include "Pipeline.h"
 
+#include <array>
+
 namespace luna::val {
 class RenderGraph;
 
@@ -48,9 +50,22 @@ struct PassNative {
 struct RenderPassState {
     RenderGraph& Graph;
     CommandBuffer& Commands;
-    const PassNative& Pass;
+    PassNative& Pass;
 
     const Image& GetAttachment(const std::string& name);
+
+    void SetColorClearValue(uint32_t attachment_index, const ClearColor& clear)
+    {
+        assert(attachment_index < Pass.ClearValues.size());
+        Pass.ClearValues[attachment_index] =
+            vk::ClearValue{vk::ClearColorValue{std::array{clear.R, clear.G, clear.B, clear.A}}};
+    }
+
+    void SetDepthStencilClearValue(uint32_t attachment_index, const ClearDepthStencil& clear)
+    {
+        assert(attachment_index < Pass.ClearValues.size());
+        Pass.ClearValues[attachment_index] = vk::ClearValue{vk::ClearDepthStencilValue{clear.Depth, clear.Stencil}};
+    }
 };
 
 using PipelineState = Pipeline&;

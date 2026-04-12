@@ -36,6 +36,12 @@
 #include <optional>
 #include <string_view>
 
+#if defined(_MSC_VER)
+// tinyobjloader's embedded fast_float path currently trips a constexpr bug under MSVC.
+// Falling back to tinyobjloader's default parser keeps OBJ loading working on Windows.
+#define TINYOBJLOADER_DISABLE_FAST_FLOAT
+#endif
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "third_party/tinyobjloader/tiny_obj_loader.h"
 
