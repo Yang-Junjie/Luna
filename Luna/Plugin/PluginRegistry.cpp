@@ -1,6 +1,5 @@
-#include "Plugin/PluginRegistry.h"
-
 #include "Core/Log.h"
+#include "Plugin/PluginRegistry.h"
 
 #include <algorithm>
 #include <stdexcept>

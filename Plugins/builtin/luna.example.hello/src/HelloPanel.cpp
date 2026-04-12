@@ -1,5 +1,4 @@
 #include "HelloPanel.h"
-
 #include "imgui.h"
 
 namespace luna::example {

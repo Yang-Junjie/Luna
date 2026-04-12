@@ -1,7 +1,6 @@
-#include "RendererInfoPanel.h"
-
 #include "Core/Application.h"
 #include "imgui.h"
+#include "RendererInfoPanel.h"
 
 namespace luna::editor {
 

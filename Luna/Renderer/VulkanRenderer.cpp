@@ -56,11 +56,10 @@ std::unique_ptr<luna::val::RenderGraph> buildDefaultRenderGraph(const RenderGrap
                                                                 bool include_imgui_pass)
 {
     luna::val::RenderGraphBuilder builder;
-    builder.AddRenderPass("clear",
-                          std::make_unique<ClearColorPass>(build_info.m_surface_format,
-                                                           build_info.m_framebuffer_width,
-                                                           build_info.m_framebuffer_height,
-                                                           clear_color));
+    builder.AddRenderPass(
+        "clear",
+        std::make_unique<ClearColorPass>(
+            build_info.m_surface_format, build_info.m_framebuffer_width, build_info.m_framebuffer_height, clear_color));
 
     if (include_imgui_pass) {
         builder.AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"));

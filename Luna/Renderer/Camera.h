@@ -13,4 +13,3 @@ public:
     glm::mat4 getViewMatrix() const;
     glm::mat4 getRotationMatrix() const;
 };
-

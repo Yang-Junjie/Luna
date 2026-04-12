@@ -1,6 +1,5 @@
-#include "RuntimeClearColorLayer.h"
-
 #include "Plugin/PluginRegistry.h"
+#include "RuntimeClearColorLayer.h"
 
 #include <memory>
 

@@ -5,9 +5,8 @@
 #include "Core/Layer.h"
 #include "imgui.h"
 
-#include <glm/glm.hpp>
-
 #include <algorithm>
+#include <glm/glm.hpp>
 
 namespace luna::editor {
 

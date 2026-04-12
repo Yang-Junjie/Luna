@@ -184,4 +184,3 @@ public:
     }
 };
 } // namespace luna
-

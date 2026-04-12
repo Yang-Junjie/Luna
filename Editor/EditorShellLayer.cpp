@@ -1,6 +1,5 @@
-#include "Editor/EditorShellLayer.h"
-
 #include "Core/Log.h"
+#include "Editor/EditorShellLayer.h"
 #include "imgui.h"
 
 #include <utility>

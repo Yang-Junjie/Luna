@@ -31,18 +31,18 @@ public:
 
     void addPanel(std::string id, std::string display_name, PanelFactory factory, bool open_by_default = true);
 
-    template<typename PanelT>
-    void addPanel(std::string id, std::string display_name, bool open_by_default = true)
+    template <typename PanelT> void addPanel(std::string id, std::string display_name, bool open_by_default = true)
     {
         static_assert(std::is_base_of_v<EditorPanel, PanelT>, "PanelT must derive from EditorPanel");
         static_assert(std::is_default_constructible_v<PanelT>, "PanelT must be default constructible");
 
-        addPanel(std::move(id),
-                 std::move(display_name),
-                 [] {
-                     return std::make_unique<PanelT>();
-                 },
-                 open_by_default);
+        addPanel(
+            std::move(id),
+            std::move(display_name),
+            [] {
+                return std::make_unique<PanelT>();
+            },
+            open_by_default);
     }
 
     void addCommand(std::string id, std::string display_name, CommandCallback callback);

@@ -1,6 +1,5 @@
-#include "HelloPanel.h"
-
 #include "Editor/EditorRegistry.h"
+#include "HelloPanel.h"
 #include "Plugin/PluginRegistry.h"
 
 extern "C" void luna_register_luna_example_hello(luna::PluginRegistry& registry)
@@ -9,8 +8,5 @@ extern "C" void luna_register_luna_example_hello(luna::PluginRegistry& registry)
         return;
     }
 
-    registry.editor().addPanel<luna::example::HelloPanel>(
-        "luna.example.hello.panel",
-        "Hello",
-        true);
+    registry.editor().addPanel<luna::example::HelloPanel>("luna.example.hello.panel", "Hello", true);
 }

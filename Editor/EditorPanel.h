@@ -7,7 +7,9 @@ public:
     virtual ~EditorPanel() = default;
 
     virtual void onAttach() {}
+
     virtual void onDetach() {}
+
     virtual void onImGuiRender() = 0;
 };
 

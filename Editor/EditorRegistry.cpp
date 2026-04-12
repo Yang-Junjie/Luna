@@ -1,6 +1,5 @@
-#include "Editor/EditorRegistry.h"
-
 #include "Core/Log.h"
+#include "Editor/EditorRegistry.h"
 
 #include <algorithm>
 #include <utility>

@@ -1,5 +1,4 @@
 #include "App/LunaApp.h"
-
 #include "Core/Log.h"
 #include "Plugin/PluginBootstrap.h"
 #include "Plugin/PluginRegistry.h"

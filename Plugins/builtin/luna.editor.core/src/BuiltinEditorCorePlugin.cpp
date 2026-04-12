@@ -1,10 +1,9 @@
-#include "EditorCameraControllerLayer.h"
-#include "RendererInfoPanel.h"
-
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "Editor/EditorRegistry.h"
+#include "EditorCameraControllerLayer.h"
 #include "Plugin/PluginRegistry.h"
+#include "RendererInfoPanel.h"
 
 #include <glm/vec3.hpp>
 #include <memory>

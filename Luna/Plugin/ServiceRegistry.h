@@ -11,23 +11,20 @@ namespace luna {
 
 class ServiceRegistry {
 public:
-    template<typename Service, typename... Args>
-    Service& emplace(Args&&... args)
+    template <typename Service, typename... Args> Service& emplace(Args&&... args)
     {
         auto instance = std::make_shared<Service>(std::forward<Args>(args)...);
         return add<Service>(std::move(instance));
     }
 
-    template<typename Interface, typename Service, typename... Args>
-    Interface& emplaceAs(Args&&... args)
+    template <typename Interface, typename Service, typename... Args> Interface& emplaceAs(Args&&... args)
     {
         static_assert(std::is_base_of_v<Interface, Service>, "Service must derive from Interface");
         auto instance = std::make_shared<Service>(std::forward<Args>(args)...);
         return add<Interface>(std::static_pointer_cast<Interface>(instance));
     }
 
-    template<typename Service>
-    Service& add(std::shared_ptr<Service> service)
+    template <typename Service> Service& add(std::shared_ptr<Service> service)
     {
         if (service == nullptr) {
             throw std::runtime_error("Cannot register a null service instance");
@@ -37,14 +34,12 @@ public:
         return get<Service>();
     }
 
-    template<typename Service>
-    bool has() const
+    template <typename Service> bool has() const
     {
         return m_services.contains(std::type_index(typeid(Service)));
     }
 
-    template<typename Service>
-    Service& get() const
+    template <typename Service> Service& get() const
     {
         const auto it = m_services.find(std::type_index(typeid(Service)));
         if (it == m_services.end() || it->second == nullptr) {
