@@ -3,7 +3,11 @@ add_library(
     STATIC
     luna.plugin.toml
     src/RuntimeCorePlugin.cpp
-    src/RuntimeClearColorLayer.h
+    src/RuntimeStaticMeshLayer.h
+    Shaders/RuntimeSceneGeometry.vert
+    Shaders/RuntimeSceneGeometry.frag
+    Shaders/RuntimeSceneLighting.vert
+    Shaders/RuntimeSceneLighting.frag
 )
 
 target_include_directories(

@@ -1,6 +1,6 @@
 #include "Log.h"
 #include "Platform/GLFWWindow.hpp"
-#include "Window.h"
+#include "window.h"
 
 namespace luna {
 std::unique_ptr<Window> Window::create(const WindowProps& props)

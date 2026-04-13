@@ -2,6 +2,7 @@
 
 #include "Renderer/Camera.h"
 #include "Renderer/RenderGraph.h"
+#include "Renderer/SceneRenderer.h"
 
 #include <functional>
 #include <glm/vec4.hpp>
@@ -46,6 +47,7 @@ public:
     bool isImGuiEnabled() const;
 
     void requestResize();
+    void requestRenderGraphRebuild();
     bool isResizeRequested() const;
     void setImGuiEnabled(bool enabled);
 
@@ -58,6 +60,8 @@ public:
 
     Camera& getMainCamera();
     const Camera& getMainCamera() const;
+    SceneRenderer& getSceneRenderer();
+    const SceneRenderer& getSceneRenderer() const;
 
     glm::vec4& getClearColor();
     const glm::vec4& getClearColor() const;
@@ -73,11 +77,13 @@ private:
     std::unique_ptr<luna::val::VulkanContext> m_context;
     std::unique_ptr<luna::val::RenderGraph> m_render_graph;
     InitializationOptions m_initialization_options{};
+    SceneRenderer m_scene_renderer{};
     Camera m_main_camera{};
     glm::vec4 m_clear_color{0.10f, 0.10f, 0.12f, 1.0f};
     bool m_initialized{false};
     bool m_imgui_enabled{false};
     bool m_resize_requested{false};
+    bool m_render_graph_rebuild_requested{false};
     bool m_frame_started{false};
 };
 

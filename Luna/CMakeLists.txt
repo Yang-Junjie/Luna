@@ -13,16 +13,33 @@ set(RENDERER_SOURCE
     Renderer/Camera.cpp
     Renderer/ImageLoader.h
     Renderer/ImageLoader.cpp
+    Renderer/Material.h
+    Renderer/Material.cpp
+    Renderer/Mesh.h
+    Renderer/Mesh.cpp
     Renderer/ModelLoader.h
     Renderer/ModelLoader.cpp
     Renderer/RenderGraph.h
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
     Renderer/RenderGraphBuilder.cpp
+    Renderer/SceneRenderer.h
+    Renderer/SceneRenderer.cpp
     Renderer/ShaderLoader.h
     Renderer/ShaderLoader.cpp
+    Renderer/Shaders/SceneGeometry.vert
+    Renderer/Shaders/SceneGeometry.frag
+    Renderer/Shaders/SceneLighting.vert
+    Renderer/Shaders/SceneLighting.frag
     Renderer/VulkanRenderer.h
     Renderer/VulkanRenderer.cpp)
+
+set(SCENE_SOURCE
+    Scene/Components.h
+    Scene/Entity.h
+    Scene/Entity.cpp
+    Scene/Scene.h
+    Scene/Scene.cpp)
 
 set(VAL_SOURCE
     Vulkan/ArrayUtils.h
@@ -79,6 +96,8 @@ add_library(
     Core/Timestep.h
     Core/Window.h
     Core/Window.cpp
+    Core/UUID.h 
+    Core/UUID.cpp
     Plugin/PluginBootstrap.h
     Plugin/PluginRegistry.h
     Plugin/PluginRegistry.cpp
@@ -98,6 +117,7 @@ add_library(
     JobSystem/TaskHandleState.h
     JobSystem/TaskSystem.h
     JobSystem/TaskSystem.cpp
+    ${SCENE_SOURCE}
     ${RENDERER_SOURCE}
     ${VAL_SOURCE}
     ${IMGUI_SOURCE}
@@ -111,6 +131,7 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/spdlog/include
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
+        ${THIRD_PARTY_DIR}/entt/src
         ${THIRD_PARTY_DIR}/vkbootstrap/src
         ${PROJECT_SOURCE_DIR}
 )
@@ -133,7 +154,7 @@ target_link_libraries(LunaCore
 target_compile_definitions(
     LunaCore
     PUBLIC
+        LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
 )
-

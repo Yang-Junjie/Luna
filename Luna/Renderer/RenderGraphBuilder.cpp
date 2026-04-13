@@ -394,7 +394,8 @@ static vk::Pipeline CreateGraphicPipeline(const Shader& shader,
                                           const vk::PipelineLayout& layout,
                                           ArrayView<const VertexBinding> vertexBindings,
                                           const vk::RenderPass& renderPass,
-                                          const FillMode& fillMode)
+                                          const FillMode& fillMode,
+                                          uint32_t color_attachment_count)
 {
     std::vector<vk::PipelineShaderStageCreateInfo> shaderStageCreateInfos;
     shaderStageCreateInfos.push_back(vk::PipelineShaderStageCreateInfo{vk::PipelineShaderStageCreateFlags{},
@@ -496,10 +497,13 @@ static vk::Pipeline CreateGraphicPipeline(const Shader& shader,
         .setColorWriteMask(vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
                            vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
 
+    std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachment_states(
+        color_attachment_count, colorBlendAttachmentState);
+
     vk::PipelineColorBlendStateCreateInfo colorBlendStateCreateInfo;
     colorBlendStateCreateInfo.setLogicOpEnable(false)
         .setLogicOp(vk::LogicOp::eCopy)
-        .setAttachments(colorBlendAttachmentState)
+        .setAttachments(color_blend_attachment_states)
         .setBlendConstants({0.0f, 0.0f, 0.0f, 0.0f});
 
     std::array dynamicStates = {
@@ -691,7 +695,8 @@ PassNative RenderGraphBuilder::BuildRenderPass(const RenderPassReference& render
                                                         passNative.PipelineLayout,
                                                         pass.VertexBindings,
                                                         passNative.RenderPassHandle,
-                                                        pass.GetFillMode());
+                                                        pass.GetFillMode(),
+                                                        static_cast<uint32_t>(attachmentReferences.size()));
         }
         if (passNative.PipelineType == vk::PipelineBindPoint::eCompute) {
             passNative.Pipeline = CreateComputePipeline(*pass.Shader, passNative.PipelineLayout);

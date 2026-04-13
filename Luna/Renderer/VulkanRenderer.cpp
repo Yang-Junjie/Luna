@@ -1,8 +1,7 @@
 #include "Core/Log.h"
 #include "Core/Window.h"
-#include "Imgui/ImGuiRenderPass.h"
 #include "Renderer/RenderGraph.h"
-#include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/SceneRenderer.h"
 #include "Renderer/VulkanRenderer.h"
 #include "Vulkan/VulkanContext.h"
 #include "Vulkan/VulkanSurface.h"
@@ -15,59 +14,12 @@ namespace {
 
 using RenderGraphBuildInfo = luna::VulkanRenderer::RenderGraphBuildInfo;
 
-class ClearColorPass final : public luna::val::RenderPass {
-public:
-    ClearColorPass(luna::val::Format format, uint32_t width, uint32_t height, const glm::vec4* clear_color)
-        : m_format(format),
-          m_width(width),
-          m_height(height),
-          m_clear_color(clear_color)
-    {}
-
-    void SetupPipeline(luna::val::PipelineState pipeline) override
-    {
-        pipeline.DeclareAttachment("scene_color", m_format, m_width, m_height);
-        pipeline.AddOutputAttachment("scene_color",
-                                     luna::val::ClearColor{m_clear_color != nullptr ? m_clear_color->x : 0.0f,
-                                                           m_clear_color != nullptr ? m_clear_color->y : 0.0f,
-                                                           m_clear_color != nullptr ? m_clear_color->z : 0.0f,
-                                                           m_clear_color != nullptr ? m_clear_color->w : 1.0f});
-    }
-
-    void BeforeRender(luna::val::RenderPassState state) override
-    {
-        if (m_clear_color == nullptr) {
-            return;
-        }
-
-        state.SetColorClearValue(
-            0, luna::val::ClearColor{m_clear_color->x, m_clear_color->y, m_clear_color->z, m_clear_color->w});
-    }
-
-private:
-    luna::val::Format m_format{luna::val::Format::UNDEFINED};
-    uint32_t m_width{0};
-    uint32_t m_height{0};
-    const glm::vec4* m_clear_color{nullptr};
-};
-
 std::unique_ptr<luna::val::RenderGraph> buildDefaultRenderGraph(const RenderGraphBuildInfo& build_info,
-                                                                const glm::vec4* clear_color,
+                                                                luna::SceneRenderer& scene_renderer,
                                                                 bool include_imgui_pass)
 {
-    luna::val::RenderGraphBuilder builder;
-    builder.AddRenderPass(
-        "clear",
-        std::make_unique<ClearColorPass>(
-            build_info.m_surface_format, build_info.m_framebuffer_width, build_info.m_framebuffer_height, clear_color));
-
-    if (include_imgui_pass) {
-        builder.AddRenderPass("imgui", std::make_unique<luna::val::ImGuiRenderPass>("scene_color"));
-    }
-
-    builder.SetOutputName("scene_color");
-
-    return builder.Build();
+    return scene_renderer.buildRenderGraph(
+        build_info.m_surface_format, build_info.m_framebuffer_width, build_info.m_framebuffer_height, include_imgui_pass);
 }
 
 } // namespace
@@ -140,6 +92,7 @@ bool VulkanRenderer::init(Window& window, InitializationOptions options)
 
     m_initialized = true;
     m_resize_requested = false;
+    m_render_graph_rebuild_requested = false;
     m_frame_started = false;
     return true;
 }
@@ -150,11 +103,13 @@ void VulkanRenderer::shutdown()
         return;
     }
     m_render_graph.reset();
+    m_scene_renderer.shutdown();
     m_context.reset();
     m_window = nullptr;
     m_native_window = nullptr;
     m_initialization_options = {};
     m_resize_requested = false;
+    m_render_graph_rebuild_requested = false;
     m_frame_started = false;
     m_initialized = false;
 }
@@ -178,6 +133,11 @@ bool VulkanRenderer::isImGuiEnabled() const
 void VulkanRenderer::requestResize()
 {
     m_resize_requested = true;
+}
+
+void VulkanRenderer::requestRenderGraphRebuild()
+{
+    m_render_graph_rebuild_requested = true;
 }
 
 bool VulkanRenderer::isResizeRequested() const
@@ -208,6 +168,11 @@ void VulkanRenderer::startFrame()
         return;
     }
 
+    if (m_render_graph_rebuild_requested) {
+        rebuildRenderGraph();
+        m_render_graph_rebuild_requested = false;
+    }
+
     m_context->StartFrame();
     m_frame_started = true;
 }
@@ -231,6 +196,7 @@ void VulkanRenderer::endFrame()
     }
 
     m_context->EndFrame();
+    m_scene_renderer.clearSubmittedMeshes();
     m_frame_started = false;
 }
 
@@ -252,6 +218,16 @@ Camera& VulkanRenderer::getMainCamera()
 const Camera& VulkanRenderer::getMainCamera() const
 {
     return m_main_camera;
+}
+
+SceneRenderer& VulkanRenderer::getSceneRenderer()
+{
+    return m_scene_renderer;
+}
+
+const SceneRenderer& VulkanRenderer::getSceneRenderer() const
+{
+    return m_scene_renderer;
 }
 
 glm::vec4& VulkanRenderer::getClearColor()
@@ -285,7 +261,7 @@ void VulkanRenderer::rebuildRenderGraph()
     if (m_initialization_options.m_render_graph_builder) {
         m_render_graph = m_initialization_options.m_render_graph_builder(build_info);
     } else {
-        m_render_graph = buildDefaultRenderGraph(build_info, &m_clear_color, m_imgui_enabled);
+        m_render_graph = buildDefaultRenderGraph(build_info, m_scene_renderer, m_imgui_enabled);
     }
 }
 
