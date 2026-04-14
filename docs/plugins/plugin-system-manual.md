@@ -173,7 +173,7 @@ sequenceDiagram
 | Bundle | 当前启用插件 | 结果 |
 | --- | --- | --- |
 | `EditorDefault` | `luna.editor.shell`、`luna.editor.core`、`luna.example.hello`、`luna.example.imgui_demo` | 启用 editor shell、默认编辑器能力和两个示例面板 |
-| `RuntimeDefault` | `luna.runtime.core` | 启用最小 runtime Layer 示例 |
+| `RuntimeDefault` | `luna.runtime.core` | 启用最小 runtime 场景插件，默认显示旋转立方体静态网格 |
 
 > **提示 (Note):**
 > 仓库里还存在一个 `luna.imgui` 插件。
@@ -398,7 +398,10 @@ python Tools\luna\sync.py --project-root . --bundle Bundles/EditorDefault/luna.b
 | `luna.editor.core` | 提供相机控制 Layer、Renderer Panel、Reset Camera Command |
 | `luna.example.hello` | 提供最小 Hello Panel 示例 |
 | `luna.example.imgui_demo` | 提供 Dear ImGui Demo Panel 示例 |
-| `luna.runtime.core` | 提供最小 runtime Layer 示例 |
+| `luna.runtime.core` | 提供最小 runtime scene / static mesh 示例 |
+
+`luna.runtime.core` 当前不是单纯的 clear color 示例。
+它会注册 `luna.runtime.static_mesh`，配置 `SceneRenderer` 的 shader 路径并请求渲染图重建，然后创建一个最小 `Scene`，在运行时提交并旋转一个立方体静态网格。
 
 ## 13. 插件当前可以做什么，不能做什么
 
@@ -443,6 +446,7 @@ renderer.getClearColor().x = 0.25f;
 
 - 相机控制
 - clear color 调整
+- 默认 `SceneRenderer` shader 路径切换与渲染图重建请求
 - 显示 renderer 基本状态
 
 但当前仍然**不正式支持**:

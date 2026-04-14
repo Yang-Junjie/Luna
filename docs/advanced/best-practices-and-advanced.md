@@ -37,7 +37,7 @@ graph TD
 | 新增一个编辑器窗口 | `EditorPanel` 插件 | 当前最稳定的 editor 扩展点 |
 | 新增一个编辑器动作 | `EditorRegistry::addCommand()` | 菜单触发链路已经稳定 |
 | 新增持续运行的交互逻辑 | `Layer` 插件 | 具备 `onUpdate/onEvent/onRender` 生命周期 |
-| 修改主相机或 clear color | 插件内 `Layer` / `Panel` | 可通过 `Application::get().getRenderer()` 完成 |
+| 修改主相机、clear color 或默认 `SceneRenderer` 配置 | 插件内 `Layer` / `Panel` | 可通过 `Application::get().getRenderer()` 完成 |
 | 共享项目状态、场景状态 | `ServiceRegistry` | 当前的服务容器已经存在 |
 | 替换 RenderGraph | 自定义 `Application` / 宿主 | 当前正式注入点只在 renderer 初始化前 |
 | 新增 importer registry / asset registry | 先设计新的 registry，再扩展插件协议 | 目前没有正式资产扩展点 |
@@ -252,8 +252,12 @@ graph LR
 - 调试叠加层
 - 相机控制
 - clear color / 相机参数调节
+- 默认 `SceneRenderer` shader 路径切换
 
 那就走插件。
+
+如果你只是调整默认 `SceneRenderer` 使用的 shader 路径或 runtime scene 提交流程，插件已经足够。
+这类改动应在配置变化时显式 `requestRenderGraphRebuild()`，而不是每帧反复重建。
 
 如果你的目标是:
 

@@ -17,6 +17,7 @@ Luna 解决的不是“如何最快做一个成品编辑器”，而是下面这
 | Bundle 驱动装配 | 已实现 | `editor` / `runtime` 都由 Bundle 选择插件 |
 | 层系统与事件系统 | 已实现 | `Application + LayerStack + Event` 已稳定运行 |
 | Vulkan 渲染底座 | 已实现 | `VulkanContext + RenderGraph + DescriptorBinding` 已可用 |
+| 最小 Scene 运行时链路 | 已实现 | `Scene + Entity + StaticMeshComponent + SceneRenderer` 已接入默认 renderer |
 | 编辑器壳层 | 已实现 | `luna.editor.shell + editor plugins` 组合成 editor；`luna.imgui` 可供其他 bundle 独立请求 ImGui |
 | 资源导入能力 | 已实现 | `ShaderLoader`、`ModelLoader`、`ImageLoader` 可独立使用 |
 | 正式渲染插件扩展点 | 未实现 | 当前插件系统还不能正式贡献 RenderGraph / RenderPass |
@@ -179,12 +180,16 @@ graph LR
 
 | 组合 | 当前效果 |
 | --- | --- |
-| `runtime` | 一个带最小 runtime layer 的纯宿主窗口 |
+| `runtime` | `luna.runtime.core` 创建的最小运行时场景窗口，默认显示旋转立方体静态网格 |
 | `editor` | 启用 ImGui，并装配 editor shell、面板和命令 |
 
 > **提示 (Note):**
 > `luna.imgui` 是一个真实存在的 builtin 插件，但它当前不在默认 `EditorDefault` bundle 中。
 > 默认 editor 之所以会启用 ImGui，是因为 `luna.editor.shell` 在注册阶段调用了 `requestImGui()`。
+
+> **提示 (Note):**
+> `RuntimeDefault` bundle 中的 `luna.runtime.core` 当前会注册 `RuntimeStaticMeshLayer`，
+> 配置 `SceneRenderer` 的 shader 路径，并创建一个包含旋转立方体实体的最小 `Scene`。
 
 ## 目前最容易被误解的几个点
 
@@ -202,6 +207,7 @@ renderer.getClearColor().x = 0.2f;
 
 - 相机控制
 - clear color 调试
+- 配置默认 `SceneRenderer` 的 shader 路径并请求渲染图重建
 - 读取 renderer 基本状态
 
 但还不够做:

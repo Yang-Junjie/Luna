@@ -262,16 +262,18 @@ registry.editor().addCommand("my.reset", "Reset Something", [] {
 ## 类名: `luna::VulkanRenderer`
 
 - **继承/实现**: 无
-- **简述**: 渲染入口对象，持有 `VulkanContext`、活动 `RenderGraph` 与主摄像机。
+- **简述**: 渲染入口对象，持有 `VulkanContext`、活动 `RenderGraph`、默认 `SceneRenderer` 与主摄像机。
 
 ### 属性 (Properties)
 
 | 类型 | 名称 | 默认值 | 描述 |
 | --- | --- | --- | --- |
+| `SceneRenderer` | `m_scene_renderer` | 默认构造 | 默认 scene 渲染路径组织器 |
 | `Camera` | `m_main_camera` | 默认构造 | 当前主摄像机 |
 | `glm::vec4` | `m_clear_color` | `(0.10, 0.10, 0.12, 1.0)` | 当前 clear color |
 | `bool` | `m_imgui_enabled` | `false` | 是否启用 ImGui pass |
 | `bool` | `m_resize_requested` | `false` | 是否等待处理 resize |
+| `bool` | `m_render_graph_rebuild_requested` | `false` | 是否等待重建默认 RenderGraph |
 
 ### 方法 (Methods)
 
@@ -283,6 +285,7 @@ registry.editor().addCommand("my.reset", "Reset Something", [] {
 | `bool` | `isRenderingEnabled() const` | 查询当前帧是否可渲染 |
 | `bool` | `isImGuiEnabled() const` | 查询是否启用 ImGui pass |
 | `void` | `requestResize()` | 请求下一帧处理 resize |
+| `void` | `requestRenderGraphRebuild()` | 请求下一帧重建当前默认 RenderGraph |
 | `bool` | `isResizeRequested() const` | 查询 resize 标记 |
 | `void` | `setImGuiEnabled(bool enabled)` | 打开或关闭 ImGui pass |
 | `void` | `startFrame()` | 开始一帧 |
@@ -291,7 +294,11 @@ registry.editor().addCommand("my.reset", "Reset Something", [] {
 | `GLFWwindow*` | `getNativeWindow() const` | 获取原生窗口句柄 |
 | `const vk::RenderPass&` | `getImGuiRenderPass() const` | 获取 ImGui render pass |
 | `Camera&` | `getMainCamera()` | 获取主摄像机 |
+| `const Camera&` | `getMainCamera() const` | 获取只读主摄像机 |
+| `SceneRenderer&` | `getSceneRenderer()` | 获取默认 scene 渲染路径组织器 |
+| `const SceneRenderer&` | `getSceneRenderer() const` | 获取只读 scene 渲染路径组织器 |
 | `glm::vec4&` | `getClearColor()` | 获取 clear color |
+| `const glm::vec4&` | `getClearColor() const` | 获取只读 clear color |
 
 ### 方法详细说明
 
@@ -302,6 +309,33 @@ registry.editor().addCommand("my.reset", "Reset Something", [] {
 | 类型 | 名称 | 描述 |
 | --- | --- | --- |
 | `RenderGraphBuilderCallback` | `m_render_graph_builder` | 在初始化阶段自定义活动 RenderGraph |
+
+#### 默认 RenderGraph 行为
+
+如果没有提供自定义 `m_render_graph_builder`，`VulkanRenderer` 会把默认图构建委托给 `SceneRenderer::buildRenderGraph()`。
+
+正常情况下默认图是:
+
+- `scene_geometry`
+- `scene_lighting`
+- optional `imgui`
+- present
+
+如果 `SceneRenderer` 的 scene shader 或核心资源没有成功初始化，则会回退到:
+
+- `scene_clear`
+- optional `imgui`
+- present
+
+#### `requestRenderGraphRebuild()`
+
+当你修改会影响默认 scene 图资源解析的配置时，应显式请求重建:
+
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+renderer.getSceneRenderer().setShaderPaths(shader_paths);
+renderer.requestRenderGraphRebuild();
+```
 
 #### `renderFrame()`
 
@@ -315,8 +349,126 @@ m_render_graph->Present(
 
 #### 重要说明
 
-当前 `VulkanRenderer` 对 renderer 自定义的正式入口是初始化阶段。  
-因此它更适合由宿主 `Application` 子类接入，而不是由当前插件系统动态替换。
+当前 `VulkanRenderer` 对“提供全新 RenderGraph builder”的正式入口仍然是初始化阶段。  
+插件现在可以通过 `SceneRenderer` 影响默认 scene 渲染路径，但仍然不能正式替换 `RenderGraphBuilderCallback`。
+
+## 类名: `luna::SceneRenderer`
+
+- **继承/实现**: 无
+- **简述**: 默认 scene 渲染路径组织器，负责收集静态网格提交、缓存已上传 mesh/material，并构建默认 RenderGraph。
+
+### 结构体: `ShaderPaths`
+
+| 类型 | 名称 | 描述 |
+| --- | --- | --- |
+| `std::filesystem::path` | `geometry_vertex_path` | geometry pass 顶点 shader 路径 |
+| `std::filesystem::path` | `geometry_fragment_path` | geometry pass 片元 shader 路径 |
+| `std::filesystem::path` | `lighting_vertex_path` | lighting pass 顶点 shader 路径 |
+| `std::filesystem::path` | `lighting_fragment_path` | lighting pass 片元 shader 路径 |
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `void` | `shutdown()` | 销毁缓存的 scene 资源与上传状态 |
+| `void` | `beginScene(const Camera& camera)` | 记录当前场景相机并清空本帧提交列表 |
+| `void` | `clearSubmittedMeshes()` | 清空当前帧静态网格提交列表 |
+| `void` | `setShaderPaths(ShaderPaths shader_paths)` | 覆盖默认 scene shader 路径并使核心资源失效 |
+| `void` | `submitStaticMesh(const glm::mat4& transform, std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material = {})` | 提交一个静态网格绘制命令 |
+| `std::unique_ptr<val::RenderGraph>` | `buildRenderGraph(val::Format surface_format, uint32_t framebuffer_width, uint32_t framebuffer_height, bool include_imgui_pass)` | 构建默认 scene RenderGraph |
+
+### 方法详细说明
+
+#### `setShaderPaths()`
+
+`setShaderPaths()` 只会更新 `SceneRenderer` 内部记录的 shader 路径，并使已加载 shader / 核心资源失效。  
+如果 renderer 已经在运行，你通常还要再调用 `VulkanRenderer::requestRenderGraphRebuild()`，让活动图重新根据新路径构建。
+
+#### `submitStaticMesh()`
+
+`submitStaticMesh()` 会忽略空 mesh 或无效 mesh。  
+当前 `Scene::onUpdateRuntime()` 就是通过这条 API，把 `TransformComponent + StaticMeshComponent` 组合转成绘制提交。
+
+#### `buildRenderGraph()`
+
+正常情况下会构建:
+
+- `scene_geometry`
+- `scene_lighting`
+- optional `imgui`
+- present
+
+如果 scene shader 不完整或加载失败，则会回退到只输出 `scene_color` 的 `scene_clear` 图，保证宿主仍然能显示一个有效画面。
+
+## 类名: `luna::Scene`
+
+- **继承/实现**: 无
+- **简述**: 基于 `entt::registry` 的最小 runtime 场景容器，负责 entity 生命周期与运行时静态网格提交流程。
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `Entity` | `createEntity(const std::string& name = std::string{})` | 创建一个带默认组件的新实体 |
+| `Entity` | `createEntityWithUUID(UUID uuid, const std::string& name = std::string{})` | 创建一个指定 UUID 的实体 |
+| `void` | `destroyEntity(Entity entity)` | 销毁属于当前 `Scene` 的实体 |
+| `void` | `onUpdateRuntime()` | 遍历可见静态网格并提交给 `SceneRenderer` |
+
+### 方法详细说明
+
+#### `createEntity()`
+
+当前会为新实体自动添加:
+
+- `IDComponent`
+- `TagComponent`
+- `TransformComponent`
+
+如果没有提供名称，默认 tag 为 `"Entity"`。
+
+#### `onUpdateRuntime()`
+
+`onUpdateRuntime()` 会:
+
+1. 从 `Application::get().getRenderer()` 获取 renderer 和主摄像机。
+2. 调用 `SceneRenderer::beginScene()` 开始本帧 scene 提交。
+3. 遍历所有同时拥有 `TransformComponent` 与 `StaticMeshComponent` 的实体。
+4. 跳过 `visible == false` 或 mesh 为空的实体。
+5. 调用 `submitStaticMesh()` 提交最终绘制命令。
+
+## 类名: `luna::Entity`
+
+- **继承/实现**: 无
+- **简述**: 指向特定 `Scene` 中某个 `entt::entity` 的轻量句柄，负责封装组件访问与基本标识读取。
+
+### 方法 (Methods)
+
+| 返回类型 | 方法名(参数列表) | 描述 |
+| --- | --- | --- |
+| `T&` | `addComponent<T>(Args&&... args)` | 为当前实体添加组件 |
+| `T&` | `getComponent<T>()` | 获取可写组件引用 |
+| `const T&` | `getComponent<T>() const` | 获取只读组件引用 |
+| `bool` | `hasComponent<T>() const` | 判断实体是否拥有某组件 |
+| `void` | `removeComponent<T>()` | 如果存在则移除组件 |
+| `UUID` | `getUUID() const` | 读取 `IDComponent` 中的 UUID |
+| `const std::string&` | `getName() const` | 读取 `TagComponent` 中的名称 |
+
+### 额外行为
+
+`Entity` 还提供:
+
+- `bool` 转换，用于判断句柄是否有效
+- 到 `entt::entity` 与 `uint32_t` 的转换
+- 基于实体句柄和所属 `Scene` 的相等性比较
+
+## 核心 Scene 组件
+
+| 组件 | 当前字段 / 能力 | 作用 |
+| --- | --- | --- |
+| `IDComponent` | `UUID id` | 提供稳定实体标识 |
+| `TagComponent` | `std::string tag` | 提供名称 |
+| `TransformComponent` | `translation`、`rotation`、`scale`、`getTransform()` | 提供局部变换并生成模型矩阵 |
+| `StaticMeshComponent` | `mesh`、`material`、`visible` | 声明运行时静态网格与材质引用 |
 
 ## 类名: `luna::val::RenderGraphBuilder`
 

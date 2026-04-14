@@ -79,8 +79,11 @@
 | `luna.editor.core` | 注册默认编辑器相机控制、Renderer 面板与 Reset Camera 命令 |
 | `luna.example.hello` | 注册 Hello 示例面板 |
 | `luna.example.imgui_demo` | 注册 Dear ImGui Demo 面板 |
-| `luna.runtime.core` | 注册 runtime clear color 动画层 |
+| `luna.runtime.core` | 注册 runtime static mesh layer，并演示最小 scene / `SceneRenderer` 接入 |
 | `luna.imgui` | 提供独立的 ImGui 请求插件，当前不在默认 editor bundle 中 |
+
+`luna.runtime.core` 当前的意义也已经从“clear color 动画”变成“最小 runtime scene 样例”。
+它会配置默认 `SceneRenderer` 的 shader 路径、请求渲染图重建，并创建一个会旋转的立方体实体。
 
 ## 5. 当前“半实现”的部分
 
@@ -223,8 +226,9 @@
 | 问题 | 当前答案 |
 | --- | --- |
 | 插件能访问 renderer 基本状态吗 | 能 |
+| 插件能配置默认 `SceneRenderer` 并请求渲染图重建吗 | 能 |
 | 插件能改 clear color / 相机吗 | 能 |
-| 插件能像 `Samples/Model` 那样正式替换 RenderGraph 吗 | 不能，当前没有正式协议 |
+| 插件能像 `Samples/Model` 那样正式替换 RenderGraph 吗 | 不能，当前没有正式 builder 注入协议 |
 
 ### 7.2 `Editor/` 不应该重新长回“大而全”
 

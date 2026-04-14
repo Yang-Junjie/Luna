@@ -12,6 +12,8 @@
 - 当前插件系统还**没有**正式的 `RenderGraphContribution` 或 `RenderFeatureRegistry`。
 
 这不是因为插件不能访问 renderer，而是因为**renderer 初始化参数的正式注入点发生在插件注册之前**。
+这也不等于插件完全不能影响默认场景渲染链路:
+当前公共 API 已允许插件在初始化后通过 `SceneRenderer` 调整默认 scene shader 路径并请求图重建，但它仍然不能提供新的 builder callback。
 
 ## 先明确当前边界
 
@@ -209,7 +211,7 @@ buildMyRenderGraph(const luna::VulkanRenderer::RenderGraphBuildInfo& build_info)
 | --- | --- |
 | 新增 editor panel / command / tool UI | 插件 |
 | 新增 runtime layer、相机逻辑、输入逻辑 | 插件 |
-| 修改 clear color、相机、renderer 基本状态 | 插件内 Layer / Panel 即可 |
+| 修改 clear color、相机、默认 `SceneRenderer` 配置 | 插件内 Layer / Panel 即可 |
 | 替换整个 RenderGraph | 自定义宿主 |
 | 注入自定义 RenderPass / 资源上传路径 | 自定义宿主 |
 | 做类似 `Samples/Model` 的完整渲染效果 | 自定义宿主 |

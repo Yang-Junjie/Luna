@@ -147,7 +147,61 @@ extern "C" void luna_register_my_editor(luna::PluginRegistry& registry)
 
 都可以继续保持在 `Plugins/` 下，而不是重新塞回 `Editor/`。
 
-## 子系统 C: Renderer 与 RenderGraph
+## 子系统 C: Scene 与 Runtime Scene
+
+### 子系统目标
+
+这个子系统负责把“运行时世界状态”和“默认 scene render path”之间的桥接做成最小可用闭环，包括:
+
+- 用 `entt` 承载 entity/component 生命周期
+- 提供 `Entity` 包装，简化组件增删查改
+- 在 `Scene::onUpdateRuntime()` 中把可见静态网格提交给 `SceneRenderer`
+
+### 架构图
+
+```mermaid
+graph TD
+    Layer[Runtime Layer] --> Scene[Scene]
+    Scene --> Registry[entt::registry]
+    Scene --> Entity[Entity handles]
+    Entity --> Components[Transform / StaticMesh / Tag / ID]
+    Scene --> SceneRenderer[SceneRenderer]
+    SceneRenderer --> Renderer[VulkanRenderer]
+```
+
+### 核心对象
+
+| 对象 | 作用 |
+| --- | --- |
+| `Scene` | 拥有 `entt::registry`，负责创建/销毁实体并在运行时提交可见静态网格 |
+| `Entity` | 轻量句柄，封装组件访问与基本标识读取 |
+| `TransformComponent` | 保存平移/旋转/缩放，并可生成模型矩阵 |
+| `StaticMeshComponent` | 保存 `Mesh`、`Material` 与可见性 |
+| `IDComponent` / `TagComponent` | 分别提供 UUID 与名称 |
+
+### 当前默认 runtime 插件如何使用它
+
+`luna.runtime.core` 当前注册的是 `RuntimeStaticMeshLayer`。它会:
+
+- 配置 `SceneRenderer::ShaderPaths` 指向插件内置 shader
+- 调用 `requestRenderGraphRebuild()` 让默认渲染图重新解析 shader 资源
+- 创建一个最小 `Scene`
+- 创建名为 `runtime_cube` 的 entity，并挂上 `TransformComponent` 与 `StaticMeshComponent`
+- 在 `onUpdate()` 里旋转实体并调用 `Scene::onUpdateRuntime()`
+
+### 当前这层已经实现什么
+
+- 最小 entity/component 生命周期
+- 基于 `TransformComponent + StaticMeshComponent` 的静态网格提交流程
+- 与默认 `VulkanRenderer` / `SceneRenderer` 主路径的衔接
+
+### 当前还没实现什么
+
+- 层级关系 / parent-child transform
+- 场景内 camera/light 组件系统
+- 序列化、资源引用解析、editor scene service
+
+## 子系统 D: Renderer 与 RenderGraph
 
 ### 子系统目标
 
@@ -198,16 +252,25 @@ sequenceDiagram
 
 ### 当前默认宿主的渲染现实
 
-默认 `LunaApp` 使用的是一张很小的默认图:
+默认 `LunaApp` 当前会把 RenderGraph 构建委托给 `SceneRenderer`。
 
-- clear
+在 scene shader 与核心资源可用时，默认图是:
+
+- `scene_geometry`
+- `scene_lighting`
+- optional imgui
+- present
+
+如果 scene shader 加载失败，或 `SceneRenderer` 核心资源没有成功初始化，则会回退到:
+
+- `scene_clear`
 - optional imgui
 - present
 
 所以:
 
 - renderer 底座已经很强
-- 默认宿主表现还很克制
+- 默认宿主已经带有最小 scene 渲染主路径
 
 ### 当前最重要的限制
 
@@ -223,9 +286,25 @@ auto& renderer = luna::Application::get().getRenderer();
 - `RenderFeatureRegistry`
 - `RenderPass` 注入协议
 
+当前插件还可以进一步使用:
+
+```cpp
+auto& renderer = luna::Application::get().getRenderer();
+renderer.getSceneRenderer().setShaderPaths(shader_paths);
+renderer.requestRenderGraphRebuild();
+```
+
+这足够完成:
+
+- 相机控制
+- clear color 调整
+- 默认 scene renderer shader 资源切换
+
+但它仍然不等于“插件已经正式拥有 RenderGraph builder / RenderPass 注入协议”。
+
 因此 `Samples/Model` 那种完整自定义渲染路径，当前仍然是宿主级扩展，而不是插件级扩展。
 
-## 子系统 D: Asset 导入与资源工具
+## 子系统 E: Asset 导入与资源工具
 
 ### 子系统目标
 
@@ -274,7 +353,7 @@ shader->Init(
 
 这是下一阶段很值得做的一块。
 
-## 子系统 E: JobSystem
+## 子系统 F: JobSystem
 
 ### 子系统目标
 
@@ -326,8 +405,10 @@ b.wait(tasks);
 graph LR
     Host[Application / LunaApp] --> Plugins[PluginRegistry]
     Plugins --> Editor[EditorRegistry]
+    Plugins --> Scene[Scene / Runtime layers]
     Host --> Renderer[VulkanRenderer]
     Host --> Tasks[TaskSystem]
+    Scene --> Renderer
     Renderer --> Assets[ShaderLoader / ModelLoader / ImageLoader]
     Renderer --> Vulkan[VulkanContext]
     Editor --> ImGui[EditorShellLayer + ImGui]
@@ -339,6 +420,7 @@ graph LR
 | --- | --- |
 | `LunaApp -> PluginRegistry -> LayerStack` | 把宿主与插件装配彻底串起来 |
 | `EditorRegistry -> EditorShellLayer` | 把 editor 功能从宿主代码中剥离出来 |
+| `Scene -> SceneRenderer` | 把 entity/component 世界状态转成默认 scene draw submission |
 | `VulkanRenderer -> RenderGraph -> VulkanContext` | 把“图组织”与“原生资源”分层 |
 | `TaskSystem -> Application` | 让宿主天然具备后台任务能力 |
 

@@ -330,8 +330,12 @@ extern "C" void luna_register_com_example_runtime(luna::PluginRegistry& registry
 
 - 相机或输入逻辑
 - 调试动画
+- 最小 runtime scene / static mesh 演示
 - 运行时行为验证
 - clear color、相机位置、调试参数等状态修改
+
+`Plugins/builtin/luna.runtime.core` 当前就是这个方向的真实样例。
+它会配置 `SceneRenderer` shader 路径、创建 `Scene`，并在 `onUpdate()` 中提交一个旋转立方体。
 
 ## 13. 当前插件能碰 renderer 到什么程度
 
@@ -349,6 +353,7 @@ color.x = 0.2f;
 
 - 相机控制
 - clear color 调整
+- 默认 `SceneRenderer` shader 路径切换与渲染图重建请求
 - 读取 renderer 统计和状态
 
 ### 13.2 当前不要试图做的

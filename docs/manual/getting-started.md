@@ -133,7 +133,12 @@ cmake --build build --config Debug --target LunaApp
 
 - 原生系统窗口
 - 无 editor shell
-- 默认 clear color 动态变化的 runtime 示例层
+- 由 `luna.runtime.core` 创建的最小运行时场景
+- 一个持续旋转的立方体静态网格
+
+> **提示 (Note):**
+> 当前默认 runtime bundle 注册的是 `RuntimeStaticMeshLayer`。
+> 它会配置 `SceneRenderer` 使用插件内置 shader，创建一个最小 `Scene`，并在每帧提交旋转的立方体实体。
 
 ## 你的第一个 Luna 插件
 

@@ -151,6 +151,10 @@ Luna/
 │  │  ├─ ShaderLoader.h/.cpp
 │  │  ├─ ModelLoader.h/.cpp
 │  │  └─ ImageLoader.h/.cpp
+│  ├─ Scene/
+│  │  ├─ Components.h
+│  │  ├─ Entity.h/.cpp
+│  │  └─ Scene.h/.cpp                # 最小 runtime scene / entity / component 抽象
 │  └─ Vulkan/
 │     ├─ VulkanContext.h/.cpp
 │     ├─ VirtualFrame.h/.cpp
@@ -194,6 +198,7 @@ Luna/
 | `Editor/` | 定义 editor framework 扩展协议 | 继续塞大量具体面板和工作流 |
 | `Plugins/` | 具体功能插件与扩展实现 | 反向接管宿主生命周期 |
 | `Renderer/` | 更高层的渲染组织和导入器 | 处理平台事件源 |
+| `Scene/` | 维护 runtime scene、entity/component 与 scene submission | 直接持有窗口、交换链或平台事件源 |
 | `Vulkan/` | Vulkan 资源、命令、同步封装 | 决定业务级工具行为 |
 | `Tools/` | 解析配置、生成中间文件、驱动构建 | 参与运行时逻辑 |
 
@@ -429,6 +434,9 @@ Luna 当前刻意不使用:
 - Renderer 很强
 - `Samples/Model` 很完整
 - 但 `LunaApp` 的插件系统还没有正式的 `RenderFeatureRegistry` 或 `RenderGraphContribution`
+- 默认 `LunaApp` 当前使用 `SceneRenderer` 构建默认场景图
+- 插件可以在初始化后通过 `getSceneRenderer().setShaderPaths(...)` 和 `requestRenderGraphRebuild()` 影响这条默认路径
+- 但插件仍然不能提供新的 `RenderGraphBuilderCallback`，也不能正式注入任意 `RenderPass`
 
 因此如果你要做“像 `Samples/Model` 那样的完整渲染效果”，当前最正确的方式仍然是:
 

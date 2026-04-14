@@ -22,6 +22,7 @@ Luna 当前更准确的定位是:
 
 - `editor` 和 `runtime` 不是两个独立程序架构，而是同一个 `LunaApp` 的两种插件组合。
 - 插件系统已经能稳定承载 `Layer`、`Panel`、`Command` 和 ImGui 请求。
+- 默认 `runtime` 组合当前会通过 `luna.runtime.core` 创建一个最小 `Scene`，并显示旋转立方体静态网格。
 - 渲染器已经提供 `RenderGraph` 能力，但当前插件系统**还不能**把自定义 RenderGraph 作为正式扩展点接入活动宿主。
 
 ## 文档地图
