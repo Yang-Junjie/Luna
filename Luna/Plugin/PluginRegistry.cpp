@@ -1,5 +1,6 @@
 #include "Core/Log.h"
 #include "Plugin/PluginRegistry.h"
+#include "Renderer/PluginRenderGraphInternal.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -40,6 +41,20 @@ void PluginRegistry::addOverlay(std::string id, LayerFactory factory)
     addLayerContribution(std::move(id), true, std::move(factory));
 }
 
+void PluginRegistry::addRenderGraphProvider(std::string id, RenderGraphBuilderFactory factory)
+{
+    addRenderGraphProviderContribution(std::move(id), std::move(factory));
+}
+
+void PluginRegistry::addRenderGraph(std::string id, render::RenderGraphFactory factory)
+{
+    addRenderGraphProviderContribution(
+        std::move(id),
+        [factory = std::move(factory)](bool include_imgui) {
+            return render::detail::createRenderGraphBuilderCallback(factory, include_imgui);
+        });
+}
+
 void PluginRegistry::addLayerContribution(std::string id, bool overlay, LayerFactory factory)
 {
     if (!factory) {
@@ -57,6 +72,27 @@ void PluginRegistry::addLayerContribution(std::string id, bool overlay, LayerFac
     }
 
     m_layers.push_back(LayerContribution{.m_id = std::move(id), .m_overlay = overlay, .m_factory = std::move(factory)});
+}
+
+void PluginRegistry::addRenderGraphProviderContribution(std::string id, RenderGraphBuilderFactory factory)
+{
+    if (!factory) {
+        LUNA_CORE_WARN("Ignoring render-graph provider '{}' because it has no factory", id);
+        return;
+    }
+
+    const auto duplicate =
+        std::find_if(m_render_graph_providers.begin(), m_render_graph_providers.end(), [&id](const RenderGraphProviderContribution& provider) {
+            return provider.m_id == id;
+        });
+
+    if (duplicate != m_render_graph_providers.end()) {
+        LUNA_CORE_WARN("Ignoring duplicate render-graph provider '{}'", id);
+        return;
+    }
+
+    m_render_graph_providers.push_back(
+        RenderGraphProviderContribution{.m_id = std::move(id), .m_factory = std::move(factory)});
 }
 
 } // namespace luna

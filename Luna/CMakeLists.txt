@@ -13,6 +13,9 @@ set(RENDERER_SOURCE
     Renderer/Camera.cpp
     Renderer/ImageLoader.h
     Renderer/ImageLoader.cpp
+    Renderer/PluginRenderGraph.h
+    Renderer/PluginRenderGraphInternal.h
+    Renderer/PluginRenderGraph.cpp
     Renderer/Material.h
     Renderer/Material.cpp
     Renderer/Mesh.h

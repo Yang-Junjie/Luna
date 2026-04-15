@@ -46,6 +46,11 @@ bool Application::initialize()
         return false;
     }
 
+    if (!onPreInitialize()) {
+        LUNA_CORE_ERROR("Application pre-initialization failed");
+        return false;
+    }
+
     if (!m_task_system.initialize()) {
         LUNA_CORE_ERROR("Task system initialization failed");
         return false;

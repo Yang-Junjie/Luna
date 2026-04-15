@@ -30,6 +30,7 @@ class BundleManifest:
     version: str
     sdk: str
     host: str
+    render_graph_provider: str | None
     enabled_plugins: list[str]
     manifest_path: Path
 
@@ -50,6 +51,15 @@ def read_toml(path: Path) -> dict:
 
 def require_string(table: dict, key: str, path: Path) -> str:
     value = table.get(key)
+    if not isinstance(value, str) or not value:
+        fail(f"Expected non-empty string field '{key}' in {path.as_posix()}")
+    return value
+
+
+def read_optional_string(table: dict, key: str, path: Path) -> str | None:
+    value = table.get(key)
+    if value is None:
+        return None
     if not isinstance(value, str) or not value:
         fail(f"Expected non-empty string field '{key}' in {path.as_posix()}")
     return value
@@ -116,6 +126,7 @@ def parse_bundle_manifest(path: Path) -> BundleManifest:
         version=require_string(data, "version", path),
         sdk=require_string(data, "sdk", path),
         host=require_string(data, "host", path),
+        render_graph_provider=read_optional_string(data, "render_graph_provider", path),
         enabled_plugins=read_string_array(plugins_table, "enabled", path, required=True),
         manifest_path=path,
     )
@@ -210,12 +221,13 @@ namespace luna {
 class PluginRegistry;
 
 void registerResolvedPlugins(PluginRegistry& registry);
+const char* getResolvedRenderGraphProviderId();
 
 } // namespace luna
 """
 
 
-def generate_resolved_cpp(plugins: list[PluginManifest]) -> str:
+def generate_resolved_cpp(bundle: BundleManifest, plugins: list[PluginManifest]) -> str:
     lines = [
         '#include "Plugin/PluginBootstrap.h"',
         '#include "Plugin/PluginRegistry.h"',
@@ -235,6 +247,11 @@ def generate_resolved_cpp(plugins: list[PluginManifest]) -> str:
     )
     for plugin in plugins:
         lines.append(f"    {plugin.entry}(registry);")
+    lines.extend(["}", "", "const char* getResolvedRenderGraphProviderId()", "{"])
+    if bundle.render_graph_provider is None:
+        lines.append("    return nullptr;")
+    else:
+        lines.append(f'    return "{bundle.render_graph_provider}";')
     lines.extend(["}", "", "} // namespace luna", ""])
     return "\n".join(lines)
 
@@ -246,6 +263,9 @@ def generate_lock(project_root: Path, bundle: BundleManifest, plugins: list[Plug
         f'host = "{bundle.host}"',
         f'sdk = "{bundle.sdk}"',
     ]
+
+    if bundle.render_graph_provider is not None:
+        lines.append(f'render_graph_provider = "{bundle.render_graph_provider}"')
 
     for plugin in plugins:
         lines.extend(
@@ -271,7 +291,7 @@ def run_sync(project_root: Path, bundle_path: Path, generated_dir: Path, lock_fi
 
     write_text(generated_dir / "PluginList.cmake", generate_plugin_list(project_root, plugins))
     write_text(generated_dir / "ResolvedPlugins.h", generate_resolved_header())
-    write_text(generated_dir / "ResolvedPlugins.cpp", generate_resolved_cpp(plugins))
+    write_text(generated_dir / "ResolvedPlugins.cpp", generate_resolved_cpp(bundle, plugins))
     write_text(lock_file, generate_lock(project_root, bundle, plugins))
 
     print(

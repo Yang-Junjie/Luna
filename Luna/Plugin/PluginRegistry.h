@@ -1,6 +1,8 @@
 #pragma once
 
 #include "Core/Layer.h"
+#include "Renderer/PluginRenderGraph.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Plugin/ServiceRegistry.h"
 
 #include <functional>
@@ -17,11 +19,17 @@ class EditorRegistry;
 class PluginRegistry {
 public:
     using LayerFactory = std::function<std::unique_ptr<Layer>()>;
+    using RenderGraphBuilderFactory = std::function<VulkanRenderer::RenderGraphBuilderCallback(bool include_imgui)>;
 
     struct LayerContribution {
         std::string m_id;
         bool m_overlay = false;
         LayerFactory m_factory;
+    };
+
+    struct RenderGraphProviderContribution {
+        std::string m_id;
+        RenderGraphBuilderFactory m_factory;
     };
 
     explicit PluginRegistry(ServiceRegistry& services, editor::EditorRegistry* editor_registry = nullptr);
@@ -62,14 +70,22 @@ public:
 
     void addLayer(std::string id, LayerFactory factory);
     void addOverlay(std::string id, LayerFactory factory);
+    void addRenderGraph(std::string id, render::RenderGraphFactory factory);
+    void addRenderGraphProvider(std::string id, RenderGraphBuilderFactory factory);
 
     const std::vector<LayerContribution>& layers() const
     {
         return m_layers;
     }
 
+    const std::vector<RenderGraphProviderContribution>& renderGraphProviders() const
+    {
+        return m_render_graph_providers;
+    }
+
 private:
     void addLayerContribution(std::string id, bool overlay, LayerFactory factory);
+    void addRenderGraphProviderContribution(std::string id, RenderGraphBuilderFactory factory);
 
 private:
     ServiceRegistry& m_services;
@@ -77,6 +93,7 @@ private:
     bool m_imgui_requested = false;
     bool m_enable_multi_viewport = false;
     std::vector<LayerContribution> m_layers;
+    std::vector<RenderGraphProviderContribution> m_render_graph_providers;
 };
 
 } // namespace luna

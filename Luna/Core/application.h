@@ -75,6 +75,11 @@ public:
     }
 
 protected:
+    virtual bool onPreInitialize()
+    {
+        return true;
+    }
+
     virtual VulkanRenderer::InitializationOptions getRendererInitializationOptions()
     {
         return {};

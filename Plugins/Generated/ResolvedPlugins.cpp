@@ -10,4 +10,9 @@ void registerResolvedPlugins(PluginRegistry& registry)
     luna_register_luna_runtime_core(registry);
 }
 
+const char* getResolvedRenderGraphProviderId()
+{
+    return nullptr;
+}
+
 } // namespace luna

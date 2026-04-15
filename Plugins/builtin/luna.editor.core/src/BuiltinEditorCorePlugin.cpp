@@ -3,6 +3,7 @@
 #include "Editor/EditorRegistry.h"
 #include "EditorCameraControllerLayer.h"
 #include "Plugin/PluginRegistry.h"
+#include "Renderer/PluginRenderGraph.h"
 #include "RendererInfoPanel.h"
 
 #include <glm/vec3.hpp>
@@ -23,6 +24,15 @@ void resetMainCamera()
 
 extern "C" void luna_register_luna_editor_core(luna::PluginRegistry& registry)
 {
+    registry.addRenderGraph("luna.editor.core.graph", [](const luna::render::RenderGraphBuildInfo& build_info) {
+        luna::render::RenderGraphDefinition graph;
+        graph.addScenePass();
+        if (build_info.m_include_imgui) {
+            graph.addImGuiPass();
+        }
+        return graph;
+    });
+
     registry.addLayer("luna.editor.camera_controller", [] {
         return std::make_unique<luna::editor::EditorCameraControllerLayer>();
     });
