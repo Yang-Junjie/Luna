@@ -1,86 +1,74 @@
-#include <Impls/Vulkan/VKSurface.h>
-#include <Impls/Vulkan/VKAdapter.h>
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKQueue.h"
-namespace Cacao
+
+#include <Impls/Vulkan/VKAdapter.h>
+#include <Impls/Vulkan/VKSurface.h>
+
+namespace Cacao {
+VKSurface::VKSurface(const vk::SurfaceKHR& surface)
+    : m_surface(surface)
 {
-    VKSurface::VKSurface(const vk::SurfaceKHR& surface) : m_surface(surface)
-    {
-        if (!m_surface)
-        {
-            throw std::runtime_error("Invalid surface provided to VKSurface");
+    if (!m_surface) {
+        throw std::runtime_error("Invalid surface provided to VKSurface");
+    }
+}
+
+SurfaceCapabilities VKSurface::GetCapabilities(const Ref<Adapter>& adapter)
+{
+    if (!adapter) {
+        throw std::runtime_error("无法获取 Surface 能力：传入的 Adapter 为空 (Adapter is null)。");
+    }
+    auto vkAdapter = std::dynamic_pointer_cast<VKAdapter>(adapter);
+    if (!vkAdapter) {
+        throw std::runtime_error("类型转换失败：传入的 Adapter 不是 VKAdapter 实例。");
+    }
+    vk::PhysicalDevice physicalDevice = vkAdapter->GetPhysicalDevice();
+    vk::SurfaceCapabilitiesKHR vkCaps = physicalDevice.getSurfaceCapabilitiesKHR(m_surface);
+    m_surfaceCapabilities.minImageCount = vkCaps.minImageCount;
+    m_surfaceCapabilities.maxImageCount = vkCaps.maxImageCount;
+    m_surfaceCapabilities.currentExtent.width = vkCaps.currentExtent.width;
+    m_surfaceCapabilities.currentExtent.height = vkCaps.currentExtent.height;
+    m_surfaceCapabilities.minImageExtent.width = vkCaps.minImageExtent.width;
+    m_surfaceCapabilities.minImageExtent.height = vkCaps.minImageExtent.height;
+    m_surfaceCapabilities.maxImageExtent.width = vkCaps.maxImageExtent.width;
+    m_surfaceCapabilities.maxImageExtent.height = vkCaps.maxImageExtent.height;
+    auto& transform = m_surfaceCapabilities.currentTransform;
+    vk::SurfaceTransformFlagBitsKHR current = vkCaps.currentTransform;
+    transform = SurfaceTransform{};
+    if (current == vk::SurfaceTransformFlagBitsKHR::eIdentity) {
+        transform.rotation = SurfaceRotation::Identity;
+    } else {
+        if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate90) == vk::SurfaceTransformFlagBitsKHR::eRotate90) {
+            transform.rotation = SurfaceRotation::Rotate90;
+        } else if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate180) ==
+                   vk::SurfaceTransformFlagBitsKHR::eRotate180) {
+            transform.rotation = SurfaceRotation::Rotate180;
+        } else if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate270) ==
+                   vk::SurfaceTransformFlagBitsKHR::eRotate270) {
+            transform.rotation = SurfaceRotation::Rotate270;
+        }
+        transform.flipHorizontal = (current & vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror) ==
+                                   vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror;
+        bool isHorizontalMirrorRotate180 = (current & vk::SurfaceTransformFlagBitsKHR::eHorizontalMirrorRotate180) ==
+                                           vk::SurfaceTransformFlagBitsKHR::eHorizontalMirrorRotate180;
+        if (isHorizontalMirrorRotate180) {
+            transform.flipVertical = true;
         }
     }
-    SurfaceCapabilities VKSurface::GetCapabilities(const Ref<Adapter>& adapter)
-    {
-        if (!adapter)
-        {
-            throw std::runtime_error("无法获取 Surface 能力：传入的 Adapter 为空 (Adapter is null)。");
-        }
-        auto vkAdapter = std::dynamic_pointer_cast<VKAdapter>(adapter);
-        if (!vkAdapter)
-        {
-            throw std::runtime_error("类型转换失败：传入的 Adapter 不是 VKAdapter 实例。");
-        }
-        vk::PhysicalDevice physicalDevice = vkAdapter->GetPhysicalDevice();
-        vk::SurfaceCapabilitiesKHR vkCaps = physicalDevice.getSurfaceCapabilitiesKHR(m_surface);
-        m_surfaceCapabilities.minImageCount = vkCaps.minImageCount;
-        m_surfaceCapabilities.maxImageCount = vkCaps.maxImageCount;
-        m_surfaceCapabilities.currentExtent.width = vkCaps.currentExtent.width;
-        m_surfaceCapabilities.currentExtent.height = vkCaps.currentExtent.height;
-        m_surfaceCapabilities.minImageExtent.width = vkCaps.minImageExtent.width;
-        m_surfaceCapabilities.minImageExtent.height = vkCaps.minImageExtent.height;
-        m_surfaceCapabilities.maxImageExtent.width = vkCaps.maxImageExtent.width;
-        m_surfaceCapabilities.maxImageExtent.height = vkCaps.maxImageExtent.height;
-        auto& transform = m_surfaceCapabilities.currentTransform;
-        vk::SurfaceTransformFlagBitsKHR current = vkCaps.currentTransform;
-        transform = SurfaceTransform{};
-        if (current == vk::SurfaceTransformFlagBitsKHR::eIdentity)
-        {
-            transform.rotation = SurfaceRotation::Identity;
-        }
-        else
-        {
-            if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate90) ==
-                vk::SurfaceTransformFlagBitsKHR::eRotate90)
-            {
-                transform.rotation = SurfaceRotation::Rotate90;
-            }
-            else if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate180) ==
-                vk::SurfaceTransformFlagBitsKHR::eRotate180)
-            {
-                transform.rotation = SurfaceRotation::Rotate180;
-            }
-            else if ((current & vk::SurfaceTransformFlagBitsKHR::eRotate270) ==
-                vk::SurfaceTransformFlagBitsKHR::eRotate270)
-            {
-                transform.rotation = SurfaceRotation::Rotate270;
-            }
-            transform.flipHorizontal = (current & vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror) ==
-                vk::SurfaceTransformFlagBitsKHR::eHorizontalMirror;
-            bool isHorizontalMirrorRotate180 = (current & vk::SurfaceTransformFlagBitsKHR::eHorizontalMirrorRotate180)
-                == vk::SurfaceTransformFlagBitsKHR::eHorizontalMirrorRotate180;
-            if (isHorizontalMirrorRotate180)
-            {
-                transform.flipVertical = true;
-            }
-        }
-        return m_surfaceCapabilities;
+    return m_surfaceCapabilities;
+}
+
+std::vector<SurfaceFormat> VKSurface::GetSupportedFormats(const Ref<Adapter>& adapter)
+{
+    if (!adapter) {
+        throw std::runtime_error("Adapter is null in VKSurface::GetCapabilities");
     }
-    std::vector<SurfaceFormat> VKSurface::GetSupportedFormats(const Ref<Adapter>& adapter)
-    {
-        if (!adapter)
-        {
-            throw std::runtime_error("Adapter is null in VKSurface::GetCapabilities");
-        }
-        auto pyDevice = std::dynamic_pointer_cast<VKAdapter>(adapter)->GetPhysicalDevice();
-        std::vector<vk::SurfaceFormatKHR> vkFormats = pyDevice.getSurfaceFormatsKHR(m_surface);
-        m_surfaceFormats.clear();
-        for (const auto& vkFormat : vkFormats)
-        {
-            SurfaceFormat format;
-            switch (vkFormat.format)
-            {
+    auto pyDevice = std::dynamic_pointer_cast<VKAdapter>(adapter)->GetPhysicalDevice();
+    std::vector<vk::SurfaceFormatKHR> vkFormats = pyDevice.getSurfaceFormatsKHR(m_surface);
+    m_surfaceFormats.clear();
+    for (const auto& vkFormat : vkFormats) {
+        SurfaceFormat format;
+        switch (vkFormat.format) {
             case vk::Format::eB8G8R8A8Unorm:
                 format.format = Format::BGRA8_UNORM;
                 break;
@@ -117,9 +105,8 @@ namespace Cacao
             default:
                 format.format = Format::UNDEFINED;
                 break;
-            }
-            switch (vkFormat.colorSpace)
-            {
+        }
+        switch (vkFormat.colorSpace) {
             case vk::ColorSpaceKHR::eSrgbNonlinear:
                 format.colorSpace = ColorSpace::SRGB_NONLINEAR;
                 break;
@@ -168,24 +155,22 @@ namespace Cacao
             default:
                 format.colorSpace = ColorSpace::SRGB_NONLINEAR;
                 break;
-            }
-            m_surfaceFormats.push_back(format);
         }
-        return m_surfaceFormats;
+        m_surfaceFormats.push_back(format);
     }
-    std::vector<PresentMode> VKSurface::GetSupportedPresentModes(const Ref<Adapter>& adapter)
-    {
-        if (!adapter)
-        {
-            throw std::runtime_error("Adapter is null in VKSurface::GetCapabilities");
-        }
-        auto pyDevice = std::dynamic_pointer_cast<VKAdapter>(adapter)->GetPhysicalDevice();
-        std::vector<vk::PresentModeKHR> vkPresentModes = pyDevice.getSurfacePresentModesKHR(m_surface);
-        m_presentModes.clear();
-        for (const auto& vkPresentMode : vkPresentModes)
-        {
-            switch (vkPresentMode)
-            {
+    return m_surfaceFormats;
+}
+
+std::vector<PresentMode> VKSurface::GetSupportedPresentModes(const Ref<Adapter>& adapter)
+{
+    if (!adapter) {
+        throw std::runtime_error("Adapter is null in VKSurface::GetCapabilities");
+    }
+    auto pyDevice = std::dynamic_pointer_cast<VKAdapter>(adapter)->GetPhysicalDevice();
+    std::vector<vk::PresentModeKHR> vkPresentModes = pyDevice.getSurfacePresentModesKHR(m_surface);
+    m_presentModes.clear();
+    for (const auto& vkPresentMode : vkPresentModes) {
+        switch (vkPresentMode) {
             case vk::PresentModeKHR::eImmediate:
                 m_presentModes.push_back(PresentMode::Immediate);
                 break;
@@ -200,35 +185,32 @@ namespace Cacao
                 break;
             default:
                 break;
-            }
         }
-        return m_presentModes;
     }
-    uint32_t VKSurface::GetPresentQueueFamilyIndex(const Ref<Adapter>& adapter) const
-    {
-        if (!adapter)
-        {
-            throw std::runtime_error("Adapter is null in VKSurface::GetPresentQueueFamilyIndex");
+    return m_presentModes;
+}
+
+uint32_t VKSurface::GetPresentQueueFamilyIndex(const Ref<Adapter>& adapter) const
+{
+    if (!adapter) {
+        throw std::runtime_error("Adapter is null in VKSurface::GetPresentQueueFamilyIndex");
+    }
+    auto vkAdapter = std::dynamic_pointer_cast<VKAdapter>(adapter);
+    vk::PhysicalDevice physicalDevice = vkAdapter->GetPhysicalDevice();
+    auto queueFamilies = physicalDevice.getQueueFamilyProperties();
+    for (uint32_t i = 0; i < queueFamilies.size(); i++) {
+        vk::Bool32 presentSupport = physicalDevice.getSurfaceSupportKHR(i, m_surface);
+        if (presentSupport) {
+            return i;
         }
-        auto vkAdapter = std::dynamic_pointer_cast<VKAdapter>(adapter);
-        vk::PhysicalDevice physicalDevice = vkAdapter->GetPhysicalDevice();
-        auto queueFamilies = physicalDevice.getQueueFamilyProperties();
-        for (uint32_t i = 0; i < queueFamilies.size(); i++)
-        {
-            vk::Bool32 presentSupport = physicalDevice.getSurfaceSupportKHR(i, m_surface);
-            if (presentSupport)
-            {
-                return i;
-            }
-        }
-        throw std::runtime_error("Failed to find a present queue family index.");
     }
-    Ref<Queue> VKSurface::GetPresentQueue(const Ref<Device>& device)
-    {
-        uint32_t presentQueueFamilyIndex = GetPresentQueueFamilyIndex(
-            device->GetParentAdapter());
-        vk::Queue vkQueue = std::dynamic_pointer_cast<VKDevice>(device)->GetHandle().getQueue(
-            presentQueueFamilyIndex, 0);
-        return VKQueue::Create(device, vkQueue, QueueType::Present, 0);
-    }
-} 
+    throw std::runtime_error("Failed to find a present queue family index.");
+}
+
+Ref<Queue> VKSurface::GetPresentQueue(const Ref<Device>& device)
+{
+    uint32_t presentQueueFamilyIndex = GetPresentQueueFamilyIndex(device->GetParentAdapter());
+    vk::Queue vkQueue = std::dynamic_pointer_cast<VKDevice>(device)->GetHandle().getQueue(presentQueueFamilyIndex, 0);
+    return VKQueue::Create(device, vkQueue, QueueType::Present, 0);
+}
+} // namespace Cacao

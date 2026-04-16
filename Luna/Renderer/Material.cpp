@@ -9,13 +9,12 @@ Material::Material()
 {}
 
 Material::Material(std::string name, rhi::ImageData albedo_image_data, glm::vec4 albedo_color)
-    : m_name(std::move(name))
-    , m_albedo_image_data(std::move(albedo_image_data))
-    , m_albedo_color(albedo_color)
+    : m_name(std::move(name)),
+      m_albedo_image_data(std::move(albedo_image_data)),
+      m_albedo_color(albedo_color)
 {}
 
-std::shared_ptr<Material>
-    Material::create(std::string name, rhi::ImageData albedo_image_data, glm::vec4 albedo_color)
+std::shared_ptr<Material> Material::create(std::string name, rhi::ImageData albedo_image_data, glm::vec4 albedo_color)
 {
     return std::make_shared<Material>(std::move(name), std::move(albedo_image_data), albedo_color);
 }

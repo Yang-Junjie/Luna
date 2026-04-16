@@ -1,8 +1,7 @@
-#include "Scene.h"
-
 #include "Core/Application.h"
 #include "Entity.h"
 #include "Renderer/SceneRenderer.h"
+#include "Scene.h"
 
 namespace luna {
 

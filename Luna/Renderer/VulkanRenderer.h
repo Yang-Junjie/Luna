@@ -4,9 +4,7 @@
 #include "Renderer/SceneRenderer.h"
 
 #include <Core.h>
-
 #include <glm/vec4.hpp>
-
 #include <memory>
 #include <vector>
 

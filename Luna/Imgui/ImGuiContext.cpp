@@ -1,11 +1,12 @@
-#include "Imgui/ImGuiContext.h"
-
-#include "Core/Log.h"
-#include "Renderer/VulkanRenderer.h"
-
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_vulkan.h"
+#include "Core/Log.h"
+#include "Imgui/ImGuiContext.h"
+#include "Renderer/VulkanRenderer.h"
 
+#include <cstdint>
+
+#include <algorithm>
 #include <Barrier.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -19,9 +20,6 @@
 #include <Impls/Vulkan/VKTexture.h>
 #include <Texture.h>
 #include <vulkan/vulkan.hpp>
-
-#include <algorithm>
-#include <cstdint>
 
 namespace luna::rhi {
 namespace {
@@ -43,7 +41,8 @@ void checkVkResult(VkResult result)
 
 bool ImGuiVulkanContext::Init(luna::VulkanRenderer& renderer)
 {
-    if (g_initialized || !renderer.isInitialized() || renderer.getNativeWindow() == nullptr || !renderer.getSwapchain()) {
+    if (g_initialized || !renderer.isInitialized() || renderer.getNativeWindow() == nullptr ||
+        !renderer.getSwapchain()) {
         return g_initialized;
     }
 
@@ -81,14 +80,13 @@ bool ImGuiVulkanContext::Init(luna::VulkanRenderer& renderer)
     ImGui_ImplVulkan_Init(&init_info);
 
     g_device = renderer.getDevice();
-    g_default_sampler = g_device->CreateSampler(
-        Cacao::SamplerBuilder()
-            .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
-            .SetAddressMode(Cacao::SamplerAddressMode::ClampToEdge)
-            .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
-            .SetAnisotropy(false)
-            .SetName("ImGuiDefaultSampler")
-            .Build());
+    g_default_sampler = g_device->CreateSampler(Cacao::SamplerBuilder()
+                                                    .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
+                                                    .SetAddressMode(Cacao::SamplerAddressMode::ClampToEdge)
+                                                    .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
+                                                    .SetAnisotropy(false)
+                                                    .SetName("ImGuiDefaultSampler")
+                                                    .Build());
 
     g_initialized = true;
     return true;
@@ -181,13 +179,12 @@ ImTextureID ImGuiVulkanContext::GetTextureId(const Cacao::Ref<Cacao::CacaoTextur
         return {};
     }
 
-    const auto descriptor_set =
-        ImGui_ImplVulkan_AddTexture(vk_sampler->GetHandle(), vk_view->GetHandle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    const auto descriptor_set = ImGui_ImplVulkan_AddTexture(
+        vk_sampler->GetHandle(), vk_view->GetHandle(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     return static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(descriptor_set));
 }
 
-void ImGuiVulkanContext::EndFrame()
-{}
+void ImGuiVulkanContext::EndFrame() {}
 
 void ImGuiVulkanContext::NotifySwapchainChanged(uint32_t image_count)
 {

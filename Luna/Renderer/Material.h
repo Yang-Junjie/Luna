@@ -4,7 +4,6 @@
 #include "Renderer/ModelLoader.h"
 
 #include <glm/vec4.hpp>
-
 #include <memory>
 #include <string>
 #include <utility>
@@ -16,8 +15,9 @@ public:
     Material();
     Material(std::string name, rhi::ImageData albedo_image_data, glm::vec4 albedo_color = glm::vec4(1.0f));
 
-    static std::shared_ptr<Material>
-        create(std::string name = "Material", rhi::ImageData albedo_image_data = {}, glm::vec4 albedo_color = glm::vec4(1.0f));
+    static std::shared_ptr<Material> create(std::string name = "Material",
+                                            rhi::ImageData albedo_image_data = {},
+                                            glm::vec4 albedo_color = glm::vec4(1.0f));
     static std::shared_ptr<Material> createFromModelMaterial(const rhi::ModelData::Material& material_data);
 
     const std::string& getName() const

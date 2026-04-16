@@ -1,4 +1,3 @@
 #include "Pipeline.h"
-namespace Cacao
-{
-}
+
+namespace Cacao {}

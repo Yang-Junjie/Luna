@@ -1,18 +1,16 @@
-#include "LunaApp.h"
-
 #include "Core/Layer.h"
 #include "Core/Log.h"
+#include "LunaApp.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/ModelLoader.h"
 #include "Scene/Components.h"
 
-#include <glm/common.hpp>
-#include <imgui.h>
-
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <glm/common.hpp>
+#include <imgui.h>
 #include <limits>
 #include <numbers>
 #include <stdexcept>
@@ -58,7 +56,8 @@ std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::Model
     }
 
     const std::string mesh_name = shape.Name.empty() ? "DemoAssetMesh" : shape.Name;
-    return luna::Mesh::create(mesh_name, std::move(vertices), std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
+    return luna::Mesh::create(
+        mesh_name, std::move(vertices), std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
 }
 
 std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
@@ -96,12 +95,8 @@ std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
     };
 
     const std::vector<uint32_t> indices = {
-        0, 1, 2, 0, 2, 3,
-        4, 5, 6, 4, 6, 7,
-        8, 9, 10, 8, 10, 11,
-        12, 13, 14, 12, 14, 15,
-        16, 17, 18, 16, 18, 19,
-        20, 21, 22, 20, 22, 23,
+        0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
+        12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
     };
 
     return luna::Mesh::create("ProceduralCube", vertices, indices);
@@ -115,8 +110,8 @@ std::shared_ptr<luna::Material> createFallbackMaterial()
 class RuntimeHudLayer final : public luna::Layer {
 public:
     explicit RuntimeHudLayer(luna::LunaRuntimeApplication& application)
-        : Layer("RuntimeHud")
-        , m_application(&application)
+        : Layer("RuntimeHud"),
+          m_application(&application)
     {}
 
     void onImGuiRender() override
@@ -175,7 +170,7 @@ namespace luna {
 LunaRuntimeApplication::LunaRuntimeApplication()
     : Application(ApplicationSpecification{
           .m_name = "Luna ImGui Test",
-          .m_window_width = 1600,
+          .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
           .m_enable_imgui = true,

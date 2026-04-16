@@ -1,14 +1,14 @@
 #include "Renderer/ModelLoader.h"
 
+#include <cassert>
+#include <cmath>
+
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
+#include <filesystem>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
-
-#include <cassert>
-#include <cmath>
-#include <filesystem>
 #include <optional>
 #include <string_view>
 
@@ -81,8 +81,8 @@ std::pair<glm::vec3, glm::vec3> computeTangentSpace(const glm::vec3& p1,
 std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const tinyobj::mesh_t& mesh,
                                                                        const tinyobj::attrib_t& attrib)
 {
-    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(
-        attrib.vertices.size() / 3, {glm::vec3(0.0f), glm::vec3(0.0f)});
+    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(attrib.vertices.size() / 3,
+                                                                     {glm::vec3(0.0f), glm::vec3(0.0f)});
 
     ModelData::Index index_offset = 0;
     for (const size_t face_vertex_count : mesh.num_face_vertices) {
@@ -130,7 +130,8 @@ std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const tin
             attrib.texcoords[2 * size_t(idx3.texcoord_index) + 1],
         };
 
-        const auto tangent_space = computeTangentSpace(position1, position2, position3, tex_coord1, tex_coord2, tex_coord3);
+        const auto tangent_space =
+            computeTangentSpace(position1, position2, position3, tex_coord1, tex_coord2, tex_coord3);
         tangents_bitangents[idx1.vertex_index].first += tangent_space.first;
         tangents_bitangents[idx1.vertex_index].second += tangent_space.second;
         tangents_bitangents[idx2.vertex_index].first += tangent_space.first;
@@ -157,8 +158,8 @@ std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const std
                                                                        const std::vector<glm::vec3>& positions,
                                                                        const std::vector<glm::vec2>& tex_coords)
 {
-    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(
-        positions.size(), {glm::vec3(0.0f), glm::vec3(0.0f)});
+    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(positions.size(),
+                                                                     {glm::vec3(0.0f), glm::vec3(0.0f)});
 
     for (size_t i = 0; i + 2 < indices.size(); i += 3) {
         const auto i0 = indices[i + 0];
@@ -169,8 +170,8 @@ std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const std
             continue;
         }
 
-        const auto tangent_space =
-            computeTangentSpace(positions[i0], positions[i1], positions[i2], tex_coords[i0], tex_coords[i1], tex_coords[i2]);
+        const auto tangent_space = computeTangentSpace(
+            positions[i0], positions[i1], positions[i2], tex_coords[i0], tex_coords[i1], tex_coords[i2]);
 
         tangents_bitangents[i0].first += tangent_space.first;
         tangents_bitangents[i0].second += tangent_space.second;
@@ -320,14 +321,14 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
     for (const auto& material : materials) {
         auto& result_material = result.Materials.emplace_back();
         result_material.Name = material.name;
-        result_material.AlbedoTexture = material.diffuse_texname.empty()
-                                            ? createStubTexture(255, 255, 255, 255)
-                                            : ImageLoader::LoadImageFromFile(
-                                                  getAbsolutePathToObjResource(filepath, material.diffuse_texname));
-        result_material.NormalTexture = material.normal_texname.empty()
-                                            ? createStubTexture(127, 127, 255, 255)
-                                            : ImageLoader::LoadImageFromFile(
-                                                  getAbsolutePathToObjResource(filepath, material.normal_texname));
+        result_material.AlbedoTexture =
+            material.diffuse_texname.empty()
+                ? createStubTexture(255, 255, 255, 255)
+                : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.diffuse_texname));
+        result_material.NormalTexture =
+            material.normal_texname.empty()
+                ? createStubTexture(127, 127, 255, 255)
+                : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.normal_texname));
         result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
     }
 

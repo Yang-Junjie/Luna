@@ -1,106 +1,102 @@
 #ifndef CACAO_CACAOINSTANCE_H
 #define CACAO_CACAOINSTANCE_H
 #include "Core.h"
-namespace Cacao
-{
-    class ShaderCompiler;
+
+namespace Cacao {
+class ShaderCompiler;
 }
-namespace Cacao
-{
-    class Surface;
+
+namespace Cacao {
+class Surface;
 }
-namespace Cacao
-{
-    class Adapter;
-    struct NativeWindowHandle
-    {
+
+namespace Cacao {
+class Adapter;
+
+struct NativeWindowHandle {
 #if defined(_WIN32)
-        void* hWnd = nullptr;
-        void* hInst = nullptr;
+    void* hWnd = nullptr;
+    void* hInst = nullptr;
 #elif defined(__APPLE__)
-        void* metalLayer = nullptr;
+    void* metalLayer = nullptr;
 #elif defined(__linux__) && !defined(__ANDROID__)
 #if defined(USE_WAYLAND)
-        wl_display* wlDisplay = nullptr;
-        wl_surface* wlSurface = nullptr;
+    wl_display* wlDisplay = nullptr;
+    wl_surface* wlSurface = nullptr;
 #elif defined(USE_XCB)
-        xcb_connection_t* xcbConnection = nullptr;
-        xcb_window_t xcbWindow = 0;
+    xcb_connection_t* xcbConnection = nullptr;
+    xcb_window_t xcbWindow = 0;
 #elif defined(USE_XLIB)
-        Display* x11Display = nullptr;
-        Window x11Window = 0;
+    Display* x11Display = nullptr;
+    Window x11Window = 0;
 #endif
 #elif defined(__ANDROID__)
-        void* aNativeWindow = nullptr;
+    void* aNativeWindow = nullptr;
 #else
-        void* placeholder = nullptr;
+    void* placeholder = nullptr;
 #endif
-        bool IsValid() const
-        {
+    bool IsValid() const
+    {
 #if defined(_WIN32)
-            return hWnd != nullptr && hInst != nullptr;
+        return hWnd != nullptr && hInst != nullptr;
 #elif defined(__APPLE__)
-            return metalLayer != nullptr;
+        return metalLayer != nullptr;
 #elif defined(__linux__) && !defined(__ANDROID__)
 #if defined(USE_WAYLAND)
-            return wlDisplay != nullptr && wlSurface != nullptr;
+        return wlDisplay != nullptr && wlSurface != nullptr;
 #elif defined(USE_XCB)
-            return xcbConnection != nullptr && xcbWindow != 0;
+        return xcbConnection != nullptr && xcbWindow != 0;
 #elif defined(USE_XLIB)
-            return x11Display != nullptr && x11Window != 0;
+        return x11Display != nullptr && x11Window != 0;
 #endif
 #elif defined(__ANDROID__)
-            return aNativeWindow != nullptr;
+        return aNativeWindow != nullptr;
 #else
-            return placeholder != nullptr;
+        return placeholder != nullptr;
 #endif
-        }
-    };
-    enum class BackendType
+    }
+};
+enum class BackendType {
+    Auto,
+    Vulkan,
+    DirectX12,
+    DirectX11,
+    Metal,
+    OpenGL,
+    OpenGLES,
+    WebGPU,
+};
+enum class InstanceFeature {
+    ValidationLayer = 0x00'00'00'01,
+    Surface = 0x00'00'00'02,
+    RayTracing = 0x00'00'00'04,
+    MeshShader = 0x00'00'00'08,
+    BindlessDescriptors = 0x00'00'00'16,
+};
+
+struct InstanceCreateInfo {
+    BackendType type = BackendType::Auto;
+    std::string applicationName;
+    uint32_t appVersion = 1;
+    std::vector<InstanceFeature> enabledFeatures;
+};
+
+class CACAO_API Instance : public std::enable_shared_from_this<Instance> {
+public:
+    virtual ~Instance() = default;
+    static Ref<Instance> Create(const InstanceCreateInfo& createInfo);
+    [[nodiscard]] virtual BackendType GetType() const = 0;
+    virtual bool Initialize(const InstanceCreateInfo& createInfo) = 0;
+    virtual std::vector<Ref<Adapter>> EnumerateAdapters() = 0;
+    virtual bool IsFeatureEnabled(InstanceFeature feature) const = 0;
+    virtual Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) = 0;
+    virtual Ref<ShaderCompiler> CreateShaderCompiler() = 0;
+};
+
+template <> struct to_string<BackendType> {
+    static std::string convert(BackendType type)
     {
-        Auto,
-        Vulkan,
-        DirectX12,
-        DirectX11,
-        Metal,
-        OpenGL,
-        OpenGLES,
-        WebGPU,
-    };
-    enum class InstanceFeature
-    {
-        ValidationLayer = 0x00000001,
-        Surface = 0x00000002,
-        RayTracing = 0x00000004,
-        MeshShader = 0x00000008,
-        BindlessDescriptors = 0x00000016,
-    };
-    struct InstanceCreateInfo
-    {
-        BackendType type = BackendType::Auto;
-        std::string applicationName;
-        uint32_t appVersion = 1;
-        std::vector<InstanceFeature> enabledFeatures;
-    };
-    class CACAO_API Instance : public std::enable_shared_from_this<Instance>
-    {
-    public:
-        virtual ~Instance() = default;
-        static Ref<Instance> Create(const InstanceCreateInfo& createInfo);
-        [[nodiscard]] virtual BackendType GetType() const = 0;
-        virtual bool Initialize(const InstanceCreateInfo& createInfo) = 0;
-        virtual std::vector<Ref<Adapter>> EnumerateAdapters() = 0;
-        virtual bool IsFeatureEnabled(InstanceFeature feature) const = 0;
-        virtual Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) = 0;
-        virtual Ref<ShaderCompiler> CreateShaderCompiler() = 0;
-    };
-    template <>
-    struct to_string<BackendType>
-    {
-        static std::string convert(BackendType type)
-        {
-            switch (type)
-            {
+        switch (type) {
             case BackendType::Auto:
                 return "Auto";
             case BackendType::Vulkan:
@@ -119,16 +115,14 @@ namespace Cacao
                 return "WebGPU";
             default:
                 return "Unknown";
-            }
         }
-    };
-    template <>
-    struct to_string<InstanceFeature>
+    }
+};
+
+template <> struct to_string<InstanceFeature> {
+    static std::string convert(InstanceFeature feature)
     {
-        static std::string convert(InstanceFeature feature)
-        {
-            switch (feature)
-            {
+        switch (feature) {
             case InstanceFeature::ValidationLayer:
                 return "ValidationLayer";
             case InstanceFeature::Surface:
@@ -141,8 +135,8 @@ namespace Cacao
                 return "BindlessDescriptors";
             default:
                 return "Unknown";
-            }
         }
-    };
-}
+    }
+};
+} // namespace Cacao
 #endif

@@ -7,7 +7,6 @@
 #include <glm/gtx/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
-
 #include <memory>
 #include <string>
 #include <utility>
@@ -21,6 +20,7 @@ struct IDComponent {
     UUID id;
 
     IDComponent() = default;
+
     explicit IDComponent(UUID id)
         : id(id)
     {}
@@ -30,6 +30,7 @@ struct TagComponent {
     std::string tag;
 
     TagComponent() = default;
+
     explicit TagComponent(std::string tag)
         : tag(std::move(tag))
     {}
@@ -55,9 +56,10 @@ struct StaticMeshComponent {
     bool visible = true;
 
     StaticMeshComponent() = default;
+
     StaticMeshComponent(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material = {})
-        : mesh(std::move(mesh))
-        , material(std::move(material))
+        : mesh(std::move(mesh)),
+          material(std::move(material))
     {}
 };
 

@@ -36,25 +36,33 @@
 #endif
 #include <Instance.h>
 #include <vulkan/vulkan.hpp>
-namespace Cacao
-{
-    class CACAO_API VKInstance : public Instance
+
+namespace Cacao {
+class CACAO_API VKInstance : public Instance {
+private:
+    vk::Instance m_instance;
+    InstanceCreateInfo m_createInfo;
+    friend class VKInstance;
+    friend class VKDevice;
+    friend class VKAdapter;
+
+    vk::Instance& GetVulkanInstance()
     {
-    private:
-        vk::Instance m_instance;
-        InstanceCreateInfo m_createInfo;
-        friend class VKInstance;
-        friend class VKDevice;
-        friend class VKAdapter;
-        vk::Instance& GetVulkanInstance() { return m_instance; }
-    public:
-        [[nodiscard]] BackendType GetType() const override;
-        bool Initialize(const InstanceCreateInfo& createInfo) override;
-        std::vector<Ref<Adapter>> EnumerateAdapters() override;
-        bool IsFeatureEnabled(InstanceFeature feature) const override;
-        Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) override;
-        Ref<ShaderCompiler> CreateShaderCompiler() override;
-        const vk::Instance& GetNativeHandle() const { return m_instance; }
-    };
-}
-#endif 
+        return m_instance;
+    }
+
+public:
+    [[nodiscard]] BackendType GetType() const override;
+    bool Initialize(const InstanceCreateInfo& createInfo) override;
+    std::vector<Ref<Adapter>> EnumerateAdapters() override;
+    bool IsFeatureEnabled(InstanceFeature feature) const override;
+    Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) override;
+    Ref<ShaderCompiler> CreateShaderCompiler() override;
+
+    const vk::Instance& GetNativeHandle() const
+    {
+        return m_instance;
+    }
+};
+} // namespace Cacao
+#endif

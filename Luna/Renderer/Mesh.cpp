@@ -5,12 +5,13 @@
 namespace luna {
 
 Mesh::Mesh(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
-    : m_name(std::move(name))
-    , m_vertices(std::move(vertices))
-    , m_indices(std::move(indices))
+    : m_name(std::move(name)),
+      m_vertices(std::move(vertices)),
+      m_indices(std::move(indices))
 {}
 
-std::shared_ptr<Mesh> Mesh::create(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
+std::shared_ptr<Mesh>
+    Mesh::create(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
 {
     return std::make_shared<Mesh>(std::move(name), std::move(vertices), std::move(indices));
 }

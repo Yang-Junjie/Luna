@@ -1,8 +1,11 @@
-#include "Renderer/SceneRenderer.h"
-
 #include "Core/Log.h"
+#include "Renderer/SceneRenderer.h"
 #include "Renderer/ShaderLoader.h"
 
+#include <cmath>
+#include <cstring>
+
+#include <array>
 #include <Barrier.h>
 #include <Buffer.h>
 #include <Builders.h>
@@ -11,18 +14,14 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <glm/common.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderModule.h>
 #include <Texture.h>
-
-#include <array>
-#include <cmath>
-#include <cstring>
-#include <filesystem>
-#include <glm/common.hpp>
-#include <glm/ext/matrix_clip_space.hpp>
 
 namespace {
 
@@ -38,15 +37,15 @@ std::filesystem::path projectRoot()
 
 std::size_t computeShaderHash(const std::vector<uint8_t>& data)
 {
-    return std::hash<std::string_view>()(
-        std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
+    return std::hash<std::string_view>()(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
 }
 
 Cacao::Ref<Cacao::ShaderModule> loadShaderModule(const Cacao::Ref<Cacao::Device>& device,
                                                  const std::filesystem::path& path,
                                                  luna::rhi::ShaderType type)
 {
-    const auto shader_data = luna::rhi::ShaderLoader::LoadFromSourceFile(path.string(), type, luna::rhi::ShaderLanguage::GLSL);
+    const auto shader_data =
+        luna::rhi::ShaderLoader::LoadFromSourceFile(path.string(), type, luna::rhi::ShaderLanguage::GLSL);
     if (!shader_data.isValid()) {
         return {};
     }
@@ -150,8 +149,9 @@ void SceneRenderer::render(const RenderContext& context)
 
     auto& commands = *context.command_buffer;
     if (!m_depth_texture_initialized) {
-        commands.TransitionImage(
-            m_depth_texture, Cacao::ImageTransition::UndefinedToDepthAttachment, {0, 1, 0, 1, Cacao::ImageAspectFlags::Depth});
+        commands.TransitionImage(m_depth_texture,
+                                 Cacao::ImageTransition::UndefinedToDepthAttachment,
+                                 {0, 1, 0, 1, Cacao::ImageAspectFlags::Depth});
         m_depth_texture_initialized = true;
     }
 
@@ -172,8 +172,8 @@ void SceneRenderer::render(const RenderContext& context)
     color_attachment.Texture = context.color_target;
     color_attachment.LoadOp = Cacao::AttachmentLoadOp::Clear;
     color_attachment.StoreOp = Cacao::AttachmentStoreOp::Store;
-    color_attachment.ClearValue =
-        Cacao::ClearValue::ColorFloat(context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a);
+    color_attachment.ClearValue = Cacao::ClearValue::ColorFloat(
+        context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a);
 
     auto depth_attachment = Cacao::CreateRef<Cacao::RenderingAttachmentInfo>();
     depth_attachment->Texture = m_depth_texture;
@@ -189,11 +189,16 @@ void SceneRenderer::render(const RenderContext& context)
 
     commands.BeginRendering(rendering_info);
     commands.BindGraphicsPipeline(m_pipeline);
-    commands.SetViewport(
-        {0.0f, 0.0f, static_cast<float>(context.framebuffer_width), static_cast<float>(context.framebuffer_height), 0.0f, 1.0f});
+    commands.SetViewport({0.0f,
+                          0.0f,
+                          static_cast<float>(context.framebuffer_width),
+                          static_cast<float>(context.framebuffer_height),
+                          0.0f,
+                          1.0f});
     commands.SetScissor({0, 0, context.framebuffer_width, context.framebuffer_height});
 
-    const float aspect_ratio = static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
+    const float aspect_ratio =
+        static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
     const glm::mat4 view_projection = buildViewProjection(m_camera, aspect_ratio);
 
     for (const auto& draw_command : m_submitted_meshes) {
@@ -249,7 +254,10 @@ rhi::ImageData SceneRenderer::createFallbackImageData(const glm::vec4& albedo_co
     };
 
     return rhi::ImageData{
-        .ByteData = {to_byte(clamped_color.r), to_byte(clamped_color.g), to_byte(clamped_color.b), to_byte(clamped_color.a)},
+        .ByteData = {to_byte(clamped_color.r),
+                     to_byte(clamped_color.g),
+                     to_byte(clamped_color.b),
+                     to_byte(clamped_color.a)},
         .ImageFormat = Cacao::Format::RGBA8_UNORM,
         .Width = 1,
         .Height = 1,
@@ -297,23 +305,25 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
             .AddBinding(0, Cacao::DescriptorType::CombinedImageSampler, 1, Cacao::ShaderStage::Fragment)
             .Build());
 
-    m_descriptor_pool = m_device->CreateDescriptorPool(
-        Cacao::DescriptorPoolBuilder().SetMaxSets(1024).AddPoolSize(Cacao::DescriptorType::CombinedImageSampler, 1024).Build());
+    m_descriptor_pool =
+        m_device->CreateDescriptorPool(Cacao::DescriptorPoolBuilder()
+                                           .SetMaxSets(1'024)
+                                           .AddPoolSize(Cacao::DescriptorType::CombinedImageSampler, 1'024)
+                                           .Build());
 
-    m_material_sampler = m_device->CreateSampler(
-        Cacao::SamplerBuilder()
-            .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
-            .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
-            .SetAddressMode(Cacao::SamplerAddressMode::Repeat)
-            .SetAnisotropy(false)
-            .SetName("SceneMaterialSampler")
-            .Build());
+    m_material_sampler = m_device->CreateSampler(Cacao::SamplerBuilder()
+                                                     .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
+                                                     .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
+                                                     .SetAddressMode(Cacao::SamplerAddressMode::Repeat)
+                                                     .SetAnisotropy(false)
+                                                     .SetName("SceneMaterialSampler")
+                                                     .Build());
 
-    m_pipeline_layout = m_device->CreatePipelineLayout(
-        Cacao::PipelineLayoutBuilder()
-            .AddSetLayout(m_material_layout)
-            .AddPushConstant(Cacao::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
-            .Build());
+    m_pipeline_layout =
+        m_device->CreatePipelineLayout(Cacao::PipelineLayoutBuilder()
+                                           .AddSetLayout(m_material_layout)
+                                           .AddPushConstant(Cacao::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
+                                           .Build());
 
     m_pipeline = m_device->CreateGraphicsPipeline(
         Cacao::GraphicsPipelineBuilder()
@@ -354,14 +364,13 @@ void SceneRenderer::createOrResizeDepthTexture(uint32_t width, uint32_t height)
     m_framebuffer_width = width;
     m_framebuffer_height = height;
     m_depth_texture_initialized = false;
-    m_depth_texture = m_device->CreateTexture(
-        Cacao::TextureBuilder()
-            .SetSize(width, height)
-            .SetFormat(Cacao::Format::D32_FLOAT)
-            .SetUsage(Cacao::TextureUsageFlags::DepthStencilAttachment)
-            .SetInitialState(Cacao::ResourceState::Undefined)
-            .SetName("SceneDepthTexture")
-            .Build());
+    m_depth_texture = m_device->CreateTexture(Cacao::TextureBuilder()
+                                                  .SetSize(width, height)
+                                                  .SetFormat(Cacao::Format::D32_FLOAT)
+                                                  .SetUsage(Cacao::TextureUsageFlags::DepthStencilAttachment)
+                                                  .SetInitialState(Cacao::ResourceState::Undefined)
+                                                  .SetName("SceneDepthTexture")
+                                                  .Build());
 }
 
 SceneRenderer::ShaderPaths SceneRenderer::resolveShaderPaths() const
@@ -383,20 +392,19 @@ SceneRenderer::UploadedMesh& SceneRenderer::getOrCreateUploadedMesh(const Mesh& 
     auto [inserted_it, _] = m_uploaded_meshes.emplace(&mesh, UploadedMesh{});
     auto& uploaded_mesh = inserted_it->second;
 
-    uploaded_mesh.vertex_buffer = m_device->CreateBuffer(
-        Cacao::BufferBuilder()
-            .SetSize(mesh.getVertices().size() * sizeof(StaticMeshVertex))
-            .SetUsage(Cacao::BufferUsageFlags::VertexBuffer)
-            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
-            .SetName(mesh.getName() + "_VertexBuffer")
-            .Build());
-    uploaded_mesh.index_buffer = m_device->CreateBuffer(
-        Cacao::BufferBuilder()
-            .SetSize(mesh.getIndices().size() * sizeof(uint32_t))
-            .SetUsage(Cacao::BufferUsageFlags::IndexBuffer)
-            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
-            .SetName(mesh.getName() + "_IndexBuffer")
-            .Build());
+    uploaded_mesh.vertex_buffer =
+        m_device->CreateBuffer(Cacao::BufferBuilder()
+                                   .SetSize(mesh.getVertices().size() * sizeof(StaticMeshVertex))
+                                   .SetUsage(Cacao::BufferUsageFlags::VertexBuffer)
+                                   .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+                                   .SetName(mesh.getName() + "_VertexBuffer")
+                                   .Build());
+    uploaded_mesh.index_buffer = m_device->CreateBuffer(Cacao::BufferBuilder()
+                                                            .SetSize(mesh.getIndices().size() * sizeof(uint32_t))
+                                                            .SetUsage(Cacao::BufferUsageFlags::IndexBuffer)
+                                                            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+                                                            .SetName(mesh.getName() + "_IndexBuffer")
+                                                            .Build());
     uploaded_mesh.index_count = static_cast<uint32_t>(mesh.getIndices().size());
 
     if (void* vertex_memory = uploaded_mesh.vertex_buffer->Map()) {
@@ -421,28 +429,28 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
         return it->second;
     }
 
-    const rhi::ImageData source_image = material.hasAlbedoTexture() ? material.getAlbedoImageData()
-                                                                    : createFallbackImageData(material.getAlbedoColor());
+    const rhi::ImageData source_image = material.hasAlbedoTexture()
+                                            ? material.getAlbedoImageData()
+                                            : createFallbackImageData(material.getAlbedoColor());
 
     auto [inserted_it, _] = m_uploaded_materials.emplace(&material, UploadedMaterial{});
     auto& uploaded_material = inserted_it->second;
 
-    uploaded_material.albedo_texture = m_device->CreateTexture(
-        Cacao::TextureBuilder()
-            .SetSize(source_image.Width, source_image.Height)
-            .SetFormat(source_image.ImageFormat)
-            .SetUsage(Cacao::TextureUsageFlags::Sampled | Cacao::TextureUsageFlags::TransferDst)
-            .SetInitialState(Cacao::ResourceState::Undefined)
-            .SetName(material.getName() + "_Albedo")
-            .Build());
+    uploaded_material.albedo_texture =
+        m_device->CreateTexture(Cacao::TextureBuilder()
+                                    .SetSize(source_image.Width, source_image.Height)
+                                    .SetFormat(source_image.ImageFormat)
+                                    .SetUsage(Cacao::TextureUsageFlags::Sampled | Cacao::TextureUsageFlags::TransferDst)
+                                    .SetInitialState(Cacao::ResourceState::Undefined)
+                                    .SetName(material.getName() + "_Albedo")
+                                    .Build());
 
-    uploaded_material.staging_buffer = m_device->CreateBuffer(
-        Cacao::BufferBuilder()
-            .SetSize(source_image.ByteData.size())
-            .SetUsage(Cacao::BufferUsageFlags::TransferSrc)
-            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
-            .SetName(material.getName() + "_AlbedoStaging")
-            .Build());
+    uploaded_material.staging_buffer = m_device->CreateBuffer(Cacao::BufferBuilder()
+                                                                  .SetSize(source_image.ByteData.size())
+                                                                  .SetUsage(Cacao::BufferUsageFlags::TransferSrc)
+                                                                  .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+                                                                  .SetName(material.getName() + "_AlbedoStaging")
+                                                                  .Build());
 
     if (void* mapped = uploaded_material.staging_buffer->Map()) {
         std::memcpy(mapped, source_image.ByteData.data(), source_image.ByteData.size());
@@ -475,12 +483,13 @@ void SceneRenderer::uploadMaterialIfNeeded(Cacao::CommandBufferEncoder& commands
         .BufferOffset = 0,
         .BufferRowLength = 0,
         .BufferImageHeight = 0,
-        .ImageSubresource = {
-            .AspectMask = Cacao::ImageAspectFlags::Color,
-            .MipLevel = 0,
-            .BaseArrayLayer = 0,
-            .LayerCount = 1,
-        },
+        .ImageSubresource =
+            {
+                .AspectMask = Cacao::ImageAspectFlags::Color,
+                .MipLevel = 0,
+                .BaseArrayLayer = 0,
+                .LayerCount = 1,
+            },
         .ImageOffsetX = 0,
         .ImageOffsetY = 0,
         .ImageOffsetZ = 0,
@@ -490,8 +499,10 @@ void SceneRenderer::uploadMaterialIfNeeded(Cacao::CommandBufferEncoder& commands
     };
 
     const std::array<Cacao::BufferImageCopy, 1> copy_regions{copy_region};
-    commands.CopyBufferToImage(
-        uploaded_material.staging_buffer, uploaded_material.albedo_texture, Cacao::ResourceState::CopyDest, copy_regions);
+    commands.CopyBufferToImage(uploaded_material.staging_buffer,
+                               uploaded_material.albedo_texture,
+                               Cacao::ResourceState::CopyDest,
+                               copy_regions);
     commands.TransitionImage(uploaded_material.albedo_texture, Cacao::ImageTransition::TransferDstToShaderRead);
 
     uploaded_material.uploaded = true;

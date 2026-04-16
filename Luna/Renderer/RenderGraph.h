@@ -1,7 +1,6 @@
 #pragma once
 
 #include <CommandBufferEncoder.h>
-
 #include <functional>
 #include <memory>
 #include <string>

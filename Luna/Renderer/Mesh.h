@@ -2,10 +2,10 @@
 
 #include "Renderer/ModelLoader.h"
 
+#include <cstdint>
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>

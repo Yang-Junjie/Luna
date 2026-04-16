@@ -1,15 +1,15 @@
 #include "Renderer/ImageLoader.h"
 
-#include <algorithm>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <string_view>
-
 #include <stb_image.h>
+#include <string_view>
 
 #define TINYDDSLOADER_IMPLEMENTATION
 #include "third_party/tinyddsloader/tinyddsloader.h"
@@ -281,7 +281,8 @@ ImageData loadImageUsingSTBLoader(const std::string& filepath)
     }
 
     constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * actual_channels);
+    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
+                                   actual_channels);
     std::copy_n(pixels, byte_data.size(), byte_data.begin());
     stbi_image_free(pixels);
 
@@ -307,7 +308,8 @@ ImageData loadImageUsingSTBLoader(const uint8_t* data, std::size_t size)
     }
 
     constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * actual_channels);
+    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
+                                   actual_channels);
     std::copy_n(pixels, byte_data.size(), byte_data.begin());
     stbi_image_free(pixels);
 
@@ -352,12 +354,18 @@ CubemapData createCubemapFromSingleImage(const ImageData& image)
     assert(cubemap_data.FaceFormat == Cacao::Format::RGBA8_UNORM);
 
     constexpr std::size_t channel_count = 4;
-    cubemap_data.Faces[0] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 2, 1);
-    cubemap_data.Faces[1] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 0, 1);
-    cubemap_data.Faces[2] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 2);
-    cubemap_data.Faces[3] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 0);
-    cubemap_data.Faces[4] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 1);
-    cubemap_data.Faces[5] = extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 3, 1);
+    cubemap_data.Faces[0] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 2, 1);
+    cubemap_data.Faces[1] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 0, 1);
+    cubemap_data.Faces[2] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 2);
+    cubemap_data.Faces[3] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 0);
+    cubemap_data.Faces[4] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 1);
+    cubemap_data.Faces[5] =
+        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 3, 1);
     return cubemap_data;
 }
 

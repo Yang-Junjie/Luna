@@ -1,4 +1,3 @@
 #include <Queue.h>
-namespace Cacao
-{
-} 
+
+namespace Cacao {}

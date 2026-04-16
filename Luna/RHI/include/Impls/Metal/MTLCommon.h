@@ -3,27 +3,26 @@
 
 #ifdef __APPLE__
 
-#include "Core.h"
 #include "Barrier.h"
+#include "Core.h"
 
 #ifdef __OBJC__
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #endif
 
-namespace Cacao
-{
+namespace Cacao {
 #ifdef __OBJC__
-    MTLPixelFormat ToMTLPixelFormat(Format format);
-    Format FromMTLPixelFormat(MTLPixelFormat format);
-    MTLPrimitiveType ToMTLPrimitiveType(PrimitiveTopology topology);
-    MTLVertexFormat ToMTLVertexFormat(Format format);
-    MTLCullMode ToMTLCullMode(CullMode mode);
-    MTLWinding ToMTLWinding(FrontFace face);
-    MTLSamplerMinMagFilter ToMTLFilter(Filter filter);
-    MTLSamplerAddressMode ToMTLAddressMode(SamplerAddressMode mode);
+MTLPixelFormat ToMTLPixelFormat(Format format);
+Format FromMTLPixelFormat(MTLPixelFormat format);
+MTLPrimitiveType ToMTLPrimitiveType(PrimitiveTopology topology);
+MTLVertexFormat ToMTLVertexFormat(Format format);
+MTLCullMode ToMTLCullMode(CullMode mode);
+MTLWinding ToMTLWinding(FrontFace face);
+MTLSamplerMinMagFilter ToMTLFilter(Filter filter);
+MTLSamplerAddressMode ToMTLAddressMode(SamplerAddressMode mode);
 #endif
-}
+} // namespace Cacao
 
 #endif // __APPLE__
 #endif

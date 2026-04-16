@@ -1,14 +1,17 @@
 #include "CommandBufferEncoder.h"
-namespace Cacao
+
+namespace Cacao {
+void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage,
+                                           PipelineStage dstStage,
+                                           std::span<const TextureBarrier> textureBarriers)
 {
-    void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage, PipelineStage dstStage,
-                                               std::span<const TextureBarrier> textureBarriers)
-    {
-        PipelineBarrier(srcStage, dstStage, {}, {}, textureBarriers);
-    }
-    void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage, PipelineStage dstStage,
-                                               std::span<const BufferBarrier> bufferBarriers)
-    {
-        PipelineBarrier(srcStage, dstStage, {}, bufferBarriers, {});
-    }
+    PipelineBarrier(srcStage, dstStage, {}, {}, textureBarriers);
 }
+
+void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage,
+                                           PipelineStage dstStage,
+                                           std::span<const BufferBarrier> bufferBarriers)
+{
+    PipelineBarrier(srcStage, dstStage, {}, bufferBarriers, {});
+}
+} // namespace Cacao

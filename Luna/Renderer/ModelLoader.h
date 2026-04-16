@@ -2,10 +2,10 @@
 
 #include "Renderer/ImageLoader.h"
 
+#include <cstdint>
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-
-#include <cstdint>
 #include <string>
 #include <vector>
 

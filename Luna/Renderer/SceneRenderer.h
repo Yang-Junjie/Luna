@@ -5,11 +5,9 @@
 #include "Renderer/Mesh.h"
 
 #include <Core.h>
-
 #include <filesystem>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
-
 #include <memory>
 #include <unordered_map>
 #include <vector>

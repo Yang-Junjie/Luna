@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Core.h>
-
 #include <cstdint>
+
+#include <Core.h>
 #include <string>
 #include <vector>
 

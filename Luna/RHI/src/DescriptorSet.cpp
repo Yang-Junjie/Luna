@@ -1,4 +1,3 @@
 #include "DescriptorSet.h"
-namespace Caocao
-{
-} 
+
+namespace Caocao {}

@@ -1,4 +1,3 @@
 #include "DescriptorSetLayout.h"
-namespace Cacao
-{
-} 
+
+namespace Cacao {}

@@ -1,4 +1,3 @@
 #include "DescriptorPool.h"
-namespace Cacao
-{
-} 
+
+namespace Cacao {}

@@ -1,4 +1,3 @@
 #include <Adapter.h>
-namespace Cacao
-{
-}
+
+namespace Cacao {}

@@ -4,24 +4,27 @@
 #include "MTLCommon.h"
 #include "Queue.h"
 
-namespace Cacao
-{
-    class CACAO_API MTLQueue final : public Queue
+namespace Cacao {
+class CACAO_API MTLQueue final : public Queue {
+public:
+    MTLQueue(id commandQueue);
+    ~MTLQueue() override = default;
+
+    void Submit(const Ref<CommandBufferEncoder>& cmd, const Ref<Synchronization>& sync, uint32_t frameIndex) override;
+    void Submit(std::span<const Ref<CommandBufferEncoder>> cmds,
+                const Ref<Synchronization>& sync,
+                uint32_t frameIndex) override;
+    void Submit(const Ref<CommandBufferEncoder>& cmd) override;
+    void WaitIdle() override;
+
+    id GetHandle() const
     {
-    public:
-        MTLQueue(id commandQueue);
-        ~MTLQueue() override = default;
+        return m_commandQueue;
+    }
 
-        void Submit(const Ref<CommandBufferEncoder>& cmd, const Ref<Synchronization>& sync, uint32_t frameIndex) override;
-        void Submit(std::span<const Ref<CommandBufferEncoder>> cmds, const Ref<Synchronization>& sync, uint32_t frameIndex) override;
-        void Submit(const Ref<CommandBufferEncoder>& cmd) override;
-        void WaitIdle() override;
-
-        id GetHandle() const { return m_commandQueue; }
-
-    private:
-        id m_commandQueue = nullptr; // id<MTLCommandQueue>
-    };
-}
+private:
+    id m_commandQueue = nullptr; // id<MTLCommandQueue>
+};
+} // namespace Cacao
 #endif // __APPLE__
 #endif

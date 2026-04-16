@@ -1,8 +1,7 @@
-#include "Renderer/VulkanRenderer.h"
-
 #include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
+#include "Renderer/VulkanRenderer.h"
 
 #include <Adapter.h>
 #include <Builders.h>
@@ -12,17 +11,16 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <algorithm>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <Instance.h>
 #include <Queue.h>
+#include <stdexcept>
 #include <Surface.h>
 #include <Swapchain.h>
 #include <Synchronization.h>
 #include <Texture.h>
-
-#include <algorithm>
-#include <stdexcept>
 
 namespace {
 
@@ -32,9 +30,10 @@ Cacao::Ref<Cacao::Adapter> selectAdapter(const std::vector<Cacao::Ref<Cacao::Ada
         return {};
     }
 
-    const auto discrete_adapter = std::find_if(adapters.begin(), adapters.end(), [](const Cacao::Ref<Cacao::Adapter>& adapter) {
-        return adapter && adapter->GetAdapterType() == Cacao::AdapterType::Discrete;
-    });
+    const auto discrete_adapter =
+        std::find_if(adapters.begin(), adapters.end(), [](const Cacao::Ref<Cacao::Adapter>& adapter) {
+            return adapter && adapter->GetAdapterType() == Cacao::AdapterType::Discrete;
+        });
     return discrete_adapter != adapters.end() ? *discrete_adapter : adapters.front();
 }
 
@@ -122,7 +121,8 @@ bool VulkanRenderer::init(Window& window, InitializationOptions options)
     }
 
     m_main_camera.m_position = glm::vec3(0.0f, 0.0f, 5.0f);
-    m_initialized = m_instance && m_adapter && m_device && m_surface && m_swapchain && m_graphics_queue && m_synchronization;
+    m_initialized =
+        m_instance && m_adapter && m_device && m_surface && m_swapchain && m_graphics_queue && m_synchronization;
     m_resize_requested = false;
     m_frame_started = false;
     return m_initialized;
@@ -215,7 +215,8 @@ void VulkanRenderer::startFrame()
         }
 
         int acquired_image_index = -1;
-        const auto acquire_result = m_swapchain->AcquireNextImage(m_synchronization, static_cast<int>(m_frame_index), acquired_image_index);
+        const auto acquire_result =
+            m_swapchain->AcquireNextImage(m_synchronization, static_cast<int>(m_frame_index), acquired_image_index);
         if (acquire_result != Cacao::Result::Success || acquired_image_index < 0) {
             throw std::runtime_error("Failed to acquire a swapchain image");
         }
@@ -248,9 +249,9 @@ void VulkanRenderer::renderFrame()
     const auto back_buffer = m_swapchain->GetBackBuffer(m_image_index);
     const bool was_presented =
         m_image_index < m_swapchain_images_presented.size() ? m_swapchain_images_presented[m_image_index] : false;
-    m_current_command_buffer->TransitionImage(
-        back_buffer,
-        was_presented ? Cacao::ImageTransition::PresentToColorAttachment : Cacao::ImageTransition::UndefinedToColorAttachment);
+    m_current_command_buffer->TransitionImage(back_buffer,
+                                              was_presented ? Cacao::ImageTransition::PresentToColorAttachment
+                                                            : Cacao::ImageTransition::UndefinedToColorAttachment);
 
     m_scene_renderer.render(SceneRenderer::RenderContext{
         .device = m_device,
@@ -388,17 +389,16 @@ void VulkanRenderer::createSwapchain(uint32_t width, uint32_t height)
         min_image_count = (std::min)(min_image_count, capabilities.maxImageCount);
     }
 
-    m_swapchain = m_device->CreateSwapchain(
-        Cacao::SwapchainBuilder()
-            .SetExtent(clamped_extent)
-            .SetFormat(surface_format.format)
-            .SetColorSpace(surface_format.colorSpace)
-            .SetPresentMode(Cacao::PresentMode::Fifo)
-            .SetMinImageCount(min_image_count)
-            .SetPreTransform(capabilities.currentTransform)
-            .SetUsage(Cacao::SwapchainUsageFlags::ColorAttachment)
-            .SetSurface(m_surface)
-            .Build());
+    m_swapchain = m_device->CreateSwapchain(Cacao::SwapchainBuilder()
+                                                .SetExtent(clamped_extent)
+                                                .SetFormat(surface_format.format)
+                                                .SetColorSpace(surface_format.colorSpace)
+                                                .SetPresentMode(Cacao::PresentMode::Fifo)
+                                                .SetMinImageCount(min_image_count)
+                                                .SetPreTransform(capabilities.currentTransform)
+                                                .SetUsage(Cacao::SwapchainUsageFlags::ColorAttachment)
+                                                .SetSurface(m_surface)
+                                                .Build());
 
     m_surface_format = surface_format.format;
     m_frames_in_flight = (std::max)(1u, m_swapchain->GetImageCount() > 1 ? m_swapchain->GetImageCount() - 1 : 1u);

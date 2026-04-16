@@ -1,10 +1,10 @@
 #pragma once
 
-#include <Core.h>
-
-#include <array>
 #include <cstddef>
 #include <cstdint>
+
+#include <array>
+#include <Core.h>
 #include <string>
 #include <vector>
 

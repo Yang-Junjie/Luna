@@ -1,36 +1,50 @@
 #ifndef CACAO_GLQUERYPOOL_H
 #define CACAO_GLQUERYPOOL_H
-#include "QueryPool.h"
 #include "GLCommon.h"
+#include "QueryPool.h"
+
 #include <vector>
 
-namespace Cacao
-{
-    class CACAO_API GLQueryPool final : public QueryPool
+namespace Cacao {
+class CACAO_API GLQueryPool final : public QueryPool {
+public:
+    GLQueryPool(const QueryPoolCreateInfo& info);
+    static Ref<GLQueryPool> Create(const QueryPoolCreateInfo& info);
+    ~GLQueryPool() override;
+
+    void Reset(uint32_t firstQuery, uint32_t count) override;
+    bool GetResults(uint32_t firstQuery, uint32_t queryCount, std::vector<uint64_t>& outResults, bool wait) override;
+
+    QueryType GetType() const override
     {
-    public:
-        GLQueryPool(const QueryPoolCreateInfo& info);
-        static Ref<GLQueryPool> Create(const QueryPoolCreateInfo& info);
-        ~GLQueryPool() override;
+        return m_type;
+    }
 
-        void Reset(uint32_t firstQuery, uint32_t count) override;
-        bool GetResults(uint32_t firstQuery, uint32_t queryCount,
-                        std::vector<uint64_t>& outResults, bool wait) override;
-        QueryType GetType() const override { return m_type; }
-        uint32_t GetCount() const override { return m_count; }
+    uint32_t GetCount() const override
+    {
+        return m_count;
+    }
 
-        void Begin(uint32_t index);
-        void End(uint32_t index);
-        void WriteTimestamp(uint32_t index);
-        GLuint GetQuery(uint32_t index) const { return m_queries[index]; }
-        GLenum GetGLTarget() const { return m_glTarget; }
+    void Begin(uint32_t index);
+    void End(uint32_t index);
+    void WriteTimestamp(uint32_t index);
 
-    private:
-        std::vector<GLuint> m_queries;
-        QueryType m_type;
-        uint32_t m_count;
-        GLenum m_glTarget;
-    };
-}
+    GLuint GetQuery(uint32_t index) const
+    {
+        return m_queries[index];
+    }
+
+    GLenum GetGLTarget() const
+    {
+        return m_glTarget;
+    }
+
+private:
+    std::vector<GLuint> m_queries;
+    QueryType m_type;
+    uint32_t m_count;
+    GLenum m_glTarget;
+};
+} // namespace Cacao
 
 #endif
