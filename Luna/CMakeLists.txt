@@ -1,5 +1,7 @@
 set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
 
+add_subdirectory(RHI)
+
 set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_demo.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_draw.cpp
@@ -13,9 +15,6 @@ set(RENDERER_SOURCE
     Renderer/Camera.cpp
     Renderer/ImageLoader.h
     Renderer/ImageLoader.cpp
-    Renderer/PluginRenderGraph.h
-    Renderer/PluginRenderGraphInternal.h
-    Renderer/PluginRenderGraph.cpp
     Renderer/Material.h
     Renderer/Material.cpp
     Renderer/Mesh.h
@@ -44,40 +43,7 @@ set(SCENE_SOURCE
     Scene/Scene.h
     Scene/Scene.cpp)
 
-set(VAL_SOURCE
-    Vulkan/ArrayUtils.h
-    Vulkan/Buffer.h
-    Vulkan/Buffer.cpp
-    Vulkan/CommandBuffer.h
-    Vulkan/CommandBuffer.cpp
-    Vulkan/DescriptorBinding.h
-    Vulkan/DescriptorBinding.cpp
-    Vulkan/DescriptorCache.h
-    Vulkan/DescriptorCache.cpp
-    Vulkan/GraphicShader.h
-    Vulkan/GraphicShader.cpp
-    Vulkan/Image.h
-    Vulkan/Image.cpp
-    Vulkan/Pipeline.h
-    Vulkan/Pipeline.cpp
-    Vulkan/RenderPass.h
-    Vulkan/RenderPass.cpp
-    Vulkan/Sampler.h
-    Vulkan/Sampler.cpp
-    Vulkan/Shader.h
-    Vulkan/ShaderReflection.h
-    Vulkan/ShaderReflection.cpp
-    Vulkan/StageBuffer.h
-    Vulkan/StageBuffer.cpp
-    Vulkan/VirtualFrame.h
-    Vulkan/VirtualFrame.cpp
-    Vulkan/VulkanContext.h
-    Vulkan/VulkanContext.cpp
-    Vulkan/VulkanMemoryAllocator.h
-    Vulkan/VulkanMemoryAllocator.cpp
-    Vulkan/VulkanSurface.h
-    Vulkan/VulkanSurface.cpp
-    Imgui/ImGuiContext.h
+set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiContext.cpp
     Imgui/ImGuiRenderPass.h)
 
@@ -101,10 +67,6 @@ add_library(
     Core/Window.cpp
     Core/UUID.h 
     Core/UUID.cpp
-    Plugin/PluginBootstrap.h
-    Plugin/PluginRegistry.h
-    Plugin/PluginRegistry.cpp
-    Plugin/ServiceRegistry.h
     Events/ApplicationEvent.h
     Events/Event.h
     Events/KeyEvent.h
@@ -122,7 +84,7 @@ add_library(
     JobSystem/TaskSystem.cpp
     ${SCENE_SOURCE}
     ${RENDERER_SOURCE}
-    ${VAL_SOURCE}
+    ${RHI_RUNTIME_SOURCE}
     ${IMGUI_SOURCE}
 )
 
@@ -141,6 +103,7 @@ target_include_directories(
 
 target_link_libraries(LunaCore 
         PUBLIC
+        LunaRHI
         spdlog::spdlog
         fastgltf::fastgltf
         glslang::glslang

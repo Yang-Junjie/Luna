@@ -14,18 +14,18 @@ namespace luna {
 class Material {
 public:
     Material();
-    Material(std::string name, val::ImageData albedo_image_data, glm::vec4 albedo_color = glm::vec4(1.0f));
+    Material(std::string name, rhi::ImageData albedo_image_data, glm::vec4 albedo_color = glm::vec4(1.0f));
 
     static std::shared_ptr<Material>
-        create(std::string name = "Material", val::ImageData albedo_image_data = {}, glm::vec4 albedo_color = glm::vec4(1.0f));
-    static std::shared_ptr<Material> createFromModelMaterial(const val::ModelData::Material& material_data);
+        create(std::string name = "Material", rhi::ImageData albedo_image_data = {}, glm::vec4 albedo_color = glm::vec4(1.0f));
+    static std::shared_ptr<Material> createFromModelMaterial(const rhi::ModelData::Material& material_data);
 
     const std::string& getName() const
     {
         return m_name;
     }
 
-    const val::ImageData& getAlbedoImageData() const
+    const rhi::ImageData& getAlbedoImageData() const
     {
         return m_albedo_image_data;
     }
@@ -42,7 +42,7 @@ public:
 
 private:
     std::string m_name;
-    val::ImageData m_albedo_image_data;
+    rhi::ImageData m_albedo_image_data;
     glm::vec4 m_albedo_color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 

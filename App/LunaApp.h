@@ -1,35 +1,48 @@
 #pragma once
 
 #include "Core/Application.h"
-#include "Editor/EditorRegistry.h"
-#include "Plugin/PluginRegistry.h"
-#include "Plugin/ServiceRegistry.h"
+#include "Scene/Entity.h"
+#include "Scene/Scene.h"
 
 #include <memory>
 #include <string>
 
-namespace luna::app {
+namespace luna {
 
-class LunaApp final : public Application {
+class Material;
+class Mesh;
+
+class LunaRuntimeApplication final : public Application {
 public:
-    LunaApp();
+    LunaRuntimeApplication();
+
+    const std::string& getAssetLabel() const;
+    bool isAutoRotateEnabled() const;
+    void setAutoRotateEnabled(bool enabled);
+    float getSpinSpeed() const;
+    void setSpinSpeed(float speed);
+    void resetCamera();
 
 protected:
-    bool onPreInitialize() override;
-    VulkanRenderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
+    void onUpdate(Timestep timestep) override;
 
 private:
-    bool ensurePluginBootstrap();
-    bool resolveRenderGraphProvider();
+    void buildScene();
+    bool tryLoadDefaultAsset();
+    void createFallbackAsset();
+    void updateDemoTransform(float delta_time);
 
 private:
-    luna::ServiceRegistry m_service_registry;
-    std::shared_ptr<luna::editor::EditorRegistry> m_editor_registry;
-    std::unique_ptr<luna::PluginRegistry> m_plugin_registry;
-    VulkanRenderer::RenderGraphBuilderCallback m_active_render_graph_builder;
-    std::string m_active_render_graph_provider_id;
-    bool m_plugin_bootstrap_completed = false;
+    Scene m_scene;
+    Entity m_demo_entity;
+    std::shared_ptr<Mesh> m_demo_mesh;
+    std::shared_ptr<Material> m_demo_material;
+    std::string m_asset_label{"Procedural cube"};
+    float m_spin_speed{0.85f};
+    bool m_auto_rotate{true};
 };
 
-} // namespace luna::app
+Application* createApplication(int argc, char** argv);
+
+} // namespace luna

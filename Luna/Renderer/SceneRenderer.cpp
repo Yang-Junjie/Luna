@@ -1,20 +1,28 @@
 #include "Renderer/SceneRenderer.h"
 
 #include "Core/Log.h"
-#include "Imgui/ImGuiRenderPass.h"
-#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/ShaderLoader.h"
-#include "Vulkan/CommandBuffer.h"
-#include "Vulkan/GraphicShader.h"
-#include "Vulkan/VulkanContext.h"
 
+#include <Barrier.h>
+#include <Buffer.h>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <DescriptorPool.h>
+#include <DescriptorSet.h>
+#include <DescriptorSetLayout.h>
+#include <Device.h>
+#include <Pipeline.h>
+#include <PipelineLayout.h>
+#include <Sampler.h>
+#include <ShaderModule.h>
+#include <Texture.h>
+
+#include <array>
+#include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <glm/common.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include <algorithm>
-#include <cmath>
-#include <utility>
+#include <glm/ext/matrix_clip_space.hpp>
 
 namespace {
 
@@ -28,197 +36,44 @@ std::filesystem::path projectRoot()
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-std::shared_ptr<luna::val::GraphicShader> loadGraphicsShader(const std::filesystem::path& vertex_path,
-                                                             const std::filesystem::path& fragment_path)
+std::size_t computeShaderHash(const std::vector<uint8_t>& data)
 {
-    const auto vertex_shader_data = luna::val::ShaderLoader::LoadFromSourceFile(
-        vertex_path.string(), luna::val::ShaderType::VERTEX, luna::val::ShaderLanguage::GLSL);
-    const auto fragment_shader_data = luna::val::ShaderLoader::LoadFromSourceFile(
-        fragment_path.string(), luna::val::ShaderType::FRAGMENT, luna::val::ShaderLanguage::GLSL);
+    return std::hash<std::string_view>()(
+        std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
+}
 
-    if (vertex_shader_data.Bytecode.empty() || fragment_shader_data.Bytecode.empty()) {
+Cacao::Ref<Cacao::ShaderModule> loadShaderModule(const Cacao::Ref<Cacao::Device>& device,
+                                                 const std::filesystem::path& path,
+                                                 luna::rhi::ShaderType type)
+{
+    const auto shader_data = luna::rhi::ShaderLoader::LoadFromSourceFile(path.string(), type, luna::rhi::ShaderLanguage::GLSL);
+    if (!shader_data.isValid()) {
         return {};
     }
 
-    auto shader = std::make_shared<luna::val::GraphicShader>();
-    shader->Init(vertex_shader_data, fragment_shader_data);
-    return shader;
+    Cacao::ShaderBlob blob;
+    blob.Data.resize(shader_data.Bytecode.size() * sizeof(uint32_t));
+    std::memcpy(blob.Data.data(), shader_data.Bytecode.data(), blob.Data.size());
+    blob.Hash = computeShaderHash(blob.Data);
+
+    Cacao::ShaderCreateInfo create_info;
+    create_info.SourcePath = path.string();
+    create_info.EntryPoint = "main";
+    create_info.Stage = shader_data.Stage;
+    return device->CreateShaderModule(blob, create_info);
 }
 
 glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio)
 {
     const float clamped_aspect_ratio = std::max(aspect_ratio, 0.001f);
-    const glm::mat4 projection = glm::perspective(glm::radians(50.0f), clamped_aspect_ratio, 0.05f, 200.0f);
+    glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(50.0f), clamped_aspect_ratio, 0.05f, 200.0f);
+    projection[1][1] *= -1.0f;
     return projection * camera.getViewMatrix();
-}
-
-void updateCombinedImageSamplerDescriptor(const vk::DescriptorSet& descriptor_set,
-                                          uint32_t binding,
-                                          const luna::val::Image& image,
-                                          const luna::val::Sampler& sampler)
-{
-    const vk::DescriptorImageInfo descriptor_image_info{
-        sampler.GetNativeHandle(),
-        image.GetNativeView(luna::val::ImageView::NATIVE),
-        luna::val::ImageUsageToImageLayout(luna::val::ImageUsage::SHADER_READ),
-    };
-
-    vk::WriteDescriptorSet write_descriptor_set;
-    write_descriptor_set.setDstSet(descriptor_set)
-        .setDstBinding(binding)
-        .setDescriptorType(vk::DescriptorType::eCombinedImageSampler)
-        .setDescriptorCount(1)
-        .setPImageInfo(&descriptor_image_info);
-
-    luna::val::GetCurrentVulkanContext().GetDevice().updateDescriptorSets(write_descriptor_set, {});
 }
 
 } // namespace
 
 namespace luna {
-
-class SceneGeometryPass final : public val::RenderPass {
-public:
-    SceneGeometryPass(SceneRenderer& scene_renderer, val::Format surface_format, uint32_t width, uint32_t height)
-        : m_scene_renderer(scene_renderer)
-        , m_surface_format(surface_format)
-        , m_width(width)
-        , m_height(height)
-    {}
-
-    void SetupPipeline(val::PipelineState pipeline) override
-    {
-        pipeline.Shader = m_scene_renderer.m_geometry_shader;
-        pipeline.VertexBindings = {
-            {val::VertexBinding::Rate::PER_VERTEX, val::VertexBinding::BindingRangeAll},
-        };
-        pipeline.DeclareAttachment("gbuffer_albedo", val::Format::R8G8B8A8_UNORM, m_width, m_height);
-        pipeline.DeclareAttachment("gbuffer_normal", val::Format::R16G16B16A16_SFLOAT, m_width, m_height);
-        pipeline.DeclareAttachment("gbuffer_depth", val::Format::D32_SFLOAT, m_width, m_height);
-        pipeline.AddOutputAttachment("gbuffer_albedo", val::ClearColor{0.0f, 0.0f, 0.0f, 0.0f});
-        pipeline.AddOutputAttachment("gbuffer_normal", val::ClearColor{0.5f, 0.5f, 1.0f, 0.0f});
-        pipeline.AddOutputAttachment("gbuffer_depth", val::ClearDepthStencil{1.0f, 0});
-    }
-
-    void BeforeRender(val::RenderPassState state) override
-    {
-        m_scene_renderer.getOrCreateUploadedMaterial(m_scene_renderer.m_default_material);
-        for (const auto& draw_command : m_scene_renderer.m_submitted_meshes) {
-            if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-                continue;
-            }
-
-            (void) m_scene_renderer.getOrCreateUploadedMesh(*draw_command.mesh);
-
-            const Material& material =
-                draw_command.material != nullptr ? *draw_command.material : m_scene_renderer.m_default_material;
-            auto& uploaded_material = m_scene_renderer.getOrCreateUploadedMaterial(material);
-            m_scene_renderer.uploadMaterialIfNeeded(uploaded_material, state.Commands);
-        }
-    }
-
-    void OnRender(val::RenderPassState state) override
-    {
-        const auto& gbuffer_albedo = state.GetAttachment("gbuffer_albedo");
-        const float aspect_ratio =
-            static_cast<float>(gbuffer_albedo.GetWidth()) / static_cast<float>(gbuffer_albedo.GetHeight());
-        const glm::mat4 view_projection = buildViewProjection(m_scene_renderer.m_camera, aspect_ratio);
-
-        state.Commands.SetRenderArea(gbuffer_albedo);
-
-        for (const auto& draw_command : m_scene_renderer.m_submitted_meshes) {
-            if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-                continue;
-            }
-
-            const auto uploaded_mesh_it = m_scene_renderer.m_uploaded_meshes.find(draw_command.mesh.get());
-            if (uploaded_mesh_it == m_scene_renderer.m_uploaded_meshes.end()) {
-                continue;
-            }
-
-            const Material& material =
-                draw_command.material != nullptr ? *draw_command.material : m_scene_renderer.m_default_material;
-            const auto uploaded_material_it = m_scene_renderer.m_uploaded_materials.find(&material);
-            if (uploaded_material_it == m_scene_renderer.m_uploaded_materials.end()) {
-                continue;
-            }
-
-            const auto& uploaded_mesh = uploaded_mesh_it->second;
-            const auto& uploaded_material = uploaded_material_it->second;
-
-            MeshPushConstants push_constants;
-            push_constants.model = draw_command.transform;
-            push_constants.view_projection = view_projection;
-
-            updateCombinedImageSamplerDescriptor(
-                state.Pass.DescriptorSet, 0, uploaded_material.albedo_image, uploaded_material.albedo_sampler);
-
-            state.Commands.BindVertexBuffers(uploaded_mesh.vertex_buffer);
-            state.Commands.BindIndexBufferUInt32(uploaded_mesh.index_buffer);
-            state.Commands.PushConstants(state.Pass, &push_constants);
-            state.Commands.DrawIndexed(uploaded_mesh.index_count, 1);
-        }
-    }
-
-private:
-    SceneRenderer& m_scene_renderer;
-    val::Format m_surface_format{val::Format::UNDEFINED};
-    uint32_t m_width{0};
-    uint32_t m_height{0};
-};
-
-class SceneLightingPass final : public val::RenderPass {
-public:
-    SceneLightingPass(SceneRenderer& scene_renderer, val::Format surface_format, uint32_t width, uint32_t height)
-        : m_scene_renderer(scene_renderer)
-        , m_surface_format(surface_format)
-        , m_width(width)
-        , m_height(height)
-    {}
-
-    void SetupPipeline(val::PipelineState pipeline) override
-    {
-        pipeline.Shader = m_scene_renderer.m_lighting_shader;
-        pipeline.DeclareAttachment("scene_color", m_surface_format, m_width, m_height);
-        pipeline.AddOutputAttachment("scene_color", val::ClearColor{0.10f, 0.10f, 0.12f, 1.0f});
-        pipeline.DescriptorBindings.Bind(
-            0, "gbuffer_albedo", m_scene_renderer.m_gbuffer_sampler, val::UniformType::COMBINED_IMAGE_SAMPLER);
-        pipeline.DescriptorBindings.Bind(
-            1, "gbuffer_normal", m_scene_renderer.m_gbuffer_sampler, val::UniformType::COMBINED_IMAGE_SAMPLER);
-    }
-
-    void OnRender(val::RenderPassState state) override
-    {
-        state.Commands.SetRenderArea(state.GetAttachment("scene_color"));
-        state.Commands.Draw(3, 1);
-    }
-
-private:
-    SceneRenderer& m_scene_renderer;
-    val::Format m_surface_format{val::Format::UNDEFINED};
-    uint32_t m_width{0};
-    uint32_t m_height{0};
-};
-
-class SceneClearPass final : public val::RenderPass {
-public:
-    SceneClearPass(val::Format surface_format, uint32_t width, uint32_t height)
-        : m_surface_format(surface_format)
-        , m_width(width)
-        , m_height(height)
-    {}
-
-    void SetupPipeline(val::PipelineState pipeline) override
-    {
-        pipeline.DeclareAttachment("scene_color", m_surface_format, m_width, m_height);
-        pipeline.AddOutputAttachment("scene_color", val::ClearColor{0.10f, 0.10f, 0.12f, 1.0f});
-    }
-
-private:
-    val::Format m_surface_format{val::Format::UNDEFINED};
-    uint32_t m_width{0};
-    uint32_t m_height{0};
-};
 
 SceneRenderer::~SceneRenderer()
 {
@@ -228,9 +83,11 @@ SceneRenderer::~SceneRenderer()
 void SceneRenderer::setShaderPaths(ShaderPaths shader_paths)
 {
     m_shader_paths = std::move(shader_paths);
-    m_geometry_shader.reset();
-    m_lighting_shader.reset();
-    m_core_resources_initialized = false;
+    m_pipeline.reset();
+    m_pipeline_layout.reset();
+    m_vertex_shader.reset();
+    m_fragment_shader.reset();
+    m_surface_format = Cacao::Format::UNDEFINED;
 }
 
 void SceneRenderer::shutdown()
@@ -238,10 +95,19 @@ void SceneRenderer::shutdown()
     clearSubmittedMeshes();
     m_uploaded_materials.clear();
     m_uploaded_meshes.clear();
-    m_geometry_shader.reset();
-    m_lighting_shader.reset();
-    m_gbuffer_sampler = val::Sampler{};
-    m_core_resources_initialized = false;
+    m_pipeline.reset();
+    m_pipeline_layout.reset();
+    m_material_layout.reset();
+    m_descriptor_pool.reset();
+    m_material_sampler.reset();
+    m_vertex_shader.reset();
+    m_fragment_shader.reset();
+    m_depth_texture.reset();
+    m_device.reset();
+    m_surface_format = Cacao::Format::UNDEFINED;
+    m_framebuffer_width = 0;
+    m_framebuffer_height = 0;
+    m_depth_texture_initialized = false;
 }
 
 void SceneRenderer::beginScene(const Camera& camera)
@@ -270,32 +136,98 @@ void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
     });
 }
 
-std::unique_ptr<val::RenderGraph> SceneRenderer::buildRenderGraph(
-    val::Format surface_format, uint32_t framebuffer_width, uint32_t framebuffer_height, bool include_imgui_pass)
+void SceneRenderer::render(const RenderContext& context)
 {
-    ensureCoreResources();
+    if (!context.device || !context.command_buffer || !context.color_target || context.framebuffer_width == 0 ||
+        context.framebuffer_height == 0) {
+        return;
+    }
 
-    val::RenderGraphBuilder builder;
-    if (!m_core_resources_initialized) {
-        builder.AddRenderPass("scene_clear", std::make_unique<SceneClearPass>(surface_format, framebuffer_width, framebuffer_height));
-        if (include_imgui_pass) {
-            builder.AddRenderPass("imgui", std::make_unique<val::ImGuiRenderPass>("scene_color"));
+    ensureFrameResources(context);
+    if (!m_pipeline || !m_depth_texture) {
+        return;
+    }
+
+    auto& commands = *context.command_buffer;
+    if (!m_depth_texture_initialized) {
+        commands.TransitionImage(
+            m_depth_texture, Cacao::ImageTransition::UndefinedToDepthAttachment, {0, 1, 0, 1, Cacao::ImageAspectFlags::Depth});
+        m_depth_texture_initialized = true;
+    }
+
+    getOrCreateUploadedMaterial(m_default_material);
+
+    for (const auto& draw_command : m_submitted_meshes) {
+        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+            continue;
         }
-        builder.SetOutputName("scene_color");
-        return builder.Build();
+
+        (void) getOrCreateUploadedMesh(*draw_command.mesh);
+        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
+        auto& uploaded_material = getOrCreateUploadedMaterial(material);
+        uploadMaterialIfNeeded(commands, uploaded_material);
     }
 
-    builder.AddRenderPass(
-        "scene_geometry", std::make_unique<SceneGeometryPass>(*this, surface_format, framebuffer_width, framebuffer_height));
-    builder.AddRenderPass(
-        "scene_lighting", std::make_unique<SceneLightingPass>(*this, surface_format, framebuffer_width, framebuffer_height));
+    Cacao::RenderingAttachmentInfo color_attachment;
+    color_attachment.Texture = context.color_target;
+    color_attachment.LoadOp = Cacao::AttachmentLoadOp::Clear;
+    color_attachment.StoreOp = Cacao::AttachmentStoreOp::Store;
+    color_attachment.ClearValue =
+        Cacao::ClearValue::ColorFloat(context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a);
 
-    if (include_imgui_pass) {
-        builder.AddRenderPass("imgui", std::make_unique<val::ImGuiRenderPass>("scene_color"));
+    auto depth_attachment = Cacao::CreateRef<Cacao::RenderingAttachmentInfo>();
+    depth_attachment->Texture = m_depth_texture;
+    depth_attachment->LoadOp = Cacao::AttachmentLoadOp::Clear;
+    depth_attachment->StoreOp = Cacao::AttachmentStoreOp::Store;
+    depth_attachment->ClearDepthStencil = {1.0f, 0};
+
+    Cacao::RenderingInfo rendering_info;
+    rendering_info.RenderArea = {0, 0, context.framebuffer_width, context.framebuffer_height};
+    rendering_info.ColorAttachments = {color_attachment};
+    rendering_info.DepthAttachment = depth_attachment;
+    rendering_info.LayerCount = 1;
+
+    commands.BeginRendering(rendering_info);
+    commands.BindGraphicsPipeline(m_pipeline);
+    commands.SetViewport(
+        {0.0f, 0.0f, static_cast<float>(context.framebuffer_width), static_cast<float>(context.framebuffer_height), 0.0f, 1.0f});
+    commands.SetScissor({0, 0, context.framebuffer_width, context.framebuffer_height});
+
+    const float aspect_ratio = static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
+    const glm::mat4 view_projection = buildViewProjection(m_camera, aspect_ratio);
+
+    for (const auto& draw_command : m_submitted_meshes) {
+        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+            continue;
+        }
+
+        const auto uploaded_mesh_it = m_uploaded_meshes.find(draw_command.mesh.get());
+        if (uploaded_mesh_it == m_uploaded_meshes.end()) {
+            continue;
+        }
+
+        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
+        const auto uploaded_material_it = m_uploaded_materials.find(&material);
+        if (uploaded_material_it == m_uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
+            continue;
+        }
+
+        const auto& uploaded_mesh = uploaded_mesh_it->second;
+        const auto& uploaded_material = uploaded_material_it->second;
+        const std::array<Cacao::Ref<Cacao::DescriptorSet>, 1> descriptor_sets{uploaded_material.descriptor_set};
+
+        MeshPushConstants push_constants;
+        push_constants.model = draw_command.transform;
+        push_constants.view_projection = view_projection;
+
+        commands.BindDescriptorSets(m_pipeline, 0, descriptor_sets);
+        commands.BindVertexBuffer(0, uploaded_mesh.vertex_buffer);
+        commands.BindIndexBuffer(uploaded_mesh.index_buffer, 0, Cacao::IndexType::UInt32);
+        commands.PushConstants(m_pipeline, Cacao::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
+        commands.DrawIndexed(uploaded_mesh.index_count, 1, 0, 0, 0);
     }
 
-    builder.SetOutputName("scene_color");
-    return builder.Build();
+    commands.EndRendering();
 }
 
 SceneRenderer::ShaderPaths SceneRenderer::getDefaultShaderPaths()
@@ -309,19 +241,127 @@ SceneRenderer::ShaderPaths SceneRenderer::getDefaultShaderPaths()
     };
 }
 
-val::ImageData SceneRenderer::createFallbackImageData(const glm::vec4& albedo_color)
+rhi::ImageData SceneRenderer::createFallbackImageData(const glm::vec4& albedo_color)
 {
     const glm::vec4 clamped_color = glm::clamp(albedo_color, glm::vec4(0.0f), glm::vec4(1.0f));
     auto to_byte = [](float channel) {
         return static_cast<uint8_t>(std::lround(channel * 255.0f));
     };
 
-    return val::ImageData{
+    return rhi::ImageData{
         .ByteData = {to_byte(clamped_color.r), to_byte(clamped_color.g), to_byte(clamped_color.b), to_byte(clamped_color.a)},
-        .ImageFormat = val::Format::R8G8B8A8_UNORM,
+        .ImageFormat = Cacao::Format::RGBA8_UNORM,
         .Width = 1,
         .Height = 1,
     };
+}
+
+void SceneRenderer::ensurePipeline(const RenderContext& context)
+{
+    if (!context.device) {
+        return;
+    }
+
+    if (m_device != context.device) {
+        m_uploaded_materials.clear();
+        m_uploaded_meshes.clear();
+        m_pipeline.reset();
+        m_pipeline_layout.reset();
+        m_material_layout.reset();
+        m_descriptor_pool.reset();
+        m_material_sampler.reset();
+        m_vertex_shader.reset();
+        m_fragment_shader.reset();
+        m_depth_texture.reset();
+        m_depth_texture_initialized = false;
+        m_device = context.device;
+        m_surface_format = Cacao::Format::UNDEFINED;
+    }
+
+    if (m_pipeline && m_surface_format == context.color_format) {
+        return;
+    }
+
+    const ShaderPaths shader_paths = resolveShaderPaths();
+    m_vertex_shader = loadShaderModule(m_device, shader_paths.geometry_vertex_path, rhi::ShaderType::VERTEX);
+    m_fragment_shader = loadShaderModule(m_device, shader_paths.geometry_fragment_path, rhi::ShaderType::FRAGMENT);
+    if (!m_vertex_shader || !m_fragment_shader) {
+        LUNA_CORE_ERROR("Failed to load scene renderer shaders: '{}' '{}'",
+                        shader_paths.geometry_vertex_path.string(),
+                        shader_paths.geometry_fragment_path.string());
+        return;
+    }
+
+    m_material_layout = m_device->CreateDescriptorSetLayout(
+        Cacao::DescriptorSetLayoutBuilder()
+            .AddBinding(0, Cacao::DescriptorType::CombinedImageSampler, 1, Cacao::ShaderStage::Fragment)
+            .Build());
+
+    m_descriptor_pool = m_device->CreateDescriptorPool(
+        Cacao::DescriptorPoolBuilder().SetMaxSets(1024).AddPoolSize(Cacao::DescriptorType::CombinedImageSampler, 1024).Build());
+
+    m_material_sampler = m_device->CreateSampler(
+        Cacao::SamplerBuilder()
+            .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
+            .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
+            .SetAddressMode(Cacao::SamplerAddressMode::Repeat)
+            .SetAnisotropy(false)
+            .SetName("SceneMaterialSampler")
+            .Build());
+
+    m_pipeline_layout = m_device->CreatePipelineLayout(
+        Cacao::PipelineLayoutBuilder()
+            .AddSetLayout(m_material_layout)
+            .AddPushConstant(Cacao::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
+            .Build());
+
+    m_pipeline = m_device->CreateGraphicsPipeline(
+        Cacao::GraphicsPipelineBuilder()
+            .SetShaders({m_vertex_shader, m_fragment_shader})
+            .AddVertexBinding(0, sizeof(StaticMeshVertex), Cacao::VertexInputRate::Vertex)
+            .AddVertexAttribute(0, 0, Cacao::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, position), "POSITION")
+            .AddVertexAttribute(1, 0, Cacao::Format::RG32_FLOAT, offsetof(StaticMeshVertex, uv), "TEXCOORD")
+            .AddVertexAttribute(2, 0, Cacao::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, normal), "NORMAL")
+            .SetTopology(Cacao::PrimitiveTopology::TriangleList)
+            .SetCullMode(Cacao::CullMode::None)
+            .SetFrontFace(Cacao::FrontFace::CounterClockwise)
+            .SetDepthTest(true, true, Cacao::CompareOp::Less)
+            .AddColorAttachmentDefault(false)
+            .AddColorFormat(context.color_format)
+            .SetDepthStencilFormat(Cacao::Format::D32_FLOAT)
+            .SetLayout(m_pipeline_layout)
+            .Build());
+
+    m_surface_format = context.color_format;
+}
+
+void SceneRenderer::ensureFrameResources(const RenderContext& context)
+{
+    ensurePipeline(context);
+    createOrResizeDepthTexture(context.framebuffer_width, context.framebuffer_height);
+}
+
+void SceneRenderer::createOrResizeDepthTexture(uint32_t width, uint32_t height)
+{
+    if (!m_device || width == 0 || height == 0) {
+        return;
+    }
+
+    if (m_depth_texture && m_framebuffer_width == width && m_framebuffer_height == height) {
+        return;
+    }
+
+    m_framebuffer_width = width;
+    m_framebuffer_height = height;
+    m_depth_texture_initialized = false;
+    m_depth_texture = m_device->CreateTexture(
+        Cacao::TextureBuilder()
+            .SetSize(width, height)
+            .SetFormat(Cacao::Format::D32_FLOAT)
+            .SetUsage(Cacao::TextureUsageFlags::DepthStencilAttachment)
+            .SetInitialState(Cacao::ResourceState::Undefined)
+            .SetName("SceneDepthTexture")
+            .Build());
 }
 
 SceneRenderer::ShaderPaths SceneRenderer::resolveShaderPaths() const
@@ -331,33 +371,6 @@ SceneRenderer::ShaderPaths SceneRenderer::resolveShaderPaths() const
     }
 
     return getDefaultShaderPaths();
-}
-
-void SceneRenderer::ensureCoreResources()
-{
-    if (m_core_resources_initialized) {
-        return;
-    }
-
-    const ShaderPaths shader_paths = resolveShaderPaths();
-
-    m_geometry_shader = loadGraphicsShader(shader_paths.geometry_vertex_path, shader_paths.geometry_fragment_path);
-    m_lighting_shader = loadGraphicsShader(shader_paths.lighting_vertex_path, shader_paths.lighting_fragment_path);
-
-    if (!m_geometry_shader || !m_lighting_shader) {
-        LUNA_CORE_ERROR("Failed to load scene renderer shaders: '{}', '{}', '{}', '{}'",
-                        shader_paths.geometry_vertex_path.string(),
-                        shader_paths.geometry_fragment_path.string(),
-                        shader_paths.lighting_vertex_path.string(),
-                        shader_paths.lighting_fragment_path.string());
-        return;
-    }
-
-    m_gbuffer_sampler = val::Sampler(val::Sampler::MinFilter::LINEAR,
-                                     val::Sampler::MagFilter::LINEAR,
-                                     val::Sampler::AddressMode::CLAMP_TO_EDGE,
-                                     val::Sampler::MipFilter::LINEAR);
-    m_core_resources_initialized = true;
 }
 
 SceneRenderer::UploadedMesh& SceneRenderer::getOrCreateUploadedMesh(const Mesh& mesh)
@@ -370,16 +383,33 @@ SceneRenderer::UploadedMesh& SceneRenderer::getOrCreateUploadedMesh(const Mesh& 
     auto [inserted_it, _] = m_uploaded_meshes.emplace(&mesh, UploadedMesh{});
     auto& uploaded_mesh = inserted_it->second;
 
-    uploaded_mesh.vertex_buffer = val::Buffer(
-        mesh.getVertices().size() * sizeof(StaticMeshVertex), val::BufferUsage::VERTEX_BUFFER, val::MemoryUsage::CPU_TO_GPU);
-    uploaded_mesh.index_buffer =
-        val::Buffer(mesh.getIndices().size() * sizeof(uint32_t), val::BufferUsage::INDEX_BUFFER, val::MemoryUsage::CPU_TO_GPU);
+    uploaded_mesh.vertex_buffer = m_device->CreateBuffer(
+        Cacao::BufferBuilder()
+            .SetSize(mesh.getVertices().size() * sizeof(StaticMeshVertex))
+            .SetUsage(Cacao::BufferUsageFlags::VertexBuffer)
+            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+            .SetName(mesh.getName() + "_VertexBuffer")
+            .Build());
+    uploaded_mesh.index_buffer = m_device->CreateBuffer(
+        Cacao::BufferBuilder()
+            .SetSize(mesh.getIndices().size() * sizeof(uint32_t))
+            .SetUsage(Cacao::BufferUsageFlags::IndexBuffer)
+            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+            .SetName(mesh.getName() + "_IndexBuffer")
+            .Build());
     uploaded_mesh.index_count = static_cast<uint32_t>(mesh.getIndices().size());
 
-    uploaded_mesh.vertex_buffer.CopyData(
-        reinterpret_cast<const uint8_t*>(mesh.getVertices().data()), mesh.getVertices().size() * sizeof(StaticMeshVertex), 0);
-    uploaded_mesh.index_buffer.CopyData(
-        reinterpret_cast<const uint8_t*>(mesh.getIndices().data()), mesh.getIndices().size() * sizeof(uint32_t), 0);
+    if (void* vertex_memory = uploaded_mesh.vertex_buffer->Map()) {
+        std::memcpy(vertex_memory, mesh.getVertices().data(), mesh.getVertices().size() * sizeof(StaticMeshVertex));
+        uploaded_mesh.vertex_buffer->Flush();
+        uploaded_mesh.vertex_buffer->Unmap();
+    }
+
+    if (void* index_memory = uploaded_mesh.index_buffer->Map()) {
+        std::memcpy(index_memory, mesh.getIndices().data(), mesh.getIndices().size() * sizeof(uint32_t));
+        uploaded_mesh.index_buffer->Flush();
+        uploaded_mesh.index_buffer->Unmap();
+    }
 
     return uploaded_mesh;
 }
@@ -391,46 +421,78 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
         return it->second;
     }
 
-    const val::ImageData source_image = material.hasAlbedoTexture() ? material.getAlbedoImageData()
+    const rhi::ImageData source_image = material.hasAlbedoTexture() ? material.getAlbedoImageData()
                                                                     : createFallbackImageData(material.getAlbedoColor());
 
     auto [inserted_it, _] = m_uploaded_materials.emplace(&material, UploadedMaterial{});
     auto& uploaded_material = inserted_it->second;
 
-    uploaded_material.albedo_image =
-        val::Image(source_image.Width,
-                   source_image.Height,
-                   source_image.ImageFormat,
-                   val::ImageUsage::TRANSFER_DISTINATION | val::ImageUsage::SHADER_READ | val::ImageUsage::TRANSFER_SOURCE,
-                   val::MemoryUsage::GPU_ONLY,
-                   val::ImageOptions::MIPMAPS);
-    uploaded_material.albedo_sampler = val::Sampler(val::Sampler::MinFilter::LINEAR,
-                                                    val::Sampler::MagFilter::LINEAR,
-                                                    val::Sampler::AddressMode::REPEAT,
-                                                    val::Sampler::MipFilter::LINEAR);
-    uploaded_material.staging_buffer =
-        val::Buffer(source_image.ByteData.size(), val::BufferUsage::TRANSFER_SOURCE, val::MemoryUsage::CPU_TO_GPU);
-    uploaded_material.staging_buffer.CopyData(source_image.ByteData.data(), source_image.ByteData.size(), 0);
+    uploaded_material.albedo_texture = m_device->CreateTexture(
+        Cacao::TextureBuilder()
+            .SetSize(source_image.Width, source_image.Height)
+            .SetFormat(source_image.ImageFormat)
+            .SetUsage(Cacao::TextureUsageFlags::Sampled | Cacao::TextureUsageFlags::TransferDst)
+            .SetInitialState(Cacao::ResourceState::Undefined)
+            .SetName(material.getName() + "_Albedo")
+            .Build());
+
+    uploaded_material.staging_buffer = m_device->CreateBuffer(
+        Cacao::BufferBuilder()
+            .SetSize(source_image.ByteData.size())
+            .SetUsage(Cacao::BufferUsageFlags::TransferSrc)
+            .SetMemoryUsage(Cacao::BufferMemoryUsage::CpuToGpu)
+            .SetName(material.getName() + "_AlbedoStaging")
+            .Build());
+
+    if (void* mapped = uploaded_material.staging_buffer->Map()) {
+        std::memcpy(mapped, source_image.ByteData.data(), source_image.ByteData.size());
+        uploaded_material.staging_buffer->Flush();
+        uploaded_material.staging_buffer->Unmap();
+    }
+
+    uploaded_material.descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_material_layout);
+    uploaded_material.descriptor_set->WriteTexture(Cacao::TextureWriteInfo{
+        .Binding = 0,
+        .TextureView = uploaded_material.albedo_texture->GetDefaultView(),
+        .Layout = Cacao::ResourceState::ShaderRead,
+        .Type = Cacao::DescriptorType::CombinedImageSampler,
+        .Sampler = m_material_sampler,
+    });
+    uploaded_material.descriptor_set->Update();
 
     return uploaded_material;
 }
 
-void SceneRenderer::uploadMaterialIfNeeded(UploadedMaterial& uploaded_material, val::CommandBuffer& commands)
+void SceneRenderer::uploadMaterialIfNeeded(Cacao::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material)
 {
-    if (uploaded_material.uploaded) {
+    if (uploaded_material.uploaded || !uploaded_material.albedo_texture || !uploaded_material.staging_buffer) {
         return;
     }
 
-    commands.CopyBufferToImage(val::BufferInfo{std::cref(uploaded_material.staging_buffer), 0},
-                               val::ImageInfo{std::cref(uploaded_material.albedo_image), val::ImageUsage::UNKNOWN, 0, 0});
+    commands.TransitionImage(uploaded_material.albedo_texture, Cacao::ImageTransition::UndefinedToTransferDst);
 
-    if (uploaded_material.albedo_image.GetMipLevelCount() > 1) {
-        commands.GenerateMipLevels(
-            uploaded_material.albedo_image, val::ImageUsage::TRANSFER_DISTINATION, val::BlitFilter::LINEAR);
-    } else {
-        commands.TransferLayout(
-            uploaded_material.albedo_image, val::ImageUsage::TRANSFER_DISTINATION, val::ImageUsage::SHADER_READ);
-    }
+    const Cacao::BufferImageCopy copy_region{
+        .BufferOffset = 0,
+        .BufferRowLength = 0,
+        .BufferImageHeight = 0,
+        .ImageSubresource = {
+            .AspectMask = Cacao::ImageAspectFlags::Color,
+            .MipLevel = 0,
+            .BaseArrayLayer = 0,
+            .LayerCount = 1,
+        },
+        .ImageOffsetX = 0,
+        .ImageOffsetY = 0,
+        .ImageOffsetZ = 0,
+        .ImageExtentWidth = uploaded_material.albedo_texture->GetWidth(),
+        .ImageExtentHeight = uploaded_material.albedo_texture->GetHeight(),
+        .ImageExtentDepth = 1,
+    };
+
+    const std::array<Cacao::BufferImageCopy, 1> copy_regions{copy_region};
+    commands.CopyBufferToImage(
+        uploaded_material.staging_buffer, uploaded_material.albedo_texture, Cacao::ResourceState::CopyDest, copy_regions);
+    commands.TransitionImage(uploaded_material.albedo_texture, Cacao::ImageTransition::TransferDstToShaderRead);
 
     uploaded_material.uploaded = true;
 }

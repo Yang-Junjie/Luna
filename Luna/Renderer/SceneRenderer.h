@@ -3,27 +3,32 @@
 #include "Renderer/Camera.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/RenderGraph.h"
-#include "Vulkan/Buffer.h"
-#include "Vulkan/Image.h"
-#include "Vulkan/Sampler.h"
+
+#include <Core.h>
 
 #include <filesystem>
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
-namespace luna::val {
-class GraphicShader;
-class CommandBuffer;
-} // namespace luna::val
+namespace Cacao {
+class Buffer;
+class CommandBufferEncoder;
+class DescriptorPool;
+class DescriptorSet;
+class DescriptorSetLayout;
+class Device;
+class GraphicsPipeline;
+class PipelineLayout;
+class Sampler;
+class ShaderModule;
+class Texture;
+} // namespace Cacao
 
 namespace luna {
-
-class SceneGeometryPass;
-class SceneLightingPass;
 
 class SceneRenderer {
 public:
@@ -35,9 +40,18 @@ public:
 
         bool isComplete() const
         {
-            return !geometry_vertex_path.empty() && !geometry_fragment_path.empty() && !lighting_vertex_path.empty() &&
-                   !lighting_fragment_path.empty();
+            return !geometry_vertex_path.empty() && !geometry_fragment_path.empty();
         }
+    };
+
+    struct RenderContext {
+        Cacao::Ref<Cacao::Device> device;
+        Cacao::Ref<Cacao::CommandBufferEncoder> command_buffer;
+        Cacao::Ref<Cacao::Texture> color_target;
+        Cacao::Format color_format{Cacao::Format::UNDEFINED};
+        glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
+        uint32_t framebuffer_width{0};
+        uint32_t framebuffer_height{0};
     };
 
     SceneRenderer() = default;
@@ -54,9 +68,7 @@ public:
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
                           std::shared_ptr<Material> material = {});
-
-    std::unique_ptr<val::RenderGraph>
-        buildRenderGraph(val::Format surface_format, uint32_t framebuffer_width, uint32_t framebuffer_height, bool include_imgui_pass);
+    void render(const RenderContext& context);
 
 private:
     struct StaticMeshDrawCommand {
@@ -66,26 +78,28 @@ private:
     };
 
     struct UploadedMesh {
-        val::Buffer vertex_buffer;
-        val::Buffer index_buffer;
+        Cacao::Ref<Cacao::Buffer> vertex_buffer;
+        Cacao::Ref<Cacao::Buffer> index_buffer;
         uint32_t index_count{0};
     };
 
     struct UploadedMaterial {
-        val::Image albedo_image;
-        val::Buffer staging_buffer;
-        val::Sampler albedo_sampler;
+        Cacao::Ref<Cacao::Texture> albedo_texture;
+        Cacao::Ref<Cacao::Buffer> staging_buffer;
+        Cacao::Ref<Cacao::DescriptorSet> descriptor_set;
         bool uploaded{false};
     };
 
     static ShaderPaths getDefaultShaderPaths();
-    static val::ImageData createFallbackImageData(const glm::vec4& albedo_color);
+    static rhi::ImageData createFallbackImageData(const glm::vec4& albedo_color);
 
-    void ensureCoreResources();
+    void ensurePipeline(const RenderContext& context);
+    void ensureFrameResources(const RenderContext& context);
+    void createOrResizeDepthTexture(uint32_t width, uint32_t height);
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
-    void uploadMaterialIfNeeded(UploadedMaterial& uploaded_material, val::CommandBuffer& commands);
+    void uploadMaterialIfNeeded(Cacao::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
 
 private:
     Camera m_camera{};
@@ -93,14 +107,20 @@ private:
     std::unordered_map<const Mesh*, UploadedMesh> m_uploaded_meshes;
     std::unordered_map<const Material*, UploadedMaterial> m_uploaded_materials;
     Material m_default_material;
-    std::shared_ptr<val::GraphicShader> m_geometry_shader;
-    std::shared_ptr<val::GraphicShader> m_lighting_shader;
-    val::Sampler m_gbuffer_sampler;
     ShaderPaths m_shader_paths{};
-    bool m_core_resources_initialized{false};
-
-    friend class SceneGeometryPass;
-    friend class SceneLightingPass;
+    Cacao::Ref<Cacao::Device> m_device;
+    Cacao::Ref<Cacao::GraphicsPipeline> m_pipeline;
+    Cacao::Ref<Cacao::PipelineLayout> m_pipeline_layout;
+    Cacao::Ref<Cacao::DescriptorSetLayout> m_material_layout;
+    Cacao::Ref<Cacao::DescriptorPool> m_descriptor_pool;
+    Cacao::Ref<Cacao::Sampler> m_material_sampler;
+    Cacao::Ref<Cacao::ShaderModule> m_vertex_shader;
+    Cacao::Ref<Cacao::ShaderModule> m_fragment_shader;
+    Cacao::Ref<Cacao::Texture> m_depth_texture;
+    Cacao::Format m_surface_format{Cacao::Format::UNDEFINED};
+    uint32_t m_framebuffer_width{0};
+    uint32_t m_framebuffer_height{0};
+    bool m_depth_texture_initialized{false};
 };
 
 } // namespace luna

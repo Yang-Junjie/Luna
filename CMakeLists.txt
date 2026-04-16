@@ -70,6 +70,11 @@ add_subdirectory(third_party/glslang EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/SPIRV-Cross EXCLUDE_FROM_ALL)
 
 add_subdirectory(Luna)
-add_subdirectory(Editor)
-add_subdirectory(App)
-add_subdirectory(samples)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Editor/CMakeLists.txt")
+    add_subdirectory(Editor)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/App/CMakeLists.txt")
+    add_subdirectory(App)
+endif()

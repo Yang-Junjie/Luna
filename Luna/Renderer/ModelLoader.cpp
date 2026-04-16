@@ -1,174 +1,198 @@
-// Copyright(c) 2021, #Momo
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met :
-//
-// 1. Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
-//
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-// this list of conditions and the following disclaimer in the documentation
-// and /or other materials provided with the distribution.
-//
-// 3. Neither the name of the copyright holder nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED.IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "Renderer/ModelLoader.h"
-#include "Vulkan/ArrayUtils.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
+#include <glm/geometric.hpp>
+#include <glm/gtx/norm.hpp>
+
+#include <cassert>
+#include <cmath>
 #include <filesystem>
 #include <optional>
 #include <string_view>
 
 #if defined(_MSC_VER)
-// tinyobjloader's embedded fast_float path currently trips a constexpr bug under MSVC.
-// Falling back to tinyobjloader's default parser keeps OBJ loading working on Windows.
 #define TINYOBJLOADER_DISABLE_FAST_FLOAT
 #endif
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "third_party/tinyobjloader/tiny_obj_loader.h"
 
-namespace luna::val {
+namespace luna::rhi {
 namespace {
-std::string GetAbsolutePathToObjResource(const std::string& objPath, const std::string& relativePath)
+
+std::string getAbsolutePathToObjResource(const std::string& obj_path, const std::string& relative_path)
 {
-    return (std::filesystem::path{objPath}.parent_path() / relativePath).string();
+    return (std::filesystem::path(obj_path).parent_path() / relative_path).string();
 }
 
-ImageData CreateStubTexture(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a)
+ImageData createStubTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
-    return ImageData{std::vector<uint8_t>{r, g, b, a}, Format::R8G8B8A8_UNORM, 1, 1};
+    return ImageData{
+        .ByteData = {r, g, b, a},
+        .ImageFormat = Cacao::Format::RGBA8_UNORM,
+        .Width = 1,
+        .Height = 1,
+    };
 }
 
-Vector2 ToVector2(const fastgltf::math::fvec2& value)
+glm::vec2 toVec2(const fastgltf::math::fvec2& value)
 {
-    return Vector2{value[0], value[1]};
+    return {value[0], value[1]};
 }
 
-Vector3 ToVector3(const fastgltf::math::fvec3& value)
+glm::vec3 toVec3(const fastgltf::math::fvec3& value)
 {
-    return Vector3{value[0], value[1], value[2]};
+    return {value[0], value[1], value[2]};
 }
 
-std::vector<std::pair<Vector3, Vector3>> ComputeTangentsBitangents(const tinyobj::mesh_t& mesh,
-                                                                   const tinyobj::attrib_t& attrib)
+std::pair<glm::vec3, glm::vec3> computeTangentSpace(const glm::vec3& p1,
+                                                    const glm::vec3& p2,
+                                                    const glm::vec3& p3,
+                                                    const glm::vec2& uv1,
+                                                    const glm::vec2& uv2,
+                                                    const glm::vec2& uv3)
 {
-    std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
-    tangentsBitangents.resize(attrib.vertices.size() / 3, {Vector3{0.0f, 0.0f, 0.0f}, Vector3{0.0f, 0.0f, 0.0f}});
+    const glm::vec3 edge1 = p2 - p1;
+    const glm::vec3 edge2 = p3 - p1;
+    const glm::vec2 delta_uv1 = uv2 - uv1;
+    const glm::vec2 delta_uv2 = uv3 - uv1;
+    const float determinant = delta_uv1.x * delta_uv2.y - delta_uv2.x * delta_uv1.y;
 
-    ModelData::Index indexOffset = 0;
-    for (const size_t faceIndex : mesh.num_face_vertices) {
-        assert(faceIndex == 3);
-
-        const tinyobj::index_t idx1 = mesh.indices[indexOffset + 0];
-        const tinyobj::index_t idx2 = mesh.indices[indexOffset + 1];
-        const tinyobj::index_t idx3 = mesh.indices[indexOffset + 2];
-
-        Vector3 position1, position2, position3;
-        Vector2 texCoord1, texCoord2, texCoord3;
-
-        position1.x = attrib.vertices[3 * size_t(idx1.vertex_index) + 0];
-        position1.y = attrib.vertices[3 * size_t(idx1.vertex_index) + 1];
-        position1.z = attrib.vertices[3 * size_t(idx1.vertex_index) + 2];
-
-        position2.x = attrib.vertices[3 * size_t(idx2.vertex_index) + 0];
-        position2.y = attrib.vertices[3 * size_t(idx2.vertex_index) + 1];
-        position2.z = attrib.vertices[3 * size_t(idx2.vertex_index) + 2];
-
-        position3.x = attrib.vertices[3 * size_t(idx3.vertex_index) + 0];
-        position3.y = attrib.vertices[3 * size_t(idx3.vertex_index) + 1];
-        position3.z = attrib.vertices[3 * size_t(idx3.vertex_index) + 2];
-
-        texCoord1.x = attrib.texcoords[2 * size_t(idx1.texcoord_index) + 0];
-        texCoord1.y = attrib.texcoords[2 * size_t(idx1.texcoord_index) + 1];
-
-        texCoord2.x = attrib.texcoords[2 * size_t(idx2.texcoord_index) + 0];
-        texCoord2.y = attrib.texcoords[2 * size_t(idx2.texcoord_index) + 1];
-
-        texCoord3.x = attrib.texcoords[2 * size_t(idx3.texcoord_index) + 0];
-        texCoord3.y = attrib.texcoords[2 * size_t(idx3.texcoord_index) + 1];
-
-        const auto tangentBitangent =
-            ComputeTangentSpace(position1, position2, position3, texCoord1, texCoord2, texCoord3);
-
-        tangentsBitangents[idx1.vertex_index].first += tangentBitangent.first;
-        tangentsBitangents[idx1.vertex_index].second += tangentBitangent.second;
-        tangentsBitangents[idx2.vertex_index].first += tangentBitangent.first;
-        tangentsBitangents[idx2.vertex_index].second += tangentBitangent.second;
-        tangentsBitangents[idx3.vertex_index].first += tangentBitangent.first;
-        tangentsBitangents[idx3.vertex_index].second += tangentBitangent.second;
-
-        indexOffset += static_cast<ModelData::Index>(faceIndex);
+    if (std::abs(determinant) < 1e-6f) {
+        return {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
     }
 
-    for (auto& [tangent, bitangent] : tangentsBitangents) {
-        if (tangent != Vector3{0.0f, 0.0f, 0.0f}) {
-            tangent = Normalize(tangent);
-        }
-        if (bitangent != Vector3{0.0f, 0.0f, 0.0f}) {
-            bitangent = Normalize(bitangent);
-        }
+    const float inv_determinant = 1.0f / determinant;
+    glm::vec3 tangent = inv_determinant * (delta_uv2.y * edge1 - delta_uv1.y * edge2);
+    glm::vec3 bitangent = inv_determinant * (-delta_uv2.x * edge1 + delta_uv1.x * edge2);
+
+    if (glm::length2(tangent) > 0.0f) {
+        tangent = glm::normalize(tangent);
     }
-    return tangentsBitangents;
+    if (glm::length2(bitangent) > 0.0f) {
+        bitangent = glm::normalize(bitangent);
+    }
+
+    return {tangent, bitangent};
 }
 
-std::vector<std::pair<Vector3, Vector3>> ComputeTangentsBitangents(ArrayView<ModelData::Index> indices,
-                                                                   ArrayView<const Vector3> positions,
-                                                                   ArrayView<const Vector2> texCoords)
+std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const tinyobj::mesh_t& mesh,
+                                                                       const tinyobj::attrib_t& attrib)
 {
-    std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
-    tangentsBitangents.resize(positions.size(), {Vector3{0.0f, 0.0f, 0.0f}, Vector3{0.0f, 0.0f, 0.0f}});
+    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(
+        attrib.vertices.size() / 3, {glm::vec3(0.0f), glm::vec3(0.0f)});
 
-    assert(indices.size() % 3 == 0);
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        const auto& position1 = positions[indices[i + 0]];
-        const auto& position2 = positions[indices[i + 1]];
-        const auto& position3 = positions[indices[i + 2]];
+    ModelData::Index index_offset = 0;
+    for (const size_t face_vertex_count : mesh.num_face_vertices) {
+        if (face_vertex_count != 3) {
+            index_offset += static_cast<ModelData::Index>(face_vertex_count);
+            continue;
+        }
 
-        const auto& texCoord1 = texCoords[indices[i + 0]];
-        const auto& texCoord2 = texCoords[indices[i + 1]];
-        const auto& texCoord3 = texCoords[indices[i + 2]];
+        const tinyobj::index_t idx1 = mesh.indices[index_offset + 0];
+        const tinyobj::index_t idx2 = mesh.indices[index_offset + 1];
+        const tinyobj::index_t idx3 = mesh.indices[index_offset + 2];
 
-        const auto tangentBitangent =
-            ComputeTangentSpace(position1, position2, position3, texCoord1, texCoord2, texCoord3);
+        if (idx1.vertex_index < 0 || idx2.vertex_index < 0 || idx3.vertex_index < 0 || idx1.texcoord_index < 0 ||
+            idx2.texcoord_index < 0 || idx3.texcoord_index < 0) {
+            index_offset += 3;
+            continue;
+        }
 
-        tangentsBitangents[indices[i + 0]].first += tangentBitangent.first;
-        tangentsBitangents[indices[i + 0]].second += tangentBitangent.second;
-        tangentsBitangents[indices[i + 1]].first += tangentBitangent.first;
-        tangentsBitangents[indices[i + 1]].second += tangentBitangent.second;
-        tangentsBitangents[indices[i + 2]].first += tangentBitangent.first;
-        tangentsBitangents[indices[i + 2]].second += tangentBitangent.second;
+        const glm::vec3 position1{
+            attrib.vertices[3 * size_t(idx1.vertex_index) + 0],
+            attrib.vertices[3 * size_t(idx1.vertex_index) + 1],
+            attrib.vertices[3 * size_t(idx1.vertex_index) + 2],
+        };
+        const glm::vec3 position2{
+            attrib.vertices[3 * size_t(idx2.vertex_index) + 0],
+            attrib.vertices[3 * size_t(idx2.vertex_index) + 1],
+            attrib.vertices[3 * size_t(idx2.vertex_index) + 2],
+        };
+        const glm::vec3 position3{
+            attrib.vertices[3 * size_t(idx3.vertex_index) + 0],
+            attrib.vertices[3 * size_t(idx3.vertex_index) + 1],
+            attrib.vertices[3 * size_t(idx3.vertex_index) + 2],
+        };
+
+        const glm::vec2 tex_coord1{
+            attrib.texcoords[2 * size_t(idx1.texcoord_index) + 0],
+            attrib.texcoords[2 * size_t(idx1.texcoord_index) + 1],
+        };
+        const glm::vec2 tex_coord2{
+            attrib.texcoords[2 * size_t(idx2.texcoord_index) + 0],
+            attrib.texcoords[2 * size_t(idx2.texcoord_index) + 1],
+        };
+        const glm::vec2 tex_coord3{
+            attrib.texcoords[2 * size_t(idx3.texcoord_index) + 0],
+            attrib.texcoords[2 * size_t(idx3.texcoord_index) + 1],
+        };
+
+        const auto tangent_space = computeTangentSpace(position1, position2, position3, tex_coord1, tex_coord2, tex_coord3);
+        tangents_bitangents[idx1.vertex_index].first += tangent_space.first;
+        tangents_bitangents[idx1.vertex_index].second += tangent_space.second;
+        tangents_bitangents[idx2.vertex_index].first += tangent_space.first;
+        tangents_bitangents[idx2.vertex_index].second += tangent_space.second;
+        tangents_bitangents[idx3.vertex_index].first += tangent_space.first;
+        tangents_bitangents[idx3.vertex_index].second += tangent_space.second;
+
+        index_offset += 3;
     }
 
-    for (auto& [tangent, bitangent] : tangentsBitangents) {
-        if (tangent != Vector3{0.0f, 0.0f, 0.0f}) {
-            tangent = Normalize(tangent);
+    for (auto& [tangent, bitangent] : tangents_bitangents) {
+        if (glm::length2(tangent) > 0.0f) {
+            tangent = glm::normalize(tangent);
         }
-        if (bitangent != Vector3{0.0f, 0.0f, 0.0f}) {
-            bitangent = Normalize(bitangent);
+        if (glm::length2(bitangent) > 0.0f) {
+            bitangent = glm::normalize(bitangent);
         }
     }
-    return tangentsBitangents;
+
+    return tangents_bitangents;
 }
 
-const std::byte* GetBufferData(const fastgltf::Buffer& buffer)
+std::vector<std::pair<glm::vec3, glm::vec3>> computeTangentsBitangents(const std::vector<ModelData::Index>& indices,
+                                                                       const std::vector<glm::vec3>& positions,
+                                                                       const std::vector<glm::vec2>& tex_coords)
+{
+    std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents(
+        positions.size(), {glm::vec3(0.0f), glm::vec3(0.0f)});
+
+    for (size_t i = 0; i + 2 < indices.size(); i += 3) {
+        const auto i0 = indices[i + 0];
+        const auto i1 = indices[i + 1];
+        const auto i2 = indices[i + 2];
+        if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size() || i0 >= tex_coords.size() ||
+            i1 >= tex_coords.size() || i2 >= tex_coords.size()) {
+            continue;
+        }
+
+        const auto tangent_space =
+            computeTangentSpace(positions[i0], positions[i1], positions[i2], tex_coords[i0], tex_coords[i1], tex_coords[i2]);
+
+        tangents_bitangents[i0].first += tangent_space.first;
+        tangents_bitangents[i0].second += tangent_space.second;
+        tangents_bitangents[i1].first += tangent_space.first;
+        tangents_bitangents[i1].second += tangent_space.second;
+        tangents_bitangents[i2].first += tangent_space.first;
+        tangents_bitangents[i2].second += tangent_space.second;
+    }
+
+    for (auto& [tangent, bitangent] : tangents_bitangents) {
+        if (glm::length2(tangent) > 0.0f) {
+            tangent = glm::normalize(tangent);
+        }
+        if (glm::length2(bitangent) > 0.0f) {
+            bitangent = glm::normalize(bitangent);
+        }
+    }
+
+    return tangents_bitangents;
+}
+
+const std::byte* getBufferData(const fastgltf::Buffer& buffer)
 {
     return std::visit(fastgltf::visitor{
                           [](const fastgltf::sources::Array& source) -> const std::byte* {
@@ -184,9 +208,9 @@ const std::byte* GetBufferData(const fastgltf::Buffer& buffer)
                       buffer.data);
 }
 
-ImageData LoadFastGltfImageSource(const fastgltf::Asset& asset,
+ImageData loadFastGltfImageSource(const fastgltf::Asset& asset,
                                   const fastgltf::Image& image,
-                                  const std::filesystem::path& basePath)
+                                  const std::filesystem::path& base_path)
 {
     return std::visit(
         fastgltf::visitor{
@@ -194,7 +218,7 @@ ImageData LoadFastGltfImageSource(const fastgltf::Asset& asset,
                 if (!source.uri.isLocalPath()) {
                     return {};
                 }
-                return ImageLoader::LoadImageFromFile((basePath / source.uri.fspath()).string());
+                return ImageLoader::LoadImageFromFile((base_path / source.uri.fspath()).string());
             },
             [&](const fastgltf::sources::Array& source) -> ImageData {
                 return ImageLoader::LoadImageFromMemory(reinterpret_cast<const uint8_t*>(source.bytes.data()),
@@ -216,12 +240,12 @@ ImageData LoadFastGltfImageSource(const fastgltf::Asset& asset,
                     return {};
                 }
 
-                const std::byte* bufferData = GetBufferData(asset.buffers[view.bufferIndex]);
-                if (bufferData == nullptr) {
+                const std::byte* buffer_data = getBufferData(asset.buffers[view.bufferIndex]);
+                if (buffer_data == nullptr) {
                     return {};
                 }
 
-                return ImageLoader::LoadImageFromMemory(reinterpret_cast<const uint8_t*>(bufferData + view.byteOffset),
+                return ImageLoader::LoadImageFromMemory(reinterpret_cast<const uint8_t*>(buffer_data + view.byteOffset),
                                                         view.byteLength,
                                                         std::string(fastgltf::getMimeTypeString(source.mimeType)));
             },
@@ -232,7 +256,7 @@ ImageData LoadFastGltfImageSource(const fastgltf::Asset& asset,
         image.data);
 }
 
-std::optional<std::size_t> GetTextureImageIndex(const fastgltf::Texture& texture)
+std::optional<std::size_t> getTextureImageIndex(const fastgltf::Texture& texture)
 {
     if (texture.ddsImageIndex.has_value()) {
         return texture.ddsImageIndex;
@@ -250,42 +274,41 @@ std::optional<std::size_t> GetTextureImageIndex(const fastgltf::Texture& texture
 }
 
 template <typename OptionalTextureInfoType>
-ImageData LoadMaterialTexture(const fastgltf::Asset& asset,
-                              const OptionalTextureInfoType& textureInfo,
-                              const std::filesystem::path& basePath)
+ImageData loadMaterialTexture(const fastgltf::Asset& asset,
+                              const OptionalTextureInfoType& texture_info,
+                              const std::filesystem::path& base_path)
 {
-    if (!textureInfo.has_value() || textureInfo->textureIndex >= asset.textures.size()) {
+    if (!texture_info.has_value() || texture_info->textureIndex >= asset.textures.size()) {
         return {};
     }
 
-    const auto imageIndex = GetTextureImageIndex(asset.textures[textureInfo->textureIndex]);
-    if (!imageIndex.has_value() || *imageIndex >= asset.images.size()) {
+    const auto image_index = getTextureImageIndex(asset.textures[texture_info->textureIndex]);
+    if (!image_index.has_value() || *image_index >= asset.images.size()) {
         return {};
     }
 
-    return LoadFastGltfImageSource(asset, asset.images[*imageIndex], basePath);
+    return loadFastGltfImageSource(asset, asset.images[*image_index], base_path);
 }
 
-bool IsGLTFModel(const std::string& filepath)
+bool isGLTFModel(const std::string& filepath)
 {
-    const auto extension = std::filesystem::path{filepath}.extension();
+    const auto extension = std::filesystem::path(filepath).extension();
     return extension == ".gltf" || extension == ".glb";
 }
 
-bool IsObjModel(const std::string& filepath)
+bool isObjModel(const std::string& filepath)
 {
-    return std::filesystem::path{filepath}.extension() == ".obj";
+    return std::filesystem::path(filepath).extension() == ".obj";
 }
+
 } // namespace
 
 ModelData ModelLoader::LoadFromObj(const std::string& filepath)
 {
     ModelData result;
 
-    tinyobj::ObjReaderConfig readerConfig;
     tinyobj::ObjReader reader;
-
-    if (!reader.ParseFromFile(filepath, readerConfig)) {
+    if (!reader.ParseFromFile(filepath, tinyobj::ObjReaderConfig{})) {
         return result;
     }
 
@@ -295,65 +318,76 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
 
     result.Materials.reserve(materials.size());
     for (const auto& material : materials) {
-        auto& resultMaterial = result.Materials.emplace_back();
-        resultMaterial.Name = material.name;
-
-        if (!material.diffuse_texname.empty()) {
-            resultMaterial.AlbedoTexture =
-                ImageLoader::LoadImageFromFile(GetAbsolutePathToObjResource(filepath, material.diffuse_texname));
-        } else {
-            resultMaterial.AlbedoTexture = CreateStubTexture(255, 255, 255, 255);
-        }
-
-        if (!material.normal_texname.empty()) {
-            resultMaterial.NormalTexture =
-                ImageLoader::LoadImageFromFile(GetAbsolutePathToObjResource(filepath, material.normal_texname));
-        } else {
-            resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
-        }
-
-        resultMaterial.MetallicRoughness = CreateStubTexture(0, 255, 0, 255);
+        auto& result_material = result.Materials.emplace_back();
+        result_material.Name = material.name;
+        result_material.AlbedoTexture = material.diffuse_texname.empty()
+                                            ? createStubTexture(255, 255, 255, 255)
+                                            : ImageLoader::LoadImageFromFile(
+                                                  getAbsolutePathToObjResource(filepath, material.diffuse_texname));
+        result_material.NormalTexture = material.normal_texname.empty()
+                                            ? createStubTexture(127, 127, 255, 255)
+                                            : ImageLoader::LoadImageFromFile(
+                                                  getAbsolutePathToObjResource(filepath, material.normal_texname));
+        result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
     }
 
     result.Shapes.reserve(shapes.size());
     for (const auto& shape : shapes) {
-        auto& resultShape = result.Shapes.emplace_back();
-        resultShape.Name = shape.name;
+        auto& result_shape = result.Shapes.emplace_back();
+        result_shape.Name = shape.name;
 
-        if (!shape.mesh.material_ids.empty()) {
-            resultShape.MaterialIndex = shape.mesh.material_ids.front();
+        if (!shape.mesh.material_ids.empty() && shape.mesh.material_ids.front() >= 0) {
+            result_shape.MaterialIndex = static_cast<uint32_t>(shape.mesh.material_ids.front());
         }
 
-        std::vector<std::pair<Vector3, Vector3>> tangentsBitangents;
+        std::vector<std::pair<glm::vec3, glm::vec3>> tangents_bitangents;
         if (!attrib.normals.empty() && !attrib.texcoords.empty()) {
-            tangentsBitangents = ComputeTangentsBitangents(shape.mesh, attrib);
+            tangents_bitangents = computeTangentsBitangents(shape.mesh, attrib);
         }
 
-        resultShape.Vertices.reserve(shape.mesh.indices.size());
-        resultShape.Indices.reserve(shape.mesh.indices.size());
+        result_shape.Vertices.reserve(shape.mesh.indices.size());
+        result_shape.Indices.reserve(shape.mesh.indices.size());
 
-        ModelData::Index indexOffset = 0;
-        for (const size_t faceIndex : shape.mesh.num_face_vertices) {
-            assert(faceIndex == 3);
-            for (size_t v = 0; v < faceIndex; ++v, ++indexOffset) {
-                const tinyobj::index_t idx = shape.mesh.indices[indexOffset];
-                auto& vertex = resultShape.Vertices.emplace_back();
-                resultShape.Indices.push_back(indexOffset);
+        ModelData::Index index_offset = 0;
+        for (const size_t face_vertex_count : shape.mesh.num_face_vertices) {
+            if (face_vertex_count != 3) {
+                index_offset += static_cast<ModelData::Index>(face_vertex_count);
+                continue;
+            }
 
-                vertex.Position.x = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-                vertex.Position.y = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-                vertex.Position.z = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+            for (size_t vertex_index = 0; vertex_index < face_vertex_count; ++vertex_index, ++index_offset) {
+                const tinyobj::index_t idx = shape.mesh.indices[index_offset];
+                if (idx.vertex_index < 0) {
+                    continue;
+                }
 
-                vertex.TexCoord.x = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
-                vertex.TexCoord.y = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                auto& vertex = result_shape.Vertices.emplace_back();
+                result_shape.Indices.push_back(static_cast<ModelData::Index>(result_shape.Indices.size()));
 
-                vertex.Normal.x = attrib.normals[3 * size_t(idx.normal_index) + 0];
-                vertex.Normal.y = attrib.normals[3 * size_t(idx.normal_index) + 1];
-                vertex.Normal.z = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                vertex.Position = {
+                    attrib.vertices[3 * size_t(idx.vertex_index) + 0],
+                    attrib.vertices[3 * size_t(idx.vertex_index) + 1],
+                    attrib.vertices[3 * size_t(idx.vertex_index) + 2],
+                };
 
-                if (!tangentsBitangents.empty()) {
-                    vertex.Tangent = tangentsBitangents[idx.vertex_index].first;
-                    vertex.Bitangent = tangentsBitangents[idx.vertex_index].second;
+                if (idx.texcoord_index >= 0 && (2 * size_t(idx.texcoord_index) + 1) < attrib.texcoords.size()) {
+                    vertex.TexCoord = {
+                        attrib.texcoords[2 * size_t(idx.texcoord_index) + 0],
+                        attrib.texcoords[2 * size_t(idx.texcoord_index) + 1],
+                    };
+                }
+
+                if (idx.normal_index >= 0 && (3 * size_t(idx.normal_index) + 2) < attrib.normals.size()) {
+                    vertex.Normal = {
+                        attrib.normals[3 * size_t(idx.normal_index) + 0],
+                        attrib.normals[3 * size_t(idx.normal_index) + 1],
+                        attrib.normals[3 * size_t(idx.normal_index) + 2],
+                    };
+                }
+
+                if (!tangents_bitangents.empty() && size_t(idx.vertex_index) < tangents_bitangents.size()) {
+                    vertex.Tangent = tangents_bitangents[idx.vertex_index].first;
+                    vertex.Bitangent = tangents_bitangents[idx.vertex_index].second;
                 }
             }
         }
@@ -366,7 +400,7 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
 {
     ModelData result;
 
-    const std::filesystem::path path{filepath};
+    const std::filesystem::path path(filepath);
     auto data = fastgltf::GltfDataBuffer::FromPath(path);
     if (data.error() != fastgltf::Error::None) {
         return result;
@@ -390,72 +424,70 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
 
     result.Materials.reserve(asset->materials.size());
     for (const auto& material : asset->materials) {
-        auto& resultMaterial = result.Materials.emplace_back();
-        resultMaterial.Name = material.name;
-        resultMaterial.RoughnessScale = material.pbrData.roughnessFactor;
-        resultMaterial.MetallicScale = material.pbrData.metallicFactor;
+        auto& result_material = result.Materials.emplace_back();
+        result_material.Name = material.name;
+        result_material.RoughnessScale = material.pbrData.roughnessFactor;
+        result_material.MetallicScale = material.pbrData.metallicFactor;
+        result_material.AlbedoTexture =
+            loadMaterialTexture(asset.get(), material.pbrData.baseColorTexture, path.parent_path());
+        result_material.NormalTexture = loadMaterialTexture(asset.get(), material.normalTexture, path.parent_path());
+        result_material.MetallicRoughness =
+            loadMaterialTexture(asset.get(), material.pbrData.metallicRoughnessTexture, path.parent_path());
 
-        resultMaterial.AlbedoTexture =
-            LoadMaterialTexture(asset.get(), material.pbrData.baseColorTexture, path.parent_path());
-        if (resultMaterial.AlbedoTexture.ByteData.empty()) {
-            resultMaterial.AlbedoTexture = CreateStubTexture(255, 255, 255, 255);
+        if (!result_material.AlbedoTexture.isValid()) {
+            result_material.AlbedoTexture = createStubTexture(255, 255, 255, 255);
         }
-
-        resultMaterial.NormalTexture = LoadMaterialTexture(asset.get(), material.normalTexture, path.parent_path());
-        if (resultMaterial.NormalTexture.ByteData.empty()) {
-            resultMaterial.NormalTexture = CreateStubTexture(127, 127, 255, 255);
+        if (!result_material.NormalTexture.isValid()) {
+            result_material.NormalTexture = createStubTexture(127, 127, 255, 255);
         }
-
-        resultMaterial.MetallicRoughness =
-            LoadMaterialTexture(asset.get(), material.pbrData.metallicRoughnessTexture, path.parent_path());
-        if (resultMaterial.MetallicRoughness.ByteData.empty()) {
-            resultMaterial.MetallicRoughness = CreateStubTexture(0, 255, 0, 255);
+        if (!result_material.MetallicRoughness.isValid()) {
+            result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
         }
     }
 
     for (const auto& mesh : asset->meshes) {
-        for (size_t primitiveIndex = 0; primitiveIndex < mesh.primitives.size(); ++primitiveIndex) {
-            const auto& primitive = mesh.primitives[primitiveIndex];
+        for (size_t primitive_index = 0; primitive_index < mesh.primitives.size(); ++primitive_index) {
+            const auto& primitive = mesh.primitives[primitive_index];
             if (primitive.type != fastgltf::PrimitiveType::Triangles) {
                 continue;
             }
 
-            const auto positionAttribute = primitive.findAttribute("POSITION");
-            if (positionAttribute == primitive.attributes.end()) {
+            const auto position_attribute = primitive.findAttribute("POSITION");
+            if (position_attribute == primitive.attributes.end()) {
                 continue;
             }
 
             auto& shape = result.Shapes.emplace_back();
             shape.Name = mesh.name.empty() ? "shape_" + std::to_string(result.Shapes.size())
-                                           : std::string(mesh.name) + "_" + std::to_string(primitiveIndex);
+                                           : std::string(mesh.name) + "_" + std::to_string(primitive_index);
             if (primitive.materialIndex.has_value()) {
                 shape.MaterialIndex = static_cast<uint32_t>(*primitive.materialIndex);
             }
 
-            const auto& positionAccessor = asset->accessors[positionAttribute->accessorIndex];
-            std::vector<fastgltf::math::fvec3> positions(positionAccessor.count);
-            fastgltf::copyFromAccessor<fastgltf::math::fvec3>(asset.get(), positionAccessor, positions.data());
+            const auto& position_accessor = asset->accessors[position_attribute->accessorIndex];
+            std::vector<fastgltf::math::fvec3> positions(position_accessor.count);
+            fastgltf::copyFromAccessor<fastgltf::math::fvec3>(asset.get(), position_accessor, positions.data());
 
-            std::vector<fastgltf::math::fvec2> texCoords;
-            if (const auto texCoordAttribute = primitive.findAttribute("TEXCOORD_0");
-                texCoordAttribute != primitive.attributes.end()) {
-                const auto& texCoordAccessor = asset->accessors[texCoordAttribute->accessorIndex];
-                texCoords.resize(texCoordAccessor.count);
-                fastgltf::copyFromAccessor<fastgltf::math::fvec2>(asset.get(), texCoordAccessor, texCoords.data());
+            std::vector<fastgltf::math::fvec2> tex_coords;
+            if (const auto tex_coord_attribute = primitive.findAttribute("TEXCOORD_0");
+                tex_coord_attribute != primitive.attributes.end()) {
+                const auto& tex_coord_accessor = asset->accessors[tex_coord_attribute->accessorIndex];
+                tex_coords.resize(tex_coord_accessor.count);
+                fastgltf::copyFromAccessor<fastgltf::math::fvec2>(asset.get(), tex_coord_accessor, tex_coords.data());
             }
 
             std::vector<fastgltf::math::fvec3> normals;
-            if (const auto normalAttribute = primitive.findAttribute("NORMAL");
-                normalAttribute != primitive.attributes.end()) {
-                const auto& normalAccessor = asset->accessors[normalAttribute->accessorIndex];
-                normals.resize(normalAccessor.count);
-                fastgltf::copyFromAccessor<fastgltf::math::fvec3>(asset.get(), normalAccessor, normals.data());
+            if (const auto normal_attribute = primitive.findAttribute("NORMAL");
+                normal_attribute != primitive.attributes.end()) {
+                const auto& normal_accessor = asset->accessors[normal_attribute->accessorIndex];
+                normals.resize(normal_accessor.count);
+                fastgltf::copyFromAccessor<fastgltf::math::fvec3>(asset.get(), normal_accessor, normals.data());
             }
 
             if (primitive.indicesAccessor.has_value()) {
-                const auto& indexAccessor = asset->accessors[*primitive.indicesAccessor];
-                shape.Indices.resize(indexAccessor.count);
-                fastgltf::copyFromAccessor<uint32_t>(asset.get(), indexAccessor, shape.Indices.data());
+                const auto& index_accessor = asset->accessors[*primitive.indicesAccessor];
+                shape.Indices.resize(index_accessor.count);
+                fastgltf::copyFromAccessor<uint32_t>(asset.get(), index_accessor, shape.Indices.data());
             } else {
                 shape.Indices.resize(positions.size());
                 for (size_t i = 0; i < shape.Indices.size(); ++i) {
@@ -464,32 +496,32 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
             }
 
             shape.Vertices.resize(positions.size());
-            std::vector<Vector3> vertexPositions(shape.Vertices.size());
-            std::vector<Vector2> vertexTexCoords(shape.Vertices.size());
-            const bool hasTexCoords = texCoords.size() == shape.Vertices.size();
-            const bool hasNormals = normals.size() == shape.Vertices.size();
+            std::vector<glm::vec3> vertex_positions(shape.Vertices.size());
+            std::vector<glm::vec2> vertex_tex_coords(shape.Vertices.size());
+            const bool has_tex_coords = tex_coords.size() == shape.Vertices.size();
+            const bool has_normals = normals.size() == shape.Vertices.size();
 
             for (size_t i = 0; i < shape.Vertices.size(); ++i) {
                 auto& vertex = shape.Vertices[i];
-                vertex.Position = ToVector3(positions[i]);
-                vertexPositions[i] = vertex.Position;
+                vertex.Position = toVec3(positions[i]);
+                vertex_positions[i] = vertex.Position;
 
-                if (hasTexCoords) {
-                    vertex.TexCoord = ToVector2(texCoords[i]);
-                    vertexTexCoords[i] = vertex.TexCoord;
+                if (has_tex_coords) {
+                    vertex.TexCoord = toVec2(tex_coords[i]);
+                    vertex_tex_coords[i] = vertex.TexCoord;
                 }
 
-                if (hasNormals) {
-                    vertex.Normal = ToVector3(normals[i]);
+                if (has_normals) {
+                    vertex.Normal = toVec3(normals[i]);
                 }
             }
 
-            if (hasTexCoords && !shape.Indices.empty()) {
-                const auto tangentsBitangents =
-                    ComputeTangentsBitangents(shape.Indices, vertexPositions, vertexTexCoords);
-                for (size_t i = 0; i < shape.Vertices.size() && i < tangentsBitangents.size(); ++i) {
-                    shape.Vertices[i].Tangent = tangentsBitangents[i].first;
-                    shape.Vertices[i].Bitangent = tangentsBitangents[i].second;
+            if (has_tex_coords && !shape.Indices.empty()) {
+                const auto tangents_bitangents =
+                    computeTangentsBitangents(shape.Indices, vertex_positions, vertex_tex_coords);
+                for (size_t i = 0; i < shape.Vertices.size() && i < tangents_bitangents.size(); ++i) {
+                    shape.Vertices[i].Tangent = tangents_bitangents[i].first;
+                    shape.Vertices[i].Bitangent = tangents_bitangents[i].second;
                 }
             }
         }
@@ -500,13 +532,13 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
 
 ModelData ModelLoader::Load(const std::string& filepath)
 {
-    if (IsGLTFModel(filepath)) {
-        return ModelLoader::LoadFromGltf(filepath);
+    if (isGLTFModel(filepath)) {
+        return LoadFromGltf(filepath);
     }
-    if (IsObjModel(filepath)) {
-        return ModelLoader::LoadFromObj(filepath);
+    if (isObjModel(filepath)) {
+        return LoadFromObj(filepath);
     }
-    assert(false);
     return {};
 }
-} // namespace luna::val
+
+} // namespace luna::rhi

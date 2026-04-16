@@ -25,7 +25,7 @@ public:
 
     static std::shared_ptr<Mesh>
         create(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices);
-    static std::shared_ptr<Mesh> createFromModelShape(const val::ModelData::Shape& shape);
+    static std::shared_ptr<Mesh> createFromModelShape(const rhi::ModelData::Shape& shape);
 
     const std::string& getName() const
     {

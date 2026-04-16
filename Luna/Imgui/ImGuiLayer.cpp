@@ -1,7 +1,7 @@
 #include "Core/Log.h"
 #include "Events/Event.h"
-#include "Imgui/ImGuiContext.h"
 #include "Imgui/ImGuiLayer.hpp"
+#include "Imgui/ImGuiContext.h"
 
 #include <imgui.h>
 
@@ -45,9 +45,13 @@ void ImGuiLayer::onAttach()
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    luna::val::ImGuiVulkanContext::Init(m_renderer->getNativeWindow(), m_renderer->getImGuiRenderPass());
+    if (!luna::rhi::ImGuiVulkanContext::Init(*m_renderer)) {
+        LUNA_CORE_ERROR("Failed to initialize ImGui Vulkan backend");
+        ImGui::DestroyContext();
+        return;
+    }
     m_attached = true;
-    LUNA_CORE_INFO("Initialized ImGui for luna::val");
+    LUNA_CORE_INFO("Initialized ImGui for luna::rhi");
 }
 
 void ImGuiLayer::onDetach()
@@ -56,7 +60,7 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    luna::val::ImGuiVulkanContext::Destroy();
+    luna::rhi::ImGuiVulkanContext::Destroy();
     m_attached = false;
 }
 
@@ -77,7 +81,7 @@ void ImGuiLayer::begin()
         return;
     }
 
-    luna::val::ImGuiVulkanContext::StartFrame();
+    luna::rhi::ImGuiVulkanContext::StartFrame();
 
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
