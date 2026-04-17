@@ -97,7 +97,7 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/entt/src
-        ${THIRD_PARTY_DIR}/vkbootstrap/src
+        # ${THIRD_PARTY_DIR}/vkbootstrap/src
         ${PROJECT_SOURCE_DIR}
 )
 
@@ -109,11 +109,11 @@ target_link_libraries(LunaCore
         glslang::glslang
         glslang::glslang-default-resource-limits
         glslang::SPIRV
-        GPUOpen::VulkanMemoryAllocator
+        # add_subdirectory(third_party/VMA)
         Vulkan::Vulkan
         glfw
         enkiTS
-        spirv-cross-core
+        # spirv-cross-core
         stb::stb
 )
 
