@@ -6,6 +6,7 @@
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <memory>
+#include <Surface.h>
 #include <vector>
 
 struct GLFWwindow;
@@ -24,15 +25,25 @@ class Synchronization;
 namespace luna {
 class Window;
 
-class VulkanRenderer {
+class Renderer {
 public:
-    struct InitializationOptions {};
+    struct InitializationOptions {
+        InitializationOptions()
+            : present_mode(Cacao::PresentMode::Fifo)
+        {}
 
-    VulkanRenderer();
-    ~VulkanRenderer();
+        explicit InitializationOptions(Cacao::PresentMode mode)
+            : present_mode(mode)
+        {}
 
-    VulkanRenderer(const VulkanRenderer&) = delete;
-    VulkanRenderer& operator=(const VulkanRenderer&) = delete;
+        Cacao::PresentMode present_mode;
+    };
+
+    Renderer();
+    ~Renderer();
+
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
 
     bool init(Window& window, InitializationOptions options = {});
     void shutdown();

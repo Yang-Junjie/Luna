@@ -19,9 +19,27 @@
 
 namespace {
 
+constexpr Cacao::PresentMode kRequestedPresentMode = Cacao::PresentMode::Immediate;
+
 std::filesystem::path projectRoot()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT);
+}
+
+const char* presentModeToString(Cacao::PresentMode mode)
+{
+    switch (mode) {
+        case Cacao::PresentMode::Immediate:
+            return "Immediate";
+        case Cacao::PresentMode::Mailbox:
+            return "Mailbox";
+        case Cacao::PresentMode::Fifo:
+            return "Fifo";
+        case Cacao::PresentMode::FifoRelaxed:
+            return "FifoRelaxed";
+        default:
+            return "Unknown";
+    }
 }
 
 std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::ModelData::Shape& shape)
@@ -48,7 +66,7 @@ std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::Model
 
     const glm::vec3 center = (bounds_min + bounds_max) * 0.5f;
     const glm::vec3 extent = bounds_max - bounds_min;
-    const float max_extent = (std::max)((std::max)(extent.x, extent.y), (std::max)(extent.z, 0.0001f));
+    const float max_extent = (std::max) ((std::max) (extent.x, extent.y), (std::max) (extent.z, 0.0001f));
     const float scale = 2.0f / max_extent;
 
     for (auto& vertex : vertices) {
@@ -123,7 +141,7 @@ public:
         auto& application = *m_application;
         auto& renderer = luna::Application::get().getRenderer();
         const float delta_seconds = luna::Application::get().getTimestep().getSeconds();
-        const float fps = 1.0f / (std::max)(delta_seconds, 0.0001f);
+        const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
 
         bool auto_rotate = application.isAutoRotateEnabled();
         float spin_speed = application.getSpinSpeed();
@@ -196,6 +214,12 @@ void LunaRuntimeApplication::setAutoRotateEnabled(bool enabled)
 float LunaRuntimeApplication::getSpinSpeed() const
 {
     return m_spin_speed;
+}
+
+Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializationOptions()
+{
+    LUNA_CORE_INFO("LunaApp requested present mode '{}' via code", presentModeToString(kRequestedPresentMode));
+    return Renderer::InitializationOptions{kRequestedPresentMode};
 }
 
 void LunaRuntimeApplication::setSpinSpeed(float speed)

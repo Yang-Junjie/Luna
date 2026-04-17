@@ -1,7 +1,7 @@
 #include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/Renderer.h"
 
 #include <Adapter.h>
 #include <Builders.h>
@@ -12,11 +12,13 @@
 #define NOMINMAX
 #endif
 #include <algorithm>
+#include <array>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <Instance.h>
 #include <Queue.h>
 #include <stdexcept>
+#include <string>
 #include <Surface.h>
 #include <Swapchain.h>
 #include <Synchronization.h>
@@ -57,18 +59,99 @@ Cacao::SurfaceFormat chooseSurfaceFormat(const std::vector<Cacao::SurfaceFormat>
                            : formats.front();
 }
 
+const char* presentModeToString(Cacao::PresentMode mode)
+{
+    switch (mode) {
+        case Cacao::PresentMode::Immediate:
+            return "Immediate";
+        case Cacao::PresentMode::Mailbox:
+            return "Mailbox";
+        case Cacao::PresentMode::Fifo:
+            return "Fifo";
+        case Cacao::PresentMode::FifoRelaxed:
+            return "FifoRelaxed";
+        default:
+            return "Unknown";
+    }
+}
+
+bool isPresentModeSupported(const std::vector<Cacao::PresentMode>& supported_modes, Cacao::PresentMode mode)
+{
+    return std::find(supported_modes.begin(), supported_modes.end(), mode) != supported_modes.end();
+}
+
+std::string describePresentModes(const std::vector<Cacao::PresentMode>& supported_modes)
+{
+    if (supported_modes.empty()) {
+        return "<none>";
+    }
+
+    std::string result;
+    for (size_t i = 0; i < supported_modes.size(); ++i) {
+        if (i > 0) {
+            result += ", ";
+        }
+        result += presentModeToString(supported_modes[i]);
+    }
+    return result;
+}
+
+Cacao::PresentMode choosePresentMode(const std::vector<Cacao::PresentMode>& supported_modes,
+                                     Cacao::PresentMode requested_mode)
+{
+    if (isPresentModeSupported(supported_modes, requested_mode)) {
+        return requested_mode;
+    }
+
+    switch (requested_mode) {
+        case Cacao::PresentMode::Mailbox:
+            for (const auto fallback_mode :
+                 std::array{Cacao::PresentMode::Immediate, Cacao::PresentMode::FifoRelaxed, Cacao::PresentMode::Fifo}) {
+                if (isPresentModeSupported(supported_modes, fallback_mode)) {
+                    return fallback_mode;
+                }
+            }
+            break;
+        case Cacao::PresentMode::Immediate:
+            for (const auto fallback_mode :
+                 std::array{Cacao::PresentMode::Mailbox, Cacao::PresentMode::FifoRelaxed, Cacao::PresentMode::Fifo}) {
+                if (isPresentModeSupported(supported_modes, fallback_mode)) {
+                    return fallback_mode;
+                }
+            }
+            break;
+        case Cacao::PresentMode::FifoRelaxed:
+            for (const auto fallback_mode :
+                 std::array{Cacao::PresentMode::Fifo, Cacao::PresentMode::Immediate, Cacao::PresentMode::Mailbox}) {
+                if (isPresentModeSupported(supported_modes, fallback_mode)) {
+                    return fallback_mode;
+                }
+            }
+            break;
+        case Cacao::PresentMode::Fifo:
+            if (isPresentModeSupported(supported_modes, Cacao::PresentMode::FifoRelaxed)) {
+                return Cacao::PresentMode::FifoRelaxed;
+            }
+            break;
+        default:
+            break;
+    }
+
+    return supported_modes.empty() ? Cacao::PresentMode::Fifo : supported_modes.front();
+}
+
 } // namespace
 
 namespace luna {
 
-VulkanRenderer::VulkanRenderer() = default;
+Renderer::Renderer() = default;
 
-VulkanRenderer::~VulkanRenderer()
+Renderer::~Renderer()
 {
     shutdown();
 }
 
-bool VulkanRenderer::init(Window& window, InitializationOptions options)
+bool Renderer::init(Window& window, InitializationOptions options)
 {
     shutdown();
 
@@ -115,7 +198,7 @@ bool VulkanRenderer::init(Window& window, InitializationOptions options)
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
     } catch (const std::exception& error) {
-        LUNA_CORE_ERROR("Failed to initialize VulkanRenderer: {}", error.what());
+        LUNA_CORE_ERROR("Failed to initialize Renderer: {}", error.what());
         shutdown();
         return false;
     }
@@ -128,7 +211,7 @@ bool VulkanRenderer::init(Window& window, InitializationOptions options)
     return m_initialized;
 }
 
-void VulkanRenderer::shutdown()
+void Renderer::shutdown()
 {
     if (m_device) {
         try {
@@ -164,38 +247,38 @@ void VulkanRenderer::shutdown()
     m_initialized = false;
 }
 
-bool VulkanRenderer::isInitialized() const
+bool Renderer::isInitialized() const
 {
     return m_initialized && m_device && m_swapchain && m_graphics_queue && m_synchronization;
 }
 
-bool VulkanRenderer::isRenderingEnabled() const
+bool Renderer::isRenderingEnabled() const
 {
     const auto extent = getFramebufferExtent();
     return isInitialized() && extent.width > 0 && extent.height > 0;
 }
 
-bool VulkanRenderer::isImGuiEnabled() const
+bool Renderer::isImGuiEnabled() const
 {
     return m_imgui_enabled;
 }
 
-void VulkanRenderer::requestResize()
+void Renderer::requestResize()
 {
     m_resize_requested = true;
 }
 
-bool VulkanRenderer::isResizeRequested() const
+bool Renderer::isResizeRequested() const
 {
     return m_resize_requested;
 }
 
-void VulkanRenderer::setImGuiEnabled(bool enabled)
+void Renderer::setImGuiEnabled(bool enabled)
 {
     m_imgui_enabled = enabled;
 }
 
-void VulkanRenderer::startFrame()
+void Renderer::startFrame()
 {
     if (!isRenderingEnabled()) {
         return;
@@ -239,7 +322,7 @@ void VulkanRenderer::startFrame()
     }
 }
 
-void VulkanRenderer::renderFrame()
+void Renderer::renderFrame()
 {
     if (!m_frame_started || !m_current_command_buffer || !m_swapchain) {
         return;
@@ -273,7 +356,7 @@ void VulkanRenderer::renderFrame()
     }
 }
 
-void VulkanRenderer::endFrame()
+void Renderer::endFrame()
 {
     if (!m_frame_started || !m_current_command_buffer) {
         return;
@@ -299,77 +382,77 @@ void VulkanRenderer::endFrame()
     }
 }
 
-GLFWwindow* VulkanRenderer::getNativeWindow() const
+GLFWwindow* Renderer::getNativeWindow() const
 {
     return m_native_window;
 }
 
-const Cacao::Ref<Cacao::Instance>& VulkanRenderer::getInstance() const
+const Cacao::Ref<Cacao::Instance>& Renderer::getInstance() const
 {
     return m_instance;
 }
 
-const Cacao::Ref<Cacao::Adapter>& VulkanRenderer::getAdapter() const
+const Cacao::Ref<Cacao::Adapter>& Renderer::getAdapter() const
 {
     return m_adapter;
 }
 
-const Cacao::Ref<Cacao::Device>& VulkanRenderer::getDevice() const
+const Cacao::Ref<Cacao::Device>& Renderer::getDevice() const
 {
     return m_device;
 }
 
-const Cacao::Ref<Cacao::Queue>& VulkanRenderer::getGraphicsQueue() const
+const Cacao::Ref<Cacao::Queue>& Renderer::getGraphicsQueue() const
 {
     return m_graphics_queue;
 }
 
-const Cacao::Ref<Cacao::Swapchain>& VulkanRenderer::getSwapchain() const
+const Cacao::Ref<Cacao::Swapchain>& Renderer::getSwapchain() const
 {
     return m_swapchain;
 }
 
-const Cacao::Ref<Cacao::Synchronization>& VulkanRenderer::getSynchronization() const
+const Cacao::Ref<Cacao::Synchronization>& Renderer::getSynchronization() const
 {
     return m_synchronization;
 }
 
-uint32_t VulkanRenderer::getFramesInFlight() const
+uint32_t Renderer::getFramesInFlight() const
 {
     return m_frames_in_flight;
 }
 
-Camera& VulkanRenderer::getMainCamera()
+Camera& Renderer::getMainCamera()
 {
     return m_main_camera;
 }
 
-const Camera& VulkanRenderer::getMainCamera() const
+const Camera& Renderer::getMainCamera() const
 {
     return m_main_camera;
 }
 
-SceneRenderer& VulkanRenderer::getSceneRenderer()
+SceneRenderer& Renderer::getSceneRenderer()
 {
     return m_scene_renderer;
 }
 
-const SceneRenderer& VulkanRenderer::getSceneRenderer() const
+const SceneRenderer& Renderer::getSceneRenderer() const
 {
     return m_scene_renderer;
 }
 
-glm::vec4& VulkanRenderer::getClearColor()
+glm::vec4& Renderer::getClearColor()
 {
     return m_clear_color;
 }
 
-const glm::vec4& VulkanRenderer::getClearColor() const
+const glm::vec4& Renderer::getClearColor() const
 {
     return m_clear_color;
 }
 
-void VulkanRenderer::createSwapchain(uint32_t width, uint32_t height)
+void Renderer::createSwapchain(uint32_t width, uint32_t height)
 {
     if (!m_device || !m_surface || !m_adapter) {
         return;
@@ -377,23 +460,37 @@ void VulkanRenderer::createSwapchain(uint32_t width, uint32_t height)
 
     const auto capabilities = m_surface->GetCapabilities(m_adapter);
     const auto formats = m_surface->GetSupportedFormats(m_adapter);
+    const auto supported_present_modes = m_surface->GetSupportedPresentModes(m_adapter);
     const auto surface_format = chooseSurfaceFormat(formats);
+    const auto requested_present_mode = m_initialization_options.present_mode;
+    const auto selected_present_mode = choosePresentMode(supported_present_modes, requested_present_mode);
 
     const Cacao::Extent2D clamped_extent{
         std::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
         std::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
     };
 
-    uint32_t min_image_count = (std::max)(2u, capabilities.minImageCount);
+    uint32_t min_image_count = (std::max) (2u, capabilities.minImageCount);
     if (capabilities.maxImageCount != 0) {
-        min_image_count = (std::min)(min_image_count, capabilities.maxImageCount);
+        min_image_count = (std::min) (min_image_count, capabilities.maxImageCount);
+    }
+
+    if (selected_present_mode != requested_present_mode) {
+        LUNA_CORE_WARN("Requested present mode '{}' is unsupported; falling back to '{}'. Supported modes: {}",
+                       presentModeToString(requested_present_mode),
+                       presentModeToString(selected_present_mode),
+                       describePresentModes(supported_present_modes));
+    } else {
+        LUNA_CORE_INFO("Using present mode '{}' (supported: {})",
+                       presentModeToString(selected_present_mode),
+                       describePresentModes(supported_present_modes));
     }
 
     m_swapchain = m_device->CreateSwapchain(Cacao::SwapchainBuilder()
                                                 .SetExtent(clamped_extent)
                                                 .SetFormat(surface_format.format)
                                                 .SetColorSpace(surface_format.colorSpace)
-                                                .SetPresentMode(Cacao::PresentMode::Fifo)
+                                                .SetPresentMode(selected_present_mode)
                                                 .SetMinImageCount(min_image_count)
                                                 .SetPreTransform(capabilities.currentTransform)
                                                 .SetUsage(Cacao::SwapchainUsageFlags::ColorAttachment)
@@ -401,7 +498,7 @@ void VulkanRenderer::createSwapchain(uint32_t width, uint32_t height)
                                                 .Build());
 
     m_surface_format = surface_format.format;
-    m_frames_in_flight = (std::max)(1u, m_swapchain->GetImageCount() > 1 ? m_swapchain->GetImageCount() - 1 : 1u);
+    m_frames_in_flight = (std::max) (1u, m_swapchain->GetImageCount() > 1 ? m_swapchain->GetImageCount() - 1 : 1u);
     m_synchronization = m_device->CreateSynchronization(m_frames_in_flight);
     m_frame_command_buffers.assign(m_frames_in_flight, {});
     m_swapchain_images_presented.assign(m_swapchain->GetImageCount(), false);
@@ -416,7 +513,7 @@ void VulkanRenderer::createSwapchain(uint32_t width, uint32_t height)
     }
 }
 
-Cacao::Extent2D VulkanRenderer::getFramebufferExtent() const
+Cacao::Extent2D Renderer::getFramebufferExtent() const
 {
     if (m_native_window == nullptr) {
         return {0, 0};
@@ -425,10 +522,10 @@ Cacao::Extent2D VulkanRenderer::getFramebufferExtent() const
     int width = 0;
     int height = 0;
     glfwGetFramebufferSize(m_native_window, &width, &height);
-    return {static_cast<uint32_t>((std::max)(width, 0)), static_cast<uint32_t>((std::max)(height, 0))};
+    return {static_cast<uint32_t>((std::max) (width, 0)), static_cast<uint32_t>((std::max) (height, 0))};
 }
 
-void VulkanRenderer::handlePendingResize()
+void Renderer::handlePendingResize()
 {
     if (!m_resize_requested || !m_device || !m_graphics_queue) {
         return;
@@ -452,7 +549,7 @@ void VulkanRenderer::handlePendingResize()
     }
 }
 
-void VulkanRenderer::releaseFrameCommandBuffers()
+void Renderer::releaseFrameCommandBuffers()
 {
     for (auto& command_buffer : m_frame_command_buffers) {
         if (command_buffer) {

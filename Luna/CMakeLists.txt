@@ -33,8 +33,8 @@ set(RENDERER_SOURCE
     Renderer/Shaders/SceneGeometry.frag
     Renderer/Shaders/SceneLighting.vert
     Renderer/Shaders/SceneLighting.frag
-    Renderer/VulkanRenderer.h
-    Renderer/VulkanRenderer.cpp)
+    Renderer/Renderer.h
+    Renderer/Renderer.cpp)
 
 set(SCENE_SOURCE
     Scene/Components.h

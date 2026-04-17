@@ -139,7 +139,7 @@ void Logger::init(const std::string& log_file, Level level)
 
         m_s_initialized = true;
         Cacao::SetLogCallback(cacaoLogBridge);
-        Cacao::SetVulkanValidationMessageFilterEnabled(false);
+        Cacao::SetVulkanValidationMessageFilterEnabled(true);
 
         if (m_s_log_file.empty()) {
             m_s_core_logger->info("Logger initialized (console only)");

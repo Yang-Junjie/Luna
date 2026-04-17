@@ -24,6 +24,7 @@ public:
     void resetCamera();
 
 protected:
+    Renderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
     void onUpdate(Timestep timestep) override;
 

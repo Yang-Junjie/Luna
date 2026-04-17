@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/Layer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/Renderer.h"
 
 namespace luna {
 
@@ -9,7 +9,7 @@ class Event;
 
 class ImGuiLayer final : public Layer {
 public:
-    ImGuiLayer(VulkanRenderer& renderer, bool enable_multi_viewport);
+    ImGuiLayer(Renderer& renderer, bool enable_multi_viewport);
     ~ImGuiLayer() override = default;
 
     void onAttach() override;
@@ -43,7 +43,7 @@ private:
     bool m_block_events = true;
     bool m_attached = false;
     bool m_enable_multi_viewport = false;
-    VulkanRenderer* m_renderer = nullptr;
+    Renderer* m_renderer = nullptr;
 };
 
 } // namespace luna

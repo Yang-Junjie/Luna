@@ -7,7 +7,7 @@
 
 namespace luna {
 
-ImGuiLayer::ImGuiLayer(VulkanRenderer& renderer, bool enable_multi_viewport)
+ImGuiLayer::ImGuiLayer(Renderer& renderer, bool enable_multi_viewport)
     : Layer("ImGuiLayer"),
       m_enable_multi_viewport(enable_multi_viewport),
       m_renderer(&renderer)

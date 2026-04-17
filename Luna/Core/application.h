@@ -5,7 +5,7 @@
 #include "JobSystem/TaskSystem.h"
 #include "Layer.h"
 #include "LayerStack.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/Renderer.h"
 #include "Timestep.h"
 #include "Window.h"
 
@@ -59,7 +59,7 @@ public:
         return m_initialized;
     }
 
-    VulkanRenderer& getRenderer()
+    Renderer& getRenderer()
     {
         return m_renderer;
     }
@@ -80,7 +80,7 @@ protected:
         return true;
     }
 
-    virtual VulkanRenderer::InitializationOptions getRendererInitializationOptions()
+    virtual Renderer::InitializationOptions getRendererInitializationOptions()
     {
         return {};
     }
@@ -106,7 +106,7 @@ private:
 
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
-    VulkanRenderer m_renderer;
+    Renderer m_renderer;
     TaskSystem m_task_system;
 
     std::unique_ptr<ImGuiLayer> m_imgui_layer;

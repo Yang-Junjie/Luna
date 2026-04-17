@@ -2,7 +2,7 @@
 #include "backends/imgui_impl_vulkan.h"
 #include "Core/Log.h"
 #include "Imgui/ImGuiContext.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/Renderer.h"
 
 #include <cstdint>
 
@@ -39,7 +39,7 @@ void checkVkResult(VkResult result)
 
 } // namespace
 
-bool ImGuiVulkanContext::Init(luna::VulkanRenderer& renderer)
+bool ImGuiVulkanContext::Init(luna::Renderer& renderer)
 {
     if (g_initialized || !renderer.isInitialized() || renderer.getNativeWindow() == nullptr ||
         !renderer.getSwapchain()) {
@@ -69,7 +69,7 @@ bool ImGuiVulkanContext::Init(luna::VulkanRenderer& renderer)
     init_info.Queue = static_cast<VkQueue>(vk_queue->GetNativeHandle());
     init_info.DescriptorPool = VK_NULL_HANDLE;
     init_info.DescriptorPoolSize = kImGuiDescriptorPoolSize;
-    init_info.MinImageCount = (std::max)(2u, renderer.getSwapchain()->GetImageCount());
+    init_info.MinImageCount = (std::max) (2u, renderer.getSwapchain()->GetImageCount());
     init_info.ImageCount = renderer.getSwapchain()->GetImageCount();
     init_info.UseDynamicRendering = true;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -192,7 +192,7 @@ void ImGuiVulkanContext::NotifySwapchainChanged(uint32_t image_count)
         return;
     }
 
-    ImGui_ImplVulkan_SetMinImageCount((std::max)(2u, image_count));
+    ImGui_ImplVulkan_SetMinImageCount((std::max) (2u, image_count));
 }
 
 } // namespace luna::rhi

@@ -12,14 +12,14 @@ class Texture;
 } // namespace Cacao
 
 namespace luna {
-class VulkanRenderer;
+class Renderer;
 }
 
 namespace luna::rhi {
 
 class ImGuiVulkanContext {
 public:
-    static bool Init(luna::VulkanRenderer& renderer);
+    static bool Init(luna::Renderer& renderer);
     static void Destroy();
     static void StartFrame();
     static void RenderFrame(Cacao::CommandBufferEncoder& command_buffer,
