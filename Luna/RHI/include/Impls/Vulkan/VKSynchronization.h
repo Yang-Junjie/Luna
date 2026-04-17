@@ -13,10 +13,12 @@ class CACAO_API VKSynchronization : public Synchronization {
     std::vector<vk::Semaphore> m_imageAvailableSemaphores;
     std::vector<vk::Semaphore> m_renderFinishedSemaphores;
     std::vector<vk::Fence> m_inFlightFences;
+    std::vector<uint32_t> m_frameImageIndices;
     Ref<VKDevice> m_vkDevice;
     friend class VKDevice;
     friend class VKSwapchain;
     friend class VKQueue;
+    void EnsureRenderSemaphore(uint32_t imageIndex);
     vk::Semaphore& GetImageSemaphore(uint32_t frameIndex);
     vk::Semaphore& GetRenderSemaphore(uint32_t frameIndex);
     vk::Fence& GetInFlightFence(uint32_t frameIndex);

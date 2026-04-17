@@ -3,7 +3,9 @@
 #if defined(__ANDROID__)
 #include <android/native_window.h>
 #elif defined(_WIN32)
+#ifndef VK_USE_PLATFORM_WIN32_KHR
 #define VK_USE_PLATFORM_WIN32_KHR
+#endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -41,6 +43,7 @@ namespace Cacao {
 class CACAO_API VKInstance : public Instance {
 private:
     vk::Instance m_instance;
+    VkDebugUtilsMessengerEXT m_debug_messenger = VK_NULL_HANDLE;
     InstanceCreateInfo m_createInfo;
     friend class VKInstance;
     friend class VKDevice;
@@ -52,6 +55,7 @@ private:
     }
 
 public:
+    ~VKInstance() override;
     [[nodiscard]] BackendType GetType() const override;
     bool Initialize(const InstanceCreateInfo& createInfo) override;
     std::vector<Ref<Adapter>> EnumerateAdapters() override;

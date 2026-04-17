@@ -1,8 +1,10 @@
+
 #include "Log.h"
 
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <Logging.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -62,6 +64,35 @@ std::unique_ptr<spdlog::formatter> makeFormatter(const char* pattern)
     return formatter;
 }
 
+void cacaoLogBridge(Cacao::LogLevel level, std::string_view message, void*)
+{
+    switch (level) {
+        case Cacao::LogLevel::Trace:
+            SPDLOG_LOGGER_TRACE(::luna::Logger::core().get(), "{}", message);
+            break;
+        case Cacao::LogLevel::Debug:
+            SPDLOG_LOGGER_DEBUG(::luna::Logger::core().get(), "{}", message);
+            break;
+        case Cacao::LogLevel::Info:
+            SPDLOG_LOGGER_INFO(::luna::Logger::core().get(), "{}", message);
+            break;
+        case Cacao::LogLevel::Warn:
+            SPDLOG_LOGGER_WARN(::luna::Logger::core().get(), "{}", message);
+            break;
+        case Cacao::LogLevel::Error:
+            SPDLOG_LOGGER_ERROR(::luna::Logger::core().get(), "{}", message);
+            break;
+        case Cacao::LogLevel::Fatal:
+            SPDLOG_LOGGER_CRITICAL(::luna::Logger::core().get(), "{}", message);
+            break;
+        default:
+            SPDLOG_LOGGER_INFO(::luna::Logger::core().get(), "{}", message);
+            break;
+    }
+
+    ::luna::Logger::flush();
+}
+
 } // namespace
 
 void Logger::init(const std::string& log_file, Level level)
@@ -107,6 +138,8 @@ void Logger::init(const std::string& log_file, Level level)
         spdlog::register_logger(m_s_editor_logger);
 
         m_s_initialized = true;
+        Cacao::SetLogCallback(cacaoLogBridge);
+        Cacao::SetVulkanValidationMessageFilterEnabled(false);
 
         if (m_s_log_file.empty()) {
             m_s_core_logger->info("Logger initialized (console only)");
@@ -128,6 +161,8 @@ void Logger::shutdown()
     if (!m_s_initialized) {
         return;
     }
+
+    Cacao::SetLogCallback(nullptr);
 
     if (m_s_core_logger) {
         m_s_core_logger->info("Logger shutdown");

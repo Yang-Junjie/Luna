@@ -1,6 +1,8 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKStagingBuffer.h"
 
+#include <algorithm>
+
 namespace Cacao {
 Ref<StagingBufferPool>
     StagingBufferPool::Create(const Ref<Device>& device, uint64_t blockSize, uint32_t maxFramesInFlight)
@@ -27,7 +29,7 @@ VKStagingBlock& VKStagingBufferPool::GetOrCreateBlock(uint64_t requiredSize)
         }
     }
 
-    uint64_t allocSize = std::max(m_blockSize, requiredSize);
+    uint64_t allocSize = (std::max)(m_blockSize, requiredSize);
 
     BufferCreateInfo bufferInfo = {};
     bufferInfo.Size = allocSize;

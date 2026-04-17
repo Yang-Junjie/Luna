@@ -3,8 +3,106 @@
 #include <Impls/Vulkan/VKAdapter.h>
 #include <Impls/Vulkan/VKInstance.h>
 #include <Impls/Vulkan/VKSurface.h>
+#include <Logging.h>
+
+#include <sstream>
 
 namespace Cacao {
+namespace {
+
+void populateDebugUtilsCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+{
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                                    VkDebugUtilsMessageTypeFlagsEXT type,
+                                    const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+                                    void*) -> VkBool32 {
+        const bool general_message = (type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) != 0;
+        const bool validation_or_performance_message =
+            (type & (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)) != 0;
+        const bool warning_or_error =
+            (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) != 0;
+
+        if (IsVulkanValidationMessageFilterEnabled() && general_message && !validation_or_performance_message && !warning_or_error) {
+            return VK_FALSE;
+        }
+
+        std::ostringstream stream;
+        stream << "[Vulkan Validation]";
+        if ((type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) != 0) {
+            stream << " [Validation]";
+        }
+        if ((type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) != 0) {
+            stream << " [Performance]";
+        }
+        if ((type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) != 0) {
+            stream << " [General]";
+        }
+        if (callbackData != nullptr) {
+            if (callbackData->pMessageIdName != nullptr && callbackData->pMessageIdName[0] != '\0') {
+                stream << " [" << callbackData->pMessageIdName << "]";
+            }
+            if (callbackData->messageIdNumber != 0) {
+                stream << " (ID=" << callbackData->messageIdNumber << ")";
+            }
+            if (callbackData->pMessage != nullptr && callbackData->pMessage[0] != '\0') {
+                stream << ' ' << callbackData->pMessage;
+            }
+        }
+
+        LogLevel log_level = LogLevel::Info;
+        if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
+            log_level = LogLevel::Error;
+        } else if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
+            log_level = LogLevel::Warn;
+        } else if ((severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0) {
+            log_level = LogLevel::Info;
+        } else {
+            log_level = LogLevel::Debug;
+        }
+
+        LogMessage(log_level, stream.str());
+        return VK_FALSE;
+    };
+};
+
+bool hasFeature(const InstanceCreateInfo& createInfo, InstanceFeature feature)
+{
+    for (const auto& enabled_feature : createInfo.enabledFeatures) {
+        if (enabled_feature == feature) {
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+VKInstance::~VKInstance()
+{
+    if (m_instance) {
+        if (m_debug_messenger != VK_NULL_HANDLE) {
+            const auto destroy_debug_utils =
+                reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT"));
+            if (destroy_debug_utils != nullptr) {
+                destroy_debug_utils(m_instance, m_debug_messenger, nullptr);
+            }
+            m_debug_messenger = VK_NULL_HANDLE;
+        }
+
+        m_instance.destroy();
+        m_instance = nullptr;
+    }
+}
+
 BackendType VKInstance::GetType() const
 {
     return BackendType::Vulkan;
@@ -50,8 +148,10 @@ bool VKInstance::Initialize(const InstanceCreateInfo& createInfo)
             case InstanceFeature::MeshShader:
                 enabledExtensionNames.push_back(VK_NV_MESH_SHADER_EXTENSION_NAME);
                 break;
-            default:
             case InstanceFeature::ValidationLayer:
+                enabledExtensionNames.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+                break;
+            default:
                 break;
         }
     }
@@ -83,11 +183,39 @@ bool VKInstance::Initialize(const InstanceCreateInfo& createInfo)
             .setPpEnabledLayerNames(enabledLayerNames.data())
             .setEnabledExtensionCount(static_cast<uint32_t>(enabledExtensionNames.size()))
             .setPpEnabledExtensionNames(enabledExtensionNames.data());
+    VkDebugUtilsMessengerCreateInfoEXT debug_utils_create_info{};
+    if (hasFeature(createInfo, InstanceFeature::ValidationLayer)) {
+        populateDebugUtilsCreateInfo(debug_utils_create_info);
+        instanceCreateInfo.setPNext(&debug_utils_create_info);
+    }
+
     m_instance = vk::createInstance(instanceCreateInfo);
     if (!m_instance) {
         throw std::runtime_error("failed to create Vulkan instance!");
         return false;
     }
+
+    if (hasFeature(createInfo, InstanceFeature::ValidationLayer)) {
+        const auto create_debug_utils =
+            reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
+        if (create_debug_utils == nullptr) {
+            LogMessage(LogLevel::Warn, "Vulkan validation layer enabled but vkCreateDebugUtilsMessengerEXT is unavailable");
+        } else {
+            const VkResult result = create_debug_utils(m_instance, &debug_utils_create_info, nullptr, &m_debug_messenger);
+            if (result != VK_SUCCESS) {
+                LogMessage(LogLevel::Warn, "Failed to create Vulkan debug utils messenger");
+                m_debug_messenger = VK_NULL_HANDLE;
+            } else {
+                if (IsVulkanValidationMessageFilterEnabled()) {
+                    LogMessage(
+                        LogLevel::Info,
+                        "Vulkan validation message filter enabled; set LUNA_VK_VALIDATION_FILTER=0 to keep loader/general info logs");
+                }
+                LogMessage(LogLevel::Debug, "Installed Vulkan debug utils messenger");
+            }
+        }
+    }
+
     return true;
 }
 

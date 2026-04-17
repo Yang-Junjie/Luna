@@ -45,4 +45,5 @@ target_compile_definitions(
     PUBLIC
         CACAO_STATIC
         CACAO_BACKEND_VULKAN
+        $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
 )
