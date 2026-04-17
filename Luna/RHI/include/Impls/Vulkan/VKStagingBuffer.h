@@ -1,5 +1,5 @@
-#ifndef CACAO_VKSTAGINGBUFFER_H
-#define CACAO_VKSTAGINGBUFFER_H
+#ifndef LUNA_RHI_VKSTAGINGBUFFER_H
+#define LUNA_RHI_VKSTAGINGBUFFER_H
 
 #include "Impls/Vulkan/VKBuffer.h"
 #include "StagingBuffer.h"
@@ -7,7 +7,7 @@
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
 struct VKStagingBlock {
@@ -17,7 +17,7 @@ struct VKStagingBlock {
     uint64_t offset = 0;
 };
 
-class CACAO_API VKStagingBufferPool final : public StagingBufferPool {
+class LUNA_RHI_API VKStagingBufferPool final : public StagingBufferPool {
 private:
     Ref<VKDevice> m_device;
     uint64_t m_blockSize;
@@ -47,6 +47,6 @@ public:
         return m_blockSize * m_frameBlocks.size();
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

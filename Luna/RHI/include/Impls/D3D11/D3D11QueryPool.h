@@ -1,12 +1,12 @@
-#ifndef CACAO_D3D11QUERYPOOL_H
-#define CACAO_D3D11QUERYPOOL_H
+#ifndef LUNA_RHI_D3D11QUERYPOOL_H
+#define LUNA_RHI_D3D11QUERYPOOL_H
 #include "D3D11Common.h"
 #include "QueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11QueryPool final : public QueryPool {
+class LUNA_RHI_API D3D11QueryPool final : public QueryPool {
 private:
     std::vector<ComPtr<ID3D11Query>> m_queries;
     Ref<D3D11Device> m_device;
@@ -36,6 +36,6 @@ public:
         return m_queries[index].Get();
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

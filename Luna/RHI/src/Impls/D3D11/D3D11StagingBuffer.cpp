@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11StagingBuffer.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11StagingBufferPool::D3D11StagingBufferPool(const Ref<D3D11Device>& device, uint64_t initialSize)
     : m_device(device),
       m_totalSize(initialSize)
@@ -47,4 +47,4 @@ void D3D11StagingBufferPool::Reset()
     }
     m_usedSize = 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

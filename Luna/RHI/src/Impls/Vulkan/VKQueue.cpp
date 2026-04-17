@@ -4,7 +4,7 @@
 
 #include <mutex>
 
-namespace Cacao {
+namespace luna::RHI {
 VKQueue::VKQueue(const Ref<Device>& device, const vk::Queue& vkQueue, QueueType type, uint32_t index)
     : m_device(device),
       m_queue(vkQueue),
@@ -111,4 +111,4 @@ void VKQueue::WaitIdle()
 {
     m_queue.waitIdle();
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,12 +1,12 @@
-#ifndef CACAO_GLBINDINGGROUP_H
-#define CACAO_GLBINDINGGROUP_H
+#ifndef LUNA_RHI_GLBINDINGGROUP_H
+#define LUNA_RHI_GLBINDINGGROUP_H
 #include "DescriptorSet.h"
 #include "GLCommon.h"
 
 #include <string>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLBindingEntry {
     uint32_t binding = 0;
     enum class Type {
@@ -26,7 +26,7 @@ struct GLBindingEntry {
     GLenum imageFormat = GL_RGBA8;
 };
 
-class CACAO_API GLBindingGroup final : public DescriptorSet {
+class LUNA_RHI_API GLBindingGroup final : public DescriptorSet {
 public:
     void AddUniformBuffer(uint32_t binding, GLuint buffer);
     void AddStorageBuffer(uint32_t binding, GLuint buffer);
@@ -50,6 +50,6 @@ public:
 private:
     std::vector<GLBindingEntry> m_entries;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

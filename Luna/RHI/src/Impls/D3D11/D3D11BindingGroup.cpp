@@ -4,7 +4,7 @@
 #include "Impls/D3D11/D3D11Sampler.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11DescriptorSet::D3D11DescriptorSet(Ref<D3D11Device> device, Ref<D3D11DescriptorSetLayout> layout)
     : m_device(std::move(device)),
       m_layout(std::move(layout))
@@ -215,4 +215,4 @@ Ref<DescriptorSet> D3D11DescriptorPool::AllocateDescriptorSet(const Ref<Descript
     auto d3dLayout = std::static_pointer_cast<D3D11DescriptorSetLayout>(layout);
     return CreateRef<D3D11DescriptorSet>(m_device, d3dLayout);
 }
-} // namespace Cacao
+} // namespace luna::RHI

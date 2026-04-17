@@ -1,13 +1,13 @@
-#ifndef CACAO_D3D12SURFACE_H
-#define CACAO_D3D12SURFACE_H
+#ifndef LUNA_RHI_D3D12SURFACE_H
+#define LUNA_RHI_D3D12SURFACE_H
 #include "D3D12Common.h"
 
 #include <Surface.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D12Instance;
 
-class CACAO_API D3D12Surface : public Surface {
+class LUNA_RHI_API D3D12Surface : public Surface {
 public:
     D3D12Surface(Ref<D3D12Instance> instance, HWND hwnd)
         : m_instance(std::move(instance)),
@@ -28,5 +28,5 @@ private:
     Ref<D3D12Instance> m_instance;
     HWND m_hwnd;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

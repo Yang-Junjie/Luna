@@ -1,14 +1,14 @@
-#ifndef CACAO_VKDESCRIPTORPOOL_H
-#define CACAO_VKDESCRIPTORPOOL_H
+#ifndef LUNA_RHI_VKDESCRIPTORPOOL_H
+#define LUNA_RHI_VKDESCRIPTORPOOL_H
 #include "DescriptorPool.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class VKDevice;
 
-class CACAO_API VKDescriptorPool : public DescriptorPool {
+class LUNA_RHI_API VKDescriptorPool : public DescriptorPool {
     Ref<VKDevice> m_device;
     vk::DescriptorPool m_descriptorPool;
     DescriptorPoolCreateInfo m_createInfo;
@@ -19,5 +19,5 @@ public:
     void Reset() override;
     Ref<DescriptorSet> AllocateDescriptorSet(const Ref<DescriptorSetLayout>& layout) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

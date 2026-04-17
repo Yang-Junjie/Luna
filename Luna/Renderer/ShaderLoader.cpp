@@ -78,9 +78,9 @@ glslang::EShSource toNativeShaderSource(ShaderLanguage language)
     }
 }
 
-Cacao::ShaderStage toCacaoShaderStage(ShaderType type)
+luna::RHI::ShaderStage toRHIShaderStage(ShaderType type)
 {
-    using ShaderStage = Cacao::ShaderStage;
+    using ShaderStage = luna::RHI::ShaderStage;
 
     switch (type) {
         case ShaderType::VERTEX:
@@ -150,7 +150,7 @@ ShaderData ShaderLoader::LoadFromBinary(std::vector<uint32_t> bytecode)
 {
     return ShaderData{
         .Bytecode = std::move(bytecode),
-        .Stage = Cacao::ShaderStage::None,
+        .Stage = luna::RHI::ShaderStage::None,
     };
 }
 
@@ -197,7 +197,7 @@ ShaderData ShaderLoader::LoadFromSource(const std::string& code, ShaderType type
 
     return ShaderData{
         .Bytecode = std::move(bytecode),
-        .Stage = toCacaoShaderStage(type),
+        .Stage = toRHIShaderStage(type),
     };
 }
 

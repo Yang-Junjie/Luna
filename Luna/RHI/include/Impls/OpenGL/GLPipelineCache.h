@@ -1,5 +1,5 @@
-#ifndef CACAO_GLPIPELINECACHE_H
-#define CACAO_GLPIPELINECACHE_H
+#ifndef LUNA_RHI_GLPIPELINECACHE_H
+#define LUNA_RHI_GLPIPELINECACHE_H
 #include "GLCommon.h"
 #include "Pipeline.h"
 
@@ -7,13 +7,13 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLProgramBinary {
     GLenum format;
     std::vector<uint8_t> data;
 };
 
-class CACAO_API GLPipelineCache final : public PipelineCache {
+class LUNA_RHI_API GLPipelineCache final : public PipelineCache {
 public:
     GLPipelineCache(const std::string& cacheDir = "");
     static Ref<GLPipelineCache> Create(const std::string& cacheDir = "");
@@ -34,6 +34,6 @@ private:
     std::string m_cacheDir;
     std::unordered_map<std::string, GLProgramBinary> m_cache;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -10,7 +10,7 @@
 #include "Impls/D3D11/D3D11Synchronization.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Device::D3D11Device(Ref<D3D11Adapter> adapter)
     : m_adapter(std::move(adapter))
 {
@@ -132,4 +132,4 @@ Ref<Synchronization> D3D11Device::CreateSynchronization(uint32_t maxFramesInFlig
     return CreateRef<D3D11Synchronization>(std::static_pointer_cast<D3D11Device>(shared_from_this()),
                                            maxFramesInFlight);
 }
-} // namespace Cacao
+} // namespace luna::RHI

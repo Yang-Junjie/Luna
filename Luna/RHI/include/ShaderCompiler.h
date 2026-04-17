@@ -1,14 +1,14 @@
-#ifndef CACAO_CACAOSHADERCOMPILER_H
-#define CACAO_CACAOSHADERCOMPILER_H
+#ifndef LUNA_RHI_SHADERCOMPILER_H
+#define LUNA_RHI_SHADERCOMPILER_H
 #include "ShaderModule.h"
 
 #if __has_include(<slang/slang.h>) && __has_include("slang-com-ptr.h")
-#define CACAO_HAS_SLANG 1
+#define LUNA_RHI_HAS_SLANG 1
 #include "slang-com-ptr.h"
 
 #include <slang/slang.h>
 #else
-#define CACAO_HAS_SLANG 0
+#define LUNA_RHI_HAS_SLANG 0
 
 namespace slang {
 class IComponentType;
@@ -30,13 +30,13 @@ public:
 using SlangStage = int;
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 enum class BackendType;
 struct ShaderCreateInfo;
 class ShaderModule;
 class Device;
 
-class CACAO_API ShaderCompiler {
+class LUNA_RHI_API ShaderCompiler {
 public:
     ShaderCompiler();
     ~ShaderCompiler();
@@ -70,10 +70,10 @@ private:
     SlangStage ConvertShaderStageToSlang(ShaderStage stage);
     BackendType m_targetBackend;
     std::filesystem::path m_cacheDir = "shader_cache";
-#if CACAO_HAS_SLANG
+#if LUNA_RHI_HAS_SLANG
     Slang::ComPtr<slang::IGlobalSession> m_globalSession;
     Slang::ComPtr<slang::ISession> m_session;
 #endif
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

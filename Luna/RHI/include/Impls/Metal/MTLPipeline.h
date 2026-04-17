@@ -1,11 +1,11 @@
-#ifndef CACAO_MTLPIPELINE_H
-#define CACAO_MTLPIPELINE_H
+#ifndef LUNA_RHI_MTLPIPELINE_H
+#define LUNA_RHI_MTLPIPELINE_H
 #ifdef __APPLE__
 #include "MTLCommon.h"
 #include "Pipeline.h"
 
-namespace Cacao {
-class CACAO_API MTLGraphicsPipeline final : public GraphicsPipeline {
+namespace luna::RHI {
+class LUNA_RHI_API MTLGraphicsPipeline final : public GraphicsPipeline {
 public:
     MTLGraphicsPipeline(const Ref<Device>& device, const GraphicsPipelineCreateInfo& info);
     ~MTLGraphicsPipeline() override = default;
@@ -25,7 +25,7 @@ private:
     id m_pipelineState = nullptr; // id<MTLRenderPipelineState>
 };
 
-class CACAO_API MTLComputePipeline final : public ComputePipeline {
+class LUNA_RHI_API MTLComputePipeline final : public ComputePipeline {
 public:
     MTLComputePipeline(const Ref<Device>& device, const ComputePipelineCreateInfo& info);
     ~MTLComputePipeline() override = default;
@@ -44,6 +44,6 @@ private:
     Ref<PipelineLayout> m_layout;
     id m_pipelineState = nullptr; // id<MTLComputePipelineState>
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

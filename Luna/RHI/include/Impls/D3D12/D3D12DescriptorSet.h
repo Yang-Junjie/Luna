@@ -1,15 +1,15 @@
-#ifndef CACAO_D3D12DESCRIPTORSET_H
-#define CACAO_D3D12DESCRIPTORSET_H
+#ifndef LUNA_RHI_D3D12DESCRIPTORSET_H
+#define LUNA_RHI_D3D12DESCRIPTORSET_H
 #include "D3D12Common.h"
 #include "DescriptorSet.h"
 
 #include <unordered_map>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D12DescriptorPool;
 
-class CACAO_API D3D12DescriptorSet : public DescriptorSet {
+class LUNA_RHI_API D3D12DescriptorSet : public DescriptorSet {
 public:
     struct SlotInfo {
         uint32_t binding;
@@ -100,6 +100,6 @@ public:
 
     void WriteAccelerationStructures(const AccelerationStructureWriteInfos& infos) override {}
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

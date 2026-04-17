@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12TimelineSemaphore.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12TimelineSemaphore::D3D12TimelineSemaphore(Ref<Device> device, uint64_t initialValue)
     : m_device(std::move(device))
 {
@@ -42,4 +42,4 @@ uint64_t D3D12TimelineSemaphore::GetValue() const
 {
     return m_fence->GetCompletedValue();
 }
-} // namespace Cacao
+} // namespace luna::RHI

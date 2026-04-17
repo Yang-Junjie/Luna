@@ -5,7 +5,7 @@
 #include <d3d12sdklayers.h>
 #include <ShaderCompiler.h>
 
-namespace Cacao {
+namespace luna::RHI {
 BackendType D3D12Instance::GetType() const
 {
     return BackendType::DirectX12;
@@ -82,4 +82,4 @@ Ref<ShaderCompiler> D3D12Instance::CreateShaderCompiler()
 {
     return ShaderCompiler::Create(BackendType::DirectX12);
 }
-} // namespace Cacao
+} // namespace luna::RHI

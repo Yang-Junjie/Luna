@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12RayTracingPipeline::D3D12RayTracingPipeline(const Ref<Device>& device, const RayTracingPipelineCreateInfo& info)
     : m_layout(info.Layout)
 {
@@ -117,4 +117,4 @@ D3D12RayTracingPipeline::D3D12RayTracingPipeline(const Ref<Device>& device, cons
     }
     std::cout << "D3D12 RT pipeline created successfully" << std::endl;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,17 +1,17 @@
-#ifndef CACAO_VKDESCRIPTORSET_H
-#define CACAO_VKDESCRIPTORSET_H
+#ifndef LUNA_RHI_VKDESCRIPTORSET_H
+#define LUNA_RHI_VKDESCRIPTORSET_H
 #include "DescriptorSet.h"
 
 #include <list>
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDescriptorSetLayout;
 class VKDescriptorPool;
 class Device;
 class VKDevice;
 
-class CACAO_API VKDescriptorSet : public DescriptorSet {
+class LUNA_RHI_API VKDescriptorSet : public DescriptorSet {
 private:
     vk::DescriptorSet m_descriptorSet;
     Ref<VKDevice> m_device;
@@ -52,5 +52,5 @@ public:
         return m_descriptorSet;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

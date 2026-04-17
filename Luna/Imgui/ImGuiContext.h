@@ -4,12 +4,12 @@
 
 #include <Core.h>
 
-namespace Cacao {
-class CacaoTextureView;
+namespace luna::RHI {
+class TextureView;
 class CommandBufferEncoder;
 class Sampler;
 class Texture;
-} // namespace Cacao
+} // namespace luna::RHI
 
 namespace luna {
 class Renderer;
@@ -22,13 +22,13 @@ public:
     static bool Init(luna::Renderer& renderer);
     static void Destroy();
     static void StartFrame();
-    static void RenderFrame(Cacao::CommandBufferEncoder& command_buffer,
-                            const Cacao::Ref<Cacao::Texture>& color_target,
+    static void RenderFrame(luna::RHI::CommandBufferEncoder& command_buffer,
+                            const luna::RHI::Ref<luna::RHI::Texture>& color_target,
                             uint32_t framebuffer_width,
                             uint32_t framebuffer_height);
-    static ImTextureID GetTextureId(const Cacao::Ref<Cacao::Texture>& texture);
-    static ImTextureID GetTextureId(const Cacao::Ref<Cacao::CacaoTextureView>& view,
-                                    const Cacao::Ref<Cacao::Sampler>& sampler = {});
+    static ImTextureID GetTextureId(const luna::RHI::Ref<luna::RHI::Texture>& texture);
+    static ImTextureID GetTextureId(const luna::RHI::Ref<luna::RHI::TextureView>& view,
+                                    const luna::RHI::Ref<luna::RHI::Sampler>& sampler = {});
     static void EndFrame();
     static void NotifySwapchainChanged(uint32_t image_count);
 };

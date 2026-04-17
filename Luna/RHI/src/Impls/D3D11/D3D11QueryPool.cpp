@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11QueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static D3D11_QUERY ToD3D11QueryType(QueryType type)
 {
     switch (type) {
@@ -50,4 +50,4 @@ bool D3D11QueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::v
     }
     return true;
 }
-} // namespace Cacao
+} // namespace luna::RHI

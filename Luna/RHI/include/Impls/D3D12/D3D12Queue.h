@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12QUEUE_H
-#define CACAO_D3D12QUEUE_H
+#ifndef LUNA_RHI_D3D12QUEUE_H
+#define LUNA_RHI_D3D12QUEUE_H
 #include "D3D12Common.h"
 #include "Queue.h"
 
-namespace Cacao {
-class CACAO_API D3D12Queue final : public Queue {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12Queue final : public Queue {
 private:
     ComPtr<ID3D12CommandQueue> m_queue;
     ComPtr<ID3D12Fence> m_fence;
@@ -47,6 +47,6 @@ public:
     uint64_t Signal();
     void WaitForFence(uint64_t value);
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

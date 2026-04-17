@@ -1,14 +1,14 @@
-#ifndef CACAO_VKDESCRIPTOR_H
-#define CACAO_VKDESCRIPTOR_H
+#ifndef LUNA_RHI_VKDESCRIPTOR_H
+#define LUNA_RHI_VKDESCRIPTOR_H
 #include "DescriptorSetLayout.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 class Device;
 
-class CACAO_API VKDescriptorSetLayout : public DescriptorSetLayout {
+class LUNA_RHI_API VKDescriptorSetLayout : public DescriptorSetLayout {
     vk::DescriptorSetLayout m_descriptorSetLayout;
     Ref<VKDevice> m_device;
     std::vector<std::vector<vk::Sampler>> m_samplerStorage;
@@ -22,5 +22,5 @@ public:
         return m_descriptorSetLayout;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

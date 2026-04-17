@@ -2,7 +2,7 @@
 #include "Impls/D3D12/D3D12Swapchain.h"
 #include "Impls/D3D12/D3D12Synchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Synchronization::D3D12Synchronization(const Ref<Device>& device, uint32_t maxFramesInFlight)
     : m_device(device),
       m_maxFramesInFlight(maxFramesInFlight)
@@ -62,4 +62,4 @@ void D3D12Synchronization::WaitIdle() const
         WaitForFrame(i);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,8 +1,8 @@
-#ifndef CACAO_CACAOTEXTURE_H
-#define CACAO_CACAOTEXTURE_H
+#ifndef LUNA_RHI_TEXTURE_H
+#define LUNA_RHI_TEXTURE_H
 #include "Barrier.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class TextureType {
     Texture1D,
     Texture2D,
@@ -101,16 +101,16 @@ struct TextureViewDesc {
     AspectMask Aspect = AspectMask::Color;
     std::string Name;
 };
-class CACAO_API Texture;
+class LUNA_RHI_API Texture;
 
-class CACAO_API CacaoTextureView : public std::enable_shared_from_this<CacaoTextureView> {
+class LUNA_RHI_API TextureView : public std::enable_shared_from_this<TextureView> {
 public:
     virtual Ref<Texture> GetTexture() const = 0;
     virtual const TextureViewDesc& GetDesc() const = 0;
-    virtual ~CacaoTextureView() = default;
+    virtual ~TextureView() = default;
 };
 
-class CACAO_API Texture : public std::enable_shared_from_this<Texture> {
+class LUNA_RHI_API Texture : public std::enable_shared_from_this<Texture> {
 public:
     virtual ~Texture() = default;
     virtual uint32_t GetWidth() const = 0;
@@ -123,8 +123,8 @@ public:
     virtual SampleCount GetSampleCount() const = 0;
     virtual TextureUsageFlags GetUsage() const = 0;
     virtual ResourceState GetCurrentState() const = 0;
-    virtual Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) = 0;
-    virtual Ref<CacaoTextureView> GetDefaultView() = 0;
+    virtual Ref<TextureView> CreateView(const TextureViewDesc& desc) = 0;
+    virtual Ref<TextureView> GetDefaultView() = 0;
     virtual void CreateDefaultViewIfNeeded() = 0;
 
     bool IsDepthStencil() const
@@ -153,5 +153,5 @@ protected:
         return format == Format::D24S8;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

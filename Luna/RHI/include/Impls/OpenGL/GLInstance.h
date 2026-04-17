@@ -1,11 +1,11 @@
-#ifndef CACAO_GLINSTANCE_H
-#define CACAO_GLINSTANCE_H
+#ifndef LUNA_RHI_GLINSTANCE_H
+#define LUNA_RHI_GLINSTANCE_H
 #include "GLCommon.h"
 
 #include <Instance.h>
 
-namespace Cacao {
-class CACAO_API GLInstance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API GLInstance : public Instance {
 public:
     [[nodiscard]] BackendType GetType() const override;
     bool Initialize(const InstanceCreateInfo& createInfo) override;
@@ -21,6 +21,6 @@ private:
     std::string m_renderer;
     std::string m_vendor;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

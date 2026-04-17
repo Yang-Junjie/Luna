@@ -4,7 +4,7 @@
 #include "Impls/OpenGL/GLSampler.h"
 #include "Impls/OpenGL/GLTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 void GLDescriptorSet::WriteBuffer(const BufferWriteInfo& info)
 {
     auto* glBuf = static_cast<GLBuffer*>(info.Buffer.get());
@@ -67,4 +67,4 @@ Ref<DescriptorSet> GLDescriptorPool::AllocateDescriptorSet(const Ref<DescriptorS
 {
     return std::make_shared<GLBindingGroup>();
 }
-} // namespace Cacao
+} // namespace luna::RHI

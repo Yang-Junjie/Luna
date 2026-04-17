@@ -20,7 +20,7 @@
 
 #include <fstream>
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Device::D3D12Device(const Ref<Adapter>& adapter, const DeviceCreateInfo& createInfo)
     : m_parentAdapter(adapter)
 {
@@ -329,4 +329,4 @@ Ref<TimelineSemaphore> D3D12Device::CreateTimelineSemaphore(uint64_t initialValu
 {
     return std::make_shared<D3D12TimelineSemaphore>(shared_from_this(), initialValue);
 }
-} // namespace Cacao
+} // namespace luna::RHI

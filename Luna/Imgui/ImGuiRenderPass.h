@@ -7,8 +7,8 @@
 namespace luna::rhi {
 
 struct ImGuiRenderPass {
-    static void Render(Cacao::CommandBufferEncoder& command_buffer,
-                       const Cacao::Ref<Cacao::Texture>& color_target,
+    static void Render(luna::RHI::CommandBufferEncoder& command_buffer,
+                       const luna::RHI::Ref<luna::RHI::Texture>& color_target,
                        uint32_t framebuffer_width,
                        uint32_t framebuffer_height)
     {

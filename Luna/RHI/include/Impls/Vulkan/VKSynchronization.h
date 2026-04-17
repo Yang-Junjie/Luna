@@ -1,14 +1,14 @@
-#ifndef CACAO_VKSYNCHRONIZATION_H
-#define CACAO_VKSYNCHRONIZATION_H
+#ifndef LUNA_RHI_VKSYNCHRONIZATION_H
+#define LUNA_RHI_VKSYNCHRONIZATION_H
 #include "Device.h"
 #include "Synchronization.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKSynchronization : public Synchronization {
+class LUNA_RHI_API VKSynchronization : public Synchronization {
     uint32_t m_maxFramesInFlight;
     std::vector<vk::Semaphore> m_imageAvailableSemaphores;
     std::vector<vk::Semaphore> m_renderFinishedSemaphores;
@@ -33,5 +33,5 @@ public:
     ~VKSynchronization() override;
     void WaitIdle() const override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

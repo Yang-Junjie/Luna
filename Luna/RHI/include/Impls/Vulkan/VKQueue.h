@@ -1,16 +1,16 @@
-#ifndef CACAO_VKQUEUE_H
-#define CACAO_VKQUEUE_H
+#ifndef LUNA_RHI_VKQUEUE_H
+#define LUNA_RHI_VKQUEUE_H
 #include "Queue.h"
 
 #include <mutex>
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 }
 
-namespace Cacao {
-class CACAO_API VKQueue final : public Queue {
+namespace luna::RHI {
+class LUNA_RHI_API VKQueue final : public Queue {
     vk::Queue m_queue;
     Ref<Device> m_device;
     QueueType m_type;
@@ -40,5 +40,5 @@ public:
         return m_queue;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

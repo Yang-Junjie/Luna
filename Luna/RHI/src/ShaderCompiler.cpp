@@ -5,13 +5,13 @@
 #include <fstream>
 #include <iostream>
 
-namespace Cacao {
-#if !CACAO_HAS_SLANG
+namespace luna::RHI {
+#if !LUNA_RHI_HAS_SLANG
 namespace {
 [[noreturn]] void ThrowSlangUnavailable()
 {
     throw std::runtime_error(
-        "Cacao ShaderCompiler requires Slang headers/libraries, but Slang was not found in this build.");
+        "Luna RHI ShaderCompiler requires Slang headers/libraries, but Slang was not found in this build.");
 }
 } // namespace
 
@@ -202,7 +202,7 @@ void ShaderCompiler::Initialize(BackendType backend)
             targetDesc.format = SLANG_WGSL;
             break;
         default:
-            throw std::runtime_error("Unsupported CacaoType in CacaoShaderCompiler");
+            throw std::runtime_error("Unsupported BackendType in ShaderCompiler");
     }
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
@@ -587,4 +587,4 @@ std::vector<DescriptorSetLayoutCreateInfo>
     return result;
 }
 #endif
-} // namespace Cacao
+} // namespace luna::RHI

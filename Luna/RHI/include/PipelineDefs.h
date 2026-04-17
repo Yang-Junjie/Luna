@@ -1,8 +1,8 @@
-#ifndef CACAO_PIPELINEDEFS_H
-#define CACAO_PIPELINEDEFS_H
+#ifndef LUNA_RHI_PIPELINEDEFS_H
+#define LUNA_RHI_PIPELINEDEFS_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class PolygonMode {
     Fill,
     Line,
@@ -193,5 +193,5 @@ struct PushConstantRange {
     uint32_t Offset;
     uint32_t Size;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

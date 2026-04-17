@@ -3,7 +3,7 @@
 #include "Impls/D3D11/D3D11Sampler.h"
 #include "Impls/D3D11/D3D11ShaderModule.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static D3D11_CULL_MODE ToD3D11CullMode(CullMode mode)
 {
     switch (mode) {
@@ -277,4 +277,4 @@ D3D11ComputePipeline::D3D11ComputePipeline(Ref<D3D11Device> device, const Comput
         m_device->GetNativeDevice()->CreateComputeShader(bc.data(), bc.size(), nullptr, &m_cs);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

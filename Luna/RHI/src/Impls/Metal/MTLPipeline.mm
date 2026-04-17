@@ -3,7 +3,7 @@
 #include "Impls/Metal/MTLDevice.h"
 #import <Metal/Metal.h>
 
-namespace Cacao
+namespace luna::RHI
 {
     static MTLVertexFormat ToMTLVertexFormat(Format format)
     {

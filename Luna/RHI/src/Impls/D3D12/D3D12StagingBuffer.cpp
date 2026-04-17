@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12StagingBuffer.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12StagingBufferPool::D3D12StagingBufferPool(const Ref<Device>& device,
                                                uint64_t blockSize,
                                                uint32_t maxFramesInFlight)
@@ -68,4 +68,4 @@ void D3D12StagingBufferPool::AdvanceFrame()
 {
     Reset();
 }
-} // namespace Cacao
+} // namespace luna::RHI

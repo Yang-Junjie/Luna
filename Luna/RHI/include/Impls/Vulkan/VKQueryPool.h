@@ -1,13 +1,13 @@
-#ifndef CACAO_VKQUERYPOOL_H
-#define CACAO_VKQUERYPOOL_H
+#ifndef LUNA_RHI_VKQUERYPOOL_H
+#define LUNA_RHI_VKQUERYPOOL_H
 #include "VKCommon.h"
 
 #include <QueryPool.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKQueryPool : public QueryPool {
+class LUNA_RHI_API VKQueryPool : public QueryPool {
 public:
     VKQueryPool(Ref<VKDevice> device, const QueryPoolCreateInfo& info);
     ~VKQueryPool() override;
@@ -36,5 +36,5 @@ private:
     QueryType m_type;
     uint32_t m_count;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

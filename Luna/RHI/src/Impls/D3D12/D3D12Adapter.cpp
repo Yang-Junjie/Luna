@@ -2,7 +2,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12Instance.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Adapter::D3D12Adapter(const Ref<Instance>& inst, ComPtr<IDXGIAdapter4> adapter)
     : m_adapter(std::move(adapter)),
       m_instance(std::dynamic_pointer_cast<D3D12Instance>(inst))
@@ -104,4 +104,4 @@ uint32_t D3D12Adapter::FindQueueFamilyIndex(QueueType type) const
 {
     return 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

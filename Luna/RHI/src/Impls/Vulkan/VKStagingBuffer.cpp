@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<StagingBufferPool>
     StagingBufferPool::Create(const Ref<Device>& device, uint64_t blockSize, uint32_t maxFramesInFlight)
 {
@@ -95,4 +95,4 @@ void VKStagingBufferPool::AdvanceFrame()
         block.offset = 0;
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

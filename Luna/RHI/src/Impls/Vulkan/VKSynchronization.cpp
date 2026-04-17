@@ -2,7 +2,7 @@
 #include "Impls/Vulkan/VKSwapchain.h"
 #include "Impls/Vulkan/VKSynchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 void VKSynchronization::EnsureRenderSemaphore(uint32_t imageIndex)
 {
     if (imageIndex < m_renderFinishedSemaphores.size()) {
@@ -114,4 +114,4 @@ void VKSynchronization::WaitIdle() const
 {
     m_vkDevice->GetHandle().waitIdle();
 }
-} // namespace Cacao
+} // namespace luna::RHI

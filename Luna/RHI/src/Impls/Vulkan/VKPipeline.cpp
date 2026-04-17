@@ -4,7 +4,7 @@
 #include "Impls/Vulkan/VKPipelineLayout.h"
 #include "Impls/Vulkan/VKShaderModule.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static void ConvertShaderStages(std::span<const Ref<ShaderModule>> shaderModules,
                                 std::vector<vk::PipelineShaderStageCreateInfo>& outShaderStages)
 {
@@ -354,4 +354,4 @@ Ref<PipelineLayout> VKComputePipeline::GetLayout() const
 {
     return m_pipelineInfo.Layout;
 }
-} // namespace Cacao
+} // namespace luna::RHI

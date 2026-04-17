@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Texture::D3D12Texture(const Ref<Device>& device, const TextureCreateInfo& info)
     : m_device(device),
       m_createInfo(info),
@@ -84,7 +84,7 @@ D3D12Texture::~D3D12Texture()
     }
 }
 
-Ref<CacaoTextureView> D3D12Texture::CreateView(const TextureViewDesc& desc)
+Ref<TextureView> D3D12Texture::CreateView(const TextureViewDesc& desc)
 {
     auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
     if (!d3dDevice || !d3dDevice->GetHandle()) {
@@ -171,4 +171,4 @@ D3D12TextureView::D3D12TextureView(const Ref<Texture>& texture,
         m_hasUAV = true;
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

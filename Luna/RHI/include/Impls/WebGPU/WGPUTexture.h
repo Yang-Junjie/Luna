@@ -1,13 +1,13 @@
-#ifndef CACAO_WGPU_TEXTURE_H
-#define CACAO_WGPU_TEXTURE_H
+#ifndef LUNA_RHI_WGPU_TEXTURE_H
+#define LUNA_RHI_WGPU_TEXTURE_H
 
 #include "Texture.h"
 #include "WGPUCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUTextureImpl;
 
-class CACAO_API WGPUTextureViewImpl : public CacaoTextureView {
+class LUNA_RHI_API WGPUTextureViewImpl : public TextureView {
 private:
     ::WGPUTextureView m_view = nullptr;
     Ref<Texture> m_texture;
@@ -29,12 +29,12 @@ public:
     }
 };
 
-class CACAO_API WGPUTextureImpl final : public Texture {
+class LUNA_RHI_API WGPUTextureImpl final : public Texture {
 private:
     ::WGPUTexture m_texture = nullptr;
     ::WGPUDevice m_wgpuDevice = nullptr;
     TextureCreateInfo m_createInfo;
-    Ref<CacaoTextureView> m_defaultView;
+    Ref<TextureView> m_defaultView;
     ResourceState m_currentState = ResourceState::Undefined;
     bool m_ownsTexture = true;
 
@@ -57,8 +57,8 @@ public:
     SampleCount GetSampleCount() const override;
     TextureUsageFlags GetUsage() const override;
     ResourceState GetCurrentState() const override;
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
-    Ref<CacaoTextureView> GetDefaultView() override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> GetDefaultView() override;
     void CreateDefaultViewIfNeeded() override;
 
     ::WGPUTexture GetNativeTexture() const
@@ -66,6 +66,6 @@ public:
         return m_texture;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

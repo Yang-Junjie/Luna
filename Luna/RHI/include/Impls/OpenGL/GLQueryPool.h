@@ -1,12 +1,12 @@
-#ifndef CACAO_GLQUERYPOOL_H
-#define CACAO_GLQUERYPOOL_H
+#ifndef LUNA_RHI_GLQUERYPOOL_H
+#define LUNA_RHI_GLQUERYPOOL_H
 #include "GLCommon.h"
 #include "QueryPool.h"
 
 #include <vector>
 
-namespace Cacao {
-class CACAO_API GLQueryPool final : public QueryPool {
+namespace luna::RHI {
+class LUNA_RHI_API GLQueryPool final : public QueryPool {
 public:
     GLQueryPool(const QueryPoolCreateInfo& info);
     static Ref<GLQueryPool> Create(const QueryPoolCreateInfo& info);
@@ -45,6 +45,6 @@ private:
     uint32_t m_count;
     GLenum m_glTarget;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

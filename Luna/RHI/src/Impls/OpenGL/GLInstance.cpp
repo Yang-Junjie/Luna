@@ -10,10 +10,10 @@
 #include <windows.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 BackendType GLInstance::GetType() const
 {
-#ifdef CACAO_GLES
+#ifdef LUNA_RHI_GLES
     return BackendType::OpenGLES;
 #else
     return BackendType::OpenGL;
@@ -24,7 +24,7 @@ bool GLInstance::Initialize(const InstanceCreateInfo& createInfo)
 {
     m_createInfo = createInfo;
 
-#if defined(_WIN32) && !defined(CACAO_GLES)
+#if defined(_WIN32) && !defined(LUNA_RHI_GLES)
     HWND tmpWnd =
         CreateWindowExA(0, "STATIC", "", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
     if (!tmpWnd) {
@@ -94,4 +94,4 @@ Ref<ShaderCompiler> GLInstance::CreateShaderCompiler()
 {
     return ShaderCompiler::Create(BackendType::OpenGL);
 }
-} // namespace Cacao
+} // namespace luna::RHI

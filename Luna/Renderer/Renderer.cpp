@@ -26,61 +26,61 @@
 
 namespace {
 
-Cacao::Ref<Cacao::Adapter> selectAdapter(const std::vector<Cacao::Ref<Cacao::Adapter>>& adapters)
+luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters)
 {
     if (adapters.empty()) {
         return {};
     }
 
     const auto discrete_adapter =
-        std::find_if(adapters.begin(), adapters.end(), [](const Cacao::Ref<Cacao::Adapter>& adapter) {
-            return adapter && adapter->GetAdapterType() == Cacao::AdapterType::Discrete;
+        std::find_if(adapters.begin(), adapters.end(), [](const luna::RHI::Ref<luna::RHI::Adapter>& adapter) {
+            return adapter && adapter->GetAdapterType() == luna::RHI::AdapterType::Discrete;
         });
     return discrete_adapter != adapters.end() ? *discrete_adapter : adapters.front();
 }
 
-Cacao::SurfaceFormat chooseSurfaceFormat(const std::vector<Cacao::SurfaceFormat>& formats)
+luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats)
 {
-    const auto preferred = std::find_if(formats.begin(), formats.end(), [](const Cacao::SurfaceFormat& format) {
-        return format.format == Cacao::Format::BGRA8_UNORM && format.colorSpace == Cacao::ColorSpace::SRGB_NONLINEAR;
+    const auto preferred = std::find_if(formats.begin(), formats.end(), [](const luna::RHI::SurfaceFormat& format) {
+        return format.format == luna::RHI::Format::BGRA8_UNORM && format.colorSpace == luna::RHI::ColorSpace::SRGB_NONLINEAR;
     });
     if (preferred != formats.end()) {
         return *preferred;
     }
 
-    const auto fallback = std::find_if(formats.begin(), formats.end(), [](const Cacao::SurfaceFormat& format) {
-        return format.format == Cacao::Format::RGBA8_UNORM || format.format == Cacao::Format::BGRA8_UNORM;
+    const auto fallback = std::find_if(formats.begin(), formats.end(), [](const luna::RHI::SurfaceFormat& format) {
+        return format.format == luna::RHI::Format::RGBA8_UNORM || format.format == luna::RHI::Format::BGRA8_UNORM;
     });
     if (fallback != formats.end()) {
         return *fallback;
     }
 
-    return formats.empty() ? Cacao::SurfaceFormat{Cacao::Format::BGRA8_UNORM, Cacao::ColorSpace::SRGB_NONLINEAR}
+    return formats.empty() ? luna::RHI::SurfaceFormat{luna::RHI::Format::BGRA8_UNORM, luna::RHI::ColorSpace::SRGB_NONLINEAR}
                            : formats.front();
 }
 
-const char* presentModeToString(Cacao::PresentMode mode)
+const char* presentModeToString(luna::RHI::PresentMode mode)
 {
     switch (mode) {
-        case Cacao::PresentMode::Immediate:
+        case luna::RHI::PresentMode::Immediate:
             return "Immediate";
-        case Cacao::PresentMode::Mailbox:
+        case luna::RHI::PresentMode::Mailbox:
             return "Mailbox";
-        case Cacao::PresentMode::Fifo:
+        case luna::RHI::PresentMode::Fifo:
             return "Fifo";
-        case Cacao::PresentMode::FifoRelaxed:
+        case luna::RHI::PresentMode::FifoRelaxed:
             return "FifoRelaxed";
         default:
             return "Unknown";
     }
 }
 
-bool isPresentModeSupported(const std::vector<Cacao::PresentMode>& supported_modes, Cacao::PresentMode mode)
+bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)
 {
     return std::find(supported_modes.begin(), supported_modes.end(), mode) != supported_modes.end();
 }
 
-std::string describePresentModes(const std::vector<Cacao::PresentMode>& supported_modes)
+std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes)
 {
     if (supported_modes.empty()) {
         return "<none>";
@@ -96,48 +96,48 @@ std::string describePresentModes(const std::vector<Cacao::PresentMode>& supporte
     return result;
 }
 
-Cacao::PresentMode choosePresentMode(const std::vector<Cacao::PresentMode>& supported_modes,
-                                     Cacao::PresentMode requested_mode)
+luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
+                                     luna::RHI::PresentMode requested_mode)
 {
     if (isPresentModeSupported(supported_modes, requested_mode)) {
         return requested_mode;
     }
 
     switch (requested_mode) {
-        case Cacao::PresentMode::Mailbox:
+        case luna::RHI::PresentMode::Mailbox:
             for (const auto fallback_mode :
-                 std::array{Cacao::PresentMode::Immediate, Cacao::PresentMode::FifoRelaxed, Cacao::PresentMode::Fifo}) {
+                 std::array{luna::RHI::PresentMode::Immediate, luna::RHI::PresentMode::FifoRelaxed, luna::RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case Cacao::PresentMode::Immediate:
+        case luna::RHI::PresentMode::Immediate:
             for (const auto fallback_mode :
-                 std::array{Cacao::PresentMode::Mailbox, Cacao::PresentMode::FifoRelaxed, Cacao::PresentMode::Fifo}) {
+                 std::array{luna::RHI::PresentMode::Mailbox, luna::RHI::PresentMode::FifoRelaxed, luna::RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case Cacao::PresentMode::FifoRelaxed:
+        case luna::RHI::PresentMode::FifoRelaxed:
             for (const auto fallback_mode :
-                 std::array{Cacao::PresentMode::Fifo, Cacao::PresentMode::Immediate, Cacao::PresentMode::Mailbox}) {
+                 std::array{luna::RHI::PresentMode::Fifo, luna::RHI::PresentMode::Immediate, luna::RHI::PresentMode::Mailbox}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case Cacao::PresentMode::Fifo:
-            if (isPresentModeSupported(supported_modes, Cacao::PresentMode::FifoRelaxed)) {
-                return Cacao::PresentMode::FifoRelaxed;
+        case luna::RHI::PresentMode::Fifo:
+            if (isPresentModeSupported(supported_modes, luna::RHI::PresentMode::FifoRelaxed)) {
+                return luna::RHI::PresentMode::FifoRelaxed;
             }
             break;
         default:
             break;
     }
 
-    return supported_modes.empty() ? Cacao::PresentMode::Fifo : supported_modes.front();
+    return supported_modes.empty() ? luna::RHI::PresentMode::Fifo : supported_modes.front();
 }
 
 } // namespace
@@ -163,20 +163,20 @@ bool Renderer::init(Window& window, InitializationOptions options)
         return false;
     }
 
-    Cacao::NativeWindowHandle window_handle;
+    luna::RHI::NativeWindowHandle window_handle;
     window_handle.hWnd = glfwGetWin32Window(m_native_window);
     window_handle.hInst = GetModuleHandleW(nullptr);
 
     try {
-        Cacao::InstanceCreateInfo instance_info;
-        instance_info.type = Cacao::BackendType::Vulkan;
+        luna::RHI::InstanceCreateInfo instance_info;
+        instance_info.type = luna::RHI::BackendType::Vulkan;
         instance_info.applicationName = "Luna";
-        instance_info.enabledFeatures.push_back(Cacao::InstanceFeature::Surface);
+        instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::Surface);
 #ifndef NDEBUG
-        instance_info.enabledFeatures.push_back(Cacao::InstanceFeature::ValidationLayer);
+        instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::ValidationLayer);
 #endif
 
-        m_instance = Cacao::Instance::Create(instance_info);
+        m_instance = luna::RHI::Instance::Create(instance_info);
         m_surface = m_instance->CreateSurface(window_handle);
 
         const auto adapters = m_instance->EnumerateAdapters();
@@ -185,15 +185,15 @@ bool Renderer::init(Window& window, InitializationOptions options)
             throw std::runtime_error("No Vulkan adapter available");
         }
 
-        Cacao::DeviceCreateInfo device_info;
-        device_info.QueueRequests = {{Cacao::QueueType::Graphics, 1, 1.0f}};
+        luna::RHI::DeviceCreateInfo device_info;
+        device_info.QueueRequests = {{luna::RHI::QueueType::Graphics, 1, 1.0f}};
         device_info.CompatibleSurface = m_surface;
-        if (m_adapter->IsFeatureSupported(Cacao::DeviceFeature::SamplerAnisotropy)) {
-            device_info.EnabledFeatures.push_back(Cacao::DeviceFeature::SamplerAnisotropy);
+        if (m_adapter->IsFeatureSupported(luna::RHI::DeviceFeature::SamplerAnisotropy)) {
+            device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::SamplerAnisotropy);
         }
 
         m_device = m_adapter->CreateDevice(device_info);
-        m_graphics_queue = m_device->GetQueue(Cacao::QueueType::Graphics, 0);
+        m_graphics_queue = m_device->GetQueue(luna::RHI::QueueType::Graphics, 0);
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
@@ -237,7 +237,7 @@ void Renderer::shutdown()
     m_window = nullptr;
     m_native_window = nullptr;
     m_initialization_options = {};
-    m_surface_format = Cacao::Format::UNDEFINED;
+    m_surface_format = luna::RHI::Format::UNDEFINED;
     m_frames_in_flight = 0;
     m_frame_index = 0;
     m_image_index = 0;
@@ -300,7 +300,7 @@ void Renderer::startFrame()
         int acquired_image_index = -1;
         const auto acquire_result =
             m_swapchain->AcquireNextImage(m_synchronization, static_cast<int>(m_frame_index), acquired_image_index);
-        if (acquire_result != Cacao::Result::Success || acquired_image_index < 0) {
+        if (acquire_result != luna::RHI::Result::Success || acquired_image_index < 0) {
             throw std::runtime_error("Failed to acquire a swapchain image");
         }
 
@@ -333,8 +333,8 @@ void Renderer::renderFrame()
     const bool was_presented =
         m_image_index < m_swapchain_images_presented.size() ? m_swapchain_images_presented[m_image_index] : false;
     m_current_command_buffer->TransitionImage(back_buffer,
-                                              was_presented ? Cacao::ImageTransition::PresentToColorAttachment
-                                                            : Cacao::ImageTransition::UndefinedToColorAttachment);
+                                              was_presented ? luna::RHI::ImageTransition::PresentToColorAttachment
+                                                            : luna::RHI::ImageTransition::UndefinedToColorAttachment);
 
     m_scene_renderer.render(SceneRenderer::RenderContext{
         .device = m_device,
@@ -350,7 +350,7 @@ void Renderer::renderFrame()
         luna::rhi::ImGuiVulkanContext::RenderFrame(*m_current_command_buffer, back_buffer, extent.width, extent.height);
     }
 
-    m_current_command_buffer->TransitionImage(back_buffer, Cacao::ImageTransition::ColorAttachmentToPresent);
+    m_current_command_buffer->TransitionImage(back_buffer, luna::RHI::ImageTransition::ColorAttachmentToPresent);
     if (m_image_index < m_swapchain_images_presented.size()) {
         m_swapchain_images_presented[m_image_index] = true;
     }
@@ -366,7 +366,7 @@ void Renderer::endFrame()
         m_current_command_buffer->End();
         m_graphics_queue->Submit(m_current_command_buffer, m_synchronization, m_frame_index);
         const auto present_result = m_swapchain->Present(m_graphics_queue, m_synchronization, m_frame_index);
-        if (present_result == Cacao::Result::OutOfDate || present_result == Cacao::Result::Suboptimal) {
+        if (present_result == luna::RHI::Result::OutOfDate || present_result == luna::RHI::Result::Suboptimal) {
             m_resize_requested = true;
         }
     } catch (const std::exception& error) {
@@ -387,32 +387,32 @@ GLFWwindow* Renderer::getNativeWindow() const
     return m_native_window;
 }
 
-const Cacao::Ref<Cacao::Instance>& Renderer::getInstance() const
+const luna::RHI::Ref<luna::RHI::Instance>& Renderer::getInstance() const
 {
     return m_instance;
 }
 
-const Cacao::Ref<Cacao::Adapter>& Renderer::getAdapter() const
+const luna::RHI::Ref<luna::RHI::Adapter>& Renderer::getAdapter() const
 {
     return m_adapter;
 }
 
-const Cacao::Ref<Cacao::Device>& Renderer::getDevice() const
+const luna::RHI::Ref<luna::RHI::Device>& Renderer::getDevice() const
 {
     return m_device;
 }
 
-const Cacao::Ref<Cacao::Queue>& Renderer::getGraphicsQueue() const
+const luna::RHI::Ref<luna::RHI::Queue>& Renderer::getGraphicsQueue() const
 {
     return m_graphics_queue;
 }
 
-const Cacao::Ref<Cacao::Swapchain>& Renderer::getSwapchain() const
+const luna::RHI::Ref<luna::RHI::Swapchain>& Renderer::getSwapchain() const
 {
     return m_swapchain;
 }
 
-const Cacao::Ref<Cacao::Synchronization>& Renderer::getSynchronization() const
+const luna::RHI::Ref<luna::RHI::Synchronization>& Renderer::getSynchronization() const
 {
     return m_synchronization;
 }
@@ -465,7 +465,7 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     const auto requested_present_mode = m_initialization_options.present_mode;
     const auto selected_present_mode = choosePresentMode(supported_present_modes, requested_present_mode);
 
-    const Cacao::Extent2D clamped_extent{
+    const luna::RHI::Extent2D clamped_extent{
         std::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
         std::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
     };
@@ -486,14 +486,14 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
                        describePresentModes(supported_present_modes));
     }
 
-    m_swapchain = m_device->CreateSwapchain(Cacao::SwapchainBuilder()
+    m_swapchain = m_device->CreateSwapchain(luna::RHI::SwapchainBuilder()
                                                 .SetExtent(clamped_extent)
                                                 .SetFormat(surface_format.format)
                                                 .SetColorSpace(surface_format.colorSpace)
                                                 .SetPresentMode(selected_present_mode)
                                                 .SetMinImageCount(min_image_count)
                                                 .SetPreTransform(capabilities.currentTransform)
-                                                .SetUsage(Cacao::SwapchainUsageFlags::ColorAttachment)
+                                                .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment)
                                                 .SetSurface(m_surface)
                                                 .Build());
 
@@ -513,7 +513,7 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     }
 }
 
-Cacao::Extent2D Renderer::getFramebufferExtent() const
+luna::RHI::Extent2D Renderer::getFramebufferExtent() const
 {
     if (m_native_window == nullptr) {
         return {0, 0};

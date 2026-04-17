@@ -1,11 +1,11 @@
-#ifndef CACAO_D3D12BUFFER_H
-#define CACAO_D3D12BUFFER_H
+#ifndef LUNA_RHI_D3D12BUFFER_H
+#define LUNA_RHI_D3D12BUFFER_H
 #include "Buffer.h"
 #include "D3D12Common.h"
 #include "D3D12MemAlloc.h"
 
-namespace Cacao {
-class CACAO_API D3D12Buffer final : public Buffer {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12Buffer final : public Buffer {
 private:
     ComPtr<ID3D12Resource> m_resource;
     D3D12MA::Allocation* m_allocation = nullptr;
@@ -37,6 +37,6 @@ public:
     void Flush(uint64_t offset, uint64_t size) override;
     uint64_t GetDeviceAddress() const override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

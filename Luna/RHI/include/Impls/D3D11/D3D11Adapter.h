@@ -1,13 +1,13 @@
-#ifndef CACAO_D3D11ADAPTER_H
-#define CACAO_D3D11ADAPTER_H
+#ifndef LUNA_RHI_D3D11ADAPTER_H
+#define LUNA_RHI_D3D11ADAPTER_H
 #include "D3D11Common.h"
 
 #include <Adapter.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Instance;
 
-class CACAO_API D3D11Adapter : public Adapter {
+class LUNA_RHI_API D3D11Adapter : public Adapter {
 public:
     D3D11Adapter(Ref<D3D11Instance> instance, ComPtr<IDXGIAdapter1> adapter);
 
@@ -32,5 +32,5 @@ private:
     ComPtr<IDXGIAdapter1> m_adapter;
     DXGI_ADAPTER_DESC1 m_desc{};
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

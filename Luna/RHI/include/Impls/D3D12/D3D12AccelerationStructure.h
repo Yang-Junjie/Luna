@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12ACCELERATIONSTRUCTURE_H
-#define CACAO_D3D12ACCELERATIONSTRUCTURE_H
+#ifndef LUNA_RHI_D3D12ACCELERATIONSTRUCTURE_H
+#define LUNA_RHI_D3D12ACCELERATIONSTRUCTURE_H
 #include "D3D12Common.h"
 #include "RayTracing.h"
 
-namespace Cacao {
-class CACAO_API D3D12AccelerationStructure final : public AccelerationStructure {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12AccelerationStructure final : public AccelerationStructure {
 public:
     D3D12AccelerationStructure(const Ref<Device>& device, const AccelerationStructureCreateInfo& info);
     ~D3D12AccelerationStructure() override;
@@ -54,6 +54,6 @@ private:
     uint64_t m_resultSize = 0;
     Ref<Device> m_device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

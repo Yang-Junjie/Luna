@@ -1,13 +1,13 @@
-#ifndef CACAO_MTLDESCRIPTORSET_H
-#define CACAO_MTLDESCRIPTORSET_H
+#ifndef LUNA_RHI_MTLDESCRIPTORSET_H
+#define LUNA_RHI_MTLDESCRIPTORSET_H
 #ifdef __APPLE__
 #include "DescriptorPool.h"
 #include "DescriptorSet.h"
 #include "DescriptorSetLayout.h"
 #include "MTLCommon.h"
 
-namespace Cacao {
-class CACAO_API MTLDescriptorSetLayout final : public DescriptorSetLayout {
+namespace luna::RHI {
+class LUNA_RHI_API MTLDescriptorSetLayout final : public DescriptorSetLayout {
 public:
     MTLDescriptorSetLayout(const DescriptorSetLayoutCreateInfo& info)
         : m_info(info)
@@ -24,7 +24,7 @@ private:
     DescriptorSetLayoutCreateInfo m_info;
 };
 
-class CACAO_API MTLDescriptorPool final : public DescriptorPool {
+class LUNA_RHI_API MTLDescriptorPool final : public DescriptorPool {
 public:
     MTLDescriptorPool(const DescriptorPoolCreateInfo& info)
         : m_info(info)
@@ -39,7 +39,7 @@ private:
     DescriptorPoolCreateInfo m_info;
 };
 
-class CACAO_API MTLDescriptorSet final : public DescriptorSet {
+class LUNA_RHI_API MTLDescriptorSet final : public DescriptorSet {
 public:
     MTLDescriptorSet(const Ref<DescriptorSetLayout>& layout)
         : m_layout(layout)
@@ -60,6 +60,6 @@ public:
 private:
     Ref<DescriptorSetLayout> m_layout;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

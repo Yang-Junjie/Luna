@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D11SAMPLER_H
-#define CACAO_D3D11SAMPLER_H
+#ifndef LUNA_RHI_D3D11SAMPLER_H
+#define LUNA_RHI_D3D11SAMPLER_H
 #include "D3D11Common.h"
 
 #include <Sampler.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
 inline D3D11_TEXTURE_ADDRESS_MODE D3D11_ToAddressMode(SamplerAddressMode mode)
@@ -49,7 +49,7 @@ inline D3D11_COMPARISON_FUNC D3D11_ToCompareFunc(CompareOp op)
     }
 }
 
-class CACAO_API D3D11Sampler : public Sampler {
+class LUNA_RHI_API D3D11Sampler : public Sampler {
 public:
     D3D11Sampler(Ref<D3D11Device> device, const SamplerCreateInfo& createInfo);
 
@@ -67,5 +67,5 @@ private:
     SamplerCreateInfo m_info;
     ComPtr<ID3D11SamplerState> m_sampler;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

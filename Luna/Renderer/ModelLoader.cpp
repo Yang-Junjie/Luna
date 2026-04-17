@@ -31,7 +31,7 @@ ImageData createStubTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
     return ImageData{
         .ByteData = {r, g, b, a},
-        .ImageFormat = Cacao::Format::RGBA8_UNORM,
+        .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
         .Width = 1,
         .Height = 1,
     };

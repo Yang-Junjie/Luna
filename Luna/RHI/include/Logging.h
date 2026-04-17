@@ -1,11 +1,11 @@
-#ifndef CACAO_LOGGING_H
-#define CACAO_LOGGING_H
+#ifndef LUNA_RHI_LOGGING_H
+#define LUNA_RHI_LOGGING_H
 
 #include "Core.h"
 
 #include <string_view>
 
-namespace Cacao {
+namespace luna::RHI {
 
 enum class LogLevel : uint8_t {
     Trace = 0,
@@ -18,11 +18,11 @@ enum class LogLevel : uint8_t {
 
 using LogCallback = void (*)(LogLevel level, std::string_view message, void* userData);
 
-CACAO_API void SetLogCallback(LogCallback callback, void* userData = nullptr);
-CACAO_API void LogMessage(LogLevel level, std::string_view message);
-CACAO_API void SetVulkanValidationMessageFilterEnabled(bool enabled);
-CACAO_API bool IsVulkanValidationMessageFilterEnabled();
+LUNA_RHI_API void SetLogCallback(LogCallback callback, void* userData = nullptr);
+LUNA_RHI_API void LogMessage(LogLevel level, std::string_view message);
+LUNA_RHI_API void SetVulkanValidationMessageFilterEnabled(bool enabled);
+LUNA_RHI_API bool IsVulkanValidationMessageFilterEnabled();
 
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

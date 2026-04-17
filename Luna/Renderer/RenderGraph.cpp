@@ -13,7 +13,7 @@ void RenderGraph::addPass(RenderGraphPass pass)
     m_passes.push_back(std::move(pass));
 }
 
-void RenderGraph::execute(Cacao::CommandBufferEncoder& encoder) const
+void RenderGraph::execute(luna::RHI::CommandBufferEncoder& encoder) const
 {
     for (const auto& pass : m_passes) {
         if (pass.Execute) {

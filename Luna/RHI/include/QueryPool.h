@@ -1,10 +1,10 @@
-#ifndef CACAO_QUERYPOOL_H
-#define CACAO_QUERYPOOL_H
+#ifndef LUNA_RHI_QUERYPOOL_H
+#define LUNA_RHI_QUERYPOOL_H
 #include "Core.h"
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 enum class QueryType {
     Occlusion,
     Timestamp,
@@ -16,7 +16,7 @@ struct QueryPoolCreateInfo {
     uint32_t Count = 64;
 };
 
-class CACAO_API QueryPool : public std::enable_shared_from_this<QueryPool> {
+class LUNA_RHI_API QueryPool : public std::enable_shared_from_this<QueryPool> {
 public:
     virtual ~QueryPool() = default;
     virtual void Reset(uint32_t firstQuery, uint32_t count) = 0;
@@ -25,5 +25,5 @@ public:
     virtual QueryType GetType() const = 0;
     virtual uint32_t GetCount() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

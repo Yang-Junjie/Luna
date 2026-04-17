@@ -1,10 +1,10 @@
-#ifndef CACAO_GLSWAPCHAIN_H
-#define CACAO_GLSWAPCHAIN_H
+#ifndef LUNA_RHI_GLSWAPCHAIN_H
+#define LUNA_RHI_GLSWAPCHAIN_H
 #include "GLCommon.h"
 #include "Swapchain.h"
 
-namespace Cacao {
-class CACAO_API GLSwapchain final : public Swapchain {
+namespace luna::RHI {
+class LUNA_RHI_API GLSwapchain final : public Swapchain {
 public:
     GLSwapchain(const SwapchainCreateInfo& info);
     static Ref<GLSwapchain> Create(const SwapchainCreateInfo& info);
@@ -23,6 +23,6 @@ private:
     uint32_t m_currentIndex = 0;
     void* m_hdc = nullptr;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

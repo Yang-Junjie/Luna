@@ -1,5 +1,5 @@
-#ifndef CACAO_RAYTRACING_H
-#define CACAO_RAYTRACING_H
+#ifndef LUNA_RHI_RAYTRACING_H
+#define LUNA_RHI_RAYTRACING_H
 #include "Buffer.h"
 #include "CommandBufferEncoder.h"
 #include "Core.h"
@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 enum class AccelerationStructureType {
     TopLevel,
     BottomLevel
@@ -46,7 +46,7 @@ struct AccelerationStructureCreateInfo {
     bool PreferFastTrace = true;
 };
 
-class CACAO_API AccelerationStructure {
+class LUNA_RHI_API AccelerationStructure {
 public:
     virtual ~AccelerationStructure() = default;
     virtual AccelerationStructureType GetType() const = 0;
@@ -62,7 +62,7 @@ struct ShaderBindingTableCreateInfo {
     uint32_t CallableCount = 0;
 };
 
-class CACAO_API ShaderBindingTable {
+class LUNA_RHI_API ShaderBindingTable {
 public:
     virtual ~ShaderBindingTable() = default;
     virtual Ref<Buffer> GetBuffer() const = 0;
@@ -72,6 +72,6 @@ public:
     virtual uint64_t GetCallableOffset() const = 0;
     virtual uint32_t GetEntrySize() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

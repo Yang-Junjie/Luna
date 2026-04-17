@@ -1,6 +1,6 @@
 #include "CommandBufferEncoder.h"
 
-namespace Cacao {
+namespace luna::RHI {
 void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage,
                                            PipelineStage dstStage,
                                            std::span<const TextureBarrier> textureBarriers)
@@ -14,4 +14,4 @@ void CommandBufferEncoder::PipelineBarrier(PipelineStage srcStage,
 {
     PipelineBarrier(srcStage, dstStage, {}, bufferBarriers, {});
 }
-} // namespace Cacao
+} // namespace luna::RHI

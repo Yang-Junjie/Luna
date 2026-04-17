@@ -4,7 +4,7 @@
 #include "Impls/WebGPU/WGPUPipeline.h"
 #include "Impls/WebGPU/WGPUTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUCommandBufferEncoder::WGPUCommandBufferEncoder(::WGPUDevice device, CommandBufferType type)
     : m_wgpuDevice(device),
       m_type(type)
@@ -62,14 +62,14 @@ void WGPUCommandBufferEncoder::Begin(const CommandBufferBeginInfo& info)
     }
 
     WGPUCommandEncoderDescriptor desc = {};
-    desc.label = "CacaoCommandEncoder";
+    desc.label = "LunaRHICommandEncoder";
     m_encoder = wgpuDeviceCreateCommandEncoder(m_wgpuDevice, &desc);
 }
 
 void WGPUCommandBufferEncoder::End()
 {
     WGPUCommandBufferDescriptor desc = {};
-    desc.label = "CacaoCommandBuffer";
+    desc.label = "LunaRHICommandBuffer";
     m_commandBuffer = wgpuCommandEncoderFinish(m_encoder, &desc);
 }
 
@@ -415,4 +415,4 @@ void WGPUCommandBufferEncoder::BindRayTracingDescriptorSets(const Ref<RayTracing
 {}
 
 void WGPUCommandBufferEncoder::TraceRays(const Ref<ShaderBindingTable>&, uint32_t, uint32_t, uint32_t) {}
-} // namespace Cacao
+} // namespace luna::RHI

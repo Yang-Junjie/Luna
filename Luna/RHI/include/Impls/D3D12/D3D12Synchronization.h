@@ -1,11 +1,11 @@
-#ifndef CACAO_D3D12SYNCHRONIZATION_H
-#define CACAO_D3D12SYNCHRONIZATION_H
+#ifndef LUNA_RHI_D3D12SYNCHRONIZATION_H
+#define LUNA_RHI_D3D12SYNCHRONIZATION_H
 #include "D3D12Common.h"
 #include "Device.h"
 #include "Synchronization.h"
 
-namespace Cacao {
-class CACAO_API D3D12Synchronization : public Synchronization {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12Synchronization : public Synchronization {
 private:
     uint32_t m_maxFramesInFlight;
     std::vector<ComPtr<ID3D12Fence>> m_frameFences;
@@ -42,6 +42,6 @@ public:
         m_fenceValues[frameIndex]++;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

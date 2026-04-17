@@ -1,7 +1,7 @@
 #ifdef __APPLE__
 #include "Impls/Metal/MTLDescriptorSet.h"
 
-namespace Cacao
+namespace luna::RHI
 {
     Ref<DescriptorSet> MTLDescriptorPool::AllocateDescriptorSet(const Ref<DescriptorSetLayout>& layout)
     {

@@ -32,11 +32,11 @@ enum class ShaderLanguage {
 
 struct ShaderData {
     std::vector<uint32_t> Bytecode;
-    Cacao::ShaderStage Stage{Cacao::ShaderStage::None};
+    luna::RHI::ShaderStage Stage{luna::RHI::ShaderStage::None};
 
     bool isValid() const
     {
-        return !Bytecode.empty() && Stage != Cacao::ShaderStage::None;
+        return !Bytecode.empty() && Stage != luna::RHI::ShaderStage::None;
     }
 };
 

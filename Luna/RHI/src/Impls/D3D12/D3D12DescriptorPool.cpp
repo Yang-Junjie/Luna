@@ -3,7 +3,7 @@
 #include "Impls/D3D12/D3D12DescriptorSetLayout.h"
 #include "Impls/D3D12/D3D12Device.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12DescriptorPool::D3D12DescriptorPool(const Ref<Device>& device, const DescriptorPoolCreateInfo& info)
     : m_device(device)
 {
@@ -116,4 +116,4 @@ void D3D12DescriptorPool::Reset()
     m_cbvSrvUavOffset = 0;
     m_samplerOffset = 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -3,7 +3,7 @@
 #include "Impls/D3D12/D3D12Queue.h"
 #include "Impls/D3D12/D3D12Synchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Queue::D3D12Queue(const Ref<Device>& device, QueueType type, uint32_t index)
     : m_device(device),
       m_type(type),
@@ -88,4 +88,4 @@ void D3D12Queue::WaitForFence(uint64_t value)
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

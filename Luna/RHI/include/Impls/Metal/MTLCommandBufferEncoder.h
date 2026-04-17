@@ -1,11 +1,11 @@
-#ifndef CACAO_MTLCOMMANDBUFFERENCODER_H
-#define CACAO_MTLCOMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_MTLCOMMANDBUFFERENCODER_H
+#define LUNA_RHI_MTLCOMMANDBUFFERENCODER_H
 #ifdef __APPLE__
 #include "CommandBufferEncoder.h"
 #include "MTLCommon.h"
 
-namespace Cacao {
-class CACAO_API MTLCommandBufferEncoder final : public CommandBufferEncoder {
+namespace luna::RHI {
+class LUNA_RHI_API MTLCommandBufferEncoder final : public CommandBufferEncoder {
 public:
     MTLCommandBufferEncoder(const Ref<Device>& device, CommandBufferType type);
     ~MTLCommandBufferEncoder() override = default;
@@ -122,6 +122,6 @@ private:
     uint32_t m_indexBufferOffset = 0;
     bool m_indexIs32Bit = true;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

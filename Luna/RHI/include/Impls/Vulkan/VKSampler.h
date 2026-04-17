@@ -1,14 +1,14 @@
-#ifndef CACAO_VKSAMPLER_H
-#define CACAO_VKSAMPLER_H
+#ifndef LUNA_RHI_VKSAMPLER_H
+#define LUNA_RHI_VKSAMPLER_H
 #include "Sampler.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class VKDevice;
 
-class CACAO_API VKSampler : public Sampler {
+class LUNA_RHI_API VKSampler : public Sampler {
 private:
     vk::Sampler m_sampler;
     Ref<VKDevice> m_device;
@@ -26,5 +26,5 @@ public:
         return m_sampler;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

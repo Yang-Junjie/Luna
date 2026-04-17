@@ -1,15 +1,15 @@
-#ifndef CACAO_D3D11COMMANDBUFFERENCODER_H
-#define CACAO_D3D11COMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_D3D11COMMANDBUFFERENCODER_H
+#define LUNA_RHI_D3D11COMMANDBUFFERENCODER_H
 #include "D3D11Common.h"
 
 #include <CommandBufferEncoder.h>
 #include <unordered_set>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 class D3D11GraphicsPipeline;
 
-class CACAO_API D3D11CommandBufferEncoder : public CommandBufferEncoder {
+class LUNA_RHI_API D3D11CommandBufferEncoder : public CommandBufferEncoder {
 public:
     D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type);
 
@@ -116,5 +116,5 @@ private:
 #endif
     UINT m_currentVBStride = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

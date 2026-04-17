@@ -1,16 +1,16 @@
-#ifndef CACAO_VKBUFFER_H
-#define CACAO_VKBUFFER_H
+#ifndef LUNA_RHI_VKBUFFER_H
+#define LUNA_RHI_VKBUFFER_H
 #include "Buffer.h"
 #include "vk_mem_alloc.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 }
 
-namespace Cacao {
-class CACAO_API VKBuffer final : public Buffer {
+namespace luna::RHI {
+class LUNA_RHI_API VKBuffer final : public Buffer {
 private:
     vk::Buffer m_buffer;
     Ref<Device> m_device;
@@ -39,5 +39,5 @@ public:
         return m_buffer;
     }
 };
-}; // namespace Cacao
+}; // namespace luna::RHI
 #endif

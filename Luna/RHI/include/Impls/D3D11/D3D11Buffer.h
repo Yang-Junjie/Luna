@@ -1,13 +1,13 @@
-#ifndef CACAO_D3D11BUFFER_H
-#define CACAO_D3D11BUFFER_H
+#ifndef LUNA_RHI_D3D11BUFFER_H
+#define LUNA_RHI_D3D11BUFFER_H
 #include "D3D11Common.h"
 
 #include <Buffer.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11Buffer : public Buffer {
+class LUNA_RHI_API D3D11Buffer : public Buffer {
 public:
     D3D11Buffer(Ref<D3D11Device> device, const BufferCreateInfo& createInfo);
 
@@ -61,5 +61,5 @@ private:
     ComPtr<ID3D11ShaderResourceView> m_structuredSRV;
     uint32_t m_structuredStride = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

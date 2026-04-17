@@ -2,7 +2,7 @@
 #include "Impls/OpenGL/GLQueue.h"
 #include "Impls/OpenGL/GLSynchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLQueue::GLQueue() = default;
 
 Ref<GLQueue> GLQueue::Create(const Ref<GLDevice>&)
@@ -52,4 +52,4 @@ QueueType GLQueue::GetType() const
 {
     return QueueType::Graphics;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Buffer.h"
 #include "Impls/D3D12/D3D12Device.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Buffer::D3D12Buffer(const Ref<Device>& device, const BufferCreateInfo& info)
     : m_device(device),
       m_createInfo(info)
@@ -91,4 +91,4 @@ uint64_t D3D12Buffer::GetDeviceAddress() const
 {
     return m_resource ? m_resource->GetGPUVirtualAddress() : 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

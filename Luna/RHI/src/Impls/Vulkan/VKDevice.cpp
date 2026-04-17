@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <Impls/Vulkan/VKDevice.h>
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<VKDevice> VKDevice::Create(const Ref<Adapter>& adapter, const DeviceCreateInfo& createInfo)
 {
     auto device = CreateRef<VKDevice>(adapter, createInfo);
@@ -411,4 +411,4 @@ Ref<ShaderBindingTable> VKDevice::CreateShaderBindingTable(const Ref<RayTracingP
     return std::make_shared<VKShaderBindingTable>(
         shared_from_this(), vkPipeline->GetHandle(), rayGenCount, missCount, hitGroupCount, callableCount);
 }
-} // namespace Cacao
+} // namespace luna::RHI

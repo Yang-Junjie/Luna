@@ -19,23 +19,23 @@
 
 namespace {
 
-constexpr Cacao::PresentMode kRequestedPresentMode = Cacao::PresentMode::Immediate;
+constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
 
 std::filesystem::path projectRoot()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-const char* presentModeToString(Cacao::PresentMode mode)
+const char* presentModeToString(luna::RHI::PresentMode mode)
 {
     switch (mode) {
-        case Cacao::PresentMode::Immediate:
+        case luna::RHI::PresentMode::Immediate:
             return "Immediate";
-        case Cacao::PresentMode::Mailbox:
+        case luna::RHI::PresentMode::Mailbox:
             return "Mailbox";
-        case Cacao::PresentMode::Fifo:
+        case luna::RHI::PresentMode::Fifo:
             return "Fifo";
-        case Cacao::PresentMode::FifoRelaxed:
+        case luna::RHI::PresentMode::FifoRelaxed:
             return "FifoRelaxed";
         default:
             return "Unknown";
@@ -148,7 +148,7 @@ public:
 
         ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Luna ImGui Test");
-        ImGui::TextUnformatted("Backend: Cacao / Vulkan");
+        ImGui::TextUnformatted("Backend: Luna RHI / Vulkan");
         ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
         ImGui::Separator();
         ImGui::Text("Scene Source: %s", application.getAssetLabel().c_str());

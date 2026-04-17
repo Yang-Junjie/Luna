@@ -1,5 +1,5 @@
-#ifndef CACAO_BUILDERS_H
-#define CACAO_BUILDERS_H
+#ifndef LUNA_RHI_BUILDERS_H
+#define LUNA_RHI_BUILDERS_H
 #include "Buffer.h"
 #include "DescriptorPool.h"
 #include "DescriptorSetLayout.h"
@@ -9,7 +9,7 @@
 #include "Swapchain.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class BufferBuilder {
     BufferCreateInfo m_info;
 
@@ -684,5 +684,5 @@ public:
         return m_info;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

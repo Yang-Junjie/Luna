@@ -1,5 +1,5 @@
-#ifndef CACAO_MTL_DEVICE_H
-#define CACAO_MTL_DEVICE_H
+#ifndef LUNA_RHI_MTL_DEVICE_H
+#define LUNA_RHI_MTL_DEVICE_H
 
 #ifdef __APPLE__
 
@@ -9,10 +9,10 @@
 #import <Metal/Metal.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 class MTLAdapter;
 
-class CACAO_API MTLDevice final : public Device {
+class LUNA_RHI_API MTLDevice final : public Device {
 private:
     Ref<Adapter> m_parentAdapter;
 #ifdef __OBJC__
@@ -60,7 +60,7 @@ public:
     Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& info) override;
     Ref<Synchronization> CreateSynchronization(uint32_t maxFramesInFlight) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif // __APPLE__
 #endif

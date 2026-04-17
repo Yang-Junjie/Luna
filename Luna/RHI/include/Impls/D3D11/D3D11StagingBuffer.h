@@ -1,14 +1,14 @@
-#ifndef CACAO_D3D11STAGINGBUFFER_H
-#define CACAO_D3D11STAGINGBUFFER_H
+#ifndef LUNA_RHI_D3D11STAGINGBUFFER_H
+#define LUNA_RHI_D3D11STAGINGBUFFER_H
 #include "D3D11Common.h"
 #include "StagingBuffer.h"
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11StagingBufferPool final : public StagingBufferPool {
+class LUNA_RHI_API D3D11StagingBufferPool final : public StagingBufferPool {
 private:
     struct PoolEntry {
         ComPtr<ID3D11Buffer> buffer;
@@ -38,6 +38,6 @@ public:
         return m_usedSize;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

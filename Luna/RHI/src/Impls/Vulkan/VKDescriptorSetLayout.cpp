@@ -3,7 +3,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKSampler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static std::vector<vk::Sampler> ConvertSamplers(std::span<const Ref<Sampler>> samplers)
 {
     std::vector<vk::Sampler> vkSamplers;
@@ -52,4 +52,4 @@ Ref<VKDescriptorSetLayout> VKDescriptorSetLayout::Create(const Ref<Device>& devi
 {
     return CreateRef<VKDescriptorSetLayout>(device, info);
 }
-} // namespace Cacao
+} // namespace luna::RHI

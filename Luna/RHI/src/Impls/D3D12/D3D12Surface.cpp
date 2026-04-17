@@ -3,7 +3,7 @@
 
 #include <Device.h>
 
-namespace Cacao {
+namespace luna::RHI {
 SurfaceCapabilities D3D12Surface::GetCapabilities(const Ref<Adapter>& adapter)
 {
     RECT rect;
@@ -37,4 +37,4 @@ std::vector<PresentMode> D3D12Surface::GetSupportedPresentModes(const Ref<Adapte
 {
     return {PresentMode::Immediate, PresentMode::Fifo, PresentMode::Mailbox};
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12PIPELINELAYOUT_H
-#define CACAO_D3D12PIPELINELAYOUT_H
+#ifndef LUNA_RHI_D3D12PIPELINELAYOUT_H
+#define LUNA_RHI_D3D12PIPELINELAYOUT_H
 #include "D3D12Common.h"
 #include "PipelineLayout.h"
 
-namespace Cacao {
-class CACAO_API D3D12PipelineLayout : public PipelineLayout {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12PipelineLayout : public PipelineLayout {
 private:
     ComPtr<ID3D12RootSignature> m_rootSignature;
     Ref<Device> m_device;
@@ -30,6 +30,6 @@ public:
         return m_createInfo;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

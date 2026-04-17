@@ -1,16 +1,16 @@
-#ifndef CACAO_CACAOINSTANCE_H
-#define CACAO_CACAOINSTANCE_H
+#ifndef LUNA_RHI_INSTANCE_H
+#define LUNA_RHI_INSTANCE_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class ShaderCompiler;
 }
 
-namespace Cacao {
+namespace luna::RHI {
 class Surface;
 }
 
-namespace Cacao {
+namespace luna::RHI {
 class Adapter;
 
 struct NativeWindowHandle {
@@ -81,7 +81,7 @@ struct InstanceCreateInfo {
     std::vector<InstanceFeature> enabledFeatures;
 };
 
-class CACAO_API Instance : public std::enable_shared_from_this<Instance> {
+class LUNA_RHI_API Instance : public std::enable_shared_from_this<Instance> {
 public:
     virtual ~Instance() = default;
     static Ref<Instance> Create(const InstanceCreateInfo& createInfo);
@@ -138,5 +138,5 @@ template <> struct to_string<InstanceFeature> {
         }
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

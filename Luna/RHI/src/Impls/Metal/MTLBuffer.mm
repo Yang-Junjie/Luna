@@ -3,7 +3,7 @@
 #include "Impls/Metal/MTLBuffer.h"
 #include <cstring>
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLBufferImpl::MTLBufferImpl(id device, const BufferCreateInfo& info)
         : m_createInfo(info)

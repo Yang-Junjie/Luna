@@ -3,7 +3,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKPipelineLayout.h"
 
-namespace Cacao {
+namespace luna::RHI {
 VKPipelineLayout::VKPipelineLayout(const Ref<Device>& device, const PipelineLayoutCreateInfo& info)
 {
     if (!device) {
@@ -49,4 +49,4 @@ Ref<VKPipelineLayout> VKPipelineLayout::Create(const Ref<Device>& device, const 
 {
     return CreateRef<VKPipelineLayout>(device, info);
 }
-} // namespace Cacao
+} // namespace luna::RHI

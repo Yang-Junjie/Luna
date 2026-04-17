@@ -1,3 +1,3 @@
 #include "DescriptorPool.h"
 
-namespace Cacao {}
+namespace luna::RHI {}

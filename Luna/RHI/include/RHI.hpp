@@ -1,5 +1,5 @@
-#ifndef CACAO_CACAO_HPP
-#define CACAO_CACAO_HPP
+#ifndef LUNA_RHI_HPP
+#define LUNA_RHI_HPP
 #include "Adapter.h"
 #include "Barrier.h"
 #include "Buffer.h"

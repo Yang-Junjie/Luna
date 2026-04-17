@@ -1,13 +1,13 @@
-#ifndef CACAO_GLTEXTURE_H
-#define CACAO_GLTEXTURE_H
+#ifndef LUNA_RHI_GLTEXTURE_H
+#define LUNA_RHI_GLTEXTURE_H
 #include "GLCommon.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class GLTexture;
 
-class CACAO_API GLTextureView : public CacaoTextureView {
+class LUNA_RHI_API GLTextureView : public TextureView {
 public:
     GLTextureView(const Ref<Texture>& texture, const TextureViewDesc& desc);
     static Ref<GLTextureView> Create(const Ref<Texture>& texture, const TextureViewDesc& desc);
@@ -19,7 +19,7 @@ private:
     TextureViewDesc m_desc;
 };
 
-class CACAO_API GLTexture final : public Texture {
+class LUNA_RHI_API GLTexture final : public Texture {
 public:
     GLTexture(const Ref<Device>& device, const TextureCreateInfo& info);
     static Ref<GLTexture> Create(const Ref<Device>& device, const TextureCreateInfo& info);
@@ -35,8 +35,8 @@ public:
     SampleCount GetSampleCount() const override;
     TextureUsageFlags GetUsage() const override;
     ResourceState GetCurrentState() const override;
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
-    Ref<CacaoTextureView> GetDefaultView() override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> GetDefaultView() override;
     void CreateDefaultViewIfNeeded() override;
 
     GLuint GetHandle() const
@@ -64,6 +64,6 @@ private:
     TextureCreateInfo m_createInfo;
     Ref<GLTextureView> m_defaultView;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

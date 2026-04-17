@@ -1,6 +1,6 @@
 #include "Impls/WebGPU/WGPUTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 // --- WGPUTextureViewImpl ---
 
 WGPUTextureViewImpl::WGPUTextureViewImpl(::WGPUTextureView view,
@@ -118,7 +118,7 @@ ResourceState WGPUTextureImpl::GetCurrentState() const
     return m_currentState;
 }
 
-Ref<CacaoTextureView> WGPUTextureImpl::CreateView(const TextureViewDesc& desc)
+Ref<TextureView> WGPUTextureImpl::CreateView(const TextureViewDesc& desc)
 {
     WGPUTextureViewDescriptor viewDesc = {};
     viewDesc.format = (desc.FormatOverride != Format::UNDEFINED) ? ToWGPUFormat(desc.FormatOverride)
@@ -145,7 +145,7 @@ Ref<CacaoTextureView> WGPUTextureImpl::CreateView(const TextureViewDesc& desc)
     return std::make_shared<WGPUTextureViewImpl>(nativeView, shared_from_this(), desc);
 }
 
-Ref<CacaoTextureView> WGPUTextureImpl::GetDefaultView()
+Ref<TextureView> WGPUTextureImpl::GetDefaultView()
 {
     return m_defaultView;
 }
@@ -167,4 +167,4 @@ void WGPUTextureImpl::CreateDefaultViewIfNeeded()
 
     m_defaultView = CreateView(desc);
 }
-} // namespace Cacao
+} // namespace luna::RHI

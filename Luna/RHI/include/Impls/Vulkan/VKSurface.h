@@ -1,16 +1,16 @@
-#ifndef CACAO_VKSURFACE_H
-#define CACAO_VKSURFACE_H
+#ifndef LUNA_RHI_VKSURFACE_H
+#define LUNA_RHI_VKSURFACE_H
 #include "Surface.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class VKQueue;
-} // namespace Cacao
+} // namespace luna::RHI
 
-namespace Cacao {
-class CACAO_API VKSurface : public Surface {
+namespace luna::RHI {
+class LUNA_RHI_API VKSurface : public Surface {
     vk::SurfaceKHR m_surface;
     SurfaceCapabilities m_surfaceCapabilities;
     std::vector<SurfaceFormat> m_surfaceFormats;
@@ -30,5 +30,5 @@ public:
     uint32_t GetPresentQueueFamilyIndex(const Ref<Adapter>& adapter) const;
     Ref<Queue> GetPresentQueue(const Ref<Device>& device) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

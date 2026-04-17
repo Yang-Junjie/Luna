@@ -12,7 +12,7 @@
 #import <Metal/Metal.h>
 #include <iostream>
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLDevice::MTLDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
         : m_parentAdapter(adapter)

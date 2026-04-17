@@ -1,10 +1,10 @@
-#ifndef CACAO_CACAOBARRIER_H
-#define CACAO_CACAOBARRIER_H
+#ifndef LUNA_RHI_BARRIER_H
+#define LUNA_RHI_BARRIER_H
 #include "Core.h"
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class Buffer;
 class Texture;
 
@@ -127,5 +127,5 @@ struct TextureBarrier {
     uint32_t SrcQueueFamily = UINT32_MAX;
     uint32_t DstQueueFamily = UINT32_MAX;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

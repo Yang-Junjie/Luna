@@ -1,7 +1,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKShaderModule.h"
 
-Cacao::VKShaderModule::VKShaderModule(const Ref<Device>& device, const ShaderCreateInfo& info, const ShaderBlob& blob)
+luna::RHI::VKShaderModule::VKShaderModule(const Ref<Device>& device, const ShaderCreateInfo& info, const ShaderBlob& blob)
     : m_shaderBlob(blob),
       m_createInfo(info)
 {
@@ -24,28 +24,28 @@ Cacao::VKShaderModule::VKShaderModule(const Ref<Device>& device, const ShaderCre
     }
 }
 
-Cacao::Ref<Cacao::VKShaderModule>
-    Cacao::VKShaderModule::Create(const Ref<Device>& device, const ShaderCreateInfo& info, const ShaderBlob& blob)
+luna::RHI::Ref<luna::RHI::VKShaderModule>
+    luna::RHI::VKShaderModule::Create(const Ref<Device>& device, const ShaderCreateInfo& info, const ShaderBlob& blob)
 {
     return CreateRef<VKShaderModule>(device, info, blob);
 }
 
-const std::string& Cacao::VKShaderModule::GetEntryPoint() const
+const std::string& luna::RHI::VKShaderModule::GetEntryPoint() const
 {
     return m_createInfo.EntryPoint;
 }
 
-Cacao::ShaderStage Cacao::VKShaderModule::GetStage() const
+luna::RHI::ShaderStage luna::RHI::VKShaderModule::GetStage() const
 {
     return m_createInfo.Stage;
 }
 
-const Cacao::ShaderBlob& Cacao::VKShaderModule::GetBlob() const
+const luna::RHI::ShaderBlob& luna::RHI::VKShaderModule::GetBlob() const
 {
     return m_shaderBlob;
 }
 
-Cacao::VKShaderModule::~VKShaderModule()
+luna::RHI::VKShaderModule::~VKShaderModule()
 {
     if (m_module && m_device) {
         m_device->GetHandle().destroyShaderModule(m_module);

@@ -4,7 +4,7 @@
 
 #include <Impls/Vulkan/VKAdapter.h>
 
-namespace Cacao {
+namespace luna::RHI {
 uint32_t VKAdapter::GetTotalGPUMemory() const
 {
     vk::PhysicalDeviceMemoryProperties memoryProperties = m_physicalDevice.getMemoryProperties();
@@ -206,4 +206,4 @@ DeviceLimits VKAdapter::QueryLimits() const
     limits.supportsStorageBufferWriteInGraphics = true;
     return limits;
 }
-} // namespace Cacao
+} // namespace luna::RHI

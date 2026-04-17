@@ -1,13 +1,13 @@
-#ifndef CACAO_D3D11SWAPCHAIN_H
-#define CACAO_D3D11SWAPCHAIN_H
+#ifndef LUNA_RHI_D3D11SWAPCHAIN_H
+#define LUNA_RHI_D3D11SWAPCHAIN_H
 #include "D3D11Common.h"
 
 #include <Swapchain.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11Swapchain : public Swapchain {
+class LUNA_RHI_API D3D11Swapchain : public Swapchain {
 public:
     D3D11Swapchain(Ref<D3D11Device> device, const SwapchainCreateInfo& createInfo);
 
@@ -54,5 +54,5 @@ private:
     Format m_format = Format::BGRA8_UNORM;
     PresentMode m_presentMode = PresentMode::Mailbox;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

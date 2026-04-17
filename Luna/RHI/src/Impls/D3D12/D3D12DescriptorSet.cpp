@@ -6,7 +6,7 @@
 #include "Impls/D3D12/D3D12Sampler.h"
 #include "Impls/D3D12/D3D12Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12DescriptorSet::D3D12DescriptorSet(const Ref<Device>& device,
                                        D3D12_GPU_DESCRIPTOR_HANDLE cbvGpu,
                                        D3D12_CPU_DESCRIPTOR_HANDLE cbvCpu,
@@ -180,4 +180,4 @@ void D3D12DescriptorSet::WriteAccelerationStructure(const AccelerationStructureW
 
     d3dDevice->GetHandle()->CreateShaderResourceView(nullptr, &srvDesc, dest);
 }
-} // namespace Cacao
+} // namespace luna::RHI

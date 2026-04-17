@@ -1,11 +1,11 @@
-#ifndef CACAO_D3D11INSTANCE_H
-#define CACAO_D3D11INSTANCE_H
+#ifndef LUNA_RHI_D3D11INSTANCE_H
+#define LUNA_RHI_D3D11INSTANCE_H
 #include "D3D11Common.h"
 
 #include <Instance.h>
 
-namespace Cacao {
-class CACAO_API D3D11Instance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API D3D11Instance : public Instance {
 public:
     [[nodiscard]] BackendType GetType() const override
     {
@@ -28,5 +28,5 @@ private:
     InstanceCreateInfo m_createInfo;
     bool m_debugEnabled = false;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

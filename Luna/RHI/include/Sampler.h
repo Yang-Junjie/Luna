@@ -1,9 +1,9 @@
-#ifndef CACAO_CACAOSAMPLER_H
-#define CACAO_CACAOSAMPLER_H
+#ifndef LUNA_RHI_SAMPLER_H
+#define LUNA_RHI_SAMPLER_H
 #include "Core.h"
 #include "PipelineDefs.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class Filter {
     Nearest,
     Linear
@@ -47,10 +47,10 @@ struct SamplerCreateInfo {
     std::string Name;
 };
 
-class CACAO_API Sampler : public std::enable_shared_from_this<Sampler> {
+class LUNA_RHI_API Sampler : public std::enable_shared_from_this<Sampler> {
 public:
     virtual ~Sampler() = default;
     virtual const SamplerCreateInfo& GetInfo() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

@@ -8,7 +8,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 #include <iostream>
 
-namespace Cacao
+namespace luna::RHI
 {
     BackendType MTLInstance::GetType() const { return BackendType::Metal; }
 

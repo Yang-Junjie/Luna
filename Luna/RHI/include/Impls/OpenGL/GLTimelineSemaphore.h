@@ -1,13 +1,13 @@
-#ifndef CACAO_GLTIMELINESEMAPHORE_H
-#define CACAO_GLTIMELINESEMAPHORE_H
+#ifndef LUNA_RHI_GLTIMELINESEMAPHORE_H
+#define LUNA_RHI_GLTIMELINESEMAPHORE_H
 #include "GLCommon.h"
 #include "Synchronization.h"
 
 #include <map>
 #include <mutex>
 
-namespace Cacao {
-class CACAO_API GLTimelineSemaphore final : public TimelineSemaphore {
+namespace luna::RHI {
+class LUNA_RHI_API GLTimelineSemaphore final : public TimelineSemaphore {
 public:
     GLTimelineSemaphore(uint64_t initialValue = 0);
     ~GLTimelineSemaphore() override;
@@ -25,6 +25,6 @@ private:
     std::map<uint64_t, GLsync> m_fences;
     mutable std::mutex m_mutex;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

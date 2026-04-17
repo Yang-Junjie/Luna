@@ -1,5 +1,5 @@
-#ifndef CACAO_GLSURFACE_H
-#define CACAO_GLSURFACE_H
+#ifndef LUNA_RHI_GLSURFACE_H
+#define LUNA_RHI_GLSURFACE_H
 #include "GLCommon.h"
 #include "Instance.h"
 #include "Surface.h"
@@ -11,8 +11,8 @@
 #include <windows.h>
 #endif
 
-namespace Cacao {
-class CACAO_API GLSurface final : public Surface {
+namespace luna::RHI {
+class LUNA_RHI_API GLSurface final : public Surface {
 public:
     GLSurface(const NativeWindowHandle& windowHandle);
     static Ref<GLSurface> Create(const NativeWindowHandle& windowHandle);
@@ -38,6 +38,6 @@ private:
     HGLRC m_context = nullptr;
 #endif
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

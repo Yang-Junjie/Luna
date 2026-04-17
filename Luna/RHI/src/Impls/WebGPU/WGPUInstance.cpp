@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUInstance::~WGPUInstance()
 {
     if (m_instance) {
@@ -90,4 +90,4 @@ Ref<ShaderCompiler> WGPUInstance::CreateShaderCompiler()
 {
     return ShaderCompiler::Create(BackendType::WebGPU);
 }
-} // namespace Cacao
+} // namespace luna::RHI

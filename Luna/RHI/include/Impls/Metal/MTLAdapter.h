@@ -1,5 +1,5 @@
-#ifndef CACAO_MTL_ADAPTER_H
-#define CACAO_MTL_ADAPTER_H
+#ifndef LUNA_RHI_MTL_ADAPTER_H
+#define LUNA_RHI_MTL_ADAPTER_H
 
 #ifdef __APPLE__
 
@@ -9,10 +9,10 @@
 #import <Metal/Metal.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 class MTLInstance;
 
-class CACAO_API MTLAdapter : public Adapter {
+class LUNA_RHI_API MTLAdapter : public Adapter {
 private:
     Ref<MTLInstance> m_instance;
 #ifdef __OBJC__
@@ -41,7 +41,7 @@ public:
     }
 #endif
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif // __APPLE__
 #endif

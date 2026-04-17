@@ -1,5 +1,5 @@
-#ifndef CACAO_VKINSTANCE_H
-#define CACAO_VKINSTANCE_H
+#ifndef LUNA_RHI_VKINSTANCE_H
+#define LUNA_RHI_VKINSTANCE_H
 #if defined(__ANDROID__)
 #include <android/native_window.h>
 #elif defined(_WIN32)
@@ -39,8 +39,8 @@
 #include <Instance.h>
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
-class CACAO_API VKInstance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API VKInstance : public Instance {
 private:
     vk::Instance m_instance;
     VkDebugUtilsMessengerEXT m_debug_messenger = VK_NULL_HANDLE;
@@ -68,5 +68,5 @@ public:
         return m_instance;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

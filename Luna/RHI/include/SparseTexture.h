@@ -1,12 +1,12 @@
-#ifndef CACAO_SPARSE_TEXTURE_H
-#define CACAO_SPARSE_TEXTURE_H
+#ifndef LUNA_RHI_SPARSE_TEXTURE_H
+#define LUNA_RHI_SPARSE_TEXTURE_H
 #include "Core.h"
 #include "Texture.h"
 
 #include <memory>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 struct TileRegion {
     uint32_t X = 0, Y = 0, Z = 0;
     uint32_t Width = 1, Height = 1, Depth = 1;
@@ -30,7 +30,7 @@ struct TileMapping {
     bool Mapped = true;
 };
 
-class CACAO_API SparseTexture {
+class LUNA_RHI_API SparseTexture {
 public:
     virtual ~SparseTexture() = default;
     virtual Ref<Texture> GetTexture() const = 0;
@@ -39,6 +39,6 @@ public:
     virtual void UpdateTileMappings(const std::vector<TileMapping>& mappings) = 0;
     virtual uint64_t GetTileMemorySize() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

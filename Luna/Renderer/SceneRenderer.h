@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class Buffer;
 class CommandBufferEncoder;
 class DescriptorPool;
@@ -24,7 +24,7 @@ class PipelineLayout;
 class Sampler;
 class ShaderModule;
 class Texture;
-} // namespace Cacao
+} // namespace luna::RHI
 
 namespace luna {
 
@@ -43,10 +43,10 @@ public:
     };
 
     struct RenderContext {
-        Cacao::Ref<Cacao::Device> device;
-        Cacao::Ref<Cacao::CommandBufferEncoder> command_buffer;
-        Cacao::Ref<Cacao::Texture> color_target;
-        Cacao::Format color_format{Cacao::Format::UNDEFINED};
+        luna::RHI::Ref<luna::RHI::Device> device;
+        luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer;
+        luna::RHI::Ref<luna::RHI::Texture> color_target;
+        luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         uint32_t framebuffer_width{0};
         uint32_t framebuffer_height{0};
@@ -76,15 +76,15 @@ private:
     };
 
     struct UploadedMesh {
-        Cacao::Ref<Cacao::Buffer> vertex_buffer;
-        Cacao::Ref<Cacao::Buffer> index_buffer;
+        luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
+        luna::RHI::Ref<luna::RHI::Buffer> index_buffer;
         uint32_t index_count{0};
     };
 
     struct UploadedMaterial {
-        Cacao::Ref<Cacao::Texture> albedo_texture;
-        Cacao::Ref<Cacao::Buffer> staging_buffer;
-        Cacao::Ref<Cacao::DescriptorSet> descriptor_set;
+        luna::RHI::Ref<luna::RHI::Texture> albedo_texture;
+        luna::RHI::Ref<luna::RHI::Buffer> staging_buffer;
+        luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
         bool uploaded{false};
     };
 
@@ -97,7 +97,7 @@ private:
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
-    void uploadMaterialIfNeeded(Cacao::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
+    void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
 
 private:
     Camera m_camera{};
@@ -106,16 +106,16 @@ private:
     std::unordered_map<const Material*, UploadedMaterial> m_uploaded_materials;
     Material m_default_material;
     ShaderPaths m_shader_paths{};
-    Cacao::Ref<Cacao::Device> m_device;
-    Cacao::Ref<Cacao::GraphicsPipeline> m_pipeline;
-    Cacao::Ref<Cacao::PipelineLayout> m_pipeline_layout;
-    Cacao::Ref<Cacao::DescriptorSetLayout> m_material_layout;
-    Cacao::Ref<Cacao::DescriptorPool> m_descriptor_pool;
-    Cacao::Ref<Cacao::Sampler> m_material_sampler;
-    Cacao::Ref<Cacao::ShaderModule> m_vertex_shader;
-    Cacao::Ref<Cacao::ShaderModule> m_fragment_shader;
-    Cacao::Ref<Cacao::Texture> m_depth_texture;
-    Cacao::Format m_surface_format{Cacao::Format::UNDEFINED};
+    luna::RHI::Ref<luna::RHI::Device> m_device;
+    luna::RHI::Ref<luna::RHI::GraphicsPipeline> m_pipeline;
+    luna::RHI::Ref<luna::RHI::PipelineLayout> m_pipeline_layout;
+    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_material_layout;
+    luna::RHI::Ref<luna::RHI::DescriptorPool> m_descriptor_pool;
+    luna::RHI::Ref<luna::RHI::Sampler> m_material_sampler;
+    luna::RHI::Ref<luna::RHI::ShaderModule> m_vertex_shader;
+    luna::RHI::Ref<luna::RHI::ShaderModule> m_fragment_shader;
+    luna::RHI::Ref<luna::RHI::Texture> m_depth_texture;
+    luna::RHI::Format m_surface_format{luna::RHI::Format::UNDEFINED};
     uint32_t m_framebuffer_width{0};
     uint32_t m_framebuffer_height{0};
     bool m_depth_texture_initialized{false};

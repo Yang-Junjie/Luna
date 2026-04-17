@@ -1,12 +1,12 @@
-#ifndef CACAO_D3D12SWAPCHAIN_H
-#define CACAO_D3D12SWAPCHAIN_H
+#ifndef LUNA_RHI_D3D12SWAPCHAIN_H
+#define LUNA_RHI_D3D12SWAPCHAIN_H
 #include "D3D12Common.h"
 #include "Swapchain.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D12Queue;
 
-class CACAO_API D3D12Swapchain final : public Swapchain {
+class LUNA_RHI_API D3D12Swapchain final : public Swapchain {
 private:
     ComPtr<IDXGISwapChain4> m_swapchain;
     std::vector<Ref<Texture>> m_backBuffers;
@@ -37,6 +37,6 @@ public:
     PresentMode GetPresentMode() const override;
     Result AcquireNextImage(const Ref<Synchronization>& sync, int idx, int& out) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -11,7 +11,7 @@ namespace luna::rhi {
 
 struct RenderGraphPass {
     std::string Name;
-    std::function<void(Cacao::CommandBufferEncoder&)> Execute;
+    std::function<void(luna::RHI::CommandBufferEncoder&)> Execute;
 };
 
 class RenderGraph {
@@ -22,7 +22,7 @@ public:
     explicit RenderGraph(PassList passes);
 
     void addPass(RenderGraphPass pass);
-    void execute(Cacao::CommandBufferEncoder& encoder) const;
+    void execute(luna::RHI::CommandBufferEncoder& encoder) const;
 
     const RenderGraphPass* findPass(std::string_view name) const;
     RenderGraphPass* findPass(std::string_view name);

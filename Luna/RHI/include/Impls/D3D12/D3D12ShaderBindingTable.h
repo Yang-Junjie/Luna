@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12SBT_H
-#define CACAO_D3D12SBT_H
+#ifndef LUNA_RHI_D3D12SBT_H
+#define LUNA_RHI_D3D12SBT_H
 #include "D3D12Common.h"
 #include "RayTracing.h"
 
-namespace Cacao {
-class CACAO_API D3D12ShaderBindingTable final : public ShaderBindingTable {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12ShaderBindingTable final : public ShaderBindingTable {
 public:
     D3D12ShaderBindingTable(const Ref<Device>& device,
                             ID3D12StateObject* rtPSO,
@@ -54,6 +54,6 @@ private:
     uint64_t m_hitGroupOffset = 0;
     uint64_t m_callableOffset = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

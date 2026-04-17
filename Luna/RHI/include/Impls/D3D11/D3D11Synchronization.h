@@ -1,12 +1,12 @@
-#ifndef CACAO_D3D11SYNCHRONIZATION_H
-#define CACAO_D3D11SYNCHRONIZATION_H
+#ifndef LUNA_RHI_D3D11SYNCHRONIZATION_H
+#define LUNA_RHI_D3D11SYNCHRONIZATION_H
 #include "D3D11Common.h"
 #include "Synchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11Synchronization : public Synchronization {
+class LUNA_RHI_API D3D11Synchronization : public Synchronization {
 private:
     uint32_t m_maxFramesInFlight;
     std::vector<ComPtr<ID3D11Query>> m_eventQueries;
@@ -26,6 +26,6 @@ public:
     void WaitIdle() const override;
     void SignalFrame(uint32_t frameIndex);
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

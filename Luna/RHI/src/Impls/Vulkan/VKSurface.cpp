@@ -4,7 +4,7 @@
 #include <Impls/Vulkan/VKAdapter.h>
 #include <Impls/Vulkan/VKSurface.h>
 
-namespace Cacao {
+namespace luna::RHI {
 VKSurface::VKSurface(const vk::SurfaceKHR& surface)
     : m_surface(surface)
 {
@@ -213,4 +213,4 @@ Ref<Queue> VKSurface::GetPresentQueue(const Ref<Device>& device)
     vk::Queue vkQueue = std::dynamic_pointer_cast<VKDevice>(device)->GetHandle().getQueue(presentQueueFamilyIndex, 0);
     return VKQueue::Create(device, vkQueue, QueueType::Present, 0);
 }
-} // namespace Cacao
+} // namespace luna::RHI

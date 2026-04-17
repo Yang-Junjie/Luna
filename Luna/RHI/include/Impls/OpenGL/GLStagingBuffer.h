@@ -1,10 +1,10 @@
-#ifndef CACAO_GLSTAGINGBUFFER_H
-#define CACAO_GLSTAGINGBUFFER_H
+#ifndef LUNA_RHI_GLSTAGINGBUFFER_H
+#define LUNA_RHI_GLSTAGINGBUFFER_H
 #include "GLCommon.h"
 
 #include <cstdint>
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLStagingAllocation {
     uint64_t offset = 0;
     uint64_t size = 0;
@@ -12,7 +12,7 @@ struct GLStagingAllocation {
     GLuint buffer = 0;
 };
 
-class CACAO_API GLStagingBuffer {
+class LUNA_RHI_API GLStagingBuffer {
 public:
     GLStagingBuffer(uint64_t capacity);
     ~GLStagingBuffer();
@@ -41,6 +41,6 @@ private:
     uint64_t m_capacity;
     uint64_t m_offset = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

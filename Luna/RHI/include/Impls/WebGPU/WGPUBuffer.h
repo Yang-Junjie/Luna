@@ -1,13 +1,13 @@
-#ifndef CACAO_WGPU_BUFFER_H
-#define CACAO_WGPU_BUFFER_H
+#ifndef LUNA_RHI_WGPU_BUFFER_H
+#define LUNA_RHI_WGPU_BUFFER_H
 
 #include "Buffer.h"
 #include "WGPUCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUDevice;
 
-class CACAO_API WGPUBufferImpl final : public Buffer {
+class LUNA_RHI_API WGPUBufferImpl final : public Buffer {
 private:
     ::WGPUBuffer m_buffer = nullptr;
     ::WGPUDevice m_wgpuDevice = nullptr;
@@ -36,6 +36,6 @@ public:
         return m_buffer;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

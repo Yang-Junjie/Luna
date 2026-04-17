@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <fstream>
 
-namespace Cacao {
+namespace luna::RHI {
 GLPipelineCache::GLPipelineCache(const std::string& cacheDir)
     : m_cacheDir(cacheDir)
 {
@@ -116,4 +116,4 @@ void GLPipelineCache::LoadFromDisk()
         m_cache[key] = std::move(binary);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

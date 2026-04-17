@@ -1,7 +1,7 @@
-#ifndef CACAO_GLCOMMON_H
-#define CACAO_GLCOMMON_H
+#ifndef LUNA_RHI_GLCOMMON_H
+#define LUNA_RHI_GLCOMMON_H
 
-#ifdef CACAO_GLES
+#ifdef LUNA_RHI_GLES
 #include <GLES2/gl2ext.h>
 #include <GLES3/gl32.h>
 #else
@@ -11,7 +11,7 @@
 #include <Barrier.h>
 #include <Core.h>
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLFormatInfo {
     GLenum internalFormat;
     GLenum format;
@@ -80,6 +80,6 @@ inline GLenum PrimitiveTopologyToGL(uint32_t topology)
 }
 
 inline void TransitionResourceState(GLenum, GLenum) {}
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

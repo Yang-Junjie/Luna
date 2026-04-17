@@ -1,3 +1,3 @@
 #include "DescriptorSetLayout.h"
 
-namespace Cacao {}
+namespace luna::RHI {}

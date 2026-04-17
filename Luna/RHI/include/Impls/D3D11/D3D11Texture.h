@@ -1,14 +1,14 @@
-#ifndef CACAO_D3D11TEXTURE_H
-#define CACAO_D3D11TEXTURE_H
+#ifndef LUNA_RHI_D3D11TEXTURE_H
+#define LUNA_RHI_D3D11TEXTURE_H
 #include "D3D11Common.h"
 
 #include <Texture.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 class D3D11Texture;
 
-class CACAO_API D3D11TextureView : public CacaoTextureView {
+class LUNA_RHI_API D3D11TextureView : public TextureView {
 public:
     D3D11TextureView(Ref<D3D11Texture> texture)
         : m_texture(std::move(texture))
@@ -26,7 +26,7 @@ private:
     TextureViewDesc m_desc;
 };
 
-class CACAO_API D3D11Texture : public Texture {
+class LUNA_RHI_API D3D11Texture : public Texture {
 public:
     D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& createInfo);
     D3D11Texture(Ref<D3D11Device> device, ComPtr<ID3D11Texture2D> existingTexture, Format format);
@@ -81,8 +81,8 @@ public:
         return m_currentState;
     }
 
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
-    Ref<CacaoTextureView> GetDefaultView() override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> GetDefaultView() override;
     void CreateDefaultViewIfNeeded() override;
 
     ID3D11Texture2D* GetNativeTexture() const
@@ -119,7 +119,7 @@ private:
     ComPtr<ID3D11RenderTargetView> m_rtv;
     ComPtr<ID3D11DepthStencilView> m_dsv;
     ComPtr<ID3D11UnorderedAccessView> m_uav;
-    Ref<CacaoTextureView> m_defaultView;
+    Ref<TextureView> m_defaultView;
 
     uint32_t m_width = 1, m_height = 1, m_depth = 1;
     uint32_t m_mipLevels = 1, m_arrayLayers = 1;
@@ -129,5 +129,5 @@ private:
     TextureUsageFlags m_usage = TextureUsageFlags::Sampled;
     ResourceState m_currentState = ResourceState::Undefined;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

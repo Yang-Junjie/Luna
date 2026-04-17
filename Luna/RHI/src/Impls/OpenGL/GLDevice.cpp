@@ -13,7 +13,7 @@
 #include "Impls/OpenGL/GLSynchronization.h"
 #include "Impls/OpenGL/GLTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<GLDevice> GLDevice::Create(const Ref<Adapter>& adapter, const DeviceCreateInfo& createInfo)
 {
     return std::make_shared<GLDevice>(adapter, createInfo);
@@ -126,4 +126,4 @@ Ref<Synchronization> GLDevice::CreateSynchronization(uint32_t maxFramesInFlight)
 {
     return GLSynchronization::Create(maxFramesInFlight);
 }
-} // namespace Cacao
+} // namespace luna::RHI

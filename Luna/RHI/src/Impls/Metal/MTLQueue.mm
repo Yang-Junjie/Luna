@@ -3,7 +3,7 @@
 #include "Impls/Metal/MTLQueue.h"
 #include "Impls/Metal/MTLCommandBufferEncoder.h"
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLQueue::MTLQueue(id commandQueue) : m_commandQueue(commandQueue) {}
 

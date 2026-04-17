@@ -9,7 +9,7 @@ namespace {
 std::atomic<uint64_t> g_psoCounter{0};
 }
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const GraphicsPipelineCreateInfo& info)
     : m_device(device),
       m_layout(info.Layout),
@@ -167,4 +167,4 @@ D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const Comp
 
     d3dDevice->GetHandle()->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
 }
-} // namespace Cacao
+} // namespace luna::RHI

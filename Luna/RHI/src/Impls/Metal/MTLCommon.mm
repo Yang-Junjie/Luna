@@ -5,7 +5,7 @@
 #include "PipelineDefs.h"
 #include "Sampler.h"
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLPixelFormat ToMTLPixelFormat(Format format)
     {

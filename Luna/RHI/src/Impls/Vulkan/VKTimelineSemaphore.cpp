@@ -1,7 +1,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKTimelineSemaphore.h"
 
-namespace Cacao {
+namespace luna::RHI {
 VKTimelineSemaphore::VKTimelineSemaphore(Ref<VKDevice> device, uint64_t initialValue)
     : m_device(std::move(device))
 {
@@ -45,4 +45,4 @@ uint64_t VKTimelineSemaphore::GetValue() const
 {
     return m_device->GetHandle().getSemaphoreCounterValue(m_semaphore);
 }
-} // namespace Cacao
+} // namespace luna::RHI

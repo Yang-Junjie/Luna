@@ -9,7 +9,7 @@
 #include <windows.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 GLSwapchain::GLSwapchain(const SwapchainCreateInfo& info)
     : m_createInfo(info)
 {
@@ -68,4 +68,4 @@ PresentMode GLSwapchain::GetPresentMode() const
 {
     return m_createInfo.PresentMode;
 }
-} // namespace Cacao
+} // namespace luna::RHI

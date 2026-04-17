@@ -1,11 +1,11 @@
-#ifndef CACAO_MTLQUEUE_H
-#define CACAO_MTLQUEUE_H
+#ifndef LUNA_RHI_MTLQUEUE_H
+#define LUNA_RHI_MTLQUEUE_H
 #ifdef __APPLE__
 #include "MTLCommon.h"
 #include "Queue.h"
 
-namespace Cacao {
-class CACAO_API MTLQueue final : public Queue {
+namespace luna::RHI {
+class LUNA_RHI_API MTLQueue final : public Queue {
 public:
     MTLQueue(id commandQueue);
     ~MTLQueue() override = default;
@@ -25,6 +25,6 @@ public:
 private:
     id m_commandQueue = nullptr; // id<MTLCommandQueue>
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

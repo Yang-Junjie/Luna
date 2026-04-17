@@ -1,13 +1,13 @@
-#ifndef CACAO_GLQUEUE_H
-#define CACAO_GLQUEUE_H
+#ifndef LUNA_RHI_GLQUEUE_H
+#define LUNA_RHI_GLQUEUE_H
 #include "Adapter.h"
 #include "GLCommon.h"
 #include "Queue.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class GLDevice;
 
-class CACAO_API GLQueue final : public Queue {
+class LUNA_RHI_API GLQueue final : public Queue {
 public:
     GLQueue();
     static Ref<GLQueue> Create(const Ref<GLDevice>& device = nullptr);
@@ -26,6 +26,6 @@ public:
     void Submit(const Ref<CommandBufferEncoder>& cmd) override;
     void WaitIdle() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

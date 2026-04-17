@@ -9,7 +9,7 @@ namespace luna::rhi {
 
 class RenderGraphBuilder {
 public:
-    using ExecuteCallback = std::function<void(Cacao::CommandBufferEncoder&)>;
+    using ExecuteCallback = std::function<void(luna::RHI::CommandBufferEncoder&)>;
 
     RenderGraphBuilder& AddRenderPass(const std::string& name, ExecuteCallback execute);
     std::unique_ptr<RenderGraph> Build();

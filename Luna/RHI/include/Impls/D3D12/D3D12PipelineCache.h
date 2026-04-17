@@ -1,14 +1,14 @@
-#ifndef CACAO_D3D12PIPELINECACHE_H
-#define CACAO_D3D12PIPELINECACHE_H
+#ifndef LUNA_RHI_D3D12PIPELINECACHE_H
+#define LUNA_RHI_D3D12PIPELINECACHE_H
 
 #include "D3D12Common.h"
 #include "Device.h"
 #include "Pipeline.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D12Device;
 
-class CACAO_API D3D12PipelineCache final : public PipelineCache {
+class LUNA_RHI_API D3D12PipelineCache final : public PipelineCache {
 private:
     ComPtr<ID3D12PipelineLibrary1> m_library;
     Ref<D3D12Device> m_device;
@@ -25,6 +25,6 @@ public:
         return m_library.Get();
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

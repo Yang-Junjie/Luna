@@ -3,7 +3,7 @@
 #include "Impls/D3D11/D3D11Surface.h"
 #include "ShaderCompiler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 bool D3D11Instance::Initialize(const InstanceCreateInfo& createInfo)
 {
     m_createInfo = createInfo;
@@ -63,4 +63,4 @@ Ref<ShaderCompiler> D3D11Instance::CreateShaderCompiler()
 {
     return ShaderCompiler::Create(BackendType::DirectX11);
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,11 +1,11 @@
-#ifndef CACAO_VARIABLE_RATE_SHADING_H
-#define CACAO_VARIABLE_RATE_SHADING_H
+#ifndef LUNA_RHI_VARIABLE_RATE_SHADING_H
+#define LUNA_RHI_VARIABLE_RATE_SHADING_H
 #include "Core.h"
 #include "Texture.h"
 
 #include <memory>
 
-namespace Cacao {
+namespace luna::RHI {
 enum class ShadingRate : uint8_t {
     Rate1x1 = 0,
     Rate1x2 = 1,
@@ -30,7 +30,7 @@ struct ShadingRateImageCreateInfo {
     uint32_t TileSize = 16;
 };
 
-class CACAO_API ShadingRateImage {
+class LUNA_RHI_API ShadingRateImage {
 public:
     virtual ~ShadingRateImage() = default;
     virtual Ref<Texture> GetTexture() const = 0;
@@ -38,6 +38,6 @@ public:
     virtual void SetRate(uint32_t tileX, uint32_t tileY, ShadingRate rate) = 0;
     virtual void Upload() = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

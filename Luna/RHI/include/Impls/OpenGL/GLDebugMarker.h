@@ -1,10 +1,10 @@
-#ifndef CACAO_GLDEBUGMARKER_H
-#define CACAO_GLDEBUGMARKER_H
+#ifndef LUNA_RHI_GLDEBUGMARKER_H
+#define LUNA_RHI_GLDEBUGMARKER_H
 #include "GLCommon.h"
 
 #include <string>
 
-namespace Cacao {
+namespace luna::RHI {
 class GLDebugMarker {
 public:
     static bool IsSupported();
@@ -29,6 +29,6 @@ public:
                              msg.c_str());
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

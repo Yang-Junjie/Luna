@@ -2,7 +2,7 @@
 #include "Impls/D3D12/D3D12Buffer.h"
 #include "Impls/D3D12/D3D12Device.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12AccelerationStructure::D3D12AccelerationStructure(const Ref<Device>& device,
                                                        const AccelerationStructureCreateInfo& info)
     : m_type(info.Type),
@@ -150,4 +150,4 @@ D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC D3D12AccelerationStructure::G
     }
     return desc;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 VKRayTracingPipeline::VKRayTracingPipeline(const Ref<Device>& device, const RayTracingPipelineCreateInfo& info)
     : m_layout(info.Layout),
       m_device(device)
@@ -104,4 +104,4 @@ VKRayTracingPipeline::~VKRayTracingPipeline()
         }
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

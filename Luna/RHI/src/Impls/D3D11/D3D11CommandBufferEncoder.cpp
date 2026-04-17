@@ -6,7 +6,7 @@
 #include "Impls/D3D11/D3D11Pipeline.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11CommandBufferEncoder::D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type)
     : m_device(std::move(device)),
       m_type(type)
@@ -39,7 +39,7 @@ void D3D11CommandBufferEncoder::BeginRendering(const RenderingInfo& info)
     for (auto& att : info.ColorAttachments) {
         if (att.Texture && m_transitionedTextures.find(att.Texture.get()) == m_transitionedTextures.end()) {
             fprintf(stderr,
-                    "[Cacao WARNING] DX11: Texture used in BeginRendering without TransitionImage(). "
+                    "[Luna RHI WARNING] DX11: Texture used in BeginRendering without TransitionImage(). "
                     "This will cause errors on Vulkan/DX12.\n");
         }
     }
@@ -113,7 +113,7 @@ void D3D11CommandBufferEncoder::BindVertexBuffer(uint32_t binding, const Ref<Buf
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::VertexBuffer)) {
         fprintf(stderr,
-                "[Cacao WARNING] DX11: BindVertexBuffer without VertexBuffer usage flag. "
+                "[Luna RHI WARNING] DX11: BindVertexBuffer without VertexBuffer usage flag. "
                 "Vulkan will reject this.\n");
     }
 #endif
@@ -129,7 +129,7 @@ void D3D11CommandBufferEncoder::BindIndexBuffer(const Ref<Buffer>& buffer, uint6
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::IndexBuffer)) {
         fprintf(stderr,
-                "[Cacao WARNING] DX11: BindIndexBuffer without IndexBuffer usage flag. "
+                "[Luna RHI WARNING] DX11: BindIndexBuffer without IndexBuffer usage flag. "
                 "Vulkan will reject this.\n");
     }
 #endif
@@ -279,7 +279,7 @@ void D3D11CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
 #ifndef NDEBUG
     if (dstImage && m_transitionedTextures.find(dstImage.get()) == m_transitionedTextures.end()) {
         fprintf(stderr,
-                "[Cacao WARNING] DX11: CopyBufferToImage without TransitionImage(). "
+                "[Luna RHI WARNING] DX11: CopyBufferToImage without TransitionImage(). "
                 "Vulkan/DX12 will fail.\n");
     }
 #endif
@@ -377,4 +377,4 @@ void D3D11CommandBufferEncoder::DispatchIndirect(const Ref<Buffer>& argBuffer, u
     auto* buf = static_cast<D3D11Buffer*>(argBuffer.get());
     m_context->DispatchIndirect(buf->GetNativeBuffer(), static_cast<UINT>(offset));
 }
-} // namespace Cacao
+} // namespace luna::RHI

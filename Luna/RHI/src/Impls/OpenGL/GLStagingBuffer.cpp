@@ -2,14 +2,14 @@
 
 #include <cstring>
 
-namespace Cacao {
+namespace luna::RHI {
 GLStagingBuffer::GLStagingBuffer(uint64_t capacity)
     : m_capacity(capacity)
 {
     glGenBuffers(1, &m_buffer);
     glBindBuffer(GL_COPY_READ_BUFFER, m_buffer);
 
-#ifndef CACAO_GLES
+#ifndef LUNA_RHI_GLES
     GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
     glBufferStorage(GL_COPY_READ_BUFFER, static_cast<GLsizeiptr>(capacity), nullptr, flags | GL_DYNAMIC_STORAGE_BIT);
     m_mappedPtr = glMapBufferRange(GL_COPY_READ_BUFFER, 0, static_cast<GLsizeiptr>(capacity), flags);
@@ -53,4 +53,4 @@ void GLStagingBuffer::Reset()
 {
     m_offset = 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,15 +1,15 @@
-#ifndef CACAO_VKACCELERATIONSTRUCTURE_H
-#define CACAO_VKACCELERATIONSTRUCTURE_H
+#ifndef LUNA_RHI_VKACCELERATIONSTRUCTURE_H
+#define LUNA_RHI_VKACCELERATIONSTRUCTURE_H
 #include "Device.h"
 #include "RayTracing.h"
 #include "vk_mem_alloc.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKAccelerationStructure final : public AccelerationStructure {
+class LUNA_RHI_API VKAccelerationStructure final : public AccelerationStructure {
 public:
     VKAccelerationStructure(const Ref<Device>& device, const AccelerationStructureCreateInfo& info);
     ~VKAccelerationStructure() override;
@@ -58,6 +58,6 @@ private:
     uint64_t m_scratchSize = 0;
     Ref<Device> m_device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

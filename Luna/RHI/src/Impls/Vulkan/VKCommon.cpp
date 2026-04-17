@@ -1,7 +1,7 @@
 #include "Buffer.h"
 #include "Impls/Vulkan/VKCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 vk::BufferUsageFlags VKConverter::Convert(BufferUsageFlags usage)
 {
     vk::BufferUsageFlags usageFlags;
@@ -687,4 +687,4 @@ vk::IndexType VKConverter::Convert(IndexType indexType)
             throw std::runtime_error("Unsupported index type");
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

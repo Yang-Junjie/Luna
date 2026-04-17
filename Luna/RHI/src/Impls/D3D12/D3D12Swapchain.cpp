@@ -6,7 +6,7 @@
 #include "Impls/D3D12/D3D12Swapchain.h"
 #include "Impls/D3D12/D3D12Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12Swapchain::D3D12Swapchain(const Ref<Device>& device, const SwapchainCreateInfo& info)
     : m_device(device),
       m_createInfo(info)
@@ -156,4 +156,4 @@ PresentMode D3D12Swapchain::GetPresentMode() const
 {
     return m_createInfo.PresentMode;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -9,7 +9,7 @@
 #include "Impls/Vulkan/VKTexture.h"
 #include "Synchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<VKSwapchain> VKSwapchain::Create(const Ref<Device>& device, const SwapchainCreateInfo& createInfo)
 {
     return CreateRef<VKSwapchain>(device, createInfo);
@@ -314,4 +314,4 @@ VKSwapchain::~VKSwapchain()
         }
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

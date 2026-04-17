@@ -1,15 +1,15 @@
-#ifndef CACAO_VKTEXTURE_H
-#define CACAO_VKTEXTURE_H
+#ifndef LUNA_RHI_VKTEXTURE_H
+#define LUNA_RHI_VKTEXTURE_H
 #include "Texture.h"
 #include "vk_mem_alloc.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKTexture;
 class Device;
 
-class CACAO_API VKTextureView : public CacaoTextureView {
+class LUNA_RHI_API VKTextureView : public TextureView {
 private:
     Ref<VKTexture> m_texture;
     TextureViewDesc m_desc;
@@ -32,7 +32,7 @@ public:
     }
 };
 
-class CACAO_API VKTexture final : public Texture {
+class LUNA_RHI_API VKTexture final : public Texture {
     friend class VKSwapchain;
     friend class VKTextureView;
     friend class VKCommandBufferEncoder;
@@ -63,10 +63,10 @@ public:
     SampleCount GetSampleCount() const override;
     TextureUsageFlags GetUsage() const override;
     ResourceState GetCurrentState() const override;
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
     ~VKTexture() override;
 
-    Ref<CacaoTextureView> GetDefaultView() override
+    Ref<TextureView> GetDefaultView() override
     {
         return m_view;
     }
@@ -78,5 +78,5 @@ public:
 
     void CreateDefaultViewIfNeeded() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

@@ -1,5 +1,5 @@
-#ifndef CACAO_WGPU_COMMON_H
-#define CACAO_WGPU_COMMON_H
+#ifndef LUNA_RHI_WGPU_COMMON_H
+#define LUNA_RHI_WGPU_COMMON_H
 
 #include "Barrier.h"
 #include "Core.h"
@@ -8,7 +8,7 @@
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUTextureFormat ToWGPUFormat(Format format);
 Format FromWGPUFormat(WGPUTextureFormat format);
 WGPUBufferUsageFlags ToWGPUBufferUsage(BufferUsageFlags usage);
@@ -24,6 +24,6 @@ WGPUBlendFactor ToWGPUBlendFactor(BlendFactor factor);
 WGPUBlendOperation ToWGPUBlendOp(BlendOp op);
 WGPUStencilOperation ToWGPUStencilOp(StencilOp op);
 WGPUColorWriteMaskFlags ToWGPUColorWriteMask(ColorComponentFlags flags);
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -1,8 +1,8 @@
-#ifndef CACAO_CACAODESCRIPTORPOOL_H
-#define CACAO_CACAODESCRIPTORPOOL_H
+#ifndef LUNA_RHI_DESCRIPTORPOOL_H
+#define LUNA_RHI_DESCRIPTORPOOL_H
 #include "DescriptorSetLayout.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class DescriptorSet;
 
 struct DescriptorPoolSize {
@@ -15,7 +15,7 @@ struct DescriptorPoolCreateInfo {
     std::vector<DescriptorPoolSize> PoolSizes;
 };
 
-class CACAO_API DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
+class LUNA_RHI_API DescriptorPool : public std::enable_shared_from_this<DescriptorPool> {
 public:
     virtual ~DescriptorPool() = default;
     virtual void Reset() = 0;
@@ -28,5 +28,5 @@ public:
 };
 
 using BindingGroupAllocator = DescriptorPool;
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

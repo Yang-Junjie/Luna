@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUBufferImpl::WGPUBufferImpl(::WGPUDevice device, const BufferCreateInfo& info)
     : m_wgpuDevice(device),
       m_createInfo(info)
@@ -71,7 +71,7 @@ void* WGPUBufferImpl::Map()
     // For robust implementation, we do synchronous map via wgpuBufferMapAsync + spin.
 
     // Dawn's mappedAtCreation gives us the pointer at creation. After Unmap, we can't
-    // easily re-map a MapWrite buffer synchronously. The pattern used in Cacao (Map/Write/Unmap
+    // easily re-map a MapWrite buffer synchronously. The pattern used in Luna RHI (Map/Write/Unmap
     // at init, then never again) means this path is rarely hit.
     // For now, return nullptr for re-map attempts on already-unmapped buffers.
     return nullptr;
@@ -96,4 +96,4 @@ uint64_t WGPUBufferImpl::GetDeviceAddress() const
 {
     return 0; // WebGPU does not expose buffer device addresses
 }
-} // namespace Cacao
+} // namespace luna::RHI

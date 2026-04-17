@@ -1,14 +1,14 @@
-#ifndef CACAO_VKSWAPCHAIN_H
-#define CACAO_VKSWAPCHAIN_H
+#ifndef LUNA_RHI_VKSWAPCHAIN_H
+#define LUNA_RHI_VKSWAPCHAIN_H
 #include <Swapchain.h>
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKQueue;
 class VKDevice;
 class Device;
 
-class CACAO_API VKSwapchain : public Swapchain {
+class LUNA_RHI_API VKSwapchain : public Swapchain {
     vk::SwapchainKHR m_swapchain;
     friend class VKSynchronization;
 
@@ -36,5 +36,5 @@ public:
     Result AcquireNextImage(const Ref<Synchronization>& sync, int idx, int& out) override;
     ~VKSwapchain() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

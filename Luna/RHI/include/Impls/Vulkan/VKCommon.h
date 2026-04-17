@@ -1,5 +1,5 @@
-#ifndef CACAO_VKCOMMON_H
-#define CACAO_VKCOMMON_H
+#ifndef LUNA_RHI_VKCOMMON_H
+#define LUNA_RHI_VKCOMMON_H
 #include "vk_mem_alloc.h"
 
 #include <vulkan/vulkan.hpp>
@@ -14,7 +14,7 @@
 #include "Sampler.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class BufferMemoryUsage;
 enum class BufferUsageFlags : uint32_t;
 
@@ -79,7 +79,7 @@ inline constexpr VkImageAspectFlags kImageAspectLUT[] = {
     VK_IMAGE_ASPECT_PLANE_2_BIT,
 };
 
-inline VkPipelineStageFlags PipelineStage(Cacao::PipelineStage stage) noexcept
+inline VkPipelineStageFlags PipelineStage(luna::RHI::PipelineStage stage) noexcept
 {
     uint32_t bits = static_cast<uint32_t>(stage);
     if (bits == 0) {
@@ -99,7 +99,7 @@ inline VkPipelineStageFlags PipelineStage(Cacao::PipelineStage stage) noexcept
     return result;
 }
 
-inline VkAccessFlags AccessFlags(Cacao::AccessFlags flags) noexcept
+inline VkAccessFlags AccessFlags(luna::RHI::AccessFlags flags) noexcept
 {
     uint32_t bits = static_cast<uint32_t>(flags);
     if (bits == 0) {
@@ -119,12 +119,12 @@ inline VkAccessFlags AccessFlags(Cacao::AccessFlags flags) noexcept
     return result;
 }
 
-inline VkImageLayout ImageLayout(Cacao::ImageLayout layout) noexcept
+inline VkImageLayout ImageLayout(luna::RHI::ImageLayout layout) noexcept
 {
     return kImageLayoutLUT[static_cast<uint32_t>(layout)];
 }
 
-inline VkImageAspectFlags ImageAspectFlags(Cacao::ImageAspectFlags flags) noexcept
+inline VkImageAspectFlags ImageAspectFlags(luna::RHI::ImageAspectFlags flags) noexcept
 {
     uint32_t bits = static_cast<uint32_t>(flags);
     if (bits == 0) {
@@ -285,5 +285,5 @@ public:
     static vk::DescriptorType Convert(DescriptorType type);
     static vk::IndexType Convert(IndexType indexType);
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

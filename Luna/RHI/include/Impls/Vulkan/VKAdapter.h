@@ -1,15 +1,15 @@
-#ifndef CACAO_VKADAPTER_H
-#define CACAO_VKADAPTER_H
+#ifndef LUNA_RHI_VKADAPTER_H
+#define LUNA_RHI_VKADAPTER_H
 #include "../../Adapter.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Instance;
 }
 
-namespace Cacao {
-class CACAO_API VKAdapter : public Adapter {
+namespace luna::RHI {
+class LUNA_RHI_API VKAdapter : public Adapter {
 private:
     friend class VKSurface;
     friend class VKInstance;
@@ -41,5 +41,5 @@ public:
         return m_physicalDevice;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

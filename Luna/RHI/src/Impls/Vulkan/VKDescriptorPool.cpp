@@ -3,7 +3,7 @@
 #include "Impls/Vulkan/VKDescriptorSetLayout.h"
 #include "Impls/Vulkan/VKDevice.h"
 
-namespace Cacao {
+namespace luna::RHI {
 VKDescriptorPool::VKDescriptorPool(const Ref<Device>& device, const DescriptorPoolCreateInfo& createInfo)
 {
     if (!device) {
@@ -90,4 +90,4 @@ Ref<DescriptorSet> VKDescriptorPool::AllocateDescriptorSet(const Ref<DescriptorS
     }
     return VKDescriptorSet::Create(m_device, shared_from_this(), layout, vkDescriptorSet);
 }
-} // namespace Cacao
+} // namespace luna::RHI

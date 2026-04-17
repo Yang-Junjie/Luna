@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUAdapter::WGPUAdapter(Ref<WGPUInstance> instance, ::WGPUAdapter adapter)
     : m_instance(instance),
       m_adapter(adapter)
@@ -92,4 +92,4 @@ uint32_t WGPUAdapter::FindQueueFamilyIndex(QueueType type) const
 {
     return 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

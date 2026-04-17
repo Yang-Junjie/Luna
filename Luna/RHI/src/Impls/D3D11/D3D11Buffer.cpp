@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Buffer.h"
 #include "Impls/D3D11/D3D11Device.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Buffer::D3D11Buffer(Ref<D3D11Device> device, const BufferCreateInfo& createInfo)
     : m_device(std::move(device)),
       m_size(createInfo.Size),
@@ -143,4 +143,4 @@ void D3D11Buffer::EnsureStructuredSRV(uint32_t stride)
             m_structuredSRV.Get(),
             m_structuredBuffer.Get());
 }
-} // namespace Cacao
+} // namespace luna::RHI

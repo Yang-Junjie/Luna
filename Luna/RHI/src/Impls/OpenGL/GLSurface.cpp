@@ -2,7 +2,7 @@
 #include "Impls/OpenGL/GLQueue.h"
 #include "Impls/OpenGL/GLSurface.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLSurface::GLSurface(const NativeWindowHandle& windowHandle)
 {
 #ifdef _WIN32
@@ -90,4 +90,4 @@ std::vector<PresentMode> GLSurface::GetSupportedPresentModes(const Ref<Adapter>&
 {
     return {PresentMode::Fifo, PresentMode::Immediate};
 }
-} // namespace Cacao
+} // namespace luna::RHI

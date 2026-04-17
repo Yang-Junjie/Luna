@@ -1,14 +1,14 @@
-#ifndef CACAO_VKSBT_H
-#define CACAO_VKSBT_H
+#ifndef LUNA_RHI_VKSBT_H
+#define LUNA_RHI_VKSBT_H
 #include "Device.h"
 #include "RayTracing.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKShaderBindingTable final : public ShaderBindingTable {
+class LUNA_RHI_API VKShaderBindingTable final : public ShaderBindingTable {
 public:
     VKShaderBindingTable(const Ref<Device>& device,
                          VkPipeline rtPipeline,
@@ -61,6 +61,6 @@ private:
     uint64_t m_hitGroupOffset = 0;
     uint64_t m_callableOffset = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

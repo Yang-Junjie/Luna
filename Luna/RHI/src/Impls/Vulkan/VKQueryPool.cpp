@@ -1,7 +1,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKQueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static vk::QueryType ToVkQueryType(QueryType type)
 {
     switch (type) {
@@ -59,4 +59,4 @@ bool VKQueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::vect
 
     return result == vk::Result::eSuccess;
 }
-} // namespace Cacao
+} // namespace luna::RHI

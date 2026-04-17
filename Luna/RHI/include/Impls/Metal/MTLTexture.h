@@ -1,13 +1,13 @@
-#ifndef CACAO_MTLTEXTURE_H
-#define CACAO_MTLTEXTURE_H
+#ifndef LUNA_RHI_MTLTEXTURE_H
+#define LUNA_RHI_MTLTEXTURE_H
 #ifdef __APPLE__
 #include "MTLCommon.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class MTLTextureImpl;
 
-class CACAO_API MTLTextureViewImpl : public CacaoTextureView {
+class LUNA_RHI_API MTLTextureViewImpl : public TextureView {
 public:
     MTLTextureViewImpl(id textureView, const Ref<Texture>& texture, const TextureViewDesc& desc);
     ~MTLTextureViewImpl() override;
@@ -26,7 +26,7 @@ private:
     TextureViewDesc m_desc;
 };
 
-class CACAO_API MTLTextureImpl final : public Texture {
+class LUNA_RHI_API MTLTextureImpl final : public Texture {
 public:
     MTLTextureImpl(id device, const TextureCreateInfo& info);
     MTLTextureImpl(id texture, const TextureCreateInfo& info, bool ownsTexture);
@@ -82,8 +82,8 @@ public:
         return m_currentState;
     }
 
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
-    Ref<CacaoTextureView> GetDefaultView() override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> GetDefaultView() override;
     void CreateDefaultViewIfNeeded() override;
 
     id GetHandle() const
@@ -94,10 +94,10 @@ public:
 private:
     TextureCreateInfo m_createInfo;
     id m_texture = nullptr; // id<MTLTexture>
-    Ref<CacaoTextureView> m_defaultView;
+    Ref<TextureView> m_defaultView;
     ResourceState m_currentState = ResourceState::Undefined;
     bool m_ownsTexture = true;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

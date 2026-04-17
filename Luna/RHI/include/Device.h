@@ -1,13 +1,13 @@
-#ifndef CACAO_CACAODEVICE_H
-#define CACAO_CACAODEVICE_H
+#ifndef LUNA_RHI_DEVICE_H
+#define LUNA_RHI_DEVICE_H
 #include "ShaderModule.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class DeviceFeature : uint32_t;
 class Synchronization;
-} // namespace Cacao
+} // namespace luna::RHI
 
-namespace Cacao {
+namespace luna::RHI {
 struct ComputePipelineCreateInfo;
 class ComputePipeline;
 struct QueryPoolCreateInfo;
@@ -58,7 +58,7 @@ enum class CommandBufferType {
     Secondary
 };
 
-class CACAO_API Device : public std::enable_shared_from_this<Device> {
+class LUNA_RHI_API Device : public std::enable_shared_from_this<Device> {
 public:
     virtual ~Device() = default;
     virtual Ref<Queue> GetQueue(QueueType type, uint32_t index = 0) = 0;
@@ -115,5 +115,5 @@ public:
     bool ValidateGraphicsPipeline(const GraphicsPipelineCreateInfo& info) const;
     bool ValidateDescriptorSetLayout(const DescriptorSetLayoutCreateInfo& info) const;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

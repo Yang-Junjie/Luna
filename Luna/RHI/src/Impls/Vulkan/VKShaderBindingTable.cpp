@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-namespace Cacao {
+namespace luna::RHI {
 static uint32_t AlignUp(uint32_t val, uint32_t alignment)
 {
     return (val + alignment - 1) & ~(alignment - 1);
@@ -108,4 +108,4 @@ VkStridedDeviceAddressRegionKHR VKShaderBindingTable::GetHitRegion() const
     region.size = m_hitGroupCount * m_entrySize;
     return region;
 }
-} // namespace Cacao
+} // namespace luna::RHI

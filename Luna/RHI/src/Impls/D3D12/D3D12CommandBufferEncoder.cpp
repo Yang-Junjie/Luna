@@ -13,7 +13,7 @@
 #include <pix3.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 static inline UINT CalcSubresource(UINT mipSlice, UINT arraySlice, UINT planeSlice, UINT mipLevels, UINT arraySize)
 {
     return mipSlice + arraySlice * mipLevels + planeSlice * mipLevels * arraySize;
@@ -760,4 +760,4 @@ void D3D12CommandBufferEncoder::BuildAccelerationStructure(const Ref<Acceleratio
         cmdList4->BuildRaytracingAccelerationStructure(&desc, 0, nullptr);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

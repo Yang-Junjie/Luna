@@ -2,7 +2,7 @@
 #import <Metal/Metal.h>
 #include "Impls/Metal/MTLTexture.h"
 
-namespace Cacao
+namespace luna::RHI
 {
     static MTLPixelFormat ToMTLPixelFormat(Format format)
     {
@@ -113,7 +113,7 @@ namespace Cacao
             m_texture = nil;
     }
 
-    Ref<CacaoTextureView> MTLTextureImpl::CreateView(const TextureViewDesc& desc)
+    Ref<TextureView> MTLTextureImpl::CreateView(const TextureViewDesc& desc)
     {
         id<MTLTexture> baseTex = (id<MTLTexture>)m_texture;
         MTLPixelFormat fmt = (desc.FormatOverride != Format::UNDEFINED)
@@ -131,7 +131,7 @@ namespace Cacao
         return std::make_shared<MTLTextureViewImpl>((id)viewTex, shared_from_this(), desc);
     }
 
-    Ref<CacaoTextureView> MTLTextureImpl::GetDefaultView()
+    Ref<TextureView> MTLTextureImpl::GetDefaultView()
     {
         return m_defaultView;
     }

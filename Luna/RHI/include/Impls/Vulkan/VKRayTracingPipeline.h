@@ -1,14 +1,14 @@
-#ifndef CACAO_VKRAYTRACINGPIPELINE_H
-#define CACAO_VKRAYTRACINGPIPELINE_H
+#ifndef LUNA_RHI_VKRAYTRACINGPIPELINE_H
+#define LUNA_RHI_VKRAYTRACINGPIPELINE_H
 #include "Device.h"
 #include "Pipeline.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKRayTracingPipeline final : public RayTracingPipeline {
+class LUNA_RHI_API VKRayTracingPipeline final : public RayTracingPipeline {
 public:
     VKRayTracingPipeline(const Ref<Device>& device, const RayTracingPipelineCreateInfo& info);
     ~VKRayTracingPipeline() override;
@@ -28,6 +28,6 @@ private:
     Ref<PipelineLayout> m_layout;
     Ref<Device> m_device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

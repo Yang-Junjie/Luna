@@ -8,7 +8,7 @@
 #include "Impls/Metal/MTLDevice.h"
 #include "Impls/Metal/MTLDescriptorSet.h"
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLCommandBufferEncoder::MTLCommandBufferEncoder(const Ref<Device>& device, CommandBufferType type)
         : m_device(device), m_type(type) {}
@@ -47,8 +47,8 @@ namespace Cacao
         for (uint32_t i = 0; i < info.ColorAttachments.size(); i++)
         {
             auto& att = info.ColorAttachments[i];
-            auto* cacaoTex = static_cast<MTLTextureImpl*>(att.Texture.get());
-            rpDesc.colorAttachments[i].texture = (id<MTLTexture>)cacaoTex->GetHandle();
+            auto* colorTexture = static_cast<MTLTextureImpl*>(att.Texture.get());
+            rpDesc.colorAttachments[i].texture = (id<MTLTexture>)colorTexture->GetHandle();
             rpDesc.colorAttachments[i].loadAction =
                 (att.LoadOp == AttachmentLoadOp::Clear) ? MTLLoadActionClear :
                 (att.LoadOp == AttachmentLoadOp::Load) ? MTLLoadActionLoad : MTLLoadActionDontCare;

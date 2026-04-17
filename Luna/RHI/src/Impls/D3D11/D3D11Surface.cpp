@@ -3,7 +3,7 @@
 #include "Impls/D3D11/D3D11Instance.h"
 #include "Impls/D3D11/D3D11Surface.h"
 
-namespace Cacao {
+namespace luna::RHI {
 SurfaceCapabilities D3D11Surface::GetCapabilities(const Ref<Adapter>& adapter)
 {
     RECT rect;
@@ -36,4 +36,4 @@ Ref<Queue> D3D11Surface::GetPresentQueue(const Ref<Device>& device)
 {
     return device->GetQueue(QueueType::Graphics, 0);
 }
-} // namespace Cacao
+} // namespace luna::RHI

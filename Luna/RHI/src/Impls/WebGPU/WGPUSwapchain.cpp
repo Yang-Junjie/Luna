@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <stdexcept>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUSwapchain::WGPUSwapchain(const Ref<Device>& device, const SwapchainCreateInfo& info)
     : m_createInfo(info)
 {
@@ -53,7 +53,7 @@ WGPUSwapchain::WGPUSwapchain(const Ref<Device>& device, const SwapchainCreateInf
 
     config.alphaMode = WGPUCompositeAlphaMode_Opaque;
 
-    // m_surface must be extracted from the Cacao Surface wrapper
+    // m_surface must be extracted from the Luna RHI surface wrapper
     // For now, store config; actual configure happens when surface is available
     // wgpuSurfaceConfigure(m_surface, &config);
 }
@@ -132,4 +132,4 @@ Ref<Texture> WGPUSwapchain::GetBackBuffer(uint32_t index) const
 {
     return m_currentBackBuffer;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,6 +1,6 @@
 #include "Impls/WebGPU/WGPUCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUTextureFormat ToWGPUFormat(Format format)
 {
     switch (format) {
@@ -423,4 +423,4 @@ WGPUTextureUsageFlags ToWGPUTextureUsage(TextureUsageFlags usage)
     }
     return flags;
 }
-} // namespace Cacao
+} // namespace luna::RHI

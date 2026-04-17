@@ -1,11 +1,11 @@
-#ifndef CACAO_CACAODESCRIPTOR_H
-#define CACAO_CACAODESCRIPTOR_H
+#ifndef LUNA_RHI_DESCRIPTOR_H
+#define LUNA_RHI_DESCRIPTOR_H
 #include "Core.h"
 
 #include <memory>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class Buffer;
 class Texture;
 class Sampler;
@@ -35,7 +35,7 @@ struct DescriptorSetLayoutCreateInfo {
     bool SupportBindless = false;
 };
 
-class CACAO_API DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLayout> {
+class LUNA_RHI_API DescriptorSetLayout : public std::enable_shared_from_this<DescriptorSetLayout> {
 public:
     virtual ~DescriptorSetLayout() = default;
 };
@@ -57,5 +57,5 @@ struct BindingLayoutCreateInfo {
 using BindingLayout = DescriptorSetLayout;
 using BindingLayoutBinding = DescriptorSetLayoutBinding;
 using BindingLayoutCreateInfoLegacy = DescriptorSetLayoutCreateInfo;
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

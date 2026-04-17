@@ -1,17 +1,17 @@
-#ifndef CACAO_VKPIPELINE_H
-#define CACAO_VKPIPELINE_H
+#ifndef LUNA_RHI_VKPIPELINE_H
+#define LUNA_RHI_VKPIPELINE_H
 #include "Pipeline.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 }
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 
-class CACAO_API VKPipelineCache : public PipelineCache {
+class LUNA_RHI_API VKPipelineCache : public PipelineCache {
 public:
     VKPipelineCache(const Ref<Device>& device, std::span<const uint8_t> initialData = {});
     ~VKPipelineCache() override;
@@ -29,7 +29,7 @@ private:
     Ref<VKDevice> m_device;
 };
 
-class CACAO_API VKGraphicsPipeline final : public GraphicsPipeline {
+class LUNA_RHI_API VKGraphicsPipeline final : public GraphicsPipeline {
     vk::Pipeline m_pipeline;
     GraphicsPipelineCreateInfo m_pipelineInfo;
     Ref<VKDevice> m_device;
@@ -53,7 +53,7 @@ public:
     }
 };
 
-class CACAO_API VKComputePipeline : public ComputePipeline {
+class LUNA_RHI_API VKComputePipeline : public ComputePipeline {
 public:
     VKComputePipeline(const Ref<Device>& device, const ComputePipelineCreateInfo& createInfo);
     ~VKComputePipeline() override;
@@ -70,5 +70,5 @@ private:
     ComputePipelineCreateInfo m_pipelineInfo;
     Ref<VKDevice> m_device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

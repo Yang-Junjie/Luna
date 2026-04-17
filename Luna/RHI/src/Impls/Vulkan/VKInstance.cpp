@@ -7,7 +7,7 @@
 
 #include <sstream>
 
-namespace Cacao {
+namespace luna::RHI {
 namespace {
 
 void populateDebugUtilsCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
@@ -126,7 +126,7 @@ bool VKInstance::Initialize(const InstanceCreateInfo& createInfo)
                                       .setApplicationVersion(createInfo.appVersion)
                                       .setEngineVersion(1)
                                       .setPApplicationName(createInfo.applicationName.c_str())
-                                      .setPEngineName("Cacao Engine");
+                                      .setPEngineName("Luna RHI Engine");
     std::vector<const char*> enabledLayerNames;
     std::vector<const char*> enabledExtensionNames;
     for (const auto& feature : createInfo.enabledFeatures) {
@@ -286,11 +286,11 @@ Ref<Surface> VKInstance::CreateSurface(const NativeWindowHandle& windowHandle)
     if (!surface) {
         throw std::runtime_error("Vulkan Surface 创建失败：返回了空句柄。");
     }
-    return Cacao::CreateRef<VKSurface>(surface);
+    return luna::RHI::CreateRef<VKSurface>(surface);
 }
 
 Ref<ShaderCompiler> VKInstance::CreateShaderCompiler()
 {
     return ShaderCompiler::Create(BackendType::Vulkan);
 }
-} // namespace Cacao
+} // namespace luna::RHI

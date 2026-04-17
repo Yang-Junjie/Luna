@@ -1,5 +1,5 @@
-#ifndef CACAO_D3D11COMMON_H
-#define CACAO_D3D11COMMON_H
+#ifndef LUNA_RHI_D3D11COMMON_H
+#define LUNA_RHI_D3D11COMMON_H
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -14,7 +14,7 @@ using Microsoft::WRL::ComPtr;
 #include <Buffer.h>
 #include <Core.h>
 
-namespace Cacao {
+namespace luna::RHI {
 inline DXGI_FORMAT D3D11_ToDXGIFormat(Format format)
 {
     switch (format) {
@@ -90,5 +90,5 @@ inline D3D11_USAGE D3D11_ToUsage(BufferMemoryUsage usage)
             return D3D11_USAGE_DEFAULT;
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

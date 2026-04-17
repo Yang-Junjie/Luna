@@ -1,9 +1,9 @@
-#ifndef CACAO_CACAOSWAPCHAIN_H
-#define CACAO_CACAOSWAPCHAIN_H
+#ifndef LUNA_RHI_SWAPCHAIN_H
+#define LUNA_RHI_SWAPCHAIN_H
 #include "Surface.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Queue;
 class Synchronization;
 enum class CompositeAlpha {
@@ -59,7 +59,7 @@ enum class Result {
     Error
 };
 
-class CACAO_API Swapchain : public std::enable_shared_from_this<Swapchain> {
+class LUNA_RHI_API Swapchain : public std::enable_shared_from_this<Swapchain> {
 public:
     virtual ~Swapchain() = default;
     virtual Result Present(const Ref<Queue>& queue, const Ref<Synchronization>& sync, uint32_t frameIndex) = 0;
@@ -70,5 +70,5 @@ public:
     virtual PresentMode GetPresentMode() const = 0;
     virtual Result AcquireNextImage(const Ref<Synchronization>& sync, int idx, int& out) = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

@@ -1,10 +1,10 @@
-#ifndef CACAO_GLSHADERMODULE_H
-#define CACAO_GLSHADERMODULE_H
+#ifndef LUNA_RHI_GLSHADERMODULE_H
+#define LUNA_RHI_GLSHADERMODULE_H
 #include "GLCommon.h"
 #include "ShaderModule.h"
 
-namespace Cacao {
-class CACAO_API GLShaderModule final : public ShaderModule {
+namespace luna::RHI {
+class LUNA_RHI_API GLShaderModule final : public ShaderModule {
 public:
     GLShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info);
     static Ref<GLShaderModule> Create(const ShaderBlob& blob, const ShaderCreateInfo& info);
@@ -48,6 +48,6 @@ private:
     bool CompileShader(GLenum type, const char* source, GLuint& outShader);
     bool LinkProgram();
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

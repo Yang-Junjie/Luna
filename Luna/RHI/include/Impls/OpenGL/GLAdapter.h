@@ -1,10 +1,10 @@
-#ifndef CACAO_GLADAPTER_H
-#define CACAO_GLADAPTER_H
+#ifndef LUNA_RHI_GLADAPTER_H
+#define LUNA_RHI_GLADAPTER_H
 #include "Adapter.h"
 #include "GLCommon.h"
 
-namespace Cacao {
-class CACAO_API GLAdapter final : public Adapter {
+namespace luna::RHI {
+class LUNA_RHI_API GLAdapter final : public Adapter {
 public:
     GLAdapter(const std::string& renderer, const std::string& vendor, int glMajor, int glMinor);
     static Ref<GLAdapter> Create(const std::string& renderer, const std::string& vendor, int glMajor, int glMinor);
@@ -22,6 +22,6 @@ private:
     int m_glMajor;
     int m_glMinor;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

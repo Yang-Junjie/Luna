@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace Cacao {
+namespace luna::RHI {
 static std::string FixupVulkanGLSLForOpenGL(const char* source)
 {
     std::string glsl(source);
@@ -262,4 +262,4 @@ bool GLShaderModule::LinkProgram()
     }
     return true;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -10,7 +10,7 @@
 #include "Impls/Vulkan/VKTexture.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 namespace {
 bool IsDepthFormat(Format format)
 {
@@ -849,4 +849,4 @@ void VKCommandBufferEncoder::CopyBuffer(
     copyRegion.size = size;
     vkCmdCopyBuffer(m_commandBuffer, vkSrcBuffer->GetHandle(), vkDstBuffer->GetHandle(), 1, &copyRegion);
 }
-} // namespace Cacao
+} // namespace luna::RHI

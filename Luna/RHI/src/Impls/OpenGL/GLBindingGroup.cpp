@@ -4,7 +4,7 @@
 #include "Impls/OpenGL/GLSampler.h"
 #include "Impls/OpenGL/GLTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 void GLBindingGroup::AddUniformBuffer(uint32_t binding, GLuint buffer)
 {
     m_entries.push_back({binding, GLBindingEntry::Type::UniformBuffer, buffer, -1, 0});
@@ -96,7 +96,7 @@ void GLBindingGroup::WriteBuffer(const BufferWriteInfo& info)
     } else if (info.Type == DescriptorType::StorageBuffer || info.Type == DescriptorType::StorageBufferDynamic) {
         AddStorageBuffer(info.Binding, glBuf->GetHandle());
     } else {
-        throw std::runtime_error("[Cacao] GL WriteBuffer: unsupported DescriptorType " +
+        throw std::runtime_error("[Luna RHI] GL WriteBuffer: unsupported DescriptorType " +
                                  std::to_string(static_cast<int>(info.Type)));
     }
 }
@@ -159,4 +159,4 @@ void GLBindingGroup::WriteAccelerationStructure(const AccelerationStructureWrite
 void GLBindingGroup::WriteAccelerationStructures(const AccelerationStructureWriteInfos&) {}
 
 void GLBindingGroup::Update() {}
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12PIPELINE_H
-#define CACAO_D3D12PIPELINE_H
+#ifndef LUNA_RHI_D3D12PIPELINE_H
+#define LUNA_RHI_D3D12PIPELINE_H
 #include "D3D12Common.h"
 #include "Pipeline.h"
 
-namespace Cacao {
-class CACAO_API D3D12GraphicsPipeline final : public GraphicsPipeline {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12GraphicsPipeline final : public GraphicsPipeline {
 private:
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -49,7 +49,7 @@ public:
     }
 };
 
-class CACAO_API D3D12ComputePipeline final : public ComputePipeline {
+class LUNA_RHI_API D3D12ComputePipeline final : public ComputePipeline {
 private:
     ComPtr<ID3D12PipelineState> m_pipelineState;
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -76,6 +76,6 @@ public:
         return m_layout;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

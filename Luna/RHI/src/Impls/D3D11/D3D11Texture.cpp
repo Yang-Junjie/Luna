@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<Texture> D3D11TextureView::GetTexture() const
 {
     return m_texture;
@@ -136,12 +136,12 @@ void D3D11Texture::CreateViews()
     }
 }
 
-Ref<CacaoTextureView> D3D11Texture::CreateView(const TextureViewDesc& desc)
+Ref<TextureView> D3D11Texture::CreateView(const TextureViewDesc& desc)
 {
     return m_defaultView;
 }
 
-Ref<CacaoTextureView> D3D11Texture::GetDefaultView()
+Ref<TextureView> D3D11Texture::GetDefaultView()
 {
     return m_defaultView;
 }
@@ -153,4 +153,4 @@ void D3D11Texture::CreateDefaultViewIfNeeded()
     }
     m_defaultView = CreateRef<D3D11TextureView>(std::static_pointer_cast<D3D11Texture>(shared_from_this()));
 }
-} // namespace Cacao
+} // namespace luna::RHI

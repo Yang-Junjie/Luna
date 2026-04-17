@@ -1,15 +1,15 @@
-#ifndef CACAO_D3D11BINDINGGROUP_H
-#define CACAO_D3D11BINDINGGROUP_H
+#ifndef LUNA_RHI_D3D11BINDINGGROUP_H
+#define LUNA_RHI_D3D11BINDINGGROUP_H
 #include "D3D11Common.h"
 
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11DescriptorSetLayout : public DescriptorSetLayout {
+class LUNA_RHI_API D3D11DescriptorSetLayout : public DescriptorSetLayout {
 public:
     D3D11DescriptorSetLayout(const DescriptorSetLayoutCreateInfo& info)
         : m_bindings(info.Bindings)
@@ -35,7 +35,7 @@ struct D3D11BoundResource {
     DescriptorType type = DescriptorType::UniformBuffer;
 };
 
-class CACAO_API D3D11DescriptorSet : public DescriptorSet {
+class LUNA_RHI_API D3D11DescriptorSet : public DescriptorSet {
 public:
     D3D11DescriptorSet(Ref<D3D11Device> device, Ref<D3D11DescriptorSetLayout> layout);
 
@@ -60,7 +60,7 @@ private:
     std::vector<D3D11BoundResource> m_resources;
 };
 
-class CACAO_API D3D11DescriptorPool : public DescriptorPool {
+class LUNA_RHI_API D3D11DescriptorPool : public DescriptorPool {
 public:
     D3D11DescriptorPool(Ref<D3D11Device> device, const DescriptorPoolCreateInfo& info);
     void Reset() override;
@@ -69,5 +69,5 @@ public:
 private:
     Ref<D3D11Device> m_device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

@@ -1,12 +1,12 @@
-#ifndef CACAO_WGPU_INSTANCE_H
-#define CACAO_WGPU_INSTANCE_H
+#ifndef LUNA_RHI_WGPU_INSTANCE_H
+#define LUNA_RHI_WGPU_INSTANCE_H
 
 #include "Instance.h"
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
-class CACAO_API WGPUInstance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API WGPUInstance : public Instance {
 private:
     InstanceCreateInfo m_createInfo;
     ::WGPUInstance m_instance = nullptr;
@@ -29,6 +29,6 @@ public:
         return m_instance;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

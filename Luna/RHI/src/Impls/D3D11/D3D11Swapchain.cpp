@@ -5,7 +5,7 @@
 #include "Impls/D3D11/D3D11Swapchain.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Swapchain::D3D11Swapchain(Ref<D3D11Device> device, const SwapchainCreateInfo& createInfo)
     : m_device(std::move(device)),
       m_extent(createInfo.Extent),
@@ -88,4 +88,4 @@ Result D3D11Swapchain::AcquireNextImage(const Ref<Synchronization>& sync, int id
     out = 0;
     return Result::Success;
 }
-} // namespace Cacao
+} // namespace luna::RHI

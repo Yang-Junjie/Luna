@@ -7,7 +7,7 @@
 #include <mutex>
 #include <string>
 
-namespace Cacao {
+namespace luna::RHI {
 namespace {
 
 std::mutex g_log_callback_mutex;
@@ -107,7 +107,7 @@ void LogMessage(LogLevel level, std::string_view message)
         return;
     }
 
-    std::cerr << "[Cacao] [" << toString(level) << "] " << message << '\n';
+    std::cerr << "[Luna RHI] [" << toString(level) << "] " << message << '\n';
 }
 
 void SetVulkanValidationMessageFilterEnabled(bool enabled)
@@ -120,4 +120,4 @@ bool IsVulkanValidationMessageFilterEnabled()
     return validationMessageFilterStorage().load(std::memory_order_relaxed);
 }
 
-} // namespace Cacao
+} // namespace luna::RHI

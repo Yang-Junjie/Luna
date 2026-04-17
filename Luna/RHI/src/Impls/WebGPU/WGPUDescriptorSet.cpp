@@ -3,7 +3,7 @@
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
+namespace luna::RHI {
 // === DescriptorSetLayout ===
 // WebGPU equivalent: WGPUBindGroupLayout
 // Created via wgpuDeviceCreateBindGroupLayout when device handle is available.
@@ -128,4 +128,4 @@ WGPUShaderModule::WGPUShaderModule(const ShaderBlob& blob, const ShaderCreateInf
     // SPIRV data stored in blob.Data; native module created in pipeline construction
     // since shader modules in WebGPU require a device handle.
 }
-} // namespace Cacao
+} // namespace luna::RHI

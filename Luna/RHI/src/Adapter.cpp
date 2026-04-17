@@ -1,3 +1,3 @@
 #include <Adapter.h>
 
-namespace Cacao {}
+namespace luna::RHI {}

@@ -2,7 +2,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKSampler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 VKSampler::VKSampler(const Ref<Device>& device, const SamplerCreateInfo& createInfo)
 {
     if (!device) {
@@ -40,4 +40,4 @@ const SamplerCreateInfo& VKSampler::GetInfo() const
 {
     return m_createInfo;
 }
-} // namespace Cacao
+} // namespace luna::RHI

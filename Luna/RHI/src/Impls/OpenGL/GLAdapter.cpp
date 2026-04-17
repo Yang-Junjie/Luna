@@ -1,7 +1,7 @@
 #include "Impls/OpenGL/GLAdapter.h"
 #include "Impls/OpenGL/GLDevice.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLAdapter::GLAdapter(const std::string& renderer, const std::string& vendor, int glMajor, int glMinor)
     : m_renderer(renderer),
       m_vendor(vendor),
@@ -87,4 +87,4 @@ uint32_t GLAdapter::FindQueueFamilyIndex(QueueType) const
 {
     return 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI

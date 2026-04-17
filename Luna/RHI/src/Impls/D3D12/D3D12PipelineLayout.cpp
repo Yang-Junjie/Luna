@@ -2,7 +2,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const PipelineLayoutCreateInfo& info)
     : m_device(device),
       m_createInfo(info)
@@ -109,4 +109,4 @@ Ref<D3D12PipelineLayout> D3D12PipelineLayout::Create(const Ref<Device>& device, 
 {
     return std::make_shared<D3D12PipelineLayout>(device, info);
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,5 +1,5 @@
-#ifndef CACAO_VKDEVICE_H
-#define CACAO_VKDEVICE_H
+#ifndef LUNA_RHI_VKDEVICE_H
+#define LUNA_RHI_VKDEVICE_H
 #include "Device.h"
 #include "vk_mem_alloc.h"
 
@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Adapter;
 class VKCommandBufferEncoder;
 
@@ -19,7 +19,7 @@ struct ThreadCommandPoolData {
     std::queue<Ref<VKCommandBufferEncoder>> secondaryBuffers;
 };
 
-class CACAO_API VKDevice final : public Device {
+class LUNA_RHI_API VKDevice final : public Device {
     vk::Device m_Device;
     friend class VKSynchronization;
     friend class VKSwapchain;
@@ -100,5 +100,5 @@ public:
         return m_Device;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

@@ -8,7 +8,7 @@
 #include "Impls/OpenGL/GLTexture.h"
 #include "QueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLCommandBufferEncoder::GLCommandBufferEncoder(CommandBufferType type)
     : m_type(type)
 {
@@ -23,7 +23,7 @@ Ref<GLCommandBufferEncoder> GLCommandBufferEncoder::Create(CommandBufferType typ
 void GLCommandBufferEncoder::Begin(const CommandBufferBeginInfo& info)
 {
     if (info.SimultaneousUse) {
-        throw std::runtime_error("[Cacao] GL backend: SimultaneousUse is not supported (Tier 2)");
+        throw std::runtime_error("[Luna RHI] GL backend: SimultaneousUse is not supported (Tier 2)");
     }
     m_commands.clear();
     m_recording = true;
@@ -51,7 +51,7 @@ void GLCommandBufferEncoder::BeginRendering(const RenderingInfo& info)
             if (attachment.Texture &&
                 m_transitionedTextures.find(attachment.Texture.get()) == m_transitionedTextures.end()) {
                 fprintf(stderr,
-                        "[Cacao WARNING] GL: Texture used in BeginRendering without TransitionImage() call. "
+                        "[Luna RHI WARNING] GL: Texture used in BeginRendering without TransitionImage() call. "
                         "This will cause errors on Vulkan/DX12 backends.\n");
             }
         }
@@ -165,7 +165,7 @@ void GLCommandBufferEncoder::BindVertexBuffer(uint32_t binding, const Ref<Buffer
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::VertexBuffer)) {
         fprintf(stderr,
-                "[Cacao WARNING] GL: BindVertexBuffer with buffer missing VertexBuffer usage flag. "
+                "[Luna RHI WARNING] GL: BindVertexBuffer with buffer missing VertexBuffer usage flag. "
                 "Vulkan will reject this.\n");
     }
 #endif
@@ -190,7 +190,7 @@ void GLCommandBufferEncoder::BindIndexBuffer(const Ref<Buffer>& buffer, uint64_t
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::IndexBuffer)) {
         fprintf(stderr,
-                "[Cacao WARNING] GL: BindIndexBuffer with buffer missing IndexBuffer usage flag. "
+                "[Luna RHI WARNING] GL: BindIndexBuffer with buffer missing IndexBuffer usage flag. "
                 "Vulkan will reject this.\n");
     }
 #endif
@@ -414,7 +414,7 @@ void GLCommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
     if (m_barrierValidation && dstImage &&
         m_transitionedTextures.find(dstImage.get()) == m_transitionedTextures.end()) {
         fprintf(stderr,
-                "[Cacao WARNING] GL: CopyBufferToImage without TransitionImage(). "
+                "[Luna RHI WARNING] GL: CopyBufferToImage without TransitionImage(). "
                 "This will cause errors on Vulkan/DX12.\n");
     }
 #endif
@@ -594,4 +594,4 @@ void GLCommandBufferEncoder::Execute()
     glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
     glUseProgram(prevProgram);
 }
-} // namespace Cacao
+} // namespace luna::RHI

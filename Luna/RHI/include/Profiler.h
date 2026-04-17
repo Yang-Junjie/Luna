@@ -1,5 +1,5 @@
-#ifndef CACAO_PROFILER_H
-#define CACAO_PROFILER_H
+#ifndef LUNA_RHI_PROFILER_H
+#define LUNA_RHI_PROFILER_H
 #include "CommandBufferEncoder.h"
 #include "Core.h"
 #include "QueryPool.h"
@@ -8,13 +8,13 @@
 #include <string>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 struct GPUTimingResult {
     std::string Name;
     double ElapsedMs = 0.0;
 };
 
-class CACAO_API GPUProfiler {
+class LUNA_RHI_API GPUProfiler {
 public:
     virtual ~GPUProfiler() = default;
 
@@ -33,6 +33,6 @@ struct GPUProfilerCreateInfo {
     uint32_t MaxScopes = 256;
     Ref<class Device> Device;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

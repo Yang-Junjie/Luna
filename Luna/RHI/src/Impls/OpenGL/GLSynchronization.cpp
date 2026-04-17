@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLSynchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLSynchronization::GLSynchronization(uint32_t maxFramesInFlight)
     : m_maxFramesInFlight(maxFramesInFlight)
 {
@@ -78,4 +78,4 @@ void GLSynchronization::WaitIdle() const
 {
     glFinish();
 }
-} // namespace Cacao
+} // namespace luna::RHI

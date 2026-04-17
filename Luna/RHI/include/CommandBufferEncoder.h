@@ -1,10 +1,10 @@
-#ifndef CACAO_CACAOCOMMANDBUFFERENCODER_H
-#define CACAO_CACAOCOMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_COMMANDBUFFERENCODER_H
+#define LUNA_RHI_COMMANDBUFFERENCODER_H
 #include "Barrier.h"
 
 #include <functional>
 
-namespace Cacao {
+namespace luna::RHI {
 class Buffer;
 class Texture;
 class GraphicsPipeline;
@@ -184,7 +184,7 @@ struct CommandBufferBeginInfo {
 
 enum class CommandBufferType;
 
-class CACAO_API CommandBufferEncoder : public std::enable_shared_from_this<CommandBufferEncoder> {
+class LUNA_RHI_API CommandBufferEncoder : public std::enable_shared_from_this<CommandBufferEncoder> {
 public:
     virtual void Free() = 0;
     virtual void Reset() = 0;
@@ -311,5 +311,5 @@ public:
                                               std::span<const Ref<DescriptorSet>> descriptorSets)
     {}
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

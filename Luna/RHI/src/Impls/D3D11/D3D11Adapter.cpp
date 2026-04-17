@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Adapter.h"
 #include "Impls/D3D11/D3D11Device.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Adapter::D3D11Adapter(Ref<D3D11Instance> instance, ComPtr<IDXGIAdapter1> adapter)
     : m_instance(std::move(instance)),
       m_adapter(std::move(adapter))
@@ -81,4 +81,4 @@ DeviceLimits D3D11Adapter::QueryLimits() const
     limits.supportsStorageBufferWriteInGraphics = false;
     return limits;
 }
-} // namespace Cacao
+} // namespace luna::RHI

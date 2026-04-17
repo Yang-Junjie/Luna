@@ -1,14 +1,14 @@
-#ifndef CACAO_WGPU_PIPELINE_H
-#define CACAO_WGPU_PIPELINE_H
+#ifndef LUNA_RHI_WGPU_PIPELINE_H
+#define LUNA_RHI_WGPU_PIPELINE_H
 
 #include "Pipeline.h"
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUDevice;
 
-class CACAO_API WGPUGraphicsPipeline final : public GraphicsPipeline {
+class LUNA_RHI_API WGPUGraphicsPipeline final : public GraphicsPipeline {
 private:
     Ref<WGPUDevice> m_device;
     Ref<PipelineLayout> m_layout;
@@ -30,7 +30,7 @@ public:
     }
 };
 
-class CACAO_API WGPUComputePipelineImpl final : public ComputePipeline {
+class LUNA_RHI_API WGPUComputePipelineImpl final : public ComputePipeline {
 private:
     Ref<WGPUDevice> m_device;
     Ref<PipelineLayout> m_layout;
@@ -51,6 +51,6 @@ public:
         return m_pipeline;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

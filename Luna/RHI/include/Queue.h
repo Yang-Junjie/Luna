@@ -1,13 +1,13 @@
-#ifndef CACAO_CACAOQUEUE_H
-#define CACAO_CACAOQUEUE_H
+#ifndef LUNA_RHI_QUEUE_H
+#define LUNA_RHI_QUEUE_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Synchronization;
 class CommandBufferEncoder;
 enum class QueueType;
 
-class CACAO_API Queue : public std::enable_shared_from_this<Queue> {
+class LUNA_RHI_API Queue : public std::enable_shared_from_this<Queue> {
 public:
     virtual ~Queue() = default;
     virtual QueueType GetType() const = 0;
@@ -20,5 +20,5 @@ public:
     virtual void Submit(const Ref<CommandBufferEncoder>& cmd) = 0;
     virtual void WaitIdle() = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

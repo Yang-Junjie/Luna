@@ -1,11 +1,11 @@
-#ifndef CACAO_D3D11SHADERMODULE_H
-#define CACAO_D3D11SHADERMODULE_H
+#ifndef LUNA_RHI_D3D11SHADERMODULE_H
+#define LUNA_RHI_D3D11SHADERMODULE_H
 #include "D3D11Common.h"
 
 #include <ShaderModule.h>
 
-namespace Cacao {
-class CACAO_API D3D11ShaderModule : public ShaderModule {
+namespace luna::RHI {
+class LUNA_RHI_API D3D11ShaderModule : public ShaderModule {
 public:
     D3D11ShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info);
 
@@ -34,5 +34,5 @@ private:
     std::string m_entryPoint;
     ShaderBlob m_blob;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

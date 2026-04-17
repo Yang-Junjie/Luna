@@ -1,12 +1,12 @@
-#ifndef CACAO_GLBUFFER_H
-#define CACAO_GLBUFFER_H
+#ifndef LUNA_RHI_GLBUFFER_H
+#define LUNA_RHI_GLBUFFER_H
 #include "Buffer.h"
 #include "GLCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 
-class CACAO_API GLBuffer final : public Buffer {
+class LUNA_RHI_API GLBuffer final : public Buffer {
 public:
     GLBuffer(const Ref<Device>& device, const BufferCreateInfo& info);
     static Ref<GLBuffer> Create(const Ref<Device>& device, const BufferCreateInfo& info);
@@ -38,6 +38,6 @@ private:
     void* m_mappedPtr = nullptr;
     std::vector<uint8_t> m_cpuData;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

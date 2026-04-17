@@ -1,16 +1,16 @@
-#ifndef CACAO_D3D11DEVICE_H
-#define CACAO_D3D11DEVICE_H
+#ifndef LUNA_RHI_D3D11DEVICE_H
+#define LUNA_RHI_D3D11DEVICE_H
 #include "D3D11Common.h"
 
 #include <Adapter.h>
 #include <Device.h>
 #include <Queue.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Adapter;
 class D3D11Device;
 
-class CACAO_API D3D11Queue : public Queue {
+class LUNA_RHI_API D3D11Queue : public Queue {
 public:
     D3D11Queue(Ref<D3D11Device> device)
         : m_device(std::move(device))
@@ -41,7 +41,7 @@ private:
     Ref<D3D11Device> m_device;
 };
 
-class CACAO_API D3D11Device : public Device {
+class LUNA_RHI_API D3D11Device : public Device {
 public:
     D3D11Device(Ref<D3D11Adapter> adapter);
 
@@ -95,5 +95,5 @@ private:
     D3D_FEATURE_LEVEL m_featureLevel = D3D_FEATURE_LEVEL_11_0;
     Ref<D3D11Queue> m_pseudoQueue;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

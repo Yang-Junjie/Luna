@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12COMMANDBUFFERENCODER_H
-#define CACAO_D3D12COMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_D3D12COMMANDBUFFERENCODER_H
+#define LUNA_RHI_D3D12COMMANDBUFFERENCODER_H
 #include "CommandBufferEncoder.h"
 #include "D3D12Common.h"
 
-namespace Cacao {
-class CACAO_API D3D12CommandBufferEncoder final : public CommandBufferEncoder {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12CommandBufferEncoder final : public CommandBufferEncoder {
 private:
     ComPtr<ID3D12GraphicsCommandList6> m_commandList;
     ComPtr<ID3D12CommandAllocator> m_allocator;
@@ -145,6 +145,6 @@ public:
                                       uint32_t firstSet,
                                       std::span<const Ref<DescriptorSet>> descriptorSets) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

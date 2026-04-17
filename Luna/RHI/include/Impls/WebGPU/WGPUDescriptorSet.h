@@ -1,5 +1,5 @@
-#ifndef CACAO_WGPU_DESCRIPTORSET_H
-#define CACAO_WGPU_DESCRIPTORSET_H
+#ifndef LUNA_RHI_WGPU_DESCRIPTORSET_H
+#define LUNA_RHI_WGPU_DESCRIPTORSET_H
 
 #include "DescriptorPool.h"
 #include "DescriptorSet.h"
@@ -9,8 +9,8 @@
 #include "Sampler.h"
 #include "ShaderModule.h"
 
-namespace Cacao {
-class CACAO_API WGPUDescriptorSetLayout : public DescriptorSetLayout {
+namespace luna::RHI {
+class LUNA_RHI_API WGPUDescriptorSetLayout : public DescriptorSetLayout {
 private:
     DescriptorSetLayoutCreateInfo m_createInfo;
     // TODO: WGPUBindGroupLayout m_layout;
@@ -20,7 +20,7 @@ public:
     ~WGPUDescriptorSetLayout() override = default;
 };
 
-class CACAO_API WGPUDescriptorPool : public DescriptorPool {
+class LUNA_RHI_API WGPUDescriptorPool : public DescriptorPool {
 private:
     DescriptorPoolCreateInfo m_createInfo;
 
@@ -30,7 +30,7 @@ public:
     Ref<DescriptorSet> AllocateDescriptorSet(const Ref<DescriptorSetLayout>& layout) override;
 };
 
-class CACAO_API WGPUDescriptorSet : public DescriptorSet {
+class LUNA_RHI_API WGPUDescriptorSet : public DescriptorSet {
 private:
     // TODO: WGPUBindGroup m_bindGroup;
 
@@ -49,7 +49,7 @@ public:
     void Update() override;
 };
 
-class CACAO_API WGPUSampler : public Sampler {
+class LUNA_RHI_API WGPUSampler : public Sampler {
 private:
     // TODO: WGPUSampler m_sampler;
 
@@ -58,7 +58,7 @@ public:
     ~WGPUSampler() override = default;
 };
 
-class CACAO_API WGPUPipelineLayout : public PipelineLayout {
+class LUNA_RHI_API WGPUPipelineLayout : public PipelineLayout {
 private:
     PipelineLayoutCreateInfo m_createInfo;
     // TODO: WGPUPipelineLayout m_layout;
@@ -68,14 +68,14 @@ public:
     ~WGPUPipelineLayout() override = default;
 };
 
-class CACAO_API WGPUPipelineCache : public PipelineCache {
+class LUNA_RHI_API WGPUPipelineCache : public PipelineCache {
 public:
     WGPUPipelineCache() = default;
     ~WGPUPipelineCache() override = default;
     std::vector<uint8_t> GetData() const override;
 };
 
-class CACAO_API WGPUShaderModule : public ShaderModule {
+class LUNA_RHI_API WGPUShaderModule : public ShaderModule {
 private:
     // TODO: WGPUShaderModule m_module;
 
@@ -83,6 +83,6 @@ public:
     WGPUShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info);
     ~WGPUShaderModule() override = default;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

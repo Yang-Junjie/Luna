@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Sampler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Sampler::D3D11Sampler(Ref<D3D11Device> device, const SamplerCreateInfo& createInfo)
     : m_info(createInfo)
 {
@@ -51,4 +51,4 @@ D3D11Sampler::D3D11Sampler(Ref<D3D11Device> device, const SamplerCreateInfo& cre
 
     device->GetNativeDevice()->CreateSamplerState(&desc, &m_sampler);
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLMSAA.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLMSAARenderTarget GLMSAA::Create(uint32_t width, uint32_t height, uint32_t samples, GLenum colorFormat, bool withDepth)
 {
     GLMSAARenderTarget target;
@@ -56,4 +56,4 @@ GLint GLMSAA::GetMaxSamples()
     glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
     return maxSamples;
 }
-} // namespace Cacao
+} // namespace luna::RHI

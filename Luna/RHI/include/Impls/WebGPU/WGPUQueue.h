@@ -1,13 +1,13 @@
-#ifndef CACAO_WGPU_QUEUE_H
-#define CACAO_WGPU_QUEUE_H
+#ifndef LUNA_RHI_WGPU_QUEUE_H
+#define LUNA_RHI_WGPU_QUEUE_H
 
 #include "Queue.h"
 #include "Surface.h"
 #include "Synchronization.h"
 #include "WGPUCommon.h"
 
-namespace Cacao {
-class CACAO_API WGPUQueueImpl final : public Queue {
+namespace luna::RHI {
+class LUNA_RHI_API WGPUQueueImpl final : public Queue {
 private:
     ::WGPUQueue m_queue = nullptr;
     ::WGPUDevice m_device = nullptr;
@@ -29,7 +29,7 @@ public:
     }
 };
 
-class CACAO_API WGPUSynchronization : public Synchronization {
+class LUNA_RHI_API WGPUSynchronization : public Synchronization {
 private:
     uint32_t m_maxFramesInFlight;
 
@@ -42,7 +42,7 @@ public:
     void WaitIdle() override;
 };
 
-class CACAO_API WGPUSurfaceImpl : public Surface {
+class LUNA_RHI_API WGPUSurfaceImpl : public Surface {
 private:
     ::WGPUSurface m_surface = nullptr;
 
@@ -58,6 +58,6 @@ public:
         return m_surface;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

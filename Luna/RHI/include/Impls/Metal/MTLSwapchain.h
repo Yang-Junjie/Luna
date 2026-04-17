@@ -1,11 +1,11 @@
-#ifndef CACAO_MTLSWAPCHAIN_H
-#define CACAO_MTLSWAPCHAIN_H
+#ifndef LUNA_RHI_MTLSWAPCHAIN_H
+#define LUNA_RHI_MTLSWAPCHAIN_H
 #ifdef __APPLE__
 #include "MTLCommon.h"
 #include "Swapchain.h"
 
-namespace Cacao {
-class CACAO_API MTLSwapchain final : public Swapchain {
+namespace luna::RHI {
+class LUNA_RHI_API MTLSwapchain final : public Swapchain {
 public:
     MTLSwapchain(const Ref<Device>& device, const SwapchainCreateInfo& info);
     ~MTLSwapchain() override = default;
@@ -22,6 +22,6 @@ private:
     SwapchainCreateInfo m_createInfo;
     id m_metalLayer = nullptr; // CAMetalLayer*
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

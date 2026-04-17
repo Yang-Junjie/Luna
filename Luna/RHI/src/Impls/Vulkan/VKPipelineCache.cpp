@@ -1,7 +1,7 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKPipeline.h"
 
-namespace Cacao {
+namespace luna::RHI {
 Ref<VKPipelineCache> VKPipelineCache::Create(const Ref<Device>& device, std::span<const uint8_t> initialData)
 {
     return CreateRef<VKPipelineCache>(device, initialData);
@@ -43,4 +43,4 @@ void VKPipelineCache::Merge(std::span<const Ref<PipelineCache>> srcCaches)
 
     m_device->GetHandle().mergePipelineCaches(m_pipelineCache, vkCaches);
 }
-} // namespace Cacao
+} // namespace luna::RHI

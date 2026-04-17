@@ -1,13 +1,13 @@
-#ifndef CACAO_WGPU_COMMANDBUFFERENCODER_H
-#define CACAO_WGPU_COMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_WGPU_COMMANDBUFFERENCODER_H
+#define LUNA_RHI_WGPU_COMMANDBUFFERENCODER_H
 
 #include "CommandBufferEncoder.h"
 #include "Impls/WebGPU/WGPUCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUDeviceImpl; // forward decl to avoid name clash with webgpu WGPUDevice
 
-class CACAO_API WGPUCommandBufferEncoder : public CommandBufferEncoder {
+class LUNA_RHI_API WGPUCommandBufferEncoder : public CommandBufferEncoder {
 private:
     ::WGPUDevice m_wgpuDevice = nullptr;
     ::WGPUCommandEncoder m_encoder = nullptr;
@@ -107,6 +107,6 @@ public:
         return m_commandBuffer;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef CACAO_STAGINGBUFFER_H
-#define CACAO_STAGINGBUFFER_H
+#ifndef LUNA_RHI_STAGINGBUFFER_H
+#define LUNA_RHI_STAGINGBUFFER_H
 
 #include "Core.h"
 
@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class Buffer;
 class Device;
 
@@ -18,7 +18,7 @@ struct StagingAllocation {
     uint64_t size = 0;
 };
 
-class CACAO_API StagingBufferPool {
+class LUNA_RHI_API StagingBufferPool {
 public:
     virtual ~StagingBufferPool() = default;
 
@@ -34,6 +34,6 @@ public:
     static Ref<StagingBufferPool>
         Create(const Ref<Device>& device, uint64_t blockSize = 64 * 1'024 * 1'024, uint32_t maxFramesInFlight = 2);
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

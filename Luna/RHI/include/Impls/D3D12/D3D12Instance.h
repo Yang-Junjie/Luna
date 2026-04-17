@@ -1,11 +1,11 @@
-#ifndef CACAO_D3D12INSTANCE_H
-#define CACAO_D3D12INSTANCE_H
+#ifndef LUNA_RHI_D3D12INSTANCE_H
+#define LUNA_RHI_D3D12INSTANCE_H
 #include "D3D12Common.h"
 
 #include <Instance.h>
 
-namespace Cacao {
-class CACAO_API D3D12Instance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12Instance : public Instance {
 private:
     ComPtr<IDXGIFactory6> m_factory;
     InstanceCreateInfo m_createInfo;
@@ -28,6 +28,6 @@ public:
     Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) override;
     Ref<ShaderCompiler> CreateShaderCompiler() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

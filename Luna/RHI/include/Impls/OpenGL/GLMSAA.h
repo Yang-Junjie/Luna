@@ -1,8 +1,8 @@
-#ifndef CACAO_GLMSAA_H
-#define CACAO_GLMSAA_H
+#ifndef LUNA_RHI_GLMSAA_H
+#define LUNA_RHI_GLMSAA_H
 #include "GLCommon.h"
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLMSAARenderTarget {
     GLuint fbo = 0;
     GLuint colorRenderbuffer = 0;
@@ -12,7 +12,7 @@ struct GLMSAARenderTarget {
     uint32_t samples = 1;
 };
 
-class CACAO_API GLMSAA {
+class LUNA_RHI_API GLMSAA {
 public:
     static GLMSAARenderTarget
         Create(uint32_t width, uint32_t height, uint32_t samples, GLenum colorFormat, bool withDepth = true);
@@ -23,6 +23,6 @@ public:
 
     static GLint GetMaxSamples();
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

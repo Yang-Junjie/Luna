@@ -1,12 +1,12 @@
-#ifndef CACAO_D3D12STAGINGBUFFER_H
-#define CACAO_D3D12STAGINGBUFFER_H
+#ifndef LUNA_RHI_D3D12STAGINGBUFFER_H
+#define LUNA_RHI_D3D12STAGINGBUFFER_H
 #include "D3D12Common.h"
 #include "D3D12MemAlloc.h"
 
 #include <StagingBuffer.h>
 
-namespace Cacao {
-class CACAO_API D3D12StagingBufferPool final : public StagingBufferPool {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12StagingBufferPool final : public StagingBufferPool {
 public:
     D3D12StagingBufferPool(const Ref<Device>& device, uint64_t blockSize, uint32_t maxFramesInFlight);
     ~D3D12StagingBufferPool() override;
@@ -34,5 +34,5 @@ private:
     uint64_t m_totalAllocated = 0;
     void* m_mappedData = nullptr;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

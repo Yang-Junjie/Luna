@@ -1,14 +1,14 @@
-#ifndef CACAO_VKSHADERMODULE_H
-#define CACAO_VKSHADERMODULE_H
+#ifndef LUNA_RHI_VKSHADERMODULE_H
+#define LUNA_RHI_VKSHADERMODULE_H
 #include "ShaderModule.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class VKDevice;
 
-class CACAO_API VKShaderModule : public ShaderModule {
+class LUNA_RHI_API VKShaderModule : public ShaderModule {
     Ref<VKDevice> m_device;
     vk::ShaderModule m_module;
     ShaderBlob m_shaderBlob;
@@ -28,5 +28,5 @@ public:
 
     ~VKShaderModule() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

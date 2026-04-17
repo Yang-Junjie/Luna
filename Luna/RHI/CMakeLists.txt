@@ -1,6 +1,6 @@
 file(
     GLOB_RECURSE
-    CACAO_PUBLIC_HEADERS
+    LUNA_RHI_PUBLIC_HEADERS
     CONFIGURE_DEPENDS
     include/*.h
     include/*.hpp
@@ -8,14 +8,14 @@ file(
 
 file(
     GLOB
-    CACAO_COMMON_SOURCES
+    LUNA_RHI_COMMON_SOURCES
     CONFIGURE_DEPENDS
     src/*.cpp
 )
 
 file(
     GLOB
-    CACAO_VULKAN_SOURCES
+    LUNA_RHI_VULKAN_SOURCES
     CONFIGURE_DEPENDS
     src/Impls/Vulkan/*.cpp
 )
@@ -23,9 +23,9 @@ file(
 add_library(
     LunaRHI
     STATIC
-    ${CACAO_PUBLIC_HEADERS}
-    ${CACAO_COMMON_SOURCES}
-    ${CACAO_VULKAN_SOURCES}
+    ${LUNA_RHI_PUBLIC_HEADERS}
+    ${LUNA_RHI_COMMON_SOURCES}
+    ${LUNA_RHI_VULKAN_SOURCES}
 )
 
 target_include_directories(
@@ -43,7 +43,7 @@ target_link_libraries(
 target_compile_definitions(
     LunaRHI
     PUBLIC
-        CACAO_STATIC
-        CACAO_BACKEND_VULKAN
+        LUNA_RHI_STATIC
+        LUNA_RHI_BACKEND_VULKAN
         $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
 )

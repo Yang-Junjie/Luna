@@ -3,7 +3,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12ShaderBindingTable.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static constexpr uint32_t Align(uint32_t size, uint32_t alignment)
 {
     return (size + alignment - 1) & ~(alignment - 1);
@@ -86,4 +86,4 @@ D3D12_DISPATCH_RAYS_DESC
     desc.Depth = depth;
     return desc;
 }
-} // namespace Cacao
+} // namespace luna::RHI

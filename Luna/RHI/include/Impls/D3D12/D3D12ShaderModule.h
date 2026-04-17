@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12SHADERMODULE_H
-#define CACAO_D3D12SHADERMODULE_H
+#ifndef LUNA_RHI_D3D12SHADERMODULE_H
+#define LUNA_RHI_D3D12SHADERMODULE_H
 #include "D3D12Common.h"
 #include "ShaderModule.h"
 
-namespace Cacao {
-class CACAO_API D3D12ShaderModule final : public ShaderModule {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12ShaderModule final : public ShaderModule {
 private:
     ShaderBlob m_blob;
     ShaderCreateInfo m_info;
@@ -30,6 +30,6 @@ public:
         return m_blob;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef CACAO_D3D12DEVICE_H
-#define CACAO_D3D12DEVICE_H
+#ifndef LUNA_RHI_D3D12DEVICE_H
+#define LUNA_RHI_D3D12DEVICE_H
 #include "D3D12Common.h"
 #include "D3D12MemAlloc.h"
 #include "Device.h"
@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 struct DescriptorPoolAllocator {
     ComPtr<ID3D12DescriptorHeap> heap;
     uint32_t descriptorSize = 0;
@@ -26,7 +26,7 @@ struct DescriptorPoolAllocator {
     }
 };
 
-class CACAO_API D3D12Device final : public Device {
+class LUNA_RHI_API D3D12Device final : public Device {
 private:
     ComPtr<ID3D12Device5> m_device;
     D3D12MA::Allocator* m_allocator = nullptr;
@@ -159,6 +159,6 @@ public:
 
     Ref<TimelineSemaphore> CreateTimelineSemaphore(uint64_t initialValue = 0) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -37,10 +37,10 @@ bool isDDSData(const uint8_t* data, std::size_t size)
     return data != nullptr && size >= 4 && data[0] == 'D' && data[1] == 'D' && data[2] == 'S' && data[3] == ' ';
 }
 
-Cacao::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
+luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
 {
     using DXGIFormat = tinyddsloader::DDSFile::DXGIFormat;
-    using Format = Cacao::Format;
+    using Format = luna::RHI::Format;
 
     switch (format) {
         case DXGIFormat::R32G32B32A32_Float:
@@ -288,7 +288,7 @@ ImageData loadImageUsingSTBLoader(const std::string& filepath)
 
     return ImageData{
         .ByteData = std::move(byte_data),
-        .ImageFormat = Cacao::Format::RGBA8_UNORM,
+        .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
     };
@@ -315,7 +315,7 @@ ImageData loadImageUsingSTBLoader(const uint8_t* data, std::size_t size)
 
     return ImageData{
         .ByteData = std::move(byte_data),
-        .ImageFormat = Cacao::Format::RGBA8_UNORM,
+        .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
     };
@@ -351,7 +351,7 @@ CubemapData createCubemapFromSingleImage(const ImageData& image)
     cubemap_data.FaceHeight = image.Height / 3;
 
     assert(cubemap_data.FaceWidth == cubemap_data.FaceHeight);
-    assert(cubemap_data.FaceFormat == Cacao::Format::RGBA8_UNORM);
+    assert(cubemap_data.FaceFormat == luna::RHI::Format::RGBA8_UNORM);
 
     constexpr std::size_t channel_count = 4;
     cubemap_data.Faces[0] =

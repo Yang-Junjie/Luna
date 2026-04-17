@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12PipelineCache.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D12PipelineCache::D3D12PipelineCache(const Ref<Device>& device, std::span<const uint8_t> initialData)
     : m_device(std::dynamic_pointer_cast<D3D12Device>(device))
 {
@@ -66,4 +66,4 @@ void D3D12PipelineCache::Merge(std::span<const Ref<PipelineCache>> srcCaches)
         // application to re-store PSOs through the device's StorePSO mechanism.
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

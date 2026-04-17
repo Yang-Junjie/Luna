@@ -1,12 +1,12 @@
-#ifndef CACAO_MTL_INSTANCE_H
-#define CACAO_MTL_INSTANCE_H
+#ifndef LUNA_RHI_MTL_INSTANCE_H
+#define LUNA_RHI_MTL_INSTANCE_H
 
 #ifdef __APPLE__
 
 #include "Instance.h"
 
-namespace Cacao {
-class CACAO_API MTLInstance : public Instance {
+namespace luna::RHI {
+class LUNA_RHI_API MTLInstance : public Instance {
 private:
     InstanceCreateInfo m_createInfo;
 
@@ -20,7 +20,7 @@ public:
     Ref<Surface> CreateSurface(const NativeWindowHandle& windowHandle) override;
     Ref<ShaderCompiler> CreateShaderCompiler() override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif // __APPLE__
 #endif

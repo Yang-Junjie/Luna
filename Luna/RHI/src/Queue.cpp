@@ -1,3 +1,3 @@
 #include <Queue.h>
 
-namespace Cacao {}
+namespace luna::RHI {}

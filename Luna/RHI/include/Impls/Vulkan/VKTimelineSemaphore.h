@@ -1,13 +1,13 @@
-#ifndef CACAO_VKTIMELINESEMAPHORE_H
-#define CACAO_VKTIMELINESEMAPHORE_H
+#ifndef LUNA_RHI_VKTIMELINESEMAPHORE_H
+#define LUNA_RHI_VKTIMELINESEMAPHORE_H
 #include "VKCommon.h"
 
 #include <Synchronization.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKTimelineSemaphore : public TimelineSemaphore {
+class LUNA_RHI_API VKTimelineSemaphore : public TimelineSemaphore {
 public:
     VKTimelineSemaphore(Ref<VKDevice> device, uint64_t initialValue);
     ~VKTimelineSemaphore() override;
@@ -25,5 +25,5 @@ private:
     Ref<VKDevice> m_device;
     vk::Semaphore m_semaphore;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

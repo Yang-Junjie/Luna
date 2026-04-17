@@ -1,7 +1,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Synchronization.h"
 
-namespace Cacao {
+namespace luna::RHI {
 D3D11Synchronization::D3D11Synchronization(const Ref<D3D11Device>& device, uint32_t maxFramesInFlight)
     : m_device(device),
       m_maxFramesInFlight(maxFramesInFlight)
@@ -44,4 +44,4 @@ void D3D11Synchronization::SignalFrame(uint32_t frameIndex)
 {
     m_device->GetImmediateContext()->End(m_eventQueries[frameIndex].Get());
 }
-} // namespace Cacao
+} // namespace luna::RHI

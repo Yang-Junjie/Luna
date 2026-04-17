@@ -1,11 +1,11 @@
-#ifndef CACAO_MTLBUFFER_H
-#define CACAO_MTLBUFFER_H
+#ifndef LUNA_RHI_MTLBUFFER_H
+#define LUNA_RHI_MTLBUFFER_H
 #ifdef __APPLE__
 #include "Buffer.h"
 #include "MTLCommon.h"
 
-namespace Cacao {
-class CACAO_API MTLBufferImpl final : public Buffer {
+namespace luna::RHI {
+class LUNA_RHI_API MTLBufferImpl final : public Buffer {
 public:
     MTLBufferImpl(id device, const BufferCreateInfo& info);
     ~MTLBufferImpl() override;
@@ -43,6 +43,6 @@ private:
     BufferCreateInfo m_createInfo;
     id m_buffer = nullptr; // id<MTLBuffer>
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif // __APPLE__
 #endif

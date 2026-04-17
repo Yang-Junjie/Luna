@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLDebugMarker.h"
 
-namespace Cacao {
+namespace luna::RHI {
 bool GLDebugMarker::IsSupported()
 {
     GLint numExtensions = 0;
@@ -13,4 +13,4 @@ bool GLDebugMarker::IsSupported()
     }
     return false;
 }
-} // namespace Cacao
+} // namespace luna::RHI

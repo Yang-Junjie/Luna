@@ -1,9 +1,9 @@
-#ifndef CACAO_GLPIPELINE_H
-#define CACAO_GLPIPELINE_H
+#ifndef LUNA_RHI_GLPIPELINE_H
+#define LUNA_RHI_GLPIPELINE_H
 #include "GLCommon.h"
 #include "Pipeline.h"
 
-namespace Cacao {
+namespace luna::RHI {
 struct GLPipelineState {
     bool blendEnabled = false;
     GLenum blendSrcRGB = GL_ONE;
@@ -35,7 +35,7 @@ struct GLPipelineState {
     GLenum topology = GL_TRIANGLES;
 };
 
-class CACAO_API GLGraphicsPipeline final : public GraphicsPipeline {
+class LUNA_RHI_API GLGraphicsPipeline final : public GraphicsPipeline {
 public:
     GLGraphicsPipeline(const GraphicsPipelineCreateInfo& info);
     static Ref<GLGraphicsPipeline> Create(const GraphicsPipelineCreateInfo& info);
@@ -63,7 +63,7 @@ private:
     Ref<PipelineLayout> m_layout;
 };
 
-class CACAO_API GLComputePipeline final : public ComputePipeline {
+class LUNA_RHI_API GLComputePipeline final : public ComputePipeline {
 public:
     GLComputePipeline(const ComputePipelineCreateInfo& info);
     static Ref<GLComputePipeline> Create(const ComputePipelineCreateInfo& info);
@@ -82,6 +82,6 @@ private:
     GLuint m_program = 0;
     Ref<PipelineLayout> m_layout;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

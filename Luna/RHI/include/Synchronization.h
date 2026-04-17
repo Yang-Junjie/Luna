@@ -1,11 +1,11 @@
-#ifndef CACAO_CACAOSYNCHRONIZATION_H
-#define CACAO_CACAOSYNCHRONIZATION_H
+#ifndef LUNA_RHI_SYNCHRONIZATION_H
+#define LUNA_RHI_SYNCHRONIZATION_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Swapchain;
 
-class CACAO_API Synchronization : public std::enable_shared_from_this<Synchronization> {
+class LUNA_RHI_API Synchronization : public std::enable_shared_from_this<Synchronization> {
 public:
     virtual void WaitForFrame(uint32_t frameIndex) const = 0;
     virtual void ResetFrameFence(uint32_t frameIndex) const = 0;
@@ -15,12 +15,12 @@ public:
     virtual void WaitIdle() const = 0;
 };
 
-class CACAO_API TimelineSemaphore : public std::enable_shared_from_this<TimelineSemaphore> {
+class LUNA_RHI_API TimelineSemaphore : public std::enable_shared_from_this<TimelineSemaphore> {
 public:
     virtual ~TimelineSemaphore() = default;
     virtual void Signal(uint64_t value) = 0;
     virtual bool Wait(uint64_t value, uint64_t timeoutNs = UINT64_MAX) = 0;
     virtual uint64_t GetValue() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

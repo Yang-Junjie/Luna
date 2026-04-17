@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLBuffer.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLBuffer::GLBuffer(const Ref<Device>& device, const BufferCreateInfo& info)
     : m_device(device),
       m_createInfo(info)
@@ -95,4 +95,4 @@ uint64_t GLBuffer::GetDeviceAddress() const
     // GL doesn't have device addresses in the same sense; return handle as a proxy
     return static_cast<uint64_t>(m_buffer);
 }
-} // namespace Cacao
+} // namespace luna::RHI

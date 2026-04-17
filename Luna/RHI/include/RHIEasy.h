@@ -1,5 +1,5 @@
-#ifndef CACAO_EASY_H
-#define CACAO_EASY_H
+#ifndef LUNA_RHI_EASY_H
+#define LUNA_RHI_EASY_H
 
 #include "Adapter.h"
 #include "Buffer.h"
@@ -19,9 +19,9 @@
 #include "Synchronization.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 struct EasyConfig {
-    std::string appName = "Cacao App";
+    std::string appName = "Luna RHI App";
     uint32_t width = 1'280;
     uint32_t height = 720;
     BackendType backend = BackendType::Auto;
@@ -30,7 +30,7 @@ struct EasyConfig {
     NativeWindowHandle windowHandle;
 };
 
-class CACAO_API EasyContext {
+class LUNA_RHI_API EasyContext {
 public:
     Ref<Instance> instance;
     Ref<Adapter> adapter;
@@ -235,6 +235,6 @@ public:
         cmd->TransitionImage(backBuffer, ImageTransition::ColorAttachmentToPresent);
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

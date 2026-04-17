@@ -1,5 +1,5 @@
-#ifndef CACAO_CORE_H
-#define CACAO_CORE_H
+#ifndef LUNA_RHI_CORE_H
+#define LUNA_RHI_CORE_H
 #include <cstdint>
 
 #include <filesystem>
@@ -11,22 +11,22 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-#ifdef CACAO_STATIC
-#define CACAO_API
+#ifdef LUNA_RHI_STATIC
+#define LUNA_RHI_API
 #elif defined(_WIN32)
-#ifdef CACAO_BUILD_DLL
-#define CACAO_API __declspec(dllexport)
+#ifdef LUNA_RHI_BUILD_DLL
+#define LUNA_RHI_API __declspec(dllexport)
 #else
-#define CACAO_API __declspec(dllimport)
+#define LUNA_RHI_API __declspec(dllimport)
 #endif
 #else
-#ifdef CACAO_BUILD_DLL
-#define CACAO_API __attribute__((visibility("default")))
+#ifdef LUNA_RHI_BUILD_DLL
+#define LUNA_RHI_API __attribute__((visibility("default")))
 #else
-#define CACAO_API
+#define LUNA_RHI_API
 #endif
 #endif
-namespace Cacao {
+namespace luna::RHI {
 template <typename T> using Box = std::unique_ptr<T>;
 template <typename T> using Ref = std::shared_ptr<T>;
 
@@ -200,5 +200,5 @@ inline bool operator&(ShaderStage a, ShaderStage b)
 {
     return (static_cast<uint32_t>(a) & static_cast<uint32_t>(b)) != 0;
 }
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

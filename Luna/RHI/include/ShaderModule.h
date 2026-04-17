@@ -1,10 +1,10 @@
-#ifndef CACAO_CACAOSHADERMODULE_H
-#define CACAO_CACAOSHADERMODULE_H
+#ifndef LUNA_RHI_SHADERMODULE_H
+#define LUNA_RHI_SHADERMODULE_H
 #include "DescriptorSetLayout.h"
 
 #include <map>
 
-namespace Cacao {
+namespace luna::RHI {
 struct ShaderBlob {
     std::vector<uint8_t> Data;
     size_t Hash = 0;
@@ -36,7 +36,7 @@ struct ShaderReflectionData {
     ShaderStage PushConstantStages = ShaderStage::None;
 };
 
-class CACAO_API ShaderModule : public std::enable_shared_from_this<ShaderModule> {
+class LUNA_RHI_API ShaderModule : public std::enable_shared_from_this<ShaderModule> {
 public:
     virtual ~ShaderModule() = default;
     virtual const std::string& GetEntryPoint() const = 0;
@@ -54,5 +54,5 @@ public:
         return empty;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

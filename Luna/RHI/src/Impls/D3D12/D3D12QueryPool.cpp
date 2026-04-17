@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12QueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static D3D12_QUERY_HEAP_TYPE ToD3D12QueryHeapType(QueryType type)
 {
     switch (type) {
@@ -67,4 +67,4 @@ bool D3D12QueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::v
     m_readbackBuffer->Unmap(0, &writeRange);
     return true;
 }
-} // namespace Cacao
+} // namespace luna::RHI

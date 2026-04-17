@@ -26,8 +26,8 @@ namespace {
 
 constexpr uint32_t kImGuiDescriptorPoolSize = 256;
 
-Cacao::Ref<Cacao::Device> g_device;
-Cacao::Ref<Cacao::Sampler> g_default_sampler;
+luna::RHI::Ref<luna::RHI::Device> g_device;
+luna::RHI::Ref<luna::RHI::Sampler> g_default_sampler;
 bool g_initialized = false;
 
 void checkVkResult(VkResult result)
@@ -46,16 +46,16 @@ bool ImGuiVulkanContext::Init(luna::Renderer& renderer)
         return g_initialized;
     }
 
-    const auto vk_instance = std::dynamic_pointer_cast<Cacao::VKInstance>(renderer.getInstance());
-    const auto vk_adapter = std::dynamic_pointer_cast<Cacao::VKAdapter>(renderer.getAdapter());
-    const auto vk_device = std::dynamic_pointer_cast<Cacao::VKDevice>(renderer.getDevice());
-    const auto vk_queue = std::dynamic_pointer_cast<Cacao::VKQueue>(renderer.getGraphicsQueue());
+    const auto vk_instance = std::dynamic_pointer_cast<luna::RHI::VKInstance>(renderer.getInstance());
+    const auto vk_adapter = std::dynamic_pointer_cast<luna::RHI::VKAdapter>(renderer.getAdapter());
+    const auto vk_device = std::dynamic_pointer_cast<luna::RHI::VKDevice>(renderer.getDevice());
+    const auto vk_queue = std::dynamic_pointer_cast<luna::RHI::VKQueue>(renderer.getGraphicsQueue());
     if (!vk_instance || !vk_adapter || !vk_device || !vk_queue) {
         LUNA_CORE_ERROR("Cannot initialize ImGui because Vulkan native handles are unavailable");
         return false;
     }
 
-    const vk::Format color_attachment_format = Cacao::VKConverter::Convert(renderer.getSwapchain()->GetFormat());
+    const vk::Format color_attachment_format = luna::RHI::VKConverter::Convert(renderer.getSwapchain()->GetFormat());
     const VkFormat color_attachment_vk_format = static_cast<VkFormat>(color_attachment_format);
 
     ImGui_ImplGlfw_InitForVulkan(renderer.getNativeWindow(), true);
@@ -65,7 +65,7 @@ bool ImGuiVulkanContext::Init(luna::Renderer& renderer)
     init_info.Instance = static_cast<VkInstance>(vk_instance->GetNativeHandle());
     init_info.PhysicalDevice = static_cast<VkPhysicalDevice>(vk_adapter->GetNativeHandle());
     init_info.Device = static_cast<VkDevice>(vk_device->GetNativeHandle());
-    init_info.QueueFamily = renderer.getAdapter()->FindQueueFamilyIndex(Cacao::QueueType::Graphics);
+    init_info.QueueFamily = renderer.getAdapter()->FindQueueFamilyIndex(luna::RHI::QueueType::Graphics);
     init_info.Queue = static_cast<VkQueue>(vk_queue->GetNativeHandle());
     init_info.DescriptorPool = VK_NULL_HANDLE;
     init_info.DescriptorPoolSize = kImGuiDescriptorPoolSize;
@@ -80,10 +80,10 @@ bool ImGuiVulkanContext::Init(luna::Renderer& renderer)
     ImGui_ImplVulkan_Init(&init_info);
 
     g_device = renderer.getDevice();
-    g_default_sampler = g_device->CreateSampler(Cacao::SamplerBuilder()
-                                                    .SetFilter(Cacao::Filter::Linear, Cacao::Filter::Linear)
-                                                    .SetAddressMode(Cacao::SamplerAddressMode::ClampToEdge)
-                                                    .SetMipmapMode(Cacao::SamplerMipmapMode::Linear)
+    g_default_sampler = g_device->CreateSampler(luna::RHI::SamplerBuilder()
+                                                    .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
+                                                    .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+                                                    .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
                                                     .SetAnisotropy(false)
                                                     .SetName("ImGuiDefaultSampler")
                                                     .Build());
@@ -100,7 +100,7 @@ void ImGuiVulkanContext::Destroy()
 
     if (g_device) {
         try {
-            if (const auto vk_device = std::dynamic_pointer_cast<Cacao::VKDevice>(g_device)) {
+            if (const auto vk_device = std::dynamic_pointer_cast<luna::RHI::VKDevice>(g_device)) {
                 vk_device->GetNativeHandle().waitIdle();
             }
         } catch (...) {
@@ -127,8 +127,8 @@ void ImGuiVulkanContext::StartFrame()
     ImGui::NewFrame();
 }
 
-void ImGuiVulkanContext::RenderFrame(Cacao::CommandBufferEncoder& command_buffer,
-                                     const Cacao::Ref<Cacao::Texture>& color_target,
+void ImGuiVulkanContext::RenderFrame(luna::RHI::CommandBufferEncoder& command_buffer,
+                                     const luna::RHI::Ref<luna::RHI::Texture>& color_target,
                                      uint32_t framebuffer_width,
                                      uint32_t framebuffer_height)
 {
@@ -142,12 +142,12 @@ void ImGuiVulkanContext::RenderFrame(Cacao::CommandBufferEncoder& command_buffer
         return;
     }
 
-    Cacao::RenderingAttachmentInfo color_attachment;
+    luna::RHI::RenderingAttachmentInfo color_attachment;
     color_attachment.Texture = color_target;
-    color_attachment.LoadOp = Cacao::AttachmentLoadOp::Load;
-    color_attachment.StoreOp = Cacao::AttachmentStoreOp::Store;
+    color_attachment.LoadOp = luna::RHI::AttachmentLoadOp::Load;
+    color_attachment.StoreOp = luna::RHI::AttachmentStoreOp::Store;
 
-    Cacao::RenderingInfo rendering_info;
+    luna::RHI::RenderingInfo rendering_info;
     rendering_info.RenderArea = {0, 0, framebuffer_width, framebuffer_height};
     rendering_info.ColorAttachments = {color_attachment};
     rendering_info.LayerCount = 1;
@@ -158,7 +158,7 @@ void ImGuiVulkanContext::RenderFrame(Cacao::CommandBufferEncoder& command_buffer
     command_buffer.EndRendering();
 }
 
-ImTextureID ImGuiVulkanContext::GetTextureId(const Cacao::Ref<Cacao::Texture>& texture)
+ImTextureID ImGuiVulkanContext::GetTextureId(const luna::RHI::Ref<luna::RHI::Texture>& texture)
 {
     if (!texture) {
         return {};
@@ -166,15 +166,15 @@ ImTextureID ImGuiVulkanContext::GetTextureId(const Cacao::Ref<Cacao::Texture>& t
     return GetTextureId(texture->GetDefaultView(), g_default_sampler);
 }
 
-ImTextureID ImGuiVulkanContext::GetTextureId(const Cacao::Ref<Cacao::CacaoTextureView>& view,
-                                             const Cacao::Ref<Cacao::Sampler>& sampler)
+ImTextureID ImGuiVulkanContext::GetTextureId(const luna::RHI::Ref<luna::RHI::TextureView>& view,
+                                             const luna::RHI::Ref<luna::RHI::Sampler>& sampler)
 {
     if (!g_initialized || !view) {
         return {};
     }
 
-    const auto vk_view = std::dynamic_pointer_cast<Cacao::VKTextureView>(view);
-    const auto vk_sampler = std::dynamic_pointer_cast<Cacao::VKSampler>(sampler ? sampler : g_default_sampler);
+    const auto vk_view = std::dynamic_pointer_cast<luna::RHI::VKTextureView>(view);
+    const auto vk_sampler = std::dynamic_pointer_cast<luna::RHI::VKSampler>(sampler ? sampler : g_default_sampler);
     if (!vk_view || !vk_sampler) {
         return {};
     }

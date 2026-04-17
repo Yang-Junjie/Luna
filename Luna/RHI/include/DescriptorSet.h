@@ -1,10 +1,10 @@
-#ifndef CACAO_CACAODESCRIPTORSET_H
-#define CACAO_CACAODESCRIPTORSET_H
+#ifndef LUNA_RHI_DESCRIPTORSET_H
+#define LUNA_RHI_DESCRIPTORSET_H
 #include "Barrier.h"
 
-namespace Cacao {
+namespace luna::RHI {
 enum class DescriptorType;
-class CacaoTextureView;
+class TextureView;
 class Sampler;
 class Texture;
 class Buffer;
@@ -23,7 +23,7 @@ struct BufferWriteInfo {
 
 struct TextureWriteInfo {
     uint32_t Binding = 0;
-    Ref<CacaoTextureView> TextureView = nullptr;
+    Ref<TextureView> TextureView = nullptr;
     ResourceState Layout = ResourceState::ShaderRead;
     DescriptorType Type;
     Ref<Sampler> Sampler = nullptr;
@@ -54,7 +54,7 @@ struct BufferWriteInfos {
 
 struct TextureWriteInfos {
     uint32_t Binding = 0;
-    std::vector<Ref<CacaoTextureView>> TextureViews;
+    std::vector<Ref<TextureView>> TextureViews;
     std::vector<ResourceState> Layouts;
     DescriptorType Type;
     std::vector<Ref<Sampler>> Samplers;
@@ -74,7 +74,7 @@ struct AccelerationStructureWriteInfos {
     uint32_t ArrayElement = 0;
 };
 
-class CACAO_API DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
+class LUNA_RHI_API DescriptorSet : public std::enable_shared_from_this<DescriptorSet> {
 public:
     virtual ~DescriptorSet() = default;
     virtual void WriteBuffer(const BufferWriteInfo& info) = 0;
@@ -89,5 +89,5 @@ public:
 };
 
 using BindingGroup = DescriptorSet;
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

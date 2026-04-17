@@ -1,14 +1,14 @@
-#ifndef CACAO_D3D12ADAPTER_H
-#define CACAO_D3D12ADAPTER_H
+#ifndef LUNA_RHI_D3D12ADAPTER_H
+#define LUNA_RHI_D3D12ADAPTER_H
 #include "D3D12Common.h"
 
 #include <Adapter.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class Instance;
 class D3D12Instance;
 
-class CACAO_API D3D12Adapter : public Adapter {
+class LUNA_RHI_API D3D12Adapter : public Adapter {
 private:
     ComPtr<IDXGIAdapter4> m_adapter;
     AdapterProperties m_properties;
@@ -35,6 +35,6 @@ public:
     Ref<Device> CreateDevice(const DeviceCreateInfo& info) override;
     uint32_t FindQueueFamilyIndex(QueueType type) const override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

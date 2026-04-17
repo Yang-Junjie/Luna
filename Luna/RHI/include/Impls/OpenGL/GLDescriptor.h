@@ -1,5 +1,5 @@
-#ifndef CACAO_GLDESCRIPTOR_H
-#define CACAO_GLDESCRIPTOR_H
+#ifndef LUNA_RHI_GLDESCRIPTOR_H
+#define LUNA_RHI_GLDESCRIPTOR_H
 #include "DescriptorPool.h"
 #include "DescriptorSet.h"
 #include "DescriptorSetLayout.h"
@@ -8,12 +8,12 @@
 #include "Pipeline.h"
 #include "PipelineLayout.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class GLBuffer;
 class GLTexture;
 class GLSampler;
 
-class CACAO_API GLDescriptorSetLayout : public DescriptorSetLayout {
+class LUNA_RHI_API GLDescriptorSetLayout : public DescriptorSetLayout {
 public:
     GLDescriptorSetLayout(const DescriptorSetLayoutCreateInfo& info)
         : m_bindings(info.Bindings)
@@ -28,7 +28,7 @@ private:
     std::vector<DescriptorSetLayoutBinding> m_bindings;
 };
 
-class CACAO_API GLDescriptorSet : public DescriptorSet {
+class LUNA_RHI_API GLDescriptorSet : public DescriptorSet {
 public:
     GLDescriptorSet() = default;
 
@@ -55,7 +55,7 @@ private:
     GLBindingGroup m_bindingGroup;
 };
 
-class CACAO_API GLDescriptorPool : public DescriptorPool {
+class LUNA_RHI_API GLDescriptorPool : public DescriptorPool {
 public:
     GLDescriptorPool(const DescriptorPoolCreateInfo& info) {}
 
@@ -64,10 +64,10 @@ public:
     void Reset() override {}
 };
 
-class CACAO_API GLPipelineLayout : public PipelineLayout {
+class LUNA_RHI_API GLPipelineLayout : public PipelineLayout {
 public:
     GLPipelineLayout(const PipelineLayoutCreateInfo& info) {}
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

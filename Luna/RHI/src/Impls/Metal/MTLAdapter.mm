@@ -5,7 +5,7 @@
 #include "Impls/Metal/MTLInstance.h"
 #import <Metal/Metal.h>
 
-namespace Cacao
+namespace luna::RHI
 {
     MTLAdapter::MTLAdapter(Ref<MTLInstance> instance, id<MTLDevice> device)
         : m_instance(instance), m_device(device) {}

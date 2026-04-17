@@ -1,5 +1,5 @@
-#ifndef CACAO_BINDLESS_DESCRIPTORS_H
-#define CACAO_BINDLESS_DESCRIPTORS_H
+#ifndef LUNA_RHI_BINDLESS_DESCRIPTORS_H
+#define LUNA_RHI_BINDLESS_DESCRIPTORS_H
 #include "Buffer.h"
 #include "Core.h"
 #include "Sampler.h"
@@ -7,17 +7,17 @@
 
 #include <memory>
 
-namespace Cacao {
+namespace luna::RHI {
 struct BindlessPoolCreateInfo {
     uint32_t MaxTextures = 1'024;
     uint32_t MaxBuffers = 1'024;
     uint32_t MaxSamplers = 256;
 };
 
-class CACAO_API BindlessDescriptorPool {
+class LUNA_RHI_API BindlessDescriptorPool {
 public:
     virtual ~BindlessDescriptorPool() = default;
-    virtual uint32_t AddTexture(const Ref<CacaoTextureView>& view) = 0;
+    virtual uint32_t AddTexture(const Ref<TextureView>& view) = 0;
     virtual uint32_t AddBuffer(const Ref<Buffer>& buffer, uint64_t offset = 0, uint64_t size = UINT64_MAX) = 0;
     virtual uint32_t AddSampler(const Ref<Sampler>& sampler) = 0;
     virtual void RemoveTexture(uint32_t index) = 0;
@@ -25,6 +25,6 @@ public:
     virtual void RemoveSampler(uint32_t index) = 0;
     virtual void Update() = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

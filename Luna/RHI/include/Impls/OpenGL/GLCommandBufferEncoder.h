@@ -1,5 +1,5 @@
-#ifndef CACAO_GLCOMMANDBUFFERENCODER_H
-#define CACAO_GLCOMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_GLCOMMANDBUFFERENCODER_H
+#define LUNA_RHI_GLCOMMANDBUFFERENCODER_H
 #include "CommandBufferEncoder.h"
 #include "GLCommon.h"
 
@@ -7,10 +7,10 @@
 #include <unordered_set>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 using GLCommand = std::function<void()>;
 
-class CACAO_API GLCommandBufferEncoder final : public CommandBufferEncoder {
+class LUNA_RHI_API GLCommandBufferEncoder final : public CommandBufferEncoder {
 public:
     static constexpr size_t INITIAL_COMMAND_CAPACITY = 256;
 
@@ -133,6 +133,6 @@ private:
     bool m_barrierValidation = true;
 #endif
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

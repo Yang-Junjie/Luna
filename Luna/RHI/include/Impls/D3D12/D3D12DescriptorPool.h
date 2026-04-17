@@ -1,10 +1,10 @@
-#ifndef CACAO_D3D12DESCRIPTORPOOL_H
-#define CACAO_D3D12DESCRIPTORPOOL_H
+#ifndef LUNA_RHI_D3D12DESCRIPTORPOOL_H
+#define LUNA_RHI_D3D12DESCRIPTORPOOL_H
 #include "D3D12Common.h"
 #include "DescriptorPool.h"
 
-namespace Cacao {
-class CACAO_API D3D12DescriptorPool : public DescriptorPool {
+namespace luna::RHI {
+class LUNA_RHI_API D3D12DescriptorPool : public DescriptorPool {
 private:
     ComPtr<ID3D12DescriptorHeap> m_cbvSrvUavHeap;
     ComPtr<ID3D12DescriptorHeap> m_samplerHeap;
@@ -44,6 +44,6 @@ public:
         return m_samplerDescriptorSize;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

@@ -8,7 +8,7 @@
 #include "Impls/Vulkan/VKSampler.h"
 #include "Impls/Vulkan/VKTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 vk::DescriptorBufferInfo VKDescriptorSet::ConvertToVkBufferInfo(const BufferWriteInfo& info)
 {
     vk::DescriptorBufferInfo vkInfo = {};
@@ -245,4 +245,4 @@ void VKDescriptorSet::WriteAccelerationStructures(const AccelerationStructureWri
     vkWriteDescriptorSet.pNext = pASInfo;
     m_pendingWrites.push_back(vkWriteDescriptorSet);
 }
-} // namespace Cacao
+} // namespace luna::RHI

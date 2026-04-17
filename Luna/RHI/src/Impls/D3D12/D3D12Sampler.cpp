@@ -1,7 +1,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12Sampler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static D3D12_FILTER ToD3D12Filter(Filter min, Filter mag, SamplerMipmapMode mip, bool aniso)
 {
     if (aniso) {
@@ -77,4 +77,4 @@ const SamplerCreateInfo& D3D12Sampler::GetInfo() const
 {
     return m_createInfo;
 }
-} // namespace Cacao
+} // namespace luna::RHI

@@ -1,15 +1,15 @@
-#ifndef CACAO_D3D12TEXTURE_H
-#define CACAO_D3D12TEXTURE_H
+#ifndef LUNA_RHI_D3D12TEXTURE_H
+#define LUNA_RHI_D3D12TEXTURE_H
 #include "D3D12Common.h"
 #include "D3D12MemAlloc.h"
 #include "Texture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D12Device;
 
 class D3D12Device;
 
-class CACAO_API D3D12TextureView final : public CacaoTextureView {
+class LUNA_RHI_API D3D12TextureView final : public TextureView {
 public:
     D3D12TextureView(const Ref<Texture>& texture,
                      const TextureViewDesc& desc,
@@ -75,7 +75,7 @@ private:
     bool m_hasSRV = false, m_hasRTV = false, m_hasDSV = false, m_hasUAV = false;
 };
 
-class CACAO_API D3D12Texture final : public Texture {
+class LUNA_RHI_API D3D12Texture final : public Texture {
 public:
     D3D12Texture(const Ref<Device>& device, const TextureCreateInfo& info);
     D3D12Texture(const Ref<Device>& device, ComPtr<ID3D12Resource> resource, const TextureCreateInfo& info);
@@ -130,9 +130,9 @@ public:
         return m_currentState;
     }
 
-    Ref<CacaoTextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
 
-    Ref<CacaoTextureView> GetDefaultView() override
+    Ref<TextureView> GetDefaultView() override
     {
         return m_defaultView;
     }
@@ -157,12 +157,12 @@ private:
     Ref<Device> m_device;
     TextureCreateInfo m_createInfo;
     ResourceState m_currentState = ResourceState::Undefined;
-    Ref<CacaoTextureView> m_defaultView;
+    Ref<TextureView> m_defaultView;
     bool m_ownsResource = true;
 
     friend class D3D12Device;
     friend class D3D12Swapchain;
     friend class D3D12CommandBufferEncoder;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

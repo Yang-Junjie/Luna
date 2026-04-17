@@ -1,11 +1,11 @@
-#ifndef CACAO_CACAOPIPELINELAYOUT_H
-#define CACAO_CACAOPIPELINELAYOUT_H
+#ifndef LUNA_RHI_PIPELINELAYOUT_H
+#define LUNA_RHI_PIPELINELAYOUT_H
 #include "PipelineDefs.h"
 
 #include <memory>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class DescriptorSetLayout;
 
 struct PipelineLayoutCreateInfo {
@@ -13,9 +13,9 @@ struct PipelineLayoutCreateInfo {
     std::vector<PushConstantRange> PushConstantRanges;
 };
 
-class CACAO_API PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
+class LUNA_RHI_API PipelineLayout : public std::enable_shared_from_this<PipelineLayout> {
 public:
     virtual ~PipelineLayout() = default;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

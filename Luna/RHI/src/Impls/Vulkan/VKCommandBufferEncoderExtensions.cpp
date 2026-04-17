@@ -9,7 +9,7 @@
 #include "Impls/Vulkan/VKShaderBindingTable.h"
 #include "Impls/Vulkan/VKTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 void VKCommandBufferEncoder::DrawIndirect(const Ref<Buffer>& argBuffer,
                                           uint64_t offset,
                                           uint32_t drawCount,
@@ -192,4 +192,4 @@ void VKCommandBufferEncoder::CopyTexture2D(const Ref<Texture>& src, const Ref<Te
                    &region,
                    VK_FILTER_NEAREST);
 }
-} // namespace Cacao
+} // namespace luna::RHI

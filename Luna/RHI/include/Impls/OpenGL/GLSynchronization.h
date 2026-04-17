@@ -1,12 +1,12 @@
-#ifndef CACAO_GLSYNCHRONIZATION_H
-#define CACAO_GLSYNCHRONIZATION_H
+#ifndef LUNA_RHI_GLSYNCHRONIZATION_H
+#define LUNA_RHI_GLSYNCHRONIZATION_H
 #include "GLCommon.h"
 #include "Synchronization.h"
 
 #include <vector>
 
-namespace Cacao {
-class CACAO_API GLSynchronization final : public Synchronization {
+namespace luna::RHI {
+class LUNA_RHI_API GLSynchronization final : public Synchronization {
 public:
     GLSynchronization(uint32_t maxFramesInFlight);
     static Ref<GLSynchronization> Create(uint32_t maxFramesInFlight);
@@ -24,6 +24,6 @@ private:
     uint32_t m_maxFramesInFlight;
     mutable std::vector<GLsync> m_fences;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

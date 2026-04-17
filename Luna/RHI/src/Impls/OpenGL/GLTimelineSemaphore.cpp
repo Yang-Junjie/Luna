@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLTimelineSemaphore.h"
 
-namespace Cacao {
+namespace luna::RHI {
 GLTimelineSemaphore::GLTimelineSemaphore(uint64_t initialValue)
     : m_currentValue(initialValue)
 {}
@@ -52,4 +52,4 @@ bool GLTimelineSemaphore::Wait(uint64_t value, uint64_t timeoutNs)
     m_fences.erase(it);
     return result != GL_WAIT_FAILED;
 }
-} // namespace Cacao
+} // namespace luna::RHI

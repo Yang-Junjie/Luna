@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLSampler.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static GLenum FilterToGL(Filter mode)
 {
     return (mode == Filter::Nearest) ? GL_NEAREST : GL_LINEAR;
@@ -55,4 +55,4 @@ GLSampler::~GLSampler()
         glDeleteSamplers(1, &m_sampler);
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

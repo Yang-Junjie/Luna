@@ -1,14 +1,14 @@
-#ifndef CACAO_WGPU_DEVICE_H
-#define CACAO_WGPU_DEVICE_H
+#ifndef LUNA_RHI_WGPU_DEVICE_H
+#define LUNA_RHI_WGPU_DEVICE_H
 
 #include "Device.h"
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUAdapter;
 
-class CACAO_API WGPUDevice final : public Device {
+class LUNA_RHI_API WGPUDevice final : public Device {
 private:
     Ref<Adapter> m_parentAdapter;
     ::WGPUDevice m_device = nullptr;
@@ -49,6 +49,6 @@ public:
     Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& info) override;
     Ref<Synchronization> CreateSynchronization(uint32_t maxFramesInFlight) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

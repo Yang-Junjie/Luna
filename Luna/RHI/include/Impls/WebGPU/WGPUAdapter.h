@@ -1,14 +1,14 @@
-#ifndef CACAO_WGPU_ADAPTER_H
-#define CACAO_WGPU_ADAPTER_H
+#ifndef LUNA_RHI_WGPU_ADAPTER_H
+#define LUNA_RHI_WGPU_ADAPTER_H
 
 #include "Adapter.h"
 
 #include <webgpu/webgpu.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class WGPUInstance;
 
-class CACAO_API WGPUAdapter : public Adapter {
+class LUNA_RHI_API WGPUAdapter : public Adapter {
 private:
     Ref<WGPUInstance> m_instance;
     ::WGPUAdapter m_adapter = nullptr;
@@ -31,6 +31,6 @@ public:
         return m_adapter;
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

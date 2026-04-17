@@ -11,7 +11,7 @@
 
 #include <iostream>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
     : m_parentAdapter(adapter)
 {
@@ -25,7 +25,7 @@ WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
     DeviceResult result;
 
     WGPUDeviceDescriptor desc = {};
-    desc.label = "Cacao WGPUDevice";
+    desc.label = "Luna RHI WGPUDevice";
 
     wgpuAdapterRequestDevice(
         wgpuAdapter->GetNativeAdapter(),
@@ -167,4 +167,4 @@ Ref<Synchronization> WGPUDevice::CreateSynchronization(uint32_t maxFramesInFligh
 {
     return std::make_shared<WGPUSynchronization>(maxFramesInFlight);
 }
-} // namespace Cacao
+} // namespace luna::RHI

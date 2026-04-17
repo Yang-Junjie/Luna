@@ -1,10 +1,10 @@
-#ifndef CACAO_GLDEVICE_H
-#define CACAO_GLDEVICE_H
+#ifndef LUNA_RHI_GLDEVICE_H
+#define LUNA_RHI_GLDEVICE_H
 #include "Device.h"
 #include "GLCommon.h"
 
-namespace Cacao {
-class CACAO_API GLDevice final : public Device {
+namespace luna::RHI {
+class LUNA_RHI_API GLDevice final : public Device {
 public:
     static Ref<GLDevice> Create(const Ref<Adapter>& adapter, const DeviceCreateInfo& createInfo);
     GLDevice(const Ref<Adapter>& adapter, const DeviceCreateInfo& createInfo);
@@ -42,6 +42,6 @@ private:
     GLint m_maxTextureSize = 0;
     GLint m_maxComputeWorkGroupCount[3] = {};
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

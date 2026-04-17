@@ -1,7 +1,7 @@
 #include "Impls/Vulkan/VKBuffer.h"
 #include "Impls/Vulkan/VKDevice.h"
 
-Cacao::VKBuffer::VKBuffer(const Ref<Device>& device, const VmaAllocator& allocator, const BufferCreateInfo& info)
+luna::RHI::VKBuffer::VKBuffer(const Ref<Device>& device, const VmaAllocator& allocator, const BufferCreateInfo& info)
     : m_device(device),
       m_allocator(allocator),
       m_createInfo(info)
@@ -76,45 +76,45 @@ Cacao::VKBuffer::VKBuffer(const Ref<Device>& device, const VmaAllocator& allocat
     }
 }
 
-Cacao::Ref<Cacao::VKBuffer>
-    Cacao::VKBuffer::Create(const Ref<Device>& device, const VmaAllocator& allocator, const BufferCreateInfo& info)
+luna::RHI::Ref<luna::RHI::VKBuffer>
+    luna::RHI::VKBuffer::Create(const Ref<Device>& device, const VmaAllocator& allocator, const BufferCreateInfo& info)
 {
     return CreateRef<VKBuffer>(device, allocator, info);
 }
 
-uint64_t Cacao::VKBuffer::GetSize() const
+uint64_t luna::RHI::VKBuffer::GetSize() const
 {
     return m_createInfo.Size;
 }
 
-Cacao::BufferUsageFlags Cacao::VKBuffer::GetUsage() const
+luna::RHI::BufferUsageFlags luna::RHI::VKBuffer::GetUsage() const
 {
     return m_createInfo.Usage;
 }
 
-Cacao::BufferMemoryUsage Cacao::VKBuffer::GetMemoryUsage() const
+luna::RHI::BufferMemoryUsage luna::RHI::VKBuffer::GetMemoryUsage() const
 {
     return m_createInfo.MemoryUsage;
 }
 
-void* Cacao::VKBuffer::Map()
+void* luna::RHI::VKBuffer::Map()
 {
     void* mapped;
     vmaMapMemory(m_allocator, m_allocation, &mapped);
     return mapped;
 }
 
-void Cacao::VKBuffer::Unmap()
+void luna::RHI::VKBuffer::Unmap()
 {
     vmaUnmapMemory(m_allocator, m_allocation);
 }
 
-void Cacao::VKBuffer::Flush(uint64_t offset, uint64_t size)
+void luna::RHI::VKBuffer::Flush(uint64_t offset, uint64_t size)
 {
     vmaFlushAllocation(m_allocator, m_allocation, offset, size);
 }
 
-Cacao::VKBuffer::~VKBuffer()
+luna::RHI::VKBuffer::~VKBuffer()
 {
     if (m_allocator && m_allocation) {
         vmaDestroyBuffer(m_allocator, static_cast<VkBuffer>(m_buffer), m_allocation);
@@ -123,7 +123,7 @@ Cacao::VKBuffer::~VKBuffer()
     }
 }
 
-uint64_t Cacao::VKBuffer::GetDeviceAddress() const
+uint64_t luna::RHI::VKBuffer::GetDeviceAddress() const
 {
     vk::BufferDeviceAddressInfo addressInfo = vk::BufferDeviceAddressInfo().setBuffer(m_buffer);
     return std::dynamic_pointer_cast<VKDevice>(m_device)->GetHandle().getBufferAddress(addressInfo);

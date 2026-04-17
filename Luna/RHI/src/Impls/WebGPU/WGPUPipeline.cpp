@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUGraphicsPipeline::WGPUGraphicsPipeline(const Ref<Device>& device, const GraphicsPipelineCreateInfo& info)
     : m_layout(info.Layout),
       m_createInfo(info)
@@ -233,4 +233,4 @@ WGPUComputePipelineImpl::~WGPUComputePipelineImpl()
         m_pipeline = nullptr;
     }
 }
-} // namespace Cacao
+} // namespace luna::RHI

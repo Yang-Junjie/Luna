@@ -1,16 +1,16 @@
-#ifndef CACAO_CACAOPIPELINE_H
-#define CACAO_CACAOPIPELINE_H
+#ifndef LUNA_RHI_PIPELINE_H
+#define LUNA_RHI_PIPELINE_H
 #include "PipelineDefs.h"
 #include "ShaderModule.h"
 
 #include <memory>
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 class PipelineLayout;
 class PipelineCache;
 
-class CACAO_API PipelineCache : public std::enable_shared_from_this<PipelineCache> {
+class LUNA_RHI_API PipelineCache : public std::enable_shared_from_this<PipelineCache> {
 public:
     virtual ~PipelineCache() = default;
     virtual std::vector<uint8_t> GetData() const = 0;
@@ -41,7 +41,7 @@ struct GraphicsPipelineCreateInfo {
     Ref<PipelineCache> Cache = nullptr;
 };
 
-class CACAO_API GraphicsPipeline : public std::enable_shared_from_this<GraphicsPipeline> {
+class LUNA_RHI_API GraphicsPipeline : public std::enable_shared_from_this<GraphicsPipeline> {
 public:
     virtual ~GraphicsPipeline() = default;
     virtual Ref<PipelineLayout> GetLayout() const = 0;
@@ -53,7 +53,7 @@ struct ComputePipelineCreateInfo {
     Ref<PipelineCache> Cache = nullptr;
 };
 
-class CACAO_API ComputePipeline : public std::enable_shared_from_this<ComputePipeline> {
+class LUNA_RHI_API ComputePipeline : public std::enable_shared_from_this<ComputePipeline> {
 public:
     virtual ~ComputePipeline() = default;
     virtual Ref<PipelineLayout> GetLayout() const = 0;
@@ -66,10 +66,10 @@ struct RayTracingPipelineCreateInfo {
     Ref<PipelineCache> Cache = nullptr;
 };
 
-class CACAO_API RayTracingPipeline : public std::enable_shared_from_this<RayTracingPipeline> {
+class LUNA_RHI_API RayTracingPipeline : public std::enable_shared_from_this<RayTracingPipeline> {
 public:
     virtual ~RayTracingPipeline() = default;
     virtual Ref<PipelineLayout> GetLayout() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

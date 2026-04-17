@@ -5,7 +5,7 @@
 
 #include <utility>
 
-namespace Cacao {
+namespace luna::RHI {
 VKTextureView::VKTextureView(const Ref<Texture>& texture, const TextureViewDesc& desc)
     : m_desc(desc)
 {
@@ -307,8 +307,8 @@ ResourceState VKTexture::GetCurrentState() const
     return m_createInfo.InitialState;
 }
 
-Ref<CacaoTextureView> VKTexture::CreateView(const TextureViewDesc& desc)
+Ref<TextureView> VKTexture::CreateView(const TextureViewDesc& desc)
 {
     return VKTextureView::Create(shared_from_this(), desc);
 }
-} // namespace Cacao
+} // namespace luna::RHI

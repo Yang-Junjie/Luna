@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLQueryPool.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static GLenum QueryTypeToGL(QueryType type)
 {
     switch (type) {
@@ -87,4 +87,4 @@ bool GLQueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::vect
     }
     return true;
 }
-} // namespace Cacao
+} // namespace luna::RHI

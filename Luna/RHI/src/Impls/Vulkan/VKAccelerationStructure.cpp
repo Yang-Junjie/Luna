@@ -2,7 +2,7 @@
 #include "Impls/Vulkan/VKBuffer.h"
 #include "Impls/Vulkan/VKDevice.h"
 
-namespace Cacao {
+namespace luna::RHI {
 VKAccelerationStructure::VKAccelerationStructure(const Ref<Device>& device, const AccelerationStructureCreateInfo& info)
     : m_type(info.Type),
       m_device(device)
@@ -219,4 +219,4 @@ VkAccelerationStructureBuildGeometryInfoKHR VKAccelerationStructure::GetBuildInf
     return info;
 }
 
-} // namespace Cacao
+} // namespace luna::RHI

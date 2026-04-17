@@ -3,7 +3,7 @@
 
 #include <vector>
 
-namespace Cacao {
+namespace luna::RHI {
 WGPUQueueImpl::WGPUQueueImpl(::WGPUQueue queue, ::WGPUDevice device)
     : m_queue(queue),
       m_device(device)
@@ -114,4 +114,4 @@ Ref<Queue> WGPUSurfaceImpl::GetPresentQueue(const Ref<Device>& device)
 {
     return device->GetQueue(QueueType::Graphics, 0);
 }
-} // namespace Cacao
+} // namespace luna::RHI

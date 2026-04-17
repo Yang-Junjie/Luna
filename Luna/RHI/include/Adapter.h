@@ -1,8 +1,8 @@
-#ifndef CACAO_CACAOADAPTER_H
-#define CACAO_CACAOADAPTER_H
+#ifndef LUNA_RHI_ADAPTER_H
+#define LUNA_RHI_ADAPTER_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 struct DeviceCreateInfo;
 class Device;
 
@@ -86,7 +86,7 @@ struct DeviceLimits {
     bool supportsStorageBufferWriteInGraphics = false;
 };
 
-class CACAO_API Adapter : public std::enable_shared_from_this<Adapter> {
+class LUNA_RHI_API Adapter : public std::enable_shared_from_this<Adapter> {
 public:
     virtual ~Adapter() = default;
     virtual AdapterProperties GetProperties() const = 0;
@@ -118,5 +118,5 @@ template <> struct to_string<AdapterType> {
         }
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

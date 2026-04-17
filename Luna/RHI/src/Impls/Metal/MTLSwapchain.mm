@@ -5,7 +5,7 @@
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 
-namespace Cacao
+namespace luna::RHI
 {
     static MTLPixelFormat ToMTLPixelFormatSwap(Format format)
     {

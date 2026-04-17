@@ -1,15 +1,15 @@
-#ifndef CACAO_VKPIPELINECACHE_H
-#define CACAO_VKPIPELINECACHE_H
+#ifndef LUNA_RHI_VKPIPELINECACHE_H
+#define LUNA_RHI_VKPIPELINECACHE_H
 
 #include "Device.h"
 #include "Pipeline.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 
-class CACAO_API VKPipelineCache final : public PipelineCache {
+class LUNA_RHI_API VKPipelineCache final : public PipelineCache {
 private:
     vk::PipelineCache m_cache;
     Ref<VKDevice> m_device;
@@ -31,6 +31,6 @@ public:
         return CreateRef<VKPipelineCache>(device, initialData);
     }
 };
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif

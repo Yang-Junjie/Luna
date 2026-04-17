@@ -1,13 +1,13 @@
-#ifndef CACAO_D3D11PIPELINE_H
-#define CACAO_D3D11PIPELINE_H
+#ifndef LUNA_RHI_D3D11PIPELINE_H
+#define LUNA_RHI_D3D11PIPELINE_H
 #include "D3D11Common.h"
 
 #include <Pipeline.h>
 
-namespace Cacao {
+namespace luna::RHI {
 class D3D11Device;
 
-class CACAO_API D3D11GraphicsPipeline : public GraphicsPipeline {
+class LUNA_RHI_API D3D11GraphicsPipeline : public GraphicsPipeline {
 public:
     D3D11GraphicsPipeline(Ref<D3D11Device> device, const GraphicsPipelineCreateInfo& info);
 
@@ -71,7 +71,7 @@ public:
     }
 };
 
-class CACAO_API D3D11ComputePipeline : public ComputePipeline {
+class LUNA_RHI_API D3D11ComputePipeline : public ComputePipeline {
 public:
     D3D11ComputePipeline(Ref<D3D11Device> device, const ComputePipelineCreateInfo& info);
 
@@ -90,5 +90,5 @@ private:
     ComPtr<ID3D11ComputeShader> m_cs;
     Ref<PipelineLayout> m_layout;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

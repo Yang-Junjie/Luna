@@ -1,14 +1,14 @@
-#ifndef CACAO_CACAOSURFACE_H
-#define CACAO_CACAOSURFACE_H
+#ifndef LUNA_RHI_SURFACE_H
+#define LUNA_RHI_SURFACE_H
 #include "Core.h"
 
-namespace Cacao {
+namespace luna::RHI {
 class Device;
 class Queue;
 class Adapter;
-} // namespace Cacao
+} // namespace luna::RHI
 
-namespace Cacao {
+namespace luna::RHI {
 enum class SurfaceRotation {
     Identity,
     Rotate90,
@@ -47,7 +47,7 @@ enum class PresentMode {
     FifoRelaxed
 };
 
-class CACAO_API Surface : public std::enable_shared_from_this<Surface> {
+class LUNA_RHI_API Surface : public std::enable_shared_from_this<Surface> {
 public:
     virtual ~Surface() = default;
     virtual SurfaceCapabilities GetCapabilities(const Ref<Adapter>& adapter) = 0;
@@ -55,5 +55,5 @@ public:
     virtual Ref<Queue> GetPresentQueue(const Ref<Device>& device) = 0;
     virtual std::vector<PresentMode> GetSupportedPresentModes(const Ref<Adapter>& adapter) = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

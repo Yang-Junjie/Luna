@@ -1,6 +1,6 @@
 #include "Impls/OpenGL/GLTexture.h"
 
-namespace Cacao {
+namespace luna::RHI {
 // --- GLTextureView ---
 GLTextureView::GLTextureView(const Ref<Texture>& texture, const TextureViewDesc& desc)
     : m_texture(std::dynamic_pointer_cast<GLTexture>(texture)),
@@ -113,12 +113,12 @@ ResourceState GLTexture::GetCurrentState() const
     return ResourceState::Undefined;
 }
 
-Ref<CacaoTextureView> GLTexture::CreateView(const TextureViewDesc& desc)
+Ref<TextureView> GLTexture::CreateView(const TextureViewDesc& desc)
 {
     return GLTextureView::Create(shared_from_this(), desc);
 }
 
-Ref<CacaoTextureView> GLTexture::GetDefaultView()
+Ref<TextureView> GLTexture::GetDefaultView()
 {
     CreateDefaultViewIfNeeded();
     return m_defaultView;
@@ -147,4 +147,4 @@ void GLTexture::GenerateMipmaps()
     glGenerateMipmap(m_target);
     glBindTexture(m_target, 0);
 }
-} // namespace Cacao
+} // namespace luna::RHI

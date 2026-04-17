@@ -1,12 +1,12 @@
-#ifndef CACAO_CACAOBUFFER_H
-#define CACAO_CACAOBUFFER_H
+#ifndef LUNA_RHI_BUFFER_H
+#define LUNA_RHI_BUFFER_H
 #include "Core.h"
 
 #include <cstring>
 
 #include <string>
 
-namespace Cacao {
+namespace luna::RHI {
 enum class BufferUsageFlags : uint32_t {
     None = 0,
     TransferSrc = 1 << 0,
@@ -46,7 +46,7 @@ struct BufferCreateInfo {
     const void* InitialData = nullptr;
 };
 
-class CACAO_API Buffer {
+class LUNA_RHI_API Buffer {
 public:
     virtual ~Buffer() = default;
     virtual uint64_t GetSize() const = 0;
@@ -76,5 +76,5 @@ public:
 
     virtual uint64_t GetDeviceAddress() const = 0;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

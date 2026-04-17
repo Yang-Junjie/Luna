@@ -1,5 +1,5 @@
-#ifndef CACAO_MTL_COMMON_H
-#define CACAO_MTL_COMMON_H
+#ifndef LUNA_RHI_MTL_COMMON_H
+#define LUNA_RHI_MTL_COMMON_H
 
 #ifdef __APPLE__
 
@@ -11,7 +11,7 @@
 #import <QuartzCore/CAMetalLayer.h>
 #endif
 
-namespace Cacao {
+namespace luna::RHI {
 #ifdef __OBJC__
 MTLPixelFormat ToMTLPixelFormat(Format format);
 Format FromMTLPixelFormat(MTLPixelFormat format);
@@ -22,7 +22,7 @@ MTLWinding ToMTLWinding(FrontFace face);
 MTLSamplerMinMagFilter ToMTLFilter(Filter filter);
 MTLSamplerAddressMode ToMTLAddressMode(SamplerAddressMode mode);
 #endif
-} // namespace Cacao
+} // namespace luna::RHI
 
 #endif // __APPLE__
 #endif

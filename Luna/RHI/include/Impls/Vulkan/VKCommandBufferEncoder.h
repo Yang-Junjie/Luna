@@ -1,14 +1,14 @@
-#ifndef CACAO_VKCOMMANDBUFFERENCODER_H
-#define CACAO_VKCOMMANDBUFFERENCODER_H
+#ifndef LUNA_RHI_VKCOMMANDBUFFERENCODER_H
+#define LUNA_RHI_VKCOMMANDBUFFERENCODER_H
 #include "CommandBufferEncoder.h"
 
 #include <vulkan/vulkan.hpp>
 
-namespace Cacao {
+namespace luna::RHI {
 class VKDevice;
 class Device;
 
-class CACAO_API VKCommandBufferEncoder : public CommandBufferEncoder {
+class LUNA_RHI_API VKCommandBufferEncoder : public CommandBufferEncoder {
 private:
     vk::CommandBuffer m_commandBuffer;
     Ref<VKDevice> m_device;
@@ -160,5 +160,5 @@ public:
 
     void CopyTexture2D(const Ref<Texture>& src, const Ref<Texture>& dst) override;
 };
-} // namespace Cacao
+} // namespace luna::RHI
 #endif

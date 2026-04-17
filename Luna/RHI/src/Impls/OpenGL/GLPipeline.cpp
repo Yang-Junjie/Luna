@@ -2,7 +2,7 @@
 #include "Impls/OpenGL/GLPipeline.h"
 #include "Impls/OpenGL/GLShaderModule.h"
 
-namespace Cacao {
+namespace luna::RHI {
 static GLenum CompareOpToGL(CompareOp op)
 {
     switch (op) {
@@ -224,4 +224,4 @@ Ref<GLComputePipeline> GLComputePipeline::Create(const ComputePipelineCreateInfo
 {
     return std::make_shared<GLComputePipeline>(info);
 }
-} // namespace Cacao
+} // namespace luna::RHI
