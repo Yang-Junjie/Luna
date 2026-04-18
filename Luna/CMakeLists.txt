@@ -24,11 +24,17 @@ set(RENDERER_SOURCE
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
     Renderer/RenderGraphBuilder.cpp
+    Renderer/RendererInternal.h
     Renderer/SceneRenderer.h
+    Renderer/SceneRendererInternal.h
     Renderer/SceneRenderer.cpp
+    Renderer/SceneRendererResources.cpp
+    Renderer/SceneRendererPasses.cpp
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Renderer.h
-    Renderer/Renderer.cpp)
+    Renderer/Renderer.cpp
+    Renderer/RendererFrame.cpp
+    Renderer/RendererSceneOutput.cpp)
 
 set(SCENE_SOURCE
     Scene/Components.h

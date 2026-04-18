@@ -4,6 +4,7 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/SceneRenderer.h"
 
+#include <Barrier.h>
 #include <cstdint>
 
 #include <Core.h>
@@ -65,6 +66,9 @@ public:
 
     bool init(Window& window, InitializationOptions options = {});
     void shutdown();
+    void startFrame();
+    void renderFrame();
+    void endFrame();
 
     bool isInitialized() const;
     bool isRenderingEnabled() const;
@@ -79,10 +83,6 @@ public:
     luna::RHI::Extent2D getSceneOutputSize() const;
     const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
 
-    void startFrame();
-    void renderFrame();
-    void endFrame();
-
     GLFWwindow* getNativeWindow() const;
 
     const luna::RHI::Ref<luna::RHI::Instance>& getInstance() const;
@@ -94,7 +94,7 @@ public:
 
     const luna::RHI::Ref<luna::RHI::ShaderCompiler>& getShaderCompiler() const
     {
-        return m_shader_compiler;
+        return m_device_context.shader_compiler;
     }
 
     uint32_t getFramesInFlight() const;
@@ -108,6 +108,53 @@ public:
     const glm::vec4& getClearColor() const;
 
 private:
+    struct WindowContext {
+        Window* window{nullptr};
+        GLFWwindow* native_window{nullptr};
+    };
+
+    struct DeviceContext {
+        luna::RHI::Ref<luna::RHI::Instance> instance;
+        luna::RHI::Ref<luna::RHI::Adapter> adapter;
+        luna::RHI::Ref<luna::RHI::Device> device;
+        luna::RHI::Ref<luna::RHI::Surface> surface;
+        luna::RHI::Ref<luna::RHI::Swapchain> swapchain;
+        luna::RHI::Ref<luna::RHI::Queue> graphics_queue;
+        luna::RHI::Ref<luna::RHI::ShaderCompiler> shader_compiler;
+        luna::RHI::Ref<luna::RHI::Synchronization> synchronization;
+        luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
+    };
+
+    struct SceneOutputState {
+        SceneOutputMode mode{SceneOutputMode::Swapchain};
+        luna::RHI::Extent2D extent{0, 0};
+        luna::RHI::Ref<luna::RHI::Texture> color;
+        luna::RHI::Ref<luna::RHI::Texture> depth;
+        luna::RHI::ResourceState color_state{luna::RHI::ResourceState::Undefined};
+        luna::RHI::ResourceState depth_state{luna::RHI::ResourceState::Undefined};
+    };
+
+    struct FrameResources {
+        luna::RHI::Ref<luna::RHI::CommandBufferEncoder> current_command_buffer;
+        std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> command_buffers;
+        std::vector<std::unique_ptr<luna::rhi::RenderGraph>> render_graphs;
+        std::vector<luna::rhi::RenderGraphTransientTextureCache> transient_texture_caches;
+        uint32_t frames_in_flight{0};
+        uint32_t frame_index{0};
+        uint32_t image_index{0};
+        std::vector<bool> swapchain_images_presented;
+    };
+
+    struct RuntimeState {
+        InitializationOptions initialization_options{};
+        Camera main_camera{};
+        glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
+        bool initialized{false};
+        bool imgui_enabled{false};
+        bool resize_requested{false};
+        bool frame_started{false};
+    };
+
     void createSwapchain(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
@@ -115,48 +162,15 @@ private:
     void releaseFrameCommandBuffers();
     void ensureSceneOutputTargets(uint32_t width, uint32_t height);
     void releaseSceneOutputTargets();
+    void waitForGpuIdle() noexcept;
 
 private:
-    Window* m_window{nullptr};
-    GLFWwindow* m_native_window{nullptr};
-
-    luna::RHI::Ref<luna::RHI::Instance> m_instance;
-    luna::RHI::Ref<luna::RHI::Adapter> m_adapter;
-    luna::RHI::Ref<luna::RHI::Device> m_device;
-    luna::RHI::Ref<luna::RHI::Surface> m_surface;
-    luna::RHI::Ref<luna::RHI::Swapchain> m_swapchain;
-    luna::RHI::Ref<luna::RHI::Queue> m_graphics_queue;
-    luna::RHI::Ref<luna::RHI::ShaderCompiler> m_shader_compiler;
-    luna::RHI::Ref<luna::RHI::Synchronization> m_synchronization;
-    luna::RHI::Ref<luna::RHI::CommandBufferEncoder> m_current_command_buffer;
-    std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> m_frame_command_buffers;
-    std::vector<std::unique_ptr<luna::rhi::RenderGraph>> m_frame_render_graphs;
-    std::vector<luna::rhi::RenderGraphTransientTextureCache> m_frame_transient_texture_caches;
-
-    InitializationOptions m_initialization_options{};
-
+    WindowContext m_window_context{};
+    DeviceContext m_device_context{};
+    SceneOutputState m_scene_output{};
+    FrameResources m_frame_resources{};
+    RuntimeState m_runtime{};
     SceneRenderer m_scene_renderer{};
-
-    Camera m_main_camera{};
-
-    glm::vec4 m_clear_color{0.10f, 0.10f, 0.12f, 1.0f};
-    luna::RHI::Format m_surface_format{luna::RHI::Format::UNDEFINED};
-    SceneOutputMode m_scene_output_mode{SceneOutputMode::Swapchain};
-    luna::RHI::Extent2D m_scene_output_extent{0, 0};
-    luna::RHI::Ref<luna::RHI::Texture> m_scene_output_color;
-    luna::RHI::Ref<luna::RHI::Texture> m_scene_output_depth;
-    luna::RHI::ResourceState m_scene_output_color_state{luna::RHI::ResourceState::Undefined};
-    luna::RHI::ResourceState m_scene_output_depth_state{luna::RHI::ResourceState::Undefined};
-
-    uint32_t m_frames_in_flight{0};
-    uint32_t m_frame_index{0};
-    uint32_t m_image_index{0};
-    std::vector<bool> m_swapchain_images_presented;
-
-    bool m_initialized{false};
-    bool m_imgui_enabled{false};
-    bool m_resize_requested{false};
-    bool m_frame_started{false};
 };
 
 } // namespace luna

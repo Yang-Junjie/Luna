@@ -2,9 +2,9 @@
 
 #include "Renderer/Camera.h"
 #include "Renderer/Material.h"
-#include "Renderer/Mesh.h"
 #include "Renderer/RenderGraphBuilder.h"
 
+#include <CommandBufferEncoder.h>
 #include <Core.h>
 #include <filesystem>
 #include <glm/mat4x4.hpp>
@@ -16,7 +16,6 @@
 
 namespace luna::RHI {
 class Buffer;
-class CommandBufferEncoder;
 class DescriptorPool;
 class DescriptorSet;
 class DescriptorSetLayout;
@@ -31,6 +30,8 @@ class Texture;
 
 namespace luna {
 
+class Mesh;
+
 class SceneRenderer {
 public:
     struct ShaderPaths {
@@ -39,7 +40,7 @@ public:
         std::filesystem::path lighting_vertex_path;
         std::filesystem::path lighting_fragment_path;
 
-        bool isComplete() const
+        [[nodiscard]] bool isComplete() const
         {
             return !geometry_vertex_path.empty() && !geometry_fragment_path.empty();
         }
@@ -55,6 +56,12 @@ public:
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         uint32_t framebuffer_width{0};
         uint32_t framebuffer_height{0};
+
+        [[nodiscard]] bool isValid() const
+        {
+            return device && color_target.isValid() && depth_target.isValid() && framebuffer_width > 0 &&
+                   framebuffer_height > 0;
+        }
     };
 
     SceneRenderer() = default;
@@ -63,15 +70,14 @@ public:
     SceneRenderer(const SceneRenderer&) = delete;
     SceneRenderer& operator=(const SceneRenderer&) = delete;
 
-    void shutdown();
-
     void beginScene(const Camera& camera);
-    void clearSubmittedMeshes();
-    void setShaderPaths(ShaderPaths shader_paths);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
                           std::shared_ptr<Material> material = {});
     void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
+    void clearSubmittedMeshes();
+    void setShaderPaths(ShaderPaths shader_paths);
+    void shutdown();
 
 private:
     struct StaticMeshDrawCommand {
@@ -103,10 +109,57 @@ private:
         luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
     };
 
+    struct DrawQueueState {
+        Camera camera{};
+        std::vector<StaticMeshDrawCommand> opaque_draw_commands;
+        std::vector<StaticMeshDrawCommand> transparent_draw_commands;
+    };
+
+    struct UploadCacheState {
+        std::unordered_map<const Mesh*, UploadedMesh> uploaded_meshes;
+        std::unordered_map<const Material*, UploadedMaterial> uploaded_materials;
+    };
+
+    struct GpuState {
+        luna::RHI::Ref<luna::RHI::Device> device;
+
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> geometry_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> lighting_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> transparent_pipeline;
+
+        luna::RHI::Ref<luna::RHI::PipelineLayout> geometry_pipeline_layout;
+        luna::RHI::Ref<luna::RHI::PipelineLayout> lighting_pipeline_layout;
+        luna::RHI::Ref<luna::RHI::PipelineLayout> transparent_pipeline_layout;
+
+        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> material_layout;
+        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> gbuffer_layout;
+        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> scene_layout;
+
+        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
+
+        luna::RHI::Ref<luna::RHI::Sampler> material_sampler;
+        luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+        luna::RHI::Ref<luna::RHI::Sampler> environment_sampler;
+
+        luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
+        luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
+        luna::RHI::Ref<luna::RHI::Buffer> scene_params_buffer;
+        UploadedTexture environment_texture;
+
+        luna::RHI::Ref<luna::RHI::ShaderModule> geometry_vertex_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> geometry_fragment_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> lighting_vertex_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> lighting_fragment_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> transparent_fragment_shader;
+
+        luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
+    };
+
     static ShaderPaths getDefaultShaderPaths();
     static rhi::ImageData createFallbackImageData(const glm::vec4& albedo_color);
     static std::filesystem::path getDefaultEnvironmentPath();
 
+    const Material& resolveMaterial(const std::shared_ptr<Material>& material) const;
     void resetPipelineState();
     void ensurePipelines(const RenderContext& context);
     ShaderPaths resolveShaderPaths() const;
@@ -128,48 +181,11 @@ private:
     void sortTransparentDrawCommands();
 
 private:
-    Camera m_camera{};
-    std::vector<StaticMeshDrawCommand> m_opaque_draw_commands;
-    std::vector<StaticMeshDrawCommand> m_transparent_draw_commands;
-
-    std::unordered_map<const Mesh*, UploadedMesh> m_uploaded_meshes;
-    std::unordered_map<const Material*, UploadedMaterial> m_uploaded_materials;
-
+    DrawQueueState m_draw_queue{};
+    UploadCacheState m_upload_cache{};
     Material m_default_material;
     ShaderPaths m_shader_paths{};
-
-    luna::RHI::Ref<luna::RHI::Device> m_device;
-
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> m_geometry_pipeline;
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> m_lighting_pipeline;
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> m_transparent_pipeline;
-
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_geometry_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_lighting_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_transparent_pipeline_layout;
-
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_material_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_gbuffer_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_scene_layout;
-
-    luna::RHI::Ref<luna::RHI::DescriptorPool> m_descriptor_pool;
-
-    luna::RHI::Ref<luna::RHI::Sampler> m_material_sampler;
-    luna::RHI::Ref<luna::RHI::Sampler> m_gbuffer_sampler;
-    luna::RHI::Ref<luna::RHI::Sampler> m_environment_sampler;
-
-    luna::RHI::Ref<luna::RHI::DescriptorSet> m_gbuffer_descriptor_set;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> m_scene_descriptor_set;
-    luna::RHI::Ref<luna::RHI::Buffer> m_scene_params_buffer;
-    UploadedTexture m_environment_texture;
-
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_geometry_vertex_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_geometry_fragment_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_lighting_vertex_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_lighting_fragment_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_transparent_fragment_shader;
-
-    luna::RHI::Format m_surface_format{luna::RHI::Format::UNDEFINED};
+    GpuState m_gpu{};
 };
 
 } // namespace luna
