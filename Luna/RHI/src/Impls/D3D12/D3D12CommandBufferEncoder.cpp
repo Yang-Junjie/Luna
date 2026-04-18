@@ -34,11 +34,28 @@ D3D12CommandBufferEncoder::D3D12CommandBufferEncoder(const Ref<Device>& device,
     m_commandList->Close();
 }
 
+void D3D12CommandBufferEncoder::Free()
+{
+    auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
+    if (d3dDevice) {
+        d3dDevice->FreeCommandBuffer(shared_from_this());
+    }
+}
+
 void D3D12CommandBufferEncoder::Reset()
 {
     if (m_isRecording) {
         m_commandList->Close();
         m_isRecording = false;
+    }
+    m_currentPipeline = nullptr;
+}
+
+void D3D12CommandBufferEncoder::ReturnToPool()
+{
+    auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
+    if (d3dDevice) {
+        d3dDevice->ReturnCommandBuffer(shared_from_this());
     }
 }
 
@@ -47,6 +64,7 @@ void D3D12CommandBufferEncoder::Begin(const CommandBufferBeginInfo& info)
     if (!m_isRecording) {
         m_allocator->Reset();
         m_commandList->Reset(m_allocator.Get(), nullptr);
+        m_currentPipeline = nullptr;
         m_isRecording = true;
     }
 }
@@ -55,6 +73,7 @@ void D3D12CommandBufferEncoder::End()
 {
     m_commandList->Close();
     m_isRecording = false;
+    m_currentPipeline = nullptr;
 }
 
 void D3D12CommandBufferEncoder::BeginRendering(const RenderingInfo& info)

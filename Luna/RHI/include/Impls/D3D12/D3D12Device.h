@@ -13,6 +13,8 @@
 #include <vector>
 
 namespace luna::RHI {
+class D3D12CommandBufferEncoder;
+
 struct DescriptorPoolAllocator {
     ComPtr<ID3D12DescriptorHeap> heap;
     uint32_t descriptorSize = 0;
@@ -104,6 +106,8 @@ private:
 
     struct ThreadCommandData {
         ComPtr<ID3D12CommandAllocator> allocator;
+        std::vector<Ref<D3D12CommandBufferEncoder>> primaryEncoders;
+        std::vector<Ref<D3D12CommandBufferEncoder>> secondaryEncoders;
     };
 
     std::unordered_map<std::thread::id, ThreadCommandData> m_threadCommandData;

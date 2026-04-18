@@ -303,6 +303,15 @@ Ref<Adapter> D3D12Device::GetParentAdapter() const
 
 Ref<CommandBufferEncoder> D3D12Device::CreateCommandBufferEncoder(CommandBufferType type)
 {
+    auto& threadData = GetThreadCommandData();
+    auto& encoderPool =
+        (type == CommandBufferType::Secondary) ? threadData.secondaryEncoders : threadData.primaryEncoders;
+    if (!encoderPool.empty()) {
+        auto encoder = encoderPool.back();
+        encoderPool.pop_back();
+        return encoder;
+    }
+
     auto allocator = AcquireCommandAllocator();
     return std::make_shared<D3D12CommandBufferEncoder>(shared_from_this(), type, allocator);
 }
@@ -318,11 +327,27 @@ void D3D12Device::ResetCommandPool()
 }
 
 void D3D12Device::ReturnCommandBuffer(const Ref<CommandBufferEncoder>& encoder)
-{ /* no-op for D3D12 */
+{
+    auto d3dEncoder = std::dynamic_pointer_cast<D3D12CommandBufferEncoder>(encoder);
+    if (!d3dEncoder) {
+        return;
+    }
+
+    d3dEncoder->Reset();
+
+    auto& threadData = GetThreadCommandData();
+    auto& encoderPool = (d3dEncoder->GetCommandBufferType() == CommandBufferType::Secondary)
+                            ? threadData.secondaryEncoders
+                            : threadData.primaryEncoders;
+    encoderPool.push_back(std::move(d3dEncoder));
 }
 
 void D3D12Device::FreeCommandBuffer(const Ref<CommandBufferEncoder>& encoder)
-{ /* no-op for D3D12 */
+{
+    auto d3dEncoder = std::dynamic_pointer_cast<D3D12CommandBufferEncoder>(encoder);
+    if (d3dEncoder) {
+        d3dEncoder->Reset();
+    }
 }
 
 void D3D12Device::ResetCommandBuffer(const Ref<CommandBufferEncoder>& encoder)

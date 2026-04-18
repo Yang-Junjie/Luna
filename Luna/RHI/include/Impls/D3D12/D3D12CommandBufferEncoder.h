@@ -26,11 +26,11 @@ public:
                               CommandBufferType type,
                               ComPtr<ID3D12CommandAllocator> allocator);
 
-    void Free() override {}
+    void Free() override;
 
     void Reset() override;
 
-    void ReturnToPool() override {}
+    void ReturnToPool() override;
 
     void Begin(const CommandBufferBeginInfo& info = CommandBufferBeginInfo()) override;
     void End() override;
