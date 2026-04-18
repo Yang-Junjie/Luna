@@ -330,6 +330,8 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
                 ? createStubTexture(127, 127, 255, 255)
                 : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.normal_texname));
         result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
+        result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
+        result_material.AlphaCutoff = 0.5f;
     }
 
     result.Shapes.reserve(shapes.size());
@@ -429,6 +431,21 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
         result_material.Name = material.name;
         result_material.RoughnessScale = material.pbrData.roughnessFactor;
         result_material.MetallicScale = material.pbrData.metallicFactor;
+        switch (material.alphaMode) {
+            case fastgltf::AlphaMode::Opaque:
+                result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
+                break;
+            case fastgltf::AlphaMode::Mask:
+                result_material.AlphaModeValue = ModelData::Material::AlphaMode::Mask;
+                break;
+            case fastgltf::AlphaMode::Blend:
+                result_material.AlphaModeValue = ModelData::Material::AlphaMode::Blend;
+                break;
+            default:
+                result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
+                break;
+        }
+        result_material.AlphaCutoff = material.alphaCutoff;
         result_material.AlbedoTexture =
             loadMaterialTexture(asset.get(), material.pbrData.baseColorTexture, path.parent_path());
         result_material.NormalTexture = loadMaterialTexture(asset.get(), material.normalTexture, path.parent_path());

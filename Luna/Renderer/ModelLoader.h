@@ -21,12 +21,20 @@ struct ModelData {
     };
 
     struct Material {
+        enum class AlphaMode : uint8_t {
+            Opaque,
+            Mask,
+            Blend,
+        };
+
         std::string Name;
         ImageData AlbedoTexture;
         ImageData NormalTexture;
         ImageData MetallicRoughness;
         float RoughnessScale{1.0f};
         float MetallicScale{1.0f};
+        AlphaMode AlphaModeValue{AlphaMode::Opaque};
+        float AlphaCutoff{0.5f};
     };
 
     using Index = uint32_t;
