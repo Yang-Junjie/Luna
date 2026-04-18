@@ -1,14 +1,14 @@
 #pragma once
 
+#include <cstdint>
+
 #include <Barrier.h>
 #include <CommandBufferEncoder.h>
-#include <Texture.h>
-
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <Texture.h>
 #include <vector>
 
 namespace luna::RHI {

@@ -73,11 +73,10 @@ public:
         luna::RHI::AttachmentLoadOp load_op,
         luna::RHI::AttachmentStoreOp store_op,
         const luna::RHI::ClearValue& clear_value = luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
-    RenderGraphRasterPassBuilder&
-        WriteDepth(RenderGraphTextureHandle handle,
-                   luna::RHI::AttachmentLoadOp load_op,
-                   luna::RHI::AttachmentStoreOp store_op,
-                   const luna::RHI::ClearDepthStencilValue& clear_value = {1.0f, 0});
+    RenderGraphRasterPassBuilder& WriteDepth(RenderGraphTextureHandle handle,
+                                             luna::RHI::AttachmentLoadOp load_op,
+                                             luna::RHI::AttachmentStoreOp store_op,
+                                             const luna::RHI::ClearDepthStencilValue& clear_value = {1.0f, 0});
 
 private:
     friend class RenderGraphBuilder;
@@ -93,7 +92,8 @@ public:
     using RasterPassSetupCallback = std::function<void(RenderGraphRasterPassBuilder&)>;
     using RasterPassExecuteCallback = std::function<void(RenderGraphRasterPassContext&)>;
 
-    explicit RenderGraphBuilder(FrameContext frame_context, RenderGraphTransientTextureCache* transient_texture_cache = nullptr);
+    explicit RenderGraphBuilder(FrameContext frame_context,
+                                RenderGraphTransientTextureCache* transient_texture_cache = nullptr);
 
     RenderGraphTextureHandle ImportTexture(std::string name,
                                            luna::RHI::Ref<luna::RHI::Texture> texture,
@@ -101,11 +101,10 @@ public:
                                            luna::RHI::ResourceState final_state = luna::RHI::ResourceState::Common);
     RenderGraphTextureHandle CreateTexture(RenderGraphTextureDesc desc);
     RenderGraphBuilder& ExportTexture(RenderGraphTextureHandle handle, luna::RHI::ResourceState final_state);
-    RenderGraphBuilder&
-        AddRasterPass(const std::string& name,
-                      RasterPassSetupCallback setup,
-                      RasterPassExecuteCallback execute,
-                      bool side_effect = false);
+    RenderGraphBuilder& AddRasterPass(const std::string& name,
+                                      RasterPassSetupCallback setup,
+                                      RasterPassExecuteCallback execute,
+                                      bool side_effect = false);
 
     std::unique_ptr<RenderGraph> Build();
 

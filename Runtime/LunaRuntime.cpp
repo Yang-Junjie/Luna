@@ -140,6 +140,8 @@ std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::Model
             .position = vertex.Position,
             .uv = vertex.TexCoord,
             .normal = vertex.Normal,
+            .tangent = vertex.Tangent,
+            .bitangent = vertex.Bitangent,
         });
     }
 
@@ -201,7 +203,9 @@ std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
 
 std::shared_ptr<luna::Material> createFallbackMaterial()
 {
-    return luna::Material::create("FallbackMaterial", {}, glm::vec4(0.96f, 0.52f, 0.18f, 1.0f));
+    luna::Material::SurfaceProperties surface;
+    surface.BaseColorFactor = glm::vec4(0.96f, 0.52f, 0.18f, 1.0f);
+    return luna::Material::create("FallbackMaterial", {}, surface);
 }
 
 } // namespace

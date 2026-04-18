@@ -6,6 +6,7 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <string>
 #include <vector>
 
@@ -28,13 +29,21 @@ struct ModelData {
         };
 
         std::string Name;
-        ImageData AlbedoTexture;
+        ImageData BaseColorTexture;
         ImageData NormalTexture;
-        ImageData MetallicRoughness;
-        float RoughnessScale{1.0f};
-        float MetallicScale{1.0f};
+        ImageData MetallicRoughnessTexture;
+        ImageData EmissiveTexture;
+        ImageData OcclusionTexture;
+        glm::vec4 BaseColorFactor{1.0f, 1.0f, 1.0f, 1.0f};
+        glm::vec3 EmissiveFactor{0.0f, 0.0f, 0.0f};
+        float MetallicFactor{0.0f};
+        float RoughnessFactor{1.0f};
+        float NormalScale{1.0f};
+        float OcclusionStrength{1.0f};
         AlphaMode AlphaModeValue{AlphaMode::Opaque};
         float AlphaCutoff{0.5f};
+        bool DoubleSided{false};
+        bool Unlit{false};
     };
 
     using Index = uint32_t;

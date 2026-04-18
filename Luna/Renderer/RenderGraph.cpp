@@ -1,6 +1,5 @@
-#include "Renderer/RenderGraph.h"
-
 #include "Core/Log.h"
+#include "Renderer/RenderGraph.h"
 
 #include <algorithm>
 
@@ -63,11 +62,8 @@ RenderGraphRasterPassContext::RenderGraphRasterPassContext(
     uint32_t framebuffer_width,
     uint32_t framebuffer_height,
     const luna::RHI::RenderingInfo* rendering_info)
-    : RenderGraphPassContext(std::move(device),
-                             std::move(command_buffer),
-                             textures,
-                             framebuffer_width,
-                             framebuffer_height),
+    : RenderGraphPassContext(
+          std::move(device), std::move(command_buffer), textures, framebuffer_width, framebuffer_height),
       m_rendering_info(rendering_info)
 {}
 

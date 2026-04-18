@@ -4,6 +4,8 @@
 
 namespace luna {
 
+Mesh::Mesh() = default;
+
 Mesh::Mesh(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
     : m_name(std::move(name)),
       m_vertices(std::move(vertices)),
@@ -26,10 +28,32 @@ std::shared_ptr<Mesh> Mesh::createFromModelShape(const rhi::ModelData::Shape& sh
             .position = vertex.Position,
             .uv = vertex.TexCoord,
             .normal = vertex.Normal,
+            .tangent = vertex.Tangent,
+            .bitangent = vertex.Bitangent,
         });
     }
 
     return Mesh::create(shape.Name, vertices, std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
+}
+
+const std::string& Mesh::getName() const
+{
+    return m_name;
+}
+
+const std::vector<StaticMeshVertex>& Mesh::getVertices() const
+{
+    return m_vertices;
+}
+
+const std::vector<uint32_t>& Mesh::getIndices() const
+{
+    return m_indices;
+}
+
+bool Mesh::isValid() const
+{
+    return !m_vertices.empty() && !m_indices.empty();
 }
 
 } // namespace luna

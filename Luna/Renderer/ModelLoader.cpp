@@ -27,16 +27,6 @@ std::string getAbsolutePathToObjResource(const std::string& obj_path, const std:
     return (std::filesystem::path(obj_path).parent_path() / relative_path).string();
 }
 
-ImageData createStubTexture(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
-{
-    return ImageData{
-        .ByteData = {r, g, b, a},
-        .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
-        .Width = 1,
-        .Height = 1,
-    };
-}
-
 glm::vec2 toVec2(const fastgltf::math::fvec2& value)
 {
     return {value[0], value[1]};
@@ -45,6 +35,11 @@ glm::vec2 toVec2(const fastgltf::math::fvec2& value)
 glm::vec3 toVec3(const fastgltf::math::fvec3& value)
 {
     return {value[0], value[1], value[2]};
+}
+
+glm::vec4 toVec4(const fastgltf::math::fvec4& value)
+{
+    return {value[0], value[1], value[2], value[3]};
 }
 
 std::pair<glm::vec3, glm::vec3> computeTangentSpace(const glm::vec3& p1,
@@ -321,15 +316,22 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
     for (const auto& material : materials) {
         auto& result_material = result.Materials.emplace_back();
         result_material.Name = material.name;
-        result_material.AlbedoTexture =
+        result_material.BaseColorTexture =
             material.diffuse_texname.empty()
-                ? createStubTexture(255, 255, 255, 255)
+                ? ImageData{}
                 : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.diffuse_texname));
         result_material.NormalTexture =
             material.normal_texname.empty()
-                ? createStubTexture(127, 127, 255, 255)
+                ? ImageData{}
                 : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.normal_texname));
-        result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
+        result_material.BaseColorFactor = glm::vec4(
+            material.diffuse[0], material.diffuse[1], material.diffuse[2], material.dissolve);
+        result_material.EmissiveFactor =
+            glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+        result_material.MetallicFactor = 0.0f;
+        result_material.RoughnessFactor = 1.0f;
+        result_material.NormalScale = 1.0f;
+        result_material.OcclusionStrength = 1.0f;
         result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
         result_material.AlphaCutoff = 0.5f;
     }
@@ -429,8 +431,13 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
     for (const auto& material : asset->materials) {
         auto& result_material = result.Materials.emplace_back();
         result_material.Name = material.name;
-        result_material.RoughnessScale = material.pbrData.roughnessFactor;
-        result_material.MetallicScale = material.pbrData.metallicFactor;
+        result_material.BaseColorFactor = toVec4(material.pbrData.baseColorFactor);
+        result_material.EmissiveFactor = toVec3(material.emissiveFactor) * static_cast<float>(material.emissiveStrength);
+        result_material.RoughnessFactor = material.pbrData.roughnessFactor;
+        result_material.MetallicFactor = material.pbrData.metallicFactor;
+        result_material.NormalScale = material.normalTexture.has_value() ? material.normalTexture->scale : 1.0f;
+        result_material.OcclusionStrength =
+            material.occlusionTexture.has_value() ? material.occlusionTexture->strength : 1.0f;
         switch (material.alphaMode) {
             case fastgltf::AlphaMode::Opaque:
                 result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
@@ -445,22 +452,17 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
                 result_material.AlphaModeValue = ModelData::Material::AlphaMode::Opaque;
                 break;
         }
+        result_material.DoubleSided = material.doubleSided;
+        result_material.Unlit = material.unlit;
         result_material.AlphaCutoff = material.alphaCutoff;
-        result_material.AlbedoTexture =
+        result_material.BaseColorTexture =
             loadMaterialTexture(asset.get(), material.pbrData.baseColorTexture, path.parent_path());
         result_material.NormalTexture = loadMaterialTexture(asset.get(), material.normalTexture, path.parent_path());
-        result_material.MetallicRoughness =
+        result_material.MetallicRoughnessTexture =
             loadMaterialTexture(asset.get(), material.pbrData.metallicRoughnessTexture, path.parent_path());
-
-        if (!result_material.AlbedoTexture.isValid()) {
-            result_material.AlbedoTexture = createStubTexture(255, 255, 255, 255);
-        }
-        if (!result_material.NormalTexture.isValid()) {
-            result_material.NormalTexture = createStubTexture(127, 127, 255, 255);
-        }
-        if (!result_material.MetallicRoughness.isValid()) {
-            result_material.MetallicRoughness = createStubTexture(0, 255, 0, 255);
-        }
+        result_material.EmissiveTexture = loadMaterialTexture(asset.get(), material.emissiveTexture, path.parent_path());
+        result_material.OcclusionTexture =
+            loadMaterialTexture(asset.get(), material.occlusionTexture, path.parent_path());
     }
 
     for (const auto& mesh : asset->meshes) {
