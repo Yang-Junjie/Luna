@@ -55,4 +55,14 @@ void Scene::onUpdateRuntime()
     }
 }
 
+entt::registry& Scene::registry()
+{
+    return m_registry;
+}
+
+const entt::registry& Scene::registry() const
+{
+    return m_registry;
+}
+
 } // namespace luna

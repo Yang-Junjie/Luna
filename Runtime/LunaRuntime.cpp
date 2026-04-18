@@ -272,7 +272,8 @@ void LunaRuntimeApplication::buildScene()
 
 bool LunaRuntimeApplication::tryLoadDefaultAsset()
 {
-    const std::array<std::filesystem::path, 2> candidates = {
+    const std::array<std::filesystem::path, 3> candidates = {
+        projectRoot() / "Assets" / "DamagedHelmet" / "DamagedHelmet.gltf",
         projectRoot() / "Assets" / "basicmesh.glb",
         projectRoot() / "Assets" / "material_sphere" / "material_sphere.obj",
     };

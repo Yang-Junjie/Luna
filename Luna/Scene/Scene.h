@@ -18,6 +18,8 @@ public:
     Entity createEntityWithUUID(UUID uuid, const std::string& name = std::string{});
     void destroyEntity(Entity entity);
     void onUpdateRuntime();
+    entt::registry& registry();
+    const entt::registry& registry() const;
 
 private:
     entt::registry m_registry;

@@ -86,28 +86,44 @@ private:
         uint32_t index_count{0};
     };
 
-    struct UploadedMaterial {
-        luna::RHI::Ref<luna::RHI::Texture> albedo_texture;
+    struct UploadedTexture {
+        luna::RHI::Ref<luna::RHI::Texture> texture;
         luna::RHI::Ref<luna::RHI::Buffer> staging_buffer;
+        std::vector<luna::RHI::BufferImageCopy> copy_regions;
+        bool uploaded{false};
+    };
+
+    struct UploadedMaterial {
+        UploadedTexture base_color_texture;
+        UploadedTexture normal_texture;
+        UploadedTexture metallic_roughness_texture;
+        UploadedTexture emissive_texture;
+        UploadedTexture occlusion_texture;
         luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
         luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-        bool uploaded{false};
     };
 
     static ShaderPaths getDefaultShaderPaths();
     static rhi::ImageData createFallbackImageData(const glm::vec4& albedo_color);
+    static std::filesystem::path getDefaultEnvironmentPath();
 
     void resetPipelineState();
     void ensurePipelines(const RenderContext& context);
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
+    UploadedTexture createUploadedTexture(const rhi::ImageData& image, const std::string& debug_name) const;
+    void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedTexture& uploaded_texture);
     void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
+    void ensureSceneResources();
+    void updateSceneParameters(const RenderContext& context);
     void executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context);
     void executeLightingPass(rhi::RenderGraphRasterPassContext& pass_context,
                              const RenderContext& context,
-                             rhi::RenderGraphTextureHandle gbuffer_albedo_handle,
-                             rhi::RenderGraphTextureHandle gbuffer_normal_handle);
+                             rhi::RenderGraphTextureHandle gbuffer_base_color_handle,
+                             rhi::RenderGraphTextureHandle gbuffer_normal_metallic_handle,
+                             rhi::RenderGraphTextureHandle gbuffer_world_position_roughness_handle,
+                             rhi::RenderGraphTextureHandle gbuffer_emissive_ao_handle);
     void executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context);
     void sortTransparentDrawCommands();
 
@@ -130,16 +146,22 @@ private:
 
     luna::RHI::Ref<luna::RHI::PipelineLayout> m_geometry_pipeline_layout;
     luna::RHI::Ref<luna::RHI::PipelineLayout> m_lighting_pipeline_layout;
+    luna::RHI::Ref<luna::RHI::PipelineLayout> m_transparent_pipeline_layout;
 
     luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_material_layout;
     luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_gbuffer_layout;
+    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_scene_layout;
 
     luna::RHI::Ref<luna::RHI::DescriptorPool> m_descriptor_pool;
 
     luna::RHI::Ref<luna::RHI::Sampler> m_material_sampler;
     luna::RHI::Ref<luna::RHI::Sampler> m_gbuffer_sampler;
+    luna::RHI::Ref<luna::RHI::Sampler> m_environment_sampler;
 
     luna::RHI::Ref<luna::RHI::DescriptorSet> m_gbuffer_descriptor_set;
+    luna::RHI::Ref<luna::RHI::DescriptorSet> m_scene_descriptor_set;
+    luna::RHI::Ref<luna::RHI::Buffer> m_scene_params_buffer;
+    UploadedTexture m_environment_texture;
 
     luna::RHI::Ref<luna::RHI::ShaderModule> m_geometry_vertex_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_geometry_fragment_shader;

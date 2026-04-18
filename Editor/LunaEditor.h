@@ -24,6 +24,10 @@ public:
     float getSpinSpeed() const;
     void setSpinSpeed(float speed);
     void resetCamera();
+    Scene& getScene();
+    const Scene& getScene() const;
+    Entity getSelectedEntity() const;
+    void setSelectedEntity(Entity entity);
 
 protected:
     Renderer::InitializationOptions getRendererInitializationOptions() override;
@@ -39,6 +43,7 @@ private:
 private:
     Scene m_scene;
     Entity m_demo_entity;
+    Entity m_selected_entity;
     std::shared_ptr<Mesh> m_demo_mesh;
     std::shared_ptr<Material> m_demo_material;
     std::string m_asset_label{"Procedural cube"};

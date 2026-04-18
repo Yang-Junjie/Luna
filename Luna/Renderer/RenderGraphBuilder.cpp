@@ -123,6 +123,10 @@ luna::RHI::Ref<luna::RHI::Texture>
         }
     }
 
+    std::erase_if(m_entries, [&desc](const TextureEntry& entry) {
+        return !entry.InUse && !IsCompatible(entry, desc);
+    });
+
     auto texture = createTransientTexture(device, desc);
     if (!texture) {
         return {};

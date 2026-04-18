@@ -378,7 +378,7 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
                 if (idx.texcoord_index >= 0 && (2 * size_t(idx.texcoord_index) + 1) < attrib.texcoords.size()) {
                     vertex.TexCoord = {
                         attrib.texcoords[2 * size_t(idx.texcoord_index) + 0],
-                        attrib.texcoords[2 * size_t(idx.texcoord_index) + 1],
+                        1.0f - attrib.texcoords[2 * size_t(idx.texcoord_index) + 1],
                     };
                 }
 

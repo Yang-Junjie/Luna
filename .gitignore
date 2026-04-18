@@ -10,3 +10,4 @@ Tests/
 __pycache__/
 docs/
 shader_cache/
+imgui.ini

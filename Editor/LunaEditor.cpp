@@ -12,6 +12,7 @@
 #include <cctype>
 #include <filesystem>
 #include <glm/common.hpp>
+#include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <limits>
 #include <numbers>
@@ -217,6 +218,87 @@ std::shared_ptr<luna::Material> createFallbackMaterial()
     return luna::Material::create("FallbackMaterial", {}, surface);
 }
 
+bool drawVec3Control(
+    const std::string& label, glm::vec3& values, float reset_value = 0.0f, float column_width = 100.0f, float drag_speed = 0.1f)
+{
+    bool changed = false;
+    ImGui::PushID(label.c_str());
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{0.0f, 1.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{4.0f, 1.0f});
+
+    if (ImGui::BeginTable("##Vec3Table", 2, ImGuiTableFlags_NoSavedSettings)) {
+        ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, column_width);
+        ImGui::TableSetupColumn("##controls", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFontSize() + 2.0f);
+
+        ImGui::TableNextColumn();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label.c_str());
+
+        ImGui::TableNextColumn();
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{4.0f, 0.0f});
+
+        const float line_height = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
+        const ImVec2 button_size{line_height + 3.0f, line_height};
+        const float item_spacing = ImGui::GetStyle().ItemSpacing.x;
+        const float item_width =
+            (std::max) ((ImGui::GetContentRegionAvail().x - button_size.x * 3.0f - item_spacing * 2.0f) / 3.0f, 1.0f);
+
+        auto draw_axis_control =
+            [&](const char* axis_label, float& value, const ImVec4& color, const ImVec4& hovered_color, bool last) {
+                bool axis_changed = false;
+
+                ImGui::PushStyleColor(ImGuiCol_Button, color);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hovered_color);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
+                if (ImGui::Button(axis_label, button_size)) {
+                    value = reset_value;
+                    axis_changed = true;
+                }
+                ImGui::PopStyleColor(3);
+
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(item_width);
+                if (ImGui::DragFloat((std::string("##") + axis_label).c_str(), &value, drag_speed, 0.0f, 0.0f, "%.2f")) {
+                    axis_changed = true;
+                }
+
+                if (!last) {
+                    ImGui::SameLine();
+                }
+
+                return axis_changed;
+            };
+
+        changed |= draw_axis_control("X", values.x, ImVec4{0.80f, 0.10f, 0.15f, 1.0f}, ImVec4{0.90f, 0.20f, 0.20f, 1.0f}, false);
+        changed |= draw_axis_control("Y", values.y, ImVec4{0.20f, 0.70f, 0.20f, 1.0f}, ImVec4{0.30f, 0.80f, 0.30f, 1.0f}, false);
+        changed |= draw_axis_control("Z", values.z, ImVec4{0.10f, 0.25f, 0.80f, 1.0f}, ImVec4{0.20f, 0.35f, 0.90f, 1.0f}, true);
+
+        ImGui::PopStyleVar();
+        ImGui::EndTable();
+    }
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopID();
+    return changed;
+}
+
+void drawTransformMatrix(const luna::TransformComponent& transform)
+{
+    const glm::mat4 matrix = transform.getTransform();
+    ImGui::TextUnformatted("Transform Matrix");
+    ImGui::Separator();
+
+    for (int row = 0; row < 4; ++row) {
+        ImGui::Text(
+            "[%7.3f %7.3f %7.3f %7.3f]",
+            matrix[0][row],
+            matrix[1][row],
+            matrix[2][row],
+            matrix[3][row]);
+    }
+}
+
 class EditorHudLayer final : public luna::Layer {
 public:
     explicit EditorHudLayer(luna::LunaEditorApplication& application)
@@ -265,6 +347,9 @@ public:
         ImGui::TextUnformatted("Scene rendering now targets a persistent offscreen texture and is presented in the Viewport panel.");
         ImGui::End();
 
+        drawEntityPanel(application);
+        drawInspectorPanel(application);
+
         ImGui::SetNextWindowSize(ImVec2(960.0f, 640.0f), ImGuiCond_FirstUseEver);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::Begin("Viewport");
@@ -293,6 +378,78 @@ public:
     }
 
 private:
+    void drawEntityPanel(luna::LunaEditorApplication& application)
+    {
+        ImGui::SetNextWindowSize(ImVec2(280.0f, 320.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Entities");
+
+        auto& scene = application.getScene();
+        auto view = scene.registry().view<luna::TagComponent>();
+        const luna::Entity selected_entity = application.getSelectedEntity();
+
+        if (view.begin() == view.end()) {
+            ImGui::TextUnformatted("No entities in scene.");
+        } else {
+            for (const auto entity_handle : view) {
+                luna::Entity entity(entity_handle, &scene);
+                const auto& tag = view.get<luna::TagComponent>(entity_handle);
+
+                ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth |
+                                           ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                if (entity == selected_entity) {
+                    flags |= ImGuiTreeNodeFlags_Selected;
+                }
+
+                ImGui::TreeNodeEx(
+                    reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint32_t>(entity))), flags, "%s", tag.tag.c_str());
+                if (ImGui::IsItemClicked()) {
+                    application.setSelectedEntity(entity);
+                }
+            }
+        }
+
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered()) {
+            application.setSelectedEntity({});
+        }
+
+        ImGui::End();
+    }
+
+    void drawInspectorPanel(luna::LunaEditorApplication& application)
+    {
+        ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Inspector");
+
+        luna::Entity selected_entity = application.getSelectedEntity();
+        if (!selected_entity) {
+            ImGui::TextUnformatted("Select an entity to inspect.");
+            ImGui::End();
+            return;
+        }
+
+        ImGui::Text("Entity: %s", selected_entity.getName().c_str());
+        ImGui::Separator();
+
+        if (selected_entity.hasComponent<luna::TransformComponent>()) {
+            auto& transform = selected_entity.getComponent<luna::TransformComponent>();
+            drawVec3Control("Translation", transform.translation, 0.0f);
+
+            glm::vec3 rotation_degrees = glm::degrees(transform.rotation);
+            if (drawVec3Control("Rotation", rotation_degrees, 0.0f)) {
+                transform.rotation = glm::radians(rotation_degrees);
+            }
+
+            drawVec3Control("Scale", transform.scale, 1.0f);
+
+            ImGui::Spacing();
+            drawTransformMatrix(transform);
+        } else {
+            ImGui::TextUnformatted("Selected entity does not have a TransformComponent.");
+        }
+
+        ImGui::End();
+    }
+
     luna::LunaEditorApplication* m_application{nullptr};
     bool m_show_demo_window{true};
 };
@@ -359,6 +516,26 @@ void LunaEditorApplication::resetCamera()
     camera.m_yaw = 0.0f;
 }
 
+Scene& LunaEditorApplication::getScene()
+{
+    return m_scene;
+}
+
+const Scene& LunaEditorApplication::getScene() const
+{
+    return m_scene;
+}
+
+Entity LunaEditorApplication::getSelectedEntity() const
+{
+    return m_selected_entity;
+}
+
+void LunaEditorApplication::setSelectedEntity(Entity entity)
+{
+    m_selected_entity = entity;
+}
+
 void LunaEditorApplication::onInit()
 {
     getRenderer().getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
@@ -392,11 +569,14 @@ void LunaEditorApplication::buildScene()
     transform.translation = glm::vec3(0.0f);
     transform.rotation = glm::vec3(-0.35f, 0.0f, 0.0f);
     transform.scale = glm::vec3(1.0f);
+
+    m_selected_entity = m_demo_entity;
 }
 
 bool LunaEditorApplication::tryLoadDefaultAsset()
 {
-    const std::array<std::filesystem::path, 2> candidates = {
+    const std::array<std::filesystem::path, 3> candidates = {
+        projectRoot() / "Assets" / "DamagedHelmet" / "DamagedHelmet.gltf",
         projectRoot() / "Assets" / "basicmesh.glb",
         projectRoot() / "Assets" / "material_sphere" / "material_sphere.obj",
     };
@@ -451,7 +631,6 @@ void LunaEditorApplication::updateDemoTransform(float delta_time)
     }
 
     auto& transform = m_demo_entity.getComponent<TransformComponent>();
-    transform.rotation.x = -0.35f;
     if (m_auto_rotate) {
         transform.rotation.y += delta_time * m_spin_speed;
         const float turn = std::numbers::pi_v<float> * 2.0f;

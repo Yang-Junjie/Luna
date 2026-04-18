@@ -22,6 +22,11 @@ bool isDDSImage(const std::string& filepath)
     return std::filesystem::path(filepath).extension() == ".dds";
 }
 
+bool isHDRImage(const std::string& filepath)
+{
+    return std::filesystem::path(filepath).extension() == ".hdr";
+}
+
 bool isZLIBImage(const std::string& filepath)
 {
     return std::filesystem::path(filepath).extension() == ".zlib";
@@ -273,9 +278,7 @@ ImageData loadImageUsingSTBLoader(const std::string& filepath)
     int height = 0;
     int channels = 0;
 
-    stbi_set_flip_vertically_on_load(true);
     stbi_uc* pixels = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    stbi_set_flip_vertically_on_load(false);
     if (pixels == nullptr || width <= 0 || height <= 0) {
         return {};
     }
@@ -294,15 +297,39 @@ ImageData loadImageUsingSTBLoader(const std::string& filepath)
     };
 }
 
+ImageData loadHDRImageUsingSTBLoader(const std::string& filepath)
+{
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    stbi_set_flip_vertically_on_load(false);
+    float* pixels = stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+    if (pixels == nullptr || width <= 0 || height <= 0) {
+        return {};
+    }
+
+    constexpr int actual_channels = 4;
+    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
+                                   actual_channels * sizeof(float));
+    std::memcpy(byte_data.data(), pixels, byte_data.size());
+    stbi_image_free(pixels);
+
+    return ImageData{
+        .ByteData = std::move(byte_data),
+        .ImageFormat = luna::RHI::Format::RGBA32_FLOAT,
+        .Width = static_cast<uint32_t>(width),
+        .Height = static_cast<uint32_t>(height),
+    };
+}
+
 ImageData loadImageUsingSTBLoader(const uint8_t* data, std::size_t size)
 {
     int width = 0;
     int height = 0;
     int channels = 0;
 
-    stbi_set_flip_vertically_on_load(true);
     stbi_uc* pixels = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, STBI_rgb_alpha);
-    stbi_set_flip_vertically_on_load(false);
     if (pixels == nullptr || width <= 0 || height <= 0) {
         return {};
     }
@@ -316,6 +343,32 @@ ImageData loadImageUsingSTBLoader(const uint8_t* data, std::size_t size)
     return ImageData{
         .ByteData = std::move(byte_data),
         .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
+        .Width = static_cast<uint32_t>(width),
+        .Height = static_cast<uint32_t>(height),
+    };
+}
+
+ImageData loadHDRImageUsingSTBLoader(const uint8_t* data, std::size_t size)
+{
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    stbi_set_flip_vertically_on_load(false);
+    float* pixels = stbi_loadf_from_memory(data, static_cast<int>(size), &width, &height, &channels, STBI_rgb_alpha);
+    if (pixels == nullptr || width <= 0 || height <= 0) {
+        return {};
+    }
+
+    constexpr int actual_channels = 4;
+    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
+                                   actual_channels * sizeof(float));
+    std::memcpy(byte_data.data(), pixels, byte_data.size());
+    stbi_image_free(pixels);
+
+    return ImageData{
+        .ByteData = std::move(byte_data),
+        .ImageFormat = luna::RHI::Format::RGBA32_FLOAT,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
     };
@@ -376,6 +429,9 @@ ImageData ImageLoader::LoadImageFromFile(const std::string& filepath)
     if (isDDSImage(filepath)) {
         return loadImageUsingDDSLoader(filepath);
     }
+    if (isHDRImage(filepath)) {
+        return loadHDRImageUsingSTBLoader(filepath);
+    }
     if (isZLIBImage(filepath)) {
         return loadImageUsingDDSLoader(convertZLIBToDDS(filepath));
     }
@@ -390,6 +446,9 @@ ImageData ImageLoader::LoadImageFromMemory(const uint8_t* data, std::size_t size
 
     if (isDDSMimeType(mimeType) || isDDSData(data, size)) {
         return loadImageUsingDDSLoader(data, size);
+    }
+    if (stbi_is_hdr_from_memory(data, static_cast<int>(size)) != 0) {
+        return loadHDRImageUsingSTBLoader(data, size);
     }
 
     return loadImageUsingSTBLoader(data, size);
