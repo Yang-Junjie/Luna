@@ -428,16 +428,20 @@ void Renderer::renderFrame()
             });
     }
 
-    if (m_imgui_enabled && backend_type == luna::RHI::BackendType::Vulkan) {
+    if (m_imgui_enabled) {
         graph_builder.AddRasterPass(
             "ImGui",
             [back_buffer_handle](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.WriteColor(
                     back_buffer_handle, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
             },
-            [](luna::rhi::RenderGraphRasterPassContext& pass_context) {
+            [this, back_buffer_handle](luna::rhi::RenderGraphRasterPassContext& pass_context) {
                 pass_context.beginRendering();
-                luna::rhi::ImGuiVulkanContext::RenderDrawData(pass_context.commandBuffer());
+                luna::rhi::ImGuiRhiContext::RenderDrawData(pass_context.commandBuffer(),
+                                                           pass_context.getTexture(back_buffer_handle),
+                                                           pass_context.framebufferWidth(),
+                                                           pass_context.framebufferHeight(),
+                                                           m_frame_index);
                 pass_context.endRendering();
             });
     }
@@ -611,8 +615,8 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
         m_frame_index = 0;
     }
 
-    if (m_imgui_enabled && m_instance && m_instance->GetType() == luna::RHI::BackendType::Vulkan) {
-        luna::rhi::ImGuiVulkanContext::NotifySwapchainChanged(m_swapchain->GetImageCount());
+    if (m_imgui_enabled) {
+        luna::rhi::ImGuiRhiContext::NotifyFrameResourcesChanged(m_frames_in_flight);
     }
 }
 

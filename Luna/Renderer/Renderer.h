@@ -77,6 +77,10 @@ public:
     const luna::RHI::Ref<luna::RHI::Queue>& getGraphicsQueue() const;
     const luna::RHI::Ref<luna::RHI::Swapchain>& getSwapchain() const;
     const luna::RHI::Ref<luna::RHI::Synchronization>& getSynchronization() const;
+    const luna::RHI::Ref<luna::RHI::ShaderCompiler>& getShaderCompiler() const
+    {
+        return m_shader_compiler;
+    }
     uint32_t getFramesInFlight() const;
 
     Camera& getMainCamera();

@@ -11,6 +11,8 @@ private:
     Ref<Device> m_device;
     uint32_t m_cbvSrvUavOffset = 0;
     uint32_t m_samplerOffset = 0;
+    uint32_t m_cbvSrvUavCapacity = 0;
+    uint32_t m_samplerCapacity = 0;
     uint32_t m_cbvSrvUavDescriptorSize = 0;
     uint32_t m_samplerDescriptorSize = 0;
 

@@ -7,8 +7,7 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_draw.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_tables.cpp
     ${THIRD_PARTY_DIR}/imgui/imgui_widgets.cpp
-    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp
-    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_vulkan.cpp)
+    ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp)
 
 set(RENDERER_SOURCE
     Renderer/Camera.h
@@ -40,7 +39,8 @@ set(SCENE_SOURCE
 
 set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiContext.cpp
-    Imgui/ImGuiRenderPass.h)
+    Imgui/ImGuiRenderPass.h
+    Imgui/Shaders/ImGui.slang)
 
 add_library(
     LunaCore

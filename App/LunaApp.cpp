@@ -24,6 +24,12 @@ namespace {
 
 constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
 
+bool backendSupportsImGui(luna::RHI::BackendType backend)
+{
+    return backend == luna::RHI::BackendType::Vulkan || backend == luna::RHI::BackendType::DirectX11 ||
+           backend == luna::RHI::BackendType::DirectX12;
+}
+
 std::filesystem::path projectRoot()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT);
@@ -272,7 +278,7 @@ LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend)
           .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
-          .m_enable_imgui = backend == luna::RHI::BackendType::Vulkan,
+          .m_enable_imgui = backendSupportsImGui(backend),
           .m_enable_multi_viewport = false,
       }),
       m_backend(backend)

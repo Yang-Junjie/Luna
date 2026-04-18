@@ -20,7 +20,7 @@ void ImGuiLayer::onAttach()
     }
 
     if (m_renderer == nullptr || !m_renderer->isInitialized() || m_renderer->getNativeWindow() == nullptr) {
-        LUNA_IMGUI_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
+        LUNA_IMGUI_ERROR("Cannot initialize ImGui layer because renderer state is incomplete");
         return;
     }
 
@@ -31,7 +31,7 @@ void ImGuiLayer::onAttach()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     if (m_enable_multi_viewport) {
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        LUNA_IMGUI_WARN("ImGui multi-viewport is disabled until the RHI path supports rendering platform windows");
     }
     io.Fonts->AddFontDefault();
 
@@ -45,8 +45,8 @@ void ImGuiLayer::onAttach()
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    if (!luna::rhi::ImGuiVulkanContext::Init(*m_renderer)) {
-        LUNA_IMGUI_ERROR("Failed to initialize ImGui Vulkan backend");
+    if (!luna::rhi::ImGuiRhiContext::Init(*m_renderer)) {
+        LUNA_IMGUI_ERROR("Failed to initialize ImGui RHI backend");
         ImGui::DestroyContext();
         return;
     }
@@ -60,7 +60,7 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    luna::rhi::ImGuiVulkanContext::Destroy();
+    luna::rhi::ImGuiRhiContext::Destroy();
     m_attached = false;
 }
 
@@ -81,7 +81,7 @@ void ImGuiLayer::begin()
         return;
     }
 
-    luna::rhi::ImGuiVulkanContext::StartFrame();
+    luna::rhi::ImGuiRhiContext::StartFrame();
 
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
