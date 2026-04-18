@@ -79,6 +79,43 @@ void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
 
 } // namespace
 
+void RenderGraphTransientTextureCache::BeginFrame()
+{
+    for (auto& entry : m_entries) {
+        entry.InUse = false;
+    }
+}
+
+luna::RHI::Ref<luna::RHI::Texture>
+    RenderGraphTransientTextureCache::AcquireTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                                     const RenderGraphTextureDesc& desc)
+{
+    for (auto& entry : m_entries) {
+        if (!entry.InUse && IsCompatible(entry, desc) && entry.Texture) {
+            entry.InUse = true;
+            return entry.Texture;
+        }
+    }
+
+    auto texture = createTransientTexture(device, desc);
+    if (!texture) {
+        return {};
+    }
+
+    m_entries.push_back(TextureEntry{
+        .Desc = desc,
+        .Texture = texture,
+        .InUse = true,
+    });
+    return texture;
+}
+
+bool RenderGraphTransientTextureCache::IsCompatible(const TextureEntry& entry, const RenderGraphTextureDesc& desc)
+{
+    return entry.Desc.Width == desc.Width && entry.Desc.Height == desc.Height && entry.Desc.Format == desc.Format &&
+           entry.Desc.Usage == desc.Usage && entry.Desc.SampleCount == desc.SampleCount;
+}
+
 RenderGraphRasterPassBuilder::RenderGraphRasterPassBuilder(detail::RenderGraphRasterPassNode* pass_node)
     : m_pass_node(pass_node)
 {}
@@ -124,8 +161,10 @@ RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::WriteDepth(
     return *this;
 }
 
-RenderGraphBuilder::RenderGraphBuilder(FrameContext frame_context)
-    : m_frame_context(std::move(frame_context))
+RenderGraphBuilder::RenderGraphBuilder(FrameContext frame_context,
+                                       RenderGraphTransientTextureCache* transient_texture_cache)
+    : m_frame_context(std::move(frame_context)),
+      m_transient_texture_cache(transient_texture_cache)
 {}
 
 RenderGraphTextureHandle RenderGraphBuilder::ImportTexture(std::string name,
@@ -272,14 +311,21 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
     std::vector<luna::RHI::ResourceState> current_states(texture_count, luna::RHI::ResourceState::Undefined);
     for (size_t i = 0; i < texture_count; ++i) {
         const auto& texture_node = m_texture_nodes[i];
-        current_states[i] = texture_node.InitialState;
 
         if (!live_resources[i] && !texture_node.Exported) {
             continue;
         }
 
-        physical_textures[i] =
-            texture_node.Imported ? texture_node.ImportedTexture : createTransientTexture(m_frame_context.device, texture_node.Desc);
+        if (texture_node.Imported) {
+            physical_textures[i] = texture_node.ImportedTexture;
+            current_states[i] = texture_node.InitialState;
+        } else if (m_transient_texture_cache != nullptr) {
+            physical_textures[i] = m_transient_texture_cache->AcquireTexture(m_frame_context.device, texture_node.Desc);
+            current_states[i] = physical_textures[i] ? physical_textures[i]->GetCurrentState() : texture_node.InitialState;
+        } else {
+            physical_textures[i] = createTransientTexture(m_frame_context.device, texture_node.Desc);
+            current_states[i] = physical_textures[i] ? physical_textures[i]->GetCurrentState() : texture_node.InitialState;
+        }
     }
 
     RenderGraph::PassList pass_list;

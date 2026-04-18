@@ -19,10 +19,13 @@ class LUNA_RHI_API VKSwapchain : public Swapchain {
 
     std::vector<vk::Image> m_images;
     std::vector<vk::ImageView> m_imageViews;
+    std::vector<Ref<Texture>> m_backBuffers;
     Ref<VKDevice> m_device;
     SwapchainCreateInfo m_swapchainCreateInfo;
     uint32_t m_currentImageIndex = 0;
     bool m_hasAcquiredImage = false;
+
+    void CreateBackBuffers();
 
 public:
     static Ref<VKSwapchain> Create(const Ref<Device>& device, const SwapchainCreateInfo& createInfo);

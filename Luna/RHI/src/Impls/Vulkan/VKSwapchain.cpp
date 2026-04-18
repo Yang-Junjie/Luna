@@ -188,6 +188,8 @@ VKSwapchain::VKSwapchain(const Ref<Device>& device, const SwapchainCreateInfo& c
         vk::ImageView imageView = pyDevice.createImageView(ivci);
         m_imageViews.push_back(imageView);
     }
+
+    CreateBackBuffers();
 }
 
 Result VKSwapchain::Present(const Ref<Queue>& queue, const Ref<Synchronization>& sync, uint32_t frameIndex)
@@ -241,8 +243,11 @@ uint32_t VKSwapchain::GetImageCount() const
     return m_images.size();
 }
 
-Ref<Texture> VKSwapchain::GetBackBuffer(uint32_t index) const
+void VKSwapchain::CreateBackBuffers()
 {
+    m_backBuffers.clear();
+    m_backBuffers.reserve(m_images.size());
+
     TextureCreateInfo info{};
     info.Type = TextureType::Texture2D;
     info.Width = m_swapchainCreateInfo.Extent.width;
@@ -251,6 +256,7 @@ Ref<Texture> VKSwapchain::GetBackBuffer(uint32_t index) const
     info.ArrayLayers = 1;
     info.MipLevels = 1;
     info.Format = m_swapchainCreateInfo.Format;
+
     TextureUsageFlags usage = {};
     if (m_swapchainCreateInfo.Usage & SwapchainUsageFlags::ColorAttachment) {
         usage |= TextureUsageFlags::ColorAttachment;
@@ -264,12 +270,24 @@ Ref<Texture> VKSwapchain::GetBackBuffer(uint32_t index) const
     if (m_swapchainCreateInfo.Usage & SwapchainUsageFlags::Storage) {
         usage |= TextureUsageFlags::Storage;
     }
+
     info.Usage = usage;
     info.InitialState = ResourceState::Present;
     info.SampleCount = SampleCount::Count1;
     info.Name = "SwapchainBackBuffer";
     info.InitialData = nullptr;
-    return VKTexture::CreateFromSwapchainImage(m_images[index], m_imageViews[index], info);
+
+    for (size_t i = 0; i < m_images.size(); ++i) {
+        m_backBuffers.push_back(VKTexture::CreateFromSwapchainImage(m_device, m_images[i], m_imageViews[i], info));
+    }
+}
+
+Ref<Texture> VKSwapchain::GetBackBuffer(uint32_t index) const
+{
+    if (index < m_backBuffers.size()) {
+        return m_backBuffers[index];
+    }
+    return nullptr;
 }
 
 Extent2D VKSwapchain::GetExtent() const
@@ -302,12 +320,14 @@ VKSwapchain::~VKSwapchain()
 {
     if (m_device) {
         auto deviceHandle = m_device->GetHandle();
+        m_backBuffers.clear();
         for (auto& imageView : m_imageViews) {
             if (imageView) {
                 deviceHandle.destroyImageView(imageView);
             }
         }
         m_imageViews.clear();
+        m_images.clear();
         if (m_swapchain) {
             deviceHandle.destroySwapchainKHR(m_swapchain);
             m_swapchain = nullptr;

@@ -265,6 +265,7 @@ void Renderer::shutdown()
     releaseFrameCommandBuffers();
     m_current_command_buffer.reset();
     m_frame_render_graphs.clear();
+    m_frame_transient_texture_caches.clear();
     m_scene_renderer.shutdown();
     m_synchronization.reset();
     m_swapchain.reset();
@@ -339,6 +340,9 @@ void Renderer::startFrame()
         if (m_frame_index < m_frame_render_graphs.size()) {
             m_frame_render_graphs[m_frame_index].reset();
         }
+        if (m_frame_index < m_frame_transient_texture_caches.size()) {
+            m_frame_transient_texture_caches[m_frame_index].BeginFrame();
+        }
 
         int acquired_image_index = -1;
         const auto acquire_result =
@@ -376,12 +380,15 @@ void Renderer::renderFrame()
     const bool was_presented =
         m_image_index < m_swapchain_images_presented.size() ? m_swapchain_images_presented[m_image_index] : false;
     const auto backend_type = m_instance ? m_instance->GetType() : m_initialization_options.backend;
+    luna::rhi::RenderGraphTransientTextureCache* transient_texture_cache =
+        (m_frame_index < m_frame_transient_texture_caches.size()) ? &m_frame_transient_texture_caches[m_frame_index] : nullptr;
     luna::rhi::RenderGraphBuilder graph_builder(luna::rhi::RenderGraphBuilder::FrameContext{
-        .device = m_device,
-        .command_buffer = m_current_command_buffer,
-        .framebuffer_width = extent.width,
-        .framebuffer_height = extent.height,
-    });
+                                                    .device = m_device,
+                                                    .command_buffer = m_current_command_buffer,
+                                                    .framebuffer_width = extent.width,
+                                                    .framebuffer_height = extent.height,
+                                                },
+                                                transient_texture_cache);
 
     const auto back_buffer_handle =
         graph_builder.ImportTexture("SwapchainBackBuffer",
@@ -608,6 +615,8 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     m_frame_command_buffers.assign(m_frames_in_flight, {});
     m_frame_render_graphs.clear();
     m_frame_render_graphs.resize(m_frames_in_flight);
+    m_frame_transient_texture_caches.clear();
+    m_frame_transient_texture_caches.resize(m_frames_in_flight);
     m_swapchain_images_presented.assign(m_swapchain->GetImageCount(), false);
     if (m_frames_in_flight > 0) {
         m_frame_index %= m_frames_in_flight;
@@ -648,6 +657,7 @@ void Renderer::handlePendingResize()
         releaseFrameCommandBuffers();
         m_current_command_buffer.reset();
         m_frame_render_graphs.clear();
+        m_frame_transient_texture_caches.clear();
         m_swapchain.reset();
         m_synchronization.reset();
         createSwapchain(extent.width, extent.height);
@@ -666,6 +676,7 @@ void Renderer::releaseFrameCommandBuffers()
         }
     }
     m_frame_command_buffers.clear();
+    m_frame_transient_texture_caches.clear();
 }
 
 } // namespace luna

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Renderer/Camera.h"
+#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/SceneRenderer.h"
 
 #include <Core.h>
@@ -112,6 +113,7 @@ private:
     luna::RHI::Ref<luna::RHI::CommandBufferEncoder> m_current_command_buffer;
     std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> m_frame_command_buffers;
     std::vector<std::unique_ptr<luna::rhi::RenderGraph>> m_frame_render_graphs;
+    std::vector<luna::rhi::RenderGraphTransientTextureCache> m_frame_transient_texture_caches;
 
     InitializationOptions m_initialization_options{};
 

@@ -111,21 +111,26 @@ VKTextureView::~VKTextureView()
     m_imageView = nullptr;
 }
 
-VKTexture::VKTexture(const vk::Image& image, const vk::ImageView& imageView, const TextureCreateInfo& info)
+VKTexture::VKTexture(const Ref<Device>& device,
+                     const vk::Image& image,
+                     const vk::ImageView& imageView,
+                     const TextureCreateInfo& info)
     : m_allocator(nullptr),
       m_allocation(nullptr),
-      m_allocationInfo()
+      m_allocationInfo(),
+      m_device(device)
 {
     m_image = image;
     m_createInfo = info;
     m_imageView = imageView;
 }
 
-Ref<VKTexture> VKTexture::CreateFromSwapchainImage(const vk::Image& image,
+Ref<VKTexture> VKTexture::CreateFromSwapchainImage(const Ref<Device>& device,
+                                                   const vk::Image& image,
                                                    const vk::ImageView& imageView,
                                                    const TextureCreateInfo& info)
 {
-    auto texture = CreateRef<VKTexture>(image, imageView, info);
+    auto texture = CreateRef<VKTexture>(device, image, imageView, info);
     texture->CreateDefaultViewIfNeeded();
     return texture;
 }

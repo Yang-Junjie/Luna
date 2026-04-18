@@ -46,6 +46,25 @@ struct RenderGraphRasterPassNode {
 
 namespace luna::rhi {
 
+class RenderGraphTransientTextureCache {
+public:
+    void BeginFrame();
+    luna::RHI::Ref<luna::RHI::Texture> AcquireTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                                      const RenderGraphTextureDesc& desc);
+
+private:
+    struct TextureEntry {
+        RenderGraphTextureDesc Desc;
+        luna::RHI::Ref<luna::RHI::Texture> Texture;
+        bool InUse{false};
+    };
+
+    static bool IsCompatible(const TextureEntry& entry, const RenderGraphTextureDesc& desc);
+
+private:
+    std::vector<TextureEntry> m_entries;
+};
+
 class RenderGraphRasterPassBuilder {
 public:
     RenderGraphRasterPassBuilder& ReadTexture(RenderGraphTextureHandle handle);
@@ -74,7 +93,7 @@ public:
     using RasterPassSetupCallback = std::function<void(RenderGraphRasterPassBuilder&)>;
     using RasterPassExecuteCallback = std::function<void(RenderGraphRasterPassContext&)>;
 
-    explicit RenderGraphBuilder(FrameContext frame_context);
+    explicit RenderGraphBuilder(FrameContext frame_context, RenderGraphTransientTextureCache* transient_texture_cache = nullptr);
 
     RenderGraphTextureHandle ImportTexture(std::string name,
                                            luna::RHI::Ref<luna::RHI::Texture> texture,
@@ -95,6 +114,7 @@ private:
 
 private:
     FrameContext m_frame_context;
+    RenderGraphTransientTextureCache* m_transient_texture_cache{nullptr};
     std::vector<detail::RenderGraphTextureNode> m_texture_nodes;
     std::vector<detail::RenderGraphRasterPassNode> m_raster_pass_nodes;
 };

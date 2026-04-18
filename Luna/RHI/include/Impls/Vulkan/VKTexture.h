@@ -51,9 +51,12 @@ class LUNA_RHI_API VKTexture final : public Texture {
     TextureCreateInfo m_createInfo;
 
 public:
-    VKTexture(const vk::Image& image, const vk::ImageView& imageView, const TextureCreateInfo& info);
+    VKTexture(const Ref<Device>& device, const vk::Image& image, const vk::ImageView& imageView, const TextureCreateInfo& info);
     static Ref<VKTexture>
-        CreateFromSwapchainImage(const vk::Image& image, const vk::ImageView& imageView, const TextureCreateInfo& info);
+        CreateFromSwapchainImage(const Ref<Device>& device,
+                                 const vk::Image& image,
+                                 const vk::ImageView& imageView,
+                                 const TextureCreateInfo& info);
     VKTexture(const Ref<Device>& device, const VmaAllocator& allocator, const TextureCreateInfo& info);
     static Ref<VKTexture>
         Create(const Ref<Device>& device, const VmaAllocator& allocator, const TextureCreateInfo& info);
