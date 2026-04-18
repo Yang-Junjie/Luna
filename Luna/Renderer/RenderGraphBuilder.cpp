@@ -77,6 +77,32 @@ void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
     current_states[handle.Index] = desired_state;
 }
 
+luna::RHI::Extent2D resolvePassFramebufferExtent(
+    const detail::RenderGraphRasterPassNode& pass_node,
+    const std::vector<luna::RHI::Ref<luna::RHI::Texture>>& physical_textures,
+    uint32_t fallback_width,
+    uint32_t fallback_height)
+{
+    for (const auto& attachment : pass_node.ColorAttachments) {
+        if (attachment.Handle.isValid() && attachment.Handle.Index < physical_textures.size()) {
+            const auto& texture = physical_textures[attachment.Handle.Index];
+            if (texture) {
+                return {texture->GetWidth(), texture->GetHeight()};
+            }
+        }
+    }
+
+    if (pass_node.DepthAttachment.has_value() && pass_node.DepthAttachment->Handle.isValid() &&
+        pass_node.DepthAttachment->Handle.Index < physical_textures.size()) {
+        const auto& texture = physical_textures[pass_node.DepthAttachment->Handle.Index];
+        if (texture) {
+            return {texture->GetWidth(), texture->GetHeight()};
+        }
+    }
+
+    return {fallback_width, fallback_height};
+}
+
 } // namespace
 
 void RenderGraphTransientTextureCache::BeginFrame()
@@ -345,10 +371,11 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             .Type = RenderGraphPassType::Raster,
         };
         compiled_pass.Execute = std::move(pass_node.Execute);
-        compiled_pass.RenderingInfo.RenderArea = {0,
-                                                  0,
-                                                  m_frame_context.framebuffer_width,
-                                                  m_frame_context.framebuffer_height};
+        const auto pass_extent = resolvePassFramebufferExtent(
+            pass_node, physical_textures, m_frame_context.framebuffer_width, m_frame_context.framebuffer_height);
+        compiled_pass.FramebufferWidth = pass_extent.width;
+        compiled_pass.FramebufferHeight = pass_extent.height;
+        compiled_pass.RenderingInfo.RenderArea = {0, 0, pass_extent.width, pass_extent.height};
         compiled_pass.RenderingInfo.LayerCount = 1;
 
         for (const auto& read : pass_node.Reads) {

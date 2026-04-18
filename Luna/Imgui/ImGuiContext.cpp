@@ -464,10 +464,27 @@ void setupRenderState(luna::RHI::CommandBufferEncoder& command_buffer,
 
 ImGuiTextureBinding* resolveTextureBinding(ImTextureID texture_id)
 {
+    auto resolve_binding = [](ImTextureID id) -> ImGuiTextureBinding* {
+        return reinterpret_cast<ImGuiTextureBinding*>(static_cast<uintptr_t>(id));
+    };
+
     if (texture_id == 0) {
         texture_id = g_font_texture_id;
     }
-    return reinterpret_cast<ImGuiTextureBinding*>(static_cast<uintptr_t>(texture_id));
+
+    auto* binding = resolve_binding(texture_id);
+    if (binding != nullptr && binding->view && binding->descriptorSet && binding->view->GetTexture()) {
+        return binding;
+    }
+
+    if (texture_id != g_font_texture_id && g_font_texture_id != 0) {
+        binding = resolve_binding(g_font_texture_id);
+        if (binding != nullptr && binding->view && binding->descriptorSet && binding->view->GetTexture()) {
+            return binding;
+        }
+    }
+
+    return nullptr;
 }
 
 void clearState()

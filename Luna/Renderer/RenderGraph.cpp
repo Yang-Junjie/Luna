@@ -121,8 +121,8 @@ void RenderGraph::execute() const
         RenderGraphRasterPassContext pass_context(m_frame_context.device,
                                                   m_frame_context.command_buffer,
                                                   &m_textures,
-                                                  m_frame_context.framebuffer_width,
-                                                  m_frame_context.framebuffer_height,
+                                                  pass.FramebufferWidth,
+                                                  pass.FramebufferHeight,
                                                   &pass.RenderingInfo);
         if (pass.Execute) {
             pass.Execute(pass_context);

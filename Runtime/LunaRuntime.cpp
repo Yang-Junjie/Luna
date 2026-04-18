@@ -1,6 +1,5 @@
-#include "Core/Layer.h"
 #include "Core/Log.h"
-#include "LunaApp.h"
+#include "LunaRuntime.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/ModelLoader.h"
@@ -11,7 +10,6 @@
 #include <cctype>
 #include <filesystem>
 #include <glm/common.hpp>
-#include <imgui.h>
 #include <limits>
 #include <numbers>
 #include <optional>
@@ -23,12 +21,6 @@
 namespace {
 
 constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
-
-bool backendSupportsImGui(luna::RHI::BackendType backend)
-{
-    return backend == luna::RHI::BackendType::Vulkan || backend == luna::RHI::BackendType::DirectX11 ||
-           backend == luna::RHI::BackendType::DirectX12;
-}
 
 std::filesystem::path projectRoot()
 {
@@ -153,14 +145,14 @@ std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::Model
 
     const glm::vec3 center = (bounds_min + bounds_max) * 0.5f;
     const glm::vec3 extent = bounds_max - bounds_min;
-    const float max_extent = (std::max) ((std::max) (extent.x, extent.y), (std::max) (extent.z, 0.0001f));
+    const float max_extent = (std::max)((std::max)(extent.x, extent.y), (std::max)(extent.z, 0.0001f));
     const float scale = 2.0f / max_extent;
 
     for (auto& vertex : vertices) {
         vertex.position = (vertex.position - center) * scale;
     }
 
-    const std::string mesh_name = shape.Name.empty() ? "DemoAssetMesh" : shape.Name;
+    const std::string mesh_name = shape.Name.empty() ? "RuntimeAssetMesh" : shape.Name;
     return luna::Mesh::create(
         mesh_name, std::move(vertices), std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
 }
@@ -212,114 +204,28 @@ std::shared_ptr<luna::Material> createFallbackMaterial()
     return luna::Material::create("FallbackMaterial", {}, glm::vec4(0.96f, 0.52f, 0.18f, 1.0f));
 }
 
-class RuntimeHudLayer final : public luna::Layer {
-public:
-    explicit RuntimeHudLayer(luna::LunaRuntimeApplication& application)
-        : Layer("RuntimeHud"),
-          m_application(&application)
-    {}
-
-    void onImGuiRender() override
-    {
-        if (m_application == nullptr) {
-            return;
-        }
-
-        auto& application = *m_application;
-        auto& renderer = luna::Application::get().getRenderer();
-        const float delta_seconds = luna::Application::get().getTimestep().getSeconds();
-        const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
-
-        bool auto_rotate = application.isAutoRotateEnabled();
-        float spin_speed = application.getSpinSpeed();
-
-        ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Luna ImGui Test");
-        ImGui::Text("Backend: Luna RHI / %s", backendTypeToString(application.getBackend()));
-        ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
-        ImGui::Separator();
-        ImGui::Text("Scene Source: %s", application.getAssetLabel().c_str());
-        if (ImGui::Checkbox("Auto Rotate", &auto_rotate)) {
-            application.setAutoRotateEnabled(auto_rotate);
-        }
-        if (ImGui::SliderFloat("Spin Speed", &spin_speed, 0.0f, 3.5f, "%.2f rad/s")) {
-            application.setSpinSpeed(spin_speed);
-        }
-        ImGui::ColorEdit4("Clear Color", &renderer.getClearColor().x);
-        if (ImGui::Button("Reset Camera")) {
-            application.resetCamera();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Close")) {
-            luna::Application::get().close();
-        }
-        ImGui::Separator();
-        ImGui::Checkbox("Show Demo Window", &m_show_demo_window);
-        ImGui::TextUnformatted("This program is the minimal ImGui validation app for the new renderer path.");
-        ImGui::End();
-
-        if (m_show_demo_window) {
-            ImGui::ShowDemoWindow(&m_show_demo_window);
-        }
-    }
-
-private:
-    luna::LunaRuntimeApplication* m_application{nullptr};
-    bool m_show_demo_window{true};
-};
-
 } // namespace
 
 namespace luna {
 
 LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend)
     : Application(ApplicationSpecification{
-          .m_name = "Luna ImGui Test",
+          .m_name = "Luna Runtime",
           .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
-          .m_enable_imgui = backendSupportsImGui(backend),
+          .m_enable_imgui = false,
           .m_enable_multi_viewport = false,
       }),
       m_backend(backend)
 {}
 
-const std::string& LunaRuntimeApplication::getAssetLabel() const
-{
-    return m_asset_label;
-}
-
-luna::RHI::BackendType LunaRuntimeApplication::getBackend() const
-{
-    return m_backend;
-}
-
-bool LunaRuntimeApplication::isAutoRotateEnabled() const
-{
-    return m_auto_rotate;
-}
-
-void LunaRuntimeApplication::setAutoRotateEnabled(bool enabled)
-{
-    m_auto_rotate = enabled;
-}
-
-float LunaRuntimeApplication::getSpinSpeed() const
-{
-    return m_spin_speed;
-}
-
 Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializationOptions()
 {
-    LUNA_RUNTIME_INFO("LunaApp requested backend '{}' and present mode '{}' via code",
+    LUNA_RUNTIME_INFO("LunaRuntime requested backend '{}' and present mode '{}' via code",
                       backendTypeToString(m_backend),
                       presentModeToString(kRequestedPresentMode));
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
-}
-
-void LunaRuntimeApplication::setSpinSpeed(float speed)
-{
-    m_spin_speed = speed;
 }
 
 void LunaRuntimeApplication::resetCamera()
@@ -332,14 +238,11 @@ void LunaRuntimeApplication::resetCamera()
 
 void LunaRuntimeApplication::onInit()
 {
-    getRenderer().getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
+    auto& renderer = getRenderer();
+    renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
+    renderer.getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
     resetCamera();
     buildScene();
-    if (getImGuiLayer() != nullptr) {
-        pushOverlay(std::make_unique<RuntimeHudLayer>(*this));
-    } else {
-        LUNA_RUNTIME_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
-    }
 }
 
 void LunaRuntimeApplication::onUpdate(Timestep timestep)
@@ -354,7 +257,7 @@ void LunaRuntimeApplication::buildScene()
         createFallbackAsset();
     }
 
-    m_demo_entity = m_scene.createEntity("Demo Mesh");
+    m_demo_entity = m_scene.createEntity("Runtime Mesh");
     m_demo_entity.addComponent<StaticMeshComponent>(m_demo_mesh, m_demo_material);
 
     auto& transform = m_demo_entity.getComponent<TransformComponent>();
@@ -395,10 +298,10 @@ bool LunaRuntimeApplication::tryLoadDefaultAsset()
             }
 
             m_asset_label = candidate.filename().string();
-            LUNA_RUNTIME_INFO("Loaded demo asset '{}'", candidate.string());
+            LUNA_RUNTIME_INFO("Loaded runtime asset '{}'", candidate.string());
             return true;
         } catch (const std::exception& error) {
-            LUNA_RUNTIME_WARN("Failed to load demo asset '{}': {}", candidate.string(), error.what());
+            LUNA_RUNTIME_WARN("Failed to load runtime asset '{}': {}", candidate.string(), error.what());
         }
     }
 
@@ -433,7 +336,7 @@ void LunaRuntimeApplication::updateDemoTransform(float delta_time)
 Application* createApplication(int argc, char** argv)
 {
     const auto backend = parseBackendFromArgs(argc, argv);
-    LUNA_RUNTIME_INFO("Starting LunaApp with backend '{}'", backendTypeToString(backend));
+    LUNA_RUNTIME_INFO("Starting LunaRuntime with backend '{}'", backendTypeToString(backend));
     return new LunaRuntimeApplication(backend);
 }
 

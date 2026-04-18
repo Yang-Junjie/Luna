@@ -97,6 +97,8 @@ struct RenderGraphCompiledRasterPass {
     RenderGraphPass Pass;
     std::vector<luna::RHI::TextureBarrier> PreTextureBarriers;
     luna::RHI::RenderingInfo RenderingInfo;
+    uint32_t FramebufferWidth{0};
+    uint32_t FramebufferHeight{0};
     std::function<void(RenderGraphRasterPassContext&)> Execute;
 };
 

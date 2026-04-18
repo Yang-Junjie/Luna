@@ -266,6 +266,7 @@ void Renderer::shutdown()
     m_current_command_buffer.reset();
     m_frame_render_graphs.clear();
     m_frame_transient_texture_caches.clear();
+    releaseSceneOutputTargets();
     m_scene_renderer.shutdown();
     m_synchronization.reset();
     m_swapchain.reset();
@@ -279,6 +280,8 @@ void Renderer::shutdown()
     m_native_window = nullptr;
     m_initialization_options = {};
     m_surface_format = luna::RHI::Format::UNDEFINED;
+    m_scene_output_mode = SceneOutputMode::Swapchain;
+    m_scene_output_extent = {0, 0};
     m_frames_in_flight = 0;
     m_frame_index = 0;
     m_image_index = 0;
@@ -317,6 +320,59 @@ bool Renderer::isResizeRequested() const
 void Renderer::setImGuiEnabled(bool enabled)
 {
     m_imgui_enabled = enabled;
+}
+
+Renderer::SceneOutputMode Renderer::getSceneOutputMode() const
+{
+    return m_scene_output_mode;
+}
+
+void Renderer::setSceneOutputMode(SceneOutputMode mode)
+{
+    if (m_scene_output_mode == mode) {
+        return;
+    }
+
+    m_scene_output_mode = mode;
+
+    if (m_scene_output_mode != SceneOutputMode::OffscreenTexture) {
+        if (m_scene_output_color || m_scene_output_depth) {
+            if (m_graphics_queue) {
+                m_graphics_queue->WaitIdle();
+            } else if (m_synchronization) {
+                m_synchronization->WaitIdle();
+            }
+        }
+        releaseSceneOutputTargets();
+        return;
+    }
+
+    if (m_scene_output_extent.width > 0 && m_scene_output_extent.height > 0 &&
+        !hasMatchingSceneOutputTargets(m_scene_output_extent.width, m_scene_output_extent.height)) {
+        ensureSceneOutputTargets(m_scene_output_extent.width, m_scene_output_extent.height);
+    }
+}
+
+void Renderer::setSceneOutputSize(uint32_t width, uint32_t height)
+{
+    const bool size_changed = m_scene_output_extent.width != width || m_scene_output_extent.height != height;
+    m_scene_output_extent = {width, height};
+
+    if (!size_changed || m_scene_output_mode != SceneOutputMode::OffscreenTexture || width == 0 || height == 0) {
+        return;
+    }
+
+    ensureSceneOutputTargets(width, height);
+}
+
+luna::RHI::Extent2D Renderer::getSceneOutputSize() const
+{
+    return m_scene_output_extent;
+}
+
+const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getSceneOutputTexture() const
+{
+    return m_scene_output_color;
 }
 
 void Renderer::startFrame()
@@ -380,6 +436,13 @@ void Renderer::renderFrame()
     const bool was_presented =
         m_image_index < m_swapchain_images_presented.size() ? m_swapchain_images_presented[m_image_index] : false;
     const auto backend_type = m_instance ? m_instance->GetType() : m_initialization_options.backend;
+    const bool offscreen_scene_output = m_scene_output_mode == SceneOutputMode::OffscreenTexture;
+
+    const bool render_scene_to_offscreen =
+        offscreen_scene_output && m_scene_output_extent.width > 0 && m_scene_output_extent.height > 0 &&
+        m_scene_output_color && m_scene_output_depth;
+
+    const bool render_scene_to_swapchain = !offscreen_scene_output;
     luna::rhi::RenderGraphTransientTextureCache* transient_texture_cache =
         (m_frame_index < m_frame_transient_texture_caches.size()) ? &m_frame_transient_texture_caches[m_frame_index] : nullptr;
     luna::rhi::RenderGraphBuilder graph_builder(luna::rhi::RenderGraphBuilder::FrameContext{
@@ -396,32 +459,107 @@ void Renderer::renderFrame()
                                     was_presented ? luna::RHI::ResourceState::Present
                                                   : luna::RHI::ResourceState::Undefined);
 
-    if (usesSceneRenderer(backend_type)) {
-        const auto depth_handle = graph_builder.CreateTexture(luna::rhi::RenderGraphTextureDesc{
-            .Name = "SceneDepthTexture",
-            .Width = extent.width,
-            .Height = extent.height,
-            .Format = luna::RHI::Format::D32_FLOAT,
-            .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
-        });
+    luna::rhi::RenderGraphTextureHandle scene_color_handle{};
+    luna::rhi::RenderGraphTextureHandle scene_depth_handle{};
+    luna::RHI::Format scene_color_format = m_surface_format;
+    uint32_t scene_width = 0;
+    uint32_t scene_height = 0;
 
-        m_scene_renderer.buildRenderGraph(graph_builder,
-                                          SceneRenderer::RenderContext{
-                                              .device = m_device,
-                                              .compiler = m_shader_compiler,
-                                              .backend_type = backend_type,
-                                              .color_target = back_buffer_handle,
-                                              .depth_target = depth_handle,
-                                              .color_format = m_surface_format,
-                                              .clear_color = m_clear_color,
-                                              .framebuffer_width = extent.width,
-                                              .framebuffer_height = extent.height,
-                                          });
-    } else {
+    if (render_scene_to_swapchain) {
+        scene_color_handle = back_buffer_handle;
+        scene_color_format = m_surface_format;
+        scene_width = extent.width;
+        scene_height = extent.height;
+
+        if (usesSceneRenderer(backend_type)) {
+            scene_depth_handle = graph_builder.CreateTexture(luna::rhi::RenderGraphTextureDesc{
+                .Name = "SceneDepthTexture",
+                .Width = extent.width,
+                .Height = extent.height,
+                .Format = luna::RHI::Format::D32_FLOAT,
+                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment,
+                .InitialState = luna::RHI::ResourceState::Undefined,
+                .SampleCount = luna::RHI::SampleCount::Count1,
+            });
+        }
+    } else if (render_scene_to_offscreen) {
+        scene_color_handle = graph_builder.ImportTexture(
+            "SceneOutputColor", m_scene_output_color, m_scene_output_color_state, luna::RHI::ResourceState::ShaderRead);
+        scene_depth_handle = graph_builder.ImportTexture(
+            "SceneOutputDepth", m_scene_output_depth, m_scene_output_depth_state, luna::RHI::ResourceState::Common);
+        scene_color_format = m_scene_output_color ? m_scene_output_color->GetFormat() : m_surface_format;
+        scene_width = m_scene_output_color ? m_scene_output_color->GetWidth() : 0;
+        scene_height = m_scene_output_color ? m_scene_output_color->GetHeight() : 0;
+    }
+
+    const bool scene_output_valid = scene_color_handle.isValid() && scene_width > 0 && scene_height > 0;
+    if (scene_output_valid) {
+        if (usesSceneRenderer(backend_type) && scene_depth_handle.isValid()) {
+            m_scene_renderer.buildRenderGraph(graph_builder,
+                                              SceneRenderer::RenderContext{
+                                                  .device = m_device,
+                                                  .compiler = m_shader_compiler,
+                                                  .backend_type = backend_type,
+                                                  .color_target = scene_color_handle,
+                                                  .depth_target = scene_depth_handle,
+                                                  .color_format = scene_color_format,
+                                                  .clear_color = m_clear_color,
+                                                  .framebuffer_width = scene_width,
+                                                  .framebuffer_height = scene_height,
+                                              });
+        } else {
+            graph_builder.AddRasterPass(
+                "ClearScene",
+                [scene_color_handle, clear_color = m_clear_color](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
+                    pass_builder.WriteColor(scene_color_handle,
+                                            luna::RHI::AttachmentLoadOp::Clear,
+                                            luna::RHI::AttachmentStoreOp::Store,
+                                            luna::RHI::ClearValue::ColorFloat(
+                                                clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+                },
+                [](luna::rhi::RenderGraphRasterPassContext& pass_context) {
+                    pass_context.beginRendering();
+                    pass_context.endRendering();
+                });
+        }
+    }
+
+    if (render_scene_to_offscreen && scene_output_valid) {
+        graph_builder.ExportTexture(scene_color_handle, luna::RHI::ResourceState::ShaderRead);
+        if (scene_depth_handle.isValid()) {
+            graph_builder.ExportTexture(scene_depth_handle, luna::RHI::ResourceState::Common);
+        }
+    }
+
+    if (m_imgui_enabled) {
         graph_builder.AddRasterPass(
-            "ClearScene",
+            "ImGui",
+            [back_buffer_handle, scene_color_handle, render_scene_to_offscreen, render_scene_to_swapchain, scene_output_valid, clear_color = m_clear_color](
+                luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
+                if (render_scene_to_offscreen && scene_output_valid) {
+                    pass_builder.ReadTexture(scene_color_handle);
+                }
+
+                pass_builder.WriteColor(
+                    back_buffer_handle,
+                    render_scene_to_swapchain && scene_output_valid ? luna::RHI::AttachmentLoadOp::Load
+                                                                    : luna::RHI::AttachmentLoadOp::Clear,
+                    luna::RHI::AttachmentStoreOp::Store,
+                    luna::RHI::ClearValue::ColorFloat(
+                        clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+            },
+            [this, back_buffer_handle](luna::rhi::RenderGraphRasterPassContext& pass_context) {
+                pass_context.beginRendering();
+                luna::rhi::ImGuiRhiContext::RenderDrawData(pass_context.commandBuffer(),
+                                                           pass_context.getTexture(back_buffer_handle),
+                                                           pass_context.framebufferWidth(),
+                                                           pass_context.framebufferHeight(),
+                                                           m_frame_index);
+                pass_context.endRendering();
+            });
+    } else if (!render_scene_to_swapchain) {
+        graph_builder.AddRasterPass(
+            "PresentClear",
             [back_buffer_handle, clear_color = m_clear_color](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.WriteColor(back_buffer_handle,
                                         luna::RHI::AttachmentLoadOp::Clear,
@@ -435,24 +573,6 @@ void Renderer::renderFrame()
             });
     }
 
-    if (m_imgui_enabled) {
-        graph_builder.AddRasterPass(
-            "ImGui",
-            [back_buffer_handle](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
-                pass_builder.WriteColor(
-                    back_buffer_handle, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
-            },
-            [this, back_buffer_handle](luna::rhi::RenderGraphRasterPassContext& pass_context) {
-                pass_context.beginRendering();
-                luna::rhi::ImGuiRhiContext::RenderDrawData(pass_context.commandBuffer(),
-                                                           pass_context.getTexture(back_buffer_handle),
-                                                           pass_context.framebufferWidth(),
-                                                           pass_context.framebufferHeight(),
-                                                           m_frame_index);
-                pass_context.endRendering();
-            });
-    }
-
     graph_builder.ExportTexture(back_buffer_handle, luna::RHI::ResourceState::Present);
 
     if (m_frame_index >= m_frame_render_graphs.size()) {
@@ -461,6 +581,12 @@ void Renderer::renderFrame()
     m_frame_render_graphs[m_frame_index] = graph_builder.Build();
     if (m_frame_render_graphs[m_frame_index]) {
         m_frame_render_graphs[m_frame_index]->execute();
+    }
+
+    if (render_scene_to_offscreen && scene_output_valid) {
+        m_scene_output_color_state = luna::RHI::ResourceState::ShaderRead;
+        m_scene_output_depth_state = scene_depth_handle.isValid() ? luna::RHI::ResourceState::Common
+                                                                  : luna::RHI::ResourceState::Undefined;
     }
 
     if (m_image_index < m_swapchain_images_presented.size()) {
@@ -562,6 +688,63 @@ glm::vec4& Renderer::getClearColor()
 const glm::vec4& Renderer::getClearColor() const
 {
     return m_clear_color;
+}
+
+bool Renderer::hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const
+{
+    return m_scene_output_color && m_scene_output_depth && m_scene_output_color->GetWidth() == width &&
+           m_scene_output_color->GetHeight() == height && m_scene_output_depth->GetWidth() == width &&
+           m_scene_output_depth->GetHeight() == height && m_scene_output_color->GetFormat() == m_surface_format &&
+           m_scene_output_depth->GetFormat() == luna::RHI::Format::D32_FLOAT;
+}
+
+void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
+{
+    if (!m_device || width == 0 || height == 0) {
+        return;
+    }
+
+    if (hasMatchingSceneOutputTargets(width, height)) {
+        return;
+    }
+
+    if (m_graphics_queue) {
+        m_graphics_queue->WaitIdle();
+    } else if (m_synchronization) {
+        m_synchronization->WaitIdle();
+    }
+
+    releaseSceneOutputTargets();
+
+    m_scene_output_color =
+        m_device->CreateTexture(luna::RHI::TextureBuilder()
+                                    .SetSize(width, height)
+                                    .SetFormat(m_surface_format)
+                                    .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment |
+                                              luna::RHI::TextureUsageFlags::Sampled)
+                                    .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                    .SetName("SceneOutputColor")
+                                    .Build());
+
+    m_scene_output_depth =
+        m_device->CreateTexture(luna::RHI::TextureBuilder()
+                                    .SetSize(width, height)
+                                    .SetFormat(luna::RHI::Format::D32_FLOAT)
+                                    .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment)
+                                    .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                    .SetName("SceneOutputDepth")
+                                    .Build());
+
+    m_scene_output_color_state = luna::RHI::ResourceState::Undefined;
+    m_scene_output_depth_state = luna::RHI::ResourceState::Undefined;
+}
+
+void Renderer::releaseSceneOutputTargets()
+{
+    m_scene_output_color.reset();
+    m_scene_output_depth.reset();
+    m_scene_output_color_state = luna::RHI::ResourceState::Undefined;
+    m_scene_output_depth_state = luna::RHI::ResourceState::Undefined;
 }
 
 void Renderer::createSwapchain(uint32_t width, uint32_t height)

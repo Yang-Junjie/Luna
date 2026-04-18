@@ -1,4 +1,4 @@
-#include "Application.h"
+#include "application.h"
 #include "Core/Log.h"
 
 #include <chrono>
@@ -35,6 +35,12 @@ Application::~Application()
     m_s_instance = nullptr;
 }
 
+void Application::onInit() {}
+
+void Application::onUpdate(Timestep) {}
+
+void Application::onShutdown() {}
+
 bool Application::initialize()
 {
     if (m_initialized) {
@@ -43,11 +49,6 @@ bool Application::initialize()
 
     if (m_s_instance != this) {
         LUNA_CORE_ERROR("Cannot initialize application because another instance already exists");
-        return false;
-    }
-
-    if (!onPreInitialize()) {
-        LUNA_CORE_ERROR("Application pre-initialization failed");
         return false;
     }
 
@@ -255,4 +256,48 @@ bool Application::onWindowClose(const WindowCloseEvent&)
     return true;
 }
 
+ImGuiLayer* Application::getImGuiLayer() const
+{
+    return m_imgui_layer_raw;
+}
+
+void Application::close()
+{
+    m_running = false;
+}
+
+Application& Application::get()
+{
+    return *m_s_instance;
+}
+
+Timestep Application::getTimestep() const
+{
+    return m_timestep;
+}
+
+bool Application::isInitialized() const
+{
+    return m_initialized;
+}
+
+Renderer& Application::getRenderer()
+{
+    return m_renderer;
+}
+
+TaskSystem& Application::getTaskSystem()
+{
+    return m_task_system;
+}
+
+const TaskSystem& Application::getTaskSystem() const
+{
+    return m_task_system;
+}
+
+Renderer::InitializationOptions Application::getRendererInitializationOptions()
+{
+    return {};
+}
 } // namespace luna

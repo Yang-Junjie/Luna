@@ -34,8 +34,12 @@ file(
     src/Impls/D3D12/*.cpp
 )
 
-set(slang_DIR "C:/slang/cmake" CACHE PATH "Path to the Slang CMake package")
-find_package(slang CONFIG REQUIRED)
+
+if(NOT slang_DIR AND DEFINED ENV{SLANG_DIR})
+    set(slang_DIR "$ENV{SLANG_DIR}" CACHE PATH "Path to the Slang CMake package")
+endif()
+
+find_package(slang REQUIRED)
 
 set(
     LUNA_RHI_PLATFORM_SOURCES

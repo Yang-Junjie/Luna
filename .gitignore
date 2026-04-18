@@ -9,3 +9,4 @@ Tests/
 /DesignTarget.md
 __pycache__/
 docs/
+shader_cache/

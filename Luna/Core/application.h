@@ -3,11 +3,11 @@
 #include "Events/Event.h"
 #include "Imgui/ImGuiLayer.hpp"
 #include "JobSystem/TaskSystem.h"
-#include "Layer.h"
+#include "layer.h"
 #include "LayerStack.h"
 #include "Renderer/Renderer.h"
 #include "Timestep.h"
-#include "Window.h"
+#include "window.h"
 
 #include <memory>
 #include <string>
@@ -15,11 +15,11 @@
 namespace luna {
 
 struct ApplicationSpecification {
-    std::string m_name = "Luna";
-    uint32_t m_window_width = 1'600, m_window_height = 900;
-    bool m_maximized = false;
-    bool m_enable_imgui = true;
-    bool m_enable_multi_viewport = false;
+    std::string m_name{"Luna"};
+    uint32_t m_window_width{1'600}, m_window_height{900};
+    bool m_maximized{false};
+    bool m_enable_imgui{true};
+    bool m_enable_multi_viewport{false};
 };
 
 class Application {
@@ -28,68 +28,28 @@ public:
     virtual ~Application();
 
     bool initialize();
+    bool isInitialized() const;
+
+    void close();
+    void run();
 
     void pushLayer(std::unique_ptr<Layer> layer);
     void pushOverlay(std::unique_ptr<Layer> overlay);
 
-    ImGuiLayer* getImGuiLayer() const
-    {
-        return m_imgui_layer_raw;
-    }
+    ImGuiLayer* getImGuiLayer() const;
+    Timestep getTimestep() const;
+    static Application& get();
 
-    void close()
-    {
-        m_running = false;
-    }
-
-    void run();
-
-    static Application& get()
-    {
-        return *m_s_instance;
-    }
-
-    Timestep getTimestep() const
-    {
-        return m_timestep;
-    }
-
-    bool isInitialized() const
-    {
-        return m_initialized;
-    }
-
-    Renderer& getRenderer()
-    {
-        return m_renderer;
-    }
-
-    TaskSystem& getTaskSystem()
-    {
-        return m_task_system;
-    }
-
-    const TaskSystem& getTaskSystem() const
-    {
-        return m_task_system;
-    }
+    Renderer& getRenderer();
+    TaskSystem& getTaskSystem();
+    const TaskSystem& getTaskSystem() const;
 
 protected:
-    virtual bool onPreInitialize()
-    {
-        return true;
-    }
+    virtual Renderer::InitializationOptions getRendererInitializationOptions();
 
-    virtual Renderer::InitializationOptions getRendererInitializationOptions()
-    {
-        return {};
-    }
-
-    virtual void onInit() {}
-
-    virtual void onUpdate(Timestep) {}
-
-    virtual void onShutdown() {}
+    virtual void onInit();
+    virtual void onUpdate(Timestep);
+    virtual void onShutdown();
 
     bool enableImGui(bool enable_multi_viewport = false);
 
@@ -100,9 +60,9 @@ private:
     void renderFrame();
 
 private:
-    bool m_initialized = false;
-    bool m_running = true;
-    bool m_minimized = false;
+    bool m_initialized{false};
+    bool m_running{true};
+    bool m_minimized{false};
 
     ApplicationSpecification m_specification;
     std::unique_ptr<Window> m_window;
@@ -110,11 +70,11 @@ private:
     TaskSystem m_task_system;
 
     std::unique_ptr<ImGuiLayer> m_imgui_layer;
-    ImGuiLayer* m_imgui_layer_raw = nullptr;
+    ImGuiLayer* m_imgui_layer_raw{nullptr};
     LayerStack m_layer_stack;
 
     Timestep m_timestep;
-    float m_last_frame_time = 0.0f;
+    float m_last_frame_time{0.0f};
     static Application* m_s_instance;
 };
 

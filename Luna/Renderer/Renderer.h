@@ -7,6 +7,7 @@
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <Instance.h>
+#include <cstdint>
 #include <memory>
 #include <Surface.h>
 #include <vector>
@@ -23,6 +24,7 @@ class ShaderCompiler;
 class Surface;
 class Swapchain;
 class Synchronization;
+class Texture;
 } // namespace luna::RHI
 
 namespace luna::rhi {
@@ -49,6 +51,11 @@ public:
         luna::RHI::PresentMode present_mode;
     };
 
+    enum class SceneOutputMode : uint8_t {
+        Swapchain,
+        OffscreenTexture,
+    };
+
     Renderer();
     ~Renderer();
 
@@ -65,6 +72,11 @@ public:
     void requestResize();
     bool isResizeRequested() const;
     void setImGuiEnabled(bool enabled);
+    SceneOutputMode getSceneOutputMode() const;
+    void setSceneOutputMode(SceneOutputMode mode);
+    void setSceneOutputSize(uint32_t width, uint32_t height);
+    luna::RHI::Extent2D getSceneOutputSize() const;
+    const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
 
     void startFrame();
     void renderFrame();
@@ -96,7 +108,10 @@ private:
     void createSwapchain(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
+    bool hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const;
     void releaseFrameCommandBuffers();
+    void ensureSceneOutputTargets(uint32_t width, uint32_t height);
+    void releaseSceneOutputTargets();
 
 private:
     Window* m_window{nullptr};
@@ -123,6 +138,12 @@ private:
 
     glm::vec4 m_clear_color{0.10f, 0.10f, 0.12f, 1.0f};
     luna::RHI::Format m_surface_format{luna::RHI::Format::UNDEFINED};
+    SceneOutputMode m_scene_output_mode{SceneOutputMode::Swapchain};
+    luna::RHI::Extent2D m_scene_output_extent{0, 0};
+    luna::RHI::Ref<luna::RHI::Texture> m_scene_output_color;
+    luna::RHI::Ref<luna::RHI::Texture> m_scene_output_depth;
+    luna::RHI::ResourceState m_scene_output_color_state{luna::RHI::ResourceState::Undefined};
+    luna::RHI::ResourceState m_scene_output_depth_state{luna::RHI::ResourceState::Undefined};
 
     uint32_t m_frames_in_flight{0};
     uint32_t m_frame_index{0};

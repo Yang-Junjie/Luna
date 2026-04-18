@@ -13,9 +13,9 @@ namespace luna {
 class Material;
 class Mesh;
 
-class LunaRuntimeApplication final : public Application {
+class LunaEditorApplication final : public Application {
 public:
-    explicit LunaRuntimeApplication(luna::RHI::BackendType backend);
+    explicit LunaEditorApplication(luna::RHI::BackendType backend);
 
     const std::string& getAssetLabel() const;
     luna::RHI::BackendType getBackend() const;
