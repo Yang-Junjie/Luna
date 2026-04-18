@@ -33,7 +33,7 @@ bool g_initialized = false;
 void checkVkResult(VkResult result)
 {
     if (result != VK_SUCCESS) {
-        LUNA_CORE_ERROR("ImGui Vulkan backend returned error {}", static_cast<int>(result));
+        LUNA_IMGUI_ERROR("ImGui Vulkan backend returned error {}", static_cast<int>(result));
     }
 }
 
@@ -51,7 +51,7 @@ bool ImGuiVulkanContext::Init(luna::Renderer& renderer)
     const auto vk_device = std::dynamic_pointer_cast<luna::RHI::VKDevice>(renderer.getDevice());
     const auto vk_queue = std::dynamic_pointer_cast<luna::RHI::VKQueue>(renderer.getGraphicsQueue());
     if (!vk_instance || !vk_adapter || !vk_device || !vk_queue) {
-        LUNA_CORE_ERROR("Cannot initialize ImGui because Vulkan native handles are unavailable");
+        LUNA_IMGUI_ERROR("Cannot initialize ImGui because Vulkan native handles are unavailable");
         return false;
     }
 

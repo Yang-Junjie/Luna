@@ -14,7 +14,7 @@ namespace {
 bool reportTaskSystemFailure(const char* message)
 {
     if (Logger::isInitialized()) {
-        LUNA_CORE_ERROR("{}", message);
+        LUNA_JOBS_ERROR("{}", message);
     }
 
     assert(false && "TaskSystem misuse");
@@ -355,7 +355,7 @@ bool TaskSystem::initialize(const TaskSystemConfig& config)
         }
     } catch (const std::system_error& error) {
         if (Logger::isInitialized()) {
-            LUNA_CORE_ERROR("Task system failed to create IO thread: {}", error.what());
+            LUNA_JOBS_ERROR("Task system failed to create IO thread: {}", error.what());
         }
         shutdown();
         return false;
@@ -369,7 +369,7 @@ bool TaskSystem::initialize(const TaskSystemConfig& config)
 
         if (m_io_startup_failed) {
             if (Logger::isInitialized()) {
-                LUNA_CORE_ERROR("Task system failed to register one or more IO threads");
+                LUNA_JOBS_ERROR("Task system failed to register one or more IO threads");
             }
             shutdown();
             return false;
@@ -379,7 +379,7 @@ bool TaskSystem::initialize(const TaskSystemConfig& config)
     m_initialized = true;
 
     if (Logger::isInitialized()) {
-        LUNA_CORE_INFO("Task system initialized with {} worker threads, {} IO threads, {} external slots ({} total "
+        LUNA_JOBS_INFO("Task system initialized with {} worker threads, {} IO threads, {} external slots ({} total "
                        "registered threads)",
                        m_config.worker_thread_count,
                        m_config.io_thread_count,
@@ -421,7 +421,7 @@ void TaskSystem::shutdown()
     m_initialized = false;
 
     if (Logger::isInitialized()) {
-        LUNA_CORE_INFO("Task system shutdown");
+        LUNA_JOBS_INFO("Task system shutdown");
     }
 }
 
@@ -578,7 +578,7 @@ TaskHandle TaskSystem::submitParallel(std::function<void(enki::TaskSetPartition,
                                       TaskSubmitDesc desc)
 {
     if (desc.target != TaskTarget::Worker && Logger::isInitialized()) {
-        LUNA_CORE_WARN("Parallel task submissions only support worker execution; forcing TaskTarget::Worker");
+        LUNA_JOBS_WARN("Parallel task submissions only support worker execution; forcing TaskTarget::Worker");
     }
 
     desc.target = TaskTarget::Worker;
@@ -755,7 +755,7 @@ bool TaskSystem::requireSchedulerApiThread(const char* operation) const
     }
 
     if (Logger::isInitialized()) {
-        LUNA_CORE_ERROR("{} requires the calling thread to be the application thread, an enkiTS worker, or a "
+        LUNA_JOBS_ERROR("{} requires the calling thread to be the application thread, an enkiTS worker, or a "
                         "registered external task thread",
                         operation);
     }

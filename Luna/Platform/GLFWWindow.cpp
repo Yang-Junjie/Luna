@@ -15,7 +15,7 @@ GLFWwindow* s_active_window = nullptr;
 
 void glfwErrorCallback(int error, const char* description)
 {
-    LUNA_CORE_ERROR("GLFW error {}: {}", error, description != nullptr ? description : "Unknown error");
+    LUNA_PLATFORM_ERROR("GLFW error {}: {}", error, description != nullptr ? description : "Unknown error");
 }
 
 } // namespace
@@ -105,7 +105,7 @@ void GLFWWindow::init(const WindowProps& props)
     if (s_glfw_window_count == 0) {
         glfwSetErrorCallback(glfwErrorCallback);
         if (!glfwInit()) {
-            LUNA_CORE_ERROR("Failed to initialize GLFW");
+            LUNA_PLATFORM_ERROR("Failed to initialize GLFW");
             return;
         }
     }
@@ -120,7 +120,7 @@ void GLFWWindow::init(const WindowProps& props)
             glfwTerminate();
         }
 
-        LUNA_CORE_ERROR("Failed to create GLFW window '{}'", props.m_title);
+        LUNA_PLATFORM_ERROR("Failed to create GLFW window '{}'", props.m_title);
         return;
     }
 
@@ -240,7 +240,7 @@ void GLFWWindow::init(const WindowProps& props)
         data.m_event_callback(event);
     });
 
-    LUNA_CORE_INFO("Created GLFW window '{}' ({}x{})", m_data.m_title, m_data.m_width, m_data.m_height);
+    LUNA_PLATFORM_INFO("Created GLFW window '{}' ({}x{})", m_data.m_title, m_data.m_width, m_data.m_height);
 }
 
 void GLFWWindow::shutdown()
@@ -249,7 +249,7 @@ void GLFWWindow::shutdown()
         return;
     }
 
-    LUNA_CORE_INFO("Destroying GLFW window '{}'", m_data.m_title);
+    LUNA_PLATFORM_INFO("Destroying GLFW window '{}'", m_data.m_title);
 
     if (s_active_window == m_window) {
         s_active_window = nullptr;

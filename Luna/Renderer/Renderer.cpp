@@ -190,7 +190,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
     m_native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
     m_initialization_options = std::move(options);
     if (m_native_window == nullptr) {
-        LUNA_CORE_ERROR("Cannot initialize renderer without a GLFW window");
+        LUNA_RENDERER_ERROR("Cannot initialize renderer without a GLFW window");
         return false;
     }
 
@@ -234,9 +234,9 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
-        LUNA_CORE_INFO("Initialized renderer backend '{}'", backendTypeToString(m_instance->GetType()));
+        LUNA_RENDERER_INFO("Initialized renderer backend '{}'", backendTypeToString(m_instance->GetType()));
     } catch (const std::exception& error) {
-        LUNA_CORE_ERROR("Failed to initialize Renderer: {}", error.what());
+        LUNA_RENDERER_ERROR("Failed to initialize Renderer: {}", error.what());
         shutdown();
         return false;
     }
@@ -358,7 +358,7 @@ void Renderer::startFrame()
         m_frame_command_buffers[m_frame_index] = m_current_command_buffer;
         m_frame_started = true;
     } catch (const std::exception& error) {
-        LUNA_CORE_WARN("StartFrame failed, swapchain will be recreated: {}", error.what());
+        LUNA_RENDERER_WARN("StartFrame failed, swapchain will be recreated: {}", error.what());
         m_frame_started = false;
         m_current_command_buffer.reset();
         m_resize_requested = true;
@@ -471,7 +471,7 @@ void Renderer::endFrame()
             m_resize_requested = true;
         }
     } catch (const std::exception& error) {
-        LUNA_CORE_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
+        LUNA_RENDERER_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
         m_resize_requested = true;
     }
 
@@ -577,14 +577,14 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     }
 
     if (selected_present_mode != requested_present_mode) {
-        LUNA_CORE_WARN("Requested present mode '{}' is unsupported; falling back to '{}'. Supported modes: {}",
-                       presentModeToString(requested_present_mode),
-                       presentModeToString(selected_present_mode),
-                       describePresentModes(supported_present_modes));
+        LUNA_RENDERER_WARN("Requested present mode '{}' is unsupported; falling back to '{}'. Supported modes: {}",
+                           presentModeToString(requested_present_mode),
+                           presentModeToString(selected_present_mode),
+                           describePresentModes(supported_present_modes));
     } else {
-        LUNA_CORE_INFO("Using present mode '{}' (supported: {})",
-                       presentModeToString(selected_present_mode),
-                       describePresentModes(supported_present_modes));
+        LUNA_RENDERER_INFO("Using present mode '{}' (supported: {})",
+                           presentModeToString(selected_present_mode),
+                           describePresentModes(supported_present_modes));
     }
 
     m_swapchain = m_device->CreateSwapchain(luna::RHI::SwapchainBuilder()
@@ -649,7 +649,7 @@ void Renderer::handlePendingResize()
         createSwapchain(extent.width, extent.height);
         m_resize_requested = false;
     } catch (const std::exception& error) {
-        LUNA_CORE_WARN("Swapchain recreation failed: {}", error.what());
+        LUNA_RENDERER_WARN("Swapchain recreation failed: {}", error.what());
     }
 }
 

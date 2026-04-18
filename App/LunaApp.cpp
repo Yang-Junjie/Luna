@@ -98,8 +98,8 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
 
         if (argument == "--backend") {
             if (i + 1 >= argc || argv[i + 1] == nullptr) {
-                LUNA_CORE_WARN("Missing value after '--backend'; defaulting to '{}'",
-                               backendTypeToString(selected_backend));
+                LUNA_RUNTIME_WARN("Missing value after '--backend'; defaulting to '{}'",
+                                  backendTypeToString(selected_backend));
                 continue;
             }
 
@@ -115,9 +115,9 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
             continue;
         }
 
-        LUNA_CORE_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
-                       std::string(backend_value),
-                       backendTypeToString(selected_backend));
+        LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
+                          std::string(backend_value),
+                          backendTypeToString(selected_backend));
     }
 
     return selected_backend;
@@ -305,9 +305,9 @@ float LunaRuntimeApplication::getSpinSpeed() const
 
 Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializationOptions()
 {
-    LUNA_CORE_INFO("LunaApp requested backend '{}' and present mode '{}' via code",
-                   backendTypeToString(m_backend),
-                   presentModeToString(kRequestedPresentMode));
+    LUNA_RUNTIME_INFO("LunaApp requested backend '{}' and present mode '{}' via code",
+                      backendTypeToString(m_backend),
+                      presentModeToString(kRequestedPresentMode));
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
 
@@ -332,7 +332,7 @@ void LunaRuntimeApplication::onInit()
     if (getImGuiLayer() != nullptr) {
         pushOverlay(std::make_unique<RuntimeHudLayer>(*this));
     } else {
-        LUNA_CORE_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
+        LUNA_RUNTIME_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
     }
 }
 
@@ -389,10 +389,10 @@ bool LunaRuntimeApplication::tryLoadDefaultAsset()
             }
 
             m_asset_label = candidate.filename().string();
-            LUNA_CORE_INFO("Loaded demo asset '{}'", candidate.string());
+            LUNA_RUNTIME_INFO("Loaded demo asset '{}'", candidate.string());
             return true;
         } catch (const std::exception& error) {
-            LUNA_CORE_WARN("Failed to load demo asset '{}': {}", candidate.string(), error.what());
+            LUNA_RUNTIME_WARN("Failed to load demo asset '{}': {}", candidate.string(), error.what());
         }
     }
 
@@ -404,7 +404,7 @@ void LunaRuntimeApplication::createFallbackAsset()
     m_demo_mesh = createProceduralCubeMesh();
     m_demo_material = createFallbackMaterial();
     m_asset_label = "Procedural cube";
-    LUNA_CORE_INFO("Using fallback procedural cube for runtime demo");
+    LUNA_RUNTIME_INFO("Using fallback procedural cube for runtime demo");
 }
 
 void LunaRuntimeApplication::updateDemoTransform(float delta_time)
@@ -427,7 +427,7 @@ void LunaRuntimeApplication::updateDemoTransform(float delta_time)
 Application* createApplication(int argc, char** argv)
 {
     const auto backend = parseBackendFromArgs(argc, argv);
-    LUNA_CORE_INFO("Starting LunaApp with backend '{}'", backendTypeToString(backend));
+    LUNA_RUNTIME_INFO("Starting LunaApp with backend '{}'", backendTypeToString(backend));
     return new LunaRuntimeApplication(backend);
 }
 

@@ -67,25 +67,25 @@ void rhiLogBridge(luna::RHI::LogLevel level, std::string_view message, void*)
 {
     switch (level) {
         case luna::RHI::LogLevel::Trace:
-            SPDLOG_LOGGER_TRACE(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_TRACE(::luna::Logger::rhi().get(), "{}", message);
             break;
         case luna::RHI::LogLevel::Debug:
-            SPDLOG_LOGGER_DEBUG(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_DEBUG(::luna::Logger::rhi().get(), "{}", message);
             break;
         case luna::RHI::LogLevel::Info:
-            SPDLOG_LOGGER_INFO(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_INFO(::luna::Logger::rhi().get(), "{}", message);
             break;
         case luna::RHI::LogLevel::Warn:
-            SPDLOG_LOGGER_WARN(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_WARN(::luna::Logger::rhi().get(), "{}", message);
             break;
         case luna::RHI::LogLevel::Error:
-            SPDLOG_LOGGER_ERROR(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_ERROR(::luna::Logger::rhi().get(), "{}", message);
             break;
         case luna::RHI::LogLevel::Fatal:
-            SPDLOG_LOGGER_CRITICAL(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_CRITICAL(::luna::Logger::rhi().get(), "{}", message);
             break;
         default:
-            SPDLOG_LOGGER_INFO(::luna::Logger::core().get(), "{}", message);
+            SPDLOG_LOGGER_INFO(::luna::Logger::rhi().get(), "{}", message);
             break;
     }
 
@@ -125,14 +125,29 @@ void Logger::init(const std::string& log_file, Level level)
         }
 
         m_s_core_logger = std::make_shared<spdlog::logger>("LunaCore", m_s_sinks.begin(), m_s_sinks.end());
-        m_s_runtime_logger = std::make_shared<spdlog::logger>("Runtime", m_s_sinks.begin(), m_s_sinks.end());
-        m_s_editor_logger = std::make_shared<spdlog::logger>("Editor", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_platform_logger = std::make_shared<spdlog::logger>("LunaPlatform", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_jobs_logger = std::make_shared<spdlog::logger>("LunaJobs", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_renderer_logger = std::make_shared<spdlog::logger>("LunaRenderer", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_imgui_logger = std::make_shared<spdlog::logger>("LunaImGui", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_rhi_logger = std::make_shared<spdlog::logger>("LunaRHI", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_runtime_logger = std::make_shared<spdlog::logger>("LunaRuntime", m_s_sinks.begin(), m_s_sinks.end());
+        m_s_editor_logger = std::make_shared<spdlog::logger>("LunaEditor", m_s_sinks.begin(), m_s_sinks.end());
 
         configureLogger(m_s_core_logger, spdlog_level);
+        configureLogger(m_s_platform_logger, spdlog_level);
+        configureLogger(m_s_jobs_logger, spdlog_level);
+        configureLogger(m_s_renderer_logger, spdlog_level);
+        configureLogger(m_s_imgui_logger, spdlog_level);
+        configureLogger(m_s_rhi_logger, spdlog_level);
         configureLogger(m_s_runtime_logger, spdlog_level);
         configureLogger(m_s_editor_logger, spdlog_level);
 
         spdlog::register_logger(m_s_core_logger);
+        spdlog::register_logger(m_s_platform_logger);
+        spdlog::register_logger(m_s_jobs_logger);
+        spdlog::register_logger(m_s_renderer_logger);
+        spdlog::register_logger(m_s_imgui_logger);
+        spdlog::register_logger(m_s_rhi_logger);
         spdlog::register_logger(m_s_runtime_logger);
         spdlog::register_logger(m_s_editor_logger);
 
@@ -162,6 +177,11 @@ void Logger::init(const std::string& log_file, Level level)
         m_s_initialized = false;
         m_s_sinks.clear();
         m_s_core_logger.reset();
+        m_s_platform_logger.reset();
+        m_s_jobs_logger.reset();
+        m_s_renderer_logger.reset();
+        m_s_imgui_logger.reset();
+        m_s_rhi_logger.reset();
         m_s_runtime_logger.reset();
         m_s_editor_logger.reset();
     }
@@ -180,8 +200,28 @@ void Logger::shutdown()
         m_s_core_logger->flush();
     }
 
+    if (m_s_platform_logger) {
+        m_s_platform_logger->flush();
+    }
+
+    if (m_s_jobs_logger) {
+        m_s_jobs_logger->flush();
+    }
+
+    if (m_s_renderer_logger) {
+        m_s_renderer_logger->flush();
+    }
+
+    if (m_s_imgui_logger) {
+        m_s_imgui_logger->flush();
+    }
+
     if (m_s_runtime_logger) {
         m_s_runtime_logger->flush();
+    }
+
+    if (m_s_rhi_logger) {
+        m_s_rhi_logger->flush();
     }
 
     if (m_s_editor_logger) {
@@ -189,10 +229,20 @@ void Logger::shutdown()
     }
 
     spdlog::drop("LunaCore");
-    spdlog::drop("Runtime");
-    spdlog::drop("Editor");
+    spdlog::drop("LunaPlatform");
+    spdlog::drop("LunaJobs");
+    spdlog::drop("LunaRenderer");
+    spdlog::drop("LunaImGui");
+    spdlog::drop("LunaRHI");
+    spdlog::drop("LunaRuntime");
+    spdlog::drop("LunaEditor");
 
     m_s_core_logger.reset();
+    m_s_platform_logger.reset();
+    m_s_jobs_logger.reset();
+    m_s_renderer_logger.reset();
+    m_s_imgui_logger.reset();
+    m_s_rhi_logger.reset();
     m_s_runtime_logger.reset();
     m_s_editor_logger.reset();
     m_s_sinks.clear();
@@ -218,6 +268,11 @@ void Logger::setLevel(Level level)
     }
 
     configureLogger(m_s_core_logger, spdlog_level);
+    configureLogger(m_s_platform_logger, spdlog_level);
+    configureLogger(m_s_jobs_logger, spdlog_level);
+    configureLogger(m_s_renderer_logger, spdlog_level);
+    configureLogger(m_s_imgui_logger, spdlog_level);
+    configureLogger(m_s_rhi_logger, spdlog_level);
     configureLogger(m_s_runtime_logger, spdlog_level);
     configureLogger(m_s_editor_logger, spdlog_level);
 }
@@ -233,6 +288,16 @@ const std::shared_ptr<spdlog::logger>& Logger::get(Type type)
     switch (type) {
         case Type::Core:
             return m_s_core_logger;
+        case Type::Platform:
+            return m_s_platform_logger;
+        case Type::Jobs:
+            return m_s_jobs_logger;
+        case Type::Renderer:
+            return m_s_renderer_logger;
+        case Type::ImGui:
+            return m_s_imgui_logger;
+        case Type::RHI:
+            return m_s_rhi_logger;
         case Type::Runtime:
             return m_s_runtime_logger;
         case Type::Editor:
@@ -245,6 +310,31 @@ const std::shared_ptr<spdlog::logger>& Logger::get(Type type)
 const std::shared_ptr<spdlog::logger>& Logger::core()
 {
     return get(Type::Core);
+}
+
+const std::shared_ptr<spdlog::logger>& Logger::platform()
+{
+    return get(Type::Platform);
+}
+
+const std::shared_ptr<spdlog::logger>& Logger::jobs()
+{
+    return get(Type::Jobs);
+}
+
+const std::shared_ptr<spdlog::logger>& Logger::renderer()
+{
+    return get(Type::Renderer);
+}
+
+const std::shared_ptr<spdlog::logger>& Logger::imgui()
+{
+    return get(Type::ImGui);
+}
+
+const std::shared_ptr<spdlog::logger>& Logger::rhi()
+{
+    return get(Type::RHI);
 }
 
 const std::shared_ptr<spdlog::logger>& Logger::runtime()
@@ -265,6 +355,21 @@ void Logger::flush()
 
     if (m_s_core_logger) {
         m_s_core_logger->flush();
+    }
+    if (m_s_platform_logger) {
+        m_s_platform_logger->flush();
+    }
+    if (m_s_jobs_logger) {
+        m_s_jobs_logger->flush();
+    }
+    if (m_s_renderer_logger) {
+        m_s_renderer_logger->flush();
+    }
+    if (m_s_imgui_logger) {
+        m_s_imgui_logger->flush();
+    }
+    if (m_s_rhi_logger) {
+        m_s_rhi_logger->flush();
     }
     if (m_s_runtime_logger) {
         m_s_runtime_logger->flush();

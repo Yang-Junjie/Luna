@@ -20,7 +20,7 @@ void ImGuiLayer::onAttach()
     }
 
     if (m_renderer == nullptr || !m_renderer->isInitialized() || m_renderer->getNativeWindow() == nullptr) {
-        LUNA_CORE_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
+        LUNA_IMGUI_ERROR("Cannot initialize ImGui layer because Vulkan state is incomplete");
         return;
     }
 
@@ -46,12 +46,12 @@ void ImGuiLayer::onAttach()
     }
 
     if (!luna::rhi::ImGuiVulkanContext::Init(*m_renderer)) {
-        LUNA_CORE_ERROR("Failed to initialize ImGui Vulkan backend");
+        LUNA_IMGUI_ERROR("Failed to initialize ImGui Vulkan backend");
         ImGui::DestroyContext();
         return;
     }
     m_attached = true;
-    LUNA_CORE_INFO("Initialized ImGui for luna::rhi");
+    LUNA_IMGUI_INFO("Initialized ImGui for luna::rhi");
 }
 
 void ImGuiLayer::onDetach()

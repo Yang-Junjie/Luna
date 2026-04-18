@@ -213,9 +213,9 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
                                          "sceneFragmentMain",
                                          luna::RHI::ShaderStage::Fragment);
     if (!m_vertex_shader || !m_fragment_shader) {
-        LUNA_CORE_ERROR("Failed to load scene renderer shaders: '{}' '{}'",
-                        shader_paths.geometry_vertex_path.string(),
-                        shader_paths.geometry_fragment_path.string());
+        LUNA_RENDERER_ERROR("Failed to load scene renderer shaders: '{}' '{}'",
+                            shader_paths.geometry_vertex_path.string(),
+                            shader_paths.geometry_fragment_path.string());
         return;
     }
 
@@ -408,7 +408,7 @@ void SceneRenderer::executeOpaquePass(rhi::RenderGraphRasterPassContext& pass_co
 {
     ensurePipeline(context);
     if (!m_pipeline) {
-        LUNA_CORE_ERROR("SceneRenderer::executeOpaquePass aborted: graphics pipeline is null");
+        LUNA_RENDERER_ERROR("SceneRenderer::executeOpaquePass aborted: graphics pipeline is null");
         return;
     }
 
