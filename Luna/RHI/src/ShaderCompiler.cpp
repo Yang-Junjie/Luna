@@ -1,11 +1,147 @@
 #include "Device.h"
 #include "Instance.h"
+#include "Logging.h"
 #include "ShaderCompiler.h"
 
+#include <algorithm>
+#include <cctype>
 #include <fstream>
-#include <iostream>
+#include <map>
+#include <sstream>
+#include <string_view>
+#include <vector>
 
 namespace luna::RHI {
+namespace {
+#if LUNA_RHI_HAS_SLANG
+void PrintDiagnostics(const char* label, slang::IBlob* diagnosticsBlob)
+{
+    if (!diagnosticsBlob || diagnosticsBlob->getBufferSize() == 0) {
+        return;
+    }
+
+    std::string message(label);
+    message += ":\n";
+    message += static_cast<const char*>(diagnosticsBlob->getBufferPointer());
+    LogMessage(LogLevel::Warn, message);
+}
+
+std::string ReadTextFile(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        throw std::runtime_error("Failed to open shader source file: " + path.string());
+    }
+
+    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
+
+std::string BuildModuleName(const std::filesystem::path& path)
+{
+    std::string moduleName = path.stem().string();
+    if (moduleName.empty()) {
+        moduleName = "shader";
+    }
+
+    for (char& ch : moduleName) {
+        if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '_') {
+            ch = '_';
+        }
+    }
+
+    const auto canonicalPath = std::filesystem::absolute(path).lexically_normal().string();
+    moduleName += "_";
+    moduleName += std::to_string(std::hash<std::string>()(canonicalPath));
+    return moduleName;
+}
+
+std::string ComposeSourceWithDefines(const std::string& source, const ShaderDefines& defines)
+{
+    if (defines.empty()) {
+        return source;
+    }
+
+    std::ostringstream stream;
+    for (const auto& [name, value] : defines) {
+        stream << "#define " << name;
+        if (!value.empty()) {
+            stream << " " << value;
+        }
+        stream << "\n";
+    }
+    stream << "\n" << source;
+    return stream.str();
+}
+
+void InjectBackendDefines(BackendType backend, ShaderDefines& defines)
+{
+    defines.insert_or_assign("LUNA_SHADER_SLANG", "1");
+
+    switch (backend) {
+        case BackendType::Vulkan:
+            defines.insert_or_assign("LUNA_BACKEND_VULKAN", "1");
+            break;
+        case BackendType::DirectX12:
+            defines.insert_or_assign("LUNA_BACKEND_D3D12", "1");
+            break;
+        case BackendType::DirectX11:
+            defines.insert_or_assign("LUNA_BACKEND_D3D11", "1");
+            break;
+        case BackendType::OpenGL:
+            defines.insert_or_assign("LUNA_BACKEND_OPENGL", "1");
+            break;
+        case BackendType::OpenGLES:
+            defines.insert_or_assign("LUNA_BACKEND_OPENGLES", "1");
+            break;
+        case BackendType::Metal:
+            defines.insert_or_assign("LUNA_BACKEND_METAL", "1");
+            break;
+        case BackendType::WebGPU:
+            defines.insert_or_assign("LUNA_BACKEND_WEBGPU", "1");
+            break;
+        default:
+            break;
+    }
+}
+
+slang::TargetDesc MakeTargetDesc(BackendType backend, slang::IGlobalSession* globalSession)
+{
+    slang::TargetDesc targetDesc = {};
+
+    switch (backend) {
+        case BackendType::Vulkan:
+            targetDesc.format = SLANG_SPIRV;
+            targetDesc.profile = globalSession->findProfile("spirv_1_5");
+            break;
+        case BackendType::DirectX12:
+            targetDesc.format = SLANG_DXIL;
+            targetDesc.profile = globalSession->findProfile("sm_6_6");
+            break;
+        case BackendType::DirectX11:
+            targetDesc.format = SLANG_DXBC;
+            targetDesc.profile = globalSession->findProfile("sm_5_0");
+            break;
+        case BackendType::OpenGL:
+        case BackendType::OpenGLES:
+            targetDesc.format = SLANG_GLSL;
+            targetDesc.profile = globalSession->findProfile("glsl_450");
+            break;
+        case BackendType::Metal:
+            targetDesc.format = SLANG_METAL;
+            targetDesc.profile = globalSession->findProfile("metal");
+            break;
+        case BackendType::WebGPU:
+            targetDesc.format = SLANG_WGSL;
+            break;
+        default:
+            throw std::runtime_error("Unsupported BackendType in ShaderCompiler");
+    }
+
+    return targetDesc;
+}
+#endif
+} // namespace
+
 #if !LUNA_RHI_HAS_SLANG
 namespace {
 [[noreturn]] void ThrowSlangUnavailable()
@@ -171,41 +307,17 @@ Ref<ShaderCompiler> ShaderCompiler::Create(BackendType backend)
 void ShaderCompiler::Initialize(BackendType backend)
 {
     m_targetBackend = backend;
+
     if (SLANG_FAILED(createGlobalSession(m_globalSession.writeRef()))) {
         throw std::runtime_error("Failed to create Slang global session");
     }
-    SessionDesc sessionDesc = {};
-    TargetDesc targetDesc = {};
-    switch (backend) {
-        case BackendType::Vulkan:
-            targetDesc.format = SLANG_SPIRV;
-            targetDesc.profile = m_globalSession->findProfile("spirv_1_5");
-            break;
-        case BackendType::DirectX12:
-            targetDesc.format = SLANG_DXIL;
-            targetDesc.profile = m_globalSession->findProfile("sm_6_6");
-            break;
-        case BackendType::OpenGL:
-        case BackendType::OpenGLES:
-            targetDesc.format = SLANG_GLSL;
-            targetDesc.profile = m_globalSession->findProfile("glsl_450");
-            break;
-        case BackendType::DirectX11:
-            targetDesc.format = SLANG_DXBC;
-            targetDesc.profile = m_globalSession->findProfile("sm_5_0");
-            break;
-        case BackendType::Metal:
-            targetDesc.format = SLANG_METAL;
-            targetDesc.profile = m_globalSession->findProfile("metal");
-            break;
-        case BackendType::WebGPU:
-            targetDesc.format = SLANG_WGSL;
-            break;
-        default:
-            throw std::runtime_error("Unsupported BackendType in ShaderCompiler");
-    }
-    sessionDesc.targetCount = 1;
+
+    slang::TargetDesc targetDesc = MakeTargetDesc(backend, m_globalSession.get());
+    slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+    sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+
     if (SLANG_FAILED(m_globalSession->createSession(sessionDesc, m_session.writeRef()))) {
         throw std::runtime_error("Failed to create Slang session");
     }
@@ -213,103 +325,117 @@ void ShaderCompiler::Initialize(BackendType backend)
 
 std::shared_ptr<ShaderModule> ShaderCompiler::CompileOrLoad(const Ref<Device>& device, const ShaderCreateInfo& info)
 {
-    size_t hash = CalculateHash(info);
+    ShaderCreateInfo effectiveInfo = info;
+    InjectBackendDefines(m_targetBackend, effectiveInfo.Defines);
+
+    size_t hash = CalculateHash(effectiveInfo);
     std::filesystem::path cachePath = m_cacheDir / (std::to_string(hash) + ".bin");
     ShaderBlob blob;
+
     if (std::filesystem::exists(cachePath)) {
         std::ifstream ifs(cachePath, std::ios::binary | std::ios::ate);
         if (!ifs) {
             throw std::runtime_error("Failed to open shader cache file: " + cachePath.string());
         }
+
         std::streamsize size = ifs.tellg();
         ifs.seekg(0, std::ios::beg);
-        blob.Data.resize(size);
+        blob.Data.resize(static_cast<size_t>(size));
         if (!ifs.read(reinterpret_cast<char*>(blob.Data.data()), size)) {
             throw std::runtime_error("Failed to read shader cache file: " + cachePath.string());
         }
+
         blob.Hash = std::hash<std::string_view>()(
             std::string_view(reinterpret_cast<const char*>(blob.Data.data()), blob.Data.size()));
-        return device->CreateShaderModule(blob, info);
+        return device->CreateShaderModule(blob, effectiveInfo);
     }
+
+    const std::filesystem::path sourcePath = std::filesystem::absolute(effectiveInfo.SourcePath).lexically_normal();
+    const std::string sourceText = ComposeSourceWithDefines(ReadTextFile(sourcePath), effectiveInfo.Defines);
+    const std::string moduleName = BuildModuleName(sourcePath);
+
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
     Slang::ComPtr<slang::IModule> slangModule;
-    slangModule = m_session->loadModule(info.SourcePath.c_str(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Shader load diagnostics:\n"
-                  << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
+    slangModule = m_session->loadModuleFromSourceString(
+        moduleName.c_str(), sourcePath.string().c_str(), sourceText.c_str(), diagnosticsBlob.writeRef());
+    PrintDiagnostics("Shader load diagnostics", diagnosticsBlob.get());
     if (!slangModule) {
-        std::cerr << "Failed to load shader module: " << info.SourcePath << std::endl;
+        LogMessage(LogLevel::Error, "Failed to load shader module: " + sourcePath.string());
         return nullptr;
     }
+
     Slang::ComPtr<slang::IEntryPoint> entryPoint;
-    SlangStage slangStage = ConvertShaderStageToSlang(info.Stage);
-    SlangResult result = slangModule->findEntryPointByName(info.EntryPoint.c_str(), entryPoint.writeRef());
-    if (SLANG_FAILED(result) || !entryPoint) {
-        std::cerr << "Failed to find entry point: " << info.EntryPoint << std::endl;
+    const SlangResult findResult =
+        slangModule->findEntryPointByName(effectiveInfo.EntryPoint.c_str(), entryPoint.writeRef());
+    if (SLANG_FAILED(findResult) || !entryPoint) {
+        LogMessage(LogLevel::Error, "Failed to find entry point: " + effectiveInfo.EntryPoint);
         return nullptr;
     }
+
     std::vector<slang::IComponentType*> components;
     components.push_back(slangModule);
     components.push_back(entryPoint);
+
     Slang::ComPtr<slang::IComponentType> composedProgram;
-    result = m_session->createCompositeComponentType(components.data(),
-                                                     static_cast<SlangInt>(components.size()),
-                                                     composedProgram.writeRef(),
-                                                     diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Composition diagnostics:\n"
-                  << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
+    SlangResult result = m_session->createCompositeComponentType(components.data(),
+                                                                 static_cast<SlangInt>(components.size()),
+                                                                 composedProgram.writeRef(),
+                                                                 diagnosticsBlob.writeRef());
+    PrintDiagnostics("Composition diagnostics", diagnosticsBlob.get());
     if (SLANG_FAILED(result) || !composedProgram) {
-        std::cerr << "Failed to create composite program" << std::endl;
+        LogMessage(LogLevel::Error, "Failed to create composite program");
         return nullptr;
     }
+
     Slang::ComPtr<slang::IComponentType> linkedProgram;
     result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Link diagnostics:\n"
-                  << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
+    PrintDiagnostics("Link diagnostics", diagnosticsBlob.get());
     if (SLANG_FAILED(result) || !linkedProgram) {
-        std::cerr << "Failed to link program" << std::endl;
+        LogMessage(LogLevel::Error, "Failed to link program");
         return nullptr;
     }
+
     Slang::ComPtr<slang::IBlob> codeBlob;
     result = linkedProgram->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Code generation diagnostics:\n"
-                  << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
+    PrintDiagnostics("Code generation diagnostics", diagnosticsBlob.get());
     if (SLANG_FAILED(result) || !codeBlob) {
-        std::cerr << "Failed to get entry point code" << std::endl;
+        LogMessage(LogLevel::Error, "Failed to get entry point code");
         return nullptr;
     }
+
     blob = ConvertBlob(codeBlob.get());
-    if (!blob.Data.empty()) {
-        if (!std::filesystem::exists(m_cacheDir)) {
-            std::filesystem::create_directories(m_cacheDir);
-        }
-        std::ofstream ofs(cachePath, std::ios::binary);
-        if (ofs) {
-            ofs.write(reinterpret_cast<const char*>(blob.Data.data()), static_cast<std::streamsize>(blob.Data.size()));
-            ofs.close();
-        }
+    if (blob.Data.empty()) {
+        return nullptr;
     }
-    return device->CreateShaderModule(blob, info);
+
+    if (!std::filesystem::exists(m_cacheDir)) {
+        std::filesystem::create_directories(m_cacheDir);
+    }
+
+    std::ofstream ofs(cachePath, std::ios::binary);
+    if (ofs) {
+        ofs.write(reinterpret_cast<const char*>(blob.Data.data()), static_cast<std::streamsize>(blob.Data.size()));
+    }
+
+    return device->CreateShaderModule(blob, effectiveInfo);
 }
 
 std::shared_ptr<ShaderModule> ShaderCompiler::CompileLibrary(const Ref<Device>& device,
                                                              const std::string& sourcePath,
                                                              const std::vector<std::string>& entryPoints)
 {
+    const std::filesystem::path absolutePath = std::filesystem::absolute(sourcePath).lexically_normal();
+    const std::string moduleName = BuildModuleName(absolutePath);
+    ShaderDefines defines;
+    InjectBackendDefines(m_targetBackend, defines);
+    const std::string sourceText = ComposeSourceWithDefines(ReadTextFile(absolutePath), defines);
+
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-    auto slangModule = m_session->loadModule(sourcePath.c_str(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Library load: " << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
+    auto slangModule = m_session->loadModuleFromSourceString(
+        moduleName.c_str(), absolutePath.string().c_str(), sourceText.c_str(), diagnosticsBlob.writeRef());
+    PrintDiagnostics("Library load diagnostics", diagnosticsBlob.get());
     if (!slangModule) {
-        std::cerr << "Failed to load module: " << sourcePath << std::endl;
+        LogMessage(LogLevel::Error, "Failed to load module: " + absolutePath.string());
         return nullptr;
     }
 
@@ -317,55 +443,51 @@ std::shared_ptr<ShaderModule> ShaderCompiler::CompileLibrary(const Ref<Device>& 
     std::vector<slang::IComponentType*> components;
     components.push_back(slangModule);
     for (size_t i = 0; i < entryPoints.size(); i++) {
-        auto r = slangModule->findEntryPointByName(entryPoints[i].c_str(), eps[i].writeRef());
-        if (SLANG_FAILED(r) || !eps[i]) {
-            std::cerr << "EP not found: " << entryPoints[i] << std::endl;
+        auto result = slangModule->findEntryPointByName(entryPoints[i].c_str(), eps[i].writeRef());
+        if (SLANG_FAILED(result) || !eps[i]) {
+            LogMessage(LogLevel::Error, "EP not found: " + entryPoints[i]);
             return nullptr;
         }
         components.push_back(eps[i]);
     }
 
     Slang::ComPtr<slang::IComponentType> composed;
-    auto r = m_session->createCompositeComponentType(
-        components.data(), components.size(), composed.writeRef(), diagnosticsBlob.writeRef());
-    if (SLANG_FAILED(r) || !composed) {
-        std::cerr << "Failed to compose library" << std::endl;
+    auto result = m_session->createCompositeComponentType(
+        components.data(), static_cast<SlangInt>(components.size()), composed.writeRef(), diagnosticsBlob.writeRef());
+    PrintDiagnostics("Library composition diagnostics", diagnosticsBlob.get());
+    if (SLANG_FAILED(result) || !composed) {
+        LogMessage(LogLevel::Error, "Failed to compose library");
         return nullptr;
     }
 
     Slang::ComPtr<slang::IComponentType> linked;
-    r = composed->link(linked.writeRef(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Library link: " << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
-    if (SLANG_FAILED(r) || !linked) {
-        std::cerr << "Failed to link library" << std::endl;
+    result = composed->link(linked.writeRef(), diagnosticsBlob.writeRef());
+    PrintDiagnostics("Library link diagnostics", diagnosticsBlob.get());
+    if (SLANG_FAILED(result) || !linked) {
+        LogMessage(LogLevel::Error, "Failed to link library");
         return nullptr;
     }
 
     Slang::ComPtr<slang::IBlob> codeBlob;
-    r = linked->getTargetCode(0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
-    if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-        std::cerr << "Library codegen: " << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-    }
-    if (SLANG_FAILED(r) || !codeBlob) {
-        std::cerr << "getTargetCode failed (0x" << std::hex << r << std::dec << "), trying getEntryPointCode..."
-                  << std::endl;
-        // Fallback: get code for first entry point (produces a library in DXIL mode for RT shaders)
-        r = linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
-        if (diagnosticsBlob && diagnosticsBlob->getBufferSize() > 0) {
-            std::cerr << "EP codegen: " << static_cast<const char*>(diagnosticsBlob->getBufferPointer()) << std::endl;
-        }
-        if (SLANG_FAILED(r) || !codeBlob) {
-            std::cerr << "Failed to get library code" << std::endl;
+    result = linked->getTargetCode(0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
+    PrintDiagnostics("Library codegen diagnostics", diagnosticsBlob.get());
+    if (SLANG_FAILED(result) || !codeBlob) {
+        result = linked->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
+        PrintDiagnostics("Library fallback codegen diagnostics", diagnosticsBlob.get());
+        if (SLANG_FAILED(result) || !codeBlob) {
+            LogMessage(LogLevel::Error, "Failed to get library code");
             return nullptr;
         }
     }
 
     ShaderBlob blob = ConvertBlob(codeBlob.get());
+    if (blob.Data.empty()) {
+        return nullptr;
+    }
+
     ShaderCreateInfo info;
-    info.SourcePath = sourcePath;
-    info.EntryPoint = entryPoints[0];
+    info.SourcePath = absolutePath.string();
+    info.EntryPoint = entryPoints.empty() ? "" : entryPoints.front();
     info.Stage = ShaderStage::RayGen;
     return device->CreateShaderModule(blob, info);
 }
@@ -380,10 +502,12 @@ void ShaderCompiler::SetCacheDirectory(const std::filesystem::path& path)
 
 void ShaderCompiler::PruneCache()
 {
-    if (std::filesystem::exists(m_cacheDir)) {
-        for (const auto& entry : std::filesystem::directory_iterator(m_cacheDir)) {
-            std::filesystem::remove(entry.path());
-        }
+    if (!std::filesystem::exists(m_cacheDir)) {
+        return;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(m_cacheDir)) {
+        std::filesystem::remove(entry.path());
     }
 }
 
@@ -404,17 +528,19 @@ size_t ShaderCompiler::CalculateHash(const ShaderCreateInfo& info) const
     return std::hash<std::string>()(combined);
 }
 
-ShaderBlob ShaderCompiler::ConvertBlob(IBlob* blob)
+ShaderBlob ShaderCompiler::ConvertBlob(slang::IBlob* blob)
 {
     ShaderBlob result;
     if (!blob) {
         return result;
     }
+
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(blob->getBufferPointer());
-    size_t size = blob->getBufferSize();
+    const size_t size = blob->getBufferSize();
     if (!ptr || size == 0) {
         return result;
     }
+
     result.Data.assign(ptr, ptr + size);
     result.Hash = std::hash<std::string_view>()(std::string_view(reinterpret_cast<const char*>(ptr), size));
     return result;

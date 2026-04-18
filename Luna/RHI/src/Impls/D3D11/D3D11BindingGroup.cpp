@@ -50,11 +50,12 @@ void D3D11DescriptorSet::WriteTexture(const TextureWriteInfo& info)
 {
     for (auto& res : m_resources) {
         if (res.slot == info.Binding) {
-            if (info.TextureView) {
-                auto tex = info.TextureView->GetTexture();
-                auto* d3dTex = static_cast<D3D11Texture*>(tex.get());
-                if (d3dTex && d3dTex->GetSRV()) {
-                    res.srv = d3dTex->GetSRV();
+            auto d3dView = std::dynamic_pointer_cast<D3D11TextureView>(info.TextureView);
+            if (d3dView) {
+                if (info.Type == DescriptorType::StorageImage) {
+                    res.uav = d3dView->GetUAV();
+                } else {
+                    res.srv = d3dView->GetSRV();
                 }
             }
             if (info.Sampler) {

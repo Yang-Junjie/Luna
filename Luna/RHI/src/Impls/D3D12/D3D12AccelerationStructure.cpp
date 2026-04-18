@@ -60,24 +60,6 @@ D3D12AccelerationStructure::D3D12AccelerationStructure(const Ref<Device>& device
     m_resultSize = prebuild.ResultDataMaxSizeInBytes;
     m_scratchSize = prebuild.ScratchDataSizeInBytes;
 
-    fprintf(stderr,
-            "[AS] type=%d numDescs=%u resultSize=%llu scratchSize=%llu\n",
-            static_cast<int>(info.Type),
-            m_inputs.NumDescs,
-            m_resultSize,
-            m_scratchSize);
-    if (info.Type == AccelerationStructureType::BottomLevel && !m_geomDescs.empty()) {
-        auto& g = m_geomDescs[0];
-        fprintf(stderr,
-                "[AS] geom: type=%d vertCount=%u vertFormat=%d vertStride=%llu indexCount=%u addr=0x%llx\n",
-                g.Type,
-                g.Triangles.VertexCount,
-                g.Triangles.VertexFormat,
-                g.Triangles.VertexBuffer.StrideInBytes,
-                g.Triangles.IndexCount,
-                g.Triangles.VertexBuffer.StartAddress);
-    }
-
     D3D12_HEAP_PROPERTIES hp = {};
     hp.Type = D3D12_HEAP_TYPE_DEFAULT;
     D3D12_RESOURCE_DESC rd = {};

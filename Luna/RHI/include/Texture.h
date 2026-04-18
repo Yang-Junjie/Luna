@@ -105,6 +105,8 @@ class LUNA_RHI_API Texture;
 
 class LUNA_RHI_API TextureView : public std::enable_shared_from_this<TextureView> {
 public:
+    // TextureView must not strongly own its parent texture. Backends should store
+    // native view handles directly and use a weak back-reference when needed.
     virtual Ref<Texture> GetTexture() const = 0;
     virtual const TextureViewDesc& GetDesc() const = 0;
     virtual ~TextureView() = default;
@@ -124,6 +126,7 @@ public:
     virtual TextureUsageFlags GetUsage() const = 0;
     virtual ResourceState GetCurrentState() const = 0;
     virtual Ref<TextureView> CreateView(const TextureViewDesc& desc) = 0;
+    // GetDefaultView() should lazily create and return the backend default view.
     virtual Ref<TextureView> GetDefaultView() = 0;
     virtual void CreateDefaultViewIfNeeded() = 0;
 
@@ -145,12 +148,15 @@ public:
 protected:
     static bool IsDepthFormat(Format format)
     {
-        return format == Format::D32F;
+        return format == Format::D16_UNORM || format == Format::D32_FLOAT || format == Format::D32F ||
+               format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 ||
+               format == Format::D32_FLOAT_S8_UINT;
     }
 
     static bool IsStencilFormat(Format format)
     {
-        return format == Format::D24S8;
+        return format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 ||
+               format == Format::D32_FLOAT_S8_UINT || format == Format::S8_UINT;
     }
 };
 } // namespace luna::RHI

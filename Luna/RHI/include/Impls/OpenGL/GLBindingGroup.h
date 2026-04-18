@@ -17,6 +17,7 @@ struct GLBindingEntry {
         Image
     } type;
     GLuint resource = 0;
+    GLenum textureTarget = GL_TEXTURE_2D;
     GLint uniformLocation = -1;
     uint32_t textureUnit = 0;
     uint32_t imageLevel = 0;
@@ -30,7 +31,7 @@ class LUNA_RHI_API GLBindingGroup final : public DescriptorSet {
 public:
     void AddUniformBuffer(uint32_t binding, GLuint buffer);
     void AddStorageBuffer(uint32_t binding, GLuint buffer);
-    void AddTexture(uint32_t binding, GLuint texture, uint32_t textureUnit);
+    void AddTexture(uint32_t binding, GLuint texture, GLenum target, uint32_t textureUnit);
     void AddSampler(uint32_t binding, GLuint sampler, uint32_t textureUnit);
     void AddImage(
         uint32_t binding, GLuint texture, uint32_t level, bool layered, uint32_t layer, GLenum access, GLenum format);

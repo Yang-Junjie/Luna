@@ -8,11 +8,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <filesystem>
 #include <glm/common.hpp>
 #include <imgui.h>
 #include <limits>
 #include <numbers>
+#include <optional>
+#include <string_view>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -40,6 +43,84 @@ const char* presentModeToString(luna::RHI::PresentMode mode)
         default:
             return "Unknown";
     }
+}
+
+const char* backendTypeToString(luna::RHI::BackendType type)
+{
+    switch (type) {
+        case luna::RHI::BackendType::Auto:
+            return "Auto";
+        case luna::RHI::BackendType::Vulkan:
+            return "Vulkan";
+        case luna::RHI::BackendType::DirectX12:
+            return "DirectX12";
+        case luna::RHI::BackendType::DirectX11:
+            return "DirectX11";
+        case luna::RHI::BackendType::Metal:
+            return "Metal";
+        case luna::RHI::BackendType::OpenGL:
+            return "OpenGL";
+        case luna::RHI::BackendType::OpenGLES:
+            return "OpenGLES";
+        case luna::RHI::BackendType::WebGPU:
+            return "WebGPU";
+        default:
+            return "Unknown";
+    }
+}
+
+std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
+{
+    std::string normalized(value);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    if (normalized == "vulkan" || normalized == "vk") {
+        return luna::RHI::BackendType::Vulkan;
+    }
+    if (normalized == "d3d12" || normalized == "dx12" || normalized == "directx12") {
+        return luna::RHI::BackendType::DirectX12;
+    }
+    if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
+        return luna::RHI::BackendType::DirectX11;
+    }
+    return std::nullopt;
+}
+
+luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
+{
+    luna::RHI::BackendType selected_backend = luna::RHI::BackendType::Vulkan;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument = argv[i] != nullptr ? std::string_view(argv[i]) : std::string_view{};
+        std::string_view backend_value;
+
+        if (argument == "--backend") {
+            if (i + 1 >= argc || argv[i + 1] == nullptr) {
+                LUNA_CORE_WARN("Missing value after '--backend'; defaulting to '{}'",
+                               backendTypeToString(selected_backend));
+                continue;
+            }
+
+            backend_value = std::string_view(argv[++i]);
+        } else if (argument.starts_with("--backend=")) {
+            backend_value = argument.substr(std::string_view("--backend=").size());
+        } else {
+            continue;
+        }
+
+        if (const auto parsed = parseBackendValue(backend_value)) {
+            selected_backend = *parsed;
+            continue;
+        }
+
+        LUNA_CORE_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
+                       std::string(backend_value),
+                       backendTypeToString(selected_backend));
+    }
+
+    return selected_backend;
 }
 
 std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::ModelData::Shape& shape)
@@ -148,7 +229,7 @@ public:
 
         ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Luna ImGui Test");
-        ImGui::TextUnformatted("Backend: Luna RHI / Vulkan");
+        ImGui::Text("Backend: Luna RHI / %s", backendTypeToString(application.getBackend()));
         ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
         ImGui::Separator();
         ImGui::Text("Scene Source: %s", application.getAssetLabel().c_str());
@@ -185,20 +266,26 @@ private:
 
 namespace luna {
 
-LunaRuntimeApplication::LunaRuntimeApplication()
+LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend)
     : Application(ApplicationSpecification{
           .m_name = "Luna ImGui Test",
           .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
-          .m_enable_imgui = true,
+          .m_enable_imgui = backend == luna::RHI::BackendType::Vulkan,
           .m_enable_multi_viewport = false,
-      })
+      }),
+      m_backend(backend)
 {}
 
 const std::string& LunaRuntimeApplication::getAssetLabel() const
 {
     return m_asset_label;
+}
+
+luna::RHI::BackendType LunaRuntimeApplication::getBackend() const
+{
+    return m_backend;
 }
 
 bool LunaRuntimeApplication::isAutoRotateEnabled() const
@@ -218,8 +305,10 @@ float LunaRuntimeApplication::getSpinSpeed() const
 
 Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializationOptions()
 {
-    LUNA_CORE_INFO("LunaApp requested present mode '{}' via code", presentModeToString(kRequestedPresentMode));
-    return Renderer::InitializationOptions{kRequestedPresentMode};
+    LUNA_CORE_INFO("LunaApp requested backend '{}' and present mode '{}' via code",
+                   backendTypeToString(m_backend),
+                   presentModeToString(kRequestedPresentMode));
+    return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
 
 void LunaRuntimeApplication::setSpinSpeed(float speed)
@@ -240,7 +329,11 @@ void LunaRuntimeApplication::onInit()
     getRenderer().getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
     resetCamera();
     buildScene();
-    pushOverlay(std::make_unique<RuntimeHudLayer>(*this));
+    if (getImGuiLayer() != nullptr) {
+        pushOverlay(std::make_unique<RuntimeHudLayer>(*this));
+    } else {
+        LUNA_CORE_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
+    }
 }
 
 void LunaRuntimeApplication::onUpdate(Timestep timestep)
@@ -333,9 +426,9 @@ void LunaRuntimeApplication::updateDemoTransform(float delta_time)
 
 Application* createApplication(int argc, char** argv)
 {
-    (void) argc;
-    (void) argv;
-    return new LunaRuntimeApplication();
+    const auto backend = parseBackendFromArgs(argc, argv);
+    LUNA_CORE_INFO("Starting LunaApp with backend '{}'", backendTypeToString(backend));
+    return new LunaRuntimeApplication(backend);
 }
 
 } // namespace luna

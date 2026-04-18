@@ -3,6 +3,7 @@
 #include "Texture.h"
 #include "vk_mem_alloc.h"
 
+#include <memory>
 #include <vulkan/vulkan.hpp>
 
 namespace luna::RHI {
@@ -11,9 +12,11 @@ class Device;
 
 class LUNA_RHI_API VKTextureView : public TextureView {
 private:
-    Ref<VKTexture> m_texture;
+    std::weak_ptr<VKTexture> m_texture;
+    Ref<Device> m_deviceOwner;
     TextureViewDesc m_desc;
     vk::ImageView m_imageView;
+    bool m_ownsImageView = false;
     friend class VKCommandBufferEncoder;
     friend class VKDescriptorSet;
 
@@ -25,6 +28,7 @@ public:
         Create(const Ref<Texture>& texture, const vk::ImageView& view, const TextureViewDesc& desc);
     Ref<Texture> GetTexture() const override;
     const TextureViewDesc& GetDesc() const override;
+    ~VKTextureView() override;
 
     vk::ImageView& GetHandle()
     {
@@ -64,12 +68,8 @@ public:
     TextureUsageFlags GetUsage() const override;
     ResourceState GetCurrentState() const override;
     Ref<TextureView> CreateView(const TextureViewDesc& desc) override;
+    Ref<TextureView> GetDefaultView() override;
     ~VKTexture() override;
-
-    Ref<TextureView> GetDefaultView() override
-    {
-        return m_view;
-    }
 
     vk::Image& GetHandle()
     {

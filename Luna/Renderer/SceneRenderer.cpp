@@ -1,6 +1,5 @@
 #include "Core/Log.h"
 #include "Renderer/SceneRenderer.h"
-#include "Renderer/ShaderLoader.h"
 
 #include <cmath>
 #include <cstring>
@@ -20,7 +19,9 @@
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
+#include <ShaderCompiler.h>
 #include <ShaderModule.h>
+#include <string_view>
 #include <Texture.h>
 
 namespace {
@@ -35,38 +36,30 @@ std::filesystem::path projectRoot()
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-std::size_t computeShaderHash(const std::vector<uint8_t>& data)
-{
-    return std::hash<std::string_view>()(std::string_view(reinterpret_cast<const char*>(data.data()), data.size()));
-}
-
 luna::RHI::Ref<luna::RHI::ShaderModule> loadShaderModule(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                                 const luna::RHI::Ref<luna::RHI::ShaderCompiler>& compiler,
                                                  const std::filesystem::path& path,
-                                                 luna::rhi::ShaderType type)
+                                                 std::string_view entry_point,
+                                                 luna::RHI::ShaderStage stage)
 {
-    const auto shader_data =
-        luna::rhi::ShaderLoader::LoadFromSourceFile(path.string(), type, luna::rhi::ShaderLanguage::GLSL);
-    if (!shader_data.isValid()) {
+    if (!device || !compiler) {
         return {};
     }
 
-    luna::RHI::ShaderBlob blob;
-    blob.Data.resize(shader_data.Bytecode.size() * sizeof(uint32_t));
-    std::memcpy(blob.Data.data(), shader_data.Bytecode.data(), blob.Data.size());
-    blob.Hash = computeShaderHash(blob.Data);
-
     luna::RHI::ShaderCreateInfo create_info;
     create_info.SourcePath = path.string();
-    create_info.EntryPoint = "main";
-    create_info.Stage = shader_data.Stage;
-    return device->CreateShaderModule(blob, create_info);
+    create_info.EntryPoint = std::string(entry_point);
+    create_info.Stage = stage;
+    return compiler->CompileOrLoad(device, create_info);
 }
 
-glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio)
+glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio, luna::RHI::BackendType backend_type)
 {
     const float clamped_aspect_ratio = std::max(aspect_ratio, 0.001f);
     glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(50.0f), clamped_aspect_ratio, 0.05f, 200.0f);
-    projection[1][1] *= -1.0f;
+    if (backend_type == luna::RHI::BackendType::Vulkan) {
+        projection[1][1] *= -1.0f;
+    }
     return projection * camera.getViewMatrix();
 }
 
@@ -101,12 +94,8 @@ void SceneRenderer::shutdown()
     m_material_sampler.reset();
     m_vertex_shader.reset();
     m_fragment_shader.reset();
-    m_depth_texture.reset();
     m_device.reset();
     m_surface_format = luna::RHI::Format::UNDEFINED;
-    m_framebuffer_width = 0;
-    m_framebuffer_height = 0;
-    m_depth_texture_initialized = false;
 }
 
 void SceneRenderer::beginScene(const Camera& camera)
@@ -135,114 +124,41 @@ void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
     });
 }
 
-void SceneRenderer::render(const RenderContext& context)
+void SceneRenderer::buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context)
 {
-    if (!context.device || !context.command_buffer || !context.color_target || context.framebuffer_width == 0 ||
-        context.framebuffer_height == 0) {
+    if (!context.device || !context.color_target.isValid() || !context.depth_target.isValid() ||
+        context.framebuffer_width == 0 || context.framebuffer_height == 0) {
         return;
     }
 
-    ensureFrameResources(context);
-    if (!m_pipeline || !m_depth_texture) {
-        return;
-    }
-
-    auto& commands = *context.command_buffer;
-    if (!m_depth_texture_initialized) {
-        commands.TransitionImage(m_depth_texture,
-                                 luna::RHI::ImageTransition::UndefinedToDepthAttachment,
-                                 {0, 1, 0, 1, luna::RHI::ImageAspectFlags::Depth});
-        m_depth_texture_initialized = true;
-    }
-
-    getOrCreateUploadedMaterial(m_default_material);
-
-    for (const auto& draw_command : m_submitted_meshes) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        (void) getOrCreateUploadedMesh(*draw_command.mesh);
-        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
-        auto& uploaded_material = getOrCreateUploadedMaterial(material);
-        uploadMaterialIfNeeded(commands, uploaded_material);
-    }
-
-    luna::RHI::RenderingAttachmentInfo color_attachment;
-    color_attachment.Texture = context.color_target;
-    color_attachment.LoadOp = luna::RHI::AttachmentLoadOp::Clear;
-    color_attachment.StoreOp = luna::RHI::AttachmentStoreOp::Store;
-    color_attachment.ClearValue = luna::RHI::ClearValue::ColorFloat(
-        context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a);
-
-    auto depth_attachment = luna::RHI::CreateRef<luna::RHI::RenderingAttachmentInfo>();
-    depth_attachment->Texture = m_depth_texture;
-    depth_attachment->LoadOp = luna::RHI::AttachmentLoadOp::Clear;
-    depth_attachment->StoreOp = luna::RHI::AttachmentStoreOp::Store;
-    depth_attachment->ClearDepthStencil = {1.0f, 0};
-
-    luna::RHI::RenderingInfo rendering_info;
-    rendering_info.RenderArea = {0, 0, context.framebuffer_width, context.framebuffer_height};
-    rendering_info.ColorAttachments = {color_attachment};
-    rendering_info.DepthAttachment = depth_attachment;
-    rendering_info.LayerCount = 1;
-
-    commands.BeginRendering(rendering_info);
-    commands.BindGraphicsPipeline(m_pipeline);
-    commands.SetViewport({0.0f,
-                          0.0f,
-                          static_cast<float>(context.framebuffer_width),
-                          static_cast<float>(context.framebuffer_height),
-                          0.0f,
-                          1.0f});
-    commands.SetScissor({0, 0, context.framebuffer_width, context.framebuffer_height});
-
-    const float aspect_ratio =
-        static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
-    const glm::mat4 view_projection = buildViewProjection(m_camera, aspect_ratio);
-
-    for (const auto& draw_command : m_submitted_meshes) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        const auto uploaded_mesh_it = m_uploaded_meshes.find(draw_command.mesh.get());
-        if (uploaded_mesh_it == m_uploaded_meshes.end()) {
-            continue;
-        }
-
-        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
-        const auto uploaded_material_it = m_uploaded_materials.find(&material);
-        if (uploaded_material_it == m_uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
-            continue;
-        }
-
-        const auto& uploaded_mesh = uploaded_mesh_it->second;
-        const auto& uploaded_material = uploaded_material_it->second;
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{uploaded_material.descriptor_set};
-
-        MeshPushConstants push_constants;
-        push_constants.model = draw_command.transform;
-        push_constants.view_projection = view_projection;
-
-        commands.BindDescriptorSets(m_pipeline, 0, descriptor_sets);
-        commands.BindVertexBuffer(0, uploaded_mesh.vertex_buffer);
-        commands.BindIndexBuffer(uploaded_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
-        commands.PushConstants(m_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
-        commands.DrawIndexed(uploaded_mesh.index_count, 1, 0, 0, 0);
-    }
-
-    commands.EndRendering();
+    graph.AddRasterPass(
+        "OpaqueScene",
+        [&](rhi::RenderGraphRasterPassBuilder& pass_builder) {
+            pass_builder.WriteColor(
+                context.color_target,
+                luna::RHI::AttachmentLoadOp::Clear,
+                luna::RHI::AttachmentStoreOp::Store,
+                luna::RHI::ClearValue::ColorFloat(
+                    context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a));
+            pass_builder.WriteDepth(context.depth_target,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    {1.0f, 0});
+        },
+        [this, context](rhi::RenderGraphRasterPassContext& pass_context) {
+            executeOpaquePass(pass_context, context);
+        });
 }
 
 SceneRenderer::ShaderPaths SceneRenderer::getDefaultShaderPaths()
 {
     const std::filesystem::path shader_root = projectRoot() / "Luna" / "Renderer" / "Shaders";
+    const std::filesystem::path shader_path = shader_root / "SceneGeometry.slang";
     return ShaderPaths{
-        .geometry_vertex_path = shader_root / "SceneGeometry.vert",
-        .geometry_fragment_path = shader_root / "SceneGeometry.frag",
-        .lighting_vertex_path = shader_root / "SceneLighting.vert",
-        .lighting_fragment_path = shader_root / "SceneLighting.frag",
+        .geometry_vertex_path = shader_path,
+        .geometry_fragment_path = shader_path,
+        .lighting_vertex_path = {},
+        .lighting_fragment_path = {},
     };
 }
 
@@ -266,7 +182,7 @@ rhi::ImageData SceneRenderer::createFallbackImageData(const glm::vec4& albedo_co
 
 void SceneRenderer::ensurePipeline(const RenderContext& context)
 {
-    if (!context.device) {
+    if (!context.device || !context.compiler) {
         return;
     }
 
@@ -280,8 +196,6 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
         m_material_sampler.reset();
         m_vertex_shader.reset();
         m_fragment_shader.reset();
-        m_depth_texture.reset();
-        m_depth_texture_initialized = false;
         m_device = context.device;
         m_surface_format = luna::RHI::Format::UNDEFINED;
     }
@@ -291,8 +205,13 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
     }
 
     const ShaderPaths shader_paths = resolveShaderPaths();
-    m_vertex_shader = loadShaderModule(m_device, shader_paths.geometry_vertex_path, rhi::ShaderType::VERTEX);
-    m_fragment_shader = loadShaderModule(m_device, shader_paths.geometry_fragment_path, rhi::ShaderType::FRAGMENT);
+    m_vertex_shader = loadShaderModule(
+        m_device, context.compiler, shader_paths.geometry_vertex_path, "sceneVertexMain", luna::RHI::ShaderStage::Vertex);
+    m_fragment_shader = loadShaderModule(m_device,
+                                         context.compiler,
+                                         shader_paths.geometry_fragment_path,
+                                         "sceneFragmentMain",
+                                         luna::RHI::ShaderStage::Fragment);
     if (!m_vertex_shader || !m_fragment_shader) {
         LUNA_CORE_ERROR("Failed to load scene renderer shaders: '{}' '{}'",
                         shader_paths.geometry_vertex_path.string(),
@@ -302,13 +221,15 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
 
     m_material_layout = m_device->CreateDescriptorSetLayout(
         luna::RHI::DescriptorSetLayoutBuilder()
-            .AddBinding(0, luna::RHI::DescriptorType::CombinedImageSampler, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(0, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(1, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 
     m_descriptor_pool =
         m_device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
                                            .SetMaxSets(1'024)
-                                           .AddPoolSize(luna::RHI::DescriptorType::CombinedImageSampler, 1'024)
+                                           .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 1'024)
+                                           .AddPoolSize(luna::RHI::DescriptorType::Sampler, 1'024)
                                            .Build());
 
     m_material_sampler = m_device->CreateSampler(luna::RHI::SamplerBuilder()
@@ -343,34 +264,6 @@ void SceneRenderer::ensurePipeline(const RenderContext& context)
             .Build());
 
     m_surface_format = context.color_format;
-}
-
-void SceneRenderer::ensureFrameResources(const RenderContext& context)
-{
-    ensurePipeline(context);
-    createOrResizeDepthTexture(context.framebuffer_width, context.framebuffer_height);
-}
-
-void SceneRenderer::createOrResizeDepthTexture(uint32_t width, uint32_t height)
-{
-    if (!m_device || width == 0 || height == 0) {
-        return;
-    }
-
-    if (m_depth_texture && m_framebuffer_width == width && m_framebuffer_height == height) {
-        return;
-    }
-
-    m_framebuffer_width = width;
-    m_framebuffer_height = height;
-    m_depth_texture_initialized = false;
-    m_depth_texture = m_device->CreateTexture(luna::RHI::TextureBuilder()
-                                                  .SetSize(width, height)
-                                                  .SetFormat(luna::RHI::Format::D32_FLOAT)
-                                                  .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment)
-                                                  .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                  .SetName("SceneDepthTexture")
-                                                  .Build());
 }
 
 SceneRenderer::ShaderPaths SceneRenderer::resolveShaderPaths() const
@@ -463,7 +356,10 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
         .Binding = 0,
         .TextureView = uploaded_material.albedo_texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::CombinedImageSampler,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        .Binding = 1,
         .Sampler = m_material_sampler,
     });
     uploaded_material.descriptor_set->Update();
@@ -506,6 +402,77 @@ void SceneRenderer::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& comm
     commands.TransitionImage(uploaded_material.albedo_texture, luna::RHI::ImageTransition::TransferDstToShaderRead);
 
     uploaded_material.uploaded = true;
+}
+
+void SceneRenderer::executeOpaquePass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context)
+{
+    ensurePipeline(context);
+    if (!m_pipeline) {
+        LUNA_CORE_ERROR("SceneRenderer::executeOpaquePass aborted: graphics pipeline is null");
+        return;
+    }
+
+    auto& commands = pass_context.commandBuffer();
+
+    getOrCreateUploadedMaterial(m_default_material);
+
+    for (const auto& draw_command : m_submitted_meshes) {
+        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+            continue;
+        }
+
+        (void) getOrCreateUploadedMesh(*draw_command.mesh);
+        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
+        auto& uploaded_material = getOrCreateUploadedMaterial(material);
+        uploadMaterialIfNeeded(commands, uploaded_material);
+    }
+
+    pass_context.beginRendering();
+    commands.BindGraphicsPipeline(m_pipeline);
+    commands.SetViewport({0.0f,
+                          0.0f,
+                          static_cast<float>(pass_context.framebufferWidth()),
+                          static_cast<float>(pass_context.framebufferHeight()),
+                          0.0f,
+                          1.0f});
+    commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
+
+    const float aspect_ratio =
+        static_cast<float>(pass_context.framebufferWidth()) / static_cast<float>(pass_context.framebufferHeight());
+    const glm::mat4 view_projection = buildViewProjection(m_camera, aspect_ratio, context.backend_type);
+
+    for (const auto& draw_command : m_submitted_meshes) {
+        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+            continue;
+        }
+
+        const auto uploaded_mesh_it = m_uploaded_meshes.find(draw_command.mesh.get());
+        if (uploaded_mesh_it == m_uploaded_meshes.end()) {
+            continue;
+        }
+
+        const Material& material = draw_command.material != nullptr ? *draw_command.material : m_default_material;
+        const auto uploaded_material_it = m_uploaded_materials.find(&material);
+        if (uploaded_material_it == m_uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
+            continue;
+        }
+
+        const auto& uploaded_mesh = uploaded_mesh_it->second;
+        const auto& uploaded_material = uploaded_material_it->second;
+        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{uploaded_material.descriptor_set};
+
+        MeshPushConstants push_constants;
+        push_constants.model = draw_command.transform;
+        push_constants.view_projection = view_projection;
+
+        commands.BindDescriptorSets(m_pipeline, 0, descriptor_sets);
+        commands.BindVertexBuffer(0, uploaded_mesh.vertex_buffer);
+        commands.BindIndexBuffer(uploaded_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.PushConstants(m_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
+        commands.DrawIndexed(uploaded_mesh.index_count, 1, 0, 0, 0);
+    }
+
+    pass_context.endRendering();
 }
 
 } // namespace luna

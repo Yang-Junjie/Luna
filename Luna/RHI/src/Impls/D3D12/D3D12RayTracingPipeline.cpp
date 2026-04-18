@@ -4,8 +4,8 @@
 #include "Impls/D3D12/D3D12ShaderModule.h"
 
 #include <cstdio>
-
-#include <iostream>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -76,45 +76,36 @@ D3D12RayTracingPipeline::D3D12RayTracingPipeline(const Ref<Device>& device, cons
     stateObjDesc.NumSubobjects = static_cast<UINT>(subobjects.size());
     stateObjDesc.pSubobjects = subobjects.data();
 
-    // Debug: dump library info
-    for (size_t i = 0; i < shaderCount; i++) {
-        auto& blob = info.Shaders[i]->GetBlob();
-        std::cerr << "  Shader[" << i << "]: stage=" << static_cast<int>(info.Shaders[i]->GetStage())
-                  << " entry=" << info.Shaders[i]->GetEntryPoint() << " size=" << blob.Data.size() << " bytes";
-        if (blob.Data.size() >= 4) {
-            std::cerr << " magic=0x" << std::hex
-                      << (blob.Data[0] | (blob.Data[1] << 8) | (blob.Data[2] << 16) | (blob.Data[3] << 24)) << std::dec;
-        }
-        std::cerr << std::endl;
-    }
-
     HRESULT hr = dev->CreateStateObject(&stateObjDesc, IID_PPV_ARGS(&m_stateObject));
     if (FAILED(hr)) {
-        // Try to get more info from D3D12 debug layer
+        std::ostringstream error;
+        error << "Failed to create D3D12 RT pipeline: HRESULT=0x";
+        char hrBuffer[16];
+        snprintf(hrBuffer, sizeof(hrBuffer), "%08lX", hr);
+        error << hrBuffer << ", subobjects=" << stateObjDesc.NumSubobjects;
+
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SUCCEEDED(dev->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
             UINT64 msgCount = infoQueue->GetNumStoredMessages();
+            bool appendedMessage = false;
             for (UINT64 i = 0; i < msgCount; i++) {
                 SIZE_T msgSize = 0;
                 infoQueue->GetMessage(i, nullptr, &msgSize);
                 auto* msg = (D3D12_MESSAGE*) malloc(msgSize);
                 if (msg) {
                     infoQueue->GetMessage(i, msg, &msgSize);
-                    std::cerr << "D3D12: " << msg->pDescription << std::endl;
+                    error << (appendedMessage ? " | " : " [");
+                    error << msg->pDescription;
+                    appendedMessage = true;
                     free(msg);
                 }
             }
+            if (appendedMessage) {
+                error << "]";
+            }
             infoQueue->ClearStoredMessages();
         }
-        char buf[256];
-        snprintf(buf,
-                 sizeof(buf),
-                 "Failed to create D3D12 RT pipeline: HRESULT=0x%08lX, subobjects=%u",
-                 hr,
-                 stateObjDesc.NumSubobjects);
-        std::cerr << buf << std::endl;
-        throw std::runtime_error(buf);
+        throw std::runtime_error(error.str());
     }
-    std::cout << "D3D12 RT pipeline created successfully" << std::endl;
 }
 } // namespace luna::RHI

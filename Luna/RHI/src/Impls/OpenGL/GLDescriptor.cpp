@@ -20,15 +20,9 @@ void GLDescriptorSet::WriteBuffer(const BufferWriteInfo& info)
 
 void GLDescriptorSet::WriteTexture(const TextureWriteInfo& info)
 {
-    if (!info.TextureView) {
-        return;
+    if (auto glView = std::dynamic_pointer_cast<GLTextureView>(info.TextureView)) {
+        m_bindingGroup.AddTexture(info.Binding, glView->GetHandle(), glView->GetTarget(), info.Binding);
     }
-    auto texture = info.TextureView->GetTexture();
-    if (!texture) {
-        return;
-    }
-    auto* glTex = static_cast<GLTexture*>(texture.get());
-    m_bindingGroup.AddTexture(info.Binding, glTex->GetHandle(), info.Binding);
 }
 
 void GLDescriptorSet::WriteSampler(const SamplerWriteInfo& info)

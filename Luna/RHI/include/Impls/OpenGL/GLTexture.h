@@ -3,6 +3,8 @@
 #include "GLCommon.h"
 #include "Texture.h"
 
+#include <memory>
+
 namespace luna::RHI {
 class Device;
 class GLTexture;
@@ -14,9 +16,21 @@ public:
     Ref<Texture> GetTexture() const override;
     const TextureViewDesc& GetDesc() const override;
 
+    GLuint GetHandle() const
+    {
+        return m_textureHandle;
+    }
+
+    GLenum GetTarget() const
+    {
+        return m_target;
+    }
+
 private:
-    Ref<GLTexture> m_texture;
+    std::weak_ptr<GLTexture> m_texture;
     TextureViewDesc m_desc;
+    GLuint m_textureHandle = 0;
+    GLenum m_target = GL_TEXTURE_2D;
 };
 
 class LUNA_RHI_API GLTexture final : public Texture {

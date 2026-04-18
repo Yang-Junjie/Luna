@@ -4,6 +4,8 @@
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
 #include <atomic>
+#include <cstdio>
+#include <stdexcept>
 
 namespace {
 std::atomic<uint64_t> g_psoCounter{0};
@@ -28,9 +30,19 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
         D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
         rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
         ComPtr<ID3DBlob> signatureBlob, errorBlob;
-        D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-        d3dDevice->GetHandle()->CreateRootSignature(
+        HRESULT hr = D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+        if (FAILED(hr)) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "D3D12SerializeRootSignature failed: 0x%08X", static_cast<unsigned>(hr));
+            throw std::runtime_error(buf);
+        }
+        hr = d3dDevice->GetHandle()->CreateRootSignature(
             0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+        if (FAILED(hr)) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ID3D12Device::CreateRootSignature failed: 0x%08X", static_cast<unsigned>(hr));
+            throw std::runtime_error(buf);
+        }
     }
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
@@ -51,7 +63,7 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     for (auto& attr : info.VertexAttributes) {
         D3D12_INPUT_ELEMENT_DESC elem = {};
         elem.SemanticName = attr.SemanticName.c_str();
-        elem.SemanticIndex = (attr.SemanticIndex != UINT32_MAX) ? attr.SemanticIndex : attr.Location;
+        elem.SemanticIndex = (attr.SemanticIndex != UINT32_MAX) ? attr.SemanticIndex : 0;
         elem.Format = ToDXGIFormat(attr.Format);
         elem.InputSlot = attr.Binding;
         elem.AlignedByteOffset = attr.Offset;
@@ -131,7 +143,12 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     if (FAILED(hr)) {
         hr = d3dDevice->GetHandle()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
         if (FAILED(hr)) {
-            fprintf(stderr, "D3D12: CreateGraphicsPipelineState FAILED: 0x%08X\n", (unsigned) hr);
+            char buf[128];
+            snprintf(buf,
+                     sizeof(buf),
+                     "ID3D12Device::CreateGraphicsPipelineState failed: 0x%08X",
+                     static_cast<unsigned>(hr));
+            throw std::runtime_error(buf);
         } else {
             d3dDevice->StorePSO(psoName, m_pipelineState.Get());
         }
@@ -152,9 +169,19 @@ D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const Comp
     if (!m_rootSignature) {
         D3D12_ROOT_SIGNATURE_DESC rsDesc = {};
         ComPtr<ID3DBlob> signatureBlob, errorBlob;
-        D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-        d3dDevice->GetHandle()->CreateRootSignature(
+        HRESULT hr = D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
+        if (FAILED(hr)) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "D3D12SerializeRootSignature failed: 0x%08X", static_cast<unsigned>(hr));
+            throw std::runtime_error(buf);
+        }
+        hr = d3dDevice->GetHandle()->CreateRootSignature(
             0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+        if (FAILED(hr)) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "ID3D12Device::CreateRootSignature failed: 0x%08X", static_cast<unsigned>(hr));
+            throw std::runtime_error(buf);
+        }
     }
 
     D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc = {};
@@ -165,6 +192,14 @@ D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const Comp
         psoDesc.CS = {blob.Data.data(), blob.Data.size()};
     }
 
-    d3dDevice->GetHandle()->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
+    HRESULT hr = d3dDevice->GetHandle()->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
+    if (FAILED(hr)) {
+        char buf[128];
+        snprintf(buf,
+                 sizeof(buf),
+                 "ID3D12Device::CreateComputePipelineState failed: 0x%08X",
+                 static_cast<unsigned>(hr));
+        throw std::runtime_error(buf);
+    }
 }
 } // namespace luna::RHI

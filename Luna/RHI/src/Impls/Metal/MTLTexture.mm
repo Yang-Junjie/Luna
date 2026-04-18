@@ -64,7 +64,7 @@ namespace luna::RHI
         m_view = nil;
     }
 
-    Ref<Texture> MTLTextureViewImpl::GetTexture() const { return m_texture; }
+    Ref<Texture> MTLTextureViewImpl::GetTexture() const { return m_texture.lock(); }
     const TextureViewDesc& MTLTextureViewImpl::GetDesc() const { return m_desc; }
 
     // --- MTLTextureImpl ---
@@ -133,6 +133,7 @@ namespace luna::RHI
 
     Ref<TextureView> MTLTextureImpl::GetDefaultView()
     {
+        CreateDefaultViewIfNeeded();
         return m_defaultView;
     }
 

@@ -27,12 +27,7 @@ set(RENDERER_SOURCE
     Renderer/RenderGraphBuilder.cpp
     Renderer/SceneRenderer.h
     Renderer/SceneRenderer.cpp
-    Renderer/ShaderLoader.h
-    Renderer/ShaderLoader.cpp
-    Renderer/Shaders/SceneGeometry.vert
-    Renderer/Shaders/SceneGeometry.frag
-    Renderer/Shaders/SceneLighting.vert
-    Renderer/Shaders/SceneLighting.frag
+    Renderer/Shaders/SceneGeometry.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp)
 
@@ -106,9 +101,6 @@ target_link_libraries(LunaCore
         LunaRHI
         spdlog::spdlog
         fastgltf::fastgltf
-        glslang::glslang
-        glslang::glslang-default-resource-limits
-        glslang::SPIRV
         # add_subdirectory(third_party/VMA)
         Vulkan::Vulkan
         glfw

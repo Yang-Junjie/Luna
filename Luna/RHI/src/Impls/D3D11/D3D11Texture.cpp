@@ -2,9 +2,23 @@
 #include "Impls/D3D11/D3D11Texture.h"
 
 namespace luna::RHI {
+D3D11TextureView::D3D11TextureView(Ref<D3D11Texture> texture, TextureViewDesc desc)
+    : m_texture(texture),
+      m_desc(std::move(desc))
+{
+    if (!texture) {
+        return;
+    }
+
+    m_srv = texture->GetSRV();
+    m_rtv = texture->GetRTV();
+    m_dsv = texture->GetDSV();
+    m_uav = texture->GetUAV();
+}
+
 Ref<Texture> D3D11TextureView::GetTexture() const
 {
-    return m_texture;
+    return m_texture.lock();
 }
 
 D3D11Texture::D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& createInfo)
@@ -138,11 +152,12 @@ void D3D11Texture::CreateViews()
 
 Ref<TextureView> D3D11Texture::CreateView(const TextureViewDesc& desc)
 {
-    return m_defaultView;
+    return CreateRef<D3D11TextureView>(std::static_pointer_cast<D3D11Texture>(shared_from_this()), desc);
 }
 
 Ref<TextureView> D3D11Texture::GetDefaultView()
 {
+    CreateDefaultViewIfNeeded();
     return m_defaultView;
 }
 
@@ -151,6 +166,16 @@ void D3D11Texture::CreateDefaultViewIfNeeded()
     if (m_defaultView) {
         return;
     }
-    m_defaultView = CreateRef<D3D11TextureView>(std::static_pointer_cast<D3D11Texture>(shared_from_this()));
+
+    TextureViewDesc desc{};
+    desc.ViewType = m_type;
+    desc.FormatOverride = Format::UNDEFINED;
+    desc.BaseMipLevel = 0;
+    desc.MipLevelCount = m_mipLevels;
+    desc.BaseArrayLayer = 0;
+    desc.ArrayLayerCount = m_arrayLayers;
+    desc.Aspect = IsDepthStencil() ? AspectMask::DepthStencil : AspectMask::Color;
+
+    m_defaultView = CreateView(desc);
 }
 } // namespace luna::RHI

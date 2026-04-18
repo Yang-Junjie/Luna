@@ -1,6 +1,9 @@
 #include "Impls/D3D11/D3D11Buffer.h"
 #include "Impls/D3D11/D3D11Device.h"
 
+#include <cstdio>
+#include <stdexcept>
+
 namespace luna::RHI {
 D3D11Buffer::D3D11Buffer(Ref<D3D11Device> device, const BufferCreateInfo& createInfo)
     : m_device(std::move(device)),
@@ -109,7 +112,6 @@ void D3D11Buffer::EnsureStructuredSRV(uint32_t stride)
         return;
     }
     m_structuredStride = stride;
-    fprintf(stderr, "D3D11Buffer::EnsureStructuredSRV stride=%u size=%llu\n", stride, m_size);
 
     auto* dev = m_device->GetNativeDevice();
 
@@ -123,7 +125,15 @@ void D3D11Buffer::EnsureStructuredSRV(uint32_t stride)
         structDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
         structDesc.Usage = D3D11_USAGE_DEFAULT;
         structDesc.CPUAccessFlags = 0;
-        dev->CreateBuffer(&structDesc, nullptr, &m_structuredBuffer);
+        const HRESULT createBufferHr = dev->CreateBuffer(&structDesc, nullptr, &m_structuredBuffer);
+        if (FAILED(createBufferHr)) {
+            char buf[160];
+            snprintf(buf,
+                     sizeof(buf),
+                     "D3D11 structured buffer creation failed: 0x%08X",
+                     static_cast<unsigned>(createBufferHr));
+            throw std::runtime_error(buf);
+        }
         if (m_structuredBuffer) {
             m_device->GetImmediateContext()->CopyResource(m_structuredBuffer.Get(), m_buffer.Get());
         }
@@ -137,10 +147,10 @@ void D3D11Buffer::EnsureStructuredSRV(uint32_t stride)
     d3d11SrvDesc.Buffer.FirstElement = 0;
     d3d11SrvDesc.Buffer.NumElements = static_cast<UINT>(m_size / stride);
     HRESULT hr = dev->CreateShaderResourceView(targetBuf, &d3d11SrvDesc, &m_structuredSRV);
-    fprintf(stderr,
-            "  CreateSRV hr=0x%08X srv=%p structured=%p\n",
-            (unsigned) hr,
-            m_structuredSRV.Get(),
-            m_structuredBuffer.Get());
+    if (FAILED(hr)) {
+        char buf[160];
+        snprintf(buf, sizeof(buf), "D3D11 structured SRV creation failed: 0x%08X", static_cast<unsigned>(hr));
+        throw std::runtime_error(buf);
+    }
 }
 } // namespace luna::RHI

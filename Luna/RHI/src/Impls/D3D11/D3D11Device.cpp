@@ -10,6 +10,8 @@
 #include "Impls/D3D11/D3D11Synchronization.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
+#include <PipelineLayout.h>
+
 namespace luna::RHI {
 D3D11Device::D3D11Device(Ref<D3D11Adapter> adapter)
     : m_adapter(std::move(adapter))
@@ -108,7 +110,8 @@ Ref<ShaderModule> D3D11Device::CreateShaderModule(const ShaderBlob& blob, const 
 
 Ref<PipelineLayout> D3D11Device::CreatePipelineLayout(const PipelineLayoutCreateInfo& info)
 {
-    return nullptr; // DX11 doesn't have pipeline layouts
+    (void) info;
+    return CreateRef<PipelineLayout>();
 }
 
 Ref<PipelineCache> D3D11Device::CreatePipelineCache(std::span<const uint8_t> initialData)

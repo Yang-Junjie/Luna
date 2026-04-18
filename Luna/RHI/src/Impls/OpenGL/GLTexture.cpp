@@ -5,7 +5,12 @@ namespace luna::RHI {
 GLTextureView::GLTextureView(const Ref<Texture>& texture, const TextureViewDesc& desc)
     : m_texture(std::dynamic_pointer_cast<GLTexture>(texture)),
       m_desc(desc)
-{}
+{
+    if (auto glTexture = std::dynamic_pointer_cast<GLTexture>(texture)) {
+        m_textureHandle = glTexture->GetHandle();
+        m_target = glTexture->GetTarget();
+    }
+}
 
 Ref<GLTextureView> GLTextureView::Create(const Ref<Texture>& texture, const TextureViewDesc& desc)
 {
@@ -14,7 +19,7 @@ Ref<GLTextureView> GLTextureView::Create(const Ref<Texture>& texture, const Text
 
 Ref<Texture> GLTextureView::GetTexture() const
 {
-    return m_texture;
+    return m_texture.lock();
 }
 
 const TextureViewDesc& GLTextureView::GetDesc() const

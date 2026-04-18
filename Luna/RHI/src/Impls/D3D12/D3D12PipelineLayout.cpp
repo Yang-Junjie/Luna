@@ -2,6 +2,10 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
+#include <cstdio>
+#include <stdexcept>
+#include <string>
+
 namespace luna::RHI {
 D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const PipelineLayoutCreateInfo& info)
     : m_device(device),
@@ -14,7 +18,7 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
     if (!info.PushConstantRanges.empty()) {
         D3D12_ROOT_PARAMETER pushParam = {};
         pushParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        pushParam.Constants.ShaderRegister = 0;
+        pushParam.Constants.ShaderRegister = 15;
         pushParam.Constants.RegisterSpace = 0;
         uint32_t totalSize = 0;
         for (auto& range : info.PushConstantRanges) {
@@ -84,24 +88,28 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
     rsDesc.pParameters = rootParams.empty() ? nullptr : rootParams.data();
     rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
-    fprintf(
-        stderr, "D3D12PipelineLayout: %zu root params, %zu set layouts\n", rootParams.size(), info.SetLayouts.size());
-
     ComPtr<ID3DBlob> signatureBlob, errorBlob;
     HRESULT hr = D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
     if (FAILED(hr)) {
-        fprintf(stderr, "D3D12: SerializeRootSignature FAILED: 0x%08X\n", static_cast<unsigned>(hr));
-        if (errorBlob) {
-            fprintf(stderr, "  Error: %s\n", static_cast<const char*>(errorBlob->GetBufferPointer()));
+        char hrBuffer[16];
+        snprintf(hrBuffer, sizeof(hrBuffer), "%08X", static_cast<unsigned>(hr));
+        std::string message = "D3D12SerializeRootSignature failed: 0x";
+        message += hrBuffer;
+        if (errorBlob && errorBlob->GetBufferPointer() != nullptr) {
+            message += " ";
+            message += static_cast<const char*>(errorBlob->GetBufferPointer());
         }
-    } else {
-        hr = d3dDevice->GetHandle()->CreateRootSignature(
-            0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
-        if (FAILED(hr)) {
-            fprintf(stderr, "D3D12: CreateRootSignature FAILED: 0x%08X\n", static_cast<unsigned>(hr));
-        } else {
-            fprintf(stderr, "D3D12: Root signature created successfully: %p\n", (void*) m_rootSignature.Get());
-        }
+        throw std::runtime_error(message);
+    }
+
+    hr = d3dDevice->GetHandle()->CreateRootSignature(
+        0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+    if (FAILED(hr)) {
+        char hrBuffer[16];
+        snprintf(hrBuffer, sizeof(hrBuffer), "%08X", static_cast<unsigned>(hr));
+        std::string message = "ID3D12Device::CreateRootSignature failed: 0x";
+        message += hrBuffer;
+        throw std::runtime_error(message);
     }
 }
 

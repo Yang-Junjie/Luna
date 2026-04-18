@@ -7,22 +7,43 @@
 namespace luna::RHI {
 void GLBindingGroup::AddUniformBuffer(uint32_t binding, GLuint buffer)
 {
-    m_entries.push_back({binding, GLBindingEntry::Type::UniformBuffer, buffer, -1, 0});
+    GLBindingEntry entry;
+    entry.binding = binding;
+    entry.type = GLBindingEntry::Type::UniformBuffer;
+    entry.resource = buffer;
+    m_entries.push_back(entry);
 }
 
 void GLBindingGroup::AddStorageBuffer(uint32_t binding, GLuint buffer)
 {
-    m_entries.push_back({binding, GLBindingEntry::Type::StorageBuffer, buffer, -1, 0});
+    GLBindingEntry entry;
+    entry.binding = binding;
+    entry.type = GLBindingEntry::Type::StorageBuffer;
+    entry.resource = buffer;
+    m_entries.push_back(entry);
 }
 
-void GLBindingGroup::AddTexture(uint32_t binding, GLuint texture, uint32_t textureUnit)
+void GLBindingGroup::AddTexture(uint32_t binding, GLuint texture, GLenum target, uint32_t textureUnit)
 {
-    m_entries.push_back({binding, GLBindingEntry::Type::Texture, texture, -1, textureUnit});
+    GLBindingEntry entry;
+    entry.binding = binding;
+    entry.type = GLBindingEntry::Type::Texture;
+    entry.resource = texture;
+    entry.textureTarget = target;
+    entry.uniformLocation = -1;
+    entry.textureUnit = textureUnit;
+    m_entries.push_back(entry);
 }
 
 void GLBindingGroup::AddSampler(uint32_t binding, GLuint sampler, uint32_t textureUnit)
 {
-    m_entries.push_back({binding, GLBindingEntry::Type::Sampler, sampler, -1, textureUnit});
+    GLBindingEntry entry;
+    entry.binding = binding;
+    entry.type = GLBindingEntry::Type::Sampler;
+    entry.resource = sampler;
+    entry.uniformLocation = -1;
+    entry.textureUnit = textureUnit;
+    m_entries.push_back(entry);
 }
 
 void GLBindingGroup::AddImage(
@@ -42,7 +63,6 @@ void GLBindingGroup::AddImage(
 
 void GLBindingGroup::Bind(GLuint program) const
 {
-    bool dbg = false;
     for (const auto& entry : m_entries) {
         switch (entry.type) {
             case GLBindingEntry::Type::UniformBuffer:
@@ -50,25 +70,16 @@ void GLBindingGroup::Bind(GLuint program) const
                 break;
             case GLBindingEntry::Type::StorageBuffer:
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, entry.binding, entry.resource);
-                if (dbg) {
-                    fprintf(stderr, "  SSBO bind=%u buf=%u err=%u\n", entry.binding, entry.resource, glGetError());
-                }
                 break;
             case GLBindingEntry::Type::Texture:
                 glActiveTexture(GL_TEXTURE0 + entry.textureUnit);
-                glBindTexture(GL_TEXTURE_2D, entry.resource);
-                if (dbg) {
-                    fprintf(stderr, "  Tex unit=%u tex=%u err=%u\n", entry.textureUnit, entry.resource, glGetError());
-                }
+                glBindTexture(entry.textureTarget, entry.resource);
                 break;
             case GLBindingEntry::Type::Sampler:
                 for (auto& texEntry : m_entries) {
                     if (texEntry.type == GLBindingEntry::Type::Texture) {
                         glBindSampler(texEntry.textureUnit, entry.resource);
                     }
-                }
-                if (dbg) {
-                    fprintf(stderr, "  Samp samp=%u err=%u\n", entry.resource, glGetError());
                 }
                 break;
             case GLBindingEntry::Type::Image:
@@ -114,9 +125,8 @@ void GLBindingGroup::WriteBuffers(const BufferWriteInfos& infos)
 
 void GLBindingGroup::WriteTexture(const TextureWriteInfo& info)
 {
-    if (auto glTex =
-            std::dynamic_pointer_cast<GLTexture>(info.TextureView ? info.TextureView->GetTexture() : nullptr)) {
-        AddTexture(info.Binding, glTex->GetHandle(), info.Binding);
+    if (auto glView = std::dynamic_pointer_cast<GLTextureView>(info.TextureView)) {
+        AddTexture(info.Binding, glView->GetHandle(), glView->GetTarget(), info.Binding);
     }
     if (auto glSamp = std::dynamic_pointer_cast<GLSampler>(info.Sampler)) {
         AddSampler(info.Binding, glSamp->GetHandle(), info.Binding);

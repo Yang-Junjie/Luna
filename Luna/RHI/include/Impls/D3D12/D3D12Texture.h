@@ -4,9 +4,9 @@
 #include "D3D12MemAlloc.h"
 #include "Texture.h"
 
-namespace luna::RHI {
-class D3D12Device;
+#include <memory>
 
+namespace luna::RHI {
 class D3D12Device;
 
 class LUNA_RHI_API D3D12TextureView final : public TextureView {
@@ -14,10 +14,11 @@ public:
     D3D12TextureView(const Ref<Texture>& texture,
                      const TextureViewDesc& desc,
                      const std::shared_ptr<D3D12Device>& d3dDevice);
+    ~D3D12TextureView() override;
 
     Ref<Texture> GetTexture() const override
     {
-        return m_texture;
+        return m_texture.lock();
     }
 
     const TextureViewDesc& GetDesc() const override
@@ -66,7 +67,8 @@ public:
     }
 
 private:
-    Ref<Texture> m_texture;
+    std::weak_ptr<Texture> m_texture;
+    std::shared_ptr<D3D12Device> m_device;
     TextureViewDesc m_desc;
     D3D12_CPU_DESCRIPTOR_HANDLE m_srvHandle = {};
     D3D12_CPU_DESCRIPTOR_HANDLE m_rtvHandle = {};
@@ -134,6 +136,7 @@ public:
 
     Ref<TextureView> GetDefaultView() override
     {
+        CreateDefaultViewIfNeeded();
         return m_defaultView;
     }
 

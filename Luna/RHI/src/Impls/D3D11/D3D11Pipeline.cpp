@@ -129,14 +129,13 @@ D3D11GraphicsPipeline::D3D11GraphicsPipeline(Ref<D3D11Device> device, const Grap
 
     if (vsModule) {
         auto bc = vsModule->GetBytecode();
-        HRESULT hr = dev->CreateVertexShader(bc.data(), bc.size(), nullptr, &m_vs);
-        fprintf(stderr, "D3D11: CreateVertexShader hr=0x%08X vs=%p bc=%zu\n", (unsigned) hr, m_vs.Get(), bc.size());
+        dev->CreateVertexShader(bc.data(), bc.size(), nullptr, &m_vs);
 
         std::vector<D3D11_INPUT_ELEMENT_DESC> elements;
         for (auto& attr : info.VertexAttributes) {
             D3D11_INPUT_ELEMENT_DESC elem{};
-            elem.SemanticName = "TEXCOORD";
-            elem.SemanticIndex = attr.Location;
+            elem.SemanticName = attr.SemanticName.c_str();
+            elem.SemanticIndex = (attr.SemanticIndex != UINT32_MAX) ? attr.SemanticIndex : 0;
             elem.Format = D3D11_ToDXGIFormat(attr.Format);
             elem.InputSlot = attr.Binding;
             elem.AlignedByteOffset = attr.Offset;
@@ -163,8 +162,7 @@ D3D11GraphicsPipeline::D3D11GraphicsPipeline(Ref<D3D11Device> device, const Grap
 
     if (psModule) {
         auto bc = psModule->GetBytecode();
-        HRESULT hr = dev->CreatePixelShader(bc.data(), bc.size(), nullptr, &m_ps);
-        fprintf(stderr, "D3D11: CreatePixelShader hr=0x%08X ps=%p bc=%zu\n", (unsigned) hr, m_ps.Get(), bc.size());
+        dev->CreatePixelShader(bc.data(), bc.size(), nullptr, &m_ps);
     }
 
     if (gsModule) {

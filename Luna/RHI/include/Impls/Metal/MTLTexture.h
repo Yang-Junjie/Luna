@@ -4,6 +4,8 @@
 #include "MTLCommon.h"
 #include "Texture.h"
 
+#include <memory>
+
 namespace luna::RHI {
 class MTLTextureImpl;
 
@@ -22,7 +24,7 @@ public:
 
 private:
     id m_view = nullptr; // id<MTLTexture> (texture view)
-    Ref<Texture> m_texture;
+    std::weak_ptr<Texture> m_texture;
     TextureViewDesc m_desc;
 };
 

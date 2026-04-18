@@ -16,6 +16,8 @@ D3D12Synchronization::D3D12Synchronization(const Ref<Device>& device, uint32_t m
         d3dDevice->GetHandle()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_frameFences[i]));
         m_fenceEvents[i] = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     }
+
+    d3dDevice->InitializeDeferredDescriptorRecycling(maxFramesInFlight);
 }
 
 D3D12Synchronization::~D3D12Synchronization()
@@ -37,6 +39,10 @@ void D3D12Synchronization::WaitForFrame(uint32_t frameIndex) const
     if (m_frameFences[frameIndex]->GetCompletedValue() < m_fenceValues[frameIndex]) {
         m_frameFences[frameIndex]->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvents[frameIndex]);
         WaitForSingleObject(m_fenceEvents[frameIndex], INFINITE);
+    }
+
+    if (auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device)) {
+        d3dDevice->PrepareDeferredDescriptorFrame(frameIndex);
     }
 }
 

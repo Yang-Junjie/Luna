@@ -127,18 +127,28 @@ void ImGuiVulkanContext::StartFrame()
     ImGui::NewFrame();
 }
 
-void ImGuiVulkanContext::RenderFrame(luna::RHI::CommandBufferEncoder& command_buffer,
-                                     const luna::RHI::Ref<luna::RHI::Texture>& color_target,
-                                     uint32_t framebuffer_width,
-                                     uint32_t framebuffer_height)
+void ImGuiVulkanContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_buffer)
 {
-    if (!g_initialized || !color_target || framebuffer_width == 0 || framebuffer_height == 0) {
+    if (!g_initialized) {
         return;
     }
 
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
     if (draw_data == nullptr) {
+        return;
+    }
+
+    auto* native_command_buffer = static_cast<vk::CommandBuffer*>(command_buffer.GetNativeHandle());
+    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(*native_command_buffer));
+}
+
+void ImGuiVulkanContext::RenderFrame(luna::RHI::CommandBufferEncoder& command_buffer,
+                                     const luna::RHI::Ref<luna::RHI::Texture>& color_target,
+                                     uint32_t framebuffer_width,
+                                     uint32_t framebuffer_height)
+{
+    if (!g_initialized || !color_target || framebuffer_width == 0 || framebuffer_height == 0) {
         return;
     }
 
@@ -153,8 +163,7 @@ void ImGuiVulkanContext::RenderFrame(luna::RHI::CommandBufferEncoder& command_bu
     rendering_info.LayerCount = 1;
 
     command_buffer.BeginRendering(rendering_info);
-    auto* native_command_buffer = static_cast<vk::CommandBuffer*>(command_buffer.GetNativeHandle());
-    ImGui_ImplVulkan_RenderDrawData(draw_data, static_cast<VkCommandBuffer>(*native_command_buffer));
+    RenderDrawData(command_buffer);
     command_buffer.EndRendering();
 }
 

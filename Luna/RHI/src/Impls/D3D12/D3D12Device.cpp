@@ -69,6 +69,7 @@ D3D12Device::D3D12Device(const Ref<Adapter>& adapter, const DeviceCreateInfo& cr
 D3D12Device::~D3D12Device()
 {
     SavePipelineLibrary();
+    ReleaseAllDeferredDescriptors();
     m_threadCommandData.clear();
     if (m_allocator) {
         m_allocator->Release();
@@ -108,6 +109,87 @@ void D3D12Device::SavePipelineLibrary()
     if (SUCCEEDED(m_pipelineLibrary->Serialize(blob.data(), size))) {
         std::ofstream file("pso_cache.bin", std::ios::binary);
         file.write(reinterpret_cast<const char*>(blob.data()), size);
+    }
+}
+
+void D3D12Device::InitializeDeferredDescriptorRecycling(uint32_t maxFramesInFlight)
+{
+    std::lock_guard lock(m_deferredDescriptorMutex);
+    m_deferredDescriptorFrees.clear();
+    m_deferredDescriptorFrees.resize(maxFramesInFlight);
+    m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
+}
+
+void D3D12Device::PrepareDeferredDescriptorFrame(uint32_t frameIndex)
+{
+    std::vector<DeferredDescriptorFree> readyToFree;
+
+    {
+        std::lock_guard lock(m_deferredDescriptorMutex);
+        if (frameIndex >= m_deferredDescriptorFrees.size()) {
+            m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
+            return;
+        }
+
+        m_currentDeferredDescriptorFrame = frameIndex;
+        readyToFree.swap(m_deferredDescriptorFrees[frameIndex]);
+    }
+
+    for (const auto& pending : readyToFree) {
+        FreeDescriptorImmediate(pending.type, pending.handle);
+    }
+}
+
+void D3D12Device::ReleaseAllDeferredDescriptors()
+{
+    std::vector<DeferredDescriptorFree> pendingDescriptors;
+
+    {
+        std::lock_guard lock(m_deferredDescriptorMutex);
+        for (auto& pendingList : m_deferredDescriptorFrees) {
+            pendingDescriptors.insert(pendingDescriptors.end(), pendingList.begin(), pendingList.end());
+            pendingList.clear();
+        }
+        m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
+    }
+
+    for (const auto& pending : pendingDescriptors) {
+        FreeDescriptorImmediate(pending.type, pending.handle);
+    }
+}
+
+void D3D12Device::QueueDeferredDescriptorFree(DeferredDescriptorType type, D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+    if (handle.ptr == 0) {
+        return;
+    }
+
+    {
+        std::lock_guard lock(m_deferredDescriptorMutex);
+        if (m_currentDeferredDescriptorFrame != kInvalidDeferredDescriptorFrame &&
+            m_currentDeferredDescriptorFrame < m_deferredDescriptorFrees.size()) {
+            m_deferredDescriptorFrees[m_currentDeferredDescriptorFrame].push_back({type, handle});
+            return;
+        }
+    }
+
+    FreeDescriptorImmediate(type, handle);
+}
+
+void D3D12Device::FreeDescriptorImmediate(DeferredDescriptorType type, D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+    switch (type) {
+        case DeferredDescriptorType::RTV:
+            m_rtvPool.Free(handle);
+            break;
+        case DeferredDescriptorType::DSV:
+            m_dsvPool.Free(handle);
+            break;
+        case DeferredDescriptorType::CbvSrvUav:
+            m_cbvSrvUavPool.Free(handle);
+            break;
+        default:
+            break;
     }
 }
 

@@ -3,7 +3,6 @@
 
 #include <exception>
 #include <filesystem>
-#include <iostream>
 #include <Logging.h>
 #include <spdlog/pattern_formatter.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -147,12 +146,24 @@ void Logger::init(const std::string& log_file, Level level)
             m_s_core_logger->info("Logger initialized, output file: {}", m_s_log_file);
         }
     } catch (const std::exception& ex) {
+        try {
+            if (m_s_core_logger) {
+                m_s_core_logger->error("Logger initialization failed: {}", ex.what());
+                m_s_core_logger->flush();
+            } else if (!m_s_sinks.empty()) {
+                auto fallback_logger = std::make_shared<spdlog::logger>("LunaCoreBootstrap", m_s_sinks.begin(), m_s_sinks.end());
+                configureLogger(fallback_logger, toSpdlogLevel(level));
+                fallback_logger->error("Logger initialization failed: {}", ex.what());
+                fallback_logger->flush();
+            }
+        } catch (...) {
+        }
+
         m_s_initialized = false;
         m_s_sinks.clear();
         m_s_core_logger.reset();
         m_s_runtime_logger.reset();
         m_s_editor_logger.reset();
-        std::cerr << "Logger initialization failed: " << ex.what() << '\n';
     }
 }
 

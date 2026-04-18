@@ -4,13 +4,15 @@
 #include "Texture.h"
 #include "WGPUCommon.h"
 
+#include <memory>
+
 namespace luna::RHI {
 class WGPUTextureImpl;
 
 class LUNA_RHI_API WGPUTextureViewImpl : public TextureView {
 private:
     ::WGPUTextureView m_view = nullptr;
-    Ref<Texture> m_texture;
+    std::weak_ptr<Texture> m_texture;
     TextureViewDesc m_desc;
 
     friend class WGPUCommandBufferEncoder;

@@ -6,6 +6,7 @@
 #include "Impls/OpenGL/GLPipeline.h"
 #include "Impls/OpenGL/GLQueryPool.h"
 #include "Impls/OpenGL/GLTexture.h"
+#include "Logging.h"
 #include "QueryPool.h"
 
 namespace luna::RHI {
@@ -50,9 +51,9 @@ void GLCommandBufferEncoder::BeginRendering(const RenderingInfo& info)
         for (auto& attachment : info.ColorAttachments) {
             if (attachment.Texture &&
                 m_transitionedTextures.find(attachment.Texture.get()) == m_transitionedTextures.end()) {
-                fprintf(stderr,
-                        "[Luna RHI WARNING] GL: Texture used in BeginRendering without TransitionImage() call. "
-                        "This will cause errors on Vulkan/DX12 backends.\n");
+                LogMessage(LogLevel::Warn,
+                           "GL: Texture used in BeginRendering without TransitionImage() call. "
+                           "This will cause errors on Vulkan/DX12 backends.");
             }
         }
     }
@@ -164,9 +165,8 @@ void GLCommandBufferEncoder::BindVertexBuffer(uint32_t binding, const Ref<Buffer
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::VertexBuffer)) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] GL: BindVertexBuffer with buffer missing VertexBuffer usage flag. "
-                "Vulkan will reject this.\n");
+        LogMessage(LogLevel::Warn,
+                   "GL: BindVertexBuffer with buffer missing VertexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto glBuf = std::dynamic_pointer_cast<GLBuffer>(buffer);
@@ -189,9 +189,8 @@ void GLCommandBufferEncoder::BindIndexBuffer(const Ref<Buffer>& buffer, uint64_t
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::IndexBuffer)) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] GL: BindIndexBuffer with buffer missing IndexBuffer usage flag. "
-                "Vulkan will reject this.\n");
+        LogMessage(LogLevel::Warn,
+                   "GL: BindIndexBuffer with buffer missing IndexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto glBuf = std::dynamic_pointer_cast<GLBuffer>(buffer);
@@ -413,9 +412,9 @@ void GLCommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
 #ifndef NDEBUG
     if (m_barrierValidation && dstImage &&
         m_transitionedTextures.find(dstImage.get()) == m_transitionedTextures.end()) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] GL: CopyBufferToImage without TransitionImage(). "
-                "This will cause errors on Vulkan/DX12.\n");
+        LogMessage(LogLevel::Warn,
+                   "GL: CopyBufferToImage without TransitionImage(). "
+                   "This will cause errors on Vulkan/DX12.");
     }
 #endif
     auto glBuf = std::dynamic_pointer_cast<GLBuffer>(srcBuffer);
@@ -449,8 +448,17 @@ void GLCommandBufferEncoder::PipelineBarrier(PipelineStage,
                                              PipelineStage,
                                              std::span<const CMemoryBarrier>,
                                              std::span<const BufferBarrier>,
-                                             std::span<const TextureBarrier>)
+                                             std::span<const TextureBarrier> textureBarriers)
 {
+#ifndef NDEBUG
+    if (m_barrierValidation) {
+        for (const auto& barrier : textureBarriers) {
+            if (barrier.Texture) {
+                m_transitionedTextures.insert(barrier.Texture.get());
+            }
+        }
+    }
+#endif
     m_commands.push_back([]() {
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     });

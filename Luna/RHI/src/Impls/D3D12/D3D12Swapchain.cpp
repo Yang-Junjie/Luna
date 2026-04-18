@@ -5,6 +5,9 @@
 #include "Impls/D3D12/D3D12Surface.h"
 #include "Impls/D3D12/D3D12Swapchain.h"
 #include "Impls/D3D12/D3D12Texture.h"
+#include "Logging.h"
+
+#include <cstdio>
 
 namespace luna::RHI {
 D3D12Swapchain::D3D12Swapchain(const Ref<Device>& device, const SwapchainCreateInfo& info)
@@ -91,7 +94,12 @@ Result D3D12Swapchain::Present(const Ref<Queue>& queue, const Ref<Synchronizatio
         auto d3dDev = std::dynamic_pointer_cast<D3D12Device>(m_device);
         if (d3dDev) {
             HRESULT reason = d3dDev->GetHandle()->GetDeviceRemovedReason();
-            fprintf(stderr, "D3D12: Device removed reason: 0x%08X\n", static_cast<unsigned>(reason));
+            char buffer[128];
+            snprintf(buffer,
+                     sizeof(buffer),
+                     "D3D12: Device removed reason: 0x%08X",
+                     static_cast<unsigned>(reason));
+            LogMessage(LogLevel::Error, buffer);
             ComPtr<ID3D12InfoQueue> iq;
             if (SUCCEEDED(d3dDev->GetHandle()->QueryInterface(IID_PPV_ARGS(&iq)))) {
                 UINT64 n = iq->GetNumStoredMessages();
@@ -101,7 +109,13 @@ Result D3D12Swapchain::Present(const Ref<Queue>& queue, const Ref<Synchronizatio
                     auto* msg = (D3D12_MESSAGE*) malloc(len);
                     if (msg) {
                         iq->GetMessage(i, msg, &len);
-                        fprintf(stderr, "  D3D12 MSG[%llu]: %s\n", i, msg->pDescription);
+                        char messageBuffer[1024];
+                        snprintf(messageBuffer,
+                                 sizeof(messageBuffer),
+                                 "D3D12 MSG[%llu]: %s",
+                                 static_cast<unsigned long long>(i),
+                                 msg->pDescription ? msg->pDescription : "");
+                        LogMessage(LogLevel::Error, messageBuffer);
                         free(msg);
                     }
                 }

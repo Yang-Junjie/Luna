@@ -5,7 +5,9 @@
 #include "Device.h"
 
 #include <atomic>
+#include <limits>
 #include <mutex>
+#include <stdexcept>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -16,18 +18,70 @@ struct DescriptorPoolAllocator {
     uint32_t descriptorSize = 0;
     std::atomic<uint32_t> next{0};
     uint32_t capacity = 0;
+    std::mutex mutex;
+    std::vector<uint32_t> freeIndices;
 
     D3D12_CPU_DESCRIPTOR_HANDLE Allocate()
     {
-        uint32_t idx = next.fetch_add(1, std::memory_order_relaxed);
+        std::lock_guard lock(mutex);
+
+        uint32_t idx = 0;
+        if (!freeIndices.empty()) {
+            idx = freeIndices.back();
+            freeIndices.pop_back();
+        } else {
+            idx = next.fetch_add(1, std::memory_order_relaxed);
+            if (idx >= capacity) {
+                throw std::runtime_error("D3D12 descriptor heap exhausted");
+            }
+        }
+
         D3D12_CPU_DESCRIPTOR_HANDLE handle = heap->GetCPUDescriptorHandleForHeapStart();
         handle.ptr += static_cast<SIZE_T>(idx) * descriptorSize;
         return handle;
+    }
+
+    void Free(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+    {
+        if (!heap || handle.ptr == 0 || descriptorSize == 0 || capacity == 0) {
+            return;
+        }
+
+        const D3D12_CPU_DESCRIPTOR_HANDLE base = heap->GetCPUDescriptorHandleForHeapStart();
+        if (handle.ptr < base.ptr) {
+            return;
+        }
+
+        const SIZE_T delta = handle.ptr - base.ptr;
+        if ((delta % descriptorSize) != 0) {
+            return;
+        }
+
+        const uint32_t idx = static_cast<uint32_t>(delta / descriptorSize);
+        if (idx >= capacity) {
+            return;
+        }
+
+        std::lock_guard lock(mutex);
+        freeIndices.push_back(idx);
     }
 };
 
 class LUNA_RHI_API D3D12Device final : public Device {
 private:
+    enum class DeferredDescriptorType : uint8_t {
+        RTV,
+        DSV,
+        CbvSrvUav,
+    };
+
+    struct DeferredDescriptorFree {
+        DeferredDescriptorType type{};
+        D3D12_CPU_DESCRIPTOR_HANDLE handle{};
+    };
+
+    static constexpr uint32_t kInvalidDeferredDescriptorFrame = (std::numeric_limits<uint32_t>::max)();
+
     ComPtr<ID3D12Device5> m_device;
     D3D12MA::Allocator* m_allocator = nullptr;
     Ref<Adapter> m_parentAdapter;
@@ -59,8 +113,16 @@ private:
     ComPtr<ID3D12PipelineLibrary1> m_pipelineLibrary;
     std::vector<uint8_t> m_psoLibraryBlob;
     std::mutex m_psoLibMutex;
+    std::mutex m_deferredDescriptorMutex;
+    std::vector<std::vector<DeferredDescriptorFree>> m_deferredDescriptorFrees;
+    uint32_t m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
     void InitPipelineLibrary();
     void SavePipelineLibrary();
+    void InitializeDeferredDescriptorRecycling(uint32_t maxFramesInFlight);
+    void PrepareDeferredDescriptorFrame(uint32_t frameIndex);
+    void ReleaseAllDeferredDescriptors();
+    void QueueDeferredDescriptorFree(DeferredDescriptorType type, D3D12_CPU_DESCRIPTOR_HANDLE handle);
+    void FreeDescriptorImmediate(DeferredDescriptorType type, D3D12_CPU_DESCRIPTOR_HANDLE handle);
 
     friend class D3D12Queue;
     friend class D3D12CommandBufferEncoder;
@@ -105,14 +167,29 @@ public:
         return m_rtvPool.Allocate();
     }
 
+    void FreeRTV(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+    {
+        QueueDeferredDescriptorFree(DeferredDescriptorType::RTV, handle);
+    }
+
     D3D12_CPU_DESCRIPTOR_HANDLE AllocateDSV()
     {
         return m_dsvPool.Allocate();
     }
 
+    void FreeDSV(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+    {
+        QueueDeferredDescriptorFree(DeferredDescriptorType::DSV, handle);
+    }
+
     D3D12_CPU_DESCRIPTOR_HANDLE AllocateCbvSrvUav()
     {
         return m_cbvSrvUavPool.Allocate();
+    }
+
+    void FreeCbvSrvUav(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+    {
+        QueueDeferredDescriptorFree(DeferredDescriptorType::CbvSrvUav, handle);
     }
 
     ComPtr<ID3D12CommandAllocator> AcquireCommandAllocator();

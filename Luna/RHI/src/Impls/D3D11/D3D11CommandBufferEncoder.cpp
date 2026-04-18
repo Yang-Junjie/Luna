@@ -5,8 +5,13 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Pipeline.h"
 #include "Impls/D3D11/D3D11Texture.h"
+#include "Logging.h"
 
 namespace luna::RHI {
+namespace {
+constexpr UINT kPushConstantSlot = 13;
+}
+
 D3D11CommandBufferEncoder::D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type)
     : m_device(std::move(device)),
       m_type(type)
@@ -38,9 +43,9 @@ void D3D11CommandBufferEncoder::BeginRendering(const RenderingInfo& info)
 #ifndef NDEBUG
     for (auto& att : info.ColorAttachments) {
         if (att.Texture && m_transitionedTextures.find(att.Texture.get()) == m_transitionedTextures.end()) {
-            fprintf(stderr,
-                    "[Luna RHI WARNING] DX11: Texture used in BeginRendering without TransitionImage(). "
-                    "This will cause errors on Vulkan/DX12.\n");
+            LogMessage(LogLevel::Warn,
+                       "DX11: Texture used in BeginRendering without TransitionImage(). "
+                       "This will cause errors on Vulkan/DX12.");
         }
     }
 #endif
@@ -58,10 +63,12 @@ void D3D11CommandBufferEncoder::BeginRendering(const RenderingInfo& info)
         auto* depthTex = static_cast<D3D11Texture*>(info.DepthAttachment->Texture.get());
         dsv = depthTex->GetDSV();
         if (info.DepthAttachment->LoadOp == AttachmentLoadOp::Clear) {
-            m_context->ClearDepthStencilView(dsv,
-                                             D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
-                                             info.DepthAttachment->ClearDepthStencil.Depth,
-                                             info.DepthAttachment->ClearDepthStencil.Stencil);
+            UINT clearFlags = D3D11_CLEAR_DEPTH;
+            if (depthTex->HasStencil()) {
+                clearFlags |= D3D11_CLEAR_STENCIL;
+            }
+            m_context->ClearDepthStencilView(
+                dsv, clearFlags, info.DepthAttachment->ClearDepthStencil.Depth, info.DepthAttachment->ClearDepthStencil.Stencil);
         }
     }
 
@@ -112,9 +119,8 @@ void D3D11CommandBufferEncoder::BindVertexBuffer(uint32_t binding, const Ref<Buf
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::VertexBuffer)) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] DX11: BindVertexBuffer without VertexBuffer usage flag. "
-                "Vulkan will reject this.\n");
+        LogMessage(LogLevel::Warn,
+                   "DX11: BindVertexBuffer without VertexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto* d3dBuf = static_cast<D3D11Buffer*>(buffer.get());
@@ -128,9 +134,8 @@ void D3D11CommandBufferEncoder::BindIndexBuffer(const Ref<Buffer>& buffer, uint6
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::IndexBuffer)) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] DX11: BindIndexBuffer without IndexBuffer usage flag. "
-                "Vulkan will reject this.\n");
+        LogMessage(LogLevel::Warn,
+                   "DX11: BindIndexBuffer without IndexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto* d3dBuf = static_cast<D3D11Buffer*>(buffer.get());
@@ -164,16 +169,15 @@ void D3D11CommandBufferEncoder::PushConstants(
     }
     m_context->UpdateSubresource(cb.Get(), 0, nullptr, data, 0, 0);
 
-    constexpr UINT slot = 15;
     ID3D11Buffer* bufs[] = {cb.Get()};
     if (stageFlags & ShaderStage::Vertex) {
-        m_context->VSSetConstantBuffers(slot, 1, bufs);
+        m_context->VSSetConstantBuffers(kPushConstantSlot, 1, bufs);
     }
     if (stageFlags & ShaderStage::Fragment) {
-        m_context->PSSetConstantBuffers(slot, 1, bufs);
+        m_context->PSSetConstantBuffers(kPushConstantSlot, 1, bufs);
     }
     if (stageFlags & ShaderStage::Geometry) {
-        m_context->GSSetConstantBuffers(slot, 1, bufs);
+        m_context->GSSetConstantBuffers(kPushConstantSlot, 1, bufs);
     }
 }
 
@@ -230,7 +234,7 @@ void D3D11CommandBufferEncoder::ComputePushConstants(
     }
     m_context->UpdateSubresource(cb.Get(), 0, nullptr, data, 0, 0);
     ID3D11Buffer* bufs[] = {cb.Get()};
-    m_context->CSSetConstantBuffers(15, 1, bufs);
+    m_context->CSSetConstantBuffers(kPushConstantSlot, 1, bufs);
 }
 
 void D3D11CommandBufferEncoder::PipelineBarrier(SyncScope srcStage,
@@ -240,6 +244,13 @@ void D3D11CommandBufferEncoder::PipelineBarrier(SyncScope srcStage,
                                                 std::span<const TextureBarrier> textureBarriers)
 {
     // DX11: no explicit barriers, driver manages resource hazards
+#ifndef NDEBUG
+    for (const auto& barrier : textureBarriers) {
+        if (barrier.Texture) {
+            m_transitionedTextures.insert(barrier.Texture.get());
+        }
+    }
+#endif
 }
 
 void D3D11CommandBufferEncoder::TransitionImage(const Ref<Texture>& texture,
@@ -278,9 +289,8 @@ void D3D11CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
 {
 #ifndef NDEBUG
     if (dstImage && m_transitionedTextures.find(dstImage.get()) == m_transitionedTextures.end()) {
-        fprintf(stderr,
-                "[Luna RHI WARNING] DX11: CopyBufferToImage without TransitionImage(). "
-                "Vulkan/DX12 will fail.\n");
+        LogMessage(LogLevel::Warn,
+                   "DX11: CopyBufferToImage without TransitionImage(). Vulkan/DX12 will fail.");
     }
 #endif
     auto* srcBuf = static_cast<D3D11Buffer*>(srcBuffer.get());

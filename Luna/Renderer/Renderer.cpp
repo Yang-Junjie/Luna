@@ -1,6 +1,7 @@
 #include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
+#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/Renderer.h"
 
 #include <Adapter.h>
@@ -73,6 +74,36 @@ const char* presentModeToString(luna::RHI::PresentMode mode)
         default:
             return "Unknown";
     }
+}
+
+const char* backendTypeToString(luna::RHI::BackendType type)
+{
+    switch (type) {
+        case luna::RHI::BackendType::Auto:
+            return "Auto";
+        case luna::RHI::BackendType::Vulkan:
+            return "Vulkan";
+        case luna::RHI::BackendType::DirectX12:
+            return "DirectX12";
+        case luna::RHI::BackendType::DirectX11:
+            return "DirectX11";
+        case luna::RHI::BackendType::Metal:
+            return "Metal";
+        case luna::RHI::BackendType::OpenGL:
+            return "OpenGL";
+        case luna::RHI::BackendType::OpenGLES:
+            return "OpenGLES";
+        case luna::RHI::BackendType::WebGPU:
+            return "WebGPU";
+        default:
+            return "Unknown";
+    }
+}
+
+bool usesSceneRenderer(luna::RHI::BackendType type)
+{
+    return type == luna::RHI::BackendType::Vulkan || type == luna::RHI::BackendType::DirectX11 ||
+           type == luna::RHI::BackendType::DirectX12;
 }
 
 bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)
@@ -159,7 +190,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
     m_native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
     m_initialization_options = std::move(options);
     if (m_native_window == nullptr) {
-        LUNA_CORE_ERROR("Cannot initialize Vulkan renderer without a GLFW window");
+        LUNA_CORE_ERROR("Cannot initialize renderer without a GLFW window");
         return false;
     }
 
@@ -169,7 +200,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
     try {
         luna::RHI::InstanceCreateInfo instance_info;
-        instance_info.type = luna::RHI::BackendType::Vulkan;
+        instance_info.type = m_initialization_options.backend;
         instance_info.applicationName = "Luna";
         instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::Surface);
 #ifndef NDEBUG
@@ -177,12 +208,18 @@ bool Renderer::init(Window& window, InitializationOptions options)
 #endif
 
         m_instance = luna::RHI::Instance::Create(instance_info);
+        m_shader_compiler = m_instance->CreateShaderCompiler();
         m_surface = m_instance->CreateSurface(window_handle);
+        if (!m_surface) {
+            throw std::runtime_error("Failed to create surface for backend '" +
+                                     std::string(backendTypeToString(m_instance->GetType())) + "'");
+        }
 
         const auto adapters = m_instance->EnumerateAdapters();
         m_adapter = selectAdapter(adapters);
         if (!m_adapter) {
-            throw std::runtime_error("No Vulkan adapter available");
+            throw std::runtime_error("No compatible adapter available for backend '" +
+                                     std::string(backendTypeToString(m_instance->GetType())) + "'");
         }
 
         luna::RHI::DeviceCreateInfo device_info;
@@ -197,6 +234,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
+        LUNA_CORE_INFO("Initialized renderer backend '{}'", backendTypeToString(m_instance->GetType()));
     } catch (const std::exception& error) {
         LUNA_CORE_ERROR("Failed to initialize Renderer: {}", error.what());
         shutdown();
@@ -226,10 +264,12 @@ void Renderer::shutdown()
 
     releaseFrameCommandBuffers();
     m_current_command_buffer.reset();
+    m_frame_render_graphs.clear();
     m_scene_renderer.shutdown();
     m_synchronization.reset();
     m_swapchain.reset();
     m_graphics_queue.reset();
+    m_shader_compiler.reset();
     m_device.reset();
     m_surface.reset();
     m_adapter.reset();
@@ -296,6 +336,9 @@ void Renderer::startFrame()
             m_frame_command_buffers[m_frame_index]->ReturnToPool();
             m_frame_command_buffers[m_frame_index].reset();
         }
+        if (m_frame_index < m_frame_render_graphs.size()) {
+            m_frame_render_graphs[m_frame_index].reset();
+        }
 
         int acquired_image_index = -1;
         const auto acquire_result =
@@ -332,25 +375,83 @@ void Renderer::renderFrame()
     const auto back_buffer = m_swapchain->GetBackBuffer(m_image_index);
     const bool was_presented =
         m_image_index < m_swapchain_images_presented.size() ? m_swapchain_images_presented[m_image_index] : false;
-    m_current_command_buffer->TransitionImage(back_buffer,
-                                              was_presented ? luna::RHI::ImageTransition::PresentToColorAttachment
-                                                            : luna::RHI::ImageTransition::UndefinedToColorAttachment);
-
-    m_scene_renderer.render(SceneRenderer::RenderContext{
+    const auto backend_type = m_instance ? m_instance->GetType() : m_initialization_options.backend;
+    luna::rhi::RenderGraphBuilder graph_builder(luna::rhi::RenderGraphBuilder::FrameContext{
         .device = m_device,
         .command_buffer = m_current_command_buffer,
-        .color_target = back_buffer,
-        .color_format = m_surface_format,
-        .clear_color = m_clear_color,
         .framebuffer_width = extent.width,
         .framebuffer_height = extent.height,
     });
 
-    if (m_imgui_enabled) {
-        luna::rhi::ImGuiVulkanContext::RenderFrame(*m_current_command_buffer, back_buffer, extent.width, extent.height);
+    const auto back_buffer_handle =
+        graph_builder.ImportTexture("SwapchainBackBuffer",
+                                    back_buffer,
+                                    was_presented ? luna::RHI::ResourceState::Present
+                                                  : luna::RHI::ResourceState::Undefined);
+
+    if (usesSceneRenderer(backend_type)) {
+        const auto depth_handle = graph_builder.CreateTexture(luna::rhi::RenderGraphTextureDesc{
+            .Name = "SceneDepthTexture",
+            .Width = extent.width,
+            .Height = extent.height,
+            .Format = luna::RHI::Format::D32_FLOAT,
+            .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        });
+
+        m_scene_renderer.buildRenderGraph(graph_builder,
+                                          SceneRenderer::RenderContext{
+                                              .device = m_device,
+                                              .compiler = m_shader_compiler,
+                                              .backend_type = backend_type,
+                                              .color_target = back_buffer_handle,
+                                              .depth_target = depth_handle,
+                                              .color_format = m_surface_format,
+                                              .clear_color = m_clear_color,
+                                              .framebuffer_width = extent.width,
+                                              .framebuffer_height = extent.height,
+                                          });
+    } else {
+        graph_builder.AddRasterPass(
+            "ClearScene",
+            [back_buffer_handle, clear_color = m_clear_color](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
+                pass_builder.WriteColor(back_buffer_handle,
+                                        luna::RHI::AttachmentLoadOp::Clear,
+                                        luna::RHI::AttachmentStoreOp::Store,
+                                        luna::RHI::ClearValue::ColorFloat(
+                                            clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+            },
+            [](luna::rhi::RenderGraphRasterPassContext& pass_context) {
+                pass_context.beginRendering();
+                pass_context.endRendering();
+            });
     }
 
-    m_current_command_buffer->TransitionImage(back_buffer, luna::RHI::ImageTransition::ColorAttachmentToPresent);
+    if (m_imgui_enabled && backend_type == luna::RHI::BackendType::Vulkan) {
+        graph_builder.AddRasterPass(
+            "ImGui",
+            [back_buffer_handle](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
+                pass_builder.WriteColor(
+                    back_buffer_handle, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+            },
+            [](luna::rhi::RenderGraphRasterPassContext& pass_context) {
+                pass_context.beginRendering();
+                luna::rhi::ImGuiVulkanContext::RenderDrawData(pass_context.commandBuffer());
+                pass_context.endRendering();
+            });
+    }
+
+    graph_builder.ExportTexture(back_buffer_handle, luna::RHI::ResourceState::Present);
+
+    if (m_frame_index >= m_frame_render_graphs.size()) {
+        m_frame_render_graphs.resize(m_frames_in_flight);
+    }
+    m_frame_render_graphs[m_frame_index] = graph_builder.Build();
+    if (m_frame_render_graphs[m_frame_index]) {
+        m_frame_render_graphs[m_frame_index]->execute();
+    }
+
     if (m_image_index < m_swapchain_images_presented.size()) {
         m_swapchain_images_presented[m_image_index] = true;
     }
@@ -501,6 +602,8 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     m_frames_in_flight = (std::max) (1u, m_swapchain->GetImageCount() > 1 ? m_swapchain->GetImageCount() - 1 : 1u);
     m_synchronization = m_device->CreateSynchronization(m_frames_in_flight);
     m_frame_command_buffers.assign(m_frames_in_flight, {});
+    m_frame_render_graphs.clear();
+    m_frame_render_graphs.resize(m_frames_in_flight);
     m_swapchain_images_presented.assign(m_swapchain->GetImageCount(), false);
     if (m_frames_in_flight > 0) {
         m_frame_index %= m_frames_in_flight;
@@ -508,7 +611,7 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
         m_frame_index = 0;
     }
 
-    if (m_imgui_enabled) {
+    if (m_imgui_enabled && m_instance && m_instance->GetType() == luna::RHI::BackendType::Vulkan) {
         luna::rhi::ImGuiVulkanContext::NotifySwapchainChanged(m_swapchain->GetImageCount());
     }
 }
@@ -540,6 +643,7 @@ void Renderer::handlePendingResize()
         m_graphics_queue->WaitIdle();
         releaseFrameCommandBuffers();
         m_current_command_buffer.reset();
+        m_frame_render_graphs.clear();
         m_swapchain.reset();
         m_synchronization.reset();
         createSwapchain(extent.width, extent.height);

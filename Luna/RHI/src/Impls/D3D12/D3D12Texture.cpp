@@ -112,6 +112,7 @@ D3D12TextureView::D3D12TextureView(const Ref<Texture>& texture,
                                    const TextureViewDesc& desc,
                                    const std::shared_ptr<D3D12Device>& d3dDevice)
     : m_texture(texture),
+      m_device(d3dDevice),
       m_desc(desc)
 {
     auto* d3dTex = static_cast<D3D12Texture*>(texture.get());
@@ -169,6 +170,34 @@ D3D12TextureView::D3D12TextureView(const Ref<Texture>& texture,
         uavDesc.Texture2D.MipSlice = desc.BaseMipLevel;
         device->CreateUnorderedAccessView(d3dTex->GetHandle(), nullptr, &uavDesc, m_uavHandle);
         m_hasUAV = true;
+    }
+}
+
+D3D12TextureView::~D3D12TextureView()
+{
+    if (!m_device) {
+        return;
+    }
+
+    if (m_hasSRV) {
+        m_device->FreeCbvSrvUav(m_srvHandle);
+        m_hasSRV = false;
+        m_srvHandle = {};
+    }
+    if (m_hasRTV) {
+        m_device->FreeRTV(m_rtvHandle);
+        m_hasRTV = false;
+        m_rtvHandle = {};
+    }
+    if (m_hasDSV) {
+        m_device->FreeDSV(m_dsvHandle);
+        m_hasDSV = false;
+        m_dsvHandle = {};
+    }
+    if (m_hasUAV) {
+        m_device->FreeCbvSrvUav(m_uavHandle);
+        m_hasUAV = false;
+        m_uavHandle = {};
     }
 }
 } // namespace luna::RHI

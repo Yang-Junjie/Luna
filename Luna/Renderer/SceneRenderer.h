@@ -3,8 +3,10 @@
 #include "Renderer/Camera.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/RenderGraphBuilder.h"
 
 #include <Core.h>
+#include <Instance.h>
 #include <filesystem>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
@@ -22,6 +24,7 @@ class Device;
 class GraphicsPipeline;
 class PipelineLayout;
 class Sampler;
+class ShaderCompiler;
 class ShaderModule;
 class Texture;
 } // namespace luna::RHI
@@ -44,8 +47,10 @@ public:
 
     struct RenderContext {
         luna::RHI::Ref<luna::RHI::Device> device;
-        luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer;
-        luna::RHI::Ref<luna::RHI::Texture> color_target;
+        luna::RHI::Ref<luna::RHI::ShaderCompiler> compiler;
+        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
+        rhi::RenderGraphTextureHandle color_target;
+        rhi::RenderGraphTextureHandle depth_target;
         luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         uint32_t framebuffer_width{0};
@@ -66,7 +71,7 @@ public:
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
                           std::shared_ptr<Material> material = {});
-    void render(const RenderContext& context);
+    void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
 
 private:
     struct StaticMeshDrawCommand {
@@ -92,12 +97,11 @@ private:
     static rhi::ImageData createFallbackImageData(const glm::vec4& albedo_color);
 
     void ensurePipeline(const RenderContext& context);
-    void ensureFrameResources(const RenderContext& context);
-    void createOrResizeDepthTexture(uint32_t width, uint32_t height);
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
     void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
+    void executeOpaquePass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context);
 
 private:
     Camera m_camera{};
@@ -114,11 +118,7 @@ private:
     luna::RHI::Ref<luna::RHI::Sampler> m_material_sampler;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_vertex_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_fragment_shader;
-    luna::RHI::Ref<luna::RHI::Texture> m_depth_texture;
     luna::RHI::Format m_surface_format{luna::RHI::Format::UNDEFINED};
-    uint32_t m_framebuffer_width{0};
-    uint32_t m_framebuffer_height{0};
-    bool m_depth_texture_initialized{false};
 };
 
 } // namespace luna

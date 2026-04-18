@@ -8,8 +8,7 @@
 #include "Impls/WebGPU/WGPUQueue.h"
 #include "Impls/WebGPU/WGPUSwapchain.h"
 #include "Impls/WebGPU/WGPUTexture.h"
-
-#include <iostream>
+#include "Logging.h"
 
 namespace luna::RHI {
 WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
@@ -35,7 +34,8 @@ WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
             if (status == WGPURequestDeviceStatus_Success) {
                 res->device = device;
             } else {
-                std::cerr << "WebGPU device request failed: " << (message ? message : "unknown") << std::endl;
+                LogMessage(LogLevel::Error,
+                           std::string("WebGPU device request failed: ") + (message ? message : "unknown"));
             }
             res->done = true;
         },
@@ -65,7 +65,8 @@ WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
                 default:
                     break;
             }
-            std::cerr << "[WebGPU " << typeStr << "] " << (message ? message : "") << std::endl;
+            LogMessage(LogLevel::Error,
+                       std::string("[WebGPU ") + typeStr + "] " + (message ? message : ""));
         },
         nullptr);
 }

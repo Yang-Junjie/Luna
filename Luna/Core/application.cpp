@@ -159,6 +159,7 @@ void Application::run()
     }
 
     m_running = false;
+    LUNA_CORE_INFO("Application main loop exited");
     onShutdown();
 }
 
@@ -241,6 +242,7 @@ bool Application::onWindowResize(const WindowResizeEvent& event)
 
 bool Application::onWindowClose(const WindowCloseEvent&)
 {
+    LUNA_CORE_INFO("Window close requested");
     m_running = false;
 
     if (m_window != nullptr) {

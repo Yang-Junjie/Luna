@@ -2,11 +2,12 @@
 #define LUNA_RHI_SHADERCOMPILER_H
 #include "ShaderModule.h"
 
-#if __has_include(<slang/slang.h>) && __has_include("slang-com-ptr.h")
-#define LUNA_RHI_HAS_SLANG 1
-#include "slang-com-ptr.h"
+#include <filesystem>
 
-#include <slang/slang.h>
+#if __has_include(<slang.h>) && __has_include(<slang-com-ptr.h>)
+#define LUNA_RHI_HAS_SLANG 1
+#include <slang-com-ptr.h>
+#include <slang.h>
 #else
 #define LUNA_RHI_HAS_SLANG 0
 

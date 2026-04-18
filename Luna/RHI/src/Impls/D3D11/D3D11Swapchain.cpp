@@ -4,6 +4,9 @@
 #include "Impls/D3D11/D3D11Surface.h"
 #include "Impls/D3D11/D3D11Swapchain.h"
 #include "Impls/D3D11/D3D11Texture.h"
+#include "Logging.h"
+
+#include <cstdio>
 
 namespace luna::RHI {
 D3D11Swapchain::D3D11Swapchain(Ref<D3D11Device> device, const SwapchainCreateInfo& createInfo)
@@ -66,7 +69,9 @@ Result D3D11Swapchain::Present(const Ref<Queue>& queue, const Ref<Synchronizatio
     HRESULT hr = m_swapchain->Present(syncInterval, 0);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
         HRESULT reason = m_device->GetNativeDevice()->GetDeviceRemovedReason();
-        fprintf(stderr, "D3D11: Present DeviceLost, reason=0x%08X\n", (unsigned) reason);
+        char buffer[128];
+        snprintf(buffer, sizeof(buffer), "D3D11: Present device lost, reason=0x%08X", static_cast<unsigned>(reason));
+        LogMessage(LogLevel::Error, buffer);
         return Result::DeviceLost;
     }
     if (hr == DXGI_STATUS_OCCLUDED) {

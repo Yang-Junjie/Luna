@@ -22,6 +22,7 @@ public:
     static bool Init(luna::Renderer& renderer);
     static void Destroy();
     static void StartFrame();
+    static void RenderDrawData(luna::RHI::CommandBufferEncoder& command_buffer);
     static void RenderFrame(luna::RHI::CommandBufferEncoder& command_buffer,
                             const luna::RHI::Ref<luna::RHI::Texture>& color_target,
                             uint32_t framebuffer_width,

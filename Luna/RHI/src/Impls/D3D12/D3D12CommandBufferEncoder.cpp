@@ -13,6 +13,8 @@
 #include <pix3.h>
 #endif
 
+#include <stdexcept>
+
 namespace luna::RHI {
 static inline UINT CalcSubresource(UINT mipSlice, UINT arraySlice, UINT planeSlice, UINT mipLevels, UINT arraySize)
 {
@@ -79,8 +81,12 @@ void D3D12CommandBufferEncoder::BeginRendering(const RenderingInfo& info)
             dsvHandle = view->GetDSVHandle();
             pDSV = &dsvHandle;
             if (info.DepthAttachment->LoadOp == AttachmentLoadOp::Clear) {
+                D3D12_CLEAR_FLAGS clearFlags = D3D12_CLEAR_FLAG_DEPTH;
+                if (depthTex->HasStencil()) {
+                    clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+                }
                 m_commandList->ClearDepthStencilView(dsvHandle,
-                                                     D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
+                                                     clearFlags,
                                                      info.DepthAttachment->ClearDepthStencil.Depth,
                                                      info.DepthAttachment->ClearDepthStencil.Stencil,
                                                      0,
@@ -100,8 +106,7 @@ void D3D12CommandBufferEncoder::BindGraphicsPipeline(const Ref<GraphicsPipeline>
 {
     auto* d3dPipeline = static_cast<D3D12GraphicsPipeline*>(pipeline.get());
     if (!d3dPipeline->GetHandle()) {
-        fprintf(stderr, "D3D12: BindGraphicsPipeline: PSO is null!\n");
-        return;
+        throw std::runtime_error("D3D12 graphics pipeline state is null");
     }
     m_currentPipeline = d3dPipeline;
     m_commandList->SetPipelineState(d3dPipeline->GetHandle());

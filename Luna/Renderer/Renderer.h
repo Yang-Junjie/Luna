@@ -5,6 +5,7 @@
 
 #include <Core.h>
 #include <glm/vec4.hpp>
+#include <Instance.h>
 #include <memory>
 #include <Surface.h>
 #include <vector>
@@ -17,10 +18,15 @@ class CommandBufferEncoder;
 class Device;
 class Instance;
 class Queue;
+class ShaderCompiler;
 class Surface;
 class Swapchain;
 class Synchronization;
 } // namespace luna::RHI
+
+namespace luna::rhi {
+class RenderGraph;
+}
 
 namespace luna {
 class Window;
@@ -29,13 +35,16 @@ class Renderer {
 public:
     struct InitializationOptions {
         InitializationOptions()
-            : present_mode(luna::RHI::PresentMode::Fifo)
+            : backend(luna::RHI::BackendType::Vulkan),
+              present_mode(luna::RHI::PresentMode::Fifo)
         {}
 
-        explicit InitializationOptions(luna::RHI::PresentMode mode)
-            : present_mode(mode)
+        InitializationOptions(luna::RHI::BackendType backend_type, luna::RHI::PresentMode mode)
+            : backend(backend_type),
+              present_mode(mode)
         {}
 
+        luna::RHI::BackendType backend;
         luna::RHI::PresentMode present_mode;
     };
 
@@ -94,9 +103,11 @@ private:
     luna::RHI::Ref<luna::RHI::Surface> m_surface;
     luna::RHI::Ref<luna::RHI::Swapchain> m_swapchain;
     luna::RHI::Ref<luna::RHI::Queue> m_graphics_queue;
+    luna::RHI::Ref<luna::RHI::ShaderCompiler> m_shader_compiler;
     luna::RHI::Ref<luna::RHI::Synchronization> m_synchronization;
     luna::RHI::Ref<luna::RHI::CommandBufferEncoder> m_current_command_buffer;
     std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> m_frame_command_buffers;
+    std::vector<std::unique_ptr<luna::rhi::RenderGraph>> m_frame_render_graphs;
 
     InitializationOptions m_initialization_options{};
 

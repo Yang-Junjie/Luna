@@ -1,4 +1,5 @@
 #include "Impls/OpenGL/GLShaderModule.h"
+#include "Logging.h"
 
 #include <cstring>
 
@@ -234,9 +235,10 @@ bool GLShaderModule::CompileShader(GLenum type, const char* source, GLuint& outS
         if (logLength > 0) {
             std::string log(logLength, '\0');
             glGetShaderInfoLog(outShader, logLength, nullptr, log.data());
-            fprintf(stderr, "[GLShaderModule] Compile error: %s\n", log.c_str());
+            LogMessage(LogLevel::Error, std::string("[GLShaderModule] Compile error: ") + log);
         }
-        fprintf(stderr, "[GLShaderModule] === Full GLSL source ===\n%s\n=== End ===\n", source);
+        LogMessage(LogLevel::Error,
+                   std::string("[GLShaderModule] === Full GLSL source ===\n") + source + "\n=== End ===");
         glDeleteShader(outShader);
         outShader = 0;
         return false;
@@ -256,7 +258,7 @@ bool GLShaderModule::LinkProgram()
         if (logLength > 0) {
             std::string log(logLength, '\0');
             glGetProgramInfoLog(m_program, logLength, nullptr, log.data());
-            fprintf(stderr, "[GLShaderModule] Link error: %s\n", log.c_str());
+            LogMessage(LogLevel::Error, std::string("[GLShaderModule] Link error: ") + log);
         }
         return false;
     }

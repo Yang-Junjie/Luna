@@ -1,6 +1,7 @@
 #include "Impls/OpenGL/GLCommon.h"
 #include "Impls/OpenGL/GLPipeline.h"
 #include "Impls/OpenGL/GLShaderModule.h"
+#include "Logging.h"
 
 namespace luna::RHI {
 static GLenum CompareOpToGL(CompareOp op)
@@ -126,7 +127,7 @@ GLGraphicsPipeline::GLGraphicsPipeline(const GraphicsPipelineCreateInfo& info)
         glGetProgramiv(m_program, GL_INFO_LOG_LENGTH, &len);
         std::string log(len, '\0');
         glGetProgramInfoLog(m_program, len, nullptr, log.data());
-        fprintf(stderr, "[GL] Pipeline link error: %s\n", log.c_str());
+        LogMessage(LogLevel::Error, std::string("[GL] Pipeline link error: ") + log);
     }
 
     if (!info.ColorBlend.Attachments.empty() && info.ColorBlend.Attachments[0].BlendEnable) {

@@ -2,6 +2,7 @@
 #define LUNA_RHI_D3D11TEXTURE_H
 #include "D3D11Common.h"
 
+#include <memory>
 #include <Texture.h>
 
 namespace luna::RHI {
@@ -10,9 +11,7 @@ class D3D11Texture;
 
 class LUNA_RHI_API D3D11TextureView : public TextureView {
 public:
-    D3D11TextureView(Ref<D3D11Texture> texture)
-        : m_texture(std::move(texture))
-    {}
+    D3D11TextureView(Ref<D3D11Texture> texture, TextureViewDesc desc);
 
     Ref<Texture> GetTexture() const override;
 
@@ -21,9 +20,33 @@ public:
         return m_desc;
     }
 
+    ID3D11ShaderResourceView* GetSRV() const
+    {
+        return m_srv.Get();
+    }
+
+    ID3D11RenderTargetView* GetRTV() const
+    {
+        return m_rtv.Get();
+    }
+
+    ID3D11DepthStencilView* GetDSV() const
+    {
+        return m_dsv.Get();
+    }
+
+    ID3D11UnorderedAccessView* GetUAV() const
+    {
+        return m_uav.Get();
+    }
+
 private:
-    Ref<D3D11Texture> m_texture;
+    std::weak_ptr<D3D11Texture> m_texture;
     TextureViewDesc m_desc;
+    ComPtr<ID3D11ShaderResourceView> m_srv;
+    ComPtr<ID3D11RenderTargetView> m_rtv;
+    ComPtr<ID3D11DepthStencilView> m_dsv;
+    ComPtr<ID3D11UnorderedAccessView> m_uav;
 };
 
 class LUNA_RHI_API D3D11Texture : public Texture {

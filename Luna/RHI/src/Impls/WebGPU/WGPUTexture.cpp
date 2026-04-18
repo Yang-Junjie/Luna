@@ -21,7 +21,7 @@ WGPUTextureViewImpl::~WGPUTextureViewImpl()
 
 Ref<Texture> WGPUTextureViewImpl::GetTexture() const
 {
-    return m_texture;
+    return m_texture.lock();
 }
 
 const TextureViewDesc& WGPUTextureViewImpl::GetDesc() const
@@ -147,6 +147,7 @@ Ref<TextureView> WGPUTextureImpl::CreateView(const TextureViewDesc& desc)
 
 Ref<TextureView> WGPUTextureImpl::GetDefaultView()
 {
+    CreateDefaultViewIfNeeded();
     return m_defaultView;
 }
 

@@ -12,9 +12,11 @@ VKTextureView::VKTextureView(const Ref<Texture>& texture, const TextureViewDesc&
     if (!texture) {
         throw std::runtime_error("VKTextureView created with null texture");
     }
-    m_texture = std::static_pointer_cast<VKTexture>(texture);
+    auto vkTexture = std::static_pointer_cast<VKTexture>(texture);
+    m_texture = vkTexture;
+    m_deviceOwner = vkTexture->m_device;
     vk::ImageViewCreateInfo viewInfo = {};
-    viewInfo.image = m_texture->GetHandle();
+    viewInfo.image = vkTexture->GetHandle();
     viewInfo.format = VKConverter::Convert(desc.FormatOverride);
     switch (desc.ViewType) {
         case TextureType::Texture1D:
@@ -54,10 +56,11 @@ VKTextureView::VKTextureView(const Ref<Texture>& texture, const TextureViewDesc&
     viewInfo.subresourceRange.levelCount = desc.MipLevelCount;
     viewInfo.subresourceRange.baseArrayLayer = desc.BaseArrayLayer;
     viewInfo.subresourceRange.layerCount = desc.ArrayLayerCount;
-    m_imageView = std::static_pointer_cast<VKDevice>(m_texture->m_device)->GetHandle().createImageView(viewInfo);
+    m_imageView = std::static_pointer_cast<VKDevice>(m_deviceOwner)->GetHandle().createImageView(viewInfo);
     if (!m_imageView) {
         throw std::runtime_error("Failed to create image view");
     }
+    m_ownsImageView = true;
 }
 
 Ref<VKTextureView> VKTextureView::Create(const Ref<Texture>& texture, const TextureViewDesc& desc)
@@ -72,7 +75,9 @@ VKTextureView::VKTextureView(const Ref<Texture>& texture, const vk::ImageView& v
     if (!texture) {
         throw std::runtime_error("VKTextureView created with null texture");
     }
-    m_texture = std::static_pointer_cast<VKTexture>(texture);
+    auto vkTexture = std::static_pointer_cast<VKTexture>(texture);
+    m_texture = vkTexture;
+    m_deviceOwner = vkTexture->m_device;
 }
 
 Ref<VKTextureView>
@@ -83,12 +88,27 @@ Ref<VKTextureView>
 
 Ref<Texture> VKTextureView::GetTexture() const
 {
-    return m_texture;
+    return m_texture.lock();
 }
 
 const TextureViewDesc& VKTextureView::GetDesc() const
 {
     return m_desc;
+}
+
+VKTextureView::~VKTextureView()
+{
+    if (!m_ownsImageView || !m_imageView || !m_deviceOwner) {
+        return;
+    }
+
+    const auto device = std::dynamic_pointer_cast<VKDevice>(m_deviceOwner);
+    if (!device) {
+        return;
+    }
+
+    device->GetHandle().destroyImageView(m_imageView);
+    m_imageView = nullptr;
 }
 
 VKTexture::VKTexture(const vk::Image& image, const vk::ImageView& imageView, const TextureCreateInfo& info)
@@ -251,10 +271,15 @@ void VKTexture::CreateDefaultViewIfNeeded()
     viewDesc.Aspect = aspectFlags;
     if (m_imageView) {
         m_view = VKTextureView::Create(shared_from_this(), m_imageView, viewDesc);
-        m_imageView = nullptr;
     } else {
         m_view = VKTextureView::Create(shared_from_this(), viewDesc);
     }
+}
+
+Ref<TextureView> VKTexture::GetDefaultView()
+{
+    CreateDefaultViewIfNeeded();
+    return m_view;
 }
 
 uint32_t VKTexture::GetWidth() const

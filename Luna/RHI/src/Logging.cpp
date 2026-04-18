@@ -3,9 +3,9 @@
 #include <atomic>
 #include <cctype>
 #include <cstdlib>
-#include <iostream>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace luna::RHI {
 namespace {
@@ -13,6 +13,7 @@ namespace {
 std::mutex g_log_callback_mutex;
 LogCallback g_log_callback = nullptr;
 void* g_log_callback_user_data = nullptr;
+std::vector<std::pair<LogLevel, std::string>> g_pending_log_messages;
 
 bool parseBoolean(std::string value, bool default_value)
 {
@@ -63,33 +64,25 @@ std::atomic_bool& validationMessageFilterStorage()
     return enabled;
 }
 
-const char* toString(LogLevel level)
-{
-    switch (level) {
-        case LogLevel::Trace:
-            return "TRACE";
-        case LogLevel::Debug:
-            return "DEBUG";
-        case LogLevel::Info:
-            return "INFO";
-        case LogLevel::Warn:
-            return "WARN";
-        case LogLevel::Error:
-            return "ERROR";
-        case LogLevel::Fatal:
-            return "FATAL";
-        default:
-            return "INFO";
-    }
-}
-
 } // namespace
 
 void SetLogCallback(LogCallback callback, void* userData)
 {
-    std::lock_guard<std::mutex> lock(g_log_callback_mutex);
-    g_log_callback = callback;
-    g_log_callback_user_data = userData;
+    std::vector<std::pair<LogLevel, std::string>> pendingMessages;
+    {
+        std::lock_guard<std::mutex> lock(g_log_callback_mutex);
+        g_log_callback = callback;
+        g_log_callback_user_data = userData;
+        if (callback != nullptr && !g_pending_log_messages.empty()) {
+            pendingMessages.swap(g_pending_log_messages);
+        }
+    }
+
+    if (callback != nullptr) {
+        for (const auto& [level, message] : pendingMessages) {
+            callback(level, message, userData);
+        }
+    }
 }
 
 void LogMessage(LogLevel level, std::string_view message)
@@ -107,7 +100,18 @@ void LogMessage(LogLevel level, std::string_view message)
         return;
     }
 
-    std::cerr << "[Luna RHI] [" << toString(level) << "] " << message << '\n';
+    {
+        std::lock_guard<std::mutex> lock(g_log_callback_mutex);
+        if (g_log_callback != nullptr) {
+            callback = g_log_callback;
+            user_data = g_log_callback_user_data;
+        } else {
+            g_pending_log_messages.emplace_back(level, std::string(message));
+            return;
+        }
+    }
+
+    callback(level, message, user_data);
 }
 
 void SetVulkanValidationMessageFilterEnabled(bool enabled)

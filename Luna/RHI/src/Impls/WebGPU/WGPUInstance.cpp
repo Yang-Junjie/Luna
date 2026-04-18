@@ -1,9 +1,8 @@
 #include "Impls/WebGPU/WGPUAdapter.h"
 #include "Impls/WebGPU/WGPUInstance.h"
 #include "Impls/WebGPU/WGPUQueue.h"
+#include "Logging.h"
 #include "ShaderCompiler.h"
-
-#include <iostream>
 
 namespace luna::RHI {
 WGPUInstance::~WGPUInstance()
@@ -25,7 +24,7 @@ bool WGPUInstance::Initialize(const InstanceCreateInfo& createInfo)
     WGPUInstanceDescriptor desc = {};
     m_instance = wgpuCreateInstance(&desc);
     if (!m_instance) {
-        std::cerr << "Failed to create WebGPU instance" << std::endl;
+        LogMessage(LogLevel::Error, "Failed to create WebGPU instance");
         return false;
     }
     return true;
@@ -53,7 +52,8 @@ std::vector<Ref<Adapter>> WGPUInstance::EnumerateAdapters()
             if (status == WGPURequestAdapterStatus_Success) {
                 res->adapter = adapter;
             } else {
-                std::cerr << "WebGPU adapter request failed: " << (message ? message : "unknown") << std::endl;
+                LogMessage(LogLevel::Error,
+                           std::string("WebGPU adapter request failed: ") + (message ? message : "unknown"));
             }
             res->done = true;
         },
