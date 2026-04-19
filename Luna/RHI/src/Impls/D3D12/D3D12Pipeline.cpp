@@ -3,8 +3,9 @@
 #include "Impls/D3D12/D3D12Pipeline.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
-#include <atomic>
 #include <cstdio>
+
+#include <atomic>
 #include <stdexcept>
 
 namespace {
@@ -195,10 +196,8 @@ D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const Comp
     HRESULT hr = d3dDevice->GetHandle()->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
     if (FAILED(hr)) {
         char buf[128];
-        snprintf(buf,
-                 sizeof(buf),
-                 "ID3D12Device::CreateComputePipelineState failed: 0x%08X",
-                 static_cast<unsigned>(hr));
+        snprintf(
+            buf, sizeof(buf), "ID3D12Device::CreateComputePipelineState failed: 0x%08X", static_cast<unsigned>(hr));
         throw std::runtime_error(buf);
     }
 }

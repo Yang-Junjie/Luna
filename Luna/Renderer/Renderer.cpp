@@ -59,15 +59,17 @@ bool Renderer::init(Window& window, InitializationOptions options)
         device_context.shader_compiler = device_context.instance->CreateShaderCompiler();
         device_context.surface = device_context.instance->CreateSurface(window_handle);
         if (!device_context.surface) {
-            throw std::runtime_error("Failed to create surface for backend '" +
-                                     std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
+            throw std::runtime_error(
+                "Failed to create surface for backend '" +
+                std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
         }
 
         const auto adapters = device_context.instance->EnumerateAdapters();
         device_context.adapter = renderer_detail::selectAdapter(adapters);
         if (!device_context.adapter) {
-            throw std::runtime_error("No compatible adapter available for backend '" +
-                                     std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
+            throw std::runtime_error(
+                "No compatible adapter available for backend '" +
+                std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
         }
 
         luna::RHI::DeviceCreateInfo device_info;
@@ -82,8 +84,8 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
-        LUNA_RENDERER_INFO(
-            "Initialized renderer backend '{}'", renderer_detail::backendTypeToString(device_context.instance->GetType()));
+        LUNA_RENDERER_INFO("Initialized renderer backend '{}'",
+                           renderer_detail::backendTypeToString(device_context.instance->GetType()));
     } catch (const std::exception& error) {
         LUNA_RENDERER_ERROR("Failed to initialize Renderer: {}", error.what());
         shutdown();
@@ -139,16 +141,17 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     const auto supported_present_modes = device_context.surface->GetSupportedPresentModes(device_context.adapter);
     const auto surface_format = renderer_detail::chooseSurfaceFormat(formats);
     const auto requested_present_mode = runtime.initialization_options.present_mode;
-    const auto selected_present_mode = renderer_detail::choosePresentMode(supported_present_modes, requested_present_mode);
+    const auto selected_present_mode =
+        renderer_detail::choosePresentMode(supported_present_modes, requested_present_mode);
 
     const luna::RHI::Extent2D clamped_extent{
         std::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
         std::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
     };
 
-    uint32_t min_image_count = (std::max) (2u, capabilities.minImageCount);
+    uint32_t min_image_count = (std::max)(2u, capabilities.minImageCount);
     if (capabilities.maxImageCount != 0) {
-        min_image_count = (std::min) (min_image_count, capabilities.maxImageCount);
+        min_image_count = (std::min)(min_image_count, capabilities.maxImageCount);
     }
 
     if (selected_present_mode != requested_present_mode) {
@@ -162,20 +165,21 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
                            renderer_detail::describePresentModes(supported_present_modes));
     }
 
-    device_context.swapchain = device_context.device->CreateSwapchain(luna::RHI::SwapchainBuilder()
-                                                                          .SetExtent(clamped_extent)
-                                                                          .SetFormat(surface_format.format)
-                                                                          .SetColorSpace(surface_format.colorSpace)
-                                                                          .SetPresentMode(selected_present_mode)
-                                                                          .SetMinImageCount(min_image_count)
-                                                                          .SetPreTransform(capabilities.currentTransform)
-                                                                          .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment)
-                                                                          .SetSurface(device_context.surface)
-                                                                          .Build());
+    device_context.swapchain =
+        device_context.device->CreateSwapchain(luna::RHI::SwapchainBuilder()
+                                                   .SetExtent(clamped_extent)
+                                                   .SetFormat(surface_format.format)
+                                                   .SetColorSpace(surface_format.colorSpace)
+                                                   .SetPresentMode(selected_present_mode)
+                                                   .SetMinImageCount(min_image_count)
+                                                   .SetPreTransform(capabilities.currentTransform)
+                                                   .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment)
+                                                   .SetSurface(device_context.surface)
+                                                   .Build());
 
     device_context.surface_format = surface_format.format;
-    frame_resources.frames_in_flight =
-        (std::max) (1u, device_context.swapchain->GetImageCount() > 1 ? device_context.swapchain->GetImageCount() - 1 : 1u);
+    frame_resources.frames_in_flight = (std::max)(
+        1u, device_context.swapchain->GetImageCount() > 1 ? device_context.swapchain->GetImageCount() - 1 : 1u);
     device_context.synchronization = device_context.device->CreateSynchronization(frame_resources.frames_in_flight);
     frame_resources.command_buffers.assign(frame_resources.frames_in_flight, {});
     frame_resources.render_graphs.clear();
@@ -203,7 +207,7 @@ luna::RHI::Extent2D Renderer::getFramebufferExtent() const
     int width = 0;
     int height = 0;
     glfwGetFramebufferSize(m_window_context.native_window, &width, &height);
-    return {static_cast<uint32_t>((std::max) (width, 0)), static_cast<uint32_t>((std::max) (height, 0))};
+    return {static_cast<uint32_t>((std::max)(width, 0)), static_cast<uint32_t>((std::max)(height, 0))};
 }
 
 void Renderer::handlePendingResize()

@@ -3,8 +3,9 @@
 #include "Logging.h"
 #include "ShaderCompiler.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <fstream>
 #include <map>
 #include <sstream>

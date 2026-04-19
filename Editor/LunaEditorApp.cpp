@@ -1,16 +1,16 @@
-#include "LunaEditorApp.h"
-
 #include "Core/Log.h"
+#include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/ModelLoader.h"
 #include "Scene/Components.h"
 
-#include <algorithm>
-#include <array>
 #include <cctype>
 #include <cmath>
+
+#include <algorithm>
+#include <array>
 #include <filesystem>
 #include <glm/common.hpp>
 #include <limits>
@@ -244,7 +244,6 @@ luna::RHI::BackendType LunaEditorApplication::getBackend() const
     return m_backend;
 }
 
-
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()
 {
     LUNA_RUNTIME_INFO("LunaEditor requested backend '{}' and present mode '{}' via code",
@@ -357,7 +356,6 @@ void LunaEditorApplication::createFallbackAsset()
     m_asset_label = "Procedural cube";
     LUNA_RUNTIME_INFO("Using fallback procedural cube for editor demo");
 }
-
 
 Application* createApplication(int argc, char** argv)
 {

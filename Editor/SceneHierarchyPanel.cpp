@@ -1,7 +1,6 @@
-#include "SceneHierarchyPanel.h"
-
 #include "LunaEditorApp.h"
 #include "Scene/Components.h"
+#include "SceneHierarchyPanel.h"
 
 #include <imgui.h>
 

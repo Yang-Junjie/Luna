@@ -1,8 +1,9 @@
 #include "Logging.h"
 
-#include <atomic>
 #include <cctype>
 #include <cstdlib>
+
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -59,8 +60,7 @@ std::string readEnvironmentVariable(const char* name)
 
 std::atomic_bool& validationMessageFilterStorage()
 {
-    static std::atomic_bool enabled{
-        parseBoolean(readEnvironmentVariable("LUNA_VK_VALIDATION_FILTER"), true)};
+    static std::atomic_bool enabled{parseBoolean(readEnvironmentVariable("LUNA_VK_VALIDATION_FILTER"), true)};
     return enabled;
 }
 

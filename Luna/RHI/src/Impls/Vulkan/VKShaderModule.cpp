@@ -1,7 +1,9 @@
 #include "Impls/Vulkan/VKDevice.h"
 #include "Impls/Vulkan/VKShaderModule.h"
 
-luna::RHI::VKShaderModule::VKShaderModule(const Ref<Device>& device, const ShaderCreateInfo& info, const ShaderBlob& blob)
+luna::RHI::VKShaderModule::VKShaderModule(const Ref<Device>& device,
+                                          const ShaderCreateInfo& info,
+                                          const ShaderBlob& blob)
     : m_shaderBlob(blob),
       m_createInfo(info)
 {

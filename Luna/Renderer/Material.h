@@ -4,6 +4,7 @@
 #include "Renderer/ModelLoader.h"
 
 #include <cstdint>
+
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <memory>
@@ -90,7 +91,7 @@ private:
     glm::vec4 m_base_color_factor{1.0f, 1.0f, 1.0f, 1.0f};
     glm::vec3 m_emissive_factor{0.0f, 0.0f, 0.0f};
     BlendMode m_blend_mode{BlendMode::Opaque};
-    
+
     float m_alpha_cutoff{0.5f};
 
     float m_metallic_factor{0.0f};

@@ -324,10 +324,9 @@ ModelData ModelLoader::LoadFromObj(const std::string& filepath)
             material.normal_texname.empty()
                 ? ImageData{}
                 : ImageLoader::LoadImageFromFile(getAbsolutePathToObjResource(filepath, material.normal_texname));
-        result_material.BaseColorFactor = glm::vec4(
-            material.diffuse[0], material.diffuse[1], material.diffuse[2], material.dissolve);
-        result_material.EmissiveFactor =
-            glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
+        result_material.BaseColorFactor =
+            glm::vec4(material.diffuse[0], material.diffuse[1], material.diffuse[2], material.dissolve);
+        result_material.EmissiveFactor = glm::vec3(material.emission[0], material.emission[1], material.emission[2]);
         result_material.MetallicFactor = 0.0f;
         result_material.RoughnessFactor = 1.0f;
         result_material.NormalScale = 1.0f;
@@ -432,7 +431,8 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
         auto& result_material = result.Materials.emplace_back();
         result_material.Name = material.name;
         result_material.BaseColorFactor = toVec4(material.pbrData.baseColorFactor);
-        result_material.EmissiveFactor = toVec3(material.emissiveFactor) * static_cast<float>(material.emissiveStrength);
+        result_material.EmissiveFactor =
+            toVec3(material.emissiveFactor) * static_cast<float>(material.emissiveStrength);
         result_material.RoughnessFactor = material.pbrData.roughnessFactor;
         result_material.MetallicFactor = material.pbrData.metallicFactor;
         result_material.NormalScale = material.normalTexture.has_value() ? material.normalTexture->scale : 1.0f;
@@ -460,7 +460,8 @@ ModelData ModelLoader::LoadFromGltf(const std::string& filepath)
         result_material.NormalTexture = loadMaterialTexture(asset.get(), material.normalTexture, path.parent_path());
         result_material.MetallicRoughnessTexture =
             loadMaterialTexture(asset.get(), material.pbrData.metallicRoughnessTexture, path.parent_path());
-        result_material.EmissiveTexture = loadMaterialTexture(asset.get(), material.emissiveTexture, path.parent_path());
+        result_material.EmissiveTexture =
+            loadMaterialTexture(asset.get(), material.emissiveTexture, path.parent_path());
         result_material.OcclusionTexture =
             loadMaterialTexture(asset.get(), material.occlusionTexture, path.parent_path());
     }

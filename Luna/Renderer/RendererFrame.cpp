@@ -213,7 +213,8 @@ void Renderer::renderFrame()
     } else if (!render_scene_to_swapchain) {
         graph_builder.AddRasterPass(
             "PresentClear",
-            [back_buffer_handle, clear_color = runtime.clear_color](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
+            [back_buffer_handle,
+             clear_color = runtime.clear_color](luna::rhi::RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.WriteColor(
                     back_buffer_handle,
                     luna::RHI::AttachmentLoadOp::Clear,

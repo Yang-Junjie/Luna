@@ -187,13 +187,14 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
             .SetName("SceneOutputColor")
             .Build());
 
-    m_scene_output.depth = m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
-                                                                      .SetSize(width, height)
-                                                                      .SetFormat(luna::RHI::Format::D32_FLOAT)
-                                                                      .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment)
-                                                                      .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                                      .SetName("SceneOutputDepth")
-                                                                      .Build());
+    m_scene_output.depth =
+        m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
+                                                   .SetSize(width, height)
+                                                   .SetFormat(luna::RHI::Format::D32_FLOAT)
+                                                   .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment)
+                                                   .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                                   .SetName("SceneOutputDepth")
+                                                   .Build());
 
     m_scene_output.color_state = luna::RHI::ResourceState::Undefined;
     m_scene_output.depth_state = luna::RHI::ResourceState::Undefined;

@@ -67,8 +67,10 @@ void D3D11CommandBufferEncoder::BeginRendering(const RenderingInfo& info)
             if (depthTex->HasStencil()) {
                 clearFlags |= D3D11_CLEAR_STENCIL;
             }
-            m_context->ClearDepthStencilView(
-                dsv, clearFlags, info.DepthAttachment->ClearDepthStencil.Depth, info.DepthAttachment->ClearDepthStencil.Stencil);
+            m_context->ClearDepthStencilView(dsv,
+                                             clearFlags,
+                                             info.DepthAttachment->ClearDepthStencil.Depth,
+                                             info.DepthAttachment->ClearDepthStencil.Stencil);
         }
     }
 
@@ -119,8 +121,7 @@ void D3D11CommandBufferEncoder::BindVertexBuffer(uint32_t binding, const Ref<Buf
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::VertexBuffer)) {
-        LogMessage(LogLevel::Warn,
-                   "DX11: BindVertexBuffer without VertexBuffer usage flag. Vulkan will reject this.");
+        LogMessage(LogLevel::Warn, "DX11: BindVertexBuffer without VertexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto* d3dBuf = static_cast<D3D11Buffer*>(buffer.get());
@@ -134,8 +135,7 @@ void D3D11CommandBufferEncoder::BindIndexBuffer(const Ref<Buffer>& buffer, uint6
 {
 #ifndef NDEBUG
     if (buffer && !(buffer->GetUsage() & BufferUsageFlags::IndexBuffer)) {
-        LogMessage(LogLevel::Warn,
-                   "DX11: BindIndexBuffer without IndexBuffer usage flag. Vulkan will reject this.");
+        LogMessage(LogLevel::Warn, "DX11: BindIndexBuffer without IndexBuffer usage flag. Vulkan will reject this.");
     }
 #endif
     auto* d3dBuf = static_cast<D3D11Buffer*>(buffer.get());
@@ -289,8 +289,7 @@ void D3D11CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
 {
 #ifndef NDEBUG
     if (dstImage && m_transitionedTextures.find(dstImage.get()) == m_transitionedTextures.end()) {
-        LogMessage(LogLevel::Warn,
-                   "DX11: CopyBufferToImage without TransitionImage(). Vulkan/DX12 will fail.");
+        LogMessage(LogLevel::Warn, "DX11: CopyBufferToImage without TransitionImage(). Vulkan/DX12 will fail.");
     }
 #endif
     auto* srcBuf = static_cast<D3D11Buffer*>(srcBuffer.get());

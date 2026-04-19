@@ -78,7 +78,7 @@ void LunaEditorLayer::onImGuiRender()
 
     auto& application = *m_application;
     const float delta_seconds = Application::get().getTimestep().getSeconds();
-    const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
+    const float fps = 1.0f / (std::max)(delta_seconds, 0.0001f);
 
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene");
@@ -131,8 +131,8 @@ void LunaEditorLayer::drawViewport()
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float dpi_scale = ImGui::GetWindowViewport() != nullptr ? ImGui::GetWindowViewport()->DpiScale : 1.0f;
-    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * dpi_scale, 0.0f));
-    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * dpi_scale, 0.0f));
+    const uint32_t viewport_width = static_cast<uint32_t>((std::max)(available.x * dpi_scale, 0.0f));
+    const uint32_t viewport_height = static_cast<uint32_t>((std::max)(available.y * dpi_scale, 0.0f));
     renderer.setSceneOutputSize(viewport_width, viewport_height);
 
     const auto& scene_texture = renderer.getSceneOutputTexture();

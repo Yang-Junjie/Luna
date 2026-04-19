@@ -4,15 +4,11 @@
 #include "Renderer/Mesh.h"
 #include "Renderer/SceneRenderer.h"
 
-#include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstring>
-#include <filesystem>
-#include <string_view>
-#include <utility>
-#include <vector>
 
+#include <algorithm>
+#include <array>
 #include <Barrier.h>
 #include <Buffer.h>
 #include <Builders.h>
@@ -21,6 +17,7 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
 #include <glm/common.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtx/norm.hpp>
@@ -30,7 +27,10 @@
 #include <Sampler.h>
 #include <ShaderCompiler.h>
 #include <ShaderModule.h>
+#include <string_view>
 #include <Texture.h>
+#include <utility>
+#include <vector>
 
 namespace luna::scene_renderer_detail {
 
@@ -65,11 +65,12 @@ inline std::filesystem::path projectRoot()
     return std::filesystem::path(LUNA_PROJECT_ROOT);
 }
 
-inline luna::RHI::Ref<luna::RHI::ShaderModule> loadShaderModule(const luna::RHI::Ref<luna::RHI::Device>& device,
-                                                                const luna::RHI::Ref<luna::RHI::ShaderCompiler>& compiler,
-                                                                const std::filesystem::path& path,
-                                                                std::string_view entry_point,
-                                                                luna::RHI::ShaderStage stage)
+inline luna::RHI::Ref<luna::RHI::ShaderModule>
+    loadShaderModule(const luna::RHI::Ref<luna::RHI::Device>& device,
+                     const luna::RHI::Ref<luna::RHI::ShaderCompiler>& compiler,
+                     const std::filesystem::path& path,
+                     std::string_view entry_point,
+                     luna::RHI::ShaderStage stage)
 {
     if (!device || !compiler) {
         return {};
@@ -139,10 +140,9 @@ inline luna::rhi::ImageData createFallbackFloatImageData(const glm::vec4& value)
 
 inline luna::rhi::ImageData generateEnvironmentMipChain(const luna::rhi::ImageData& source)
 {
-    if (!source.isValid() || source.ImageFormat != kEnvironmentFormat || source.ByteData.size() !=
-                                                                      static_cast<size_t>(source.Width) *
-                                                                          static_cast<size_t>(source.Height) * 4u *
-                                                                          sizeof(float)) {
+    if (!source.isValid() || source.ImageFormat != kEnvironmentFormat ||
+        source.ByteData.size() !=
+            static_cast<size_t>(source.Width) * static_cast<size_t>(source.Height) * 4u * sizeof(float)) {
         return source;
     }
 

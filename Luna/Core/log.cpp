@@ -166,7 +166,8 @@ void Logger::init(const std::string& log_file, Level level)
                 m_s_core_logger->error("Logger initialization failed: {}", ex.what());
                 m_s_core_logger->flush();
             } else if (!m_s_sinks.empty()) {
-                auto fallback_logger = std::make_shared<spdlog::logger>("LunaCoreBootstrap", m_s_sinks.begin(), m_s_sinks.end());
+                auto fallback_logger =
+                    std::make_shared<spdlog::logger>("LunaCoreBootstrap", m_s_sinks.begin(), m_s_sinks.end());
                 configureLogger(fallback_logger, toSpdlogLevel(level));
                 fallback_logger->error("Logger initialization failed: {}", ex.what());
                 fallback_logger->flush();

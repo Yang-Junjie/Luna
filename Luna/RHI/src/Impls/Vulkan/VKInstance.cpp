@@ -4,7 +4,6 @@
 #include <Impls/Vulkan/VKInstance.h>
 #include <Impls/Vulkan/VKSurface.h>
 #include <Logging.h>
-
 #include <sstream>
 
 namespace luna::RHI {
@@ -14,10 +13,9 @@ void populateDebugUtilsCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo
 {
     createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
@@ -26,12 +24,13 @@ void populateDebugUtilsCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo
                                     const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
                                     void*) -> VkBool32 {
         const bool general_message = (type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) != 0;
-        const bool validation_or_performance_message =
-            (type & (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)) != 0;
-        const bool warning_or_error =
-            (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) != 0;
+        const bool validation_or_performance_message = (type & (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                                                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)) != 0;
+        const bool warning_or_error = (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)) != 0;
 
-        if (IsVulkanValidationMessageFilterEnabled() && general_message && !validation_or_performance_message && !warning_or_error) {
+        if (IsVulkanValidationMessageFilterEnabled() && general_message && !validation_or_performance_message &&
+            !warning_or_error) {
             return VK_FALSE;
         }
 
@@ -72,7 +71,7 @@ void populateDebugUtilsCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo
         LogMessage(log_level, stream.str());
         return VK_FALSE;
     };
-};
+}
 
 bool hasFeature(const InstanceCreateInfo& createInfo, InstanceFeature feature)
 {
@@ -90,8 +89,8 @@ VKInstance::~VKInstance()
 {
     if (m_instance) {
         if (m_debug_messenger != VK_NULL_HANDLE) {
-            const auto destroy_debug_utils =
-                reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT"));
+            const auto destroy_debug_utils = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+                vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT"));
             if (destroy_debug_utils != nullptr) {
                 destroy_debug_utils(m_instance, m_debug_messenger, nullptr);
             }
@@ -196,20 +195,22 @@ bool VKInstance::Initialize(const InstanceCreateInfo& createInfo)
     }
 
     if (hasFeature(createInfo, InstanceFeature::ValidationLayer)) {
-        const auto create_debug_utils =
-            reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
+        const auto create_debug_utils = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+            vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
         if (create_debug_utils == nullptr) {
-            LogMessage(LogLevel::Warn, "Vulkan validation layer enabled but vkCreateDebugUtilsMessengerEXT is unavailable");
+            LogMessage(LogLevel::Warn,
+                       "Vulkan validation layer enabled but vkCreateDebugUtilsMessengerEXT is unavailable");
         } else {
-            const VkResult result = create_debug_utils(m_instance, &debug_utils_create_info, nullptr, &m_debug_messenger);
+            const VkResult result =
+                create_debug_utils(m_instance, &debug_utils_create_info, nullptr, &m_debug_messenger);
             if (result != VK_SUCCESS) {
                 LogMessage(LogLevel::Warn, "Failed to create Vulkan debug utils messenger");
                 m_debug_messenger = VK_NULL_HANDLE;
             } else {
                 if (IsVulkanValidationMessageFilterEnabled()) {
-                    LogMessage(
-                        LogLevel::Info,
-                        "Vulkan validation message filter enabled; set LUNA_VK_VALIDATION_FILTER=0 to keep loader/general info logs");
+                    LogMessage(LogLevel::Info,
+                               "Vulkan validation message filter enabled; set LUNA_VK_VALIDATION_FILTER=0 to keep "
+                               "loader/general info logs");
                 }
                 LogMessage(LogLevel::Debug, "Installed Vulkan debug utils messenger");
             }

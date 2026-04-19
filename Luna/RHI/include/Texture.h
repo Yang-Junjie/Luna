@@ -149,14 +149,13 @@ protected:
     static bool IsDepthFormat(Format format)
     {
         return format == Format::D16_UNORM || format == Format::D32_FLOAT || format == Format::D32F ||
-               format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 ||
-               format == Format::D32_FLOAT_S8_UINT;
+               format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 || format == Format::D32_FLOAT_S8_UINT;
     }
 
     static bool IsStencilFormat(Format format)
     {
-        return format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 ||
-               format == Format::D32_FLOAT_S8_UINT || format == Format::S8_UINT;
+        return format == Format::D24_UNORM_S8_UINT || format == Format::D24S8 || format == Format::D32_FLOAT_S8_UINT ||
+               format == Format::S8_UINT;
     }
 };
 } // namespace luna::RHI

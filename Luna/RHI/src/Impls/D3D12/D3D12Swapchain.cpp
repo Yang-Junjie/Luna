@@ -95,10 +95,7 @@ Result D3D12Swapchain::Present(const Ref<Queue>& queue, const Ref<Synchronizatio
         if (d3dDev) {
             HRESULT reason = d3dDev->GetHandle()->GetDeviceRemovedReason();
             char buffer[128];
-            snprintf(buffer,
-                     sizeof(buffer),
-                     "D3D12: Device removed reason: 0x%08X",
-                     static_cast<unsigned>(reason));
+            snprintf(buffer, sizeof(buffer), "D3D12: Device removed reason: 0x%08X", static_cast<unsigned>(reason));
             LogMessage(LogLevel::Error, buffer);
             ComPtr<ID3D12InfoQueue> iq;
             if (SUCCEEDED(d3dDev->GetHandle()->QueryInterface(IID_PPV_ARGS(&iq)))) {
@@ -109,7 +106,7 @@ Result D3D12Swapchain::Present(const Ref<Queue>& queue, const Ref<Synchronizatio
                     auto* msg = (D3D12_MESSAGE*) malloc(len);
                     if (msg) {
                         iq->GetMessage(i, msg, &len);
-                        char messageBuffer[1024];
+                        char messageBuffer[1'024];
                         snprintf(messageBuffer,
                                  sizeof(messageBuffer),
                                  "D3D12 MSG[%llu]: %s",

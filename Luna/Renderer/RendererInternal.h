@@ -1,13 +1,12 @@
 #pragma once
 
+#include <Adapter.h>
 #include <algorithm>
 #include <array>
-#include <string>
-#include <vector>
-
-#include <Adapter.h>
 #include <Instance.h>
+#include <string>
 #include <Surface.h>
+#include <vector>
 
 namespace luna::renderer_detail {
 
@@ -92,7 +91,8 @@ inline bool usesSceneRenderer(luna::RHI::BackendType type)
            type == luna::RHI::BackendType::DirectX12;
 }
 
-inline bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)
+inline bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes,
+                                   luna::RHI::PresentMode mode)
 {
     return std::find(supported_modes.begin(), supported_modes.end(), mode) != supported_modes.end();
 }

@@ -81,12 +81,13 @@ uint32_t VKSynchronization::AcquireNextImageIndex(const Ref<Swapchain>& swapchai
     if (!swapchain) {
         throw std::runtime_error("AcquireNextImageIndex called with null swapchain");
     }
-    const uint32_t imageIndex = m_vkDevice->GetHandle()
-        .acquireNextImageKHR(std::dynamic_pointer_cast<VKSwapchain>(swapchain)->GetVulkanSwapchain(),
-                             UINT64_MAX,
-                             m_imageAvailableSemaphores[frameIndex],
-                             nullptr)
-        .value;
+    const uint32_t imageIndex =
+        m_vkDevice->GetHandle()
+            .acquireNextImageKHR(std::dynamic_pointer_cast<VKSwapchain>(swapchain)->GetVulkanSwapchain(),
+                                 UINT64_MAX,
+                                 m_imageAvailableSemaphores[frameIndex],
+                                 nullptr)
+            .value;
     const_cast<VKSynchronization*>(this)->EnsureRenderSemaphore(imageIndex);
     const_cast<VKSynchronization*>(this)->m_frameImageIndices[frameIndex] = imageIndex;
     return imageIndex;

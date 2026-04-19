@@ -56,28 +56,31 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
     }
 
     const ShaderPaths shader_paths = resolveShaderPaths();
-    gpu.geometry_vertex_shader = loadShaderModule(
-        gpu.device, context.compiler, shader_paths.geometry_vertex_path, "sceneGeometryVertexMain", luna::RHI::ShaderStage::Vertex);
-    gpu.geometry_fragment_shader =
-        loadShaderModule(gpu.device,
-                         context.compiler,
-                         shader_paths.geometry_fragment_path,
-                         "sceneGeometryFragmentMain",
-                         luna::RHI::ShaderStage::Fragment);
-    gpu.lighting_vertex_shader = loadShaderModule(
-        gpu.device, context.compiler, shader_paths.lighting_vertex_path, "sceneLightingVertexMain", luna::RHI::ShaderStage::Vertex);
-    gpu.lighting_fragment_shader =
-        loadShaderModule(gpu.device,
-                         context.compiler,
-                         shader_paths.lighting_fragment_path,
-                         "sceneLightingFragmentMain",
-                         luna::RHI::ShaderStage::Fragment);
-    gpu.transparent_fragment_shader =
-        loadShaderModule(gpu.device,
-                         context.compiler,
-                         shader_paths.geometry_fragment_path,
-                         "sceneTransparentFragmentMain",
-                         luna::RHI::ShaderStage::Fragment);
+    gpu.geometry_vertex_shader = loadShaderModule(gpu.device,
+                                                  context.compiler,
+                                                  shader_paths.geometry_vertex_path,
+                                                  "sceneGeometryVertexMain",
+                                                  luna::RHI::ShaderStage::Vertex);
+    gpu.geometry_fragment_shader = loadShaderModule(gpu.device,
+                                                    context.compiler,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneGeometryFragmentMain",
+                                                    luna::RHI::ShaderStage::Fragment);
+    gpu.lighting_vertex_shader = loadShaderModule(gpu.device,
+                                                  context.compiler,
+                                                  shader_paths.lighting_vertex_path,
+                                                  "sceneLightingVertexMain",
+                                                  luna::RHI::ShaderStage::Vertex);
+    gpu.lighting_fragment_shader = loadShaderModule(gpu.device,
+                                                    context.compiler,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneLightingFragmentMain",
+                                                    luna::RHI::ShaderStage::Fragment);
+    gpu.transparent_fragment_shader = loadShaderModule(gpu.device,
+                                                       context.compiler,
+                                                       shader_paths.geometry_fragment_path,
+                                                       "sceneTransparentFragmentMain",
+                                                       luna::RHI::ShaderStage::Fragment);
 
     if (!gpu.geometry_vertex_shader || !gpu.geometry_fragment_shader || !gpu.lighting_vertex_shader ||
         !gpu.lighting_fragment_shader || !gpu.transparent_fragment_shader) {
@@ -115,20 +118,22 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
             .AddBinding(2, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 
-    gpu.descriptor_pool = gpu.device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
-                                                               .SetMaxSets(4'096)
-                                                               .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 16'384)
-                                                               .AddPoolSize(luna::RHI::DescriptorType::Sampler, 8'192)
-                                                               .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 8'192)
-                                                               .Build());
+    gpu.descriptor_pool =
+        gpu.device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+                                             .SetMaxSets(4'096)
+                                             .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 16'384)
+                                             .AddPoolSize(luna::RHI::DescriptorType::Sampler, 8'192)
+                                             .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 8'192)
+                                             .Build());
 
-    gpu.material_sampler = gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
-                                                         .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                                         .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
-                                                         .SetAddressMode(luna::RHI::SamplerAddressMode::Repeat)
-                                                         .SetAnisotropy(false)
-                                                         .SetName("SceneMaterialSampler")
-                                                         .Build());
+    gpu.material_sampler =
+        gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
+                                      .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
+                                      .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
+                                      .SetAddressMode(luna::RHI::SamplerAddressMode::Repeat)
+                                      .SetAnisotropy(false)
+                                      .SetName("SceneMaterialSampler")
+                                      .Build());
     gpu.gbuffer_sampler = gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
                                                         .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
                                                         .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
@@ -136,16 +141,17 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
                                                         .SetAnisotropy(false)
                                                         .SetName("SceneGBufferSampler")
                                                         .Build());
-    gpu.environment_sampler = gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
-                                                            .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                                            .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
-                                                            .SetAddressModeU(luna::RHI::SamplerAddressMode::Repeat)
-                                                            .SetAddressModeV(luna::RHI::SamplerAddressMode::ClampToEdge)
-                                                            .SetAddressModeW(luna::RHI::SamplerAddressMode::ClampToEdge)
-                                                            .SetLodRange(0.0f, 16.0f)
-                                                            .SetAnisotropy(false)
-                                                            .SetName("SceneEnvironmentSampler")
-                                                            .Build());
+    gpu.environment_sampler =
+        gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
+                                      .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
+                                      .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
+                                      .SetAddressModeU(luna::RHI::SamplerAddressMode::Repeat)
+                                      .SetAddressModeV(luna::RHI::SamplerAddressMode::ClampToEdge)
+                                      .SetAddressModeW(luna::RHI::SamplerAddressMode::ClampToEdge)
+                                      .SetLodRange(0.0f, 16.0f)
+                                      .SetAnisotropy(false)
+                                      .SetName("SceneEnvironmentSampler")
+                                      .Build());
 
     if (gpu.descriptor_pool && gpu.gbuffer_layout) {
         gpu.gbuffer_descriptor_set = gpu.descriptor_pool->AllocateDescriptorSet(gpu.gbuffer_layout);
@@ -153,21 +159,20 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
 
     ensureSceneResources();
 
-    gpu.geometry_pipeline_layout =
-        gpu.device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder()
-                                             .AddSetLayout(gpu.material_layout)
-                                             .AddSetLayout(gpu.scene_layout)
-                                             .AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
-                                             .Build());
-    gpu.lighting_pipeline_layout =
-        gpu.device->CreatePipelineLayout(
-            luna::RHI::PipelineLayoutBuilder().AddSetLayout(gpu.gbuffer_layout).AddSetLayout(gpu.scene_layout).Build());
-    gpu.transparent_pipeline_layout =
-        gpu.device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder()
-                                             .AddSetLayout(gpu.material_layout)
-                                             .AddSetLayout(gpu.scene_layout)
-                                             .AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
-                                             .Build());
+    gpu.geometry_pipeline_layout = gpu.device->CreatePipelineLayout(
+        luna::RHI::PipelineLayoutBuilder()
+            .AddSetLayout(gpu.material_layout)
+            .AddSetLayout(gpu.scene_layout)
+            .AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
+            .Build());
+    gpu.lighting_pipeline_layout = gpu.device->CreatePipelineLayout(
+        luna::RHI::PipelineLayoutBuilder().AddSetLayout(gpu.gbuffer_layout).AddSetLayout(gpu.scene_layout).Build());
+    gpu.transparent_pipeline_layout = gpu.device->CreatePipelineLayout(
+        luna::RHI::PipelineLayoutBuilder()
+            .AddSetLayout(gpu.material_layout)
+            .AddSetLayout(gpu.scene_layout)
+            .AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants))
+            .Build());
 
     gpu.geometry_pipeline = gpu.device->CreateGraphicsPipeline(
         luna::RHI::GraphicsPipelineBuilder()
@@ -177,8 +182,7 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
             .AddVertexAttribute(1, 0, luna::RHI::Format::RG32_FLOAT, offsetof(StaticMeshVertex, uv), "TEXCOORD")
             .AddVertexAttribute(2, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, normal), "NORMAL")
             .AddVertexAttribute(3, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, tangent), "TANGENT")
-            .AddVertexAttribute(
-                4, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, bitangent), "BINORMAL")
+            .AddVertexAttribute(4, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, bitangent), "BINORMAL")
             .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
             .SetCullMode(luna::RHI::CullMode::None)
             .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
@@ -195,17 +199,17 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
             .SetLayout(gpu.geometry_pipeline_layout)
             .Build());
 
-    gpu.lighting_pipeline = gpu.device->CreateGraphicsPipeline(
-        luna::RHI::GraphicsPipelineBuilder()
-            .SetShaders({gpu.lighting_vertex_shader, gpu.lighting_fragment_shader})
-            .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
-            .SetCullMode(luna::RHI::CullMode::None)
-            .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-            .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
-            .AddColorAttachmentDefault(false)
-            .AddColorFormat(context.color_format)
-            .SetLayout(gpu.lighting_pipeline_layout)
-            .Build());
+    gpu.lighting_pipeline =
+        gpu.device->CreateGraphicsPipeline(luna::RHI::GraphicsPipelineBuilder()
+                                               .SetShaders({gpu.lighting_vertex_shader, gpu.lighting_fragment_shader})
+                                               .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
+                                               .SetCullMode(luna::RHI::CullMode::None)
+                                               .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
+                                               .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+                                               .AddColorAttachmentDefault(false)
+                                               .AddColorFormat(context.color_format)
+                                               .SetLayout(gpu.lighting_pipeline_layout)
+                                               .Build());
 
     gpu.transparent_pipeline = gpu.device->CreateGraphicsPipeline(
         luna::RHI::GraphicsPipelineBuilder()
@@ -215,8 +219,7 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
             .AddVertexAttribute(1, 0, luna::RHI::Format::RG32_FLOAT, offsetof(StaticMeshVertex, uv), "TEXCOORD")
             .AddVertexAttribute(2, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, normal), "NORMAL")
             .AddVertexAttribute(3, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, tangent), "TANGENT")
-            .AddVertexAttribute(
-                4, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, bitangent), "BINORMAL")
+            .AddVertexAttribute(4, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, bitangent), "BINORMAL")
             .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
             .SetCullMode(luna::RHI::CullMode::None)
             .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
@@ -299,7 +302,7 @@ SceneRenderer::UploadedMesh& SceneRenderer::getOrCreateUploadedMesh(const Mesh& 
 }
 
 SceneRenderer::UploadedTexture SceneRenderer::createUploadedTexture(const rhi::ImageData& image,
-                                                                   const std::string& debug_name) const
+                                                                    const std::string& debug_name) const
 {
     UploadedTexture uploaded_texture;
     if (!m_gpu.device || !image.isValid()) {
@@ -307,15 +310,15 @@ SceneRenderer::UploadedTexture SceneRenderer::createUploadedTexture(const rhi::I
     }
 
     const uint32_t mip_level_count = 1u + static_cast<uint32_t>(image.MipLevels.size());
-    uploaded_texture.texture = m_gpu.device->CreateTexture(luna::RHI::TextureBuilder()
-                                                               .SetSize(image.Width, image.Height)
-                                                               .SetMipLevels(mip_level_count)
-                                                               .SetFormat(image.ImageFormat)
-                                                               .SetUsage(luna::RHI::TextureUsageFlags::Sampled |
-                                                                         luna::RHI::TextureUsageFlags::TransferDst)
-                                                               .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                               .SetName(debug_name)
-                                                               .Build());
+    uploaded_texture.texture = m_gpu.device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(image.Width, image.Height)
+            .SetMipLevels(mip_level_count)
+            .SetFormat(image.ImageFormat)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName(debug_name)
+            .Build());
 
     size_t total_size = image.ByteData.size();
     for (const auto& mip_level : image.MipLevels) {
@@ -326,12 +329,13 @@ SceneRenderer::UploadedTexture SceneRenderer::createUploadedTexture(const rhi::I
         return uploaded_texture;
     }
 
-    uploaded_texture.staging_buffer = m_gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                     .SetSize(total_size)
-                                                                     .SetUsage(luna::RHI::BufferUsageFlags::TransferSrc)
-                                                                     .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
-                                                                     .SetName(debug_name + "_Staging")
-                                                                     .Build());
+    uploaded_texture.staging_buffer =
+        m_gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
+                                       .SetSize(total_size)
+                                       .SetUsage(luna::RHI::BufferUsageFlags::TransferSrc)
+                                       .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                       .SetName(debug_name + "_Staging")
+                                       .Build());
 
     if (!uploaded_texture.staging_buffer) {
         return uploaded_texture;
@@ -399,21 +403,18 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
         return it->second;
     }
 
-    const rhi::ImageData base_color_image = material.hasBaseColorTexture()
-                                                ? material.getBaseColorImageData()
-                                                : createFallbackImageData(glm::vec4(1.0f));
+    const rhi::ImageData base_color_image =
+        material.hasBaseColorTexture() ? material.getBaseColorImageData() : createFallbackImageData(glm::vec4(1.0f));
     const rhi::ImageData normal_image = material.hasNormalTexture()
                                             ? material.getNormalImageData()
                                             : createFallbackImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
     const rhi::ImageData metallic_roughness_image = material.hasMetallicRoughnessTexture()
                                                         ? material.getMetallicRoughnessImageData()
                                                         : createFallbackImageData(glm::vec4(1.0f));
-    const rhi::ImageData emissive_image = material.hasEmissiveTexture()
-                                              ? material.getEmissiveImageData()
-                                              : createFallbackImageData(glm::vec4(1.0f));
-    const rhi::ImageData occlusion_image = material.hasOcclusionTexture()
-                                               ? material.getOcclusionImageData()
-                                               : createFallbackImageData(glm::vec4(1.0f));
+    const rhi::ImageData emissive_image =
+        material.hasEmissiveTexture() ? material.getEmissiveImageData() : createFallbackImageData(glm::vec4(1.0f));
+    const rhi::ImageData occlusion_image =
+        material.hasOcclusionTexture() ? material.getOcclusionImageData() : createFallbackImageData(glm::vec4(1.0f));
 
     auto [inserted_it, _] = upload_cache.uploaded_materials.emplace(&material, UploadedMaterial{});
     auto& uploaded_material = inserted_it->second;
@@ -425,19 +426,19 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
     uploaded_material.emissive_texture = createUploadedTexture(emissive_image, material.getName() + "_Emissive");
     uploaded_material.occlusion_texture = createUploadedTexture(occlusion_image, material.getName() + "_Occlusion");
 
-    uploaded_material.params_buffer = gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                   .SetSize(sizeof(MaterialGpuParams))
-                                                                   .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                                   .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
-                                                                   .SetName(material.getName() + "_Params")
-                                                                   .Build());
+    uploaded_material.params_buffer =
+        gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
+                                     .SetSize(sizeof(MaterialGpuParams))
+                                     .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
+                                     .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                     .SetName(material.getName() + "_Params")
+                                     .Build());
 
     if (uploaded_material.params_buffer) {
         if (void* mapped = uploaded_material.params_buffer->Map()) {
             const MaterialGpuParams params{
                 .base_color_factor = material.getBaseColorFactor(),
-                .emissive_factor_normal_scale =
-                    glm::vec4(material.getEmissiveFactor(), material.getNormalScale()),
+                .emissive_factor_normal_scale = glm::vec4(material.getEmissiveFactor(), material.getNormalScale()),
                 .material_factors = glm::vec4(material.getMetallicFactor(),
                                               material.getRoughnessFactor(),
                                               material.getOcclusionStrength(),
@@ -453,10 +454,10 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
         }
     }
 
-    if (!gpu.descriptor_pool || !gpu.material_layout || !gpu.material_sampler || !uploaded_material.base_color_texture.texture ||
-        !uploaded_material.normal_texture.texture || !uploaded_material.metallic_roughness_texture.texture ||
-        !uploaded_material.emissive_texture.texture || !uploaded_material.occlusion_texture.texture ||
-        !uploaded_material.params_buffer) {
+    if (!gpu.descriptor_pool || !gpu.material_layout || !gpu.material_sampler ||
+        !uploaded_material.base_color_texture.texture || !uploaded_material.normal_texture.texture ||
+        !uploaded_material.metallic_roughness_texture.texture || !uploaded_material.emissive_texture.texture ||
+        !uploaded_material.occlusion_texture.texture || !uploaded_material.params_buffer) {
         return uploaded_material;
     }
 
@@ -537,7 +538,8 @@ void SceneRenderer::uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& comma
     uploaded_texture.uploaded = true;
 }
 
-void SceneRenderer::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material)
+void SceneRenderer::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands,
+                                           UploadedMaterial& uploaded_material)
 {
     uploadTextureIfNeeded(commands, uploaded_material.base_color_texture);
     uploadTextureIfNeeded(commands, uploaded_material.normal_texture);
@@ -631,9 +633,10 @@ void SceneRenderer::updateSceneParameters(const RenderContext& context)
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
     const glm::mat4 view_projection = buildViewProjection(m_draw_queue.camera, aspect_ratio, context.backend_type);
-    const float environment_mip_count = gpu.environment_texture.texture != nullptr
-                                            ? static_cast<float>((std::max)(gpu.environment_texture.texture->GetMipLevels(), 1u) - 1u)
-                                            : 0.0f;
+    const float environment_mip_count =
+        gpu.environment_texture.texture != nullptr
+            ? static_cast<float>((std::max)(gpu.environment_texture.texture->GetMipLevels(), 1u) - 1u)
+            : 0.0f;
 
     SceneGpuParams params;
     params.view_projection = view_projection;

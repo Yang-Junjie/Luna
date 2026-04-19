@@ -3,6 +3,9 @@
 #include "Imgui/ImGuiContext.h"
 #include "Renderer/Renderer.h"
 
+#include <cstddef>
+#include <cstring>
+
 #include <algorithm>
 #include <array>
 #include <Barrier.h>
@@ -19,18 +22,15 @@
 #include <Queue.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
-#include <Texture.h>
-
-#include <cstddef>
-#include <cstring>
 #include <string>
+#include <Texture.h>
 #include <unordered_map>
 #include <vector>
 
 namespace luna::rhi {
 namespace {
 
-constexpr uint32_t kImGuiDescriptorPoolSize = 2048;
+constexpr uint32_t kImGuiDescriptorPoolSize = 2'048;
 constexpr const char* kImGuiShaderRelativePath = "Luna/Imgui/Shaders/ImGui.slang";
 
 struct ImGuiPushConstants {
@@ -130,11 +130,10 @@ bool writeBufferData(const luna::RHI::Ref<luna::RHI::Buffer>& buffer, const void
     return true;
 }
 
-luna::RHI::Ref<luna::RHI::Buffer>
-    createCpuToGpuBuffer(const luna::RHI::Ref<luna::RHI::Device>& device,
-                         uint64_t size,
-                         luna::RHI::BufferUsageFlags usage,
-                         const std::string& name)
+luna::RHI::Ref<luna::RHI::Buffer> createCpuToGpuBuffer(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                                       uint64_t size,
+                                                       luna::RHI::BufferUsageFlags usage,
+                                                       const std::string& name)
 {
     if (!device || size == 0) {
         return {};
@@ -148,8 +147,8 @@ luna::RHI::Ref<luna::RHI::Buffer>
                                     .Build());
 }
 
-std::shared_ptr<ImGuiTextureBinding>
-    createTextureBinding(const luna::RHI::Ref<luna::RHI::TextureView>& view, const luna::RHI::Ref<luna::RHI::Sampler>& sampler)
+std::shared_ptr<ImGuiTextureBinding> createTextureBinding(const luna::RHI::Ref<luna::RHI::TextureView>& view,
+                                                          const luna::RHI::Ref<luna::RHI::Sampler>& sampler)
 {
     if (!view || !sampler || !g_descriptor_pool || !g_texture_layout) {
         return {};
@@ -179,8 +178,8 @@ std::shared_ptr<ImGuiTextureBinding>
     return binding;
 }
 
-std::shared_ptr<ImGuiTextureBinding>
-    getOrCreateTextureBinding(const luna::RHI::Ref<luna::RHI::TextureView>& view, const luna::RHI::Ref<luna::RHI::Sampler>& sampler)
+std::shared_ptr<ImGuiTextureBinding> getOrCreateTextureBinding(const luna::RHI::Ref<luna::RHI::TextureView>& view,
+                                                               const luna::RHI::Ref<luna::RHI::Sampler>& sampler)
 {
     if (!view) {
         return {};
@@ -228,21 +227,21 @@ bool createFontTexture()
     }
 
     const uint64_t upload_size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4ull;
-    auto staging_buffer = createCpuToGpuBuffer(
-        g_device, upload_size, luna::RHI::BufferUsageFlags::TransferSrc, "ImGuiFontAtlasUpload");
+    auto staging_buffer =
+        createCpuToGpuBuffer(g_device, upload_size, luna::RHI::BufferUsageFlags::TransferSrc, "ImGuiFontAtlasUpload");
     if (!staging_buffer || !writeBufferData(staging_buffer, pixels, upload_size)) {
         LUNA_IMGUI_ERROR("Failed to upload ImGui font atlas staging data");
         return false;
     }
 
-    g_font_texture =
-        g_device->CreateTexture(luna::RHI::TextureBuilder()
-                                    .SetSize(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
-                                    .SetFormat(luna::RHI::Format::RGBA8_UNORM)
-                                    .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
-                                    .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                    .SetName("ImGuiFontAtlas")
-                                    .Build());
+    g_font_texture = g_device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(static_cast<uint32_t>(width), static_cast<uint32_t>(height))
+            .SetFormat(luna::RHI::Format::RGBA8_UNORM)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName("ImGuiFontAtlas")
+            .Build());
     if (!g_font_texture) {
         LUNA_IMGUI_ERROR("Failed to create ImGui font atlas texture");
         return false;
@@ -520,8 +519,7 @@ bool ImGuiRhiContext::Init(luna::Renderer& renderer)
         g_device = renderer.getDevice();
         g_graphics_queue = renderer.getGraphicsQueue();
         g_shader_compiler = renderer.getShaderCompiler();
-        g_backend_type =
-            renderer.getInstance() ? renderer.getInstance()->GetType() : luna::RHI::BackendType::Vulkan;
+        g_backend_type = renderer.getInstance() ? renderer.getInstance()->GetType() : luna::RHI::BackendType::Vulkan;
         if (!g_device || !g_graphics_queue || !g_shader_compiler || renderer.getNativeWindow() == nullptr) {
             LUNA_IMGUI_ERROR("Cannot initialize ImGui because renderer state is incomplete");
             clearState();
@@ -539,21 +537,19 @@ bool ImGuiRhiContext::Init(luna::Renderer& renderer)
                 .AddBinding(0, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
                 .AddBinding(1, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
                 .Build());
-        g_descriptor_pool =
-            g_device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
-                                               .SetMaxSets(kImGuiDescriptorPoolSize)
-                                               .AddPoolSize(luna::RHI::DescriptorType::SampledImage, kImGuiDescriptorPoolSize)
-                                               .AddPoolSize(luna::RHI::DescriptorType::Sampler, kImGuiDescriptorPoolSize)
-                                               .Build());
-        g_pipeline_layout =
-            g_device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder()
-                                               .AddSetLayout(g_texture_layout)
-                                               .AddPushConstant(
-                                                   luna::RHI::ShaderStage::Vertex, 0, sizeof(ImGuiPushConstants))
-                                               .Build());
+        g_descriptor_pool = g_device->CreateDescriptorPool(
+            luna::RHI::DescriptorPoolBuilder()
+                .SetMaxSets(kImGuiDescriptorPoolSize)
+                .AddPoolSize(luna::RHI::DescriptorType::SampledImage, kImGuiDescriptorPoolSize)
+                .AddPoolSize(luna::RHI::DescriptorType::Sampler, kImGuiDescriptorPoolSize)
+                .Build());
+        g_pipeline_layout = g_device->CreatePipelineLayout(
+            luna::RHI::PipelineLayoutBuilder()
+                .AddSetLayout(g_texture_layout)
+                .AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(ImGuiPushConstants))
+                .Build());
         g_default_sampler = g_device->CreateSampler(luna::RHI::SamplerBuilder()
-                                                        .SetFilter(
-                                                            luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
+                                                        .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
                                                         .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
                                                         .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
                                                         .SetAnisotropy(false)
@@ -637,10 +633,8 @@ void ImGuiRhiContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_bu
         return;
     }
 
-    const int draw_fb_width =
-        static_cast<int>(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
-    const int draw_fb_height =
-        static_cast<int>(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
+    const int draw_fb_width = static_cast<int>(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
+    const int draw_fb_height = static_cast<int>(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
     if (draw_fb_width <= 0 || draw_fb_height <= 0) {
         return;
     }
@@ -654,8 +648,7 @@ void ImGuiRhiContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_bu
     }
 
     const uint32_t target_width = framebuffer_width > 0 ? framebuffer_width : static_cast<uint32_t>(draw_fb_width);
-    const uint32_t target_height =
-        framebuffer_height > 0 ? framebuffer_height : static_cast<uint32_t>(draw_fb_height);
+    const uint32_t target_height = framebuffer_height > 0 ? framebuffer_height : static_cast<uint32_t>(draw_fb_height);
     auto& frame = g_frame_resources[frame_index];
 
     const ImVec2 clip_off = draw_data->DisplayPos;
@@ -664,14 +657,16 @@ void ImGuiRhiContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_bu
     const float scale_x = 2.0f / draw_data->DisplaySize.x;
     const float scale_y = (-2.0f * top_clip_y) / draw_data->DisplaySize.y;
     const ImGuiPushConstants push_constants{
-        .scale = {
-            scale_x,
-            scale_y,
-        },
-        .translate = {
-            -1.0f - clip_off.x * scale_x,
-            top_clip_y - clip_off.y * scale_y,
-        },
+        .scale =
+            {
+                scale_x,
+                scale_y,
+            },
+        .translate =
+            {
+                -1.0f - clip_off.x * scale_x,
+                top_clip_y - clip_off.y * scale_y,
+            },
     };
 
     setupRenderState(command_buffer, target_width, target_height, push_constants, frame);
@@ -701,7 +696,8 @@ void ImGuiRhiContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_bu
                 (draw_command.ClipRect.w - clip_off.y) * clip_scale.y,
             };
 
-            const int32_t scissor_x = static_cast<int32_t>(std::clamp(clip_min.x, 0.0f, static_cast<float>(target_width)));
+            const int32_t scissor_x =
+                static_cast<int32_t>(std::clamp(clip_min.x, 0.0f, static_cast<float>(target_width)));
             const int32_t scissor_y =
                 static_cast<int32_t>(std::clamp(clip_min.y, 0.0f, static_cast<float>(target_height)));
             const int32_t scissor_max_x =
@@ -721,8 +717,10 @@ void ImGuiRhiContext::RenderDrawData(luna::RHI::CommandBufferEncoder& command_bu
 
             if (draw_command.GetTexID() != last_texture_id) {
                 last_texture_id = draw_command.GetTexID();
-                if (auto* binding = resolveTextureBinding(last_texture_id); binding != nullptr && binding->descriptorSet) {
-                    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{binding->descriptorSet};
+                if (auto* binding = resolveTextureBinding(last_texture_id);
+                    binding != nullptr && binding->descriptorSet) {
+                    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+                        binding->descriptorSet};
                     command_buffer.BindDescriptorSets(g_pipeline, 0, descriptor_sets);
                 }
             }
@@ -760,7 +758,7 @@ void ImGuiRhiContext::EndFrame() {}
 
 void ImGuiRhiContext::NotifyFrameResourcesChanged(uint32_t frames_in_flight)
 {
-    g_frame_resources.resize((std::max) (frames_in_flight, 1u));
+    g_frame_resources.resize((std::max)(frames_in_flight, 1u));
 }
 
 } // namespace luna::rhi

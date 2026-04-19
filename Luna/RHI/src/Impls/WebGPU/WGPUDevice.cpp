@@ -65,8 +65,7 @@ WGPUDevice::WGPUDevice(Ref<Adapter> adapter, const DeviceCreateInfo& info)
                 default:
                     break;
             }
-            LogMessage(LogLevel::Error,
-                       std::string("[WebGPU ") + typeStr + "] " + (message ? message : ""));
+            LogMessage(LogLevel::Error, std::string("[WebGPU ") + typeStr + "] " + (message ? message : ""));
         },
         nullptr);
 }

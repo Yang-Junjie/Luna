@@ -31,7 +31,8 @@ bool Device::ValidateGraphicsPipeline(const GraphicsPipelineCreateInfo& info) co
 
     for (size_t i = 0; i < info.Shaders.size(); i++) {
         if (!info.Shaders[i]) {
-            throw std::runtime_error("[Luna RHI] Pipeline validation FAILED: Shader[" + std::to_string(i) + "] is null");
+            throw std::runtime_error("[Luna RHI] Pipeline validation FAILED: Shader[" + std::to_string(i) +
+                                     "] is null");
         }
     }
 

@@ -54,7 +54,8 @@ void SceneRenderer::executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_
 
         const Material& material = resolveMaterial(draw_command.material);
         const auto uploaded_material_it = upload_cache.uploaded_materials.find(&material);
-        if (uploaded_material_it == upload_cache.uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
+        if (uploaded_material_it == upload_cache.uploaded_materials.end() ||
+            !uploaded_material_it->second.descriptor_set) {
             continue;
         }
 
@@ -155,7 +156,8 @@ void SceneRenderer::executeLightingPass(rhi::RenderGraphRasterPassContext& pass_
     pass_context.endRendering();
 }
 
-void SceneRenderer::executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context)
+void SceneRenderer::executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context,
+                                           const RenderContext& context)
 {
     using namespace scene_renderer_detail;
 
@@ -208,7 +210,8 @@ void SceneRenderer::executeTransparentPass(rhi::RenderGraphRasterPassContext& pa
 
         const Material& material = resolveMaterial(draw_command.material);
         const auto uploaded_material_it = upload_cache.uploaded_materials.find(&material);
-        if (uploaded_material_it == upload_cache.uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
+        if (uploaded_material_it == upload_cache.uploaded_materials.end() ||
+            !uploaded_material_it->second.descriptor_set) {
             continue;
         }
 

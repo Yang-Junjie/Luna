@@ -69,7 +69,7 @@ D3D12_GPU_VIRTUAL_ADDRESS D3D12ShaderBindingTable::GetGPUAddress() const
 }
 
 D3D12_DISPATCH_RAYS_DESC
-    D3D12ShaderBindingTable::GetDispatchRaysDesc(uint32_t width, uint32_t height, uint32_t depth) const
+D3D12ShaderBindingTable::GetDispatchRaysDesc(uint32_t width, uint32_t height, uint32_t depth) const
 {
     auto base = GetGPUAddress();
     D3D12_DISPATCH_RAYS_DESC desc = {};

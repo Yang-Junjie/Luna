@@ -5,16 +5,17 @@
 #include "Renderer/ModelLoader.h"
 #include "Scene/Components.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <filesystem>
 #include <glm/common.hpp>
 #include <limits>
 #include <numbers>
 #include <optional>
-#include <string_view>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 

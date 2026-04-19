@@ -4,9 +4,9 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/SceneRenderer.h"
 
-#include <Barrier.h>
 #include <cstdint>
 
+#include <Barrier.h>
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <Instance.h>
