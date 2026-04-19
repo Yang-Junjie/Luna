@@ -42,6 +42,7 @@ add_subdirectory(third_party/spdlog)
 add_subdirectory(third_party/stb)
 add_subdirectory(third_party/simdjson)
 add_subdirectory(third_party/fastgltf)
+add_subdirectory(third_party/yaml-cpp)
 
 add_subdirectory(Luna)
 

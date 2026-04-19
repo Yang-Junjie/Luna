@@ -44,6 +44,8 @@ public:
     TaskSystem& getTaskSystem();
     const TaskSystem& getTaskSystem() const;
 
+    Window& getWindow();
+
 protected:
     virtual Renderer::InitializationOptions getRendererInitializationOptions();
 

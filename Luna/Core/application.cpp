@@ -1,5 +1,6 @@
 #include "application.h"
 #include "Core/Log.h"
+#include "window.h"
 
 #include <chrono>
 #include <GLFW/glfw3.h>
@@ -269,6 +270,11 @@ void Application::close()
 Application& Application::get()
 {
     return *m_s_instance;
+}
+
+Window& Application::getWindow()
+{
+    return *m_window;
 }
 
 Timestep Application::getTimestep() const

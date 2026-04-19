@@ -68,21 +68,29 @@ add_library(
     Core/Window.cpp
     Core/UUID.h 
     Core/UUID.cpp
+
     Events/ApplicationEvent.h
     Events/Event.h
     Events/KeyEvent.h
     Events/MouseEvent.h
+
     Platform/GLFWKeyCodes.hpp
     Platform/GLFWMouseCodes.hpp
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
+
     JobSystem/ResourceLoadQueue.h
     JobSystem/TaskHandle.h
     JobSystem/TaskHandle.cpp
     JobSystem/TaskHandleState.h
     JobSystem/TaskSystem.h
     JobSystem/TaskSystem.cpp
+
+    Asset/Asset.h
+    Asset/AssetMetadata.h
+    Asset/AssetTypes.h
+
     ${SCENE_SOURCE}
     ${RENDERER_SOURCE}
     ${RHI_RUNTIME_SOURCE}
@@ -98,7 +106,7 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/entt/src
-        # ${THIRD_PARTY_DIR}/vkbootstrap/src
+        ${EXTERNAL_DIR}/yaml-cpp/include
         ${PROJECT_SOURCE_DIR}
 )
 
@@ -113,6 +121,7 @@ target_link_libraries(LunaCore
         enkiTS
         # spirv-cross-core
         stb::stb
+        yaml-cpp::yaml-cpp
 )
 
 target_compile_definitions(
