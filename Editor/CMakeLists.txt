@@ -1,8 +1,14 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    LunaEditor.h
-    LunaEditor.cpp
+    InspectorPanel.h
+    InspectorPanel.cpp
+    LunaEditorApp.h
+    LunaEditorApp.cpp
+    LunaEditorLayer.h
+    LunaEditorLayer.cpp
+    SceneHierarchyPanel.h
+    SceneHierarchyPanel.cpp
 )
 
 target_include_directories(

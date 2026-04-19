@@ -48,6 +48,19 @@ set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiRenderPass.h
     Imgui/Shaders/ImGui.slang)
 
+set(PROJECT_SOURCE
+    Project/ProjectInfo.h
+    Project/ProjectManager.h
+    Project/ProjectManager.cpp)
+
+set(PLATFORM_SOURCE
+    Platform/Common/FileDialogs.h)
+
+if(WIN32)
+    list(APPEND PLATFORM_SOURCE
+        Platform/Windows/WinFileDialogs.cpp)
+endif()
+
 add_library(
     LunaCore
     STATIC
@@ -79,6 +92,7 @@ add_library(
     Platform/GLFWWindow.hpp
     Platform/GLFWWindow.cpp
     Platform/GLFWWindowInput.cpp
+    ${PLATFORM_SOURCE}
 
     JobSystem/ResourceLoadQueue.h
     JobSystem/TaskHandle.h
@@ -86,6 +100,8 @@ add_library(
     JobSystem/TaskHandleState.h
     JobSystem/TaskSystem.h
     JobSystem/TaskSystem.cpp
+
+    ${PROJECT_SOURCE}
 
     Asset/Asset.h
     Asset/AssetMetadata.h

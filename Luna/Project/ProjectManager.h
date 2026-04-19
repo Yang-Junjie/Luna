@@ -17,10 +17,17 @@ public:
 
     bool createProject(const std::filesystem::path& project_root_path, const ProjectInfo& info);
 
+    static ProjectManager& instance()
+    {
+        static ProjectManager manager;
+        return manager;
+    }
+
 private:
     bool serializeProject();
     bool deserializeProject();
     std::optional<ProjectInfo> m_project_info{std::nullopt};
     std::optional<std::filesystem::path> m_project_root_path{std::nullopt};
+    std::optional<std::filesystem::path> m_project_file_path{std::nullopt};
 };
 } // namespace luna

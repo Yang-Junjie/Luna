@@ -1,0 +1,7 @@
+Project:
+  Name: Sample Project
+  Version: 0.1.0
+  Author: Junjie Yang
+  Description: A simple Luna project.
+  StartScene: ./Assets/Scenes/SampleScene.lunascene
+  Assets: ./Assets/

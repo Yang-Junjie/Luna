@@ -87,6 +87,10 @@ void ImGuiLayer::begin()
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
         ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
     }
+    if (m_menu_bar_callback && ImGui::BeginMainMenuBar()) {
+        m_menu_bar_callback();
+        ImGui::EndMainMenuBar();
+    }
 }
 
 void ImGuiLayer::end()

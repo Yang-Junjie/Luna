@@ -3,12 +3,15 @@
 #include "Core/Layer.h"
 #include "Renderer/Renderer.h"
 
+#include <functional>
+
 namespace luna {
 
 class Event;
 
 class ImGuiLayer final : public Layer {
 public:
+    using MenuBarCallback = std::function<void()>;
     ImGuiLayer(Renderer& renderer, bool enable_multi_viewport);
     ~ImGuiLayer() override = default;
 
@@ -20,6 +23,11 @@ public:
 
     void begin();
     void end();
+
+    void setMenuBarCallback(MenuBarCallback callback)
+    {
+        m_menu_bar_callback = std::move(callback);
+    }
 
     void renderPlatformWindows();
 
@@ -44,6 +52,7 @@ private:
     bool m_attached = false;
     bool m_enable_multi_viewport = false;
     Renderer* m_renderer = nullptr;
+    MenuBarCallback m_menu_bar_callback;
 };
 
 } // namespace luna

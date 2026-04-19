@@ -1,4 +1,4 @@
-#include "Core/application.h"
+#include "Core/Application.h"
 #include "Core/Window.h"
 #include "Platform/Common/FileDialogs.h"
 
