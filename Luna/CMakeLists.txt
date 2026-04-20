@@ -39,6 +39,8 @@ set(SCENE_SOURCE
     Scene/Components.h
     Scene/Entity.h
     Scene/Entity.cpp
+    Scene/EntityManager.h
+    Scene/EntityManager.cpp
     Scene/Scene.h
     Scene/Scene.cpp
     Scene/SceneSerializer.h

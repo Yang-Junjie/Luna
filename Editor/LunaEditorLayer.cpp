@@ -147,7 +147,7 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
     ImGui::Separator();
     ImGui::Text("Scene File: %s", m_asset_label.c_str());
-    ImGui::Text("Entities: %zu", m_scene.entityCount());
+    ImGui::Text("Entities: %zu", m_scene.entityManager().entityCount());
     ImGui::Separator();
 
     const auto viewport_extent = application.getRenderer().getSceneOutputSize();
@@ -277,7 +277,7 @@ void LunaEditorLayer::setSelectedEntity(Entity entity)
 
 void LunaEditorLayer::resetEditorState()
 {
-    m_scene.clear();
+    m_scene.entityManager().clear();
     m_scene.setName("Untitled");
     m_selected_entity = {};
     m_scene_file_path.clear();
@@ -337,7 +337,7 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
 
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
-                     m_scene.entityCount());
+                     m_scene.entityManager().entityCount());
     return true;
 }
 
@@ -372,7 +372,8 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
         syncProjectStartScene(normalized_scene_path);
     }
 
-    LUNA_EDITOR_INFO("Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene.entityCount());
+    LUNA_EDITOR_INFO(
+        "Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene.entityManager().entityCount());
     return true;
 }
 

@@ -32,36 +32,9 @@ std::vector<std::shared_ptr<Material>>
 
 } // namespace
 
-Entity Scene::createEntity(const std::string& name)
-{
-    return createEntityWithUUID(UUID{}, name);
-}
-
-Entity Scene::createEntityWithUUID(UUID uuid, const std::string& name)
-{
-    const entt::entity entity_handle = m_registry.create();
-    Entity entity(entity_handle, this);
-
-    entity.addComponent<IDComponent>(uuid);
-    entity.addComponent<TagComponent>(name.empty() ? "Entity" : name);
-    entity.addComponent<TransformComponent>();
-
-    return entity;
-}
-
-void Scene::destroyEntity(Entity entity)
-{
-    if (entity.m_scene != this || entity.m_entity_handle == entt::null) {
-        return;
-    }
-
-    m_registry.destroy(entity.m_entity_handle);
-}
-
-void Scene::clear()
-{
-    m_registry.clear();
-}
+Scene::Scene()
+    : m_entity_manager(this)
+{}
 
 void Scene::onUpdateRuntime()
 {
@@ -72,11 +45,13 @@ void Scene::onUpdateRuntime()
 
     auto& scene_renderer = renderer.getSceneRenderer();
     auto& asset_manager = AssetManager::get();
+    auto& entity_manager = m_entity_manager;
     scene_renderer.beginScene(renderer.getMainCamera());
 
-    auto view = m_registry.view<TransformComponent, MeshComponent>();
+    auto& registry = entity_manager.registry();
+    auto view = registry.view<TransformComponent, MeshComponent>();
     for (const auto entity_handle : view) {
-        const auto& transform_component = view.get<TransformComponent>(entity_handle);
+        Entity entity(entity_handle, &entity_manager);
         const auto& mesh_component = view.get<MeshComponent>(entity_handle);
 
         if (!mesh_component.meshHandle.isValid()) {
@@ -88,7 +63,7 @@ void Scene::onUpdateRuntime()
             continue;
         }
 
-        scene_renderer.submitStaticMesh(transform_component.getTransform(),
+        scene_renderer.submitStaticMesh(entity_manager.getWorldSpaceTransformMatrix(entity),
                                         mesh,
                                         resolveSubmeshMaterials(mesh_component, *mesh, asset_manager));
     }
@@ -104,24 +79,14 @@ const std::string& Scene::getName() const
     return m_name;
 }
 
-size_t Scene::entityCount() const
+EntityManager& Scene::entityManager()
 {
-    size_t count = 0;
-    for ([[maybe_unused]] const auto entity_handle : m_registry.view<IDComponent>()) {
-        ++count;
-    }
-
-    return count;
+    return m_entity_manager;
 }
 
-entt::registry& Scene::registry()
+const EntityManager& Scene::entityManager() const
 {
-    return m_registry;
-}
-
-const entt::registry& Scene::registry() const
-{
-    return m_registry;
+    return m_entity_manager;
 }
 
 } // namespace luna

@@ -262,7 +262,7 @@ bool LunaRuntimeApplication::loadStartupScene()
     m_scene_file_path = start_scene_path;
     LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
                       m_scene_file_path.string(),
-                      m_scene.entityCount());
+                      m_scene.entityManager().entityCount());
     return true;
 }
 

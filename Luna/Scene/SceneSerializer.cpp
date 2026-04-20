@@ -17,6 +17,8 @@ struct SerializedEntityData {
     uint64_t id = 0;
     std::string tag = "Entity";
     luna::TransformComponent transform;
+    uint64_t parent_id = 0;
+    std::vector<uint64_t> serialized_children;
     bool has_mesh_component = false;
     luna::MeshComponent mesh;
 };
@@ -78,7 +80,7 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
     out << YAML::Key << "Scene" << YAML::Value << scene.getName();
     out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
-    const auto& registry = scene.registry();
+    const auto& registry = scene.entityManager().registry();
     auto view = registry.view<const IDComponent>();
     for (const auto entity_handle : view) {
         const auto& id_component = registry.get<const IDComponent>(entity_handle);
@@ -105,6 +107,19 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             emitVec3(out, transform_component.rotation);
             out << YAML::Key << "Scale" << YAML::Value;
             emitVec3(out, transform_component.scale);
+            out << YAML::EndMap;
+        }
+
+        if (registry.all_of<RelationshipComponent>(entity_handle)) {
+            const auto& relationship_component = registry.get<const RelationshipComponent>(entity_handle);
+            out << YAML::Key << "RelationshipComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "ParentHandle" << YAML::Value
+                << static_cast<uint64_t>(relationship_component.parentHandle);
+            out << YAML::Key << "Children" << YAML::Value << YAML::BeginSeq;
+            for (const UUID child_uuid : relationship_component.children) {
+                out << static_cast<uint64_t>(child_uuid);
+            }
+            out << YAML::EndSeq;
             out << YAML::EndMap;
         }
 
@@ -145,7 +160,7 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
 
     LUNA_CORE_INFO("Serialized scene '{}' with {} entities to '{}'",
                    scene.getName(),
-                   scene.entityCount(),
+                   scene.entityManager().entityCount(),
                    normalized_path.string());
     return true;
 }
@@ -205,6 +220,20 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                     entity_data.transform.scale = readVec3(transform_component["Scale"], entity_data.transform.scale);
                 }
 
+                if (const YAML::Node relationship_component = entity_node["RelationshipComponent"]; relationship_component) {
+                    if (relationship_component["ParentHandle"]) {
+                        entity_data.parent_id = relationship_component["ParentHandle"].as<uint64_t>();
+                    }
+
+                    if (const YAML::Node children_node = relationship_component["Children"];
+                        children_node && children_node.IsSequence()) {
+                        entity_data.serialized_children.reserve(children_node.size());
+                        for (const auto& child_node : children_node) {
+                            entity_data.serialized_children.emplace_back(child_node.as<uint64_t>());
+                        }
+                    }
+                }
+
                 if (const YAML::Node mesh_component = entity_node["MeshComponent"]; mesh_component) {
                     entity_data.has_mesh_component = true;
 
@@ -229,12 +258,13 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
         return false;
     }
 
-    scene.clear();
+    scene.entityManager().clear();
     scene.setName(scene_name);
 
+    auto& entity_manager = scene.entityManager();
     for (const auto& entity_data : entities) {
         const UUID uuid = entity_data.id != 0 ? UUID(entity_data.id) : UUID{};
-        Entity entity = scene.createEntityWithUUID(uuid, entity_data.tag);
+        Entity entity = entity_manager.createEntityWithUUID(uuid, entity_data.tag);
 
         auto& transform_component = entity.getComponent<TransformComponent>();
         transform_component = entity_data.transform;
@@ -245,9 +275,37 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
         }
     }
 
+    for (const auto& entity_data : entities) {
+        const UUID entity_uuid = entity_data.id != 0 ? UUID(entity_data.id) : UUID{};
+        Entity entity = entity_manager.findEntityByUUID(entity_uuid);
+        if (!entity) {
+            continue;
+        }
+
+        const UUID parent_uuid = entity_data.parent_id != 0 ? UUID(entity_data.parent_id) : UUID(0);
+        if (!parent_uuid.isValid()) {
+            continue;
+        }
+
+        Entity parent = entity_manager.findEntityByUUID(parent_uuid);
+        if (!parent) {
+            LUNA_CORE_WARN("Scene '{}' references missing parent '{}' for entity '{}'",
+                           scene_name,
+                           parent_uuid.toString(),
+                           entity.getUUID().toString());
+            continue;
+        }
+
+        if (!entity_manager.setParent(entity, parent, false)) {
+            LUNA_CORE_WARN("Failed to rebuild parent relationship '{}' -> '{}'",
+                           entity.getUUID().toString(),
+                           parent_uuid.toString());
+        }
+    }
+
     LUNA_CORE_INFO("Deserialized scene '{}' with {} entities from '{}'",
                    scene.getName(),
-                   scene.entityCount(),
+                   scene.entityManager().entityCount(),
                    normalized_path.string());
     return true;
 }
