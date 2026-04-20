@@ -46,13 +46,28 @@ void applyMeshAssetToEntity(luna::LunaEditorLayer& editor_layer,
     editor_layer.setSelectedEntity(entity);
 }
 
+void collectOwnedEntities(luna::EntityManager& entity_manager,
+                          luna::Entity entity,
+                          std::unordered_set<luna::UUID>& owned_entities)
+{
+    if (!entity || !owned_entities.insert(entity.getUUID()).second) {
+        return;
+    }
+
+    for (const luna::UUID child_uuid : entity.getChildren()) {
+        if (luna::Entity child = entity_manager.findEntityByUUID(child_uuid); child) {
+            collectOwnedEntities(entity_manager, child, owned_entities);
+        }
+    }
+}
+
 void drawEntityNode(luna::LunaEditorLayer& editor_layer,
                     luna::EntityManager& entity_manager,
                     luna::Entity entity,
                     luna::Entity selected_entity,
-                    std::unordered_set<luna::UUID>& visited_entities)
+                    std::unordered_set<luna::UUID>& rendered_entities)
 {
-    if (!entity || !visited_entities.insert(entity.getUUID()).second) {
+    if (!entity || !rendered_entities.insert(entity.getUUID()).second) {
         return;
     }
 
@@ -123,7 +138,7 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         const std::vector<luna::UUID> children = entity.getChildren();
         for (const luna::UUID child_uuid : children) {
             if (luna::Entity child = entity_manager.findEntityByUUID(child_uuid); child) {
-                drawEntityNode(editor_layer, entity_manager, child, editor_layer.getSelectedEntity(), visited_entities);
+                drawEntityNode(editor_layer, entity_manager, child, editor_layer.getSelectedEntity(), rendered_entities);
             }
         }
         ImGui::TreePop();
@@ -169,20 +184,26 @@ void SceneHierarchyPanel::onImGuiRender()
     if (view.begin() == view.end()) {
         ImGui::TextUnformatted("No entities in scene.");
     } else {
-        std::unordered_set<UUID> visited_entities;
+        std::unordered_set<UUID> owned_entities;
+        std::unordered_set<UUID> rendered_entities;
 
         for (const auto entity_handle : view) {
             Entity entity(entity_handle, &entity_manager);
             const UUID parent_uuid = entity.getParentUUID();
             if (!parent_uuid.isValid() || !entity_manager.containsEntity(parent_uuid)) {
-                drawEntityNode(*m_editor_layer, entity_manager, entity, selected_entity, visited_entities);
+                collectOwnedEntities(entity_manager, entity, owned_entities);
+                drawEntityNode(*m_editor_layer, entity_manager, entity, selected_entity, rendered_entities);
             }
         }
 
         for (const auto entity_handle : view) {
             Entity entity(entity_handle, &entity_manager);
-            if (!visited_entities.contains(entity.getUUID())) {
-                drawEntityNode(*m_editor_layer, entity_manager, entity, m_editor_layer->getSelectedEntity(), visited_entities);
+            if (!owned_entities.contains(entity.getUUID())) {
+                drawEntityNode(*m_editor_layer,
+                               entity_manager,
+                               entity,
+                               m_editor_layer->getSelectedEntity(),
+                               rendered_entities);
             }
         }
     }
