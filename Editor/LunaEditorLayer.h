@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ContentBrowserPanel.h"
 #include "Core/Layer.h"
 #include "InspectorPanel.h"
 #include "Scene/Entity.h"
@@ -26,6 +27,9 @@ public:
     Scene& getScene();
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
+    bool openSceneFile(const std::filesystem::path& scene_file_path);
+    Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
+    void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
 
 private:
     void onImGuiMenuBar();
@@ -52,6 +56,7 @@ private:
     std::string m_asset_label{"No scene loaded"};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
+    ContentBrowserPanel m_content_browser_panel;
 };
 
 } // namespace luna

@@ -1,3 +1,4 @@
+#include "EditorAssetDragDrop.h"
 #include "LunaEditorLayer.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
@@ -35,6 +36,14 @@ luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity
     }
 
     return entity;
+}
+
+void applyMeshAssetToEntity(luna::LunaEditorLayer& editor_layer,
+                            luna::Entity entity,
+                            const luna::editor::AssetDragDropData& payload)
+{
+    editor_layer.applyMeshAssetToEntity(entity, luna::editor::getAssetHandle(payload));
+    editor_layer.setSelectedEntity(entity);
 }
 
 void drawEntityNode(luna::LunaEditorLayer& editor_layer,
@@ -84,6 +93,11 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
             if (dropped_entity && dropped_entity != entity && !isDescendantOf(entity, dropped_entity)) {
                 entity_manager.setParent(dropped_entity, entity, true);
             }
+        }
+
+        luna::editor::AssetDragDropData asset_payload{};
+        if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh})) {
+            applyMeshAssetToEntity(editor_layer, entity, asset_payload);
         }
         ImGui::EndDragDropTarget();
     }
@@ -194,6 +208,11 @@ void SceneHierarchyPanel::onImGuiRender()
                 if (Entity dropped_entity = entity_manager.findEntityByUUID(UUID(dropped_id)); dropped_entity) {
                     dropped_entity.clearParent(true);
                 }
+            }
+
+            luna::editor::AssetDragDropData asset_payload{};
+            if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh})) {
+                m_editor_layer->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
             }
             ImGui::EndDragDropTarget();
         }

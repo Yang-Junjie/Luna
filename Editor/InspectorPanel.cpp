@@ -2,6 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "EditorAssetDragDrop.h"
 #include "LunaEditorLayer.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
@@ -110,12 +111,27 @@ std::string getAssetDisplayLabel(luna::AssetHandle handle)
     return "Unnamed Asset";
 }
 
-void drawAssetHandleEditor(const char* label, luna::AssetHandle& handle)
+bool drawAssetHandleEditor(const char* label,
+                          luna::AssetHandle& handle,
+                          std::initializer_list<luna::AssetType> accepted_types = {})
 {
+    bool changed = false;
     unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
     if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
         handle = luna::AssetHandle(static_cast<uint64_t>(raw_handle));
+        changed = true;
     }
+
+    if (ImGui::BeginDragDropTarget()) {
+        luna::editor::AssetDragDropData payload{};
+        if (luna::editor::acceptAssetDragDropPayload(payload, accepted_types)) {
+            handle = luna::editor::getAssetHandle(payload);
+            changed = true;
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    return changed;
 }
 
 template <typename T, typename UIFunction>
@@ -275,8 +291,14 @@ void InspectorPanel::onImGuiRender()
 
     drawComponentSection<MeshComponent>(
         "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
-            drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle);
+            const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
+            drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
             ImGui::TextDisabled("Mesh Asset: %s", getAssetDisplayLabel(mesh_component.meshHandle).c_str());
+
+            if (mesh_component.meshHandle != previous_mesh_handle) {
+                mesh_component.clearAllSubmeshMaterials();
+                syncMeshMaterialSlots(mesh_component);
+            }
 
             const auto mesh = mesh_component.meshHandle.isValid()
                                   ? AssetManager::get().loadAssetAs<Mesh>(mesh_component.meshHandle)
@@ -309,7 +331,7 @@ void InspectorPanel::onImGuiRender()
                     ImGui::Text("Submesh %u", submesh_index);
 
                     AssetHandle material_handle = mesh_component.getSubmeshMaterial(submesh_index);
-                    drawAssetHandleEditor("Material Handle", material_handle);
+                    drawAssetHandleEditor("Material Handle", material_handle, {AssetType::Material});
                     mesh_component.setSubmeshMaterial(submesh_index, material_handle);
                     ImGui::TextDisabled("Material Asset: %s", getAssetDisplayLabel(material_handle).c_str());
 

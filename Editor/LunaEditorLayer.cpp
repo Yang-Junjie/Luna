@@ -9,6 +9,8 @@
 #include "Platform/Common/FileDialogs.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
+#include "Renderer/Mesh.h"
+#include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
 #include <algorithm>
@@ -104,7 +106,8 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application),
       m_scene_hierarchy_panel(*this),
-      m_inspector_panel(*this)
+      m_inspector_panel(*this),
+      m_content_browser_panel(*this)
 {}
 
 void LunaEditorLayer::onAttach()
@@ -172,6 +175,7 @@ void LunaEditorLayer::onImGuiRender()
 
     m_scene_hierarchy_panel.onImGuiRender();
     m_inspector_panel.onImGuiRender();
+    m_content_browser_panel.onImGuiRender();
     drawViewport();
 }
 
@@ -291,6 +295,65 @@ Entity LunaEditorLayer::getSelectedEntity() const
 void LunaEditorLayer::setSelectedEntity(Entity entity)
 {
     m_selected_entity = entity;
+}
+
+bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
+{
+    return openScene(scene_file_path, true);
+}
+
+Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent)
+{
+    if (!mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
+        return {};
+    }
+
+    const auto& metadata = AssetDatabase::getAssetMetadata(mesh_handle);
+    if (metadata.Type != AssetType::Mesh) {
+        return {};
+    }
+
+    const std::string entity_name =
+        !metadata.Name.empty() ? metadata.Name
+                               : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Mesh Entity");
+
+    Entity entity = parent ? m_scene.entityManager().createChildEntity(parent, entity_name)
+                           : m_scene.entityManager().createEntity(entity_name);
+    if (!entity) {
+        return {};
+    }
+
+    applyMeshAssetToEntity(entity, mesh_handle);
+    setSelectedEntity(entity);
+    return entity;
+}
+
+void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
+{
+    if (!entity || !mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
+        return;
+    }
+
+    const auto& metadata = AssetDatabase::getAssetMetadata(mesh_handle);
+    if (metadata.Type != AssetType::Mesh) {
+        return;
+    }
+
+    if (!entity.hasComponent<MeshComponent>()) {
+        entity.addComponent<MeshComponent>();
+    }
+
+    auto& mesh_component = entity.getComponent<MeshComponent>();
+    const bool changed_mesh = mesh_component.meshHandle != mesh_handle;
+    mesh_component.meshHandle = mesh_handle;
+    if (changed_mesh) {
+        mesh_component.clearAllSubmeshMaterials();
+    }
+
+    const auto mesh = AssetManager::get().loadAssetAs<Mesh>(mesh_handle);
+    if (mesh && mesh->isValid()) {
+        mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+    }
 }
 
 void LunaEditorLayer::resetEditorState()
