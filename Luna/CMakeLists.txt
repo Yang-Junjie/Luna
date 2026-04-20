@@ -40,7 +40,9 @@ set(SCENE_SOURCE
     Scene/Entity.h
     Scene/Entity.cpp
     Scene/Scene.h
-    Scene/Scene.cpp)
+    Scene/Scene.cpp
+    Scene/SceneSerializer.h
+    Scene/SceneSerializer.cpp)
 
 set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiContext.cpp

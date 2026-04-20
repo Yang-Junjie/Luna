@@ -14,6 +14,7 @@ public:
 
     const std::optional<ProjectInfo>& getProjectInfo() const;
     void setProjectInfo(const ProjectInfo& info);
+    bool saveProject();
 
     bool createProject(const std::filesystem::path& project_root_path, const ProjectInfo& info);
 

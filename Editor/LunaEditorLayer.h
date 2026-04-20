@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Asset/Asset.h"
 #include "Core/Layer.h"
 #include "InspectorPanel.h"
 #include "Scene/Entity.h"
@@ -8,14 +7,11 @@
 #include "SceneHierarchyPanel.h"
 
 #include <filesystem>
-#include <memory>
 #include <string>
 
 namespace luna {
 
 class LunaEditorApplication;
-class Material;
-class Mesh;
 
 class LunaEditorLayer final : public Layer {
 public:
@@ -35,19 +31,24 @@ private:
     void onImGuiMenuBar();
     void drawViewport();
     void resetEditorState();
+    void createScene();
     bool openProject(const std::filesystem::path& project_file_path);
-    void buildScene();
-    bool tryLoadDefaultAsset();
+    bool openScene();
+    bool openScene(const std::filesystem::path& scene_file_path, bool update_project_start_scene);
+    bool saveScene();
+    bool saveSceneAs();
+    bool saveSceneAs(const std::filesystem::path& scene_file_path);
+    std::filesystem::path sceneDialogDefaultPath() const;
+    void updateSceneLabel();
+    void syncProjectStartScene(const std::filesystem::path& scene_file_path);
+    bool hasProjectLoaded() const;
 
 private:
     LunaEditorApplication* m_application{nullptr};
     Scene m_scene;
     Entity m_selected_entity;
-    std::shared_ptr<Mesh> m_demo_mesh;
-    std::shared_ptr<Material> m_demo_material;
-    AssetHandle m_demo_mesh_handle{0};
-    AssetHandle m_demo_material_handle{0};
-    std::string m_asset_label{"No project loaded"};
+    std::filesystem::path m_scene_file_path;
+    std::string m_asset_label{"No scene loaded"};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
 };

@@ -30,6 +30,11 @@ void ProjectManager::setProjectInfo(const ProjectInfo& info)
     m_project_info = info;
 }
 
+bool ProjectManager::saveProject()
+{
+    return serializeProject();
+}
+
 bool ProjectManager::createProject(const std::filesystem::path& project_root_path, const ProjectInfo& info)
 {
     const auto normalized_root_path = project_root_path.lexically_normal();

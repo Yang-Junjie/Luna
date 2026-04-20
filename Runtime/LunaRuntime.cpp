@@ -1,170 +1,30 @@
-#include "Core/Log.h"
-#include "Asset/AssetManager.h"
-#include "Asset/AssetDatabase.h"
-#include "Asset/Editor/ImporterManager.h"
-#include "Asset/Editor/MaterialFactory.h"
-#include "Asset/Editor/MeshLoader.h"
-#include "Asset/Editor/TextureImporter.h"
 #include "LunaRuntime.h"
-#include "Project/ProjectManager.h"
-#include "Renderer/Material.h"
-#include "Renderer/Mesh.h"
-#include "Scene/Components.h"
 
-#include <cctype>
+#include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
+#include "Asset/Editor/ImporterManager.h"
+#include "Core/Log.h"
+#include "Project/ProjectManager.h"
+#include "Scene/SceneSerializer.h"
 
 #include <algorithm>
-#include <array>
+#include <cctype>
 #include <filesystem>
-#include <glm/common.hpp>
-#include <limits>
-#include <numbers>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <optional>
-#include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace {
 
 constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
 
-std::filesystem::path projectRoot()
-{
-    return std::filesystem::path(LUNA_PROJECT_ROOT);
-}
-
-std::filesystem::path sampleProjectRoot()
-{
-    return projectRoot() / "SampleProject";
-}
-
-std::filesystem::path sampleProjectFile()
-{
-    return sampleProjectRoot() / "Sample Project.lunaproj";
-}
-
-luna::AssetHandle registerMemoryAsset(const std::shared_ptr<luna::Asset>& asset)
-{
-    if (!asset) {
-        return luna::AssetHandle(0);
-    }
-
-    luna::AssetManager::get().registerMemoryAsset(asset->handle, asset);
-    return asset->handle;
-}
-
-std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh);
-
-bool loadSampleProjectAssets()
-{
-    const auto project_file = sampleProjectFile();
-    if (!std::filesystem::exists(project_file)) {
-        return false;
-    }
-
-    if (!luna::ProjectManager::instance().loadProject(project_file)) {
-        LUNA_RUNTIME_WARN("Failed to load sample project '{}'", project_file.string());
-        return false;
-    }
-
-    luna::AssetManager::get().clear();
-    luna::AssetDatabase::clear();
-    luna::ImporterManager::init();
-    luna::ImporterManager::import();
-    luna::AssetManager::get().init();
-    return true;
-}
-
-luna::AssetHandle ensureImportedTextureHandle(const std::filesystem::path& asset_path)
-{
-    if (!std::filesystem::exists(asset_path)) {
-        return luna::AssetHandle(0);
-    }
-
-    if (const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(asset_path);
-        existing_handle.isValid()) {
-        return existing_handle;
-    }
-
-    luna::TextureImporter importer;
-    const std::filesystem::path meta_path = luna::importer_detail::getMetadataPath(asset_path);
-    luna::AssetMetadata metadata =
-        std::filesystem::exists(meta_path) ? importer.deserializeMetadata(meta_path) : importer.import(asset_path);
-    if (!std::filesystem::exists(meta_path)) {
-        importer.serializeMetadata(metadata);
-    }
-
-    luna::AssetDatabase::set(metadata.Handle, metadata);
-    return metadata.Handle;
-}
-
-luna::AssetHandle ensureDamagedHelmetMaterialAsset()
-{
-    const auto helmet_dir = sampleProjectRoot() / "Assets" / "Model" / "DamagedHelmet";
-    const auto material_path = helmet_dir / "DamagedHelmet.lunamat";
-
-    if (const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(material_path);
-        existing_handle.isValid()) {
-        return existing_handle;
-    }
-
-    luna::MaterialAssetDescriptor descriptor = luna::MaterialFactory::makeDefaultDescriptor("DamagedHelmet");
-    descriptor.Textures.BaseColor = ensureImportedTextureHandle(helmet_dir / "Default_albedo.jpg");
-    descriptor.Textures.Normal = ensureImportedTextureHandle(helmet_dir / "Default_normal.jpg");
-    descriptor.Textures.MetallicRoughness = ensureImportedTextureHandle(helmet_dir / "Default_metalRoughness.jpg");
-    descriptor.Textures.Emissive = ensureImportedTextureHandle(helmet_dir / "Default_emissive.jpg");
-    descriptor.Textures.Occlusion = ensureImportedTextureHandle(helmet_dir / "Default_AO.jpg");
-    descriptor.Surface.EmissiveFactor = glm::vec3(1.0f);
-    descriptor.Surface.MetallicFactor = 1.0f;
-    descriptor.Surface.RoughnessFactor = 1.0f;
-
-    if (!descriptor.Textures.BaseColor.isValid() || !descriptor.Textures.Normal.isValid() ||
-        !descriptor.Textures.MetallicRoughness.isValid() || !descriptor.Textures.Emissive.isValid() ||
-        !descriptor.Textures.Occlusion.isValid()) {
-        LUNA_RUNTIME_WARN("DamagedHelmet textures were not imported correctly; cannot create material asset");
-        return luna::AssetHandle(0);
-    }
-
-    if (!luna::MaterialFactory::createMaterialFile(material_path, descriptor, true)) {
-        LUNA_RUNTIME_WARN("Failed to create DamagedHelmet material asset '{}'", material_path.string());
-        return luna::AssetHandle(0);
-    }
-
-    return luna::AssetDatabase::findHandleByFilePath(material_path);
-}
-
-bool loadSampleProjectDamagedHelmet(std::shared_ptr<luna::Mesh>& mesh,
-                                    luna::AssetHandle& material_handle,
-                                    std::string& asset_label)
-{
-    if (!loadSampleProjectAssets()) {
-        return false;
-    }
-
-    const auto mesh_path = sampleProjectRoot() / "Assets" / "Model" / "DamagedHelmet" / "DamagedHelmet.gltf";
-    if (!std::filesystem::exists(mesh_path)) {
-        return false;
-    }
-
-    const auto loaded_mesh = luna::MeshLoader::loadFromFile(mesh_path);
-    if (!loaded_mesh || !loaded_mesh->isValid()) {
-        return false;
-    }
-
-    mesh = createNormalizedMesh(*loaded_mesh);
-    if (!mesh || !mesh->isValid()) {
-        return false;
-    }
-
-    material_handle = ensureDamagedHelmetMaterialAsset();
-    if (!material_handle.isValid()) {
-        return false;
-    }
-
-    asset_label = "SampleProject DamagedHelmet";
-    return true;
-}
+struct RuntimeStartupOptions {
+    luna::RHI::BackendType backend = luna::RHI::BackendType::Vulkan;
+    std::filesystem::path project_file_path;
+};
 
 const char* presentModeToString(luna::RHI::PresentMode mode)
 {
@@ -222,94 +82,97 @@ std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
     if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
         return luna::RHI::BackendType::DirectX11;
     }
+
     return std::nullopt;
 }
 
-luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
+std::filesystem::path resolveProjectFilePath(const std::filesystem::path& input_path)
 {
-    luna::RHI::BackendType selected_backend = luna::RHI::BackendType::Vulkan;
+    if (input_path.empty()) {
+        return {};
+    }
+
+    std::error_code ec;
+    if (std::filesystem::is_directory(input_path, ec) && !ec) {
+        for (const auto& entry : std::filesystem::directory_iterator(input_path, ec)) {
+            if (ec) {
+                return {};
+            }
+
+            if (entry.is_regular_file() && entry.path().extension() == ".lunaproj") {
+                return entry.path().lexically_normal();
+            }
+        }
+
+        return {};
+    }
+
+    return input_path.lexically_normal();
+}
+
+RuntimeStartupOptions parseStartupOptions(int argc, char** argv)
+{
+    RuntimeStartupOptions options;
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view argument = argv[i] != nullptr ? std::string_view(argv[i]) : std::string_view{};
-        std::string_view backend_value;
+        std::string_view option_value;
 
         if (argument == "--backend") {
             if (i + 1 >= argc || argv[i + 1] == nullptr) {
                 LUNA_RUNTIME_WARN("Missing value after '--backend'; defaulting to '{}'",
-                                  backendTypeToString(selected_backend));
+                                  backendTypeToString(options.backend));
                 continue;
             }
 
-            backend_value = std::string_view(argv[++i]);
-        } else if (argument.starts_with("--backend=")) {
-            backend_value = argument.substr(std::string_view("--backend=").size());
-        } else {
+            option_value = std::string_view(argv[++i]);
+            if (const auto parsed_backend = parseBackendValue(option_value)) {
+                options.backend = *parsed_backend;
+            } else {
+                LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
+                                  std::string(option_value),
+                                  backendTypeToString(options.backend));
+            }
             continue;
         }
 
-        if (const auto parsed = parseBackendValue(backend_value)) {
-            selected_backend = *parsed;
+        if (argument.starts_with("--backend=")) {
+            option_value = argument.substr(std::string_view("--backend=").size());
+            if (const auto parsed_backend = parseBackendValue(option_value)) {
+                options.backend = *parsed_backend;
+            } else {
+                LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
+                                  std::string(option_value),
+                                  backendTypeToString(options.backend));
+            }
             continue;
         }
 
-        LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
-                          std::string(backend_value),
-                          backendTypeToString(selected_backend));
-    }
+        if (argument == "--project") {
+            if (i + 1 >= argc || argv[i + 1] == nullptr) {
+                LUNA_RUNTIME_WARN("Missing value after '--project'; runtime will start without a loaded project");
+                continue;
+            }
 
-    return selected_backend;
-}
+            options.project_file_path = resolveProjectFilePath(argv[++i]);
+            continue;
+        }
 
-std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh)
-{
-    if (!mesh.isValid()) {
-        return {};
-    }
-
-    std::vector<luna::SubMesh> sub_meshes = mesh.getSubMeshes();
-
-    glm::vec3 bounds_min(std::numeric_limits<float>::max());
-    glm::vec3 bounds_max(std::numeric_limits<float>::lowest());
-    bool has_vertex = false;
-
-    for (const auto& sub_mesh : sub_meshes) {
-        for (const auto& vertex : sub_mesh.Vertices) {
-            bounds_min = glm::min(bounds_min, vertex.Position);
-            bounds_max = glm::max(bounds_max, vertex.Position);
-            has_vertex = true;
+        if (argument.starts_with("--project=")) {
+            option_value = argument.substr(std::string_view("--project=").size());
+            options.project_file_path = resolveProjectFilePath(std::filesystem::path(option_value));
+            continue;
         }
     }
 
-    if (!has_vertex) {
-        return {};
-    }
-
-    const glm::vec3 center = (bounds_min + bounds_max) * 0.5f;
-    const glm::vec3 extent = bounds_max - bounds_min;
-    const float max_extent = (std::max) ((std::max) (extent.x, extent.y), (std::max) (extent.z, 0.0001f));
-    const float scale = 2.0f / max_extent;
-
-    for (auto& sub_mesh : sub_meshes) {
-        for (auto& vertex : sub_mesh.Vertices) {
-            vertex.Position = (vertex.Position - center) * scale;
-        }
-    }
-
-    return luna::Mesh::create(mesh.getName().empty() ? "RuntimeAssetMesh" : mesh.getName(), std::move(sub_meshes));
-}
-
-std::shared_ptr<luna::Material> createFallbackMaterial()
-{
-    luna::Material::SurfaceProperties surface;
-    surface.BaseColorFactor = glm::vec4(0.96f, 0.52f, 0.18f, 1.0f);
-    return luna::Material::create("FallbackMaterial", {}, surface);
+    return options;
 }
 
 } // namespace
 
 namespace luna {
 
-LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend)
+LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend, std::filesystem::path project_file_path)
     : Application(ApplicationSpecification{
           .m_name = "Luna Runtime",
           .m_window_width = 1'600,
@@ -318,6 +181,7 @@ LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend)
           .m_enable_imgui = false,
           .m_enable_multi_viewport = false,
       }),
+      m_project_file_path(std::move(project_file_path)),
       m_backend(backend)
 {}
 
@@ -343,118 +207,77 @@ void LunaRuntimeApplication::onInit()
     renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
     renderer.getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
     resetCamera();
-    buildScene();
+    m_scene.setName("Untitled");
+
+    if (!loadStartupScene()) {
+        LUNA_RUNTIME_WARN("Runtime started without a loaded scene. Pass '--project <path-to-.lunaproj>' to load one.");
+    }
 }
 
-void LunaRuntimeApplication::onUpdate(Timestep timestep)
+void LunaRuntimeApplication::onUpdate(Timestep)
 {
-    updateDemoTransform(timestep.getSeconds());
     m_scene.onUpdateRuntime();
 }
 
-void LunaRuntimeApplication::buildScene()
+bool LunaRuntimeApplication::loadStartupScene()
 {
-    if (!tryLoadDefaultAsset()) {
-        m_demo_entity = {};
-        m_asset_label = "No asset loaded";
-        LUNA_RUNTIME_WARN("No default asset could be loaded for runtime startup");
-        return;
+    if (m_project_file_path.empty()) {
+        return false;
     }
 
-    m_demo_entity = m_scene.createEntity("Runtime Mesh");
-    auto& mesh_component = m_demo_entity.addComponent<MeshComponent>();
-    if (!m_demo_mesh_handle.isValid()) {
-        m_demo_mesh_handle = registerMemoryAsset(m_demo_mesh);
-    }
-    mesh_component.meshHandle = m_demo_mesh_handle;
-
-    if (m_demo_mesh) {
-        mesh_component.resizeSubmeshMaterials(m_demo_mesh->getSubMeshes().size());
+    if (!ProjectManager::instance().loadProject(m_project_file_path)) {
+        LUNA_RUNTIME_WARN("Failed to load project '{}'", m_project_file_path.string());
+        return false;
     }
 
-    if (!m_demo_material_handle.isValid()) {
-        m_demo_material_handle = registerMemoryAsset(m_demo_material);
+    AssetManager::get().clear();
+    AssetDatabase::clear();
+    ImporterManager::import();
+    AssetManager::get().init();
+
+    const auto project_root = ProjectManager::instance().getProjectRootPath();
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    if (!project_root || !project_info) {
+        LUNA_RUNTIME_WARN("Project '{}' was loaded but project state is incomplete", m_project_file_path.string());
+        return false;
     }
 
-    const AssetHandle material_handle = m_demo_material_handle;
-    for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
-        mesh_component.setSubmeshMaterial(submesh_index, material_handle);
+    if (project_info->StartScene.empty()) {
+        LUNA_RUNTIME_WARN("Project '{}' does not define StartScene", m_project_file_path.string());
+        return false;
     }
 
-    auto& transform = m_demo_entity.getComponent<TransformComponent>();
-    transform.translation = glm::vec3(0.0f);
-    transform.rotation = glm::vec3(-0.35f, 0.0f, 0.0f);
-    transform.scale = glm::vec3(1.0f);
-}
-
-bool LunaRuntimeApplication::tryLoadDefaultAsset()
-{
-    if (loadSampleProjectDamagedHelmet(m_demo_mesh, m_demo_material_handle, m_asset_label)) {
-        m_demo_material.reset();
-        m_demo_mesh_handle = AssetHandle(0);
-        LUNA_RUNTIME_INFO("Loaded SampleProject DamagedHelmet with generated .lunamat material");
-        return true;
+    const std::filesystem::path start_scene_path =
+        SceneSerializer::normalizeScenePath((*project_root / project_info->StartScene).lexically_normal());
+    if (!std::filesystem::exists(start_scene_path)) {
+        LUNA_RUNTIME_WARN("Configured StartScene '{}' does not exist", start_scene_path.string());
+        return false;
     }
 
-    const std::array<std::filesystem::path, 3> candidates = {
-        projectRoot() / "Assets" / "DamagedHelmet" / "DamagedHelmet.gltf",
-        projectRoot() / "Assets" / "basicmesh.glb",
-        projectRoot() / "Assets" / "material_sphere" / "material_sphere.obj",
-    };
-
-    for (const auto& candidate : candidates) {
-        if (!std::filesystem::exists(candidate)) {
-            continue;
-        }
-
-        try {
-            const auto loaded_mesh = MeshLoader::loadFromFile(candidate);
-            if (!loaded_mesh || !loaded_mesh->isValid()) {
-                continue;
-            }
-
-            m_demo_mesh = createNormalizedMesh(*loaded_mesh);
-            if (!m_demo_mesh || !m_demo_mesh->isValid()) {
-                continue;
-            }
-
-            m_demo_material = createFallbackMaterial();
-            m_demo_mesh_handle = AssetHandle(0);
-            m_demo_material_handle = AssetHandle(0);
-
-            m_asset_label = candidate.filename().string();
-            LUNA_RUNTIME_INFO("Loaded runtime asset '{}'", candidate.string());
-            return true;
-        } catch (const std::exception& error) {
-            LUNA_RUNTIME_WARN("Failed to load runtime asset '{}': {}", candidate.string(), error.what());
-        }
+    if (!SceneSerializer::deserialize(m_scene, start_scene_path)) {
+        LUNA_RUNTIME_WARN("Failed to load StartScene '{}'", start_scene_path.string());
+        return false;
     }
 
-    return false;
-}
-
-void LunaRuntimeApplication::updateDemoTransform(float delta_time)
-{
-    if (!m_demo_entity || !m_demo_entity.hasComponent<TransformComponent>()) {
-        return;
-    }
-
-    auto& transform = m_demo_entity.getComponent<TransformComponent>();
-    transform.rotation.x = -0.35f;
-    if (m_auto_rotate) {
-        transform.rotation.y += delta_time * m_spin_speed;
-        const float turn = std::numbers::pi_v<float> * 2.0f;
-        if (transform.rotation.y > turn) {
-            transform.rotation.y -= turn;
-        }
-    }
+    m_scene_file_path = start_scene_path;
+    LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
+                      m_scene_file_path.string(),
+                      m_scene.entityCount());
+    return true;
 }
 
 Application* createApplication(int argc, char** argv)
 {
-    const auto backend = parseBackendFromArgs(argc, argv);
-    LUNA_RUNTIME_INFO("Starting LunaRuntime with backend '{}'", backendTypeToString(backend));
-    return new LunaRuntimeApplication(backend);
+    const RuntimeStartupOptions options = parseStartupOptions(argc, argv);
+    LUNA_RUNTIME_INFO("Starting LunaRuntime with backend '{}'", backendTypeToString(options.backend));
+
+    if (!options.project_file_path.empty()) {
+        LUNA_RUNTIME_INFO("Runtime project path: '{}'", options.project_file_path.string());
+    } else {
+        LUNA_RUNTIME_WARN("No runtime project path provided");
+    }
+
+    return new LunaRuntimeApplication(options.backend, options.project_file_path);
 }
 
 } // namespace luna

@@ -6,6 +6,8 @@
 #include "Renderer/SceneRenderer.h"
 #include "Scene.h"
 
+#include <utility>
+
 namespace luna {
 
 namespace {
@@ -56,6 +58,11 @@ void Scene::destroyEntity(Entity entity)
     m_registry.destroy(entity.m_entity_handle);
 }
 
+void Scene::clear()
+{
+    m_registry.clear();
+}
+
 void Scene::onUpdateRuntime()
 {
     auto& renderer = Application::get().getRenderer();
@@ -85,6 +92,26 @@ void Scene::onUpdateRuntime()
                                         mesh,
                                         resolveSubmeshMaterials(mesh_component, *mesh, asset_manager));
     }
+}
+
+void Scene::setName(std::string name)
+{
+    m_name = name.empty() ? "Untitled" : std::move(name);
+}
+
+const std::string& Scene::getName() const
+{
+    return m_name;
+}
+
+size_t Scene::entityCount() const
+{
+    size_t count = 0;
+    for ([[maybe_unused]] const auto entity_handle : m_registry.view<IDComponent>()) {
+        ++count;
+    }
+
+    return count;
 }
 
 entt::registry& Scene::registry()

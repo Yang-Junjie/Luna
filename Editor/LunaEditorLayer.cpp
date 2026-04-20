@@ -1,31 +1,27 @@
-#include "Core/Log.h"
+#include "LunaEditorLayer.h"
+
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
-#include "Asset/Editor/MeshLoader.h"
+#include "Core/Log.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
-#include "LunaEditorLayer.h"
 #include "Platform/Common/FileDialogs.h"
+#include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
-#include "Renderer/Material.h"
-#include "Renderer/Mesh.h"
-#include "Scene/Components.h"
+#include "Scene/SceneSerializer.h"
 
 #include <algorithm>
-#include <array>
-#include <cctype>
 #include <filesystem>
-#include <glm/common.hpp>
 #include <imgui.h>
-#include <limits>
 #include <optional>
-#include <Project/ProjectInfo.h>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include <string>
+#include <system_error>
 
 namespace {
+
+constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
+constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 
 const char* backendTypeToString(luna::RHI::BackendType type)
 {
@@ -51,156 +47,39 @@ const char* backendTypeToString(luna::RHI::BackendType type)
     }
 }
 
-std::string toLower(std::string value)
-{
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    return value;
-}
-
 std::filesystem::path projectDialogDefaultPath()
 {
     if (const auto project_root = luna::ProjectManager::instance().getProjectRootPath()) {
         return *project_root;
     }
+
     return std::filesystem::current_path();
 }
 
-std::optional<std::filesystem::path> getAssetsRootPath()
+std::optional<std::filesystem::path> makeScenePathRelativeToProject(const std::filesystem::path& scene_file_path)
 {
     const auto project_root = luna::ProjectManager::instance().getProjectRootPath();
-    const auto project_info = luna::ProjectManager::instance().getProjectInfo();
-    if (!project_root || !project_info) {
+    if (!project_root || scene_file_path.empty()) {
         return std::nullopt;
     }
 
-    return (*project_root / project_info->AssetsPath).lexically_normal();
-}
-
-luna::AssetHandle registerMemoryAsset(const std::shared_ptr<luna::Asset>& asset)
-{
-    if (!asset) {
-        return luna::AssetHandle(0);
-    }
-
-    luna::AssetManager::get().registerMemoryAsset(asset->handle, asset);
-    return asset->handle;
-}
-
-std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh)
-{
-    if (!mesh.isValid()) {
-        return {};
-    }
-
-    std::vector<luna::SubMesh> sub_meshes = mesh.getSubMeshes();
-
-    glm::vec3 bounds_min(std::numeric_limits<float>::max());
-    glm::vec3 bounds_max(std::numeric_limits<float>::lowest());
-    bool has_vertex = false;
-
-    for (const auto& sub_mesh : sub_meshes) {
-        for (const auto& vertex : sub_mesh.Vertices) {
-            bounds_min = glm::min(bounds_min, vertex.Position);
-            bounds_max = glm::max(bounds_max, vertex.Position);
-            has_vertex = true;
-        }
-    }
-
-    if (!has_vertex) {
-        return {};
-    }
-
-    const glm::vec3 center = (bounds_min + bounds_max) * 0.5f;
-    const glm::vec3 extent = bounds_max - bounds_min;
-    const float max_extent = (std::max) ((std::max) (extent.x, extent.y), (std::max) (extent.z, 0.0001f));
-    const float scale = 2.0f / max_extent;
-
-    for (auto& sub_mesh : sub_meshes) {
-        for (auto& vertex : sub_mesh.Vertices) {
-            vertex.Position = (vertex.Position - center) * scale;
-        }
-    }
-
-    return luna::Mesh::create(mesh.getName().empty() ? "DemoAssetMesh" : mesh.getName(), std::move(sub_meshes));
-}
-
-std::optional<std::filesystem::path> findPreferredMeshAssetPath()
-{
-    const auto assets_root = getAssetsRootPath();
-    if (!assets_root || !std::filesystem::exists(*assets_root)) {
+    std::error_code ec;
+    std::filesystem::path relative_path = std::filesystem::relative(scene_file_path, *project_root, ec);
+    if (ec) {
         return std::nullopt;
     }
 
-    std::optional<std::filesystem::path> best_match;
-    int best_score = std::numeric_limits<int>::max();
-
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(*assets_root)) {
-        if (!entry.is_regular_file()) {
-            continue;
-        }
-
-        const auto path = entry.path();
-        const std::string extension = toLower(path.extension().string());
-        int score = std::numeric_limits<int>::max();
-
-        if (extension == ".gltf") {
-            score = 20;
-        } else if (extension == ".glb") {
-            score = 30;
-        } else if (extension == ".fbx") {
-            score = 40;
-        } else if (extension == ".obj") {
-            score = 50;
-        } else {
-            continue;
-        }
-
-        const std::string stem = toLower(path.stem().string());
-        if (stem == "damagedhelmet") {
-            score = 0;
-        } else if (stem.find("helmet") != std::string::npos) {
-            score -= 5;
-        }
-
-        if (score < best_score) {
-            best_score = score;
-            best_match = path;
-        }
+    relative_path = relative_path.lexically_normal();
+    if (relative_path.empty() || relative_path.is_absolute()) {
+        return std::nullopt;
     }
 
-    return best_match;
-}
-
-luna::AssetHandle findCompanionMaterialHandle(const std::filesystem::path& mesh_path)
-{
-    const std::array<std::filesystem::path, 4> candidates = {
-        mesh_path.parent_path() / (mesh_path.stem().string() + ".lunamat"),
-        mesh_path.parent_path() / (mesh_path.stem().string() + ".material"),
-        mesh_path.parent_path() / (mesh_path.stem().string() + ".lmat"),
-        mesh_path.parent_path() / (mesh_path.stem().string() + ".mtl"),
-    };
-
-    for (const auto& candidate : candidates) {
-        if (!std::filesystem::exists(candidate)) {
-            continue;
-        }
-
-        const luna::AssetHandle handle = luna::AssetDatabase::findHandleByFilePath(candidate);
-        if (handle.isValid()) {
-            return handle;
-        }
+    const std::string relative_string = relative_path.generic_string();
+    if (relative_string == "." || relative_string.starts_with("..")) {
+        return std::nullopt;
     }
 
-    return luna::AssetHandle(0);
-}
-
-std::shared_ptr<luna::Material> createFallbackMaterial()
-{
-    luna::Material::SurfaceProperties surface;
-    surface.BaseColorFactor = glm::vec4(0.96f, 0.52f, 0.18f, 1.0f);
-    return luna::Material::create("FallbackMaterial", {}, surface);
+    return relative_path;
 }
 
 } // namespace
@@ -219,6 +98,8 @@ void LunaEditorLayer::onAttach()
     if (m_application == nullptr) {
         return;
     }
+
+    createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::OffscreenTexture);
@@ -265,7 +146,8 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Backend: Luna RHI / %s", backendTypeToString(application.getBackend()));
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
     ImGui::Separator();
-    ImGui::Text("Scene Source: %s", m_asset_label.c_str());
+    ImGui::Text("Scene File: %s", m_asset_label.c_str());
+    ImGui::Text("Entities: %zu", m_scene.entityCount());
     ImGui::Separator();
 
     const auto viewport_extent = application.getRenderer().getSceneOutputSize();
@@ -281,10 +163,12 @@ void LunaEditorLayer::onImGuiRender()
 
 void LunaEditorLayer::onImGuiMenuBar()
 {
+    const bool project_loaded = hasProjectLoaded();
+
     if (ImGui::BeginMenu("Project")) {
         if (ImGui::MenuItem("Open Project")) {
             const std::filesystem::path project_file_path =
-                FileDialogs::openFile("Luna Project (*.lunaproj)\0*.lunaproj\0", projectDialogDefaultPath().string());
+                FileDialogs::openFile(kProjectFileFilter, projectDialogDefaultPath().string());
             if (!project_file_path.empty()) {
                 openProject(project_file_path);
             }
@@ -293,16 +177,48 @@ void LunaEditorLayer::onImGuiMenuBar()
         if (ImGui::MenuItem("Create New Project")) {
             const std::filesystem::path project_root_path =
                 FileDialogs::selectDirectory(projectDialogDefaultPath().string());
-            LUNA_EDITOR_DEBUG("project root path {0}", project_root_path.string());
-            ProjectInfo project_info{.Name = "Sample Project",
-                                     .Version = "0.1.0",
-                                     .Author = "Junjie Yang",
-                                     .Description = "A simple Luna project.",
-                                     .StartScene = "./Assets/Scenes/SampleScene.lunascene",
-                                     .AssetsPath = "./Assets/"};
             if (!project_root_path.empty()) {
-                ProjectManager::instance().createProject(project_root_path, project_info);
+                ProjectInfo project_info{.Name = "New Project",
+                                         .Version = "0.1.0",
+                                         .Author = "Junjie Yang",
+                                         .Description = "A simple Luna project.",
+                                         .StartScene = "./Assets/Scenes/Main.lunascene",
+                                         .AssetsPath = "./Assets/"};
+
+                if (ProjectManager::instance().createProject(project_root_path, project_info)) {
+                    std::error_code ec;
+                    if (!project_info.AssetsPath.empty()) {
+                        std::filesystem::create_directories(
+                            (project_root_path / project_info.AssetsPath).lexically_normal(), ec);
+                    }
+
+                    ec.clear();
+                    if (!project_info.StartScene.empty()) {
+                        const auto scene_directory =
+                            (project_root_path / project_info.StartScene).lexically_normal().parent_path();
+                        if (!scene_directory.empty()) {
+                            std::filesystem::create_directories(scene_directory, ec);
+                        }
+                    }
+
+                    openProject(project_root_path / (project_info.Name + ".lunaproj"));
+                }
             }
+        }
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Scene", project_loaded)) {
+        if (ImGui::MenuItem("Create Scene")) {
+            createScene();
+        }
+
+        if (ImGui::MenuItem("Open Scene")) {
+            openScene();
+        }
+
+        if (ImGui::MenuItem("Save Scene")) {
+            saveScene();
         }
         ImGui::EndMenu();
     }
@@ -361,13 +277,18 @@ void LunaEditorLayer::setSelectedEntity(Entity entity)
 
 void LunaEditorLayer::resetEditorState()
 {
-    m_scene.registry().clear();
+    m_scene.clear();
+    m_scene.setName("Untitled");
     m_selected_entity = {};
-    m_demo_mesh.reset();
-    m_demo_material.reset();
-    m_demo_mesh_handle = AssetHandle(0);
-    m_demo_material_handle = AssetHandle(0);
-    m_asset_label = "No asset loaded";
+    m_scene_file_path.clear();
+    m_asset_label = "No scene loaded";
+}
+
+void LunaEditorLayer::createScene()
+{
+    resetEditorState();
+    updateSceneLabel();
+    LUNA_EDITOR_INFO("Created a new empty scene");
 }
 
 bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path)
@@ -385,85 +306,197 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
 
     AssetManager::get().clear();
     AssetDatabase::clear();
-    ImporterManager::init();
     ImporterManager::import();
     AssetManager::get().init();
 
-    buildScene();
-    LUNA_EDITOR_INFO("Loaded project '{}'", project_file_path.string());
+    createScene();
+
+    const auto project_root = ProjectManager::instance().getProjectRootPath();
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    if (project_root && project_info && !project_info->StartScene.empty()) {
+        const std::filesystem::path start_scene_path =
+            SceneSerializer::normalizeScenePath((*project_root / project_info->StartScene).lexically_normal());
+        if (std::filesystem::exists(start_scene_path)) {
+            if (!openScene(start_scene_path, false)) {
+                createScene();
+                m_scene_file_path = start_scene_path;
+                updateSceneLabel();
+            }
+        } else {
+            m_scene_file_path = start_scene_path;
+            updateSceneLabel();
+            LUNA_EDITOR_WARN(
+                "Configured StartScene '{}' does not exist. Saving will create it at that location.",
+                start_scene_path.string());
+        }
+    } else {
+        updateSceneLabel();
+        LUNA_EDITOR_INFO("Project '{}' does not define a StartScene. Using an empty scene.",
+                         project_file_path.string());
+    }
+
+    LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
+                     project_file_path.string(),
+                     m_scene.entityCount());
     return true;
 }
 
-void LunaEditorLayer::buildScene()
+bool LunaEditorLayer::openScene()
 {
-    if (!tryLoadDefaultAsset()) {
-        m_selected_entity = {};
-        m_asset_label = "No asset loaded";
-        LUNA_EDITOR_WARN("No preview asset could be loaded for current project");
+    const std::filesystem::path scene_file_path =
+        FileDialogs::openFile(kSceneFileFilter, sceneDialogDefaultPath().string());
+    if (scene_file_path.empty()) {
+        return false;
+    }
+
+    return openScene(scene_file_path, true);
+}
+
+bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bool update_project_start_scene)
+{
+    const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_file_path);
+    if (normalized_scene_path.empty()) {
+        return false;
+    }
+
+    if (!SceneSerializer::deserialize(m_scene, normalized_scene_path)) {
+        LUNA_EDITOR_WARN("Failed to open scene '{}'", normalized_scene_path.string());
+        return false;
+    }
+
+    m_scene_file_path = normalized_scene_path;
+    m_selected_entity = {};
+    updateSceneLabel();
+
+    if (update_project_start_scene) {
+        syncProjectStartScene(normalized_scene_path);
+    }
+
+    LUNA_EDITOR_INFO("Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene.entityCount());
+    return true;
+}
+
+bool LunaEditorLayer::saveScene()
+{
+    if (m_scene_file_path.empty()) {
+        return saveSceneAs();
+    }
+
+    return saveSceneAs(m_scene_file_path);
+}
+
+bool LunaEditorLayer::saveSceneAs()
+{
+    const std::filesystem::path scene_file_path =
+        FileDialogs::saveFile(kSceneFileFilter, sceneDialogDefaultPath().string());
+    if (scene_file_path.empty()) {
+        return false;
+    }
+
+    return saveSceneAs(scene_file_path);
+}
+
+bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
+{
+    const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_file_path);
+    if (normalized_scene_path.empty()) {
+        return false;
+    }
+
+    if (m_scene.getName().empty() || m_scene.getName() == "Untitled") {
+        m_scene.setName(normalized_scene_path.stem().string());
+    }
+
+    if (!SceneSerializer::serialize(m_scene, normalized_scene_path)) {
+        LUNA_EDITOR_WARN("Failed to save scene '{}'", normalized_scene_path.string());
+        return false;
+    }
+
+    m_scene_file_path = normalized_scene_path;
+    updateSceneLabel();
+    syncProjectStartScene(normalized_scene_path);
+
+    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene.getName(), normalized_scene_path.string());
+    return true;
+}
+
+std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
+{
+    if (!m_scene_file_path.empty()) {
+        const std::filesystem::path parent_path = m_scene_file_path.parent_path();
+        if (!parent_path.empty() && std::filesystem::exists(parent_path)) {
+            return parent_path;
+        }
+    }
+
+    const auto project_root = ProjectManager::instance().getProjectRootPath();
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    if (project_root && project_info) {
+        const std::filesystem::path scenes_directory = (*project_root / project_info->AssetsPath / "Scenes").lexically_normal();
+        if (std::filesystem::exists(scenes_directory)) {
+            return scenes_directory;
+        }
+
+        const std::filesystem::path assets_directory = (*project_root / project_info->AssetsPath).lexically_normal();
+        if (std::filesystem::exists(assets_directory)) {
+            return assets_directory;
+        }
+
+        return *project_root;
+    }
+
+    return projectDialogDefaultPath();
+}
+
+void LunaEditorLayer::updateSceneLabel()
+{
+    if (!m_scene_file_path.empty()) {
+        if (const auto relative_path = makeScenePathRelativeToProject(m_scene_file_path)) {
+            m_asset_label = relative_path->generic_string();
+            return;
+        }
+
+        m_asset_label = m_scene_file_path.lexically_normal().string();
         return;
     }
 
-    Entity demo_entity = m_scene.createEntity("Demo Mesh");
-    auto& mesh_component = demo_entity.addComponent<MeshComponent>();
-    if (!m_demo_mesh_handle.isValid()) {
-        m_demo_mesh_handle = registerMemoryAsset(m_demo_mesh);
-    }
-    mesh_component.meshHandle = m_demo_mesh_handle;
-
-    if (m_demo_mesh) {
-        mesh_component.resizeSubmeshMaterials(m_demo_mesh->getSubMeshes().size());
-    }
-
-    if (!m_demo_material_handle.isValid()) {
-        m_demo_material_handle = registerMemoryAsset(m_demo_material);
-    }
-
-    const AssetHandle material_handle = m_demo_material_handle;
-    for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
-        mesh_component.setSubmeshMaterial(submesh_index, material_handle);
-    }
-
-    auto& transform = demo_entity.getComponent<TransformComponent>();
-    transform.translation = glm::vec3(0.0f);
-    transform.rotation = glm::vec3(-0.35f, 0.0f, 0.0f);
-    transform.scale = glm::vec3(1.0f);
-
-    m_selected_entity = demo_entity;
+    const std::string scene_name = m_scene.getName().empty() ? "Untitled" : m_scene.getName();
+    m_asset_label = scene_name + SceneSerializer::FileExtension + std::string(" (unsaved)");
 }
 
-bool LunaEditorLayer::tryLoadDefaultAsset()
+void LunaEditorLayer::syncProjectStartScene(const std::filesystem::path& scene_file_path)
 {
-    const auto mesh_path = findPreferredMeshAssetPath();
-    if (!mesh_path) {
-        return false;
+    const auto relative_scene_path = makeScenePathRelativeToProject(scene_file_path);
+    if (!relative_scene_path) {
+        LUNA_EDITOR_WARN("Scene '{}' is outside the current project root. StartScene was not updated.",
+                         scene_file_path.string());
+        return;
     }
 
-    try {
-        const auto loaded_mesh = MeshLoader::loadFromFile(*mesh_path);
-        if (!loaded_mesh || !loaded_mesh->isValid()) {
-            return false;
-        }
-
-        m_demo_mesh = createNormalizedMesh(*loaded_mesh);
-        if (!m_demo_mesh || !m_demo_mesh->isValid()) {
-            return false;
-        }
-
-        m_demo_mesh_handle = AssetHandle(0);
-        m_demo_material_handle = findCompanionMaterialHandle(*mesh_path);
-        if (m_demo_material_handle.isValid()) {
-            m_demo_material.reset();
-        } else {
-            m_demo_material = createFallbackMaterial();
-        }
-
-        m_asset_label = mesh_path->filename().string();
-        LUNA_EDITOR_INFO("Loaded project preview asset '{}'", mesh_path->string());
-        return true;
-    } catch (const std::exception& error) {
-        LUNA_EDITOR_WARN("Failed to load project preview asset '{}': {}", mesh_path->string(), error.what());
-        return false;
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    if (!project_info) {
+        return;
     }
+
+    if (project_info->StartScene.lexically_normal() == relative_scene_path->lexically_normal()) {
+        return;
+    }
+
+    ProjectInfo updated_project_info = *project_info;
+    updated_project_info.StartScene = *relative_scene_path;
+    ProjectManager::instance().setProjectInfo(updated_project_info);
+
+    if (ProjectManager::instance().saveProject()) {
+        LUNA_EDITOR_INFO("Updated project StartScene to '{}'", relative_scene_path->generic_string());
+    } else {
+        LUNA_EDITOR_WARN("Failed to persist updated StartScene '{}'", relative_scene_path->generic_string());
+    }
+}
+
+bool LunaEditorLayer::hasProjectLoaded() const
+{
+    return ProjectManager::instance().getProjectRootPath().has_value() &&
+           ProjectManager::instance().getProjectInfo().has_value();
 }
 
 } // namespace luna
