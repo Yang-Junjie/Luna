@@ -1,0 +1,19 @@
+Material:
+  Name: DamagedHelmet
+  Textures:
+    BaseColor: 11511648089715678280
+    Normal: 18102217438490747247
+    MetallicRoughness: 9026749115351921305
+    Emissive: 10011932467456349231
+    Occlusion: 1630788778120632810
+  Surface:
+    BaseColorFactor: [1, 1, 1, 1]
+    EmissiveFactor: [1, 1, 1]
+    MetallicFactor: 1
+    RoughnessFactor: 1
+    NormalScale: 1
+    OcclusionStrength: 1
+    AlphaCutoff: 0.5
+    DoubleSided: false
+    Unlit: false
+    BlendMode: Opaque

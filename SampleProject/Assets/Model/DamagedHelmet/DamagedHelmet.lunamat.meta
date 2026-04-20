@@ -1,0 +1,7 @@
+Asset:
+  Name: DamagedHelmet
+  Handle: 485581649829758004
+  Type: Material
+  FilePath: Assets/Model/DamagedHelmet/DamagedHelmet.lunamat
+  Config:
+    UseMaterialFileParameters: true

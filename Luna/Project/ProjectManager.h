@@ -10,9 +10,9 @@ public:
     // open a .lunaproj file and load the project
     bool loadProject(const std::filesystem::path& project_file_path);
 
-    std::optional<std::filesystem::path> getProjectRootPath();
+    std::optional<std::filesystem::path> getProjectRootPath() const;
 
-    const std::optional<ProjectInfo>& getProjectInfo();
+    const std::optional<ProjectInfo>& getProjectInfo() const;
     void setProjectInfo(const ProjectInfo& info);
 
     bool createProject(const std::filesystem::path& project_root_path, const ProjectInfo& info);

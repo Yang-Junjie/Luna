@@ -1,9 +1,34 @@
 #include "Core/Application.h"
+#include "Asset/AssetManager.h"
 #include "Entity.h"
+#include "Renderer/Material.h"
+#include "Renderer/Mesh.h"
 #include "Renderer/SceneRenderer.h"
 #include "Scene.h"
 
 namespace luna {
+
+namespace {
+
+std::vector<std::shared_ptr<Material>>
+    resolveSubmeshMaterials(const MeshComponent& mesh_component, const Mesh& mesh, AssetManager& asset_manager)
+{
+    const auto& sub_meshes = mesh.getSubMeshes();
+    std::vector<std::shared_ptr<Material>> submesh_materials(sub_meshes.size());
+
+    for (size_t submesh_index = 0; submesh_index < sub_meshes.size(); ++submesh_index) {
+        const AssetHandle material_handle = mesh_component.getSubmeshMaterial(static_cast<uint32_t>(submesh_index));
+        if (!material_handle.isValid()) {
+            continue;
+        }
+
+        submesh_materials[submesh_index] = asset_manager.loadAssetAs<Material>(material_handle);
+    }
+
+    return submesh_materials;
+}
+
+} // namespace
 
 Entity Scene::createEntity(const std::string& name)
 {
@@ -39,19 +64,26 @@ void Scene::onUpdateRuntime()
     }
 
     auto& scene_renderer = renderer.getSceneRenderer();
+    auto& asset_manager = AssetManager::get();
     scene_renderer.beginScene(renderer.getMainCamera());
 
-    auto view = m_registry.view<TransformComponent, StaticMeshComponent>();
+    auto view = m_registry.view<TransformComponent, MeshComponent>();
     for (const auto entity_handle : view) {
         const auto& transform_component = view.get<TransformComponent>(entity_handle);
-        const auto& static_mesh_component = view.get<StaticMeshComponent>(entity_handle);
+        const auto& mesh_component = view.get<MeshComponent>(entity_handle);
 
-        if (!static_mesh_component.visible || static_mesh_component.mesh == nullptr) {
+        if (!mesh_component.meshHandle.isValid()) {
             continue;
         }
 
-        scene_renderer.submitStaticMesh(
-            transform_component.getTransform(), static_mesh_component.mesh, static_mesh_component.material);
+        const auto mesh = asset_manager.loadAssetAs<Mesh>(mesh_component.meshHandle);
+        if (!mesh || !mesh->isValid()) {
+            continue;
+        }
+
+        scene_renderer.submitStaticMesh(transform_component.getTransform(),
+                                        mesh,
+                                        resolveSubmeshMaterials(mesh_component, *mesh, asset_manager));
     }
 }
 

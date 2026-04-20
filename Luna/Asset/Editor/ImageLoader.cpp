@@ -1,13 +1,8 @@
-#include "Renderer/ImageLoader.h"
+#include "Asset/Editor/ImageLoader.h"
 
-#include <cassert>
-#include <cstdlib>
 #include <cstring>
 
-#include <algorithm>
 #include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <stb_image.h>
 #include <string_view>
 
@@ -102,16 +97,12 @@ luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
             return Format::RG16_SNORM;
         case DXGIFormat::R16G16_SInt:
             return Format::RG16_SINT;
-        case DXGIFormat::D32_Float:
-            return Format::D32_FLOAT;
         case DXGIFormat::R32_Float:
             return Format::R32_FLOAT;
         case DXGIFormat::R32_UInt:
             return Format::R32_UINT;
         case DXGIFormat::R32_SInt:
             return Format::R32_SINT;
-        case DXGIFormat::D24_UNorm_S8_UInt:
-            return Format::D24_UNORM_S8_UINT;
         case DXGIFormat::R8G8_UNorm:
             return Format::RG8_UNORM;
         case DXGIFormat::R8G8_UInt:
@@ -122,8 +113,6 @@ luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
             return Format::RG8_SINT;
         case DXGIFormat::R16_Float:
             return Format::R16_FLOAT;
-        case DXGIFormat::D16_UNorm:
-            return Format::D16_UNORM;
         case DXGIFormat::R16_UNorm:
             return Format::R16_UNORM;
         case DXGIFormat::R16_UInt:
@@ -140,12 +129,6 @@ luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
             return Format::R8_SNORM;
         case DXGIFormat::R8_SInt:
             return Format::R8_SINT;
-        case DXGIFormat::R9G9B9E5_SHAREDEXP:
-            return Format::RGB9E5_FLOAT;
-        case DXGIFormat::B8G8R8A8_UNorm:
-            return Format::BGRA8_UNORM;
-        case DXGIFormat::B8G8R8A8_UNorm_SRGB:
-            return Format::BGRA8_SRGB;
         case DXGIFormat::BC1_UNorm:
             return Format::BC1_RGBA_UNORM;
         case DXGIFormat::BC1_UNorm_SRGB:
@@ -174,6 +157,10 @@ luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
             return Format::BC7_UNORM;
         case DXGIFormat::BC7_UNorm_SRGB:
             return Format::BC7_SRGB;
+        case DXGIFormat::B8G8R8A8_UNorm:
+            return Format::BGRA8_UNORM;
+        case DXGIFormat::B8G8R8A8_UNorm_SRGB:
+            return Format::BGRA8_SRGB;
         default:
             return Format::UNDEFINED;
     }
@@ -181,33 +168,32 @@ luna::RHI::Format toImageFormat(tinyddsloader::DDSFile::DXGIFormat format)
 
 ImageData loadImageUsingDDSLoader(const std::string& filepath)
 {
-    ImageData image;
     tinyddsloader::DDSFile dds;
+    ImageData image;
+
     if (dds.Load(filepath.c_str()) != tinyddsloader::Result::Success) {
         return image;
     }
 
-    dds.Flip();
     const auto* image_data = dds.GetImageData();
-    if (image_data == nullptr) {
+    if (image_data == nullptr || image_data->m_memSlicePitch == 0) {
         return image;
     }
 
+    image.ImageFormat = toImageFormat(dds.GetFormat());
     image.Width = image_data->m_width;
     image.Height = image_data->m_height;
-    image.ImageFormat = toImageFormat(dds.GetFormat());
-    image.ByteData.resize(image_data->m_memSlicePitch);
-    std::copy_n(static_cast<const uint8_t*>(image_data->m_mem), image.ByteData.size(), image.ByteData.begin());
+    const auto* base_memory = static_cast<const uint8_t*>(image_data->m_mem);
+    image.ByteData.assign(base_memory, base_memory + image_data->m_memSlicePitch);
 
     for (uint32_t mip = 1; mip < dds.GetMipCount(); ++mip) {
         const auto* mip_image_data = dds.GetImageData(mip);
-        if (mip_image_data == nullptr) {
+        if (mip_image_data == nullptr || mip_image_data->m_memSlicePitch == 0) {
             continue;
         }
 
-        auto& mip_level = image.MipLevels.emplace_back();
-        mip_level.resize(mip_image_data->m_memSlicePitch);
-        std::copy_n(static_cast<const uint8_t*>(mip_image_data->m_mem), mip_level.size(), mip_level.begin());
+        const auto* mip_memory = static_cast<const uint8_t*>(mip_image_data->m_mem);
+        image.MipLevels.emplace_back(mip_memory, mip_memory + mip_image_data->m_memSlicePitch);
     }
 
     return image;
@@ -215,61 +201,35 @@ ImageData loadImageUsingDDSLoader(const std::string& filepath)
 
 ImageData loadImageUsingDDSLoader(const uint8_t* data, std::size_t size)
 {
-    ImageData image;
     tinyddsloader::DDSFile dds;
+    ImageData image;
+
     if (dds.Load(data, size) != tinyddsloader::Result::Success) {
         return image;
     }
 
-    dds.Flip();
     const auto* image_data = dds.GetImageData();
-    if (image_data == nullptr) {
+    if (image_data == nullptr || image_data->m_memSlicePitch == 0) {
         return image;
     }
 
+    image.ImageFormat = toImageFormat(dds.GetFormat());
     image.Width = image_data->m_width;
     image.Height = image_data->m_height;
-    image.ImageFormat = toImageFormat(dds.GetFormat());
-    image.ByteData.resize(image_data->m_memSlicePitch);
-    std::copy_n(static_cast<const uint8_t*>(image_data->m_mem), image.ByteData.size(), image.ByteData.begin());
+    const auto* base_memory = static_cast<const uint8_t*>(image_data->m_mem);
+    image.ByteData.assign(base_memory, base_memory + image_data->m_memSlicePitch);
 
     for (uint32_t mip = 1; mip < dds.GetMipCount(); ++mip) {
         const auto* mip_image_data = dds.GetImageData(mip);
-        if (mip_image_data == nullptr) {
+        if (mip_image_data == nullptr || mip_image_data->m_memSlicePitch == 0) {
             continue;
         }
 
-        auto& mip_level = image.MipLevels.emplace_back();
-        mip_level.resize(mip_image_data->m_memSlicePitch);
-        std::copy_n(static_cast<const uint8_t*>(mip_image_data->m_mem), mip_level.size(), mip_level.begin());
+        const auto* mip_memory = static_cast<const uint8_t*>(mip_image_data->m_mem);
+        image.MipLevels.emplace_back(mip_memory, mip_memory + mip_image_data->m_memSlicePitch);
     }
 
     return image;
-}
-
-std::string convertZLIBToDDS(const std::string& filepath)
-{
-    std::ifstream file(filepath, std::ios::binary);
-    if (!file.good()) {
-        return filepath;
-    }
-
-    std::vector<char> compressed_data{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-
-    int decompressed_size = 0;
-    char* decompressed_data =
-        stbi_zlib_decode_malloc(compressed_data.data(), static_cast<int>(compressed_data.size()), &decompressed_size);
-    if (decompressed_data == nullptr || decompressed_size <= 0) {
-        return filepath;
-    }
-
-    const std::filesystem::path path(filepath);
-    const auto dds_filepath = (path.parent_path() / path.stem()).string() + ".dds";
-    std::ofstream dds_file(dds_filepath, std::ios::binary);
-    dds_file.write(decompressed_data, decompressed_size);
-    std::free(decompressed_data);
-
-    return dds_filepath;
 }
 
 ImageData loadImageUsingSTBLoader(const std::string& filepath)
@@ -277,20 +237,18 @@ ImageData loadImageUsingSTBLoader(const std::string& filepath)
     int width = 0;
     int height = 0;
     int channels = 0;
-
     stbi_uc* pixels = stbi_load(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    if (pixels == nullptr || width <= 0 || height <= 0) {
+    if (pixels == nullptr) {
         return {};
     }
 
-    constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
-                                   actual_channels);
-    std::copy_n(pixels, byte_data.size(), byte_data.begin());
+    const size_t byte_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
+    std::vector<uint8_t> bytes(byte_size);
+    std::memcpy(bytes.data(), pixels, byte_size);
     stbi_image_free(pixels);
 
     return ImageData{
-        .ByteData = std::move(byte_data),
+        .ByteData = std::move(bytes),
         .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
@@ -302,21 +260,18 @@ ImageData loadHDRImageUsingSTBLoader(const std::string& filepath)
     int width = 0;
     int height = 0;
     int channels = 0;
-
-    stbi_set_flip_vertically_on_load(false);
     float* pixels = stbi_loadf(filepath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-    if (pixels == nullptr || width <= 0 || height <= 0) {
+    if (pixels == nullptr) {
         return {};
     }
 
-    constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
-                                   actual_channels * sizeof(float));
-    std::memcpy(byte_data.data(), pixels, byte_data.size());
+    const size_t byte_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u * sizeof(float);
+    std::vector<uint8_t> bytes(byte_size);
+    std::memcpy(bytes.data(), pixels, byte_size);
     stbi_image_free(pixels);
 
     return ImageData{
-        .ByteData = std::move(byte_data),
+        .ByteData = std::move(bytes),
         .ImageFormat = luna::RHI::Format::RGBA32_FLOAT,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
@@ -328,20 +283,18 @@ ImageData loadImageUsingSTBLoader(const uint8_t* data, std::size_t size)
     int width = 0;
     int height = 0;
     int channels = 0;
-
     stbi_uc* pixels = stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, STBI_rgb_alpha);
-    if (pixels == nullptr || width <= 0 || height <= 0) {
+    if (pixels == nullptr) {
         return {};
     }
 
-    constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
-                                   actual_channels);
-    std::copy_n(pixels, byte_data.size(), byte_data.begin());
+    const size_t byte_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
+    std::vector<uint8_t> bytes(byte_size);
+    std::memcpy(bytes.data(), pixels, byte_size);
     stbi_image_free(pixels);
 
     return ImageData{
-        .ByteData = std::move(byte_data),
+        .ByteData = std::move(bytes),
         .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
@@ -353,21 +306,18 @@ ImageData loadHDRImageUsingSTBLoader(const uint8_t* data, std::size_t size)
     int width = 0;
     int height = 0;
     int channels = 0;
-
-    stbi_set_flip_vertically_on_load(false);
     float* pixels = stbi_loadf_from_memory(data, static_cast<int>(size), &width, &height, &channels, STBI_rgb_alpha);
-    if (pixels == nullptr || width <= 0 || height <= 0) {
+    if (pixels == nullptr) {
         return {};
     }
 
-    constexpr int actual_channels = 4;
-    std::vector<uint8_t> byte_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) *
-                                   actual_channels * sizeof(float));
-    std::memcpy(byte_data.data(), pixels, byte_data.size());
+    const size_t byte_size = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u * sizeof(float);
+    std::vector<uint8_t> bytes(byte_size);
+    std::memcpy(bytes.data(), pixels, byte_size);
     stbi_image_free(pixels);
 
     return ImageData{
-        .ByteData = std::move(byte_data),
+        .ByteData = std::move(bytes),
         .ImageFormat = luna::RHI::Format::RGBA32_FLOAT,
         .Width = static_cast<uint32_t>(width),
         .Height = static_cast<uint32_t>(height),
@@ -375,50 +325,48 @@ ImageData loadHDRImageUsingSTBLoader(const uint8_t* data, std::size_t size)
 }
 
 std::vector<uint8_t> extractCubemapFace(const ImageData& image,
-                                        std::size_t face_width,
-                                        std::size_t face_height,
-                                        std::size_t channel_count,
-                                        std::size_t slice_x,
-                                        std::size_t slice_y)
+                                        uint32_t face_x,
+                                        uint32_t face_y,
+                                        uint32_t face_width,
+                                        uint32_t face_height)
 {
-    std::vector<uint8_t> result(face_width * face_height * channel_count);
+    const size_t pixel_stride =
+        image.ImageFormat == luna::RHI::Format::RGBA32_FLOAT ? sizeof(float) * 4u : sizeof(uint8_t) * 4u;
+    std::vector<uint8_t> face_bytes(static_cast<size_t>(face_width) * static_cast<size_t>(face_height) * pixel_stride);
 
-    for (std::size_t row = 0; row < face_height; ++row) {
-        const std::size_t image_y = (face_height - row - 1) + slice_y * face_height;
-        const std::size_t image_x = slice_x * face_width;
-        const std::size_t bytes_in_row = face_width * channel_count;
-
-        std::memcpy(result.data() + row * bytes_in_row,
-                    image.ByteData.data() + (image_y * image.Width + image_x) * channel_count,
-                    bytes_in_row);
+    for (uint32_t row = 0; row < face_height; ++row) {
+        const size_t source_offset = (static_cast<size_t>(face_y + row) * image.Width + face_x) * pixel_stride;
+        const size_t dest_offset = static_cast<size_t>(row) * face_width * pixel_stride;
+        std::memcpy(face_bytes.data() + dest_offset, image.ByteData.data() + source_offset, face_width * pixel_stride);
     }
 
-    return result;
+    return face_bytes;
 }
 
 CubemapData createCubemapFromSingleImage(const ImageData& image)
 {
     CubemapData cubemap_data;
+    if (!image.isValid() || image.Width % 4 != 0 || image.Height % 3 != 0) {
+        return cubemap_data;
+    }
+
+    const uint32_t face_width = image.Width / 4;
+    const uint32_t face_height = image.Height / 3;
+    if (face_width != face_height) {
+        return cubemap_data;
+    }
+
     cubemap_data.FaceFormat = image.ImageFormat;
-    cubemap_data.FaceWidth = image.Width / 4;
-    cubemap_data.FaceHeight = image.Height / 3;
+    cubemap_data.FaceWidth = face_width;
+    cubemap_data.FaceHeight = face_height;
 
-    assert(cubemap_data.FaceWidth == cubemap_data.FaceHeight);
-    assert(cubemap_data.FaceFormat == luna::RHI::Format::RGBA8_UNORM);
+    cubemap_data.Faces[0] = extractCubemapFace(image, face_width * 2, face_height, face_width, face_height);
+    cubemap_data.Faces[1] = extractCubemapFace(image, 0, face_height, face_width, face_height);
+    cubemap_data.Faces[2] = extractCubemapFace(image, face_width, 0, face_width, face_height);
+    cubemap_data.Faces[3] = extractCubemapFace(image, face_width, face_height * 2, face_width, face_height);
+    cubemap_data.Faces[4] = extractCubemapFace(image, face_width, face_height, face_width, face_height);
+    cubemap_data.Faces[5] = extractCubemapFace(image, face_width * 3, face_height, face_width, face_height);
 
-    constexpr std::size_t channel_count = 4;
-    cubemap_data.Faces[0] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 2, 1);
-    cubemap_data.Faces[1] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 0, 1);
-    cubemap_data.Faces[2] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 2);
-    cubemap_data.Faces[3] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 0);
-    cubemap_data.Faces[4] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 1, 1);
-    cubemap_data.Faces[5] =
-        extractCubemapFace(image, cubemap_data.FaceWidth, cubemap_data.FaceHeight, channel_count, 3, 1);
     return cubemap_data;
 }
 
@@ -426,28 +374,24 @@ CubemapData createCubemapFromSingleImage(const ImageData& image)
 
 ImageData ImageLoader::LoadImageFromFile(const std::string& filepath)
 {
-    if (isDDSImage(filepath)) {
+    if (isDDSImage(filepath) || isZLIBImage(filepath)) {
         return loadImageUsingDDSLoader(filepath);
     }
+
     if (isHDRImage(filepath)) {
         return loadHDRImageUsingSTBLoader(filepath);
     }
-    if (isZLIBImage(filepath)) {
-        return loadImageUsingDDSLoader(convertZLIBToDDS(filepath));
-    }
+
     return loadImageUsingSTBLoader(filepath);
 }
 
 ImageData ImageLoader::LoadImageFromMemory(const uint8_t* data, std::size_t size, const std::string& mimeType)
 {
-    if (data == nullptr || size == 0) {
-        return {};
-    }
-
     if (isDDSMimeType(mimeType) || isDDSData(data, size)) {
         return loadImageUsingDDSLoader(data, size);
     }
-    if (stbi_is_hdr_from_memory(data, static_cast<int>(size)) != 0) {
+
+    if (mimeType == "image/vnd.radiance") {
         return loadHDRImageUsingSTBLoader(data, size);
     }
 

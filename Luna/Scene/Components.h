@@ -1,20 +1,20 @@
 #pragma once
 
+#include "Asset/Asset.h"
 #include "Core/UUID.h"
+
+#include <cstdint>
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
-#include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace luna {
-
-class Material;
-class Mesh;
 
 struct IDComponent {
     UUID id;
@@ -50,17 +50,60 @@ struct TransformComponent {
     }
 };
 
-struct StaticMeshComponent {
-    std::shared_ptr<Mesh> mesh;
-    std::shared_ptr<Material> material;
-    bool visible = true;
+enum class MemoryMeshType : uint8_t {
+    None = 0,
+    ProceduralCube,
+};
 
-    StaticMeshComponent() = default;
+struct MeshComponent {
+    AssetHandle meshHandle = AssetHandle(0);
 
-    StaticMeshComponent(std::shared_ptr<Mesh> mesh, std::shared_ptr<Material> material = {})
-        : mesh(std::move(mesh)),
-          material(std::move(material))
-    {}
+    bool memoryOnly = false;
+    MemoryMeshType memoryMeshType = MemoryMeshType::None;
+
+    std::vector<AssetHandle> submeshMaterials;
+
+    MeshComponent() = default;
+
+    MeshComponent(const MeshComponent&) = default;
+
+    void setSubmeshMaterial(uint32_t submeshIndex, AssetHandle materialHandle)
+    {
+        if (submeshIndex >= submeshMaterials.size()) {
+            submeshMaterials.resize(submeshIndex + 1, AssetHandle(0));
+        }
+        submeshMaterials[submeshIndex] = materialHandle;
+    }
+
+    AssetHandle getSubmeshMaterial(uint32_t submeshIndex) const
+    {
+        if (submeshIndex < submeshMaterials.size()) {
+            return submeshMaterials[submeshIndex];
+        }
+        return AssetHandle(0);
+    }
+
+    void clearSubmeshMaterial(uint32_t submeshIndex)
+    {
+        if (submeshIndex < submeshMaterials.size()) {
+            submeshMaterials[submeshIndex] = AssetHandle(0);
+        }
+    }
+
+    void clearAllSubmeshMaterials()
+    {
+        submeshMaterials.clear();
+    }
+
+    size_t getSubmeshMaterialCount() const
+    {
+        return submeshMaterials.size();
+    }
+
+    void resizeSubmeshMaterials(size_t count)
+    {
+        submeshMaterials.resize(count, AssetHandle(0));
+    }
 };
 
 } // namespace luna

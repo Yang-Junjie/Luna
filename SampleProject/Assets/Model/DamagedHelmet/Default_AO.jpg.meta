@@ -1,0 +1,14 @@
+Asset:
+  Name: Default_AO
+  Handle: 1630788778120632810
+  Type: Texture
+  FilePath: Assets/Model/DamagedHelmet/Default_AO.jpg
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

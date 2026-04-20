@@ -42,18 +42,45 @@ void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
         return;
     }
 
-    StaticMeshDrawCommand draw_command{
-        .transform = transform,
-        .mesh = std::move(mesh),
-        .material = std::move(material),
-    };
+    const size_t sub_mesh_count = mesh->getSubMeshes().size();
+    std::vector<std::shared_ptr<Material>> submesh_materials(sub_mesh_count, std::move(material));
+    submitStaticMesh(transform, std::move(mesh), submesh_materials);
+}
 
-    if (draw_command.material != nullptr && draw_command.material->isTransparent()) {
-        m_draw_queue.transparent_draw_commands.push_back(std::move(draw_command));
+void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
+                                     std::shared_ptr<Mesh> mesh,
+                                     const std::vector<std::shared_ptr<Material>>& submesh_materials)
+{
+    if (!mesh || !mesh->isValid()) {
         return;
     }
 
-    m_draw_queue.opaque_draw_commands.push_back(std::move(draw_command));
+    const auto& mesh_sub_meshes = mesh->getSubMeshes();
+    for (size_t sub_mesh_index = 0; sub_mesh_index < mesh_sub_meshes.size(); ++sub_mesh_index) {
+        const auto& sub_mesh = mesh_sub_meshes[sub_mesh_index];
+        if (sub_mesh.Vertices.empty() || sub_mesh.Indices.empty()) {
+            continue;
+        }
+
+        std::shared_ptr<Material> material;
+        if (sub_mesh_index < submesh_materials.size()) {
+            material = submesh_materials[sub_mesh_index];
+        }
+
+        StaticMeshDrawCommand draw_command{
+            .transform = transform,
+            .mesh = mesh,
+            .material = std::move(material),
+            .sub_mesh_index = static_cast<uint32_t>(sub_mesh_index),
+        };
+
+        if (draw_command.material != nullptr && draw_command.material->isTransparent()) {
+            m_draw_queue.transparent_draw_commands.push_back(std::move(draw_command));
+            continue;
+        }
+
+        m_draw_queue.opaque_draw_commands.push_back(std::move(draw_command));
+    }
 }
 
 void SceneRenderer::buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context)

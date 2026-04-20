@@ -86,41 +86,48 @@ cbuffer PushConstants
 Texture2D<float4> gBaseColorTexture : register(t0);
 
 [[vk::binding(1, 0)]]
-SamplerState gMaterialSampler : register(s1);
+SamplerState gBaseColorSampler : register(s1);
 
 [[vk::binding(2, 0)]]
 Texture2D<float4> gNormalTexture : register(t2);
 
 [[vk::binding(3, 0)]]
-Texture2D<float4> gMetallicRoughnessTexture : register(t3);
+SamplerState gNormalSampler : register(s3);
 
 [[vk::binding(4, 0)]]
-Texture2D<float4> gEmissiveTexture : register(t4);
+Texture2D<float4> gMetallicRoughnessTexture : register(t4);
 
 [[vk::binding(5, 0)]]
-Texture2D<float4> gOcclusionTexture : register(t5);
+SamplerState gMetallicRoughnessSampler : register(s5);
 
 [[vk::binding(6, 0)]]
-ConstantBuffer<MaterialParams> gMaterialParams : register(b6);
+Texture2D<float4> gEmissiveTexture : register(t6);
+
+[[vk::binding(7, 0)]]
+SamplerState gEmissiveSampler : register(s7);
+
+[[vk::binding(8, 0)]]
+Texture2D<float4> gOcclusionTexture : register(t8);
+
+[[vk::binding(9, 0)]]
+SamplerState gOcclusionSampler : register(s9);
+
+[[vk::binding(10, 0)]]
+ConstantBuffer<MaterialParams> gMaterialParams : register(b10);
 
 [[vk::binding(0, 1)]]
-ConstantBuffer<SceneParams> gSceneParams : register(b7);
+ConstantBuffer<SceneParams> gSceneParams : register(b11);
 
 [[vk::binding(1, 1)]]
-Texture2D<float4> gEnvironmentTexture : register(t8);
+Texture2D<float4> gEnvironmentTexture : register(t12);
 
 [[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s9);
+SamplerState gEnvironmentSampler : register(s13);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
     const float lengthSq = dot(value, value);
     return lengthSq > 1e-6 ? value * rsqrt(lengthSq) : fallbackValue;
-}
-
-float3 srgbToLinear(float3 color)
-{
-    return pow(saturate(color), 2.2);
 }
 
 float3 linearToSrgb(float3 color)
@@ -265,15 +272,15 @@ SampledMaterial sampleMaterial(SceneVertexOutput input)
 {
     SampledMaterial material;
 
-    const float4 baseSample = gBaseColorTexture.Sample(gMaterialSampler, input.uv);
-    material.baseColor = float4(srgbToLinear(baseSample.rgb) * gMaterialParams.baseColorFactor.rgb,
+    const float4 baseSample = gBaseColorTexture.Sample(gBaseColorSampler, input.uv);
+    material.baseColor = float4(baseSample.rgb * gMaterialParams.baseColorFactor.rgb,
                                 baseSample.a * gMaterialParams.baseColorFactor.a);
     if (isMaskedMaterial() && material.baseColor.a < gMaterialParams.materialFactors.w)
     {
         discard;
     }
 
-    const float4 normalSample = gNormalTexture.Sample(gMaterialSampler, input.uv);
+    const float4 normalSample = gNormalTexture.Sample(gNormalSampler, input.uv);
     const float3 tangentNormal = safeNormalize(float3(normalSample.xy * 2.0 - 1.0, normalSample.z * 2.0 - 1.0),
                                                float3(0.0, 0.0, 1.0));
     const float3x3 tbn = buildTangentFrame(input.worldNormal, input.worldTangent, input.worldBitangent);
@@ -282,14 +289,14 @@ SampledMaterial sampleMaterial(SceneVertexOutput input)
         float3(0.0, 0.0, 1.0));
     material.normalWS = safeNormalize(mul(scaledTangentNormal, tbn), safeNormalize(input.worldNormal, float3(0.0, 0.0, 1.0)));
 
-    const float4 metallicRoughnessSample = gMetallicRoughnessTexture.Sample(gMaterialSampler, input.uv);
+    const float4 metallicRoughnessSample = gMetallicRoughnessTexture.Sample(gMetallicRoughnessSampler, input.uv);
     material.metallic = saturate(metallicRoughnessSample.b * gMaterialParams.materialFactors.x);
     material.roughness = clamp(metallicRoughnessSample.g * gMaterialParams.materialFactors.y, kMinRoughness, 1.0);
 
-    const float4 emissiveSample = gEmissiveTexture.Sample(gMaterialSampler, input.uv);
-    material.emissive = srgbToLinear(emissiveSample.rgb) * gMaterialParams.emissiveFactorNormalScale.rgb;
+    const float4 emissiveSample = gEmissiveTexture.Sample(gEmissiveSampler, input.uv);
+    material.emissive = emissiveSample.rgb * gMaterialParams.emissiveFactorNormalScale.rgb;
 
-    const float occlusionSample = gOcclusionTexture.Sample(gMaterialSampler, input.uv).r;
+    const float occlusionSample = gOcclusionTexture.Sample(gOcclusionSampler, input.uv).r;
     material.ao = lerp(1.0, occlusionSample, saturate(gMaterialParams.materialFactors.z));
     material.unlit = gMaterialParams.materialFlags.y;
     return material;

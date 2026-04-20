@@ -12,14 +12,10 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
 set(RENDERER_SOURCE
     Renderer/Camera.h
     Renderer/Camera.cpp
-    Renderer/ImageLoader.h
-    Renderer/ImageLoader.cpp
     Renderer/Material.h
     Renderer/Material.cpp
     Renderer/Mesh.h
     Renderer/Mesh.cpp
-    Renderer/ModelLoader.h
-    Renderer/ModelLoader.cpp
     Renderer/RenderGraph.h
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
@@ -34,7 +30,10 @@ set(RENDERER_SOURCE
     Renderer/Renderer.h
     Renderer/Renderer.cpp
     Renderer/RendererFrame.cpp
-    Renderer/RendererSceneOutput.cpp)
+    Renderer/RendererSceneOutput.cpp
+    
+    Renderer/Texture.h
+    )
 
 set(SCENE_SOURCE
     Scene/Components.h
@@ -55,6 +54,34 @@ set(PROJECT_SOURCE
 
 set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h)
+
+set(ASSET_SOURCE 
+    Asset/AssetManager.h
+    Asset/AssetManager.cpp
+    Asset/Asset.h
+    Asset/AssetDatabase.h
+    Asset/AssetDatabase.cpp
+    Asset/AssetMetadata.h
+    Asset/AssetTypes.h
+    Asset/Editor/Importer.h
+    Asset/Editor/ImporterManager.h
+    Asset/Editor/ImporterManager.cpp
+    Asset/Editor/ImageLoader.h
+    Asset/Editor/ImageLoader.cpp
+    Asset/Editor/Loader.h
+    Asset/Editor/LoaderManager.h
+    Asset/Editor/LoaderManager.cpp
+    Asset/Editor/MaterialFactory.h
+    Asset/Editor/MaterialFactory.cpp
+    Asset/Editor/MaterialImporter.h
+    Asset/Editor/MaterialLoader.h
+    Asset/Editor/MeshImporter.h
+    Asset/Editor/MeshLoader.h
+    Asset/Editor/MeshLoader.cpp
+    Asset/Editor/TextureImporter.h
+    Asset/Editor/TextureLoader.h
+    Asset/Editor/TextureLoader.cpp
+)
 
 if(WIN32)
     list(APPEND PLATFORM_SOURCE
@@ -103,9 +130,7 @@ add_library(
 
     ${PROJECT_SOURCE}
 
-    Asset/Asset.h
-    Asset/AssetMetadata.h
-    Asset/AssetTypes.h
+    ${ASSET_SOURCE}
 
     ${SCENE_SOURCE}
     ${RENDERER_SOURCE}

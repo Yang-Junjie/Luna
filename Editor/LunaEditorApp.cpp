@@ -1,9 +1,15 @@
 #include "Core/Log.h"
+#include "Asset/AssetManager.h"
+#include "Asset/AssetDatabase.h"
+#include "Asset/Editor/ImporterManager.h"
+#include "Asset/Editor/MaterialFactory.h"
+#include "Asset/Editor/MeshLoader.h"
+#include "Asset/Editor/TextureImporter.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
+#include "Project/ProjectManager.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/ModelLoader.h"
 #include "Scene/Components.h"
 
 #include <cctype>
@@ -34,6 +40,138 @@ bool backendSupportsImGui(luna::RHI::BackendType backend)
 std::filesystem::path projectRoot()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT);
+}
+
+std::filesystem::path sampleProjectRoot()
+{
+    return projectRoot() / "SampleProject";
+}
+
+std::filesystem::path sampleProjectFile()
+{
+    return sampleProjectRoot() / "Sample Project.lunaproj";
+}
+
+luna::AssetHandle registerMemoryAsset(const std::shared_ptr<luna::Asset>& asset)
+{
+    if (!asset) {
+        return luna::AssetHandle(0);
+    }
+
+    luna::AssetManager::get().registerMemoryAsset(asset->handle, asset);
+    return asset->handle;
+}
+
+std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh);
+
+bool loadSampleProjectAssets()
+{
+    const auto project_file = sampleProjectFile();
+    if (!std::filesystem::exists(project_file)) {
+        return false;
+    }
+
+    if (!luna::ProjectManager::instance().loadProject(project_file)) {
+        LUNA_EDITOR_WARN("Failed to load sample project '{}'", project_file.string());
+        return false;
+    }
+
+    luna::AssetManager::get().clear();
+    luna::AssetDatabase::clear();
+    luna::ImporterManager::init();
+    luna::ImporterManager::import();
+    luna::AssetManager::get().init();
+    return true;
+}
+
+luna::AssetHandle ensureImportedTextureHandle(const std::filesystem::path& asset_path)
+{
+    if (!std::filesystem::exists(asset_path)) {
+        return luna::AssetHandle(0);
+    }
+
+    if (const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(asset_path);
+        existing_handle.isValid()) {
+        return existing_handle;
+    }
+
+    luna::TextureImporter importer;
+    const std::filesystem::path meta_path = luna::importer_detail::getMetadataPath(asset_path);
+    luna::AssetMetadata metadata =
+        std::filesystem::exists(meta_path) ? importer.deserializeMetadata(meta_path) : importer.import(asset_path);
+    if (!std::filesystem::exists(meta_path)) {
+        importer.serializeMetadata(metadata);
+    }
+
+    luna::AssetDatabase::set(metadata.Handle, metadata);
+    return metadata.Handle;
+}
+
+luna::AssetHandle ensureDamagedHelmetMaterialAsset()
+{
+    const auto helmet_dir = sampleProjectRoot() / "Assets" / "Model" / "DamagedHelmet";
+    const auto material_path = helmet_dir / "DamagedHelmet.lunamat";
+
+    if (const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(material_path);
+        existing_handle.isValid()) {
+        return existing_handle;
+    }
+
+    luna::MaterialAssetDescriptor descriptor = luna::MaterialFactory::makeDefaultDescriptor("DamagedHelmet");
+    descriptor.Textures.BaseColor = ensureImportedTextureHandle(helmet_dir / "Default_albedo.jpg");
+    descriptor.Textures.Normal = ensureImportedTextureHandle(helmet_dir / "Default_normal.jpg");
+    descriptor.Textures.MetallicRoughness = ensureImportedTextureHandle(helmet_dir / "Default_metalRoughness.jpg");
+    descriptor.Textures.Emissive = ensureImportedTextureHandle(helmet_dir / "Default_emissive.jpg");
+    descriptor.Textures.Occlusion = ensureImportedTextureHandle(helmet_dir / "Default_AO.jpg");
+    descriptor.Surface.EmissiveFactor = glm::vec3(1.0f);
+    descriptor.Surface.MetallicFactor = 1.0f;
+    descriptor.Surface.RoughnessFactor = 1.0f;
+
+    if (!descriptor.Textures.BaseColor.isValid() || !descriptor.Textures.Normal.isValid() ||
+        !descriptor.Textures.MetallicRoughness.isValid() || !descriptor.Textures.Emissive.isValid() ||
+        !descriptor.Textures.Occlusion.isValid()) {
+        LUNA_EDITOR_WARN("DamagedHelmet textures were not imported correctly; cannot create material asset");
+        return luna::AssetHandle(0);
+    }
+
+    if (!luna::MaterialFactory::createMaterialFile(material_path, descriptor, true)) {
+        LUNA_EDITOR_WARN("Failed to create DamagedHelmet material asset '{}'", material_path.string());
+        return luna::AssetHandle(0);
+    }
+
+    return luna::AssetDatabase::findHandleByFilePath(material_path);
+}
+
+bool loadSampleProjectDamagedHelmet(std::shared_ptr<luna::Mesh>& mesh,
+                                    luna::AssetHandle& material_handle,
+                                    std::string& asset_label)
+{
+    if (!loadSampleProjectAssets()) {
+        return false;
+    }
+
+    const auto mesh_path = sampleProjectRoot() / "Assets" / "Model" / "DamagedHelmet" / "DamagedHelmet.gltf";
+    if (!std::filesystem::exists(mesh_path)) {
+        return false;
+    }
+
+    const auto loaded_mesh = luna::MeshLoader::loadFromFile(mesh_path);
+    if (!loaded_mesh || !loaded_mesh->isValid()) {
+        return false;
+    }
+
+    mesh = createNormalizedMesh(*loaded_mesh);
+    if (!mesh || !mesh->isValid()) {
+        return false;
+    }
+
+    material_handle = ensureDamagedHelmetMaterialAsset();
+    if (!material_handle.isValid()) {
+        return false;
+    }
+
+    asset_label = "SampleProject DamagedHelmet";
+    return true;
 }
 
 const char* presentModeToString(luna::RHI::PresentMode mode)
@@ -106,8 +244,8 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
 
         if (argument == "--backend") {
             if (i + 1 >= argc || argv[i + 1] == nullptr) {
-                LUNA_RUNTIME_WARN("Missing value after '--backend'; defaulting to '{}'",
-                                  backendTypeToString(selected_backend));
+                LUNA_EDITOR_WARN("Missing value after '--backend'; defaulting to '{}'",
+                                 backendTypeToString(selected_backend));
                 continue;
             }
 
@@ -123,50 +261,50 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
             continue;
         }
 
-        LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
-                          std::string(backend_value),
-                          backendTypeToString(selected_backend));
+        LUNA_EDITOR_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
+                         std::string(backend_value),
+                         backendTypeToString(selected_backend));
     }
 
     return selected_backend;
 }
 
-std::shared_ptr<luna::Mesh> createNormalizedMeshFromShape(const luna::rhi::ModelData::Shape& shape)
+std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh)
 {
-    if (shape.Vertices.empty() || shape.Indices.empty()) {
+    if (!mesh.isValid()) {
         return {};
     }
 
-    std::vector<luna::StaticMeshVertex> vertices;
-    vertices.reserve(shape.Vertices.size());
+    std::vector<luna::SubMesh> sub_meshes = mesh.getSubMeshes();
 
     glm::vec3 bounds_min(std::numeric_limits<float>::max());
     glm::vec3 bounds_max(std::numeric_limits<float>::lowest());
+    bool has_vertex = false;
 
-    for (const auto& vertex : shape.Vertices) {
-        bounds_min = glm::min(bounds_min, vertex.Position);
-        bounds_max = glm::max(bounds_max, vertex.Position);
-        vertices.push_back(luna::StaticMeshVertex{
-            .position = vertex.Position,
-            .uv = vertex.TexCoord,
-            .normal = vertex.Normal,
-            .tangent = vertex.Tangent,
-            .bitangent = vertex.Bitangent,
-        });
+    for (const auto& sub_mesh : sub_meshes) {
+        for (const auto& vertex : sub_mesh.Vertices) {
+            bounds_min = glm::min(bounds_min, vertex.Position);
+            bounds_max = glm::max(bounds_max, vertex.Position);
+            has_vertex = true;
+        }
+    }
+
+    if (!has_vertex) {
+        return {};
     }
 
     const glm::vec3 center = (bounds_min + bounds_max) * 0.5f;
     const glm::vec3 extent = bounds_max - bounds_min;
-    const float max_extent = (std::max)((std::max)(extent.x, extent.y), (std::max)(extent.z, 0.0001f));
+    const float max_extent = (std::max) ((std::max) (extent.x, extent.y), (std::max) (extent.z, 0.0001f));
     const float scale = 2.0f / max_extent;
 
-    for (auto& vertex : vertices) {
-        vertex.position = (vertex.position - center) * scale;
+    for (auto& sub_mesh : sub_meshes) {
+        for (auto& vertex : sub_mesh.Vertices) {
+            vertex.Position = (vertex.Position - center) * scale;
+        }
     }
 
-    const std::string mesh_name = shape.Name.empty() ? "DemoAssetMesh" : shape.Name;
-    return luna::Mesh::create(
-        mesh_name, std::move(vertices), std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
+    return luna::Mesh::create(mesh.getName().empty() ? "DemoAssetMesh" : mesh.getName(), std::move(sub_meshes));
 }
 
 std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
@@ -208,7 +346,11 @@ std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
         12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
     };
 
-    return luna::Mesh::create("ProceduralCube", vertices, indices);
+    luna::SubMesh sub_mesh;
+    sub_mesh.Name = "ProceduralCube";
+    sub_mesh.Vertices = vertices;
+    sub_mesh.Indices = indices;
+    return luna::Mesh::create("ProceduralCube", {std::move(sub_mesh)});
 }
 
 std::shared_ptr<luna::Material> createFallbackMaterial()
@@ -246,9 +388,9 @@ luna::RHI::BackendType LunaEditorApplication::getBackend() const
 
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()
 {
-    LUNA_RUNTIME_INFO("LunaEditor requested backend '{}' and present mode '{}' via code",
-                      backendTypeToString(m_backend),
-                      presentModeToString(kRequestedPresentMode));
+    LUNA_EDITOR_INFO("LunaEditor requested backend '{}' and present mode '{}' via code",
+                     backendTypeToString(m_backend),
+                     presentModeToString(kRequestedPresentMode));
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
 
@@ -280,7 +422,7 @@ void LunaEditorApplication::onInit()
         pushOverlay(std::make_unique<LunaEditorLayer>(*this));
     } else {
         getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
-        LUNA_RUNTIME_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
+        LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_backend));
     }
 }
 
@@ -296,7 +438,26 @@ void LunaEditorApplication::buildScene()
     }
 
     m_demo_entity = m_scene.createEntity("Demo Mesh");
-    m_demo_entity.addComponent<StaticMeshComponent>(m_demo_mesh, m_demo_material);
+    auto& mesh_component = m_demo_entity.addComponent<MeshComponent>();
+    if (!m_demo_mesh_handle.isValid()) {
+        m_demo_mesh_handle = registerMemoryAsset(m_demo_mesh);
+    }
+    mesh_component.meshHandle = m_demo_mesh_handle;
+    mesh_component.memoryOnly = m_demo_mesh_memory_only;
+    mesh_component.memoryMeshType = m_demo_memory_mesh_type;
+
+    if (m_demo_mesh) {
+        mesh_component.resizeSubmeshMaterials(m_demo_mesh->getSubMeshes().size());
+    }
+
+    if (!m_demo_material_handle.isValid()) {
+        m_demo_material_handle = registerMemoryAsset(m_demo_material);
+    }
+
+    const AssetHandle material_handle = m_demo_material_handle;
+    for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
+        mesh_component.setSubmeshMaterial(submesh_index, material_handle);
+    }
 
     auto& transform = m_demo_entity.getComponent<TransformComponent>();
     transform.translation = glm::vec3(0.0f);
@@ -308,6 +469,15 @@ void LunaEditorApplication::buildScene()
 
 bool LunaEditorApplication::tryLoadDefaultAsset()
 {
+    if (loadSampleProjectDamagedHelmet(m_demo_mesh, m_demo_material_handle, m_asset_label)) {
+        m_demo_material.reset();
+        m_demo_mesh_handle = AssetHandle(0);
+        m_demo_mesh_memory_only = true;
+        m_demo_memory_mesh_type = MemoryMeshType::None;
+        LUNA_EDITOR_INFO("Loaded SampleProject DamagedHelmet with generated .lunamat material");
+        return true;
+    }
+
     const std::array<std::filesystem::path, 3> candidates = {
         projectRoot() / "Assets" / "DamagedHelmet" / "DamagedHelmet.gltf",
         projectRoot() / "Assets" / "basicmesh.glb",
@@ -320,29 +490,27 @@ bool LunaEditorApplication::tryLoadDefaultAsset()
         }
 
         try {
-            const auto model_data = rhi::ModelLoader::Load(candidate.string());
-            if (model_data.Shapes.empty()) {
+            const auto loaded_mesh = MeshLoader::loadFromFile(candidate);
+            if (!loaded_mesh || !loaded_mesh->isValid()) {
                 continue;
             }
 
-            const auto& shape = model_data.Shapes.front();
-            m_demo_mesh = createNormalizedMeshFromShape(shape);
+            m_demo_mesh = createNormalizedMesh(*loaded_mesh);
             if (!m_demo_mesh || !m_demo_mesh->isValid()) {
                 continue;
             }
 
-            if (shape.MaterialIndex < model_data.Materials.size()) {
-                m_demo_material = Material::createFromModelMaterial(model_data.Materials[shape.MaterialIndex]);
-            }
-            if (!m_demo_material) {
-                m_demo_material = createFallbackMaterial();
-            }
+            m_demo_material = createFallbackMaterial();
+            m_demo_mesh_handle = AssetHandle(0);
+            m_demo_material_handle = AssetHandle(0);
+            m_demo_mesh_memory_only = true;
+            m_demo_memory_mesh_type = MemoryMeshType::None;
 
             m_asset_label = candidate.filename().string();
-            LUNA_RUNTIME_INFO("Loaded demo asset '{}'", candidate.string());
+            LUNA_EDITOR_INFO("Loaded demo asset '{}'", candidate.string());
             return true;
         } catch (const std::exception& error) {
-            LUNA_RUNTIME_WARN("Failed to load demo asset '{}': {}", candidate.string(), error.what());
+            LUNA_EDITOR_WARN("Failed to load demo asset '{}': {}", candidate.string(), error.what());
         }
     }
 
@@ -353,14 +521,18 @@ void LunaEditorApplication::createFallbackAsset()
 {
     m_demo_mesh = createProceduralCubeMesh();
     m_demo_material = createFallbackMaterial();
+    m_demo_mesh_handle = AssetHandle(0);
+    m_demo_material_handle = AssetHandle(0);
+    m_demo_mesh_memory_only = true;
+    m_demo_memory_mesh_type = MemoryMeshType::ProceduralCube;
     m_asset_label = "Procedural cube";
-    LUNA_RUNTIME_INFO("Using fallback procedural cube for editor demo");
+    LUNA_EDITOR_INFO("Using fallback procedural cube for editor demo");
 }
 
 Application* createApplication(int argc, char** argv)
 {
     const auto backend = parseBackendFromArgs(argc, argv);
-    LUNA_RUNTIME_INFO("Starting LunaEditor with backend '{}'", backendTypeToString(backend));
+    LUNA_EDITOR_INFO("Starting LunaEditor with backend '{}'", backendTypeToString(backend));
     return new LunaEditorApplication(backend);
 }
 

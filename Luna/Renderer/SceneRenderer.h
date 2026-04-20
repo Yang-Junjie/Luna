@@ -3,6 +3,7 @@
 #include "Renderer/Camera.h"
 #include "Renderer/Material.h"
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/Texture.h"
 
 #include <CommandBufferEncoder.h>
 #include <Core.h>
@@ -74,6 +75,9 @@ public:
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
                           std::shared_ptr<Material> material = {});
+    void submitStaticMesh(const glm::mat4& transform,
+                          std::shared_ptr<Mesh> mesh,
+                          const std::vector<std::shared_ptr<Material>>& submesh_materials);
     void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
     void clearSubmittedMeshes();
     void setShaderPaths(ShaderPaths shader_paths);
@@ -84,16 +88,23 @@ private:
         glm::mat4 transform{1.0f};
         std::shared_ptr<Mesh> mesh;
         std::shared_ptr<Material> material;
+        uint32_t sub_mesh_index{UINT32_MAX};
     };
 
-    struct UploadedMesh {
+    struct UploadedSubMesh {
         luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
         luna::RHI::Ref<luna::RHI::Buffer> index_buffer;
         uint32_t index_count{0};
+        uint32_t sub_mesh_index{UINT32_MAX};
+    };
+
+    struct UploadedMesh {
+        std::vector<UploadedSubMesh> sub_meshes;
     };
 
     struct UploadedTexture {
         luna::RHI::Ref<luna::RHI::Texture> texture;
+        luna::RHI::Ref<luna::RHI::Sampler> sampler;
         luna::RHI::Ref<luna::RHI::Buffer> staging_buffer;
         std::vector<luna::RHI::BufferImageCopy> copy_regions;
         bool uploaded{false};
@@ -137,7 +148,6 @@ private:
 
         luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
 
-        luna::RHI::Ref<luna::RHI::Sampler> material_sampler;
         luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
         luna::RHI::Ref<luna::RHI::Sampler> environment_sampler;
 
@@ -165,7 +175,9 @@ private:
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
-    UploadedTexture createUploadedTexture(const rhi::ImageData& image, const std::string& debug_name) const;
+    UploadedTexture createUploadedTexture(const rhi::ImageData& image,
+                                          const rhi::Texture::SamplerSettings& sampler_settings,
+                                          const std::string& debug_name) const;
     void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedTexture& uploaded_texture);
     void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
     void ensureSceneResources();

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "Renderer/ModelLoader.h"
+#include "Asset/Asset.h"
 
 #include <cstdint>
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,31 +14,45 @@
 namespace luna {
 
 struct StaticMeshVertex {
-    glm::vec3 position{0.0f, 0.0f, 0.0f};
-    glm::vec2 uv{0.0f, 0.0f};
-    glm::vec3 normal{0.0f, 0.0f, 1.0f};
-    glm::vec3 tangent{1.0f, 0.0f, 0.0f};
-    glm::vec3 bitangent{0.0f, 1.0f, 0.0f};
+    glm::vec3 Position{0.0f, 0.0f, 0.0f};
+    glm::vec2 TexCoord{0.0f, 0.0f};
+    glm::vec3 Normal{0.0f, 0.0f, 1.0f};
+    glm::vec4 Color{1.0f, 1.0f, 1.0f, 1.0f};
+
+    glm::vec3 Tangent{1.0f, 0.0f, 0.0f};
+    glm::vec3 Bitangent{0.0f, 1.0f, 0.0f};
 };
 
-class Mesh {
-public:
-    Mesh();
-    Mesh(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices);
+struct SubMesh {
+    std::string Name;
 
-    static std::shared_ptr<Mesh>
-        create(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices);
-    static std::shared_ptr<Mesh> createFromModelShape(const rhi::ModelData::Shape& shape);
+    std::vector<StaticMeshVertex> Vertices;
+    std::vector<uint32_t> Indices;
+
+    uint32_t MaterialIndex{UINT32_MAX};
+};
+
+class Mesh final : public Asset {
+public:
+    Mesh() = default;
+
+    explicit Mesh(std::string name, std::vector<SubMesh> subMeshes);
+
+    static std::shared_ptr<Mesh> create(std::string name, std::vector<SubMesh> subMeshes);
 
     const std::string& getName() const;
-    const std::vector<StaticMeshVertex>& getVertices() const;
-    const std::vector<uint32_t>& getIndices() const;
+    const std::vector<SubMesh>& getSubMeshes() const;
+
+    AssetType getAssetsType() const override
+    {
+        return AssetType::Mesh;
+    }
+
     bool isValid() const;
 
 private:
     std::string m_name;
-    std::vector<StaticMeshVertex> m_vertices;
-    std::vector<uint32_t> m_indices;
+    std::vector<SubMesh> m_subMeshes;
 };
 
 } // namespace luna

@@ -1,0 +1,14 @@
+Asset:
+  Name: Default_normal
+  Handle: 18102217438490747247
+  Type: Texture
+  FilePath: Assets/Model/DamagedHelmet/Default_normal.jpg
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

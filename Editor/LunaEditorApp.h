@@ -40,6 +40,10 @@ private:
     Entity m_selected_entity;
     std::shared_ptr<Mesh> m_demo_mesh;
     std::shared_ptr<Material> m_demo_material;
+    AssetHandle m_demo_mesh_handle{0};
+    AssetHandle m_demo_material_handle{0};
+    bool m_demo_mesh_memory_only{true};
+    MemoryMeshType m_demo_memory_mesh_type{MemoryMeshType::None};
     std::string m_asset_label{"Procedural cube"};
     luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};
 };

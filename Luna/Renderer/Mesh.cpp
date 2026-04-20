@@ -3,37 +3,14 @@
 #include <utility>
 
 namespace luna {
-
-Mesh::Mesh() = default;
-
-Mesh::Mesh(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
+Mesh::Mesh(std::string name, std::vector<SubMesh> subMeshes)
     : m_name(std::move(name)),
-      m_vertices(std::move(vertices)),
-      m_indices(std::move(indices))
+      m_subMeshes(std::move(subMeshes))
 {}
 
-std::shared_ptr<Mesh>
-    Mesh::create(std::string name, std::vector<StaticMeshVertex> vertices, std::vector<uint32_t> indices)
+std::shared_ptr<Mesh> Mesh::create(std::string name, std::vector<SubMesh> subMeshes)
 {
-    return std::make_shared<Mesh>(std::move(name), std::move(vertices), std::move(indices));
-}
-
-std::shared_ptr<Mesh> Mesh::createFromModelShape(const rhi::ModelData::Shape& shape)
-{
-    std::vector<StaticMeshVertex> vertices;
-    vertices.reserve(shape.Vertices.size());
-
-    for (const auto& vertex : shape.Vertices) {
-        vertices.push_back(StaticMeshVertex{
-            .position = vertex.Position,
-            .uv = vertex.TexCoord,
-            .normal = vertex.Normal,
-            .tangent = vertex.Tangent,
-            .bitangent = vertex.Bitangent,
-        });
-    }
-
-    return Mesh::create(shape.Name, vertices, std::vector<uint32_t>{shape.Indices.begin(), shape.Indices.end()});
+    return std::make_shared<Mesh>(std::move(name), std::move(subMeshes));
 }
 
 const std::string& Mesh::getName() const
@@ -41,19 +18,23 @@ const std::string& Mesh::getName() const
     return m_name;
 }
 
-const std::vector<StaticMeshVertex>& Mesh::getVertices() const
+const std::vector<SubMesh>& Mesh::getSubMeshes() const
 {
-    return m_vertices;
-}
-
-const std::vector<uint32_t>& Mesh::getIndices() const
-{
-    return m_indices;
+    return m_subMeshes;
 }
 
 bool Mesh::isValid() const
 {
-    return !m_vertices.empty() && !m_indices.empty();
+    if (m_subMeshes.empty()) {
+        return false;
+    }
+
+    for (const auto& sm : m_subMeshes) {
+        if (sm.Vertices.empty() || sm.Indices.empty()) {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace luna

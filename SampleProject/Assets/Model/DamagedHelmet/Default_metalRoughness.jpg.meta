@@ -1,0 +1,14 @@
+Asset:
+  Name: Default_metalRoughness
+  Handle: 9026749115351921305
+  Type: Texture
+  FilePath: Assets/Model/DamagedHelmet/Default_metalRoughness.jpg
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

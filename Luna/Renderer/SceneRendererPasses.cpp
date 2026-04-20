@@ -65,15 +65,23 @@ void SceneRenderer::executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_
             uploaded_material.descriptor_set,
             gpu.scene_descriptor_set,
         };
+        if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
+            continue;
+        }
+
+        const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.sub_mesh_index];
+        if (!uploaded_sub_mesh.vertex_buffer || !uploaded_sub_mesh.index_buffer || uploaded_sub_mesh.index_count == 0) {
+            continue;
+        }
 
         MeshPushConstants push_constants;
         push_constants.model = draw_command.transform;
         commands.BindDescriptorSets(gpu.geometry_pipeline, 0, descriptor_sets);
-        commands.BindVertexBuffer(0, uploaded_mesh.vertex_buffer);
-        commands.BindIndexBuffer(uploaded_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
         commands.PushConstants(
             gpu.geometry_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
-        commands.DrawIndexed(uploaded_mesh.index_count, 1, 0, 0, 0);
+        commands.BindVertexBuffer(0, uploaded_sub_mesh.vertex_buffer);
+        commands.BindIndexBuffer(uploaded_sub_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.DrawIndexed(uploaded_sub_mesh.index_count, 1, 0, 0, 0);
     }
 
     pass_context.endRendering();
@@ -221,15 +229,23 @@ void SceneRenderer::executeTransparentPass(rhi::RenderGraphRasterPassContext& pa
             uploaded_material.descriptor_set,
             gpu.scene_descriptor_set,
         };
+        if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
+            continue;
+        }
+
+        const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.sub_mesh_index];
+        if (!uploaded_sub_mesh.vertex_buffer || !uploaded_sub_mesh.index_buffer || uploaded_sub_mesh.index_count == 0) {
+            continue;
+        }
 
         MeshPushConstants push_constants;
         push_constants.model = draw_command.transform;
         commands.BindDescriptorSets(gpu.transparent_pipeline, 0, descriptor_sets);
-        commands.BindVertexBuffer(0, uploaded_mesh.vertex_buffer);
-        commands.BindIndexBuffer(uploaded_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
         commands.PushConstants(
             gpu.transparent_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
-        commands.DrawIndexed(uploaded_mesh.index_count, 1, 0, 0, 0);
+        commands.BindVertexBuffer(0, uploaded_sub_mesh.vertex_buffer);
+        commands.BindIndexBuffer(uploaded_sub_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.DrawIndexed(uploaded_sub_mesh.index_count, 1, 0, 0, 0);
     }
 
     pass_context.endRendering();

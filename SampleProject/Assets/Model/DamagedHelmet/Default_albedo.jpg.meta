@@ -1,0 +1,14 @@
+Asset:
+  Name: Default_albedo
+  Handle: 11511648089715678280
+  Type: Texture
+  FilePath: Assets/Model/DamagedHelmet/Default_albedo.jpg
+  Config:
+    GenerateMipmaps: true
+    SRGB: true
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

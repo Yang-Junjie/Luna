@@ -4,7 +4,7 @@
 #include <string>
 
 namespace luna::tools {
-std::string makeRelative(const std::filesystem::path& path, const std::filesystem::path& baseDir)
+inline std::string makeRelative(const std::filesystem::path& path, const std::filesystem::path& baseDir)
 {
     if (path.empty()) {
         return {};
@@ -19,7 +19,7 @@ std::string makeRelative(const std::filesystem::path& path, const std::filesyste
     return rel.generic_string();
 }
 
-std::filesystem::path makeAbsolute(const std::string& stored, const std::filesystem::path& baseDir)
+inline std::filesystem::path makeAbsolute(const std::string& stored, const std::filesystem::path& baseDir)
 {
     if (stored.empty()) {
         return {};

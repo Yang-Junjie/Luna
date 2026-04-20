@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Renderer/ImageLoader.h"
+#include "Asset/Editor/ImageLoader.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/SceneRenderer.h"
+#include "Renderer/Texture.h"
 
 #include <cmath>
 #include <cstring>
@@ -98,6 +99,7 @@ inline float materialBlendModeToFloat(luna::Material::BlendMode blend_mode)
     switch (blend_mode) {
         case luna::Material::BlendMode::Masked:
             return 1.0f;
+        case luna::Material::BlendMode::Additive:
         case luna::Material::BlendMode::Transparent:
             return 2.0f;
         case luna::Material::BlendMode::Opaque:
@@ -118,6 +120,46 @@ inline luna::RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
     blend_attachment.AlphaBlendOp = luna::RHI::BlendOp::Add;
     blend_attachment.ColorWriteMask = luna::RHI::ColorComponentFlags::All;
     return blend_attachment;
+}
+
+inline luna::RHI::Filter toRhiFilter(luna::rhi::Texture::FilterMode filter_mode)
+{
+    switch (filter_mode) {
+        case luna::rhi::Texture::FilterMode::Nearest:
+            return luna::RHI::Filter::Nearest;
+        case luna::rhi::Texture::FilterMode::Linear:
+        default:
+            return luna::RHI::Filter::Linear;
+    }
+}
+
+inline luna::RHI::SamplerMipmapMode toRhiMipmapMode(luna::rhi::Texture::MipFilterMode mip_filter_mode)
+{
+    switch (mip_filter_mode) {
+        case luna::rhi::Texture::MipFilterMode::Nearest:
+            return luna::RHI::SamplerMipmapMode::Nearest;
+        case luna::rhi::Texture::MipFilterMode::None:
+        case luna::rhi::Texture::MipFilterMode::Linear:
+        default:
+            return luna::RHI::SamplerMipmapMode::Linear;
+    }
+}
+
+inline luna::RHI::SamplerAddressMode toRhiAddressMode(luna::rhi::Texture::WrapMode wrap_mode)
+{
+    switch (wrap_mode) {
+        case luna::rhi::Texture::WrapMode::MirroredRepeat:
+            return luna::RHI::SamplerAddressMode::MirroredRepeat;
+        case luna::rhi::Texture::WrapMode::ClampToEdge:
+            return luna::RHI::SamplerAddressMode::ClampToEdge;
+        case luna::rhi::Texture::WrapMode::ClampToBorder:
+            return luna::RHI::SamplerAddressMode::ClampToBorder;
+        case luna::rhi::Texture::WrapMode::MirrorClampToEdge:
+            return luna::RHI::SamplerAddressMode::MirrorClampToEdge;
+        case luna::rhi::Texture::WrapMode::Repeat:
+        default:
+            return luna::RHI::SamplerAddressMode::Repeat;
+    }
 }
 
 inline float transparentSortDistanceSq(const glm::mat4& transform, const Camera& camera)

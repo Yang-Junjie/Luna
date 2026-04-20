@@ -7,7 +7,7 @@ enum class AssetType {
     Texture,
     Mesh,
     Material,
-    Model,
+    Scene,
 };
 
 namespace AssetUtils {
@@ -22,8 +22,8 @@ inline const char* AssetTypeToString(AssetType type)
             return "Mesh";
         case AssetType::Material:
             return "Material";
-        case AssetType::Model:
-            return "Model";
+        case AssetType::Scene:
+            return "Scene";
     }
     return "None";
 }
@@ -39,8 +39,8 @@ inline AssetType StringToAssetType(const std::string& str)
     if (str == "Material") {
         return AssetType::Material;
     }
-    if (str == "Model") {
-        return AssetType::Model;
+    if (str == "Scene") {
+        return AssetType::Scene;
     }
     return AssetType::None;
 }

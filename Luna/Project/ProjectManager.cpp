@@ -7,19 +7,20 @@
 namespace luna {
 bool ProjectManager::loadProject(const std::filesystem::path& project_file_path)
 {
-    m_project_root_path = project_file_path.parent_path();
-    m_project_file_path = project_file_path;
-    m_project_info = ProjectInfo{};
+    const auto normalized_path = project_file_path.lexically_normal();
+    m_project_root_path = normalized_path.parent_path();
+    m_project_file_path = normalized_path;
+    m_project_info.reset();
 
     return deserializeProject();
 }
 
-std::optional<std::filesystem::path> ProjectManager::getProjectRootPath()
+std::optional<std::filesystem::path> ProjectManager::getProjectRootPath() const
 {
     return m_project_root_path;
 }
 
-const std::optional<ProjectInfo>& ProjectManager::getProjectInfo()
+const std::optional<ProjectInfo>& ProjectManager::getProjectInfo() const
 {
     return m_project_info;
 }
@@ -31,12 +32,13 @@ void ProjectManager::setProjectInfo(const ProjectInfo& info)
 
 bool ProjectManager::createProject(const std::filesystem::path& project_root_path, const ProjectInfo& info)
 {
-    const auto project_file_path = project_root_path / (info.Name + ".lunaproj");
+    const auto normalized_root_path = project_root_path.lexically_normal();
+    const auto project_file_path = normalized_root_path / (info.Name + ".lunaproj");
     if (std::filesystem::exists(project_file_path)) {
         LUNA_CORE_ERROR("Project file already exists: {0}", project_file_path.string());
         return false;
     }
-    m_project_root_path = project_root_path;
+    m_project_root_path = normalized_root_path;
     m_project_file_path = project_file_path;
     m_project_info = info;
     return serializeProject();
@@ -49,29 +51,31 @@ bool ProjectManager::serializeProject()
         return false;
     }
 
+    const ProjectInfo& project_info = *m_project_info;
+    const std::filesystem::path& project_file_path = *m_project_file_path;
+
     YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << "Project" << YAML::Value;
     {
         out << YAML::BeginMap;
-        out << YAML::Key << "Name" << YAML::Value << m_project_info.value().Name;
-        out << YAML::Key << "Version" << YAML::Value << m_project_info.value().Version;
-        out << YAML::Key << "Author" << YAML::Value << m_project_info.value().Author;
-        out << YAML::Key << "Description" << YAML::Value << m_project_info.value().Description;
-
-        out << YAML::Key << "StartScene" << YAML::Value << m_project_info.value().StartScene.string();
-        out << YAML::Key << "Assets" << YAML::Value << m_project_info.value().AssetsPath.string();
+        out << YAML::Key << "Name" << YAML::Value << project_info.Name;
+        out << YAML::Key << "Version" << YAML::Value << project_info.Version;
+        out << YAML::Key << "Author" << YAML::Value << project_info.Author;
+        out << YAML::Key << "Description" << YAML::Value << project_info.Description;
+        out << YAML::Key << "StartScene" << YAML::Value << project_info.StartScene.generic_string();
+        out << YAML::Key << "Assets" << YAML::Value << project_info.AssetsPath.generic_string();
     }
     out << YAML::EndMap;
 
-    std::ofstream fout(m_project_file_path.value());
+    std::ofstream fout(project_file_path);
     if (!fout.is_open()) {
-        LUNA_CORE_ERROR("Failed to open project file: {0}", m_project_file_path.value().string());
+        LUNA_CORE_ERROR("Failed to open project file: {0}", project_file_path.string());
         return false;
     }
     fout << out.c_str();
 
-    LUNA_CORE_INFO("Project file serialized to: {0}", m_project_file_path.value().string());
+    LUNA_CORE_INFO("Project file serialized to: {0}", project_file_path.string());
     return fout.good();
 }
 
@@ -114,11 +118,10 @@ bool ProjectManager::deserializeProject()
             info.AssetsPath = project["Assets"].as<std::string>();
         }
         m_project_info = std::move(info);
-    } else {
-        LUNA_CORE_ERROR("Project YAML does not contain a 'Project' root: {0}", m_project_file_path.value().string());
-        return false;
+        return true;
     }
 
-    return true;
+    LUNA_CORE_ERROR("Project YAML does not contain a 'Project' root: {0}", m_project_file_path.value().string());
+    return false;
 }
 } // namespace luna
