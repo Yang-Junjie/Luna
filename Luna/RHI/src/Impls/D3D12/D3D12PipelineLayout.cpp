@@ -2,6 +2,7 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
+#include <algorithm>
 #include <cstdio>
 
 #include <stdexcept>
@@ -34,17 +35,22 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
     // Keep descriptor ranges alive until root signature is serialized
     std::vector<std::vector<D3D12_DESCRIPTOR_RANGE>> srvCbvUavRanges(info.SetLayouts.size());
     std::vector<std::vector<D3D12_DESCRIPTOR_RANGE>> samplerRanges(info.SetLayouts.size());
+    uint32_t registerBase = 0;
     for (size_t i = 0; i < info.SetLayouts.size(); i++) {
         auto d3dLayout = std::dynamic_pointer_cast<D3D12DescriptorSetLayout>(info.SetLayouts[i]);
         if (!d3dLayout) {
             continue;
         }
+        uint32_t maxBinding = 0;
+        bool hasBindings = false;
         for (const auto& binding : d3dLayout->GetBindings()) {
             D3D12_DESCRIPTOR_RANGE range = {};
             range.NumDescriptors = binding.Count;
-            range.BaseShaderRegister = binding.Binding;
+            range.BaseShaderRegister = registerBase + binding.Binding;
             range.RegisterSpace = 0;
             range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+            maxBinding = (std::max)(maxBinding, binding.Binding + binding.Count - 1);
+            hasBindings = true;
 
             if (binding.Type == DescriptorType::Sampler) {
                 range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
@@ -81,6 +87,10 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
             tableParam.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(samplerRanges[i].size());
             tableParam.DescriptorTable.pDescriptorRanges = samplerRanges[i].data();
             rootParams.push_back(tableParam);
+        }
+
+        if (hasBindings) {
+            registerBase += maxBinding + 1;
         }
     }
 

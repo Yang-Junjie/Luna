@@ -3,11 +3,13 @@
 #include "D3D12Common.h"
 #include "DescriptorSet.h"
 
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
 namespace luna::RHI {
 class D3D12DescriptorPool;
+class D3D12Device;
 
 class LUNA_RHI_API D3D12DescriptorSet : public DescriptorSet {
 public:
@@ -25,10 +27,13 @@ private:
     uint32_t m_cbvSrvUavCount = 0;
     uint32_t m_cbvSrvUavDescSize = 0;
 
+    uint32_t m_samplerCount = 0;
+    std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_samplerDescriptors;
     D3D12_GPU_DESCRIPTOR_HANDLE m_samplerGpu = {};
     D3D12_CPU_DESCRIPTOR_HANDLE m_samplerCpu = {};
-    uint32_t m_samplerCount = 0;
-    uint32_t m_samplerDescSize = 0;
+    uint32_t m_stagedSamplerFrameIndex = (std::numeric_limits<uint32_t>::max)();
+    uint64_t m_samplerVersion = 1;
+    uint64_t m_stagedSamplerVersion = 0;
 
     std::vector<SlotInfo> m_bindingMap;
 
@@ -47,13 +52,9 @@ public:
                        D3D12_CPU_DESCRIPTOR_HANDLE cbvCpu,
                        uint32_t cbvCount,
                        uint32_t cbvDescSize,
-                       D3D12_GPU_DESCRIPTOR_HANDLE sampGpu,
-                       D3D12_CPU_DESCRIPTOR_HANDLE sampCpu,
                        uint32_t sampCount,
-                       uint32_t sampDescSize,
                        std::vector<SlotInfo> bindingMap,
-                       ID3D12DescriptorHeap* cbvHeap,
-                       ID3D12DescriptorHeap* sampHeap);
+                       ID3D12DescriptorHeap* cbvHeap);
 
     D3D12_GPU_DESCRIPTOR_HANDLE GetCBVSRVUAVGPUHandle() const
     {
@@ -84,6 +85,8 @@ public:
     {
         return m_samplerHeap;
     }
+
+    bool PrepareSamplerTable(D3D12Device& device);
 
     void Update() override {}
 

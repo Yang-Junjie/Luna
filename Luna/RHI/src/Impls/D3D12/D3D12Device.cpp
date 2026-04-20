@@ -117,12 +117,16 @@ void D3D12Device::InitializeDeferredDescriptorRecycling(uint32_t maxFramesInFlig
     std::lock_guard lock(m_deferredDescriptorMutex);
     m_deferredDescriptorFrees.clear();
     m_deferredDescriptorFrees.resize(maxFramesInFlight);
+    m_deferredSamplerRangeFrees.clear();
+    m_deferredSamplerRangeFrees.resize(maxFramesInFlight);
+    m_orphanedSamplerRangeFrees.clear();
     m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
 }
 
 void D3D12Device::PrepareDeferredDescriptorFrame(uint32_t frameIndex)
 {
     std::vector<DeferredDescriptorFree> readyToFree;
+    std::vector<DescriptorRange> readySamplerRanges;
 
     {
         std::lock_guard lock(m_deferredDescriptorMutex);
@@ -133,16 +137,24 @@ void D3D12Device::PrepareDeferredDescriptorFrame(uint32_t frameIndex)
 
         m_currentDeferredDescriptorFrame = frameIndex;
         readyToFree.swap(m_deferredDescriptorFrees[frameIndex]);
+        if (frameIndex < m_deferredSamplerRangeFrees.size()) {
+            readySamplerRanges.swap(m_deferredSamplerRangeFrees[frameIndex]);
+        }
     }
 
     for (const auto& pending : readyToFree) {
         FreeDescriptorImmediate(pending.type, pending.handle);
+    }
+
+    for (const auto& range : readySamplerRanges) {
+        FreeSamplerRangeImmediate(range);
     }
 }
 
 void D3D12Device::ReleaseAllDeferredDescriptors()
 {
     std::vector<DeferredDescriptorFree> pendingDescriptors;
+    std::vector<DescriptorRange> pendingSamplerRanges;
 
     {
         std::lock_guard lock(m_deferredDescriptorMutex);
@@ -150,11 +162,22 @@ void D3D12Device::ReleaseAllDeferredDescriptors()
             pendingDescriptors.insert(pendingDescriptors.end(), pendingList.begin(), pendingList.end());
             pendingList.clear();
         }
+        for (auto& pendingList : m_deferredSamplerRangeFrees) {
+            pendingSamplerRanges.insert(pendingSamplerRanges.end(), pendingList.begin(), pendingList.end());
+            pendingList.clear();
+        }
+        pendingSamplerRanges.insert(
+            pendingSamplerRanges.end(), m_orphanedSamplerRangeFrees.begin(), m_orphanedSamplerRangeFrees.end());
+        m_orphanedSamplerRangeFrees.clear();
         m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
     }
 
     for (const auto& pending : pendingDescriptors) {
         FreeDescriptorImmediate(pending.type, pending.handle);
+    }
+
+    for (const auto& range : pendingSamplerRanges) {
+        FreeSamplerRangeImmediate(range);
     }
 }
 
@@ -176,6 +199,24 @@ void D3D12Device::QueueDeferredDescriptorFree(DeferredDescriptorType type, D3D12
     FreeDescriptorImmediate(type, handle);
 }
 
+void D3D12Device::QueueDeferredSamplerRangeFree(DescriptorRange range)
+{
+    if (!range.IsValid()) {
+        return;
+    }
+
+    {
+        std::lock_guard lock(m_deferredDescriptorMutex);
+        if (m_currentDeferredDescriptorFrame != kInvalidDeferredDescriptorFrame &&
+            m_currentDeferredDescriptorFrame < m_deferredSamplerRangeFrees.size()) {
+            m_deferredSamplerRangeFrees[m_currentDeferredDescriptorFrame].push_back(range);
+            return;
+        }
+
+        m_orphanedSamplerRangeFrees.push_back(range);
+    }
+}
+
 void D3D12Device::FreeDescriptorImmediate(DeferredDescriptorType type, D3D12_CPU_DESCRIPTOR_HANDLE handle)
 {
     switch (type) {
@@ -191,6 +232,28 @@ void D3D12Device::FreeDescriptorImmediate(DeferredDescriptorType type, D3D12_CPU
         default:
             break;
     }
+}
+
+void D3D12Device::FreeSamplerRangeImmediate(DescriptorRange range)
+{
+    m_samplerRangeAllocator.Free(range);
+}
+
+D3D12Device::SamplerTableAllocation D3D12Device::AllocateTransientSamplerTable(uint32_t count)
+{
+    SamplerTableAllocation allocation{};
+    if (count == 0 || !m_samplerHeap) {
+        return allocation;
+    }
+
+    const DescriptorRange range = m_samplerRangeAllocator.Allocate(count);
+    allocation.cpu = GetSamplerCpuHandle(range.offset);
+    allocation.gpu = GetSamplerGpuHandle(range.offset);
+    allocation.heap = m_samplerHeap.Get();
+    allocation.count = count;
+
+    QueueDeferredSamplerRangeFree(range);
+    return allocation;
 }
 
 void D3D12Device::StorePSO(const wchar_t* name, ID3D12PipelineState* pso)
@@ -225,7 +288,7 @@ void D3D12Device::CreateDescriptorHeaps()
 
     createHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 256, false, m_rtvHeap);
     createHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 64, false, m_dsvHeap);
-    createHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 65'536, true, m_cbvSrvUavHeap);
+    createHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 65'536, false, m_cbvSrvUavHeap);
     createHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 2'048, true, m_samplerHeap);
 
     auto initPool =
@@ -238,6 +301,8 @@ void D3D12Device::CreateDescriptorHeaps()
     initPool(m_rtvPool, m_rtvHeap, m_rtvDescriptorSize, 256);
     initPool(m_dsvPool, m_dsvHeap, m_dsvDescriptorSize, 64);
     initPool(m_cbvSrvUavPool, m_cbvSrvUavHeap, m_cbvSrvUavDescriptorSize, 65'536);
+    m_samplerRangeAllocator.capacity = 2'048;
+    m_samplerRangeAllocator.Reset();
 }
 
 ComPtr<ID3D12CommandAllocator> D3D12Device::AcquireCommandAllocator()

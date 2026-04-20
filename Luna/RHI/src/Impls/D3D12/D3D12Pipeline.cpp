@@ -4,8 +4,10 @@
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
 #include <cstdio>
+#include <cstdlib>
 
 #include <atomic>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -144,12 +146,39 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     if (FAILED(hr)) {
         hr = d3dDevice->GetHandle()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
         if (FAILED(hr)) {
-            char buf[128];
-            snprintf(buf,
-                     sizeof(buf),
-                     "ID3D12Device::CreateGraphicsPipelineState failed: 0x%08X",
-                     static_cast<unsigned>(hr));
-            throw std::runtime_error(buf);
+            std::ostringstream error;
+            error << "ID3D12Device::CreateGraphicsPipelineState failed: 0x";
+            char hrBuffer[16];
+            snprintf(hrBuffer, sizeof(hrBuffer), "%08X", static_cast<unsigned>(hr));
+            error << hrBuffer;
+
+            ComPtr<ID3D12InfoQueue> infoQueue;
+            if (SUCCEEDED(d3dDevice->GetHandle()->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+                const UINT64 messageCount = infoQueue->GetNumStoredMessages();
+                bool appendedMessage = false;
+                for (UINT64 i = 0; i < messageCount; ++i) {
+                    SIZE_T messageSize = 0;
+                    infoQueue->GetMessage(i, nullptr, &messageSize);
+                    auto* message = static_cast<D3D12_MESSAGE*>(malloc(messageSize));
+                    if (message == nullptr) {
+                        continue;
+                    }
+
+                    if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) && message->pDescription != nullptr) {
+                        error << (appendedMessage ? " | " : " [");
+                        error << message->pDescription;
+                        appendedMessage = true;
+                    }
+                    free(message);
+                }
+
+                if (appendedMessage) {
+                    error << "]";
+                }
+                infoQueue->ClearStoredMessages();
+            }
+
+            throw std::runtime_error(error.str());
         } else {
             d3dDevice->StorePSO(psoName, m_pipelineState.Get());
         }
@@ -195,10 +224,39 @@ D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const Comp
 
     HRESULT hr = d3dDevice->GetHandle()->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState));
     if (FAILED(hr)) {
-        char buf[128];
-        snprintf(
-            buf, sizeof(buf), "ID3D12Device::CreateComputePipelineState failed: 0x%08X", static_cast<unsigned>(hr));
-        throw std::runtime_error(buf);
+        std::ostringstream error;
+        error << "ID3D12Device::CreateComputePipelineState failed: 0x";
+        char hrBuffer[16];
+        snprintf(hrBuffer, sizeof(hrBuffer), "%08X", static_cast<unsigned>(hr));
+        error << hrBuffer;
+
+        ComPtr<ID3D12InfoQueue> infoQueue;
+        if (SUCCEEDED(d3dDevice->GetHandle()->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+            const UINT64 messageCount = infoQueue->GetNumStoredMessages();
+            bool appendedMessage = false;
+            for (UINT64 i = 0; i < messageCount; ++i) {
+                SIZE_T messageSize = 0;
+                infoQueue->GetMessage(i, nullptr, &messageSize);
+                auto* message = static_cast<D3D12_MESSAGE*>(malloc(messageSize));
+                if (message == nullptr) {
+                    continue;
+                }
+
+                if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) && message->pDescription != nullptr) {
+                    error << (appendedMessage ? " | " : " [");
+                    error << message->pDescription;
+                    appendedMessage = true;
+                }
+                free(message);
+            }
+
+            if (appendedMessage) {
+                error << "]";
+            }
+            infoQueue->ClearStoredMessages();
+        }
+
+        throw std::runtime_error(error.str());
     }
 }
 } // namespace luna::RHI

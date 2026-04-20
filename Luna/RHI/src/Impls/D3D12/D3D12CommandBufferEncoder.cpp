@@ -13,12 +13,29 @@
 #include <pix3.h>
 #endif
 
+#include <array>
 #include <stdexcept>
 
 namespace luna::RHI {
 static inline UINT CalcSubresource(UINT mipSlice, UINT arraySlice, UINT planeSlice, UINT mipLevels, UINT arraySize)
 {
     return mipSlice + arraySlice * mipLevels + planeSlice * mipLevels * arraySize;
+}
+
+static void AssignDescriptorHeap(ID3D12DescriptorHeap*& target, ID3D12DescriptorHeap* candidate, const char* heapType)
+{
+    if (candidate == nullptr) {
+        return;
+    }
+
+    if (target != nullptr && target != candidate) {
+        std::string message = "D3D12 requires all bound descriptor sets to share a single ";
+        message += heapType;
+        message += " heap";
+        throw std::runtime_error(message);
+    }
+
+    target = candidate;
 }
 
 D3D12CommandBufferEncoder::D3D12CommandBufferEncoder(const Ref<Device>& device,
@@ -199,40 +216,35 @@ void D3D12CommandBufferEncoder::BindDescriptorSets(const Ref<GraphicsPipeline>& 
         }
     }
     uint32_t rootParamBase = hasPushConstants ? 1 : 0;
+    auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
 
-    std::vector<ID3D12DescriptorHeap*> heaps;
+    ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
+    ID3D12DescriptorHeap* samplerHeap = nullptr;
     for (auto& ds : descriptorSets) {
         auto d3dSet = std::dynamic_pointer_cast<D3D12DescriptorSet>(ds);
         if (!d3dSet) {
             continue;
         }
+
         if (d3dSet->GetCBVSRVUAVHeap()) {
-            bool found = false;
-            for (auto h : heaps) {
-                if (h == d3dSet->GetCBVSRVUAVHeap()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                heaps.push_back(d3dSet->GetCBVSRVUAVHeap());
-            }
+            AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
-        if (d3dSet->GetSamplerHeap()) {
-            bool found = false;
-            for (auto h : heaps) {
-                if (h == d3dSet->GetSamplerHeap()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                heaps.push_back(d3dSet->GetSamplerHeap());
-            }
+
+        if (d3dSet->HasSamplers() && d3dDevice && d3dSet->PrepareSamplerTable(*d3dDevice)) {
+            AssignDescriptorHeap(samplerHeap, d3dSet->GetSamplerHeap(), "sampler");
         }
     }
-    if (!heaps.empty()) {
-        m_commandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+
+    std::array<ID3D12DescriptorHeap*, 2> heaps{};
+    UINT heapCount = 0;
+    if (cbvSrvUavHeap != nullptr) {
+        heaps[heapCount++] = cbvSrvUavHeap;
+    }
+    if (samplerHeap != nullptr) {
+        heaps[heapCount++] = samplerHeap;
+    }
+    if (heapCount > 0) {
+        m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
     uint32_t rootIdx = rootParamBase;
@@ -294,19 +306,30 @@ void D3D12CommandBufferEncoder::BindComputeDescriptorSets(const Ref<ComputePipel
         }
     }
     uint32_t rootParamBase = hasPushConstants ? 1 : 0;
+    auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
 
-    std::vector<ID3D12DescriptorHeap*> heaps;
+    ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
+    ID3D12DescriptorHeap* samplerHeap = nullptr;
     for (auto& ds : descriptorSets) {
         auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
-        if (d3dSet->HasCBVSRVUAV() && d3dSet->GetCBVSRVUAVHeap()) {
-            heaps.push_back(d3dSet->GetCBVSRVUAVHeap());
+        if (d3dSet->HasCBVSRVUAV()) {
+            AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
-        if (d3dSet->HasSamplers() && d3dSet->GetSamplerHeap()) {
-            heaps.push_back(d3dSet->GetSamplerHeap());
+        if (d3dSet->HasSamplers() && d3dDevice && d3dSet->PrepareSamplerTable(*d3dDevice)) {
+            AssignDescriptorHeap(samplerHeap, d3dSet->GetSamplerHeap(), "sampler");
         }
     }
-    if (!heaps.empty()) {
-        m_commandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+
+    std::array<ID3D12DescriptorHeap*, 2> heaps{};
+    UINT heapCount = 0;
+    if (cbvSrvUavHeap != nullptr) {
+        heaps[heapCount++] = cbvSrvUavHeap;
+    }
+    if (samplerHeap != nullptr) {
+        heaps[heapCount++] = samplerHeap;
+    }
+    if (heapCount > 0) {
+        m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
     uint32_t rootIdx = rootParamBase;
@@ -719,36 +742,29 @@ void D3D12CommandBufferEncoder::BindRayTracingDescriptorSets(const Ref<RayTracin
                                                              uint32_t firstSet,
                                                              std::span<const Ref<DescriptorSet>> descriptorSets)
 {
-    std::vector<ID3D12DescriptorHeap*> heaps;
+    auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
+    ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
+    ID3D12DescriptorHeap* samplerHeap = nullptr;
     for (auto& ds : descriptorSets) {
         auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
         if (d3dSet->GetCBVSRVUAVHeap()) {
-            bool found = false;
-            for (auto h : heaps) {
-                if (h == d3dSet->GetCBVSRVUAVHeap()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                heaps.push_back(d3dSet->GetCBVSRVUAVHeap());
-            }
+            AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
-        if (d3dSet->GetSamplerHeap()) {
-            bool found = false;
-            for (auto h : heaps) {
-                if (h == d3dSet->GetSamplerHeap()) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                heaps.push_back(d3dSet->GetSamplerHeap());
-            }
+        if (d3dSet->HasSamplers() && d3dDevice && d3dSet->PrepareSamplerTable(*d3dDevice)) {
+            AssignDescriptorHeap(samplerHeap, d3dSet->GetSamplerHeap(), "sampler");
         }
     }
-    if (!heaps.empty()) {
-        m_commandList->SetDescriptorHeaps(static_cast<UINT>(heaps.size()), heaps.data());
+
+    std::array<ID3D12DescriptorHeap*, 2> heaps{};
+    UINT heapCount = 0;
+    if (cbvSrvUavHeap != nullptr) {
+        heaps[heapCount++] = cbvSrvUavHeap;
+    }
+    if (samplerHeap != nullptr) {
+        heaps[heapCount++] = samplerHeap;
+    }
+    if (heapCount > 0) {
+        m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
     uint32_t rootIdx = firstSet;

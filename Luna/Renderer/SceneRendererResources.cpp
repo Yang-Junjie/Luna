@@ -16,11 +16,11 @@ void SceneRenderer::resetPipelineState()
     m_gpu.material_layout.reset();
     m_gpu.gbuffer_layout.reset();
     m_gpu.scene_layout.reset();
-    m_gpu.descriptor_pool.reset();
     m_gpu.gbuffer_sampler.reset();
     m_gpu.environment_sampler.reset();
     m_gpu.gbuffer_descriptor_set.reset();
     m_gpu.scene_descriptor_set.reset();
+    m_gpu.descriptor_pool.reset();
     m_gpu.scene_params_buffer.reset();
     m_gpu.environment_texture = {};
     m_gpu.geometry_vertex_shader.reset();
@@ -327,6 +327,9 @@ SceneRenderer::UploadedTexture
         return uploaded_texture;
     }
 
+    constexpr size_t kTextureDataPlacementAlignment = 512;
+    constexpr uint32_t kTextureDataPitchAlignment = 256;
+
     const uint32_t mip_level_count = 1u + static_cast<uint32_t>(image.MipLevels.size());
     uploaded_texture.texture = m_gpu.device->CreateTexture(
         luna::RHI::TextureBuilder()
@@ -354,11 +357,79 @@ SceneRenderer::UploadedTexture
                                         .SetName(debug_name + "_Sampler")
                                         .Build());
 
-    size_t total_size = image.ByteData.size();
-    for (const auto& mip_level : image.MipLevels) {
-        total_size += mip_level.size();
+    struct PackedMipRegion {
+        const std::vector<uint8_t>* source = nullptr;
+        size_t offset = 0;
+        uint32_t row_pitch_bytes = 0;
+        uint32_t row_length_texels = 0;
+        uint32_t height = 0;
+    };
+
+    std::vector<PackedMipRegion> packed_regions;
+    packed_regions.reserve(mip_level_count);
+
+    auto align_up = [](size_t value, size_t alignment) -> size_t {
+        return alignment == 0 ? value : ((value + alignment - 1) / alignment) * alignment;
+    };
+
+    size_t total_size = 0;
+
+    if (!uploaded_texture.texture || !uploaded_texture.sampler || total_size == 0) {
+        // Continue below; total_size is determined from the packed upload layout.
     }
 
+    size_t buffer_offset = 0;
+    uint32_t mip_width = image.Width;
+    uint32_t mip_height = image.Height;
+    uploaded_texture.copy_regions.reserve(mip_level_count);
+
+    auto append_region = [&](const std::vector<uint8_t>& bytes, uint32_t mip_level) {
+        const uint32_t safe_width = (std::max)(mip_width, 1u);
+        const uint32_t safe_height = (std::max)(mip_height, 1u);
+        const uint32_t row_pitch_bytes = safe_height > 0 ? static_cast<uint32_t>(bytes.size() / safe_height) : 0;
+        const uint32_t bytes_per_texel = safe_width > 0 ? row_pitch_bytes / safe_width : 0;
+        const uint32_t aligned_row_pitch =
+            static_cast<uint32_t>(align_up(row_pitch_bytes, kTextureDataPitchAlignment));
+        const uint32_t row_length_texels =
+            bytes_per_texel > 0 ? aligned_row_pitch / bytes_per_texel : safe_width;
+
+        buffer_offset = align_up(buffer_offset, kTextureDataPlacementAlignment);
+        uploaded_texture.copy_regions.push_back(luna::RHI::BufferImageCopy{
+            .BufferOffset = buffer_offset,
+            .BufferRowLength = row_length_texels,
+            .BufferImageHeight = 0,
+            .ImageSubresource =
+                {
+                    .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                    .MipLevel = mip_level,
+                    .BaseArrayLayer = 0,
+                    .LayerCount = 1,
+                },
+            .ImageOffsetX = 0,
+            .ImageOffsetY = 0,
+            .ImageOffsetZ = 0,
+            .ImageExtentWidth = mip_width,
+            .ImageExtentHeight = mip_height,
+            .ImageExtentDepth = 1,
+        });
+        packed_regions.push_back(PackedMipRegion{
+            .source = &bytes,
+            .offset = buffer_offset,
+            .row_pitch_bytes = aligned_row_pitch,
+            .row_length_texels = row_length_texels,
+            .height = safe_height,
+        });
+        buffer_offset += static_cast<size_t>(aligned_row_pitch) * safe_height;
+    };
+
+    append_region(image.ByteData, 0);
+    for (uint32_t mip_level = 1; mip_level < mip_level_count; ++mip_level) {
+        mip_width = (std::max) (mip_width / 2, 1u);
+        mip_height = (std::max) (mip_height / 2, 1u);
+        append_region(image.MipLevels[mip_level - 1], mip_level);
+    }
+
+    total_size = buffer_offset;
     if (!uploaded_texture.texture || !uploaded_texture.sampler || total_size == 0) {
         return uploaded_texture;
     }
@@ -375,48 +446,19 @@ SceneRenderer::UploadedTexture
         return uploaded_texture;
     }
 
-    size_t buffer_offset = 0;
-    uint32_t mip_width = image.Width;
-    uint32_t mip_height = image.Height;
-    uploaded_texture.copy_regions.reserve(mip_level_count);
-
-    auto append_region = [&](const std::vector<uint8_t>& bytes, uint32_t mip_level) {
-        uploaded_texture.copy_regions.push_back(luna::RHI::BufferImageCopy{
-            .BufferOffset = buffer_offset,
-            .BufferRowLength = 0,
-            .BufferImageHeight = 0,
-            .ImageSubresource =
-                {
-                    .AspectMask = luna::RHI::ImageAspectFlags::Color,
-                    .MipLevel = mip_level,
-                    .BaseArrayLayer = 0,
-                    .LayerCount = 1,
-                },
-            .ImageOffsetX = 0,
-            .ImageOffsetY = 0,
-            .ImageOffsetZ = 0,
-            .ImageExtentWidth = mip_width,
-            .ImageExtentHeight = mip_height,
-            .ImageExtentDepth = 1,
-        });
-        buffer_offset += bytes.size();
-    };
-
-    append_region(image.ByteData, 0);
-    for (uint32_t mip_level = 1; mip_level < mip_level_count; ++mip_level) {
-        mip_width = (std::max) (mip_width / 2, 1u);
-        mip_height = (std::max) (mip_height / 2, 1u);
-        append_region(image.MipLevels[mip_level - 1], mip_level);
-    }
-
     if (void* mapped = uploaded_texture.staging_buffer->Map()) {
         uint8_t* destination = static_cast<uint8_t*>(mapped);
-        size_t write_offset = 0;
-        std::memcpy(destination + write_offset, image.ByteData.data(), image.ByteData.size());
-        write_offset += image.ByteData.size();
-        for (const auto& mip_level : image.MipLevels) {
-            std::memcpy(destination + write_offset, mip_level.data(), mip_level.size());
-            write_offset += mip_level.size();
+        for (const auto& packed_region : packed_regions) {
+            if (packed_region.source == nullptr || packed_region.height == 0) {
+                continue;
+            }
+
+            const size_t source_row_pitch = packed_region.source->size() / packed_region.height;
+            for (uint32_t row = 0; row < packed_region.height; ++row) {
+                std::memcpy(destination + packed_region.offset + static_cast<size_t>(row) * packed_region.row_pitch_bytes,
+                            packed_region.source->data() + static_cast<size_t>(row) * source_row_pitch,
+                            source_row_pitch);
+            }
         }
         uploaded_texture.staging_buffer->Flush();
         uploaded_texture.staging_buffer->Unmap();

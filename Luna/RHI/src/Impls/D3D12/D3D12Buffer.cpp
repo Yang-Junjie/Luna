@@ -10,7 +10,10 @@ D3D12Buffer::D3D12Buffer(const Ref<Device>& device, const BufferCreateInfo& info
 
     D3D12_RESOURCE_DESC desc = {};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    desc.Width = info.Size;
+    const bool isConstantBuffer = (info.Usage & BufferUsageFlags::UniformBuffer);
+    desc.Width = isConstantBuffer ? ((info.Size + D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT - 1) &
+                                     ~(static_cast<uint64_t>(D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT) - 1))
+                                  : info.Size;
     desc.Height = 1;
     desc.DepthOrArraySize = 1;
     desc.MipLevels = 1;

@@ -226,10 +226,28 @@ bool createFontTexture()
         return false;
     }
 
-    const uint64_t upload_size = static_cast<uint64_t>(width) * static_cast<uint64_t>(height) * 4ull;
+    constexpr uint32_t kTextureDataPitchAlignment = 256;
+    const uint32_t bytes_per_row = static_cast<uint32_t>(width) * 4u;
+    const uint32_t aligned_bytes_per_row =
+        (bytes_per_row + kTextureDataPitchAlignment - 1u) & ~(kTextureDataPitchAlignment - 1u);
+    const uint64_t upload_size = static_cast<uint64_t>(aligned_bytes_per_row) * static_cast<uint64_t>(height);
     auto staging_buffer =
         createCpuToGpuBuffer(g_device, upload_size, luna::RHI::BufferUsageFlags::TransferSrc, "ImGuiFontAtlasUpload");
-    if (!staging_buffer || !writeBufferData(staging_buffer, pixels, upload_size)) {
+    if (!staging_buffer) {
+        LUNA_IMGUI_ERROR("Failed to upload ImGui font atlas staging data");
+        return false;
+    }
+
+    if (void* mapped = staging_buffer->Map()) {
+        auto* destination = static_cast<uint8_t*>(mapped);
+        for (int row = 0; row < height; ++row) {
+            std::memcpy(destination + static_cast<size_t>(row) * aligned_bytes_per_row,
+                        pixels + static_cast<size_t>(row) * bytes_per_row,
+                        bytes_per_row);
+        }
+        staging_buffer->Flush(0, upload_size);
+        staging_buffer->Unmap();
+    } else {
         LUNA_IMGUI_ERROR("Failed to upload ImGui font atlas staging data");
         return false;
     }
@@ -258,7 +276,7 @@ bool createFontTexture()
 
     const luna::RHI::BufferImageCopy region{
         .BufferOffset = 0,
-        .BufferRowLength = 0,
+        .BufferRowLength = aligned_bytes_per_row / 4u,
         .BufferImageHeight = 0,
         .ImageSubresource =
             {
