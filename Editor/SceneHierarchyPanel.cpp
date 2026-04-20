@@ -1,4 +1,4 @@
-#include "LunaEditorApp.h"
+#include "LunaEditorLayer.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
 
@@ -6,22 +6,22 @@
 
 namespace luna {
 
-SceneHierarchyPanel::SceneHierarchyPanel(LunaEditorApplication& application)
-    : m_application(&application)
+SceneHierarchyPanel::SceneHierarchyPanel(LunaEditorLayer& editor_layer)
+    : m_editor_layer(&editor_layer)
 {}
 
 void SceneHierarchyPanel::onImGuiRender()
 {
-    if (m_application == nullptr) {
+    if (m_editor_layer == nullptr) {
         return;
     }
 
     ImGui::SetNextWindowSize(ImVec2(280.0f, 320.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene Hierarchy");
 
-    auto& scene = m_application->getScene();
+    auto& scene = m_editor_layer->getScene();
     auto view = scene.registry().view<TagComponent>();
-    const Entity selected_entity = m_application->getSelectedEntity();
+    const Entity selected_entity = m_editor_layer->getSelectedEntity();
 
     if (view.begin() == view.end()) {
         ImGui::TextUnformatted("No entities in scene.");
@@ -41,13 +41,13 @@ void SceneHierarchyPanel::onImGuiRender()
                               "%s",
                               tag.tag.c_str());
             if (ImGui::IsItemClicked()) {
-                m_application->setSelectedEntity(entity);
+                m_editor_layer->setSelectedEntity(entity);
             }
         }
     }
 
     if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered()) {
-        m_application->setSelectedEntity({});
+        m_editor_layer->setSelectedEntity({});
     }
 
     ImGui::End();

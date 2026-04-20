@@ -1,5 +1,5 @@
 #include "InspectorPanel.h"
-#include "LunaEditorApp.h"
+#include "LunaEditorLayer.h"
 #include "Scene/Components.h"
 
 #include <algorithm>
@@ -85,20 +85,20 @@ bool drawVec3Control(const std::string& label,
 
 namespace luna {
 
-InspectorPanel::InspectorPanel(LunaEditorApplication& application)
-    : m_application(&application)
+InspectorPanel::InspectorPanel(LunaEditorLayer& editor_layer)
+    : m_editor_layer(&editor_layer)
 {}
 
 void InspectorPanel::onImGuiRender()
 {
-    if (m_application == nullptr) {
+    if (m_editor_layer == nullptr) {
         return;
     }
 
     ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
 
-    Entity selected_entity = m_application->getSelectedEntity();
+    Entity selected_entity = m_editor_layer->getSelectedEntity();
     if (!selected_entity) {
         ImGui::TextUnformatted("Select an entity to inspect.");
         ImGui::End();
