@@ -116,6 +116,7 @@ void LunaEditorLayer::onAttach()
         return;
     }
 
+    m_scene.setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
@@ -145,6 +146,7 @@ void LunaEditorLayer::onDetach()
 
 void LunaEditorLayer::onUpdate(Timestep)
 {
+    AssetManager::get().updateAsyncLoads();
     m_scene.onUpdateRuntime();
 }
 
@@ -175,6 +177,7 @@ void LunaEditorLayer::onImGuiRender()
 
     m_scene_hierarchy_panel.onImGuiRender();
     m_inspector_panel.onImGuiRender();
+    m_asset_loading_panel.onImGuiRender();
     m_content_browser_panel.onImGuiRender();
     drawViewport();
 }
@@ -350,7 +353,7 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
         mesh_component.clearAllSubmeshMaterials();
     }
 
-    const auto mesh = AssetManager::get().loadAssetAs<Mesh>(mesh_handle);
+    const auto mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
     if (mesh && mesh->isValid()) {
         mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
     }
@@ -381,6 +384,7 @@ bool LunaEditorLayer::syncProjectAssets()
 
     const ImporterManager::ImportStats stats = ImporterManager::syncProjectAssets();
     logEditorAssetSyncStats(stats);
+    m_content_browser_panel.requestRefresh();
     return stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0;
 }
 
@@ -431,6 +435,7 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
                      m_scene.entityManager().entityCount());
+    m_content_browser_panel.requestRefresh();
     return true;
 }
 
@@ -509,6 +514,7 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
     m_scene_file_path = normalized_scene_path;
     updateSceneLabel();
     syncProjectStartScene(normalized_scene_path);
+    m_content_browser_panel.requestRefresh();
 
     LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene.getName(), normalized_scene_path.string());
     return true;

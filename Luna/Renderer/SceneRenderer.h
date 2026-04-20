@@ -111,11 +111,11 @@ private:
     };
 
     struct UploadedMaterial {
-        UploadedTexture base_color_texture;
-        UploadedTexture normal_texture;
-        UploadedTexture metallic_roughness_texture;
-        UploadedTexture emissive_texture;
-        UploadedTexture occlusion_texture;
+        std::shared_ptr<UploadedTexture> base_color_texture;
+        std::shared_ptr<UploadedTexture> normal_texture;
+        std::shared_ptr<UploadedTexture> metallic_roughness_texture;
+        std::shared_ptr<UploadedTexture> emissive_texture;
+        std::shared_ptr<UploadedTexture> occlusion_texture;
         luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
         luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
     };
@@ -128,6 +128,7 @@ private:
 
     struct UploadCacheState {
         std::unordered_map<const Mesh*, UploadedMesh> uploaded_meshes;
+        std::unordered_map<const rhi::Texture*, std::shared_ptr<UploadedTexture>> uploaded_textures;
         std::unordered_map<const Material*, UploadedMaterial> uploaded_materials;
     };
 
@@ -174,6 +175,7 @@ private:
     void ensurePipelines(const RenderContext& context);
     ShaderPaths resolveShaderPaths() const;
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh);
+    std::shared_ptr<UploadedTexture> getOrCreateUploadedTexture(const std::shared_ptr<rhi::Texture>& texture);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material);
     UploadedTexture createUploadedTexture(const rhi::ImageData& image,
                                           const rhi::Texture::SamplerSettings& sampler_settings,

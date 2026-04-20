@@ -1,12 +1,28 @@
 Scene: SampleScene
 Entities:
   - IDComponent:
+      ID: 6422384645588011490
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [-2.8, 0, 0]
+      Rotation: [-2.0751965, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 6652629833754950424
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 5963794263514486561
+      SubmeshMaterials:
+        - 8706604916645388531
+  - IDComponent:
       ID: 6652629833754950424
     TagComponent:
       Tag: Empty Entity
     TransformComponent:
       Translation: [-0.9, 0, 0]
-      Rotation: [-0.996583, -2.6162484, 0]
+      Rotation: [-0.99309236, -3.6564648, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
       ParentHandle: 0
@@ -16,19 +32,3 @@ Entities:
       MeshHandle: 17196472838577284151
       SubmeshMaterials:
         - 8706604916645388531
-  - IDComponent:
-      ID: 6422384645588011490
-    TagComponent:
-      Tag: Empty Entity
-    TransformComponent:
-      Translation: [-2.8, 0, 0]
-      Rotation: [-2.0367992, 0, 0]
-      Scale: [1, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 6652629833754950424
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 5963794263514486561
-      SubmeshMaterials:
-        - 11748804957849404480

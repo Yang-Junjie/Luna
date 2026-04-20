@@ -202,13 +202,13 @@ TaskTarget TaskCompletionState::target() const
 void TaskCompletionState::OnDependenciesComplete(enki::TaskScheduler* scheduler, uint32_t thread_number)
 {
     std::vector<std::shared_ptr<PendingLaunch>> pending_launches;
+    enki::ICompletable::OnDependenciesComplete(scheduler, thread_number);
+
     {
         std::lock_guard<std::mutex> lock(m_pending_launches_mutex);
         m_finished.store(true, std::memory_order_release);
         pending_launches.swap(m_pending_launches);
     }
-
-    enki::ICompletable::OnDependenciesComplete(scheduler, thread_number);
 
     for (const auto& launch : pending_launches) {
         if (launch) {
@@ -480,7 +480,7 @@ void TaskSystem::waitForTask(const enki::ICompletable* task)
     }
 
     if (const auto* completion_state = dynamic_cast<const detail::TaskCompletionState*>(task)) {
-        while (!completion_state->isFinished()) {
+        while (!completion_state->GetIsComplete()) {
             m_scheduler->WaitforTask(nullptr);
         }
 
@@ -493,6 +493,11 @@ void TaskSystem::waitForTask(const enki::ICompletable* task)
     }
 
     m_scheduler->WaitforTask(task);
+    reapCompletedManagedTasks();
+}
+
+void TaskSystem::pollCompletedTasks()
+{
     reapCompletedManagedTasks();
 }
 
@@ -739,7 +744,16 @@ void TaskSystem::reapCompletedManagedTasks()
 {
     std::lock_guard<std::mutex> lock(m_managed_tasks_mutex);
     std::erase_if(m_managed_tasks, [](const detail::ManagedTaskRecord& record) {
-        return !record.task_state || !record.completion_state || record.completion_state->isFinished();
+        if (!record.task_state || !record.completion_state) {
+            return true;
+        }
+
+        if (!record.completion_state->GetIsComplete()) {
+            return false;
+        }
+
+        const enki::ICompletable* completable = record.task_state->completable();
+        return completable == nullptr || completable->GetIsComplete();
     });
 }
 

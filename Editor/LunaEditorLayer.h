@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AssetLoadingPanel.h"
 #include "ContentBrowserPanel.h"
 #include "Core/Layer.h"
 #include "InspectorPanel.h"
@@ -56,6 +57,7 @@ private:
     std::string m_asset_label{"No scene loaded"};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
+    AssetLoadingPanel m_asset_loading_panel;
     ContentBrowserPanel m_content_browser_panel;
 };
 

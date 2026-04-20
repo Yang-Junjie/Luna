@@ -8,7 +8,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cfloat>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <imgui.h>
@@ -281,6 +283,8 @@ void ContentBrowserPanel::onImGuiRender()
 
     ImGui::End();
 }
+
+void ContentBrowserPanel::requestRefresh() {}
 
 void ContentBrowserPanel::syncProjectDirectories()
 {

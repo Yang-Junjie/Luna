@@ -61,6 +61,7 @@ public:
     bool submitTask(enki::ITaskSet* task);
     void waitForAll();
     void waitForTask(const enki::ICompletable* task);
+    void pollCompletedTasks();
     void runPinnedTasksForCurrentThread();
     bool submitIOJob(enki::IPinnedTask* task);
     bool submitMainThreadJob(enki::IPinnedTask* task);

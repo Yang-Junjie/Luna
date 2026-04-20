@@ -6,6 +6,7 @@ namespace luna {
 void SceneRenderer::resetPipelineState()
 {
     m_upload_cache.uploaded_materials.clear();
+    m_upload_cache.uploaded_textures.clear();
     m_gpu.geometry_pipeline.reset();
     m_gpu.lighting_pipeline.reset();
     m_gpu.transparent_pipeline.reset();
@@ -43,6 +44,7 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
 
     if (gpu.device != context.device) {
         upload_cache.uploaded_materials.clear();
+        upload_cache.uploaded_textures.clear();
         upload_cache.uploaded_meshes.clear();
         resetPipelineState();
         gpu.device = context.device;
@@ -88,6 +90,7 @@ void SceneRenderer::ensurePipelines(const RenderContext& context)
     }
 
     upload_cache.uploaded_materials.clear();
+    upload_cache.uploaded_textures.clear();
 
     gpu.material_layout = gpu.device->CreateDescriptorSetLayout(
         luna::RHI::DescriptorSetLayoutBuilder()
@@ -422,6 +425,26 @@ SceneRenderer::UploadedTexture
     return uploaded_texture;
 }
 
+std::shared_ptr<SceneRenderer::UploadedTexture>
+    SceneRenderer::getOrCreateUploadedTexture(const std::shared_ptr<rhi::Texture>& texture)
+{
+    if (texture == nullptr || !texture->isValid()) {
+        return {};
+    }
+
+    auto& upload_cache = m_upload_cache;
+    const auto it = upload_cache.uploaded_textures.find(texture.get());
+    if (it != upload_cache.uploaded_textures.end()) {
+        return it->second;
+    }
+
+    const std::string debug_name = texture->getName().empty() ? std::string("Texture") : texture->getName();
+    auto uploaded_texture =
+        std::make_shared<UploadedTexture>(createUploadedTexture(texture->getImageData(), texture->getSamplerSettings(), debug_name));
+    upload_cache.uploaded_textures.emplace(texture.get(), uploaded_texture);
+    return uploaded_texture;
+}
+
 SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(const Material& material)
 {
     using namespace scene_renderer_detail;
@@ -445,12 +468,14 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
     const auto create_material_texture =
         [&](const std::shared_ptr<rhi::Texture>& texture,
             const rhi::ImageData& fallback_image,
-            std::string_view suffix) -> UploadedTexture {
-        const std::string texture_name = material_name + "_" + std::string(suffix);
+            std::string_view suffix) -> std::shared_ptr<UploadedTexture> {
         if (texture != nullptr && texture->isValid()) {
-            return createUploadedTexture(texture->getImageData(), texture->getSamplerSettings(), texture_name);
+            return getOrCreateUploadedTexture(texture);
         }
-        return createUploadedTexture(fallback_image, default_sampler_settings, texture_name);
+
+        const std::string texture_name = material_name + "_" + std::string(suffix);
+        return std::make_shared<UploadedTexture>(
+            createUploadedTexture(fallback_image, default_sampler_settings, texture_name));
     };
 
     uploaded_material.base_color_texture =
@@ -493,11 +518,14 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
     }
 
     if (!gpu.descriptor_pool || !gpu.material_layout ||
-        !uploaded_material.base_color_texture.texture || !uploaded_material.normal_texture.texture ||
-        !uploaded_material.metallic_roughness_texture.texture || !uploaded_material.emissive_texture.texture ||
-        !uploaded_material.occlusion_texture.texture || !uploaded_material.base_color_texture.sampler ||
-        !uploaded_material.normal_texture.sampler || !uploaded_material.metallic_roughness_texture.sampler ||
-        !uploaded_material.emissive_texture.sampler || !uploaded_material.occlusion_texture.sampler ||
+        !uploaded_material.base_color_texture || !uploaded_material.normal_texture ||
+        !uploaded_material.metallic_roughness_texture || !uploaded_material.emissive_texture ||
+        !uploaded_material.occlusion_texture || !uploaded_material.base_color_texture->texture ||
+        !uploaded_material.normal_texture->texture || !uploaded_material.metallic_roughness_texture->texture ||
+        !uploaded_material.emissive_texture->texture || !uploaded_material.occlusion_texture->texture ||
+        !uploaded_material.base_color_texture->sampler || !uploaded_material.normal_texture->sampler ||
+        !uploaded_material.metallic_roughness_texture->sampler || !uploaded_material.emissive_texture->sampler ||
+        !uploaded_material.occlusion_texture->sampler ||
         !uploaded_material.params_buffer) {
         return uploaded_material;
     }
@@ -509,53 +537,53 @@ SceneRenderer::UploadedMaterial& SceneRenderer::getOrCreateUploadedMaterial(cons
 
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 0,
-        .TextureView = uploaded_material.base_color_texture.texture->GetDefaultView(),
+        .TextureView = uploaded_material.base_color_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 1,
-        .Sampler = uploaded_material.base_color_texture.sampler,
+        .Sampler = uploaded_material.base_color_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 2,
-        .TextureView = uploaded_material.normal_texture.texture->GetDefaultView(),
+        .TextureView = uploaded_material.normal_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 3,
-        .Sampler = uploaded_material.normal_texture.sampler,
+        .Sampler = uploaded_material.normal_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 4,
-        .TextureView = uploaded_material.metallic_roughness_texture.texture->GetDefaultView(),
+        .TextureView = uploaded_material.metallic_roughness_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 5,
-        .Sampler = uploaded_material.metallic_roughness_texture.sampler,
+        .Sampler = uploaded_material.metallic_roughness_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 6,
-        .TextureView = uploaded_material.emissive_texture.texture->GetDefaultView(),
+        .TextureView = uploaded_material.emissive_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 7,
-        .Sampler = uploaded_material.emissive_texture.sampler,
+        .Sampler = uploaded_material.emissive_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 8,
-        .TextureView = uploaded_material.occlusion_texture.texture->GetDefaultView(),
+        .TextureView = uploaded_material.occlusion_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 9,
-        .Sampler = uploaded_material.occlusion_texture.sampler,
+        .Sampler = uploaded_material.occlusion_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
         .Binding = 10,
@@ -598,11 +626,21 @@ void SceneRenderer::uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& comma
 void SceneRenderer::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands,
                                            UploadedMaterial& uploaded_material)
 {
-    uploadTextureIfNeeded(commands, uploaded_material.base_color_texture);
-    uploadTextureIfNeeded(commands, uploaded_material.normal_texture);
-    uploadTextureIfNeeded(commands, uploaded_material.metallic_roughness_texture);
-    uploadTextureIfNeeded(commands, uploaded_material.emissive_texture);
-    uploadTextureIfNeeded(commands, uploaded_material.occlusion_texture);
+    if (uploaded_material.base_color_texture) {
+        uploadTextureIfNeeded(commands, *uploaded_material.base_color_texture);
+    }
+    if (uploaded_material.normal_texture) {
+        uploadTextureIfNeeded(commands, *uploaded_material.normal_texture);
+    }
+    if (uploaded_material.metallic_roughness_texture) {
+        uploadTextureIfNeeded(commands, *uploaded_material.metallic_roughness_texture);
+    }
+    if (uploaded_material.emissive_texture) {
+        uploadTextureIfNeeded(commands, *uploaded_material.emissive_texture);
+    }
+    if (uploaded_material.occlusion_texture) {
+        uploadTextureIfNeeded(commands, *uploaded_material.occlusion_texture);
+    }
 }
 
 void SceneRenderer::ensureSceneResources()

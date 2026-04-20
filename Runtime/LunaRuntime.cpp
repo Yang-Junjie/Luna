@@ -246,7 +246,7 @@ bool LunaRuntimeApplication::loadStartupScene()
 
     AssetManager::get().clear();
     AssetDatabase::clear();
-    const ImporterManager::ImportStats sync_stats = ImporterManager::syncProjectAssets();
+    const ImporterManager::ImportStats sync_stats = ImporterManager::syncProjectAssets(&getTaskSystem());
     logRuntimeAssetSyncStats(sync_stats);
     AssetManager::get().init();
 

@@ -1,6 +1,8 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
+    AssetLoadingPanel.h
+    AssetLoadingPanel.cpp
     ContentBrowserPanel.h
     ContentBrowserPanel.cpp
     EditorAssetDragDrop.h

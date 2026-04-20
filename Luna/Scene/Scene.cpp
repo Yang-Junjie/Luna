@@ -13,7 +13,10 @@ namespace luna {
 namespace {
 
 std::vector<std::shared_ptr<Material>>
-    resolveSubmeshMaterials(const MeshComponent& mesh_component, const Mesh& mesh, AssetManager& asset_manager)
+    resolveSubmeshMaterials(const MeshComponent& mesh_component,
+                            const Mesh& mesh,
+                            AssetManager& asset_manager,
+                            Scene::AssetLoadBehavior asset_load_behavior)
 {
     const auto& sub_meshes = mesh.getSubMeshes();
     std::vector<std::shared_ptr<Material>> submesh_materials(sub_meshes.size());
@@ -24,7 +27,9 @@ std::vector<std::shared_ptr<Material>>
             continue;
         }
 
-        submesh_materials[submesh_index] = asset_manager.loadAssetAs<Material>(material_handle);
+        submesh_materials[submesh_index] = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking
+                                               ? asset_manager.requestAssetAs<Material>(material_handle)
+                                               : asset_manager.loadAssetAs<Material>(material_handle);
     }
 
     return submesh_materials;
@@ -58,15 +63,27 @@ void Scene::onUpdateRuntime()
             continue;
         }
 
-        const auto mesh = asset_manager.loadAssetAs<Mesh>(mesh_component.meshHandle);
+        const auto mesh = m_asset_load_behavior == AssetLoadBehavior::NonBlocking
+                              ? asset_manager.requestAssetAs<Mesh>(mesh_component.meshHandle)
+                              : asset_manager.loadAssetAs<Mesh>(mesh_component.meshHandle);
         if (!mesh || !mesh->isValid()) {
             continue;
         }
 
         scene_renderer.submitStaticMesh(entity_manager.getWorldSpaceTransformMatrix(entity),
                                         mesh,
-                                        resolveSubmeshMaterials(mesh_component, *mesh, asset_manager));
+                                        resolveSubmeshMaterials(mesh_component, *mesh, asset_manager, m_asset_load_behavior));
     }
+}
+
+void Scene::setAssetLoadBehavior(AssetLoadBehavior behavior)
+{
+    m_asset_load_behavior = behavior;
+}
+
+Scene::AssetLoadBehavior Scene::getAssetLoadBehavior() const
+{
+    return m_asset_load_behavior;
 }
 
 void Scene::setName(std::string name)

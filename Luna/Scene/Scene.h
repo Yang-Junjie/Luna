@@ -8,10 +8,17 @@ namespace luna {
 
 class Scene {
 public:
+    enum class AssetLoadBehavior {
+        Blocking,
+        NonBlocking,
+    };
+
     Scene();
     ~Scene() = default;
 
     void onUpdateRuntime();
+    void setAssetLoadBehavior(AssetLoadBehavior behavior);
+    AssetLoadBehavior getAssetLoadBehavior() const;
 
     void setName(std::string name);
     const std::string& getName() const;
@@ -21,6 +28,7 @@ public:
 
 private:
     std::string m_name{"Untitled"};
+    AssetLoadBehavior m_asset_load_behavior = AssetLoadBehavior::Blocking;
     EntityManager m_entity_manager;
 };
 

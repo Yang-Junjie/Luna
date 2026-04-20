@@ -5,6 +5,8 @@
 #include <vector>
 
 namespace luna {
+class TaskSystem;
+
 class ImporterManager final {
 public:
     struct ImportStats {
@@ -18,7 +20,7 @@ public:
     };
 
     static void init();
-    static ImportStats syncProjectAssets();
+    static ImportStats syncProjectAssets(TaskSystem* task_system = nullptr);
     static void import();
     static Importer* getImporter(std::string extension);
 

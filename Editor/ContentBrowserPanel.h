@@ -12,6 +12,7 @@ public:
     explicit ContentBrowserPanel(LunaEditorLayer& editor_layer);
 
     void onImGuiRender();
+    void requestRefresh();
 
 private:
     void syncProjectDirectories();

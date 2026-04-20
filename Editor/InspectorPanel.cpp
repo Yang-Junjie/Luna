@@ -179,7 +179,7 @@ void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
         return;
     }
 
-    const auto mesh = luna::AssetManager::get().loadAssetAs<luna::Mesh>(mesh_component.meshHandle);
+    const auto mesh = luna::AssetManager::get().requestAssetAs<luna::Mesh>(mesh_component.meshHandle);
     if (!mesh || !mesh->isValid()) {
         return;
     }
@@ -301,7 +301,7 @@ void InspectorPanel::onImGuiRender()
             }
 
             const auto mesh = mesh_component.meshHandle.isValid()
-                                  ? AssetManager::get().loadAssetAs<Mesh>(mesh_component.meshHandle)
+                                  ? AssetManager::get().requestAssetAs<Mesh>(mesh_component.meshHandle)
                                   : std::shared_ptr<Mesh>{};
             const bool mesh_loaded = mesh && mesh->isValid();
 
@@ -311,14 +311,15 @@ void InspectorPanel::onImGuiRender()
                     mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
                 }
             } else {
+                if (mesh_component.meshHandle.isValid() && AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
+                    ImGui::TextDisabled("Mesh asset is loading...");
+                }
                 int slot_count = static_cast<int>(mesh_component.getSubmeshMaterialCount());
                 if (ImGui::InputInt("Material Slot Count", &slot_count)) {
                     slot_count = (std::max)(slot_count, 0);
                     mesh_component.resizeSubmeshMaterials(static_cast<size_t>(slot_count));
                 }
             }
-
-            syncMeshMaterialSlots(mesh_component);
 
             ImGui::SeparatorText("Submesh Materials");
             if (mesh_component.getSubmeshMaterialCount() == 0) {

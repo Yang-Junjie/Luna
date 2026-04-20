@@ -18,7 +18,7 @@ bool TaskHandle::isValid() const
 
 bool TaskHandle::isComplete() const
 {
-    return !m_state || m_state->isFinished();
+    return !m_state || m_state->GetIsComplete();
 }
 
 bool TaskHandle::hasFailed() const
@@ -32,7 +32,7 @@ TaskStatus TaskHandle::status() const
         return TaskStatus::Invalid;
     }
 
-    if (!m_state->isFinished()) {
+    if (!m_state->GetIsComplete()) {
         return TaskStatus::Pending;
     }
 

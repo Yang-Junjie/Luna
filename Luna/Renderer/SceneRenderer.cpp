@@ -17,6 +17,7 @@ void SceneRenderer::shutdown()
 {
     clearSubmittedMeshes();
     m_upload_cache.uploaded_materials.clear();
+    m_upload_cache.uploaded_textures.clear();
     m_upload_cache.uploaded_meshes.clear();
     resetPipelineState();
     m_gpu.device.reset();
