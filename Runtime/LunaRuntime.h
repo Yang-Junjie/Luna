@@ -26,7 +26,6 @@ private:
     void resetCamera();
     void buildScene();
     bool tryLoadDefaultAsset();
-    void createFallbackAsset();
     void updateDemoTransform(float delta_time);
 
 private:
@@ -36,9 +35,7 @@ private:
     std::shared_ptr<Material> m_demo_material;
     AssetHandle m_demo_mesh_handle{0};
     AssetHandle m_demo_material_handle{0};
-    bool m_demo_mesh_memory_only{true};
-    MemoryMeshType m_demo_memory_mesh_type{MemoryMeshType::None};
-    std::string m_asset_label{"Procedural cube"};
+    std::string m_asset_label{"No asset loaded"};
     luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};
     float m_spin_speed{0.85f};
     bool m_auto_rotate{true};

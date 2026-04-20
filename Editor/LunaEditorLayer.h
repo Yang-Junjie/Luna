@@ -2,7 +2,6 @@
 
 #include "Core/Layer.h"
 #include "InspectorPanel.h"
-#include "Project/ProjectManager.h"
 #include "SceneHierarchyPanel.h"
 
 namespace luna {
@@ -25,7 +24,6 @@ private:
     LunaEditorApplication* m_application{nullptr};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
-    ProjectManager m_project_manager;
 };
 
 } // namespace luna

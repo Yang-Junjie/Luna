@@ -3,6 +3,7 @@
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 #include "Platform/Common/FileDialogs.h"
+#include "Project/ProjectManager.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -111,7 +112,7 @@ void LunaEditorLayer::onImGuiMenuBar()
                                      .Description = "A simple Luna project.",
                                      .StartScene = "./Assets/Scenes/SampleScene.lunascene",
                                      .AssetsPath = "./Assets/"};
-            m_project_manager.createProject(project_root_path, project_info);
+            ProjectManager::instance().createProject(project_root_path, project_info);
         }
         ImGui::EndMenu();
     }

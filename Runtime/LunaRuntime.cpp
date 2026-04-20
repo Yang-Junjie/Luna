@@ -298,52 +298,6 @@ std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh)
     return luna::Mesh::create(mesh.getName().empty() ? "RuntimeAssetMesh" : mesh.getName(), std::move(sub_meshes));
 }
 
-std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
-{
-    const std::vector<luna::StaticMeshVertex> vertices = {
-        {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-        {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-        {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-        {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-
-        {{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-        {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-        {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-
-        {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-
-        {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-
-        {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-        {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-        {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-
-        {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-        {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-        {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-        {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-    };
-
-    const std::vector<uint32_t> indices = {
-        0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
-        12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
-    };
-
-    luna::SubMesh sub_mesh;
-    sub_mesh.Name = "ProceduralCube";
-    sub_mesh.Vertices = vertices;
-    sub_mesh.Indices = indices;
-    return luna::Mesh::create("ProceduralCube", {std::move(sub_mesh)});
-}
-
 std::shared_ptr<luna::Material> createFallbackMaterial()
 {
     luna::Material::SurfaceProperties surface;
@@ -401,7 +355,10 @@ void LunaRuntimeApplication::onUpdate(Timestep timestep)
 void LunaRuntimeApplication::buildScene()
 {
     if (!tryLoadDefaultAsset()) {
-        createFallbackAsset();
+        m_demo_entity = {};
+        m_asset_label = "No asset loaded";
+        LUNA_RUNTIME_WARN("No default asset could be loaded for runtime startup");
+        return;
     }
 
     m_demo_entity = m_scene.createEntity("Runtime Mesh");
@@ -410,8 +367,6 @@ void LunaRuntimeApplication::buildScene()
         m_demo_mesh_handle = registerMemoryAsset(m_demo_mesh);
     }
     mesh_component.meshHandle = m_demo_mesh_handle;
-    mesh_component.memoryOnly = m_demo_mesh_memory_only;
-    mesh_component.memoryMeshType = m_demo_memory_mesh_type;
 
     if (m_demo_mesh) {
         mesh_component.resizeSubmeshMaterials(m_demo_mesh->getSubMeshes().size());
@@ -437,8 +392,6 @@ bool LunaRuntimeApplication::tryLoadDefaultAsset()
     if (loadSampleProjectDamagedHelmet(m_demo_mesh, m_demo_material_handle, m_asset_label)) {
         m_demo_material.reset();
         m_demo_mesh_handle = AssetHandle(0);
-        m_demo_mesh_memory_only = true;
-        m_demo_memory_mesh_type = MemoryMeshType::None;
         LUNA_RUNTIME_INFO("Loaded SampleProject DamagedHelmet with generated .lunamat material");
         return true;
     }
@@ -468,8 +421,6 @@ bool LunaRuntimeApplication::tryLoadDefaultAsset()
             m_demo_material = createFallbackMaterial();
             m_demo_mesh_handle = AssetHandle(0);
             m_demo_material_handle = AssetHandle(0);
-            m_demo_mesh_memory_only = true;
-            m_demo_memory_mesh_type = MemoryMeshType::None;
 
             m_asset_label = candidate.filename().string();
             LUNA_RUNTIME_INFO("Loaded runtime asset '{}'", candidate.string());
@@ -480,18 +431,6 @@ bool LunaRuntimeApplication::tryLoadDefaultAsset()
     }
 
     return false;
-}
-
-void LunaRuntimeApplication::createFallbackAsset()
-{
-    m_demo_mesh = createProceduralCubeMesh();
-    m_demo_material = createFallbackMaterial();
-    m_demo_mesh_handle = AssetHandle(0);
-    m_demo_material_handle = AssetHandle(0);
-    m_demo_mesh_memory_only = true;
-    m_demo_memory_mesh_type = MemoryMeshType::ProceduralCube;
-    m_asset_label = "Procedural cube";
-    LUNA_RUNTIME_INFO("Using fallback procedural cube for runtime demo");
 }
 
 void LunaRuntimeApplication::updateDemoTransform(float delta_time)

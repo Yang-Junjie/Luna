@@ -13,14 +13,11 @@
 #include "Scene/Components.h"
 
 #include <cctype>
-#include <cmath>
-
 #include <algorithm>
 #include <array>
 #include <filesystem>
 #include <glm/common.hpp>
 #include <limits>
-#include <numbers>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -307,52 +304,6 @@ std::shared_ptr<luna::Mesh> createNormalizedMesh(const luna::Mesh& mesh)
     return luna::Mesh::create(mesh.getName().empty() ? "DemoAssetMesh" : mesh.getName(), std::move(sub_meshes));
 }
 
-std::shared_ptr<luna::Mesh> createProceduralCubeMesh()
-{
-    const std::vector<luna::StaticMeshVertex> vertices = {
-        {{-1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-        {{1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-        {{1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-        {{-1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}},
-
-        {{1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-        {{-1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-        {{1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-
-        {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, -1.0f, 1.0f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-
-        {{1.0f, -1.0f, 1.0f}, {0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-
-        {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-        {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},
-        {{1.0f, 1.0f, -1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        {{-1.0f, 1.0f, -1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-
-        {{-1.0f, -1.0f, -1.0f}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-        {{1.0f, -1.0f, -1.0f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-        {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-        {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-    };
-
-    const std::vector<uint32_t> indices = {
-        0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
-        12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
-    };
-
-    luna::SubMesh sub_mesh;
-    sub_mesh.Name = "ProceduralCube";
-    sub_mesh.Vertices = vertices;
-    sub_mesh.Indices = indices;
-    return luna::Mesh::create("ProceduralCube", {std::move(sub_mesh)});
-}
-
 std::shared_ptr<luna::Material> createFallbackMaterial()
 {
     luna::Material::SurfaceProperties surface;
@@ -399,11 +350,6 @@ Scene& LunaEditorApplication::getScene()
     return m_scene;
 }
 
-const Scene& LunaEditorApplication::getScene() const
-{
-    return m_scene;
-}
-
 Entity LunaEditorApplication::getSelectedEntity() const
 {
     return m_selected_entity;
@@ -426,7 +372,7 @@ void LunaEditorApplication::onInit()
     }
 }
 
-void LunaEditorApplication::onUpdate(Timestep timestep)
+void LunaEditorApplication::onUpdate(Timestep)
 {
     m_scene.onUpdateRuntime();
 }
@@ -434,17 +380,18 @@ void LunaEditorApplication::onUpdate(Timestep timestep)
 void LunaEditorApplication::buildScene()
 {
     if (!tryLoadDefaultAsset()) {
-        createFallbackAsset();
+        m_selected_entity = {};
+        m_asset_label = "No asset loaded";
+        LUNA_EDITOR_WARN("No default asset could be loaded for editor startup");
+        return;
     }
 
-    m_demo_entity = m_scene.createEntity("Demo Mesh");
-    auto& mesh_component = m_demo_entity.addComponent<MeshComponent>();
+    Entity demo_entity = m_scene.createEntity("Demo Mesh");
+    auto& mesh_component = demo_entity.addComponent<MeshComponent>();
     if (!m_demo_mesh_handle.isValid()) {
         m_demo_mesh_handle = registerMemoryAsset(m_demo_mesh);
     }
     mesh_component.meshHandle = m_demo_mesh_handle;
-    mesh_component.memoryOnly = m_demo_mesh_memory_only;
-    mesh_component.memoryMeshType = m_demo_memory_mesh_type;
 
     if (m_demo_mesh) {
         mesh_component.resizeSubmeshMaterials(m_demo_mesh->getSubMeshes().size());
@@ -459,12 +406,12 @@ void LunaEditorApplication::buildScene()
         mesh_component.setSubmeshMaterial(submesh_index, material_handle);
     }
 
-    auto& transform = m_demo_entity.getComponent<TransformComponent>();
+    auto& transform = demo_entity.getComponent<TransformComponent>();
     transform.translation = glm::vec3(0.0f);
     transform.rotation = glm::vec3(-0.35f, 0.0f, 0.0f);
     transform.scale = glm::vec3(1.0f);
 
-    m_selected_entity = m_demo_entity;
+    m_selected_entity = demo_entity;
 }
 
 bool LunaEditorApplication::tryLoadDefaultAsset()
@@ -472,8 +419,6 @@ bool LunaEditorApplication::tryLoadDefaultAsset()
     if (loadSampleProjectDamagedHelmet(m_demo_mesh, m_demo_material_handle, m_asset_label)) {
         m_demo_material.reset();
         m_demo_mesh_handle = AssetHandle(0);
-        m_demo_mesh_memory_only = true;
-        m_demo_memory_mesh_type = MemoryMeshType::None;
         LUNA_EDITOR_INFO("Loaded SampleProject DamagedHelmet with generated .lunamat material");
         return true;
     }
@@ -503,8 +448,6 @@ bool LunaEditorApplication::tryLoadDefaultAsset()
             m_demo_material = createFallbackMaterial();
             m_demo_mesh_handle = AssetHandle(0);
             m_demo_material_handle = AssetHandle(0);
-            m_demo_mesh_memory_only = true;
-            m_demo_memory_mesh_type = MemoryMeshType::None;
 
             m_asset_label = candidate.filename().string();
             LUNA_EDITOR_INFO("Loaded demo asset '{}'", candidate.string());
@@ -515,18 +458,6 @@ bool LunaEditorApplication::tryLoadDefaultAsset()
     }
 
     return false;
-}
-
-void LunaEditorApplication::createFallbackAsset()
-{
-    m_demo_mesh = createProceduralCubeMesh();
-    m_demo_material = createFallbackMaterial();
-    m_demo_mesh_handle = AssetHandle(0);
-    m_demo_material_handle = AssetHandle(0);
-    m_demo_mesh_memory_only = true;
-    m_demo_memory_mesh_type = MemoryMeshType::ProceduralCube;
-    m_asset_label = "Procedural cube";
-    LUNA_EDITOR_INFO("Using fallback procedural cube for editor demo");
 }
 
 Application* createApplication(int argc, char** argv)

@@ -20,7 +20,6 @@ public:
     const std::string& getAssetLabel() const;
     luna::RHI::BackendType getBackend() const;
     Scene& getScene();
-    const Scene& getScene() const;
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
 
@@ -32,19 +31,15 @@ protected:
 private:
     void buildScene();
     bool tryLoadDefaultAsset();
-    void createFallbackAsset();
 
 private:
     Scene m_scene;
-    Entity m_demo_entity;
     Entity m_selected_entity;
     std::shared_ptr<Mesh> m_demo_mesh;
     std::shared_ptr<Material> m_demo_material;
     AssetHandle m_demo_mesh_handle{0};
     AssetHandle m_demo_material_handle{0};
-    bool m_demo_mesh_memory_only{true};
-    MemoryMeshType m_demo_memory_mesh_type{MemoryMeshType::None};
-    std::string m_asset_label{"Procedural cube"};
+    std::string m_asset_label{"No asset loaded"};
     luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};
 };
 

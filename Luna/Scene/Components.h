@@ -50,16 +50,8 @@ struct TransformComponent {
     }
 };
 
-enum class MemoryMeshType : uint8_t {
-    None = 0,
-    ProceduralCube,
-};
-
 struct MeshComponent {
     AssetHandle meshHandle = AssetHandle(0);
-
-    bool memoryOnly = false;
-    MemoryMeshType memoryMeshType = MemoryMeshType::None;
 
     std::vector<AssetHandle> submeshMaterials;
 

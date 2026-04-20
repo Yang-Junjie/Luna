@@ -217,7 +217,7 @@ SceneRenderer::ShaderPaths SceneRenderer::getDefaultShaderPaths()
 
 std::filesystem::path SceneRenderer::getDefaultEnvironmentPath()
 {
-    return scene_renderer_detail::projectRoot() / "Assets" / "hdr" / "newport_loft.hdr";
+    return scene_renderer_detail::projectRoot() / "SampleProject" / "Assets" / "Texture" / "newport_loft.hdr";
 }
 
 rhi::ImageData SceneRenderer::createFallbackImageData(const glm::vec4& color)
