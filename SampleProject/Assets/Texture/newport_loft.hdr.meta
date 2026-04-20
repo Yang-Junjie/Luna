@@ -1,0 +1,14 @@
+Asset:
+  Name: newport_loft
+  Handle: 4220633622516789126
+  Type: Texture
+  FilePath: Assets/Texture/newport_loft.hdr
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

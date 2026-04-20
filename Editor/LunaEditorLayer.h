@@ -32,6 +32,7 @@ private:
     void drawViewport();
     void resetEditorState();
     void createScene();
+    bool syncProjectAssets();
     bool openProject(const std::filesystem::path& project_file_path);
     bool openScene();
     bool openScene(const std::filesystem::path& scene_file_path, bool update_project_start_scene);

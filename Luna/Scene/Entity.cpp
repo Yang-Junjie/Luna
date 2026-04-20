@@ -98,4 +98,10 @@ EntityManager* Entity::getEntityManager() const
     return m_entity_manager;
 }
 
+bool Entity::isValid() const
+{
+    return m_entity_manager != nullptr && m_entity_handle != entt::null &&
+           m_entity_manager->registry().valid(m_entity_handle);
+}
+
 } // namespace luna

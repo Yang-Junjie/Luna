@@ -47,6 +47,20 @@ const char* backendTypeToString(luna::RHI::BackendType type)
     }
 }
 
+void logEditorAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
+{
+    LUNA_EDITOR_INFO(
+        "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
+        "failed={}, missing_after_sync={}",
+        stats.discoveredAssets,
+        stats.importedMissingAssets,
+        stats.loadedExistingMetadata,
+        stats.rebuiltMetadata,
+        stats.unsupportedFilesSkipped,
+        stats.failedAssets,
+        stats.missingMetadataAfterSync);
+}
+
 std::filesystem::path projectDialogDefaultPath()
 {
     if (const auto project_root = luna::ProjectManager::instance().getProjectRootPath()) {
@@ -205,6 +219,10 @@ void LunaEditorLayer::onImGuiMenuBar()
                 }
             }
         }
+
+        if (ImGui::MenuItem("Sync Assets", nullptr, false, project_loaded)) {
+            syncProjectAssets();
+        }
         ImGui::EndMenu();
     }
 
@@ -291,6 +309,18 @@ void LunaEditorLayer::createScene()
     LUNA_EDITOR_INFO("Created a new empty scene");
 }
 
+bool LunaEditorLayer::syncProjectAssets()
+{
+    if (!hasProjectLoaded()) {
+        LUNA_EDITOR_WARN("Cannot sync assets because no project is currently loaded");
+        return false;
+    }
+
+    const ImporterManager::ImportStats stats = ImporterManager::syncProjectAssets();
+    logEditorAssetSyncStats(stats);
+    return stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0;
+}
+
 bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path)
 {
     if (project_file_path.empty()) {
@@ -306,7 +336,7 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
 
     AssetManager::get().clear();
     AssetDatabase::clear();
-    ImporterManager::import();
+    syncProjectAssets();
     AssetManager::get().init();
 
     createScene();

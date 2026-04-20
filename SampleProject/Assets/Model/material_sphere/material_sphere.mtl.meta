@@ -1,0 +1,7 @@
+Asset:
+  Name: material_sphere
+  Handle: 11748804957849404480
+  Type: Material
+  FilePath: Assets/Model/material_sphere/material_sphere.mtl
+  Config:
+    UseMaterialFileParameters: true

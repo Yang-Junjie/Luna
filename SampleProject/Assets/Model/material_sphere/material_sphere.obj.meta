@@ -1,0 +1,8 @@
+Asset:
+  Name: material_sphere
+  Handle: 5963794263514486561
+  Type: Mesh
+  FilePath: Assets/Model/material_sphere/material_sphere.obj
+  Config:
+    GenerateTangents: true
+    Triangulate: true

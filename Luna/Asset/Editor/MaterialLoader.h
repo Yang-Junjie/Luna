@@ -7,6 +7,7 @@
 #include "TextureLoader.h"
 
 #include <algorithm>
+#include <charconv>
 #include <cctype>
 #include <fstream>
 #include <map>
@@ -65,20 +66,28 @@ inline std::shared_ptr<rhi::Texture> loadTextureRelative(const std::filesystem::
     }
 
     const YAML::Node texture_node = textures_node[key];
-    try {
-        const AssetHandle texture_handle(texture_node.as<uint64_t>());
-        if (texture_handle.isValid()) {
-            return AssetManager::get().loadAssetAs<rhi::Texture>(texture_handle);
+
+    if (texture_node.IsScalar()) {
+        const std::string scalar = texture_node.Scalar();
+
+        uint64_t handle_value = 0;
+        const char* begin = scalar.data();
+        const char* end = begin + scalar.size();
+        const auto [ptr, ec] = std::from_chars(begin, end, handle_value);
+        if (ec == std::errc{} && ptr == end) {
+            const AssetHandle texture_handle(handle_value);
+            if (texture_handle.isValid()) {
+                return AssetManager::get().loadAssetAs<rhi::Texture>(texture_handle);
+            }
+
+            return {};
         }
-    } catch (const YAML::Exception&) {
+
+        const auto path = (base_dir / scalar).lexically_normal();
+        return TextureLoader::loadFromFile(path, debug_name);
     }
 
-    try {
-        const auto path = (base_dir / texture_node.as<std::string>()).lexically_normal();
-        return TextureLoader::loadFromFile(path, debug_name);
-    } catch (const YAML::Exception&) {
-        return {};
-    }
+    return {};
 }
 
 inline std::shared_ptr<Material> loadFromYaml(const std::filesystem::path& path, std::string asset_name)

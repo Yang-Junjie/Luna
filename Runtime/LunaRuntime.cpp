@@ -66,6 +66,20 @@ const char* backendTypeToString(luna::RHI::BackendType type)
     }
 }
 
+void logRuntimeAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
+{
+    LUNA_RUNTIME_INFO(
+        "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
+        "failed={}, missing_after_sync={}",
+        stats.discoveredAssets,
+        stats.importedMissingAssets,
+        stats.loadedExistingMetadata,
+        stats.rebuiltMetadata,
+        stats.unsupportedFilesSkipped,
+        stats.failedAssets,
+        stats.missingMetadataAfterSync);
+}
+
 std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
 {
     std::string normalized(value);
@@ -232,7 +246,8 @@ bool LunaRuntimeApplication::loadStartupScene()
 
     AssetManager::get().clear();
     AssetDatabase::clear();
-    ImporterManager::import();
+    const ImporterManager::ImportStats sync_stats = ImporterManager::syncProjectAssets();
+    logRuntimeAssetSyncStats(sync_stats);
     AssetManager::get().init();
 
     const auto project_root = ProjectManager::instance().getProjectRootPath();

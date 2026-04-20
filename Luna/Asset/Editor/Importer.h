@@ -2,6 +2,7 @@
 #include "Asset/AssetMetadata.h"
 #include "Asset/AssetTypes.h"
 #include "Core/FileTool.h"
+#include "Core/Log.h"
 #include "Project/ProjectManager.h"
 
 #include "yaml-cpp/yaml.h"
@@ -74,10 +75,43 @@ inline void endMetadataFile(YAML::Emitter& out)
     out << YAML::EndMap;
 }
 
-inline void writeMetadataFile(const YAML::Emitter& out, const std::filesystem::path& meta_path)
+inline bool writeMetadataFile(const YAML::Emitter& out, const std::filesystem::path& meta_path)
 {
-    std::ofstream fout(meta_path);
+    if (meta_path.empty()) {
+        LUNA_CORE_ERROR("Failed to write metadata file because the target path is empty");
+        return false;
+    }
+
+    if (!meta_path.parent_path().empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(meta_path.parent_path(), ec);
+        if (ec) {
+            LUNA_CORE_ERROR("Failed to create metadata directory '{}': {}",
+                            meta_path.parent_path().string(),
+                            ec.message());
+            return false;
+        }
+    }
+
+    std::ofstream fout(meta_path, std::ios::out | std::ios::trunc);
+    if (!fout.is_open()) {
+        LUNA_CORE_ERROR("Failed to open metadata file for writing: '{}'", meta_path.string());
+        return false;
+    }
+
     fout << out.c_str();
+    fout.flush();
+    if (!fout.good()) {
+        LUNA_CORE_ERROR("Failed to write metadata file: '{}'", meta_path.string());
+        return false;
+    }
+
+    if (!std::filesystem::exists(meta_path)) {
+        LUNA_CORE_ERROR("Metadata file was not created after serialization: '{}'", meta_path.string());
+        return false;
+    }
+
+    return true;
 }
 
 inline YAML::Node loadMetadataNode(const std::filesystem::path& meta_path)
@@ -119,14 +153,19 @@ inline YAML::Node resolveConfig(const AssetMetadata& metadata, DefaultConfigFact
 }
 
 template <typename DefaultConfigFactory>
-inline void serializeMetadataWithConfig(const AssetMetadata& metadata, DefaultConfigFactory&& make_default_config)
+inline bool serializeMetadataWithConfig(const AssetMetadata& metadata, DefaultConfigFactory&& make_default_config)
 {
     YAML::Emitter out;
     beginMetadataFile(out);
     writeCommonMetadata(out, metadata);
     out << YAML::Key << "Config" << YAML::Value << resolveConfig(metadata, std::forward<DefaultConfigFactory>(make_default_config));
     endMetadataFile(out);
-    writeMetadataFile(out, getMetadataPath(metadata));
+    if (!out.good()) {
+        LUNA_CORE_ERROR("Failed to emit metadata YAML for '{}': {}", metadata.FilePath.generic_string(), out.GetLastError());
+        return false;
+    }
+
+    return writeMetadataFile(out, getMetadataPath(metadata));
 }
 
 template <typename DefaultConfigFactory>
@@ -144,9 +183,18 @@ inline AssetMetadata deserializeMetadataWithConfig(const std::filesystem::path& 
 inline std::string normalizeExtension(std::filesystem::path path)
 {
     std::string extension = path.extension().string();
+    if (extension.empty()) {
+        extension = path.filename().string();
+    }
+
     std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
         return static_cast<char>(std::tolower(c));
     });
+
+    if (!extension.empty() && extension.front() != '.') {
+        extension.insert(extension.begin(), '.');
+    }
+
     return extension;
 }
 

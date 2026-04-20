@@ -1,8 +1,15 @@
 #include "InspectorPanel.h"
+
+#include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
 #include "LunaEditorLayer.h"
+#include "Renderer/Material.h"
+#include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <string>
@@ -81,6 +88,89 @@ bool drawVec3Control(const std::string& label,
     return changed;
 }
 
+std::string getAssetDisplayLabel(luna::AssetHandle handle)
+{
+    if (!handle.isValid()) {
+        return "None";
+    }
+
+    if (!luna::AssetDatabase::exists(handle)) {
+        return "Unknown Asset";
+    }
+
+    const auto& metadata = luna::AssetDatabase::getAssetMetadata(handle);
+    if (!metadata.Name.empty()) {
+        return metadata.Name;
+    }
+
+    if (!metadata.FilePath.empty()) {
+        return metadata.FilePath.generic_string();
+    }
+
+    return "Unnamed Asset";
+}
+
+void drawAssetHandleEditor(const char* label, luna::AssetHandle& handle)
+{
+    unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
+    if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
+        handle = luna::AssetHandle(static_cast<uint64_t>(raw_handle));
+    }
+}
+
+template <typename T, typename UIFunction>
+void drawComponentSection(const char* label, luna::Entity entity, UIFunction&& ui_function, bool allow_remove)
+{
+    if (!entity.hasComponent<T>()) {
+        return;
+    }
+
+    auto& component = entity.getComponent<T>();
+    ImGui::PushID(label);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{6.0f, 4.0f});
+
+    const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed |
+                                     ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding |
+                                     ImGuiTreeNodeFlags_AllowOverlap;
+    const bool open = ImGui::TreeNodeEx("##Section", flags, "%s", label);
+    ImGui::PopStyleVar();
+
+    bool remove_component = false;
+    if (allow_remove) {
+        if (ImGui::BeginPopupContextItem("ComponentSettings")) {
+            if (ImGui::MenuItem("Remove Component")) {
+                remove_component = true;
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    if (open) {
+        ui_function(component);
+        ImGui::TreePop();
+    }
+
+    if (remove_component) {
+        entity.removeComponent<T>();
+    }
+
+    ImGui::PopID();
+}
+
+void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
+{
+    if (!mesh_component.meshHandle.isValid()) {
+        return;
+    }
+
+    const auto mesh = luna::AssetManager::get().loadAssetAs<luna::Mesh>(mesh_component.meshHandle);
+    if (!mesh || !mesh->isValid()) {
+        return;
+    }
+
+    mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+}
+
 } // namespace
 
 namespace luna {
@@ -95,33 +185,148 @@ void InspectorPanel::onImGuiRender()
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
 
     Entity selected_entity = m_editor_layer->getSelectedEntity();
+    if (selected_entity && !selected_entity.isValid()) {
+        m_editor_layer->setSelectedEntity({});
+        selected_entity = {};
+    }
+
     if (!selected_entity) {
         ImGui::TextUnformatted("Select an entity to inspect.");
         ImGui::End();
         return;
     }
 
-    ImGui::Text("Entity: %s", selected_entity.getName().c_str());
-    ImGui::Separator();
+    auto& tag_component = selected_entity.getComponent<TagComponent>();
+    char tag_buffer[256] = {};
+    strncpy_s(tag_buffer, tag_component.tag.c_str(), _TRUNCATE);
 
-    if (selected_entity.hasComponent<TransformComponent>()) {
-        auto& transform = selected_entity.getComponent<TransformComponent>();
-        drawVec3Control("Translation", transform.translation, 0.0f);
+    if (ImGui::InputText("##Tag", tag_buffer, sizeof(tag_buffer))) {
+        tag_component.tag = tag_buffer;
+    }
 
-        glm::vec3 rotation_degrees = glm::degrees(transform.rotation);
-        if (drawVec3Control("Rotation", rotation_degrees, 0.0f)) {
-            transform.rotation = glm::radians(rotation_degrees);
+    ImGui::SameLine();
+    if (ImGui::Button("Add Component")) {
+        ImGui::OpenPopup("AddComponentPopup");
+    }
+
+    if (ImGui::BeginPopup("AddComponentPopup")) {
+        if (!selected_entity.hasComponent<MeshComponent>() && ImGui::MenuItem("Mesh")) {
+            selected_entity.addComponent<MeshComponent>();
+            ImGui::CloseCurrentPopup();
         }
 
-        drawVec3Control("Scale", transform.scale, 1.0f);
-        ImGui::Spacing();
-    } else {
-        ImGui::TextUnformatted("Selected entity does not have a TransformComponent.");
+        ImGui::EndPopup();
     }
+
+    ImGui::TextDisabled("UUID: %s", selected_entity.getUUID().toString().c_str());
+    ImGui::Separator();
+
+    drawComponentSection<TransformComponent>(
+        "Transform", selected_entity, [&](TransformComponent& transform) {
+            drawVec3Control("Translation", transform.translation, 0.0f);
+
+            glm::vec3 rotation_degrees = glm::degrees(transform.rotation);
+            if (drawVec3Control("Rotation", rotation_degrees, 0.0f)) {
+                transform.setRotationEuler(glm::radians(rotation_degrees));
+            }
+
+            drawVec3Control("Scale", transform.scale, 1.0f);
+        },
+        false);
+
+    drawComponentSection<RelationshipComponent>(
+        "Relationship", selected_entity, [&](RelationshipComponent&) {
+            Entity parent = selected_entity.getParent();
+            if (parent) {
+                if (ImGui::Button(parent.getName().c_str(), ImVec2(-1.0f, 0.0f))) {
+                    m_editor_layer->setSelectedEntity(parent);
+                }
+                ImGui::TextDisabled("Parent UUID: %s", parent.getUUID().toString().c_str());
+
+                if (ImGui::Button("Detach From Parent", ImVec2(-1.0f, 0.0f))) {
+                    selected_entity.clearParent(true);
+                }
+            } else {
+                ImGui::TextUnformatted("Parent: None");
+            }
+
+            ImGui::SeparatorText("Children");
+            if (!selected_entity.hasChildren()) {
+                ImGui::TextUnformatted("No child entities.");
+            } else {
+                for (const UUID child_uuid : selected_entity.getChildren()) {
+                    Entity child = selected_entity.getEntityManager()->findEntityByUUID(child_uuid);
+                    if (!child) {
+                        continue;
+                    }
+
+                    if (ImGui::Selectable(child.getName().c_str())) {
+                        m_editor_layer->setSelectedEntity(child);
+                    }
+                    ImGui::TextDisabled("UUID: %s", child.getUUID().toString().c_str());
+                }
+            }
+        },
+        false);
+
+    drawComponentSection<MeshComponent>(
+        "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
+            drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle);
+            ImGui::TextDisabled("Mesh Asset: %s", getAssetDisplayLabel(mesh_component.meshHandle).c_str());
+
+            const auto mesh = mesh_component.meshHandle.isValid()
+                                  ? AssetManager::get().loadAssetAs<Mesh>(mesh_component.meshHandle)
+                                  : std::shared_ptr<Mesh>{};
+            const bool mesh_loaded = mesh && mesh->isValid();
+
+            if (mesh_loaded) {
+                ImGui::Text("Submeshes: %zu", mesh->getSubMeshes().size());
+                if (ImGui::Button("Sync Material Slots To Mesh", ImVec2(-1.0f, 0.0f))) {
+                    mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+                }
+            } else {
+                int slot_count = static_cast<int>(mesh_component.getSubmeshMaterialCount());
+                if (ImGui::InputInt("Material Slot Count", &slot_count)) {
+                    slot_count = (std::max)(slot_count, 0);
+                    mesh_component.resizeSubmeshMaterials(static_cast<size_t>(slot_count));
+                }
+            }
+
+            syncMeshMaterialSlots(mesh_component);
+
+            ImGui::SeparatorText("Submesh Materials");
+            if (mesh_component.getSubmeshMaterialCount() == 0) {
+                ImGui::TextUnformatted("No material slots.");
+            } else {
+                for (uint32_t submesh_index = 0;
+                     submesh_index < static_cast<uint32_t>(mesh_component.getSubmeshMaterialCount());
+                     ++submesh_index) {
+                    ImGui::PushID(static_cast<int>(submesh_index));
+                    ImGui::Text("Submesh %u", submesh_index);
+
+                    AssetHandle material_handle = mesh_component.getSubmeshMaterial(submesh_index);
+                    drawAssetHandleEditor("Material Handle", material_handle);
+                    mesh_component.setSubmeshMaterial(submesh_index, material_handle);
+                    ImGui::TextDisabled("Material Asset: %s", getAssetDisplayLabel(material_handle).c_str());
+
+                    if (ImGui::Button("Clear Material", ImVec2(-1.0f, 0.0f))) {
+                        mesh_component.clearSubmeshMaterial(submesh_index);
+                    }
+
+                    ImGui::Separator();
+                    ImGui::PopID();
+                }
+
+                if (ImGui::Button("Clear All Materials", ImVec2(-1.0f, 0.0f))) {
+                    mesh_component.clearAllSubmeshMaterials();
+                }
+            }
+        },
+        true);
 
     ImGui::End();
 }

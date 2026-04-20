@@ -1,0 +1,8 @@
+Asset:
+  Name: DamagedHelmet
+  Handle: 17196472838577284151
+  Type: Mesh
+  FilePath: Assets/Model/DamagedHelmet/DamagedHelmet.gltf
+  Config:
+    GenerateTangents: true
+    Triangulate: true

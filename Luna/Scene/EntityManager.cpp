@@ -289,7 +289,8 @@ bool EntityManager::convertToWorldSpace(Entity entity)
         return false;
     }
 
-    return setParent(entity, {}, true);
+    entity.transform().setTransform(getWorldSpaceTransformMatrix(entity));
+    return true;
 }
 
 bool EntityManager::convertToLocalSpace(Entity entity)

@@ -57,10 +57,11 @@ public:
     bool hasChildren() const;
     bool removeChild(Entity child, bool preserve_world_transform = true);
     EntityManager* getEntityManager() const;
+    bool isValid() const;
 
     explicit operator bool() const
     {
-        return m_entity_manager != nullptr && m_entity_handle != entt::null;
+        return isValid();
     }
 
     operator entt::entity() const

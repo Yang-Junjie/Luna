@@ -109,6 +109,13 @@ void createMaterialMetadata(const std::filesystem::path& path, const MaterialAss
     AssetMetadata metadata = importer.import(path);
     metadata.Name = descriptor.Name.empty() ? path.stem().string() : descriptor.Name;
     importer.serializeMetadata(metadata);
+
+    const std::filesystem::path metadata_path = importer_detail::getMetadataPath(metadata);
+    if (!std::filesystem::exists(metadata_path)) {
+        LUNA_CORE_ERROR("Failed to create material metadata '{}'", metadata_path.string());
+        return;
+    }
+
     AssetDatabase::set(metadata.Handle, metadata);
 }
 
