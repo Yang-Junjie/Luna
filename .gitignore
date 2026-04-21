@@ -11,3 +11,4 @@ __pycache__/
 docs/
 shader_cache/
 imgui.ini
+.codex/

@@ -14,10 +14,12 @@
 #include <filesystem>
 #include <glm/common.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/scalar_constants.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/trigonometric.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <string_view>
@@ -28,8 +30,17 @@ namespace luna::scene_renderer_detail {
 inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
 inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
+inline constexpr luna::RHI::Format kEnvironmentCubeFormat = luna::RHI::Format::RGBA16_FLOAT;
+inline constexpr luna::RHI::Format kEnvironmentBrdfFormat = luna::RHI::Format::RGBA16_FLOAT;
 inline constexpr float kDefaultMaterialAlphaCutoff = 0.5f;
 inline constexpr float kEnvironmentFallbackValue = 0.08f;
+inline constexpr uint32_t kEnvironmentCubeFaceSize = 512;
+inline constexpr uint32_t kEnvironmentIrradianceFaceSize = 64;
+inline constexpr uint32_t kEnvironmentPrefilterFaceSize = 256;
+inline constexpr uint32_t kEnvironmentBrdfLutSize = 256;
+inline constexpr uint32_t kEnvironmentIrradianceSamples = 128;
+inline constexpr uint32_t kEnvironmentPrefilterSamples = 512;
+inline constexpr uint32_t kEnvironmentBrdfSamples = 1024;
 
 struct MeshPushConstants {
     glm::mat4 model{1.0f};
@@ -42,6 +53,7 @@ struct SceneGpuParams {
     glm::vec4 light_direction_intensity{0.45f, 0.80f, 0.35f, 4.0f};
     glm::vec4 light_color_exposure{1.0f, 0.98f, 0.95f, 1.0f};
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
+    std::array<glm::vec4, 9> irradiance_sh{};
 };
 
 struct MaterialGpuParams {
@@ -184,6 +196,11 @@ inline luna::rhi::ImageData createFallbackColorImageData(const glm::vec4& color)
     };
 }
 
+inline luna::rhi::ImageData createFallbackMetallicRoughnessImageData(float roughness, float metallic)
+{
+    return createFallbackColorImageData(glm::vec4(0.0f, roughness, metallic, 1.0f));
+}
+
 inline luna::rhi::ImageData createFallbackFloatImageData(const glm::vec4& value)
 {
     std::vector<uint8_t> bytes(sizeof(float) * 4u, 0);
@@ -194,6 +211,97 @@ inline luna::rhi::ImageData createFallbackFloatImageData(const glm::vec4& value)
         .Width = 1,
         .Height = 1,
     };
+}
+
+inline std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::rhi::ImageData& image)
+{
+    std::array<glm::vec4, 9> result{};
+    if (!image.isValid() || image.ImageFormat != kEnvironmentFormat ||
+        image.ByteData.size() != static_cast<size_t>(image.Width) * static_cast<size_t>(image.Height) * 4u * sizeof(float)) {
+        return result;
+    }
+
+    const auto* pixels = reinterpret_cast<const float*>(image.ByteData.data());
+    std::array<glm::dvec3, 9> coefficients{};
+    const double width = static_cast<double>(image.Width);
+    const double height = static_cast<double>(image.Height);
+    constexpr double kPi = 3.14159265358979323846;
+    constexpr double kTwoPi = kPi * 2.0;
+    constexpr double kFourPi = kPi * 4.0;
+    const double d_phi = kTwoPi / width;
+    const double d_theta = kPi / height;
+    double total_weight = 0.0;
+
+    for (uint32_t y = 0; y < image.Height; ++y) {
+        const double theta = kPi * (static_cast<double>(y) + 0.5) / height;
+        const double sin_theta = std::sin(theta);
+        const double cos_theta = std::cos(theta);
+
+        for (uint32_t x = 0; x < image.Width; ++x) {
+            const double phi = kTwoPi * (static_cast<double>(x) + 0.5) / width - kPi;
+            const double sin_phi = std::sin(phi);
+            const double cos_phi = std::cos(phi);
+            const glm::dvec3 direction(cos_phi * sin_theta, cos_theta, sin_phi * sin_theta);
+            const double weight = sin_theta * d_theta * d_phi;
+            const size_t pixel_index = (static_cast<size_t>(y) * image.Width + x) * 4u;
+            const glm::dvec3 radiance(
+                static_cast<double>(pixels[pixel_index + 0]),
+                static_cast<double>(pixels[pixel_index + 1]),
+                static_cast<double>(pixels[pixel_index + 2]));
+
+            const std::array<double, 9> basis{
+                0.282095,
+                0.488603 * direction.y,
+                0.488603 * direction.z,
+                0.488603 * direction.x,
+                1.092548 * direction.x * direction.y,
+                1.092548 * direction.y * direction.z,
+                0.315392 * (3.0 * direction.z * direction.z - 1.0),
+                1.092548 * direction.x * direction.z,
+                0.546274 * (direction.x * direction.x - direction.y * direction.y),
+            };
+
+            for (size_t basis_index = 0; basis_index < basis.size(); ++basis_index) {
+                coefficients[basis_index] += radiance * (basis[basis_index] * weight);
+            }
+            total_weight += weight;
+        }
+    }
+
+    if (total_weight <= 0.0) {
+        return result;
+    }
+
+    const double normalization = kFourPi / total_weight;
+    constexpr std::array<double, 9> lambert_band_scale{
+        kPi,
+        kTwoPi / 3.0,
+        kTwoPi / 3.0,
+        kTwoPi / 3.0,
+        kPi / 4.0,
+        kPi / 4.0,
+        kPi / 4.0,
+        kPi / 4.0,
+        kPi / 4.0,
+    };
+
+    for (size_t coefficient_index = 0; coefficient_index < coefficients.size(); ++coefficient_index) {
+        const glm::dvec3 irradiance = coefficients[coefficient_index] * (normalization * lambert_band_scale[coefficient_index]);
+        result[coefficient_index] = glm::vec4(glm::vec3(irradiance), 0.0f);
+    }
+
+    return result;
+}
+
+inline uint32_t calculateMipCount(uint32_t width, uint32_t height = 1)
+{
+    uint32_t mip_count = 1;
+    while (width > 1 || height > 1) {
+        width = (std::max)(width / 2, 1u);
+        height = (std::max)(height / 2, 1u);
+        ++mip_count;
+    }
+    return mip_count;
 }
 
 inline luna::rhi::ImageData generateEnvironmentMipChain(const luna::rhi::ImageData& source)

@@ -49,6 +49,7 @@ struct SceneParams
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
+    float4 irradianceSh[9];
 };
 
 struct SampledMaterial
@@ -118,11 +119,28 @@ ConstantBuffer<MaterialParams> gMaterialParams : register(b10);
 [[vk::binding(0, 1)]]
 ConstantBuffer<SceneParams> gSceneParams : register(b11);
 
+#if defined(LUNA_BACKEND_VULKAN)
+[[vk::binding(1, 1)]]
+TextureCube<float4> gEnvironmentSkyTexture : register(t12);
+
+[[vk::binding(2, 1)]]
+SamplerState gEnvironmentSampler : register(s13);
+
+[[vk::binding(3, 1)]]
+TextureCube<float4> gEnvironmentIrradianceTexture : register(t14);
+
+[[vk::binding(4, 1)]]
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t15);
+
+[[vk::binding(5, 1)]]
+Texture2D<float4> gEnvironmentBrdfLutTexture : register(t16);
+#else
 [[vk::binding(1, 1)]]
 Texture2D<float4> gEnvironmentTexture : register(t12);
 
 [[vk::binding(2, 1)]]
 SamplerState gEnvironmentSampler : register(s13);
+#endif
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -145,22 +163,88 @@ float3 toneMapACES(float3 color)
     return saturate((color * (a * color + b)) / (color * (c * color + d) + e));
 }
 
+float2 envBrdfApprox(float roughness, float NdotV);
+
+float3 evaluateEnvironmentIrradianceSH(float3 direction)
+{
+    const float3 dir = safeNormalize(direction, float3(0.0, 1.0, 0.0));
+    const float x = dir.x;
+    const float y = dir.y;
+    const float z = dir.z;
+
+    const float basis[9] = {
+        0.282095,
+        0.488603 * y,
+        0.488603 * z,
+        0.488603 * x,
+        1.092548 * x * y,
+        1.092548 * y * z,
+        0.315392 * (3.0 * z * z - 1.0),
+        1.092548 * x * z,
+        0.546274 * (x * x - y * y),
+    };
+
+    float3 irradiance = 0.0;
+    [unroll]
+    for (int basisIndex = 0; basisIndex < 9; ++basisIndex)
+    {
+        irradiance += gSceneParams.irradianceSh[basisIndex].rgb * basis[basisIndex];
+    }
+    return max(irradiance, 0.0);
+}
+
 bool isMaskedMaterial()
 {
     return gMaterialParams.materialFlags.x > 0.5 && gMaterialParams.materialFlags.x < 1.5;
 }
 
+#if !defined(LUNA_BACKEND_VULKAN)
 float2 directionToEquirectUv(float3 direction)
 {
     const float3 dir = safeNormalize(direction, float3(0.0, 1.0, 0.0));
     const float u = atan2(dir.z, dir.x) * (0.5 / kPi) + 0.5;
-    const float v = acos(clamp(dir.y, -1.0, 1.0)) / kPi;
+    const float v = 1.0 - acos(clamp(dir.y, -1.0, 1.0)) / kPi;
     return float2(u, v);
 }
 
 float3 sampleEnvironment(float3 direction, float lod)
 {
     return gEnvironmentTexture.SampleLevel(gEnvironmentSampler, directionToEquirectUv(direction), lod).rgb;
+}
+#endif
+
+float3 sampleEnvironmentIrradiance(float3 direction)
+{
+#if defined(LUNA_BACKEND_VULKAN)
+    return evaluateEnvironmentIrradianceSH(direction);
+#else
+    const float maxEnvMip = gSceneParams.cameraPositionEnvMip.w;
+    return sampleEnvironment(direction, maxEnvMip);
+#endif
+}
+
+float3 sampleEnvironmentPrefilter(float3 direction, float lod)
+{
+#if defined(LUNA_BACKEND_VULKAN)
+    return gEnvironmentPrefilterTexture.SampleLevel(
+        gEnvironmentSampler,
+        safeNormalize(direction, float3(0.0, 1.0, 0.0)),
+        lod).rgb;
+#else
+    return sampleEnvironment(direction, lod);
+#endif
+}
+
+float2 sampleEnvironmentBrdf(float roughness, float NdotV)
+{
+#if defined(LUNA_BACKEND_VULKAN)
+    return gEnvironmentBrdfLutTexture.SampleLevel(
+        gEnvironmentSampler,
+        float2(saturate(NdotV), saturate(roughness)),
+        0.0).rg;
+#else
+    return envBrdfApprox(roughness, NdotV);
+#endif
 }
 
 float distributionGGX(float3 N, float3 H, float roughness)
@@ -218,34 +302,47 @@ float3 evaluatePbrLighting(float3 worldPosition,
     const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
     const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
     const float3 L = safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0));
-    const float3 H = safeNormalize(V + L, N);
     const float NdotL = saturate(dot(N, L));
     const float NdotV = saturate(dot(N, V));
-    const float HdotV = saturate(dot(H, V));
 
     const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
-    const float3 F = fresnelSchlick(HdotV, F0);
-    const float NDF = distributionGGX(N, H, roughness);
-    const float G = geometrySmith(N, V, L, roughness);
-    const float3 numerator = NDF * G * F;
-    const float denominator = max(4.0 * NdotL * NdotV, 1e-4);
-    const float3 specular = numerator / denominator;
-
-    const float3 kS = F;
-    const float3 kD = (1.0 - kS) * (1.0 - metallic);
     const float3 radiance = gSceneParams.lightColorExposure.rgb * gSceneParams.lightDirectionIntensity.w;
-    const float3 directLighting = (kD * baseColor / kPi + specular) * radiance * NdotL;
+
+    // When V ~= -L, the microfacet half vector becomes undefined. Treat that direct-specular case as zero
+    // instead of falling back to N, otherwise the Fresnel split can produce the black ring + white dot artifact.
+    const float3 directHalfVector = V + L;
+    const float directHalfVectorLengthSq = dot(directHalfVector, directHalfVector);
+    const bool hasValidDirectHalfVector = NdotL > 0.0 && NdotV > 0.0 && directHalfVectorLengthSq > 1e-6;
+
+    float3 directKs = 0.0;
+    float3 directSpecular = 0.0;
+    if (hasValidDirectHalfVector)
+    {
+        const float3 H = directHalfVector * rsqrt(directHalfVectorLengthSq);
+        const float HdotV = saturate(dot(H, V));
+        const float3 F = fresnelSchlick(HdotV, F0);
+        const float NDF = distributionGGX(N, H, roughness);
+        const float G = geometrySmith(N, V, L, roughness);
+        const float denominator = max(4.0 * NdotL * NdotV, 1e-4);
+
+        directKs = F;
+        directSpecular = (NDF * G * F / denominator) * radiance * NdotL;
+    }
+
+    const float3 directKd = (1.0 - directKs) * (1.0 - metallic);
+    const float3 directDiffuse = directKd * baseColor / kPi * radiance * NdotL;
+    const float3 directLighting = directDiffuse + directSpecular;
 
     const float maxEnvMip = gSceneParams.cameraPositionEnvMip.w;
-    const float3 irradiance = sampleEnvironment(N, maxEnvMip);
-    const float3 diffuseIbl = irradiance * baseColor;
+    const float3 ambientKs = fresnelSchlickRoughness(NdotV, F0, roughness);
+    const float3 ambientKd = (1.0 - ambientKs) * (1.0 - metallic);
+    const float3 diffuseIbl = sampleEnvironmentIrradiance(N) * baseColor;
 
     const float3 R = reflect(-V, N);
-    const float3 prefilteredColor = sampleEnvironment(R, roughness * maxEnvMip);
-    const float3 Fibl = fresnelSchlickRoughness(NdotV, F0, roughness);
-    const float2 envBrdf = envBrdfApprox(roughness, NdotV);
-    const float3 specularIbl = prefilteredColor * (Fibl * envBrdf.x + envBrdf.y);
-    const float3 ambient = (kD * diffuseIbl * gSceneParams.iblFactors.x + specularIbl * gSceneParams.iblFactors.y) *
+    const float3 prefilteredColor = sampleEnvironmentPrefilter(R, roughness * maxEnvMip);
+    const float2 envBrdf = sampleEnvironmentBrdf(roughness, NdotV);
+    const float3 specularIbl = prefilteredColor * (ambientKs * envBrdf.x + envBrdf.y);
+    const float3 ambient = (ambientKd * diffuseIbl * gSceneParams.iblFactors.x + specularIbl * gSceneParams.iblFactors.y) *
                            ao * gSceneParams.iblFactors.z;
 
     return emissive + directLighting + ambient;
