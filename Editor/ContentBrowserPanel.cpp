@@ -1,23 +1,39 @@
-#include "ContentBrowserPanel.h"
-
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/ImageLoader.h"
+#include "ContentBrowserPanel.h"
+#include "Core/Application.h"
 #include "Core/Log.h"
 #include "EditorAssetDragDrop.h"
+#include "Imgui/ImGuiContext.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
 
-#include <algorithm>
 #include <cctype>
-#include <cfloat>
+#include <cstdint>
+#include <cstring>
+
+#include <algorithm>
+#include <array>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <Device.h>
+#include <imgui.h>
+#include <Queue.h>
 #include <string>
 #include <string_view>
+#include <system_error>
+#include <unordered_map>
 #include <vector>
-
-#include <imgui.h>
 
 namespace {
 
-enum class BrowserEntryKind {
+enum class DirectoryScanMode : uint8_t {
+    None = 0,
+    Children = 1 << 0,
+    Entries = 1 << 1,
+};
+
+enum class BrowserEntryKind : uint8_t {
     Directory,
     SceneFile,
     AssetFile,
@@ -27,10 +43,28 @@ enum class BrowserEntryKind {
 struct BrowserEntry {
     std::filesystem::path Path;
     std::string Label;
+    std::string LabelLower;
     BrowserEntryKind Kind = BrowserEntryKind::OtherFile;
     luna::AssetHandle Handle = luna::AssetHandle(0);
-    luna::AssetType Type = luna::AssetType::None;
 };
+
+struct DirectoryCache {
+    std::filesystem::path Path;
+    std::vector<std::filesystem::path> ChildDirectories;
+    std::vector<BrowserEntry> Entries;
+    bool ChildDirectoriesLoaded = false;
+    bool EntriesLoaded = false;
+};
+
+bool wantsChildren(DirectoryScanMode mode)
+{
+    return (static_cast<uint8_t>(mode) & static_cast<uint8_t>(DirectoryScanMode::Children)) != 0;
+}
+
+bool wantsEntries(DirectoryScanMode mode)
+{
+    return (static_cast<uint8_t>(mode) & static_cast<uint8_t>(DirectoryScanMode::Entries)) != 0;
+}
 
 std::string toLower(std::string value)
 {
@@ -69,7 +103,7 @@ bool isRelativeTo(const std::filesystem::path& candidate, const std::filesystem:
         return false;
     }
 
-    if (relative_path.empty()) {
+    if (relative_path.empty() || relative_path == ".") {
         return true;
     }
 
@@ -77,45 +111,80 @@ bool isRelativeTo(const std::filesystem::path& candidate, const std::filesystem:
         return false;
     }
 
-    const std::string relative_string = relative_path.generic_string();
-    return relative_string != "." && !relative_string.starts_with("..");
+    return !relative_path.generic_string().starts_with("..");
 }
 
-std::vector<std::filesystem::path> collectChildDirectories(const std::filesystem::path& directory)
+int entrySortRank(BrowserEntryKind kind)
 {
-    std::vector<std::filesystem::path> directories;
+    return kind == BrowserEntryKind::Directory ? 0 : 1;
+}
 
-    std::error_code ec;
-    for (std::filesystem::directory_iterator it(directory, std::filesystem::directory_options::skip_permission_denied, ec),
-         end;
-         !ec && it != end;
-         it.increment(ec)) {
-        if (it->is_directory(ec) && !ec) {
-            directories.push_back(it->path());
+std::string makeAssetLookupKey(const std::filesystem::path& path)
+{
+    if (path.empty()) {
+        return {};
+    }
+
+    std::filesystem::path normalized_path = path.lexically_normal();
+    if (normalized_path.is_absolute()) {
+        if (const auto project_root = luna::ProjectManager::instance().getProjectRootPath()) {
+            std::error_code ec;
+            const std::filesystem::path relative_path = std::filesystem::relative(normalized_path, *project_root, ec);
+            if (!ec && !relative_path.empty() && !relative_path.is_absolute()) {
+                normalized_path = relative_path.lexically_normal();
+            }
         }
     }
 
-    std::sort(directories.begin(), directories.end(), [](const auto& lhs, const auto& rhs) {
-        return toLower(lhs.filename().string()) < toLower(rhs.filename().string());
-    });
-    return directories;
+    return normalized_path.generic_string();
 }
 
-std::vector<BrowserEntry> collectDirectoryEntries(const std::filesystem::path& directory)
+bool matchesSearch(const BrowserEntry& entry, std::string_view filter_lower)
 {
-    std::vector<BrowserEntry> entries;
+    return filter_lower.empty() || entry.LabelLower.find(filter_lower) != std::string::npos;
+}
+
+void loadChildDirectories(DirectoryCache& cache)
+{
+    cache.ChildDirectories.clear();
 
     std::error_code ec;
-    for (std::filesystem::directory_iterator it(directory, std::filesystem::directory_options::skip_permission_denied, ec),
+    for (std::filesystem::directory_iterator
+             it(cache.Path, std::filesystem::directory_options::skip_permission_denied, ec),
          end;
          !ec && it != end;
          it.increment(ec)) {
-        const std::filesystem::path path = it->path();
+        if (!it->is_directory(ec) || ec) {
+            continue;
+        }
+
+        cache.ChildDirectories.push_back(it->path().lexically_normal());
+    }
+
+    std::sort(cache.ChildDirectories.begin(), cache.ChildDirectories.end(), [](const auto& lhs, const auto& rhs) {
+        return toLower(lhs.filename().string()) < toLower(rhs.filename().string());
+    });
+
+    cache.ChildDirectoriesLoaded = true;
+}
+
+void loadDirectoryEntries(DirectoryCache& cache, const std::unordered_map<std::string, luna::AssetHandle>& asset_lookup)
+{
+    cache.Entries.clear();
+
+    std::error_code ec;
+    for (std::filesystem::directory_iterator
+             it(cache.Path, std::filesystem::directory_options::skip_permission_denied, ec),
+         end;
+         !ec && it != end;
+         it.increment(ec)) {
+        const std::filesystem::path path = it->path().lexically_normal();
 
         if (it->is_directory(ec) && !ec) {
-            entries.push_back(BrowserEntry{
+            cache.Entries.push_back(BrowserEntry{
                 .Path = path,
                 .Label = path.filename().string(),
+                .LabelLower = toLower(path.filename().string()),
                 .Kind = BrowserEntryKind::Directory,
             });
             continue;
@@ -128,98 +197,33 @@ std::vector<BrowserEntry> collectDirectoryEntries(const std::filesystem::path& d
         BrowserEntry entry{
             .Path = path,
             .Label = path.filename().string(),
+            .LabelLower = toLower(path.filename().string()),
         };
 
         if (isSceneFile(path)) {
             entry.Kind = BrowserEntryKind::SceneFile;
+        } else if (const auto lookup_it = asset_lookup.find(makeAssetLookupKey(path));
+                   lookup_it != asset_lookup.end()) {
+            entry.Kind = BrowserEntryKind::AssetFile;
+            entry.Handle = lookup_it->second;
         } else {
-            const luna::AssetHandle handle = luna::AssetDatabase::findHandleByFilePath(path);
-            if (handle.isValid() && luna::AssetDatabase::exists(handle)) {
-                const auto& metadata = luna::AssetDatabase::getAssetMetadata(handle);
-                entry.Kind = BrowserEntryKind::AssetFile;
-                entry.Handle = handle;
-                entry.Type = metadata.Type;
-            } else {
-                entry.Kind = BrowserEntryKind::OtherFile;
-            }
+            entry.Kind = BrowserEntryKind::OtherFile;
         }
 
-        entries.push_back(std::move(entry));
+        cache.Entries.push_back(std::move(entry));
     }
 
-    std::sort(entries.begin(), entries.end(), [](const BrowserEntry& lhs, const BrowserEntry& rhs) {
-        const auto category_rank = [](BrowserEntryKind kind) {
-            switch (kind) {
-                case BrowserEntryKind::Directory:
-                    return 0;
-                case BrowserEntryKind::SceneFile:
-                    return 1;
-                case BrowserEntryKind::AssetFile:
-                    return 2;
-                case BrowserEntryKind::OtherFile:
-                default:
-                    return 3;
-            }
-        };
-
-        const int lhs_rank = category_rank(lhs.Kind);
-        const int rhs_rank = category_rank(rhs.Kind);
+    std::sort(cache.Entries.begin(), cache.Entries.end(), [](const BrowserEntry& lhs, const BrowserEntry& rhs) {
+        const int lhs_rank = entrySortRank(lhs.Kind);
+        const int rhs_rank = entrySortRank(rhs.Kind);
         if (lhs_rank != rhs_rank) {
             return lhs_rank < rhs_rank;
         }
 
-        return toLower(lhs.Label) < toLower(rhs.Label);
+        return lhs.LabelLower < rhs.LabelLower;
     });
 
-    return entries;
-}
-
-bool matchesSearch(const BrowserEntry& entry, std::string_view search_filter)
-{
-    if (search_filter.empty()) {
-        return true;
-    }
-
-    return toLower(entry.Label).find(toLower(std::string(search_filter))) != std::string::npos;
-}
-
-const char* entryBadge(const BrowserEntry& entry)
-{
-    switch (entry.Kind) {
-        case BrowserEntryKind::Directory:
-            return "DIR";
-        case BrowserEntryKind::SceneFile:
-            return "SCN";
-        case BrowserEntryKind::AssetFile:
-            return luna::AssetUtils::AssetTypeToString(entry.Type);
-        case BrowserEntryKind::OtherFile:
-        default:
-            return "FILE";
-    }
-}
-
-ImVec4 entryColor(const BrowserEntry& entry)
-{
-    switch (entry.Kind) {
-        case BrowserEntryKind::Directory:
-            return ImVec4(0.28f, 0.41f, 0.64f, 1.0f);
-        case BrowserEntryKind::SceneFile:
-            return ImVec4(0.27f, 0.55f, 0.36f, 1.0f);
-        case BrowserEntryKind::AssetFile:
-            switch (entry.Type) {
-                case luna::AssetType::Mesh:
-                    return ImVec4(0.51f, 0.34f, 0.16f, 1.0f);
-                case luna::AssetType::Material:
-                    return ImVec4(0.56f, 0.32f, 0.20f, 1.0f);
-                case luna::AssetType::Texture:
-                    return ImVec4(0.39f, 0.29f, 0.60f, 1.0f);
-                default:
-                    return ImVec4(0.33f, 0.33f, 0.35f, 1.0f);
-            }
-        case BrowserEntryKind::OtherFile:
-        default:
-            return ImVec4(0.25f, 0.25f, 0.26f, 1.0f);
-    }
+    cache.EntriesLoaded = true;
 }
 
 void drawEntryTooltip(const BrowserEntry& entry)
@@ -231,12 +235,275 @@ void drawEntryTooltip(const BrowserEntry& entry)
     ImGui::BeginTooltip();
     ImGui::TextUnformatted(entry.Label.c_str());
     ImGui::TextDisabled("%s", entry.Path.lexically_normal().string().c_str());
-    if (entry.Kind == BrowserEntryKind::AssetFile && entry.Handle.isValid() && luna::AssetDatabase::exists(entry.Handle)) {
-        ImGui::Separator();
-        ImGui::Text("Type: %s", luna::AssetUtils::AssetTypeToString(entry.Type));
-        ImGui::Text("Handle: %s", entry.Handle.toString().c_str());
-    }
     ImGui::EndTooltip();
+}
+
+std::string currentDirectoryLabel(const std::filesystem::path& assets_root,
+                                  const std::filesystem::path& current_directory)
+{
+    if (assets_root.empty() || current_directory.empty()) {
+        return "Assets";
+    }
+
+    std::error_code ec;
+    const std::filesystem::path relative_path = std::filesystem::relative(current_directory, assets_root, ec);
+    if (ec || relative_path.empty() || relative_path == ".") {
+        return "Assets";
+    }
+
+    return "Assets/" + relative_path.generic_string();
+}
+
+std::filesystem::path editorAssetPath(std::string_view file_name)
+{
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Editor" / "EditorAssets" / std::string(file_name);
+}
+
+luna::RHI::Ref<luna::RHI::Texture> uploadEditorIconTexture(const std::filesystem::path& path,
+                                                           std::string_view debug_name)
+{
+    const luna::rhi::ImageData image = luna::rhi::ImageLoader::LoadImageFromFile(path.string());
+    if (!image.isValid()) {
+        LUNA_EDITOR_WARN("Content Browser failed to load icon '{}'", path.string());
+        return {};
+    }
+
+    auto& renderer = luna::Application::get().getRenderer();
+    const auto& device = renderer.getDevice();
+    const auto& graphics_queue = renderer.getGraphicsQueue();
+    if (!device || !graphics_queue) {
+        return {};
+    }
+
+    constexpr uint32_t kTextureDataPitchAlignment = 256u;
+
+    const uint64_t texel_count = static_cast<uint64_t>(image.Width) * static_cast<uint64_t>(image.Height);
+    if (texel_count == 0 || image.ByteData.empty() || image.ByteData.size() % texel_count != 0) {
+        return {};
+    }
+
+    const uint32_t bytes_per_pixel = static_cast<uint32_t>(image.ByteData.size() / texel_count);
+    const uint32_t bytes_per_row = image.Width * bytes_per_pixel;
+    const uint32_t aligned_bytes_per_row = static_cast<uint32_t>(
+        ((bytes_per_row + kTextureDataPitchAlignment - 1u) / kTextureDataPitchAlignment) * kTextureDataPitchAlignment);
+    const uint64_t upload_size = static_cast<uint64_t>(aligned_bytes_per_row) * static_cast<uint64_t>(image.Height);
+
+    const auto staging_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+                                                         .SetSize(upload_size)
+                                                         .SetUsage(luna::RHI::BufferUsageFlags::TransferSrc)
+                                                         .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                         .SetName(std::string(debug_name) + "_Upload")
+                                                         .Build());
+    if (!staging_buffer) {
+        return {};
+    }
+
+    void* mapped = staging_buffer->Map();
+    if (mapped == nullptr) {
+        return {};
+    }
+
+    auto* destination = static_cast<uint8_t*>(mapped);
+    const auto* source = image.ByteData.data();
+    for (uint32_t row = 0; row < image.Height; ++row) {
+        std::memcpy(destination + static_cast<uint64_t>(row) * aligned_bytes_per_row,
+                    source + static_cast<uint64_t>(row) * bytes_per_row,
+                    bytes_per_row);
+    }
+    staging_buffer->Flush(0, upload_size);
+    staging_buffer->Unmap();
+
+    const auto texture = device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(image.Width, image.Height)
+            .SetFormat(image.ImageFormat)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName(std::string(debug_name))
+            .Build());
+    if (!texture) {
+        return {};
+    }
+
+    const auto upload_commands = device->CreateCommandBufferEncoder();
+    if (!upload_commands) {
+        return {};
+    }
+
+    const luna::RHI::BufferImageCopy copy_region{
+        .BufferOffset = 0,
+        .BufferRowLength = bytes_per_pixel > 0 ? aligned_bytes_per_row / bytes_per_pixel : image.Width,
+        .BufferImageHeight = 0,
+        .ImageSubresource =
+            {
+                .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                .MipLevel = 0,
+                .BaseArrayLayer = 0,
+                .LayerCount = 1,
+            },
+        .ImageOffsetX = 0,
+        .ImageOffsetY = 0,
+        .ImageOffsetZ = 0,
+        .ImageExtentWidth = image.Width,
+        .ImageExtentHeight = image.Height,
+        .ImageExtentDepth = 1,
+    };
+    const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{copy_region};
+
+    upload_commands->Begin();
+    upload_commands->TransitionImage(texture, luna::RHI::ImageTransition::UndefinedToTransferDst);
+    upload_commands->CopyBufferToImage(staging_buffer, texture, luna::RHI::ResourceState::CopyDest, copy_regions);
+    upload_commands->TransitionImage(texture, luna::RHI::ImageTransition::TransferDstToShaderRead);
+    upload_commands->End();
+
+    graphics_queue->Submit(upload_commands);
+    graphics_queue->WaitIdle();
+    upload_commands->ReturnToPool();
+    return texture;
+}
+
+struct EntryTileResult {
+    bool Clicked = false;
+    bool DoubleClicked = false;
+};
+
+EntryTileResult drawEntryTile(const BrowserEntry& entry, ImTextureID icon_texture_id, bool selected, const ImVec2& size)
+{
+    EntryTileResult result;
+
+    ImGui::BeginGroup();
+
+    const ImVec4 selected_color = ImGui::GetStyleColorVec4(ImGuiCol_Header);
+    const ImVec4 hovered_color = ImGui::GetStyleColorVec4(ImGuiCol_HeaderHovered);
+    const ImVec4 active_color = ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive);
+
+    ImGui::PushStyleColor(ImGuiCol_Button, selected ? selected_color : ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hovered_color);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, active_color);
+
+    const ImVec2 icon_size(80.0f, 80.0f);
+    if (icon_texture_id != 0) {
+        result.Clicked = ImGui::ImageButton("##EntryButton", icon_texture_id, icon_size);
+    } else {
+        result.Clicked = ImGui::Button("##EntryButton", icon_size);
+    }
+    result.DoubleClicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+    if (entry.Kind == BrowserEntryKind::AssetFile && entry.Handle.isValid() &&
+        luna::AssetDatabase::exists(entry.Handle)) {
+        luna::editor::beginAssetDragDropSource(luna::AssetDatabase::getAssetMetadata(entry.Handle),
+                                               entry.Label.c_str());
+    }
+
+    ImGui::PopStyleColor(3);
+
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + size.x);
+    ImGui::TextUnformatted(entry.Label.c_str());
+    ImGui::PopTextWrapPos();
+
+    ImGui::EndGroup();
+    result.Clicked = result.Clicked || ImGui::IsItemClicked(ImGuiMouseButton_Left);
+    result.DoubleClicked =
+        result.DoubleClicked || (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left));
+
+    return result;
+}
+
+} // namespace
+
+namespace luna {
+
+struct ContentBrowserPanelState {
+    std::unordered_map<std::filesystem::path, DirectoryCache> DirectoryCaches;
+    std::unordered_map<std::string, AssetHandle> AssetLookup;
+    std::vector<std::size_t> VisibleEntryIndices;
+    std::filesystem::path VisibleEntriesDirectory;
+    std::filesystem::path SelectedEntry;
+    RHI::Ref<RHI::Texture> DirectoryIconTexture;
+    RHI::Ref<RHI::Texture> FileIconTexture;
+    ImTextureID DirectoryIconTextureId = 0;
+    ImTextureID FileIconTextureId = 0;
+    std::string SearchFilter;
+    std::string SearchFilterLower;
+    bool RefreshRequested = true;
+    bool VisibleEntriesDirty = true;
+};
+
+} // namespace luna
+
+namespace {
+
+std::unordered_map<std::string, luna::AssetHandle> buildAssetLookup()
+{
+    std::unordered_map<std::string, luna::AssetHandle> lookup;
+    const auto& database = luna::AssetDatabase::getDatabase();
+    lookup.reserve(database.size());
+
+    for (const auto& [handle, metadata] : database) {
+        lookup.emplace(makeAssetLookupKey(metadata.FilePath), handle);
+    }
+
+    return lookup;
+}
+
+DirectoryCache& ensureDirectoryCache(luna::ContentBrowserPanelState& state,
+                                     const std::filesystem::path& directory,
+                                     DirectoryScanMode scan_mode)
+{
+    const std::filesystem::path normalized_directory = directory.lexically_normal();
+    auto [it, inserted] = state.DirectoryCaches.try_emplace(normalized_directory);
+    DirectoryCache& cache = it->second;
+    if (inserted || cache.Path.empty()) {
+        cache.Path = normalized_directory;
+    }
+
+    if (wantsChildren(scan_mode) && !cache.ChildDirectoriesLoaded) {
+        loadChildDirectories(cache);
+    }
+    if (wantsEntries(scan_mode) && !cache.EntriesLoaded) {
+        loadDirectoryEntries(cache, state.AssetLookup);
+    }
+
+    return cache;
+}
+
+void rebuildVisibleEntries(luna::ContentBrowserPanelState& state, const std::filesystem::path& directory)
+{
+    DirectoryCache& cache = ensureDirectoryCache(state, directory, DirectoryScanMode::Entries);
+    state.VisibleEntryIndices.clear();
+    state.VisibleEntryIndices.reserve(cache.Entries.size());
+
+    for (std::size_t index = 0; index < cache.Entries.size(); ++index) {
+        if (matchesSearch(cache.Entries[index], state.SearchFilterLower)) {
+            state.VisibleEntryIndices.push_back(index);
+        }
+    }
+
+    state.VisibleEntriesDirectory = directory.lexically_normal();
+    state.VisibleEntriesDirty = false;
+}
+
+void ensureIconsLoaded(luna::ContentBrowserPanelState& state)
+{
+    if (!state.DirectoryIconTexture) {
+        state.DirectoryIconTexture =
+            uploadEditorIconTexture(editorAssetPath("DirectoryIcon.png"), "ContentBrowser_DirectoryIcon");
+    }
+    if (!state.FileIconTexture) {
+        state.FileIconTexture = uploadEditorIconTexture(editorAssetPath("FileIcon.png"), "ContentBrowser_FileIcon");
+    }
+
+    if (state.DirectoryIconTextureId == 0 && state.DirectoryIconTexture) {
+        state.DirectoryIconTextureId = luna::rhi::ImGuiRhiContext::GetTextureId(state.DirectoryIconTexture);
+    }
+    if (state.FileIconTextureId == 0 && state.FileIconTexture) {
+        state.FileIconTextureId = luna::rhi::ImGuiRhiContext::GetTextureId(state.FileIconTexture);
+    }
+}
+
+ImTextureID entryIconTextureId(const luna::ContentBrowserPanelState& state, BrowserEntryKind kind)
+{
+    return kind == BrowserEntryKind::Directory ? state.DirectoryIconTextureId : state.FileIconTextureId;
 }
 
 } // namespace
@@ -244,15 +511,26 @@ void drawEntryTooltip(const BrowserEntry& entry)
 namespace luna {
 
 ContentBrowserPanel::ContentBrowserPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer)
+    : m_editor_layer(&editor_layer),
+      m_state(std::make_unique<ContentBrowserPanelState>())
 {}
+
+ContentBrowserPanel::~ContentBrowserPanel() = default;
 
 void ContentBrowserPanel::onImGuiRender()
 {
+    if (m_state == nullptr) {
+        return;
+    }
+
+    ensureIconsLoaded(*m_state);
     syncProjectDirectories();
 
     ImGui::SetNextWindowSize(ImVec2(880.0f, 540.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Content Browser");
+    if (!ImGui::Begin("Content Browser")) {
+        ImGui::End();
+        return;
+    }
 
     if (m_assets_root.empty()) {
         ImGui::TextUnformatted("No project loaded.");
@@ -261,21 +539,30 @@ void ContentBrowserPanel::onImGuiRender()
         return;
     }
 
+    if (m_state->VisibleEntriesDirty || m_state->VisibleEntriesDirectory != m_current_directory.lexically_normal()) {
+        rebuildVisibleEntries(*m_state, m_current_directory);
+    }
+
     drawHeader();
     ImGui::Separator();
 
-    if (ImGui::BeginTable("##ContentBrowserLayout", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp)) {
-        ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 260.0f);
-        ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
+    if (ImGui::BeginTable("##ContentBrowserLayout",
+                          2,
+                          ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV |
+                              ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings)) {
+        ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 240.0f);
+        ImGui::TableSetupColumn("Files", ImGuiTableColumnFlags_WidthStretch);
 
         ImGui::TableNextColumn();
-        ImGui::BeginChild("##ContentBrowserFolders");
-        drawFolderTree(m_assets_root);
+        if (ImGui::BeginChild("##Folders", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+            drawFolderTree(m_assets_root);
+        }
         ImGui::EndChild();
 
         ImGui::TableNextColumn();
-        ImGui::BeginChild("##ContentBrowserEntries");
-        drawDirectoryContents();
+        if (ImGui::BeginChild("##Files", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+            drawDirectoryContents();
+        }
         ImGui::EndChild();
 
         ImGui::EndTable();
@@ -284,16 +571,39 @@ void ContentBrowserPanel::onImGuiRender()
     ImGui::End();
 }
 
-void ContentBrowserPanel::requestRefresh() {}
+void ContentBrowserPanel::requestRefresh()
+{
+    if (m_state == nullptr) {
+        return;
+    }
+
+    m_state->RefreshRequested = true;
+    m_state->VisibleEntriesDirty = true;
+    m_state->VisibleEntriesDirectory.clear();
+}
 
 void ContentBrowserPanel::syncProjectDirectories()
 {
+    if (m_state == nullptr) {
+        return;
+    }
+
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     const auto project_info = ProjectManager::instance().getProjectInfo();
 
     if (!project_root || !project_info) {
         m_assets_root.clear();
         m_current_directory.clear();
+        m_search_buffer[0] = '\0';
+        m_state->SearchFilter.clear();
+        m_state->SearchFilterLower.clear();
+        m_state->SelectedEntry.clear();
+        m_state->VisibleEntryIndices.clear();
+        m_state->VisibleEntriesDirectory.clear();
+        m_state->DirectoryCaches.clear();
+        m_state->AssetLookup.clear();
+        m_state->RefreshRequested = false;
+        m_state->VisibleEntriesDirty = false;
         return;
     }
 
@@ -302,15 +612,32 @@ void ContentBrowserPanel::syncProjectDirectories()
         m_assets_root = resolved_assets_root;
         m_current_directory = resolved_assets_root;
         m_search_buffer[0] = '\0';
+        m_state->SearchFilter.clear();
+        m_state->SearchFilterLower.clear();
+        m_state->SelectedEntry.clear();
+        m_state->RefreshRequested = true;
+        m_state->VisibleEntriesDirty = true;
+        m_state->VisibleEntriesDirectory.clear();
+    }
+
+    if (m_state->RefreshRequested) {
+        m_state->DirectoryCaches.clear();
+        m_state->AssetLookup = buildAssetLookup();
+        m_state->RefreshRequested = false;
+        m_state->VisibleEntriesDirty = true;
+        m_state->VisibleEntriesDirectory.clear();
     }
 
     if (m_current_directory.empty() || !isWithinAssetsRoot(m_current_directory)) {
         m_current_directory = m_assets_root;
+        m_state->VisibleEntriesDirty = true;
     }
 
     std::error_code ec;
-    if (!std::filesystem::exists(m_current_directory, ec) || ec) {
+    if (!std::filesystem::exists(m_current_directory, ec) || ec ||
+        !std::filesystem::is_directory(m_current_directory, ec)) {
         m_current_directory = m_assets_root;
+        m_state->VisibleEntriesDirty = true;
     }
 }
 
@@ -327,34 +654,33 @@ void ContentBrowserPanel::drawHeader()
         navigateTo(m_assets_root);
     }
 
-    std::error_code ec;
-    const std::filesystem::path relative_directory = std::filesystem::relative(m_current_directory, m_assets_root, ec);
-    if (!ec && !relative_directory.empty() && relative_directory != ".") {
-        std::filesystem::path partial = m_assets_root;
-        for (const auto& part : relative_directory) {
-            partial /= part;
-            ImGui::SameLine();
-            ImGui::TextUnformatted("/");
-            ImGui::SameLine();
-            const std::string label = part.string();
-            if (ImGui::Button(label.c_str())) {
-                navigateTo(partial);
-            }
-        }
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh")) {
+        requestRefresh();
+        syncProjectDirectories();
+        rebuildVisibleEntries(*m_state, m_current_directory);
     }
 
     ImGui::SameLine();
-    ImGui::SetCursorPosX((std::max)(ImGui::GetCursorPosX(), ImGui::GetWindowContentRegionMax().x - 240.0f));
     ImGui::SetNextItemWidth(220.0f);
-    ImGui::InputTextWithHint("##ContentBrowserSearch", "Filter current directory", m_search_buffer.data(), m_search_buffer.size());
+    if (ImGui::InputTextWithHint(
+            "##ContentBrowserSearch", "Search current folder", m_search_buffer.data(), m_search_buffer.size())) {
+        m_state->SearchFilter = m_search_buffer.data();
+        m_state->SearchFilterLower = toLower(m_state->SearchFilter);
+        m_state->VisibleEntriesDirty = true;
+    }
 
-    ImGui::TextDisabled("Current: %s", m_current_directory.lexically_normal().string().c_str());
+    ImGui::TextDisabled("%s", currentDirectoryLabel(m_assets_root, m_current_directory).c_str());
 }
 
 void ContentBrowserPanel::drawFolderTree(const std::filesystem::path& directory)
 {
-    const std::vector<std::filesystem::path> subdirectories = collectChildDirectories(directory);
-    const bool has_children = !subdirectories.empty();
+    if (m_state == nullptr) {
+        return;
+    }
+
+    DirectoryCache& cache = ensureDirectoryCache(*m_state, directory, DirectoryScanMode::Children);
+    const bool has_children = !cache.ChildDirectories.empty();
     const bool selected = directory == m_current_directory;
     const bool on_current_branch = isSameOrDescendant(directory, m_current_directory);
 
@@ -370,15 +696,14 @@ void ContentBrowserPanel::drawFolderTree(const std::filesystem::path& directory)
     }
 
     const std::string label = directory == m_assets_root ? "Assets" : directory.filename().string();
-    const bool opened =
-        ImGui::TreeNodeEx(directory.lexically_normal().string().c_str(), flags, "%s", label.c_str());
+    const bool opened = ImGui::TreeNodeEx(directory.lexically_normal().string().c_str(), flags, "%s", label.c_str());
 
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && !ImGui::IsItemToggledOpen()) {
         navigateTo(directory);
     }
 
     if (opened && has_children) {
-        for (const auto& child_directory : subdirectories) {
+        for (const auto& child_directory : cache.ChildDirectories) {
             drawFolderTree(child_directory);
         }
         ImGui::TreePop();
@@ -387,64 +712,76 @@ void ContentBrowserPanel::drawFolderTree(const std::filesystem::path& directory)
 
 void ContentBrowserPanel::drawDirectoryContents()
 {
-    const std::vector<BrowserEntry> all_entries = collectDirectoryEntries(m_current_directory);
-
-    std::vector<BrowserEntry> filtered_entries;
-    filtered_entries.reserve(all_entries.size());
-    const std::string_view filter = m_search_buffer.data();
-    for (const BrowserEntry& entry : all_entries) {
-        if (matchesSearch(entry, filter)) {
-            filtered_entries.push_back(entry);
-        }
-    }
-
-    if (filtered_entries.empty()) {
-        ImGui::TextUnformatted("No matching files or folders.");
+    if (m_state == nullptr) {
         return;
     }
 
-    const float desired_cell_width = 140.0f;
+    DirectoryCache& directory_cache = ensureDirectoryCache(*m_state, m_current_directory, DirectoryScanMode::Entries);
+    if (m_state->VisibleEntriesDirty || m_state->VisibleEntriesDirectory != m_current_directory.lexically_normal()) {
+        rebuildVisibleEntries(*m_state, m_current_directory);
+    }
+
+    const auto& visible_entries = m_state->VisibleEntryIndices;
+    if (visible_entries.empty()) {
+        ImGui::TextDisabled("Empty.");
+        return;
+    }
+
     const float available_width = ImGui::GetContentRegionAvail().x;
-    const int column_count = (std::max)(1, static_cast<int>(available_width / desired_cell_width));
+    const float tile_width = 104.0f;
+    const float tile_height = 88.0f;
+    const int column_count = (std::max) (1, static_cast<int>(available_width / tile_width));
 
-    if (!ImGui::BeginTable("##ContentBrowserGrid", column_count, ImGuiTableFlags_SizingStretchSame)) {
+    if (!ImGui::BeginTable(
+            "##ContentBrowserGrid", column_count, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {
         return;
     }
 
-    for (const BrowserEntry& entry : filtered_entries) {
-        ImGui::TableNextColumn();
-        ImGui::PushID(entry.Path.lexically_normal().string().c_str());
+    for (int column = 0; column < column_count; ++column) {
+        ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, tile_width);
+    }
 
-        ImGui::BeginGroup();
+    const int row_count = static_cast<int>((visible_entries.size() + static_cast<std::size_t>(column_count) - 1) /
+                                           static_cast<std::size_t>(column_count));
+    ImGuiListClipper clipper;
+    clipper.Begin(row_count);
 
-        const ImVec4 color = entryColor(entry);
-        ImGui::PushStyleColor(ImGuiCol_Button, color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(color.x + 0.08f, color.y + 0.08f, color.z + 0.08f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-        ImGui::Button(entryBadge(entry), ImVec2(-FLT_MIN, 72.0f));
-        ImGui::PopStyleColor(3);
+    while (clipper.Step()) {
+        for (int row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
+            ImGui::TableNextRow(ImGuiTableRowFlags_None, tile_height);
 
-        if (entry.Kind == BrowserEntryKind::AssetFile && entry.Handle.isValid() && AssetDatabase::exists(entry.Handle)) {
-            editor::beginAssetDragDropSource(AssetDatabase::getAssetMetadata(entry.Handle), entry.Label.c_str());
+            for (int column = 0; column < column_count; ++column) {
+                ImGui::TableSetColumnIndex(column);
+
+                const std::size_t entry_index = static_cast<std::size_t>(row) * static_cast<std::size_t>(column_count) +
+                                                static_cast<std::size_t>(column);
+                if (entry_index >= visible_entries.size()) {
+                    continue;
+                }
+
+                BrowserEntry& entry = directory_cache.Entries[visible_entries[entry_index]];
+                ImGui::PushID(entry.Path.lexically_normal().string().c_str());
+
+                const EntryTileResult tile_result = drawEntryTile(entry,
+                                                                  entryIconTextureId(*m_state, entry.Kind),
+                                                                  m_state->SelectedEntry == entry.Path,
+                                                                  ImVec2(tile_width - 8.0f, tile_height - 8.0f));
+                if (tile_result.Clicked) {
+                    m_state->SelectedEntry = entry.Path;
+                }
+
+                if (tile_result.DoubleClicked) {
+                    if (entry.Kind == BrowserEntryKind::Directory) {
+                        navigateTo(entry.Path);
+                    } else if (entry.Kind == BrowserEntryKind::SceneFile && m_editor_layer != nullptr) {
+                        m_editor_layer->openSceneFile(entry.Path);
+                    }
+                }
+
+                drawEntryTooltip(entry);
+                ImGui::PopID();
+            }
         }
-
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
-        ImGui::TextUnformatted(entry.Label.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::TextDisabled("%s", entryBadge(entry));
-        ImGui::EndGroup();
-
-        const bool hovered = ImGui::IsItemHovered();
-        const bool double_clicked = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-
-        if (entry.Kind == BrowserEntryKind::Directory && double_clicked) {
-            navigateTo(entry.Path);
-        } else if (entry.Kind == BrowserEntryKind::SceneFile && double_clicked && m_editor_layer != nullptr) {
-            m_editor_layer->openSceneFile(entry.Path);
-        }
-
-        drawEntryTooltip(entry);
-        ImGui::PopID();
     }
 
     ImGui::EndTable();
@@ -452,6 +789,10 @@ void ContentBrowserPanel::drawDirectoryContents()
 
 bool ContentBrowserPanel::navigateTo(const std::filesystem::path& directory)
 {
+    if (m_state == nullptr) {
+        return false;
+    }
+
     const std::filesystem::path normalized_directory = directory.lexically_normal();
     if (!isWithinAssetsRoot(normalized_directory)) {
         LUNA_EDITOR_WARN("Content Browser rejected navigation outside assets root: '{}'",
@@ -460,14 +801,20 @@ bool ContentBrowserPanel::navigateTo(const std::filesystem::path& directory)
     }
 
     std::error_code ec;
-    if (!std::filesystem::exists(normalized_directory, ec) || ec || !std::filesystem::is_directory(normalized_directory, ec)) {
+    if (!std::filesystem::exists(normalized_directory, ec) || ec ||
+        !std::filesystem::is_directory(normalized_directory, ec)) {
         LUNA_EDITOR_WARN("Content Browser failed to navigate to '{}': not a valid directory",
                          normalized_directory.string());
         return false;
     }
 
+    if (m_current_directory == normalized_directory) {
+        return true;
+    }
+
     m_current_directory = normalized_directory;
-    LUNA_EDITOR_INFO("Content Browser current directory: '{}'", m_current_directory.string());
+    m_state->SelectedEntry.clear();
+    m_state->VisibleEntriesDirty = true;
     return true;
 }
 
