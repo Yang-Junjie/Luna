@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <optional>
@@ -210,9 +211,9 @@ Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializatio
 void LunaRuntimeApplication::resetCamera()
 {
     auto& camera = getRenderer().getMainCamera();
-    camera.m_position = glm::vec3(0.0f, 0.45f, 4.75f);
-    camera.m_pitch = -0.12f;
-    camera.m_yaw = 0.0f;
+    camera.setPerspective(glm::radians(50.0f), 0.05f, 200.0f);
+    camera.setPosition(glm::vec3(0.0f, 0.45f, 4.75f));
+    camera.setYawPitchRoll(0.0f, -0.12f);
 }
 
 void LunaRuntimeApplication::onInit()

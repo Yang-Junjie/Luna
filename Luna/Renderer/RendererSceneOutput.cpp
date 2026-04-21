@@ -85,7 +85,6 @@ const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getSceneOutputTexture() cons
 {
     return m_scene_output.color;
 }
-
 GLFWwindow* Renderer::getNativeWindow() const
 {
     return m_window_context.native_window;

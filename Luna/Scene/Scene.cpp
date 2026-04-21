@@ -44,6 +44,12 @@ Scene::Scene()
 void Scene::onUpdateRuntime()
 {
     auto& renderer = Application::get().getRenderer();
+    onUpdateRuntime(renderer.getMainCamera());
+}
+
+void Scene::onUpdateRuntime(const Camera& camera)
+{
+    auto& renderer = Application::get().getRenderer();
     if (!renderer.isInitialized()) {
         return;
     }
@@ -51,8 +57,7 @@ void Scene::onUpdateRuntime()
     auto& scene_renderer = renderer.getSceneRenderer();
     auto& asset_manager = AssetManager::get();
     auto& entity_manager = m_entity_manager;
-    scene_renderer.beginScene(renderer.getMainCamera());
-
+    scene_renderer.beginScene(camera);
     auto& registry = entity_manager.registry();
     auto view = registry.view<TransformComponent, MeshComponent>();
     for (const auto entity_handle : view) {

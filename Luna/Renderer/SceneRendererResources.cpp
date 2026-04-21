@@ -779,7 +779,7 @@ void SceneRenderer::updateSceneParameters(const RenderContext& context)
     SceneGpuParams params;
     params.view_projection = view_projection;
     params.inverse_view_projection = glm::inverse(view_projection);
-    params.camera_position_env_mip = glm::vec4(m_draw_queue.camera.m_position, environment_mip_count);
+    params.camera_position_env_mip = glm::vec4(resolveCameraPosition(m_draw_queue.camera), environment_mip_count);
     params.light_direction_intensity = glm::vec4(glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f)), 4.0f);
     params.light_color_exposure = glm::vec4(1.0f, 0.98f, 0.95f, 1.0f);
     params.ibl_factors = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);

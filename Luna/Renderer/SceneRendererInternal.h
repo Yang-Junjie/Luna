@@ -84,15 +84,24 @@ inline luna::RHI::Ref<luna::RHI::ShaderModule>
     return compiler->CompileOrLoad(device, create_info);
 }
 
-inline glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio, luna::RHI::BackendType backend_type)
+inline glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
 {
-    const float clamped_aspect_ratio = std::max(aspect_ratio, 0.001f);
-    glm::mat4 projection = glm::perspectiveRH_ZO(glm::radians(50.0f), clamped_aspect_ratio, 0.05f, 200.0f);
     if (backend_type == luna::RHI::BackendType::Vulkan) {
         projection[1][1] *= -1.0f;
     }
-    return projection * camera.getViewMatrix();
+    return projection;
 }
+
+inline glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio, luna::RHI::BackendType backend_type)
+{
+    return adjustProjectionForBackend(camera.getProjectionMatrix(aspect_ratio), backend_type) * camera.getViewMatrix();
+}
+
+inline glm::vec3 resolveCameraPosition(const Camera& camera)
+{
+    return camera.getPosition();
+}
+
 
 inline float materialBlendModeToFloat(luna::Material::BlendMode blend_mode)
 {
@@ -162,10 +171,10 @@ inline luna::RHI::SamplerAddressMode toRhiAddressMode(luna::rhi::Texture::WrapMo
     }
 }
 
-inline float transparentSortDistanceSq(const glm::mat4& transform, const Camera& camera)
+inline float transparentSortDistanceSq(const glm::mat4& transform, const glm::vec3& camera_position)
 {
     const glm::vec3 object_position(transform[3]);
-    return glm::length2(object_position - camera.m_position);
+    return glm::length2(object_position - camera_position);
 }
 
 inline luna::rhi::ImageData createFallbackFloatImageData(const glm::vec4& value)

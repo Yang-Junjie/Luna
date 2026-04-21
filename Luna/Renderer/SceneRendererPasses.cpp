@@ -255,11 +255,12 @@ void SceneRenderer::sortTransparentDrawCommands()
 {
     using namespace scene_renderer_detail;
 
+    const glm::vec3 camera_position = resolveCameraPosition(m_draw_queue.camera);
     std::sort(m_draw_queue.transparent_draw_commands.begin(),
               m_draw_queue.transparent_draw_commands.end(),
-              [this](const StaticMeshDrawCommand& lhs, const StaticMeshDrawCommand& rhs) {
-                  return transparentSortDistanceSq(lhs.transform, m_draw_queue.camera) >
-                         transparentSortDistanceSq(rhs.transform, m_draw_queue.camera);
+              [camera_position](const StaticMeshDrawCommand& lhs, const StaticMeshDrawCommand& rhs) {
+                  return transparentSortDistanceSq(lhs.transform, camera_position) >
+                         transparentSortDistanceSq(rhs.transform, camera_position);
               });
 }
 

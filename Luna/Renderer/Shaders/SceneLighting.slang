@@ -66,7 +66,8 @@ float2 directionToEquirectUv(float3 direction)
 {
     const float3 dir = safeNormalize(direction, float3(0.0, 1.0, 0.0));
     const float u = atan2(dir.z, dir.x) * (0.5 / kPi) + 0.5;
-    const float v = acos(clamp(dir.y, -1.0, 1.0)) / kPi;
+    // The imported HDR uses a top-origin equirect layout, so +Y must map to the top of the texture.
+    const float v = 1.0 - acos(clamp(dir.y, -1.0, 1.0)) / kPi;
     return float2(u, v);
 }
 
@@ -77,7 +78,14 @@ float3 sampleEnvironment(float3 direction, float lod)
 
 float3 reconstructViewDirection(float2 uv)
 {
-    const float2 clipXY = float2(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
+    // This converts fullscreen UVs back into clip-space using the backend's screen-space Y convention.
+    const float clipY =
+#if defined(LUNA_BACKEND_VULKAN) || defined(LUNA_BACKEND_D3D12)
+        uv.y * 2.0 - 1.0;
+#else
+        1.0 - uv.y * 2.0;
+#endif
+    const float2 clipXY = float2(uv.x * 2.0 - 1.0, clipY);
     const float4 clipPosition = float4(clipXY, 1.0, 1.0);
     const float4 worldPosition = mul(gSceneParams.inverseViewProjection, clipPosition);
     const float3 worldPoint = worldPosition.xyz / max(abs(worldPosition.w), 1e-6);

@@ -1,11 +1,11 @@
-#include "LunaEditorLayer.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "Events/MouseEvent.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
+#include "LunaEditorLayer.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
@@ -139,15 +139,33 @@ void LunaEditorLayer::onDetach()
         return;
     }
 
+    m_editor_camera.releaseMouseCapture();
+    m_editor_camera.setInputEnabled(false);
+
     if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
         imgui_layer->setMenuBarCallback({});
     }
 }
 
-void LunaEditorLayer::onUpdate(Timestep)
+void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
-    m_scene.onUpdateRuntime();
+
+    const bool allow_editor_camera = m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured();
+    m_editor_camera.setInputEnabled(allow_editor_camera);
+    m_editor_camera.onUpdate(dt);
+    m_scene.onUpdateRuntime(m_editor_camera.getCamera());
+}
+
+void LunaEditorLayer::onEvent(Event& event)
+{
+    if (event.m_handled) {
+        return;
+    }
+
+    if (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) {
+        m_editor_camera.onEvent(event);
+    }
 }
 
 void LunaEditorLayer::onImGuiRender()
@@ -158,7 +176,7 @@ void LunaEditorLayer::onImGuiRender()
 
     auto& application = *m_application;
     const float delta_seconds = Application::get().getTimestep().getSeconds();
-    const float fps = 1.0f / (std::max)(delta_seconds, 0.0001f);
+    const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
 
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene");
@@ -171,6 +189,8 @@ void LunaEditorLayer::onImGuiRender()
 
     const auto viewport_extent = application.getRenderer().getSceneOutputSize();
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
+    const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
+    ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::TextUnformatted(
         "Scene rendering now targets a persistent offscreen texture and is presented in the Viewport panel.");
     ImGui::End();
@@ -260,12 +280,15 @@ void LunaEditorLayer::drawViewport()
     ImGui::SetNextWindowSize(ImVec2(960.0f, 640.0f), ImGuiCond_FirstUseEver);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("Viewport");
+    m_viewport_focused = ImGui::IsWindowFocused();
+    m_viewport_hovered = ImGui::IsWindowHovered();
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float dpi_scale = ImGui::GetWindowViewport() != nullptr ? ImGui::GetWindowViewport()->DpiScale : 1.0f;
-    const uint32_t viewport_width = static_cast<uint32_t>((std::max)(available.x * dpi_scale, 0.0f));
-    const uint32_t viewport_height = static_cast<uint32_t>((std::max)(available.y * dpi_scale, 0.0f));
+    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * dpi_scale, 0.0f));
+    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * dpi_scale, 0.0f));
     renderer.setSceneOutputSize(viewport_width, viewport_height);
+    m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
 
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = rhi::ImGuiRhiContext::GetTextureId(scene_texture);
@@ -429,9 +452,8 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
         } else {
             m_scene_file_path = start_scene_path;
             updateSceneLabel();
-            LUNA_EDITOR_WARN(
-                "Configured StartScene '{}' does not exist. Saving will create it at that location.",
-                start_scene_path.string());
+            LUNA_EDITOR_WARN("Configured StartScene '{}' does not exist. Saving will create it at that location.",
+                             start_scene_path.string());
         }
     } else {
         updateSceneLabel();
@@ -539,7 +561,8 @@ std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     const auto project_info = ProjectManager::instance().getProjectInfo();
     if (project_root && project_info) {
-        const std::filesystem::path scenes_directory = (*project_root / project_info->AssetsPath / "Scenes").lexically_normal();
+        const std::filesystem::path scenes_directory =
+            (*project_root / project_info->AssetsPath / "Scenes").lexically_normal();
         if (std::filesystem::exists(scenes_directory)) {
             return scenes_directory;
         }

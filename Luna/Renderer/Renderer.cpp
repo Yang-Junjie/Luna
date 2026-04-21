@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
+#include <glm/trigonometric.hpp>
 #include <Queue.h>
 #include <stdexcept>
 #include <Swapchain.h>
@@ -92,7 +93,8 @@ bool Renderer::init(Window& window, InitializationOptions options)
         return false;
     }
 
-    runtime.main_camera.m_position = glm::vec3(0.0f, 0.0f, 5.0f);
+    runtime.main_camera.setPerspective(glm::radians(50.0f), 0.05f, 200.0f);
+    runtime.main_camera.setPosition(glm::vec3(0.0f, 0.0f, 5.0f));
     runtime.initialized = device_context.instance && device_context.adapter && device_context.device &&
                           device_context.surface && device_context.swapchain && device_context.graphics_queue &&
                           device_context.synchronization;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Renderer/Camera.h"
 #include "EntityManager.h"
 
 #include <string>
@@ -17,6 +18,7 @@ public:
     ~Scene() = default;
 
     void onUpdateRuntime();
+    void onUpdateRuntime(const Camera& camera);
     void setAssetLoadBehavior(AssetLoadBehavior behavior);
     AssetLoadBehavior getAssetLoadBehavior() const;
 

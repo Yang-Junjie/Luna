@@ -5,6 +5,8 @@ add_executable(
     AssetLoadingPanel.cpp
     ContentBrowserPanel.h
     ContentBrowserPanel.cpp
+    EditorCamera.h
+    EditorCamera.cpp
     EditorAssetDragDrop.h
     InspectorPanel.h
     InspectorPanel.cpp
