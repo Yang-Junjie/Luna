@@ -1,267 +1,289 @@
 #include "Core/Log.h"
 #include "Renderer/SceneRendererInternal.h"
 
+#include <array>
+
 namespace luna {
 
-void SceneRenderer::executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_context, const RenderContext& context)
+namespace {
+
+void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t width, uint32_t height)
+{
+    commands.SetViewport({0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f});
+    commands.SetScissor({0, 0, width, height});
+}
+
+void recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
+                        const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
+                        const std::vector<scene_renderer::DrawCommand>& draw_commands,
+                        const scene_renderer::ResourceManager& resources,
+                        const Material& default_material)
 {
     using namespace scene_renderer_detail;
 
-    ensurePipelines(context);
-    auto& gpu = m_gpu;
-    auto& draw_queue = m_draw_queue;
-    auto& upload_cache = m_upload_cache;
+    for (const auto& draw_command : draw_commands) {
+        const scene_renderer::ResolvedDrawResources draw_resources =
+            resources.resolveDrawResources(draw_command, default_material);
+        if (!draw_resources.isValid()) {
+            continue;
+        }
 
-    if (!gpu.geometry_pipeline || !gpu.scene_descriptor_set) {
+        MeshPushConstants push_constants{
+            .model = draw_command.transform,
+        };
+        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
+            draw_resources.material_descriptor_set,
+            resources.sceneDescriptorSet(),
+        };
+
+        commands.BindDescriptorSets(pipeline, 0, descriptor_sets);
+        commands.PushConstants(pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
+        commands.BindVertexBuffer(0, draw_resources.vertex_buffer);
+        commands.BindIndexBuffer(draw_resources.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.DrawIndexed(draw_resources.index_count, 1, 0, 0, 0);
+    }
+}
+
+} // namespace
+
+void SceneRenderer::Implementation::setShaderPaths(ShaderPaths shader_paths)
+{
+    m_resources.setShaderPaths(std::move(shader_paths));
+}
+
+void SceneRenderer::Implementation::shutdown()
+{
+    clearSubmittedMeshes();
+    m_resources.shutdown();
+}
+
+void SceneRenderer::Implementation::beginScene(const Camera& camera)
+{
+    m_draw_queue.beginScene(camera);
+}
+
+void SceneRenderer::Implementation::clearSubmittedMeshes()
+{
+    m_draw_queue.clear();
+}
+
+void SceneRenderer::Implementation::submitStaticMesh(const glm::mat4& transform,
+                                                     std::shared_ptr<Mesh> mesh,
+                                                     std::shared_ptr<Material> material)
+{
+    m_draw_queue.submitStaticMesh(transform, std::move(mesh), std::move(material));
+}
+
+void SceneRenderer::Implementation::submitStaticMesh(
+    const glm::mat4& transform,
+    std::shared_ptr<Mesh> mesh,
+    const std::vector<std::shared_ptr<Material>>& submesh_materials)
+{
+    m_draw_queue.submitStaticMesh(transform, std::move(mesh), submesh_materials);
+}
+
+SceneGBufferTextures SceneRenderer::Implementation::createGBufferTextures(rhi::RenderGraphBuilder& graph,
+                                                                          const RenderContext& context) const
+{
+    using namespace scene_renderer_detail;
+
+    return SceneGBufferTextures{
+        .base_color = graph.CreateTexture(rhi::RenderGraphTextureDesc{
+            .Name = "SceneGBufferBaseColor",
+            .Width = context.framebuffer_width,
+            .Height = context.framebuffer_height,
+            .Format = kGBufferBaseColorFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
+        .normal_metallic = graph.CreateTexture(rhi::RenderGraphTextureDesc{
+            .Name = "SceneGBufferNormalMetallic",
+            .Width = context.framebuffer_width,
+            .Height = context.framebuffer_height,
+            .Format = kGBufferLightingFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
+        .world_position_roughness = graph.CreateTexture(rhi::RenderGraphTextureDesc{
+            .Name = "SceneGBufferWorldPositionRoughness",
+            .Width = context.framebuffer_width,
+            .Height = context.framebuffer_height,
+            .Format = kGBufferLightingFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
+        .emissive_ao = graph.CreateTexture(rhi::RenderGraphTextureDesc{
+            .Name = "SceneGBufferEmissiveAo",
+            .Width = context.framebuffer_width,
+            .Height = context.framebuffer_height,
+            .Format = kGBufferLightingFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
+    };
+}
+
+void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context)
+{
+    if (!context.isValid()) {
+        return;
+    }
+
+    const SceneGBufferTextures gbuffer = createGBufferTextures(graph, context);
+
+    graph.AddRasterPass(
+        "SceneGeometry",
+        [&](rhi::RenderGraphRasterPassBuilder& pass_builder) {
+            pass_builder.WriteColor(gbuffer.base_color,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteColor(gbuffer.normal_metallic,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteColor(gbuffer.world_position_roughness,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteColor(gbuffer.emissive_ao,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteDepth(context.depth_target,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    {1.0f, 0});
+        },
+        [this, context](rhi::RenderGraphRasterPassContext& pass_context) {
+            executeGeometryPass(pass_context, context);
+        });
+
+    graph.AddRasterPass(
+        "SceneLighting",
+        [&](rhi::RenderGraphRasterPassBuilder& pass_builder) {
+            pass_builder.ReadTexture(gbuffer.base_color);
+            pass_builder.ReadTexture(gbuffer.normal_metallic);
+            pass_builder.ReadTexture(gbuffer.world_position_roughness);
+            pass_builder.ReadTexture(gbuffer.emissive_ao);
+            pass_builder.WriteColor(
+                context.color_target,
+                luna::RHI::AttachmentLoadOp::Clear,
+                luna::RHI::AttachmentStoreOp::Store,
+                luna::RHI::ClearValue::ColorFloat(
+                    context.clear_color.r, context.clear_color.g, context.clear_color.b, context.clear_color.a));
+        },
+        [this, context, gbuffer](rhi::RenderGraphRasterPassContext& pass_context) {
+            executeLightingPass(pass_context, context, gbuffer);
+        });
+
+    if (!m_draw_queue.hasTransparentDrawCommands()) {
+        return;
+    }
+
+    graph.AddRasterPass(
+        "SceneTransparent",
+        [&](rhi::RenderGraphRasterPassBuilder& pass_builder) {
+            pass_builder.WriteColor(
+                context.color_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteDepth(
+                context.depth_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+        },
+        [this, context](rhi::RenderGraphRasterPassContext& pass_context) {
+            executeTransparentPass(pass_context, context);
+        });
+}
+
+void SceneRenderer::Implementation::executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_context,
+                                                        const RenderContext& context)
+{
+    m_resources.ensurePipelines(context);
+    if (!m_resources.geometryPipeline() || !m_resources.sceneDescriptorSet()) {
         LUNA_RENDERER_ERROR("Scene geometry pass aborted: graphics pipeline is null");
         return;
     }
 
     auto& commands = pass_context.commandBuffer();
-    updateSceneParameters(context);
-
-    getOrCreateUploadedMaterial(m_default_material);
-
-    for (const auto& draw_command : draw_queue.opaque_draw_commands) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        (void) getOrCreateUploadedMesh(*draw_command.mesh);
-        auto& uploaded_material = getOrCreateUploadedMaterial(resolveMaterial(draw_command.material));
-        uploadMaterialIfNeeded(commands, uploaded_material);
-    }
+    m_resources.updateSceneParameters(context, m_draw_queue.camera());
+    m_resources.prepareOpaqueDraws(commands, m_draw_queue, m_default_material);
 
     pass_context.beginRendering();
-    commands.BindGraphicsPipeline(gpu.geometry_pipeline);
-    commands.SetViewport({0.0f,
-                          0.0f,
-                          static_cast<float>(pass_context.framebufferWidth()),
-                          static_cast<float>(pass_context.framebufferHeight()),
-                          0.0f,
-                          1.0f});
-    commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-
-    for (const auto& draw_command : draw_queue.opaque_draw_commands) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        const auto uploaded_mesh_it = upload_cache.uploaded_meshes.find(draw_command.mesh.get());
-        if (uploaded_mesh_it == upload_cache.uploaded_meshes.end()) {
-            continue;
-        }
-
-        const Material& material = resolveMaterial(draw_command.material);
-        const auto uploaded_material_it = upload_cache.uploaded_materials.find(&material);
-        if (uploaded_material_it == upload_cache.uploaded_materials.end() ||
-            !uploaded_material_it->second.descriptor_set) {
-            continue;
-        }
-
-        const auto& uploaded_mesh = uploaded_mesh_it->second;
-        const auto& uploaded_material = uploaded_material_it->second;
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
-            uploaded_material.descriptor_set,
-            gpu.scene_descriptor_set,
-        };
-        if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
-            continue;
-        }
-
-        const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.sub_mesh_index];
-        if (!uploaded_sub_mesh.vertex_buffer || !uploaded_sub_mesh.index_buffer || uploaded_sub_mesh.index_count == 0) {
-            continue;
-        }
-
-        MeshPushConstants push_constants;
-        push_constants.model = draw_command.transform;
-        commands.BindDescriptorSets(gpu.geometry_pipeline, 0, descriptor_sets);
-        commands.PushConstants(
-            gpu.geometry_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
-        commands.BindVertexBuffer(0, uploaded_sub_mesh.vertex_buffer);
-        commands.BindIndexBuffer(uploaded_sub_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
-        commands.DrawIndexed(uploaded_sub_mesh.index_count, 1, 0, 0, 0);
-    }
+    commands.BindGraphicsPipeline(m_resources.geometryPipeline());
+    configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
+    recordDrawCommands(
+        commands, m_resources.geometryPipeline(), m_draw_queue.opaqueDrawCommands(), m_resources, m_default_material);
 
     pass_context.endRendering();
 }
 
-void SceneRenderer::executeLightingPass(rhi::RenderGraphRasterPassContext& pass_context,
-                                        const RenderContext& context,
-                                        rhi::RenderGraphTextureHandle gbuffer_base_color_handle,
-                                        rhi::RenderGraphTextureHandle gbuffer_normal_metallic_handle,
-                                        rhi::RenderGraphTextureHandle gbuffer_world_position_roughness_handle,
-                                        rhi::RenderGraphTextureHandle gbuffer_emissive_ao_handle)
+void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPassContext& pass_context,
+                                                        const RenderContext& context,
+                                                        const SceneGBufferTextures& gbuffer)
 {
-    ensurePipelines(context);
-    auto& gpu = m_gpu;
-
-    if (!gpu.lighting_pipeline || !gpu.gbuffer_descriptor_set || !gpu.scene_descriptor_set || !gpu.gbuffer_sampler) {
+    m_resources.ensurePipelines(context);
+    if (!m_resources.lightingPipeline() || !m_resources.gbufferDescriptorSet() || !m_resources.sceneDescriptorSet() ||
+        !m_resources.gbufferSampler()) {
         LUNA_RENDERER_ERROR("Scene lighting pass aborted: deferred lighting resources are incomplete");
         return;
     }
 
-    const auto& gbuffer_base_color = pass_context.getTexture(gbuffer_base_color_handle);
-    const auto& gbuffer_normal_metallic = pass_context.getTexture(gbuffer_normal_metallic_handle);
-    const auto& gbuffer_world_position_roughness = pass_context.getTexture(gbuffer_world_position_roughness_handle);
-    const auto& gbuffer_emissive_ao = pass_context.getTexture(gbuffer_emissive_ao_handle);
+    const auto& gbuffer_base_color = pass_context.getTexture(gbuffer.base_color);
+    const auto& gbuffer_normal_metallic = pass_context.getTexture(gbuffer.normal_metallic);
+    const auto& gbuffer_world_position_roughness = pass_context.getTexture(gbuffer.world_position_roughness);
+    const auto& gbuffer_emissive_ao = pass_context.getTexture(gbuffer.emissive_ao);
     if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao) {
         return;
     }
 
     auto& commands = pass_context.commandBuffer();
-    uploadTextureIfNeeded(commands, gpu.environment_texture);
-    updateSceneParameters(context);
-
-    gpu.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 0,
-        .TextureView = gbuffer_base_color->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
-    });
-    gpu.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 1,
-        .TextureView = gbuffer_normal_metallic->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
-    });
-    gpu.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 2,
-        .TextureView = gbuffer_world_position_roughness->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
-    });
-    gpu.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 3,
-        .TextureView = gbuffer_emissive_ao->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
-    });
-    gpu.gbuffer_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 4,
-        .Sampler = gpu.gbuffer_sampler,
-    });
-    gpu.gbuffer_descriptor_set->Update();
+    m_resources.uploadEnvironmentIfNeeded(commands);
+    m_resources.updateSceneParameters(context, m_draw_queue.camera());
+    m_resources.updateLightingResources(
+        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao);
 
     pass_context.beginRendering();
-    commands.BindGraphicsPipeline(gpu.lighting_pipeline);
-    commands.SetViewport({0.0f,
-                          0.0f,
-                          static_cast<float>(pass_context.framebufferWidth()),
-                          static_cast<float>(pass_context.framebufferHeight()),
-                          0.0f,
-                          1.0f});
-    commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
+    commands.BindGraphicsPipeline(m_resources.lightingPipeline());
+    configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
 
     const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
-        gpu.gbuffer_descriptor_set,
-        gpu.scene_descriptor_set,
+        m_resources.gbufferDescriptorSet(),
+        m_resources.sceneDescriptorSet(),
     };
-    commands.BindDescriptorSets(gpu.lighting_pipeline, 0, descriptor_sets);
+    commands.BindDescriptorSets(m_resources.lightingPipeline(), 0, descriptor_sets);
     commands.Draw(3, 1, 0, 0);
 
     pass_context.endRendering();
 }
 
-void SceneRenderer::executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context,
-                                           const RenderContext& context)
+void SceneRenderer::Implementation::executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context,
+                                                           const RenderContext& context)
 {
-    using namespace scene_renderer_detail;
-
-    ensurePipelines(context);
-    auto& gpu = m_gpu;
-    auto& draw_queue = m_draw_queue;
-    auto& upload_cache = m_upload_cache;
-
-    if (!gpu.transparent_pipeline || !gpu.scene_descriptor_set || draw_queue.transparent_draw_commands.empty()) {
+    m_resources.ensurePipelines(context);
+    if (!m_resources.transparentPipeline() || !m_resources.sceneDescriptorSet() ||
+        !m_draw_queue.hasTransparentDrawCommands()) {
         return;
     }
 
     auto& commands = pass_context.commandBuffer();
-    updateSceneParameters(context);
-    uploadTextureIfNeeded(commands, gpu.environment_texture);
-
-    getOrCreateUploadedMaterial(m_default_material);
-
-    for (const auto& draw_command : draw_queue.transparent_draw_commands) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        (void) getOrCreateUploadedMesh(*draw_command.mesh);
-        auto& uploaded_material = getOrCreateUploadedMaterial(resolveMaterial(draw_command.material));
-        uploadMaterialIfNeeded(commands, uploaded_material);
-    }
-
-    sortTransparentDrawCommands();
+    m_resources.updateSceneParameters(context, m_draw_queue.camera());
+    m_resources.uploadEnvironmentIfNeeded(commands);
+    m_resources.prepareTransparentDraws(commands, m_draw_queue, m_default_material);
+    m_draw_queue.sortTransparentBackToFront();
 
     pass_context.beginRendering();
-    commands.BindGraphicsPipeline(gpu.transparent_pipeline);
-    commands.SetViewport({0.0f,
-                          0.0f,
-                          static_cast<float>(pass_context.framebufferWidth()),
-                          static_cast<float>(pass_context.framebufferHeight()),
-                          0.0f,
-                          1.0f});
-    commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-
-    for (const auto& draw_command : draw_queue.transparent_draw_commands) {
-        if (!draw_command.mesh || !draw_command.mesh->isValid()) {
-            continue;
-        }
-
-        const auto uploaded_mesh_it = upload_cache.uploaded_meshes.find(draw_command.mesh.get());
-        if (uploaded_mesh_it == upload_cache.uploaded_meshes.end()) {
-            continue;
-        }
-
-        const Material& material = resolveMaterial(draw_command.material);
-        const auto uploaded_material_it = upload_cache.uploaded_materials.find(&material);
-        if (uploaded_material_it == upload_cache.uploaded_materials.end() ||
-            !uploaded_material_it->second.descriptor_set) {
-            continue;
-        }
-
-        const auto& uploaded_mesh = uploaded_mesh_it->second;
-        const auto& uploaded_material = uploaded_material_it->second;
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
-            uploaded_material.descriptor_set,
-            gpu.scene_descriptor_set,
-        };
-        if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
-            continue;
-        }
-
-        const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.sub_mesh_index];
-        if (!uploaded_sub_mesh.vertex_buffer || !uploaded_sub_mesh.index_buffer || uploaded_sub_mesh.index_count == 0) {
-            continue;
-        }
-
-        MeshPushConstants push_constants;
-        push_constants.model = draw_command.transform;
-        commands.BindDescriptorSets(gpu.transparent_pipeline, 0, descriptor_sets);
-        commands.PushConstants(
-            gpu.transparent_pipeline, luna::RHI::ShaderStage::Vertex, 0, sizeof(MeshPushConstants), &push_constants);
-        commands.BindVertexBuffer(0, uploaded_sub_mesh.vertex_buffer);
-        commands.BindIndexBuffer(uploaded_sub_mesh.index_buffer, 0, luna::RHI::IndexType::UInt32);
-        commands.DrawIndexed(uploaded_sub_mesh.index_count, 1, 0, 0, 0);
-    }
+    commands.BindGraphicsPipeline(m_resources.transparentPipeline());
+    configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
+    recordDrawCommands(commands,
+                       m_resources.transparentPipeline(),
+                       m_draw_queue.transparentDrawCommands(),
+                       m_resources,
+                       m_default_material);
 
     pass_context.endRendering();
-}
-
-void SceneRenderer::sortTransparentDrawCommands()
-{
-    using namespace scene_renderer_detail;
-
-    const glm::vec3 camera_position = resolveCameraPosition(m_draw_queue.camera);
-    std::sort(m_draw_queue.transparent_draw_commands.begin(),
-              m_draw_queue.transparent_draw_commands.end(),
-              [camera_position](const StaticMeshDrawCommand& lhs, const StaticMeshDrawCommand& rhs) {
-                  return transparentSortDistanceSq(lhs.transform, camera_position) >
-                         transparentSortDistanceSq(rhs.transform, camera_position);
-              });
 }
 
 } // namespace luna

@@ -23,8 +23,12 @@ set(RENDERER_SOURCE
     Renderer/RendererInternal.h
     Renderer/SceneRenderer.h
     Renderer/SceneRendererInternal.h
+    Renderer/SceneRendererCommon.h
+    Renderer/SceneRendererDrawQueue.h
+    Renderer/SceneRendererDrawQueue.cpp
+    Renderer/SceneRendererResourceManager.h
     Renderer/SceneRenderer.cpp
-    Renderer/SceneRendererResources.cpp
+    Renderer/SceneRendererResourceManager.cpp
     Renderer/SceneRendererPasses.cpp
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Renderer.h

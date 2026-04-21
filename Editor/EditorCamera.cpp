@@ -1,11 +1,11 @@
-#include "EditorCamera.h"
-
 #include "Core/Input.h"
+#include "EditorCamera.h"
 #include "Events/Event.h"
 #include "Events/MouseEvent.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
@@ -66,10 +66,10 @@ void EditorCamera::onUpdate(Timestep dt)
         if (Input::isKeyPressed(KeyCode::A)) {
             input_axis.x -= 1.0f;
         }
-        if (Input::isKeyPressed(KeyCode::E)) {
+        if (Input::isKeyPressed(KeyCode::LeftShift)) {
             input_axis.y += 1.0f;
         }
-        if (Input::isKeyPressed(KeyCode::Q)) {
+        if (Input::isKeyPressed(KeyCode::Space)) {
             input_axis.y -= 1.0f;
         }
     }
@@ -77,7 +77,7 @@ void EditorCamera::onUpdate(Timestep dt)
     const glm::vec3 normalized_axis =
         glm::dot(input_axis, input_axis) > 0.0f ? glm::normalize(input_axis) : glm::vec3(0.0f);
     const glm::vec3 target_velocity = normalized_axis * currentMoveSpeed();
-    const float blend = 1.0f - std::exp(-m_velocity_smoothing * (std::max)(dt.getSeconds(), 0.0f));
+    const float blend = 1.0f - std::exp(-m_velocity_smoothing * (std::max) (dt.getSeconds(), 0.0f));
     m_smoothed_velocity = glm::mix(m_smoothed_velocity, target_velocity, blend);
 
     if (glm::dot(m_smoothed_velocity, m_smoothed_velocity) > 0.0f) {
@@ -95,8 +95,8 @@ void EditorCamera::onEvent(Event& event)
 
 void EditorCamera::setViewportSize(float width, float height)
 {
-    m_viewport_size.x = (std::max)(width, 0.0f);
-    m_viewport_size.y = (std::max)(height, 0.0f);
+    m_viewport_size.x = (std::max) (width, 0.0f);
+    m_viewport_size.y = (std::max) (height, 0.0f);
 }
 
 void EditorCamera::setInputEnabled(bool enabled)
@@ -169,14 +169,7 @@ void EditorCamera::syncCameraRotation()
 
 float EditorCamera::currentMoveSpeed() const
 {
-    float speed = m_move_speed;
-    if (Input::isKeyPressed(KeyCode::LeftShift) || Input::isKeyPressed(KeyCode::RightShift)) {
-        speed *= m_fast_multiplier;
-    }
-    if (Input::isKeyPressed(KeyCode::LeftControl) || Input::isKeyPressed(KeyCode::RightControl)) {
-        speed *= m_slow_multiplier;
-    }
-    return speed;
+    return m_move_speed;
 }
 
 } // namespace luna
