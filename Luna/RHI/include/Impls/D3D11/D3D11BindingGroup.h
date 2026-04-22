@@ -52,7 +52,7 @@ public:
 
     void Update() override {}
 
-    void Bind(ID3D11DeviceContext* ctx, ShaderStage stages) const;
+    void Bind(ID3D11DeviceContext* ctx, ShaderStage stages, uint32_t registerBase) const;
 
 private:
     Ref<D3D11Device> m_device;

@@ -4,6 +4,7 @@
 #include "Impls/D3D11/D3D11CommandBufferEncoder.h"
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Pipeline.h"
+#include "Impls/D3D11/D3D11PipelineLayout.h"
 #include "Impls/D3D11/D3D11Sampler.h"
 #include "Impls/D3D11/D3D11ShaderModule.h"
 #include "Impls/D3D11/D3D11Swapchain.h"
@@ -110,8 +111,7 @@ Ref<ShaderModule> D3D11Device::CreateShaderModule(const ShaderBlob& blob, const 
 
 Ref<PipelineLayout> D3D11Device::CreatePipelineLayout(const PipelineLayoutCreateInfo& info)
 {
-    (void) info;
-    return CreateRef<PipelineLayout>();
+    return CreateRef<D3D11PipelineLayout>(info);
 }
 
 Ref<PipelineCache> D3D11Device::CreatePipelineCache(std::span<const uint8_t> initialData)

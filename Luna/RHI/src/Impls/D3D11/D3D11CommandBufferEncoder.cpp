@@ -4,12 +4,19 @@
 #include "Impls/D3D11/D3D11CommandBufferEncoder.h"
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Pipeline.h"
+#include "Impls/D3D11/D3D11PipelineLayout.h"
 #include "Impls/D3D11/D3D11Texture.h"
 #include "Logging.h"
 
 namespace luna::RHI {
 namespace {
 constexpr UINT kPushConstantSlot = 13;
+
+uint32_t GetSetRegisterBase(const Ref<PipelineLayout>& layout, uint32_t setIndex)
+{
+    auto d3dLayout = std::dynamic_pointer_cast<D3D11PipelineLayout>(layout);
+    return d3dLayout ? d3dLayout->GetSetRegisterBase(setIndex) : 0;
+}
 }
 
 D3D11CommandBufferEncoder::D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type)
@@ -147,9 +154,15 @@ void D3D11CommandBufferEncoder::BindDescriptorSets(const Ref<GraphicsPipeline>& 
                                                    uint32_t firstSet,
                                                    std::span<const Ref<DescriptorSet>> descriptorSets)
 {
-    for (auto& ds : descriptorSets) {
-        auto* d3dDS = static_cast<D3D11DescriptorSet*>(ds.get());
-        d3dDS->Bind(m_context.Get(), ShaderStage::AllGraphics);
+    const auto layout = pipeline ? pipeline->GetLayout() : nullptr;
+    for (size_t i = 0; i < descriptorSets.size(); ++i) {
+        auto* d3dDS = static_cast<D3D11DescriptorSet*>(descriptorSets[i].get());
+        if (!d3dDS) {
+            continue;
+        }
+
+        const uint32_t setIndex = firstSet + static_cast<uint32_t>(i);
+        d3dDS->Bind(m_context.Get(), ShaderStage::AllGraphics, GetSetRegisterBase(layout, setIndex));
     }
 }
 
@@ -212,9 +225,15 @@ void D3D11CommandBufferEncoder::BindComputeDescriptorSets(const Ref<ComputePipel
                                                           uint32_t firstSet,
                                                           std::span<const Ref<DescriptorSet>> descriptorSets)
 {
-    for (auto& ds : descriptorSets) {
-        auto* d3dDS = static_cast<D3D11DescriptorSet*>(ds.get());
-        d3dDS->Bind(m_context.Get(), ShaderStage::Compute);
+    const auto layout = pipeline ? pipeline->GetLayout() : nullptr;
+    for (size_t i = 0; i < descriptorSets.size(); ++i) {
+        auto* d3dDS = static_cast<D3D11DescriptorSet*>(descriptorSets[i].get());
+        if (!d3dDS) {
+            continue;
+        }
+
+        const uint32_t setIndex = firstSet + static_cast<uint32_t>(i);
+        d3dDS->Bind(m_context.Get(), ShaderStage::Compute, GetSetRegisterBase(layout, setIndex));
     }
 }
 
@@ -308,7 +327,9 @@ void D3D11CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
             region.ImageSubresource.MipLevel, region.ImageSubresource.BaseArrayLayer, dstImage->GetMipLevels());
 
         const uint8_t* srcData = static_cast<const uint8_t*>(mapped) + region.BufferOffset;
-        uint32_t rowPitch = region.BufferRowLength > 0 ? region.BufferRowLength : region.ImageExtentWidth * 4;
+        const uint32_t bytesPerPixel = D3D11GetFormatBytesPerPixel(D3D11_ToDXGIFormat(dstImage->GetFormat()));
+        const uint32_t naturalPitch = region.ImageExtentWidth * bytesPerPixel;
+        const uint32_t rowPitch = region.BufferRowLength > 0 ? region.BufferRowLength * bytesPerPixel : naturalPitch;
 
         D3D11_BOX dstBox{};
         dstBox.left = region.ImageOffsetX;

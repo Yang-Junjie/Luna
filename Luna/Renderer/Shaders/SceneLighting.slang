@@ -36,28 +36,11 @@ SamplerState gGBufferSampler : register(s4);
 [[vk::binding(0, 1)]]
 ConstantBuffer<SceneParams> gSceneParams : register(b5);
 
-#if defined(LUNA_BACKEND_VULKAN)
-[[vk::binding(1, 1)]]
-TextureCube<float4> gEnvironmentSkyTexture : register(t6);
-
-[[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s7);
-
-[[vk::binding(3, 1)]]
-TextureCube<float4> gEnvironmentIrradianceTexture : register(t8);
-
-[[vk::binding(4, 1)]]
-TextureCube<float4> gEnvironmentPrefilterTexture : register(t9);
-
-[[vk::binding(5, 1)]]
-Texture2D<float4> gEnvironmentBrdfLutTexture : register(t10);
-#else
 [[vk::binding(1, 1)]]
 Texture2D<float4> gEnvironmentTexture : register(t6);
 
 [[vk::binding(2, 1)]]
 SamplerState gEnvironmentSampler : register(s7);
-#endif
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -110,7 +93,6 @@ float3 evaluateEnvironmentIrradianceSH(float3 direction)
     return max(irradiance, 0.0);
 }
 
-#if !defined(LUNA_BACKEND_VULKAN)
 float2 directionToEquirectUv(float3 direction)
 {
     const float3 dir = safeNormalize(direction, float3(0.0, 1.0, 0.0));
@@ -123,49 +105,25 @@ float3 sampleEnvironment(float3 direction, float lod)
 {
     return gEnvironmentTexture.SampleLevel(gEnvironmentSampler, directionToEquirectUv(direction), lod).rgb;
 }
-#endif
 
 float3 sampleEnvironmentSky(float3 direction, float lod)
 {
-#if defined(LUNA_BACKEND_VULKAN)
-    return gEnvironmentSkyTexture.SampleLevel(gEnvironmentSampler, safeNormalize(direction, float3(0.0, 1.0, 0.0)), lod).rgb;
-#else
     return sampleEnvironment(direction, lod);
-#endif
 }
 
 float3 sampleEnvironmentIrradiance(float3 direction)
 {
-#if defined(LUNA_BACKEND_VULKAN)
     return evaluateEnvironmentIrradianceSH(direction);
-#else
-    const float maxEnvMip = gSceneParams.cameraPositionEnvMip.w;
-    return sampleEnvironment(direction, maxEnvMip);
-#endif
 }
 
 float3 sampleEnvironmentPrefilter(float3 direction, float lod)
 {
-#if defined(LUNA_BACKEND_VULKAN)
-    return gEnvironmentPrefilterTexture.SampleLevel(
-        gEnvironmentSampler,
-        safeNormalize(direction, float3(0.0, 1.0, 0.0)),
-        lod).rgb;
-#else
     return sampleEnvironment(direction, lod);
-#endif
 }
 
 float2 sampleEnvironmentBrdf(float roughness, float NdotV)
 {
-#if defined(LUNA_BACKEND_VULKAN)
-    return gEnvironmentBrdfLutTexture.SampleLevel(
-        gEnvironmentSampler,
-        float2(saturate(NdotV), saturate(roughness)),
-        0.0).rg;
-#else
     return envBrdfApprox(roughness, NdotV);
-#endif
 }
 
 float3 reconstructViewDirection(float2 uv)

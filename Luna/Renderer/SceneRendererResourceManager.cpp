@@ -96,27 +96,21 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device, luna::RHI::BackendType backend_type)
+    createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    luna::RHI::DescriptorSetLayoutBuilder builder;
-    builder.AddBinding(0,
-                       luna::RHI::DescriptorType::UniformBuffer,
-                       1,
-                       luna::RHI::ShaderStage::Vertex | luna::RHI::ShaderStage::Fragment)
-        .AddBinding(1, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-        .AddBinding(2, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment);
-
-    if (backend_type == luna::RHI::BackendType::Vulkan) {
-        builder.AddBinding(3, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(4, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(5, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment);
-    }
-
-    return device->CreateDescriptorSetLayout(builder.Build());
+    return device->CreateDescriptorSetLayout(
+        luna::RHI::DescriptorSetLayoutBuilder()
+            .AddBinding(0,
+                        luna::RHI::DescriptorType::UniformBuffer,
+                        1,
+                        luna::RHI::ShaderStage::Vertex | luna::RHI::ShaderStage::Fragment)
+            .AddBinding(1, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(2, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
+            .Build());
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
@@ -639,23 +633,9 @@ void ResourceManager::Implementation::resetPipelineState()
 
 bool ResourceManager::Implementation::hasCompletePipelineState(luna::RHI::Format color_format) const
 {
-    const bool has_scene_pipelines = m_gpu.geometry_pipeline && m_gpu.lighting_pipeline && m_gpu.transparent_pipeline &&
-                                     m_gpu.surface_format == color_format && m_gpu.gbuffer_descriptor_set &&
-                                     m_gpu.scene_descriptor_set && m_gpu.scene_params_buffer &&
-                                     m_gpu.environment_source_texture.texture;
-    if (!has_scene_pipelines) {
-        return false;
-    }
-
-    if (m_gpu.backend_type != luna::RHI::BackendType::Vulkan) {
-        return true;
-    }
-
-    return m_gpu.equirect_to_cube_pipeline && m_gpu.irradiance_pipeline && m_gpu.prefilter_pipeline &&
-           m_gpu.brdf_lut_pipeline && m_gpu.equirect_to_cube_descriptor_set && m_gpu.irradiance_descriptor_set &&
-           !m_gpu.prefilter_descriptor_sets.empty() && m_gpu.brdf_lut_descriptor_set &&
-           m_gpu.environment_sky_texture.texture && m_gpu.environment_irradiance_texture.texture &&
-           m_gpu.environment_prefilter_texture.texture && m_gpu.environment_brdf_lut.texture;
+    return m_gpu.geometry_pipeline && m_gpu.lighting_pipeline && m_gpu.transparent_pipeline &&
+           m_gpu.surface_format == color_format && m_gpu.gbuffer_descriptor_set && m_gpu.scene_descriptor_set &&
+           m_gpu.scene_params_buffer && m_gpu.environment_source_texture.texture;
 }
 
 ShaderPaths ResourceManager::Implementation::resolveShaderPaths() const
@@ -733,50 +713,15 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
                                                          "sceneTransparentFragmentMain",
                                                          luna::RHI::ShaderStage::Fragment);
 
-    if (context.backend_type == luna::RHI::BackendType::Vulkan) {
-        const auto ibl_shader_path = defaultEnvironmentIblShaderPath();
-        m_gpu.equirect_to_cube_shader = loadShaderModule(m_gpu.device,
-                                                         context.compiler,
-                                                         ibl_shader_path,
-                                                         "environmentEquirectToCubeMain",
-                                                         luna::RHI::ShaderStage::Compute);
-        m_gpu.irradiance_shader = loadShaderModule(m_gpu.device,
-                                                   context.compiler,
-                                                   ibl_shader_path,
-                                                   "environmentIrradianceMain",
-                                                   luna::RHI::ShaderStage::Compute);
-        m_gpu.prefilter_shader = loadShaderModule(m_gpu.device,
-                                                  context.compiler,
-                                                  ibl_shader_path,
-                                                  "environmentPrefilterMain",
-                                                  luna::RHI::ShaderStage::Compute);
-        m_gpu.brdf_lut_shader = loadShaderModule(m_gpu.device,
-                                                 context.compiler,
-                                                 ibl_shader_path,
-                                                 "environmentBrdfLutMain",
-                                                 luna::RHI::ShaderStage::Compute);
-    }
-
     if (!m_gpu.geometry_vertex_shader || !m_gpu.geometry_fragment_shader || !m_gpu.lighting_vertex_shader ||
         !m_gpu.lighting_fragment_shader || !m_gpu.transparent_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene renderer shaders");
         return;
     }
-    if (context.backend_type == luna::RHI::BackendType::Vulkan &&
-        (!m_gpu.equirect_to_cube_shader || !m_gpu.irradiance_shader || !m_gpu.prefilter_shader ||
-         !m_gpu.brdf_lut_shader)) {
-        LUNA_RENDERER_ERROR("Failed to load Vulkan environment IBL compute shaders");
-        return;
-    }
 
     m_gpu.material_layout = createMaterialLayout(m_gpu.device);
     m_gpu.gbuffer_layout = createGBufferLayout(m_gpu.device);
-    m_gpu.scene_layout = createSceneLayout(m_gpu.device, context.backend_type);
-    if (context.backend_type == luna::RHI::BackendType::Vulkan) {
-        m_gpu.equirect_to_cube_layout = createEquirectToCubeComputeLayout(m_gpu.device);
-        m_gpu.cube_convolution_layout = createCubeConvolutionComputeLayout(m_gpu.device);
-        m_gpu.brdf_lut_layout = createBrdfComputeLayout(m_gpu.device);
-    }
+    m_gpu.scene_layout = createSceneLayout(m_gpu.device);
     m_gpu.descriptor_pool = createDescriptorPool(m_gpu.device);
     m_gpu.gbuffer_sampler = createGBufferSampler(m_gpu.device);
     m_gpu.environment_source_sampler = createEnvironmentSourceSampler(m_gpu.device);
@@ -798,24 +743,6 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
     m_gpu.geometry_pipeline_layout = createPipelineLayout(m_gpu.device, geometry_set_layouts, true);
     m_gpu.lighting_pipeline_layout = createPipelineLayout(m_gpu.device, lighting_set_layouts, false);
     m_gpu.transparent_pipeline_layout = createPipelineLayout(m_gpu.device, geometry_set_layouts, true);
-    if (context.backend_type == luna::RHI::BackendType::Vulkan) {
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSetLayout>, 1> equirect_set_layouts{
-            m_gpu.equirect_to_cube_layout,
-        };
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSetLayout>, 1> cube_convolution_set_layouts{
-            m_gpu.cube_convolution_layout,
-        };
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSetLayout>, 1> brdf_set_layouts{
-            m_gpu.brdf_lut_layout,
-        };
-
-        m_gpu.equirect_to_cube_pipeline_layout =
-            createComputePipelineLayout(m_gpu.device, equirect_set_layouts, sizeof(uint32_t) * 4);
-        m_gpu.cube_convolution_pipeline_layout =
-            createComputePipelineLayout(m_gpu.device, cube_convolution_set_layouts, sizeof(uint32_t) * 4);
-        m_gpu.brdf_lut_pipeline_layout =
-            createComputePipelineLayout(m_gpu.device, brdf_set_layouts, sizeof(uint32_t) * 4);
-    }
 
     m_gpu.geometry_pipeline = createGeometryPipeline(
         m_gpu.device, m_gpu.geometry_pipeline_layout, m_gpu.geometry_vertex_shader, m_gpu.geometry_fragment_shader);
@@ -823,28 +750,6 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
         m_gpu.device, m_gpu.lighting_pipeline_layout, context.color_format, m_gpu.lighting_vertex_shader, m_gpu.lighting_fragment_shader);
     m_gpu.transparent_pipeline = createTransparentPipeline(
         m_gpu.device, m_gpu.transparent_pipeline_layout, context.color_format, m_gpu.geometry_vertex_shader, m_gpu.transparent_fragment_shader);
-    if (context.backend_type == luna::RHI::BackendType::Vulkan) {
-        m_gpu.equirect_to_cube_pipeline = m_gpu.device->CreateComputePipeline(
-            luna::RHI::ComputePipelineBuilder()
-                .SetShader(m_gpu.equirect_to_cube_shader)
-                .SetLayout(m_gpu.equirect_to_cube_pipeline_layout)
-                .Build());
-        m_gpu.irradiance_pipeline = m_gpu.device->CreateComputePipeline(
-            luna::RHI::ComputePipelineBuilder()
-                .SetShader(m_gpu.irradiance_shader)
-                .SetLayout(m_gpu.cube_convolution_pipeline_layout)
-                .Build());
-        m_gpu.prefilter_pipeline = m_gpu.device->CreateComputePipeline(
-            luna::RHI::ComputePipelineBuilder()
-                .SetShader(m_gpu.prefilter_shader)
-                .SetLayout(m_gpu.cube_convolution_pipeline_layout)
-                .Build());
-        m_gpu.brdf_lut_pipeline = m_gpu.device->CreateComputePipeline(
-            luna::RHI::ComputePipelineBuilder()
-                .SetShader(m_gpu.brdf_lut_shader)
-                .SetLayout(m_gpu.brdf_lut_pipeline_layout)
-                .Build());
-    }
 
     ensureSceneResources();
 
@@ -1386,136 +1291,6 @@ void ResourceManager::Implementation::ensureSceneResources()
         m_gpu.ibl_generated = false;
     }
 
-    if (m_gpu.backend_type == luna::RHI::BackendType::Vulkan) {
-        if (!m_gpu.environment_sky_texture.texture) {
-            m_gpu.environment_sky_texture = createIblTexture(luna::RHI::TextureType::TextureCube,
-                                                             kEnvironmentCubeFaceSize,
-                                                             kEnvironmentCubeFaceSize,
-                                                             1,
-                                                             "SceneEnvironmentSky");
-        }
-        if (!m_gpu.environment_irradiance_texture.texture) {
-            m_gpu.environment_irradiance_texture = createIblTexture(luna::RHI::TextureType::TextureCube,
-                                                                    kEnvironmentIrradianceFaceSize,
-                                                                    kEnvironmentIrradianceFaceSize,
-                                                                    1,
-                                                                    "SceneEnvironmentIrradiance");
-        }
-        if (!m_gpu.environment_prefilter_texture.texture) {
-            m_gpu.environment_prefilter_texture = createIblTexture(luna::RHI::TextureType::TextureCube,
-                                                                   kEnvironmentPrefilterFaceSize,
-                                                                   kEnvironmentPrefilterFaceSize,
-                                                                   calculateMipCount(
-                                                                       kEnvironmentPrefilterFaceSize,
-                                                                       kEnvironmentPrefilterFaceSize),
-                                                                   "SceneEnvironmentPrefilter");
-        }
-        if (!m_gpu.environment_brdf_lut.texture) {
-            m_gpu.environment_brdf_lut = createIblTexture(luna::RHI::TextureType::Texture2D,
-                                                          kEnvironmentBrdfLutSize,
-                                                          kEnvironmentBrdfLutSize,
-                                                          1,
-                                                          "SceneEnvironmentBrdfLut");
-        }
-
-        if (!m_gpu.equirect_to_cube_descriptor_set && m_gpu.descriptor_pool && m_gpu.equirect_to_cube_layout) {
-            m_gpu.equirect_to_cube_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.equirect_to_cube_layout);
-        }
-        if (!m_gpu.irradiance_descriptor_set && m_gpu.descriptor_pool && m_gpu.cube_convolution_layout) {
-            m_gpu.irradiance_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.cube_convolution_layout);
-        }
-        if (m_gpu.prefilter_descriptor_sets.empty() && m_gpu.descriptor_pool && m_gpu.cube_convolution_layout &&
-            !m_gpu.environment_prefilter_texture.mip_storage_views.empty()) {
-            m_gpu.prefilter_descriptor_sets.resize(m_gpu.environment_prefilter_texture.mip_storage_views.size());
-            for (auto& descriptor_set : m_gpu.prefilter_descriptor_sets) {
-                descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.cube_convolution_layout);
-            }
-        }
-        if (!m_gpu.brdf_lut_descriptor_set && m_gpu.descriptor_pool && m_gpu.brdf_lut_layout) {
-            m_gpu.brdf_lut_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.brdf_lut_layout);
-        }
-
-        if (m_gpu.equirect_to_cube_descriptor_set && m_gpu.environment_source_texture.texture &&
-            m_gpu.environment_sky_texture.storage_view && m_gpu.environment_source_sampler) {
-            m_gpu.equirect_to_cube_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = 0,
-                .TextureView = m_gpu.environment_source_texture.texture->GetDefaultView(),
-                .Layout = luna::RHI::ResourceState::ShaderRead,
-                .Type = luna::RHI::DescriptorType::SampledImage,
-            });
-            m_gpu.equirect_to_cube_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-                .Binding = 1,
-                .Sampler = m_gpu.environment_source_sampler,
-            });
-            m_gpu.equirect_to_cube_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = 2,
-                .TextureView = m_gpu.environment_sky_texture.storage_view,
-                .Layout = luna::RHI::ResourceState::UnorderedAccess,
-                .Type = luna::RHI::DescriptorType::StorageImage,
-            });
-            m_gpu.equirect_to_cube_descriptor_set->Update();
-        }
-
-        if (m_gpu.irradiance_descriptor_set && m_gpu.environment_sky_texture.sample_view &&
-            m_gpu.environment_irradiance_texture.storage_view && m_gpu.ibl_sampler) {
-            m_gpu.irradiance_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-                .Binding = 1,
-                .Sampler = m_gpu.ibl_sampler,
-            });
-            m_gpu.irradiance_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = 2,
-                .TextureView = m_gpu.environment_irradiance_texture.storage_view,
-                .Layout = luna::RHI::ResourceState::UnorderedAccess,
-                .Type = luna::RHI::DescriptorType::StorageImage,
-            });
-            m_gpu.irradiance_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = 3,
-                .TextureView = m_gpu.environment_sky_texture.sample_view,
-                .Layout = luna::RHI::ResourceState::ShaderRead,
-                .Type = luna::RHI::DescriptorType::SampledImage,
-            });
-            m_gpu.irradiance_descriptor_set->Update();
-        }
-
-        if (!m_gpu.prefilter_descriptor_sets.empty() && m_gpu.environment_sky_texture.sample_view && m_gpu.ibl_sampler) {
-            for (size_t mip_index = 0; mip_index < m_gpu.prefilter_descriptor_sets.size(); ++mip_index) {
-                const auto& descriptor_set = m_gpu.prefilter_descriptor_sets[mip_index];
-                const auto& storage_view = m_gpu.environment_prefilter_texture.mip_storage_views[mip_index];
-                if (!descriptor_set || !storage_view) {
-                    continue;
-                }
-
-                descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-                    .Binding = 1,
-                    .Sampler = m_gpu.ibl_sampler,
-                });
-                descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                    .Binding = 2,
-                    .TextureView = storage_view,
-                    .Layout = luna::RHI::ResourceState::UnorderedAccess,
-                    .Type = luna::RHI::DescriptorType::StorageImage,
-                });
-                descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                    .Binding = 3,
-                    .TextureView = m_gpu.environment_sky_texture.sample_view,
-                    .Layout = luna::RHI::ResourceState::ShaderRead,
-                    .Type = luna::RHI::DescriptorType::SampledImage,
-                });
-                descriptor_set->Update();
-            }
-        }
-
-        if (m_gpu.brdf_lut_descriptor_set && m_gpu.environment_brdf_lut.storage_view) {
-            m_gpu.brdf_lut_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = 4,
-                .TextureView = m_gpu.environment_brdf_lut.storage_view,
-                .Layout = luna::RHI::ResourceState::UnorderedAccess,
-                .Type = luna::RHI::DescriptorType::StorageImage,
-            });
-            m_gpu.brdf_lut_descriptor_set->Update();
-        }
-    }
-
     if (!m_gpu.scene_descriptor_set) {
         m_gpu.scene_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.scene_layout);
     }
@@ -1532,64 +1307,25 @@ void ResourceManager::Implementation::ensureSceneResources()
         .Size = sizeof(SceneGpuParams),
         .Type = luna::RHI::DescriptorType::UniformBuffer,
     });
-    if (m_gpu.backend_type == luna::RHI::BackendType::Vulkan && m_gpu.environment_sky_texture.texture &&
-        m_gpu.environment_sky_texture.sample_view && m_gpu.environment_irradiance_texture.texture &&
-        m_gpu.environment_irradiance_texture.sample_view && m_gpu.environment_prefilter_texture.texture &&
-        m_gpu.environment_prefilter_texture.sample_view &&
-        m_gpu.environment_brdf_lut.texture && m_gpu.ibl_sampler) {
-        m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 1,
-            .TextureView = m_gpu.environment_sky_texture.sample_view,
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
-        });
-        m_gpu.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-            .Binding = 2,
-            .Sampler = m_gpu.ibl_sampler,
-        });
-        m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 3,
-            .TextureView = m_gpu.environment_irradiance_texture.sample_view,
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
-        });
-        m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 4,
-            .TextureView = m_gpu.environment_prefilter_texture.sample_view,
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
-        });
-        m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 5,
-            .TextureView = m_gpu.environment_brdf_lut.texture->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
-        });
-    } else {
-        m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 1,
-            .TextureView = m_gpu.environment_source_texture.texture->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
-        });
-        m_gpu.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-            .Binding = 2,
-            .Sampler = m_gpu.environment_source_sampler,
-        });
-    }
+    m_gpu.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 1,
+        .TextureView = m_gpu.environment_source_texture.texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_gpu.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        .Binding = 2,
+        .Sampler = m_gpu.environment_source_sampler,
+    });
     m_gpu.scene_descriptor_set->Update();
 }
 
 void ResourceManager::Implementation::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
 {
-    const auto final_stage = m_gpu.backend_type == luna::RHI::BackendType::Vulkan
-                                 ? luna::RHI::SyncScope::ComputeStage
-                                 : luna::RHI::SyncScope::FragmentStage;
-    uploadTextureIfNeeded(commands, m_gpu.environment_source_texture, luna::RHI::ResourceState::ShaderRead, final_stage);
-
-    if (m_gpu.backend_type == luna::RHI::BackendType::Vulkan) {
-        ensureImageBasedLighting(commands);
-    }
+    uploadTextureIfNeeded(commands,
+                          m_gpu.environment_source_texture,
+                          luna::RHI::ResourceState::ShaderRead,
+                          luna::RHI::SyncScope::FragmentStage);
 }
 
 void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::CommandBufferEncoder& commands)
@@ -1772,16 +1508,10 @@ void ResourceManager::Implementation::updateSceneParameters(const RenderContext&
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
     const glm::mat4 view_projection = buildViewProjection(camera, aspect_ratio, context.backend_type);
-    const float environment_mip_count =
-        (m_gpu.backend_type == luna::RHI::BackendType::Vulkan ? m_gpu.environment_prefilter_texture.texture
-                                                              : m_gpu.environment_source_texture.texture) != nullptr
-            ? static_cast<float>(
-                  (std::max)((m_gpu.backend_type == luna::RHI::BackendType::Vulkan
-                                  ? m_gpu.environment_prefilter_texture.texture->GetMipLevels()
-                                  : m_gpu.environment_source_texture.texture->GetMipLevels()),
-                             1u) -
-                  1u)
-            : 0.0f;
+    const float environment_mip_count = m_gpu.environment_source_texture.texture != nullptr
+                                            ? static_cast<float>(
+                                                  (std::max)(m_gpu.environment_source_texture.texture->GetMipLevels(), 1u) - 1u)
+                                            : 0.0f;
 
     SceneGpuParams params;
     params.view_projection = view_projection;

@@ -109,7 +109,8 @@ static D3D11_STENCIL_OP ToD3D11StencilOp(StencilOp op)
 }
 
 D3D11GraphicsPipeline::D3D11GraphicsPipeline(Ref<D3D11Device> device, const GraphicsPipelineCreateInfo& info)
-    : m_device(std::move(device))
+    : m_device(std::move(device)),
+      m_layout(info.Layout)
 {
     auto* dev = m_device->GetNativeDevice();
     D3D11ShaderModule* vsModule = nullptr;
@@ -267,7 +268,8 @@ D3D11GraphicsPipeline::D3D11GraphicsPipeline(Ref<D3D11Device> device, const Grap
 }
 
 D3D11ComputePipeline::D3D11ComputePipeline(Ref<D3D11Device> device, const ComputePipelineCreateInfo& info)
-    : m_device(std::move(device))
+    : m_device(std::move(device)),
+      m_layout(info.Layout)
 {
     if (info.ComputeShader) {
         auto* mod = static_cast<D3D11ShaderModule*>(info.ComputeShader.get());

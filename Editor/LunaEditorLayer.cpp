@@ -295,7 +295,9 @@ void LunaEditorLayer::drawViewport()
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
         ImVec2 uv0(0.0f, 0.0f);
         ImVec2 uv1(1.0f, 1.0f);
-        if (m_application != nullptr && m_application->getBackend() == RHI::BackendType::DirectX12) {
+        if (m_application != nullptr &&
+            (m_application->getBackend() == RHI::BackendType::DirectX11 ||
+             m_application->getBackend() == RHI::BackendType::DirectX12)) {
             uv0 = ImVec2(0.0f, 1.0f);
             uv1 = ImVec2(1.0f, 0.0f);
         }

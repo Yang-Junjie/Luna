@@ -108,9 +108,10 @@ void D3D11DescriptorSet::WriteSamplers(const SamplerWriteInfos& infos)
     }
 }
 
-void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) const
+void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages, uint32_t registerBase) const
 {
     for (auto& res : m_resources) {
+        const UINT slot = registerBase + res.slot;
         switch (res.type) {
             case DescriptorType::UniformBuffer:
             case DescriptorType::UniformBufferDynamic: {
@@ -119,13 +120,13 @@ void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) cons
                     break;
                 }
                 if (stages & ShaderStage::Vertex) {
-                    ctx->VSSetConstantBuffers(res.slot, 1, &cb);
+                    ctx->VSSetConstantBuffers(slot, 1, &cb);
                 }
                 if (stages & ShaderStage::Fragment) {
-                    ctx->PSSetConstantBuffers(res.slot, 1, &cb);
+                    ctx->PSSetConstantBuffers(slot, 1, &cb);
                 }
                 if (stages & ShaderStage::Compute) {
-                    ctx->CSSetConstantBuffers(res.slot, 1, &cb);
+                    ctx->CSSetConstantBuffers(slot, 1, &cb);
                 }
             } break;
             case DescriptorType::SampledImage:
@@ -135,25 +136,25 @@ void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) cons
                     break;
                 }
                 if (stages & ShaderStage::Vertex) {
-                    ctx->VSSetShaderResources(res.slot, 1, &srv);
+                    ctx->VSSetShaderResources(slot, 1, &srv);
                 }
                 if (stages & ShaderStage::Fragment) {
-                    ctx->PSSetShaderResources(res.slot, 1, &srv);
+                    ctx->PSSetShaderResources(slot, 1, &srv);
                 }
                 if (stages & ShaderStage::Compute) {
-                    ctx->CSSetShaderResources(res.slot, 1, &srv);
+                    ctx->CSSetShaderResources(slot, 1, &srv);
                 }
 
                 ID3D11SamplerState* sampler = res.sampler.Get();
                 if (sampler) {
                     if (stages & ShaderStage::Vertex) {
-                        ctx->VSSetSamplers(res.slot, 1, &sampler);
+                        ctx->VSSetSamplers(slot, 1, &sampler);
                     }
                     if (stages & ShaderStage::Fragment) {
-                        ctx->PSSetSamplers(res.slot, 1, &sampler);
+                        ctx->PSSetSamplers(slot, 1, &sampler);
                     }
                     if (stages & ShaderStage::Compute) {
-                        ctx->CSSetSamplers(res.slot, 1, &sampler);
+                        ctx->CSSetSamplers(slot, 1, &sampler);
                     }
                 }
             } break;
@@ -164,13 +165,13 @@ void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) cons
                     break;
                 }
                 if (stages & ShaderStage::Vertex) {
-                    ctx->VSSetShaderResources(res.slot, 1, &srv);
+                    ctx->VSSetShaderResources(slot, 1, &srv);
                 }
                 if (stages & ShaderStage::Fragment) {
-                    ctx->PSSetShaderResources(res.slot, 1, &srv);
+                    ctx->PSSetShaderResources(slot, 1, &srv);
                 }
                 if (stages & ShaderStage::Compute) {
-                    ctx->CSSetShaderResources(res.slot, 1, &srv);
+                    ctx->CSSetShaderResources(slot, 1, &srv);
                 }
             } break;
             case DescriptorType::StorageImage: {
@@ -179,7 +180,7 @@ void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) cons
                     break;
                 }
                 if (stages & ShaderStage::Compute) {
-                    ctx->CSSetUnorderedAccessViews(res.slot, 1, &uav, nullptr);
+                    ctx->CSSetUnorderedAccessViews(slot, 1, &uav, nullptr);
                 }
             } break;
             case DescriptorType::Sampler: {
@@ -188,13 +189,13 @@ void D3D11DescriptorSet::Bind(ID3D11DeviceContext* ctx, ShaderStage stages) cons
                     break;
                 }
                 if (stages & ShaderStage::Vertex) {
-                    ctx->VSSetSamplers(res.slot, 1, &sampler);
+                    ctx->VSSetSamplers(slot, 1, &sampler);
                 }
                 if (stages & ShaderStage::Fragment) {
-                    ctx->PSSetSamplers(res.slot, 1, &sampler);
+                    ctx->PSSetSamplers(slot, 1, &sampler);
                 }
                 if (stages & ShaderStage::Compute) {
-                    ctx->CSSetSamplers(res.slot, 1, &sampler);
+                    ctx->CSSetSamplers(slot, 1, &sampler);
                 }
             } break;
             default:
