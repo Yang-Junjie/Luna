@@ -24,6 +24,7 @@ namespace {
 
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
+constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
 
 const char* backendTypeToString(luna::RHI::BackendType type)
 {
@@ -121,6 +122,7 @@ void LunaEditorLayer::onAttach()
 
     if (m_application->getImGuiLayer() != nullptr) {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::OffscreenTexture);
+        syncPickDebugVisualizationState();
     } else {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
         LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_application->getBackend()));
@@ -141,6 +143,7 @@ void LunaEditorLayer::onDetach()
 
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
+    m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
 
     if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
         imgui_layer->setMenuBarCallback({});
@@ -150,6 +153,7 @@ void LunaEditorLayer::onDetach()
 void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
+    consumePendingScenePick();
 
     const bool allow_editor_camera = m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured();
     m_editor_camera.setInputEnabled(allow_editor_camera);
@@ -191,6 +195,10 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
+    if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
+        syncPickDebugVisualizationState();
+    }
+    ImGui::TextUnformatted("Highlights pickable pixels and shows the requested pick marker.");
     ImGui::TextUnformatted(
         "Scene rendering now targets a persistent offscreen texture and is presented in the Viewport panel.");
     ImGui::End();
@@ -293,16 +301,20 @@ void LunaEditorLayer::drawViewport()
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = rhi::ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
-        ImVec2 uv0(0.0f, 0.0f);
-        ImVec2 uv1(1.0f, 1.0f);
-        if (m_application != nullptr &&
-            (m_application->getBackend() == RHI::BackendType::DirectX11 ||
-             m_application->getBackend() == RHI::BackendType::DirectX12)) {
-            uv0 = ImVec2(0.0f, 1.0f);
-            uv1 = ImVec2(1.0f, 0.0f);
+        ImVec2 uv0(0.0f, 1.0f);
+        ImVec2 uv1(1.0f, 0.0f);
+        if (m_application != nullptr && m_application->getBackend() == luna::RHI::BackendType::Vulkan) {
+            uv0 = ImVec2(0.0f, 0.0f);
+            uv1 = ImVec2(1.0f, 1.0f);
         }
 
         ImGui::Image(texture_id, available, uv0, uv1);
+        requestViewportPick(ImGui::GetItemRectMin(),
+                            ImGui::GetItemRectMax(),
+                            uv0,
+                            uv1,
+                            scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
+                                          : luna::RHI::Extent2D{0, 0});
     } else if (available.x > 0.0f && available.y > 0.0f) {
         ImGui::SetCursorPos(ImVec2(16.0f, 16.0f));
         ImGui::TextUnformatted("Viewport texture will appear after the first rendered frame.");
@@ -310,6 +322,76 @@ void LunaEditorLayer::drawViewport()
 
     ImGui::End();
     ImGui::PopStyleVar();
+}
+
+void LunaEditorLayer::consumePendingScenePick()
+{
+    if (m_application == nullptr) {
+        return;
+    }
+
+    const std::optional<uint32_t> picked_id = m_application->getRenderer().consumeScenePickResult();
+    if (!picked_id.has_value()) {
+        return;
+    }
+
+    if (*picked_id == 0) {
+        setSelectedEntity({});
+        return;
+    }
+
+    auto& entity_manager = m_scene.entityManager();
+    const entt::entity entity_handle = static_cast<entt::entity>(*picked_id - 1u);
+    if (!entity_manager.registry().valid(entity_handle)) {
+        setSelectedEntity({});
+        return;
+    }
+
+    setSelectedEntity(Entity(entity_handle, &entity_manager));
+}
+
+void LunaEditorLayer::syncPickDebugVisualizationState() const
+{
+    if (m_application == nullptr) {
+        return;
+    }
+
+    m_application->getRenderer().setScenePickDebugVisualizationEnabled(m_show_pick_debug_visualization);
+}
+
+void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
+                                          const ImVec2& image_max,
+                                          const ImVec2& uv0,
+                                          const ImVec2& uv1,
+                                          const luna::RHI::Extent2D& texture_extent) const
+{
+    if (m_application == nullptr || texture_extent.width == 0 || texture_extent.height == 0 ||
+        m_editor_camera.isMouseCaptured() || !ImGui::IsItemHovered() || !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        return;
+    }
+
+    const ImVec2 mouse_position = ImGui::GetMousePos();
+    const float image_width = image_max.x - image_min.x;
+    const float image_height = image_max.y - image_min.y;
+    if (image_width <= 0.0f || image_height <= 0.0f) {
+        return;
+    }
+
+    const float local_x = std::clamp((mouse_position.x - image_min.x) / image_width, 0.0f, 0.999999f);
+    const float local_y = std::clamp((mouse_position.y - image_min.y) / image_height, 0.0f, 0.999999f);
+
+    const float texture_u = std::clamp(uv0.x + (uv1.x - uv0.x) * local_x, 0.0f, 0.999999f);
+    const float texture_v = std::clamp(uv0.y + (uv1.y - uv0.y) * local_y, 0.0f, 0.999999f);
+
+    const uint32_t pixel_x = static_cast<uint32_t>(texture_u * static_cast<float>(texture_extent.width));
+    const uint32_t color_pixel_y = static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height));
+
+    // The final scene color is produced by a fullscreen lighting pass before ImGui samples it.
+    // That pass introduces a vertical mapping difference versus the raw pick attachment, so convert
+    // the displayed color-space Y back into the pick texture's texel-space Y before issuing readback.
+    const uint32_t pick_pixel_y = (texture_extent.height - 1) - (std::min) (color_pixel_y, texture_extent.height - 1);
+
+    m_application->getRenderer().requestScenePick((std::min) (pixel_x, texture_extent.width - 1), pick_pixel_y);
 }
 
 const std::string& LunaEditorLayer::getAssetLabel() const
@@ -398,6 +480,8 @@ void LunaEditorLayer::resetEditorState()
     m_selected_entity = {};
     m_scene_file_path.clear();
     m_asset_label = "No scene loaded";
+    m_show_pick_debug_visualization = false;
+    syncPickDebugVisualizationState();
 }
 
 void LunaEditorLayer::createScene()

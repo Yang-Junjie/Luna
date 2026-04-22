@@ -13,6 +13,12 @@
 #include <filesystem>
 #include <string>
 
+struct ImVec2;
+
+namespace luna::RHI {
+struct Extent2D;
+}
+
 namespace luna {
 
 class LunaEditorApplication;
@@ -36,6 +42,13 @@ public:
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
 
 private:
+    void consumePendingScenePick();
+    void syncPickDebugVisualizationState() const;
+    void requestViewportPick(const ImVec2& image_min,
+                             const ImVec2& image_max,
+                             const ImVec2& uv0,
+                             const ImVec2& uv1,
+                             const luna::RHI::Extent2D& texture_extent) const;
     void onImGuiMenuBar();
     void drawViewport();
     void resetEditorState();
@@ -62,6 +75,7 @@ private:
     Entity m_selected_entity;
     std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
+    bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     SceneHierarchyPanel m_scene_hierarchy_panel;

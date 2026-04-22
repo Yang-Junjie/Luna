@@ -30,6 +30,7 @@ void recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
 
         MeshPushConstants push_constants{
             .model = draw_command.transform,
+            .picking_id = draw_command.picking_id,
         };
         const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
             draw_resources.material_descriptor_set,
@@ -69,17 +70,19 @@ void SceneRenderer::Implementation::clearSubmittedMeshes()
 
 void SceneRenderer::Implementation::submitStaticMesh(const glm::mat4& transform,
                                                      std::shared_ptr<Mesh> mesh,
-                                                     std::shared_ptr<Material> material)
+                                                     std::shared_ptr<Material> material,
+                                                     uint32_t picking_id)
 {
-    m_draw_queue.submitStaticMesh(transform, std::move(mesh), std::move(material));
+    m_draw_queue.submitStaticMesh(transform, std::move(mesh), std::move(material), picking_id);
 }
 
 void SceneRenderer::Implementation::submitStaticMesh(
     const glm::mat4& transform,
     std::shared_ptr<Mesh> mesh,
-    const std::vector<std::shared_ptr<Material>>& submesh_materials)
+    const std::vector<std::shared_ptr<Material>>& submesh_materials,
+    uint32_t picking_id)
 {
-    m_draw_queue.submitStaticMesh(transform, std::move(mesh), submesh_materials);
+    m_draw_queue.submitStaticMesh(transform, std::move(mesh), submesh_materials, picking_id);
 }
 
 SceneGBufferTextures SceneRenderer::Implementation::createGBufferTextures(rhi::RenderGraphBuilder& graph,
@@ -154,6 +157,10 @@ void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& gr
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteColor(context.pick_target,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteDepth(context.depth_target,
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
@@ -170,6 +177,7 @@ void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& gr
             pass_builder.ReadTexture(gbuffer.normal_metallic);
             pass_builder.ReadTexture(gbuffer.world_position_roughness);
             pass_builder.ReadTexture(gbuffer.emissive_ao);
+            pass_builder.ReadTexture(context.pick_target);
             pass_builder.WriteColor(
                 context.color_target,
                 luna::RHI::AttachmentLoadOp::Clear,
@@ -190,6 +198,8 @@ void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& gr
         [&](rhi::RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.WriteColor(
                 context.color_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteColor(
+                context.pick_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
             pass_builder.WriteDepth(
                 context.depth_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
         },
@@ -235,7 +245,9 @@ void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPa
     const auto& gbuffer_normal_metallic = pass_context.getTexture(gbuffer.normal_metallic);
     const auto& gbuffer_world_position_roughness = pass_context.getTexture(gbuffer.world_position_roughness);
     const auto& gbuffer_emissive_ao = pass_context.getTexture(gbuffer.emissive_ao);
-    if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao) {
+    const auto& pick_texture = pass_context.getTexture(context.pick_target);
+    if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao ||
+        !pick_texture) {
         return;
     }
 
@@ -243,7 +255,7 @@ void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPa
     m_resources.uploadEnvironmentIfNeeded(commands);
     m_resources.updateSceneParameters(context, m_draw_queue.camera());
     m_resources.updateLightingResources(
-        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao);
+        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(m_resources.lightingPipeline());

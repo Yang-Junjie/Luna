@@ -53,7 +53,8 @@ public:
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao);
+                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture);
 
     [[nodiscard]] ResolvedDrawResources resolveDrawResources(const DrawCommand& draw_command,
                                                              const Material& default_material) const;

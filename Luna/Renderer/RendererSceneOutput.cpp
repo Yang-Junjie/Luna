@@ -51,7 +51,7 @@ void Renderer::setSceneOutputMode(SceneOutputMode mode)
     m_scene_output.mode = mode;
 
     if (m_scene_output.mode != SceneOutputMode::OffscreenTexture) {
-        if (m_scene_output.color || m_scene_output.depth) {
+        if (m_scene_output.color || m_scene_output.depth || m_scene_output.pick) {
             waitForGpuIdle();
         }
         releaseSceneOutputTargets();
@@ -85,6 +85,51 @@ const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getSceneOutputTexture() cons
 {
     return m_scene_output.color;
 }
+
+void Renderer::setScenePickDebugVisualizationEnabled(bool enabled)
+{
+    m_scene_output.pick_debug_visualization_enabled = enabled;
+    if (!enabled) {
+        m_scene_output.debug_pick_marker = {};
+    }
+}
+
+bool Renderer::isScenePickDebugVisualizationEnabled() const
+{
+    return m_scene_output.pick_debug_visualization_enabled;
+}
+
+void Renderer::requestScenePick(uint32_t x, uint32_t y)
+{
+    if (m_scene_output.mode != SceneOutputMode::OffscreenTexture || !m_scene_output.pick || m_scene_output.extent.width == 0 ||
+        m_scene_output.extent.height == 0) {
+        return;
+    }
+
+    const uint32_t clamped_x = (std::min)(x, m_scene_output.extent.width - 1);
+    const uint32_t clamped_y = (std::min)(y, m_scene_output.extent.height - 1);
+    m_scene_output.debug_pick_marker = SceneOutputState::PickDebugMarker{
+        .x = clamped_x,
+        .y = clamped_y,
+        .valid = m_scene_output.pick_debug_visualization_enabled,
+    };
+    m_scene_output.queued_pick_request = SceneOutputState::PickRequest{
+        .x = clamped_x,
+        .y = clamped_y,
+    };
+}
+
+std::optional<uint32_t> Renderer::consumeScenePickResult()
+{
+    if (!m_scene_output.completed_pick_id.has_value()) {
+        return std::nullopt;
+    }
+
+    const uint32_t picked_id = *m_scene_output.completed_pick_id;
+    m_scene_output.completed_pick_id.reset();
+    return picked_id;
+}
+
 GLFWwindow* Renderer::getNativeWindow() const
 {
     return m_window_context.native_window;
@@ -157,11 +202,13 @@ const glm::vec4& Renderer::getClearColor() const
 
 bool Renderer::hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const
 {
-    return m_scene_output.color && m_scene_output.depth && m_scene_output.color->GetWidth() == width &&
+    return m_scene_output.color && m_scene_output.depth && m_scene_output.pick && m_scene_output.color->GetWidth() == width &&
            m_scene_output.color->GetHeight() == height && m_scene_output.depth->GetWidth() == width &&
-           m_scene_output.depth->GetHeight() == height &&
+           m_scene_output.depth->GetHeight() == height && m_scene_output.pick->GetWidth() == width &&
+           m_scene_output.pick->GetHeight() == height &&
            m_scene_output.color->GetFormat() == m_device_context.surface_format &&
-           m_scene_output.depth->GetFormat() == luna::RHI::Format::D32_FLOAT;
+           m_scene_output.depth->GetFormat() == luna::RHI::Format::D32_FLOAT &&
+           m_scene_output.pick->GetFormat() == luna::RHI::Format::R32_UINT;
 }
 
 void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
@@ -195,16 +242,33 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
                                                    .SetName("SceneOutputDepth")
                                                    .Build());
 
+    m_scene_output.pick =
+        m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
+                                                   .SetSize(width, height)
+                                                   .SetFormat(luna::RHI::Format::R32_UINT)
+                                                   .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment |
+                                                             luna::RHI::TextureUsageFlags::Sampled |
+                                                             luna::RHI::TextureUsageFlags::TransferSrc)
+                                                   .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                                   .SetName("SceneOutputPick")
+                                                   .Build());
+
     m_scene_output.color_state = luna::RHI::ResourceState::Undefined;
     m_scene_output.depth_state = luna::RHI::ResourceState::Undefined;
+    m_scene_output.pick_state = luna::RHI::ResourceState::Undefined;
 }
 
 void Renderer::releaseSceneOutputTargets()
 {
     m_scene_output.color.reset();
     m_scene_output.depth.reset();
+    m_scene_output.pick.reset();
     m_scene_output.color_state = luna::RHI::ResourceState::Undefined;
     m_scene_output.depth_state = luna::RHI::ResourceState::Undefined;
+    m_scene_output.pick_state = luna::RHI::ResourceState::Undefined;
+    m_scene_output.queued_pick_request.reset();
+    m_scene_output.completed_pick_id.reset();
+    m_scene_output.debug_pick_marker = {};
 }
 
 } // namespace luna

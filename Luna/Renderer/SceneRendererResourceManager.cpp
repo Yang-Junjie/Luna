@@ -92,6 +92,7 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
             .AddBinding(2, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(3, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(4, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(5, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 }
 
@@ -291,10 +292,12 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
         .AddColorAttachmentDefault(false)
         .AddColorAttachmentDefault(false)
         .AddColorAttachmentDefault(false)
+        .AddColorAttachmentDefault(false)
         .AddColorFormat(scene_renderer_detail::kGBufferBaseColorFormat)
         .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
         .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
         .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
+        .AddColorFormat(scene_renderer_detail::kScenePickingFormat)
         .SetDepthStencilFormat(luna::RHI::Format::D32_FLOAT)
         .SetLayout(layout);
 
@@ -340,7 +343,9 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     addStaticMeshVertexLayout(builder);
     builder.SetDepthTest(true, false, luna::RHI::CompareOp::Less)
         .AddColorAttachment(scene_renderer_detail::makeAlphaBlendAttachment())
+        .AddColorAttachmentDefault(false)
         .AddColorFormat(color_format)
+        .AddColorFormat(scene_renderer_detail::kScenePickingFormat)
         .SetDepthStencilFormat(luna::RHI::Format::D32_FLOAT)
         .SetLayout(layout);
 
@@ -393,7 +398,8 @@ public:
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao);
+                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture);
 
     [[nodiscard]] ResolvedDrawResources resolveDrawResources(const DrawCommand& draw_command,
                                                              const Material& default_material) const;
@@ -1520,6 +1526,13 @@ void ResourceManager::Implementation::updateSceneParameters(const RenderContext&
     params.light_direction_intensity = glm::vec4(glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f)), 4.0f);
     params.light_color_exposure = glm::vec4(1.0f, 0.98f, 0.95f, 1.0f);
     params.ibl_factors = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+    params.debug_overlay_params =
+        glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f, 0.65f, 0.0f, 0.0f);
+    params.debug_pick_marker = glm::vec4(static_cast<float>(context.debug_pick_pixel_x),
+                                         static_cast<float>(context.debug_pick_pixel_y),
+                                         (context.show_pick_debug_visualization && context.show_pick_debug_marker) ? 1.0f
+                                                                                                                   : 0.0f,
+                                         1.0f);
     params.irradiance_sh = m_gpu.environment_irradiance_sh;
 
     if (void* mapped = m_gpu.scene_params_buffer->Map()) {
@@ -1533,10 +1546,11 @@ void ResourceManager::Implementation::updateLightingResources(
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao)
+    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+    const luna::RHI::Ref<luna::RHI::Texture>& pick_texture)
 {
     if (!m_gpu.gbuffer_descriptor_set || !m_gpu.gbuffer_sampler || !gbuffer_base_color || !gbuffer_normal_metallic ||
-        !gbuffer_world_position_roughness || !gbuffer_emissive_ao) {
+        !gbuffer_world_position_roughness || !gbuffer_emissive_ao || !pick_texture) {
         return;
     }
 
@@ -1567,6 +1581,12 @@ void ResourceManager::Implementation::updateLightingResources(
     m_gpu.gbuffer_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 4,
         .Sampler = m_gpu.gbuffer_sampler,
+    });
+    m_gpu.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 5,
+        .TextureView = pick_texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
     });
     m_gpu.gbuffer_descriptor_set->Update();
 }
@@ -1654,10 +1674,11 @@ void ResourceManager::updateSceneParameters(const SceneRenderer::RenderContext& 
 void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao)
+                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+                                              const luna::RHI::Ref<luna::RHI::Texture>& pick_texture)
 {
     m_impl->updateLightingResources(
-        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao);
+        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
 }
 
 ResolvedDrawResources ResourceManager::resolveDrawResources(const DrawCommand& draw_command,

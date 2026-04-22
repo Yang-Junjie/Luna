@@ -21,6 +21,45 @@ bool IsStencilFormat(Format format)
 {
     return format == Format::D24S8;
 }
+
+bool IsUnsignedIntegerFormat(Format format)
+{
+    switch (format) {
+        case Format::R8_UINT:
+        case Format::RG8_UINT:
+        case Format::RGBA8_UINT:
+        case Format::R16_UINT:
+        case Format::RG16_UINT:
+        case Format::RGBA16_UINT:
+        case Format::R32_UINT:
+        case Format::RG32_UINT:
+        case Format::RGB32_UINT:
+        case Format::RGBA32_UINT:
+        case Format::RGB10A2_UINT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool IsSignedIntegerFormat(Format format)
+{
+    switch (format) {
+        case Format::R8_SINT:
+        case Format::RG8_SINT:
+        case Format::RGBA8_SINT:
+        case Format::R16_SINT:
+        case Format::RG16_SINT:
+        case Format::RGBA16_SINT:
+        case Format::R32_SINT:
+        case Format::RG32_SINT:
+        case Format::RGB32_SINT:
+        case Format::RGBA32_SINT:
+            return true;
+        default:
+            return false;
+    }
+}
 } // namespace
 
 vk::CommandBufferInheritanceRenderingInfo VKCommandBufferEncoder::ConvertRenderingInfo(const RenderingInfo& info)
@@ -84,11 +123,28 @@ vk::RenderingInfo VKCommandBufferEncoder::ConvertRenderingInfoBegin(const Render
                 break;
         }
         if (attachment.LoadOp == AttachmentLoadOp::Clear) {
-            vkAttachment.clearValue =
-                vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{attachment.ClearValue.Color[0],
-                                                                        attachment.ClearValue.Color[1],
-                                                                        attachment.ClearValue.Color[2],
-                                                                        attachment.ClearValue.Color[3]}));
+            const Format format = attachment.Texture->GetFormat();
+            if (IsUnsignedIntegerFormat(format)) {
+                vkAttachment.clearValue =
+                    vk::ClearValue(vk::ClearColorValue(std::array<uint32_t, 4>{
+                        static_cast<uint32_t>(attachment.ClearValue.Color[0]),
+                        static_cast<uint32_t>(attachment.ClearValue.Color[1]),
+                        static_cast<uint32_t>(attachment.ClearValue.Color[2]),
+                        static_cast<uint32_t>(attachment.ClearValue.Color[3])}));
+            } else if (IsSignedIntegerFormat(format)) {
+                vkAttachment.clearValue =
+                    vk::ClearValue(vk::ClearColorValue(std::array<int32_t, 4>{
+                        static_cast<int32_t>(attachment.ClearValue.Color[0]),
+                        static_cast<int32_t>(attachment.ClearValue.Color[1]),
+                        static_cast<int32_t>(attachment.ClearValue.Color[2]),
+                        static_cast<int32_t>(attachment.ClearValue.Color[3])}));
+            } else {
+                vkAttachment.clearValue =
+                    vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{attachment.ClearValue.Color[0],
+                                                                            attachment.ClearValue.Color[1],
+                                                                            attachment.ClearValue.Color[2],
+                                                                            attachment.ClearValue.Color[3]}));
+            }
         }
     }
     vkRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(m_vkColorAttachments.size());

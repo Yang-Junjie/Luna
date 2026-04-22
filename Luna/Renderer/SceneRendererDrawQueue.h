@@ -20,6 +20,7 @@ struct DrawCommand {
     std::shared_ptr<Mesh> mesh;
     std::shared_ptr<Material> material;
     uint32_t sub_mesh_index{UINT32_MAX};
+    uint32_t picking_id{0};
 };
 
 class DrawQueue final {
@@ -29,10 +30,12 @@ public:
 
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          std::shared_ptr<Material> material = {});
+                          std::shared_ptr<Material> material = {},
+                          uint32_t picking_id = 0);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          const std::vector<std::shared_ptr<Material>>& submesh_materials);
+                          const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                          uint32_t picking_id = 0);
 
     void sortTransparentBackToFront();
 

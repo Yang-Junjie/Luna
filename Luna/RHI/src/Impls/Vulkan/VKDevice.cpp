@@ -78,6 +78,9 @@ VKDevice::VKDevice(const Ref<Adapter>& adapter, const DeviceCreateInfo& createIn
             case DeviceFeature::TessellationShader:
                 features10.tessellationShader = VK_TRUE;
                 break;
+            case DeviceFeature::IndependentBlending:
+                features10.independentBlend = VK_TRUE;
+                break;
             case DeviceFeature::MultiDrawIndirect:
                 features10.multiDrawIndirect = VK_TRUE;
                 break;

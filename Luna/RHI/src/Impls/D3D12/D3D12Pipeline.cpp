@@ -12,6 +12,82 @@
 
 namespace {
 std::atomic<uint64_t> g_psoCounter{0};
+
+D3D12_BLEND ToD3D12Blend(luna::RHI::BlendFactor factor)
+{
+    using namespace luna::RHI;
+
+    switch (factor) {
+        case BlendFactor::Zero:
+            return D3D12_BLEND_ZERO;
+        case BlendFactor::One:
+            return D3D12_BLEND_ONE;
+        case BlendFactor::SrcColor:
+            return D3D12_BLEND_SRC_COLOR;
+        case BlendFactor::OneMinusSrcColor:
+            return D3D12_BLEND_INV_SRC_COLOR;
+        case BlendFactor::DstColor:
+            return D3D12_BLEND_DEST_COLOR;
+        case BlendFactor::OneMinusDstColor:
+            return D3D12_BLEND_INV_DEST_COLOR;
+        case BlendFactor::SrcAlpha:
+            return D3D12_BLEND_SRC_ALPHA;
+        case BlendFactor::OneMinusSrcAlpha:
+            return D3D12_BLEND_INV_SRC_ALPHA;
+        case BlendFactor::DstAlpha:
+            return D3D12_BLEND_DEST_ALPHA;
+        case BlendFactor::OneMinusDstAlpha:
+            return D3D12_BLEND_INV_DEST_ALPHA;
+        case BlendFactor::ConstantColor:
+            return D3D12_BLEND_BLEND_FACTOR;
+        case BlendFactor::OneMinusConstantColor:
+            return D3D12_BLEND_INV_BLEND_FACTOR;
+        case BlendFactor::SrcAlphaSaturate:
+            return D3D12_BLEND_SRC_ALPHA_SAT;
+        default:
+            return D3D12_BLEND_ONE;
+    }
+}
+
+D3D12_BLEND_OP ToD3D12BlendOp(luna::RHI::BlendOp op)
+{
+    using namespace luna::RHI;
+
+    switch (op) {
+        case BlendOp::Add:
+            return D3D12_BLEND_OP_ADD;
+        case BlendOp::Subtract:
+            return D3D12_BLEND_OP_SUBTRACT;
+        case BlendOp::ReverseSubtract:
+            return D3D12_BLEND_OP_REV_SUBTRACT;
+        case BlendOp::Min:
+            return D3D12_BLEND_OP_MIN;
+        case BlendOp::Max:
+            return D3D12_BLEND_OP_MAX;
+        default:
+            return D3D12_BLEND_OP_ADD;
+    }
+}
+
+UINT8 ToD3D12ColorWriteMask(luna::RHI::ColorComponentFlags mask)
+{
+    using namespace luna::RHI;
+
+    UINT8 result = 0;
+    if (mask & ColorComponentFlags::R) {
+        result |= D3D12_COLOR_WRITE_ENABLE_RED;
+    }
+    if (mask & ColorComponentFlags::G) {
+        result |= D3D12_COLOR_WRITE_ENABLE_GREEN;
+    }
+    if (mask & ColorComponentFlags::B) {
+        result |= D3D12_COLOR_WRITE_ENABLE_BLUE;
+    }
+    if (mask & ColorComponentFlags::A) {
+        result |= D3D12_COLOR_WRITE_ENABLE_ALPHA;
+    }
+    return result;
+}
 }
 
 namespace luna::RHI {
@@ -102,16 +178,24 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 
     // Blend
-    psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-    if (!info.ColorBlend.Attachments.empty() && info.ColorBlend.Attachments[0].BlendEnable) {
-        auto& blend = info.ColorBlend.Attachments[0];
-        psoDesc.BlendState.RenderTarget[0].BlendEnable = TRUE;
-        psoDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
-        psoDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
-        psoDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        psoDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-        psoDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-        psoDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+    psoDesc.BlendState.AlphaToCoverageEnable = info.Multisample.AlphaToCoverageEnable ? TRUE : FALSE;
+    psoDesc.BlendState.IndependentBlendEnable = info.ColorBlend.Attachments.size() > 1 ? TRUE : FALSE;
+    for (size_t i = 0; i < info.ColorBlend.Attachments.size() && i < 8; ++i) {
+        const auto& src = info.ColorBlend.Attachments[i];
+        auto& dst = psoDesc.BlendState.RenderTarget[i];
+        dst.BlendEnable = src.BlendEnable ? TRUE : FALSE;
+        dst.LogicOpEnable = FALSE;
+        dst.SrcBlend = ToD3D12Blend(src.SrcColorBlendFactor);
+        dst.DestBlend = ToD3D12Blend(src.DstColorBlendFactor);
+        dst.BlendOp = ToD3D12BlendOp(src.ColorBlendOp);
+        dst.SrcBlendAlpha = ToD3D12Blend(src.SrcAlphaBlendFactor);
+        dst.DestBlendAlpha = ToD3D12Blend(src.DstAlphaBlendFactor);
+        dst.BlendOpAlpha = ToD3D12BlendOp(src.AlphaBlendOp);
+        dst.LogicOp = D3D12_LOGIC_OP_NOOP;
+        dst.RenderTargetWriteMask = ToD3D12ColorWriteMask(src.ColorWriteMask);
+    }
+    if (info.ColorBlend.Attachments.empty()) {
+        psoDesc.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
 
     // Multisample

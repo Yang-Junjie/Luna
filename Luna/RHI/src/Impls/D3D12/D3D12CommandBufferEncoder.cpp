@@ -522,6 +522,53 @@ void D3D12CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
     }
 }
 
+void D3D12CommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
+                                                  ImageLayout srcImageLayout,
+                                                  const Ref<Buffer>& dstBuffer,
+                                                  std::span<const BufferImageCopy> regions)
+{
+    auto* d3dSrc = static_cast<D3D12Texture*>(srcImage.get());
+    auto* d3dDst = static_cast<D3D12Buffer*>(dstBuffer.get());
+    if (!d3dSrc || !d3dDst) {
+        return;
+    }
+
+    for (const auto& region : regions) {
+        D3D12_TEXTURE_COPY_LOCATION src{};
+        src.pResource = d3dSrc->GetHandle();
+        src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        src.SubresourceIndex = CalcSubresource(region.ImageSubresource.MipLevel,
+                                               region.ImageSubresource.BaseArrayLayer,
+                                               0,
+                                               srcImage->GetMipLevels(),
+                                               srcImage->GetArrayLayers());
+
+        D3D12_TEXTURE_COPY_LOCATION dst{};
+        dst.pResource = d3dDst->GetHandle();
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        dst.PlacedFootprint.Offset = region.BufferOffset;
+        dst.PlacedFootprint.Footprint.Format = ToDXGIFormat(srcImage->GetFormat());
+        dst.PlacedFootprint.Footprint.Width = region.ImageExtentWidth;
+        dst.PlacedFootprint.Footprint.Height = region.ImageExtentHeight;
+        dst.PlacedFootprint.Footprint.Depth = region.ImageExtentDepth;
+        const uint32_t bytes_per_pixel = D3D12GetFormatBytesPerPixel(dst.PlacedFootprint.Footprint.Format);
+        const uint32_t natural_row_pitch = region.ImageExtentWidth * bytes_per_pixel;
+        const uint32_t requested_row_pitch =
+            region.BufferRowLength > 0 ? (region.BufferRowLength * bytes_per_pixel) : natural_row_pitch;
+        dst.PlacedFootprint.Footprint.RowPitch = (requested_row_pitch + 255u) & ~255u;
+
+        D3D12_BOX src_box{};
+        src_box.left = region.ImageOffsetX;
+        src_box.top = region.ImageOffsetY;
+        src_box.front = region.ImageOffsetZ;
+        src_box.right = region.ImageOffsetX + region.ImageExtentWidth;
+        src_box.bottom = region.ImageOffsetY + region.ImageExtentHeight;
+        src_box.back = region.ImageOffsetZ + region.ImageExtentDepth;
+
+        m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &src_box);
+    }
+}
+
 void D3D12CommandBufferEncoder::CopyBuffer(
     const Ref<Buffer>& srcBuffer, const Ref<Buffer>& dstBuffer, uint64_t srcOffset, uint64_t dstOffset, uint64_t size)
 {

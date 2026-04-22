@@ -42,8 +42,13 @@ public:
         luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
         rhi::RenderGraphTextureHandle color_target;
         rhi::RenderGraphTextureHandle depth_target;
+        rhi::RenderGraphTextureHandle pick_target;
         luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
+        bool show_pick_debug_visualization{false};
+        uint32_t debug_pick_pixel_x{0};
+        uint32_t debug_pick_pixel_y{0};
+        bool show_pick_debug_marker{false};
         uint32_t framebuffer_width{0};
         uint32_t framebuffer_height{0};
 
@@ -63,10 +68,12 @@ public:
     void beginScene(const Camera& camera);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          std::shared_ptr<Material> material = {});
+                          std::shared_ptr<Material> material = {},
+                          uint32_t picking_id = 0);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          const std::vector<std::shared_ptr<Material>>& submesh_materials);
+                          const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                          uint32_t picking_id = 0);
     void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
     void clearSubmittedMeshes();
     void setShaderPaths(ShaderPaths shader_paths);

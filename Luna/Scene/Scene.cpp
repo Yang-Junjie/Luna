@@ -35,6 +35,11 @@ std::vector<std::shared_ptr<Material>>
     return submesh_materials;
 }
 
+uint32_t encodePickingId(Entity entity)
+{
+    return entity ? (static_cast<uint32_t>(entity) + 1u) : 0u;
+}
+
 } // namespace
 
 Scene::Scene()
@@ -77,7 +82,9 @@ void Scene::onUpdateRuntime(const Camera& camera)
 
         scene_renderer.submitStaticMesh(entity_manager.getWorldSpaceTransformMatrix(entity),
                                         mesh,
-                                        resolveSubmeshMaterials(mesh_component, *mesh, asset_manager, m_asset_load_behavior));
+                                        resolveSubmeshMaterials(
+                                            mesh_component, *mesh, asset_manager, m_asset_load_behavior),
+                                        encodePickingId(entity));
     }
 }
 

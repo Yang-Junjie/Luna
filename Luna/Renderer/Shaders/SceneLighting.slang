@@ -15,6 +15,8 @@ struct SceneParams
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
+    float4 debugOverlayParams;
+    float4 debugPickMarker;
     float4 irradianceSh[9];
 };
 
@@ -32,6 +34,9 @@ Texture2D<float4> gGBufferEmissiveAo : register(t3);
 
 [[vk::binding(4, 0)]]
 SamplerState gGBufferSampler : register(s4);
+
+[[vk::binding(5, 0)]]
+Texture2D<uint> gPickBuffer : register(t5);
 
 [[vk::binding(0, 1)]]
 ConstantBuffer<SceneParams> gSceneParams : register(b5);
@@ -64,6 +69,69 @@ float3 toneMapACES(float3 color)
 }
 
 float2 envBrdfApprox(float roughness, float NdotV);
+
+float3 pickDebugColor(uint pickingId)
+{
+    const uint hash = pickingId * 1664525u + 1013904223u;
+    const float3 hashedColor = float3((hash & 255u) / 255.0,
+                                      ((hash >> 8u) & 255u) / 255.0,
+                                      ((hash >> 16u) & 255u) / 255.0);
+    return lerp(float3(0.20, 0.95, 0.30), hashedColor, 0.45);
+}
+
+uint loadPickingId(float2 uv)
+{
+    uint width = 0;
+    uint height = 0;
+    gPickBuffer.GetDimensions(width, height);
+    if (width == 0 || height == 0)
+    {
+        return 0;
+    }
+
+    const uint2 pixel = min(uint2(uv * float2(width, height)), uint2(width - 1u, height - 1u));
+    return gPickBuffer.Load(int3(pixel, 0));
+}
+
+bool isDebugPickMarkerPixel(float2 uv)
+{
+    if (gSceneParams.debugPickMarker.z <= 0.5)
+    {
+        return false;
+    }
+
+    uint width = 0;
+    uint height = 0;
+    gPickBuffer.GetDimensions(width, height);
+    if (width == 0 || height == 0)
+    {
+        return false;
+    }
+
+    const uint2 pixel = min(uint2(uv * float2(width, height)), uint2(width - 1u, height - 1u));
+    const int2 debugPixel = int2(gSceneParams.debugPickMarker.xy);
+    const int2 delta = abs(int2(pixel) - debugPixel);
+    return delta.x <= 2 && delta.y <= 2;
+}
+
+bool isPickDebugVisualizationEnabled()
+{
+    return gSceneParams.debugOverlayParams.x > 0.5;
+}
+
+float3 applyPickDebugVisualization(float3 color, uint pickingId, float2 uv)
+{
+    float3 result = color;
+    if (isPickDebugVisualizationEnabled() && pickingId != 0)
+    {
+        result = lerp(result, pickDebugColor(pickingId), gSceneParams.debugOverlayParams.y);
+    }
+    if (isDebugPickMarkerPixel(uv))
+    {
+        result = float3(1.0, 0.15, 0.15);
+    }
+    return result;
+}
 
 float3 evaluateEnvironmentIrradianceSH(float3 direction)
 {
@@ -267,6 +335,7 @@ SceneLightingVertexOutput sceneLightingVertexMain(uint vertexID : SV_VertexID)
 [shader("fragment")]
 float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
 {
+    const uint pickingId = loadPickingId(input.uv);
     const float4 baseColorAlpha = gGBufferBaseColor.Sample(gGBufferSampler, input.uv);
     const float4 normalMetallic = gGBufferNormalMetallic.Sample(gGBufferSampler, input.uv);
     const float4 worldPositionRoughness = gGBufferWorldPositionRoughness.Sample(gGBufferSampler, input.uv);
@@ -277,7 +346,8 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
         const float3 skyDirection = reconstructViewDirection(input.uv);
         float3 skyColor = sampleEnvironmentSky(skyDirection, 0.0);
         skyColor *= gSceneParams.lightColorExposure.a;
-        return float4(linearToSrgb(toneMapACES(skyColor)), 1.0);
+        const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(skyColor)), pickingId, input.uv);
+        return float4(finalColor, 1.0);
     }
 
     const float3 baseColor = baseColorAlpha.rgb;
@@ -295,5 +365,6 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
     }
 
     color *= gSceneParams.lightColorExposure.a;
-    return float4(linearToSrgb(toneMapACES(color)), baseColorAlpha.a);
+    const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(color)), pickingId, input.uv);
+    return float4(finalColor, baseColorAlpha.a);
 }

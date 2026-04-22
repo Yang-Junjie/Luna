@@ -6,11 +6,21 @@
 #include <CommandBufferEncoder.h>
 #include <Device.h>
 #include <Queue.h>
+#include <array>
 #include <stdexcept>
 #include <Swapchain.h>
 #include <Synchronization.h>
 
 namespace luna {
+
+namespace {
+
+bool supportsScenePickReadback(luna::RHI::BackendType backend_type)
+{
+    return backend_type == luna::RHI::BackendType::Vulkan || backend_type == luna::RHI::BackendType::DirectX12;
+}
+
+} // namespace
 
 void Renderer::startFrame()
 {
@@ -29,6 +39,7 @@ void Renderer::startFrame()
 
     try {
         device_context.synchronization->WaitForFrame(frame_resources.frame_index);
+        collectCompletedScenePickResult(frame_resources.frame_index);
 
         if (frame_resources.frame_index < frame_resources.command_buffers.size() &&
             frame_resources.command_buffers[frame_resources.frame_index]) {
@@ -88,7 +99,8 @@ void Renderer::renderFrame()
     const bool offscreen_scene_output = scene_output.mode == SceneOutputMode::OffscreenTexture;
 
     const bool render_scene_to_offscreen = offscreen_scene_output && scene_output.extent.width > 0 &&
-                                           scene_output.extent.height > 0 && scene_output.color && scene_output.depth;
+                                           scene_output.extent.height > 0 && scene_output.color && scene_output.depth &&
+                                           scene_output.pick;
     const bool render_scene_to_swapchain = !offscreen_scene_output;
     luna::rhi::RenderGraphTransientTextureCache* transient_texture_cache =
         (frame_resources.frame_index < frame_resources.transient_texture_caches.size())
@@ -110,6 +122,7 @@ void Renderer::renderFrame()
 
     luna::rhi::RenderGraphTextureHandle scene_color_handle{};
     luna::rhi::RenderGraphTextureHandle scene_depth_handle{};
+    luna::rhi::RenderGraphTextureHandle scene_pick_handle{};
     luna::RHI::Format scene_color_format = device_context.surface_format;
     uint32_t scene_width = 0;
     uint32_t scene_height = 0;
@@ -130,18 +143,36 @@ void Renderer::renderFrame()
                 .InitialState = luna::RHI::ResourceState::Undefined,
                 .SampleCount = luna::RHI::SampleCount::Count1,
             });
+            scene_pick_handle = graph_builder.CreateTexture(luna::rhi::RenderGraphTextureDesc{
+                .Name = "ScenePickTexture",
+                .Width = extent.width,
+                .Height = extent.height,
+                .Format = luna::RHI::Format::R32_UINT,
+                .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+                .InitialState = luna::RHI::ResourceState::Undefined,
+                .SampleCount = luna::RHI::SampleCount::Count1,
+            });
         }
     } else if (render_scene_to_offscreen) {
         scene_color_handle = graph_builder.ImportTexture(
             "SceneOutputColor", scene_output.color, scene_output.color_state, luna::RHI::ResourceState::ShaderRead);
         scene_depth_handle = graph_builder.ImportTexture(
             "SceneOutputDepth", scene_output.depth, scene_output.depth_state, luna::RHI::ResourceState::Common);
+        scene_pick_handle = graph_builder.ImportTexture(
+            "SceneOutputPick", scene_output.pick, scene_output.pick_state, luna::RHI::ResourceState::Common);
         scene_color_format = scene_output.color ? scene_output.color->GetFormat() : device_context.surface_format;
         scene_width = scene_output.color ? scene_output.color->GetWidth() : 0;
         scene_height = scene_output.color ? scene_output.color->GetHeight() : 0;
     }
 
     const bool scene_output_valid = scene_color_handle.isValid() && scene_width > 0 && scene_height > 0;
+    const bool pick_readback_supported = supportsScenePickReadback(backend_type);
+    const bool scene_pick_available = scene_pick_handle.isValid();
+    const bool issue_pick_readback =
+        render_scene_to_offscreen && scene_output_valid && scene_pick_available && pick_readback_supported &&
+        scene_output.queued_pick_request.has_value() &&
+        frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
+        frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
     if (scene_output_valid) {
         if (renderer_detail::usesSceneRenderer(backend_type) && scene_depth_handle.isValid()) {
             m_scene_renderer.buildRenderGraph(graph_builder,
@@ -151,8 +182,15 @@ void Renderer::renderFrame()
                                                   .backend_type = backend_type,
                                                   .color_target = scene_color_handle,
                                                   .depth_target = scene_depth_handle,
+                                                  .pick_target = scene_pick_handle,
                                                   .color_format = scene_color_format,
                                                   .clear_color = runtime.clear_color,
+                                                  .show_pick_debug_visualization =
+                                                      scene_output.pick_debug_visualization_enabled,
+                                                  .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
+                                                  .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
+                                                  .show_pick_debug_marker = scene_output.pick_debug_visualization_enabled &&
+                                                                            scene_output.debug_pick_marker.valid,
                                                   .framebuffer_width = scene_width,
                                                   .framebuffer_height = scene_height,
                                               });
@@ -178,6 +216,11 @@ void Renderer::renderFrame()
         graph_builder.ExportTexture(scene_color_handle, luna::RHI::ResourceState::ShaderRead);
         if (scene_depth_handle.isValid()) {
             graph_builder.ExportTexture(scene_depth_handle, luna::RHI::ResourceState::Common);
+        }
+        if (scene_pick_handle.isValid()) {
+            graph_builder.ExportTexture(
+                scene_pick_handle,
+                issue_pick_readback ? luna::RHI::ResourceState::CopySource : luna::RHI::ResourceState::Common);
         }
     }
 
@@ -237,10 +280,47 @@ void Renderer::renderFrame()
         frame_resources.render_graphs[frame_resources.frame_index]->execute();
     }
 
+    if (render_scene_to_offscreen && scene_output_valid && scene_output.queued_pick_request.has_value() &&
+        !pick_readback_supported) {
+        scene_output.queued_pick_request.reset();
+    }
+
+    if (issue_pick_readback) {
+        auto& readback_slot = frame_resources.scene_pick_readback_slots[frame_resources.frame_index];
+        const auto pick_request = *scene_output.queued_pick_request;
+        const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{luna::RHI::BufferImageCopy{
+            .BufferOffset = 0,
+            .BufferRowLength = 0,
+            .BufferImageHeight = 0,
+            .ImageSubresource =
+                {
+                    .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                    .MipLevel = 0,
+                    .BaseArrayLayer = 0,
+                    .LayerCount = 1,
+                },
+            .ImageOffsetX = static_cast<int32_t>(pick_request.x),
+            .ImageOffsetY = static_cast<int32_t>(pick_request.y),
+            .ImageOffsetZ = 0,
+            .ImageExtentWidth = 1,
+            .ImageExtentHeight = 1,
+            .ImageExtentDepth = 1,
+        }};
+
+        frame_resources.current_command_buffer->CopyImageToBuffer(
+            scene_output.pick, luna::RHI::ResourceState::CopySource, readback_slot.buffer, copy_regions);
+        readback_slot.pending = true;
+        scene_output.queued_pick_request.reset();
+    }
+
     if (render_scene_to_offscreen && scene_output_valid) {
         scene_output.color_state = luna::RHI::ResourceState::ShaderRead;
         scene_output.depth_state =
             scene_depth_handle.isValid() ? luna::RHI::ResourceState::Common : luna::RHI::ResourceState::Undefined;
+        scene_output.pick_state = scene_pick_handle.isValid()
+                                      ? (issue_pick_readback ? luna::RHI::ResourceState::CopySource
+                                                             : luna::RHI::ResourceState::Common)
+                                      : luna::RHI::ResourceState::Undefined;
     }
 
     if (frame_resources.image_index < frame_resources.swapchain_images_presented.size()) {

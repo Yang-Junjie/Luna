@@ -192,4 +192,39 @@ void VKCommandBufferEncoder::CopyTexture2D(const Ref<Texture>& src, const Ref<Te
                    &region,
                    VK_FILTER_NEAREST);
 }
+
+void VKCommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
+                                               ImageLayout srcImageLayout,
+                                               const Ref<Buffer>& dstBuffer,
+                                               std::span<const BufferImageCopy> regions)
+{
+    auto* vkSrc = static_cast<VKTexture*>(srcImage.get());
+    auto* vkDst = static_cast<VKBuffer*>(dstBuffer.get());
+    if (!vkSrc || !vkDst || regions.empty()) {
+        return;
+    }
+
+    std::vector<VkBufferImageCopy> vkRegions;
+    vkRegions.reserve(regions.size());
+    for (const auto& region : regions) {
+        VkBufferImageCopy vkRegion{};
+        vkRegion.bufferOffset = region.BufferOffset;
+        vkRegion.bufferRowLength = region.BufferRowLength;
+        vkRegion.bufferImageHeight = region.BufferImageHeight;
+        vkRegion.imageSubresource.aspectMask = VKFastConvert::ImageAspectFlags(region.ImageSubresource.AspectMask);
+        vkRegion.imageSubresource.mipLevel = region.ImageSubresource.MipLevel;
+        vkRegion.imageSubresource.baseArrayLayer = region.ImageSubresource.BaseArrayLayer;
+        vkRegion.imageSubresource.layerCount = region.ImageSubresource.LayerCount;
+        vkRegion.imageOffset = {region.ImageOffsetX, region.ImageOffsetY, region.ImageOffsetZ};
+        vkRegion.imageExtent = {region.ImageExtentWidth, region.ImageExtentHeight, region.ImageExtentDepth};
+        vkRegions.push_back(vkRegion);
+    }
+
+    vkCmdCopyImageToBuffer(static_cast<VkCommandBuffer>(m_commandBuffer),
+                           static_cast<VkImage>(vkSrc->GetHandle()),
+                           VKResourceStateConvert::GetLayout(srcImageLayout),
+                           static_cast<VkBuffer>(vkDst->GetHandle()),
+                           static_cast<uint32_t>(vkRegions.size()),
+                           vkRegions.data());
+}
 } // namespace luna::RHI

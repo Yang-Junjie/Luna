@@ -4,6 +4,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererInternal.h"
 
+#include <Buffer.h>
 #include <Builders.h>
 #include <Device.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -11,6 +12,7 @@
 #define NOMINMAX
 #endif
 #include <algorithm>
+#include <cstring>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <glm/trigonometric.hpp>
@@ -20,6 +22,12 @@
 #include <Synchronization.h>
 
 namespace luna {
+
+namespace {
+
+constexpr uint64_t kScenePickReadbackBufferSize = 256;
+
+} // namespace
 
 Renderer::Renderer() = default;
 
@@ -78,6 +86,9 @@ bool Renderer::init(Window& window, InitializationOptions options)
         device_info.CompatibleSurface = device_context.surface;
         if (device_context.adapter->IsFeatureSupported(luna::RHI::DeviceFeature::SamplerAnisotropy)) {
             device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::SamplerAnisotropy);
+        }
+        if (device_context.adapter->IsFeatureSupported(luna::RHI::DeviceFeature::IndependentBlending)) {
+            device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::IndependentBlending);
         }
 
         device_context.device = device_context.adapter->CreateDevice(device_info);
@@ -188,6 +199,7 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     frame_resources.render_graphs.resize(frame_resources.frames_in_flight);
     frame_resources.transient_texture_caches.clear();
     frame_resources.transient_texture_caches.resize(frame_resources.frames_in_flight);
+    ensureScenePickReadbackBuffers();
     frame_resources.swapchain_images_presented.assign(device_context.swapchain->GetImageCount(), false);
     if (frame_resources.frames_in_flight > 0) {
         frame_resources.frame_index %= frame_resources.frames_in_flight;
@@ -252,6 +264,50 @@ void Renderer::releaseFrameCommandBuffers()
     }
     m_frame_resources.command_buffers.clear();
     m_frame_resources.transient_texture_caches.clear();
+    m_frame_resources.scene_pick_readback_slots.clear();
+}
+
+void Renderer::ensureScenePickReadbackBuffers()
+{
+    auto& frame_resources = m_frame_resources;
+    if (!m_device_context.device || frame_resources.frames_in_flight == 0) {
+        frame_resources.scene_pick_readback_slots.clear();
+        return;
+    }
+
+    frame_resources.scene_pick_readback_slots.clear();
+    frame_resources.scene_pick_readback_slots.resize(frame_resources.frames_in_flight);
+    for (uint32_t frame_index = 0; frame_index < frame_resources.frames_in_flight; ++frame_index) {
+        frame_resources.scene_pick_readback_slots[frame_index].buffer =
+            m_device_context.device->CreateBuffer(luna::RHI::BufferBuilder()
+                                                      .SetSize(kScenePickReadbackBufferSize)
+                                                      .SetUsage(luna::RHI::BufferUsageFlags::TransferDst)
+                                                      .SetMemoryUsage(luna::RHI::BufferMemoryUsage::GpuToCpu)
+                                                      .SetName("ScenePickReadback_" + std::to_string(frame_index))
+                                                      .Build());
+        frame_resources.scene_pick_readback_slots[frame_index].pending = false;
+    }
+}
+
+void Renderer::collectCompletedScenePickResult(uint32_t frame_index)
+{
+    if (frame_index >= m_frame_resources.scene_pick_readback_slots.size()) {
+        return;
+    }
+
+    auto& slot = m_frame_resources.scene_pick_readback_slots[frame_index];
+    if (!slot.pending || !slot.buffer) {
+        return;
+    }
+
+    uint32_t picked_id = 0;
+    if (void* mapped = slot.buffer->Map()) {
+        std::memcpy(&picked_id, mapped, sizeof(picked_id));
+        slot.buffer->Unmap();
+    }
+
+    slot.pending = false;
+    m_scene_output.completed_pick_id = picked_id;
 }
 
 void Renderer::waitForGpuIdle() noexcept

@@ -93,6 +93,10 @@ public:
                            const Ref<Texture>& dstImage,
                            ImageLayout dstImageLayout,
                            std::span<const BufferImageCopy> regions) override;
+    void CopyImageToBuffer(const Ref<Texture>& srcImage,
+                           ImageLayout srcImageLayout,
+                           const Ref<Buffer>& dstBuffer,
+                           std::span<const BufferImageCopy> regions) override;
     void CopyBuffer(const Ref<Buffer>& srcBuffer,
                     const Ref<Buffer>& dstBuffer,
                     uint64_t srcOffset,

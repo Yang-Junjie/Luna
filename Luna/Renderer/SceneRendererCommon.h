@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <string_view>
 #include <vector>
@@ -29,6 +30,7 @@ namespace luna::scene_renderer_detail {
 
 inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
 inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
+inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_UINT;
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
 inline constexpr luna::RHI::Format kEnvironmentCubeFormat = luna::RHI::Format::RGBA16_FLOAT;
 inline constexpr luna::RHI::Format kEnvironmentBrdfFormat = luna::RHI::Format::RGBA16_FLOAT;
@@ -44,6 +46,8 @@ inline constexpr uint32_t kEnvironmentBrdfSamples = 1024;
 
 struct MeshPushConstants {
     glm::mat4 model{1.0f};
+    uint32_t picking_id{0};
+    uint32_t padding[3]{0, 0, 0};
 };
 
 struct SceneGpuParams {
@@ -53,6 +57,8 @@ struct SceneGpuParams {
     glm::vec4 light_direction_intensity{0.45f, 0.80f, 0.35f, 4.0f};
     glm::vec4 light_color_exposure{1.0f, 0.98f, 0.95f, 1.0f};
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
+    glm::vec4 debug_overlay_params{0.0f, 0.65f, 0.0f, 0.0f};
+    glm::vec4 debug_pick_marker{0.0f, 0.0f, 0.0f, 1.0f};
     std::array<glm::vec4, 9> irradiance_sh{};
 };
 

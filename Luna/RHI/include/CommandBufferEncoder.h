@@ -247,6 +247,11 @@ public:
                                    const Ref<Texture>& dstImage,
                                    ImageLayout dstImageLayout,
                                    std::span<const BufferImageCopy> regions) = 0;
+    virtual void CopyImageToBuffer(const Ref<Texture>& srcImage,
+                                   ImageLayout srcImageLayout,
+                                   const Ref<Buffer>& dstBuffer,
+                                   std::span<const BufferImageCopy> regions)
+    {}
     virtual ~CommandBufferEncoder() = default;
     virtual CommandBufferType GetCommandBufferType() const = 0;
     virtual void CopyBuffer(const Ref<Buffer>& srcBuffer,

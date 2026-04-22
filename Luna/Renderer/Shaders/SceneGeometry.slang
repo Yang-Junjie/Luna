@@ -18,6 +18,7 @@ struct SceneVertexOutput
     float3 worldNormal : TEXCOORD2;
     float3 worldTangent : TEXCOORD3;
     float3 worldBitangent : TEXCOORD4;
+    nointerpolation uint pickingId : TEXCOORD5;
 };
 
 struct GBufferOutput
@@ -26,11 +27,20 @@ struct GBufferOutput
     float4 normalMetallic : SV_Target1;
     float4 worldPositionRoughness : SV_Target2;
     float4 emissiveAo : SV_Target3;
+    uint pickingId : SV_Target4;
+};
+
+struct TransparentOutput
+{
+    float4 color : SV_Target0;
+    uint pickingId : SV_Target1;
 };
 
 struct MeshPushConstants
 {
     float4x4 model;
+    uint pickingId;
+    uint3 padding;
 };
 
 struct MaterialParams
@@ -49,6 +59,8 @@ struct SceneParams
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
+    float4 debugOverlayParams;
+    float4 debugPickMarker;
     float4 irradianceSh[9];
 };
 
@@ -147,6 +159,15 @@ float3 toneMapACES(float3 color)
 }
 
 float2 envBrdfApprox(float roughness, float NdotV);
+
+float3 pickDebugColor(uint pickingId)
+{
+    const uint hash = pickingId * 1664525u + 1013904223u;
+    const float3 hashedColor = float3((hash & 255u) / 255.0,
+                                      ((hash >> 8u) & 255u) / 255.0,
+                                      ((hash >> 16u) & 255u) / 255.0);
+    return lerp(float3(0.20, 0.95, 0.30), hashedColor, 0.45);
+}
 
 float3 evaluateEnvironmentIrradianceSH(float3 direction)
 {
@@ -374,6 +395,7 @@ SceneVertexOutput sceneGeometryVertexMain(SceneVertexInput input)
     output.worldNormal = mul(normalMatrix, input.normal);
     output.worldTangent = mul(normalMatrix, input.tangent);
     output.worldBitangent = mul(normalMatrix, input.bitangent);
+    output.pickingId = gPushConstants.pickingId;
     return output;
 }
 
@@ -387,11 +409,12 @@ GBufferOutput sceneGeometryFragmentMain(SceneVertexOutput input)
     output.normalMetallic = float4(material.normalWS, material.metallic);
     output.worldPositionRoughness = float4(input.worldPosition, material.roughness);
     output.emissiveAo = float4(material.emissive, material.unlit > 0.5 ? -material.ao : material.ao);
+    output.pickingId = input.pickingId;
     return output;
 }
 
 [shader("fragment")]
-float4 sceneTransparentFragmentMain(SceneVertexOutput input) : SV_Target
+TransparentOutput sceneTransparentFragmentMain(SceneVertexOutput input)
 {
     const SampledMaterial material = sampleMaterial(input);
     if (material.baseColor.a <= 0.001)
@@ -412,5 +435,12 @@ float4 sceneTransparentFragmentMain(SceneVertexOutput input) : SV_Target
     }
 
     color *= gSceneParams.lightColorExposure.a;
-    return float4(linearToSrgb(toneMapACES(color)), material.baseColor.a);
+    if (gSceneParams.debugOverlayParams.x > 0.5 && input.pickingId != 0)
+    {
+        color = lerp(color, pickDebugColor(input.pickingId), gSceneParams.debugOverlayParams.y);
+    }
+    TransparentOutput output;
+    output.color = float4(linearToSrgb(toneMapACES(color)), material.baseColor.a);
+    output.pickingId = input.pickingId;
+    return output;
 }

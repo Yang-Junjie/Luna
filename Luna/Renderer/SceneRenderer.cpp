@@ -35,16 +35,18 @@ void SceneRenderer::clearSubmittedMeshes()
 
 void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
                                      std::shared_ptr<Mesh> mesh,
-                                     std::shared_ptr<Material> material)
+                                     std::shared_ptr<Material> material,
+                                     uint32_t picking_id)
 {
-    m_impl->submitStaticMesh(transform, std::move(mesh), std::move(material));
+    m_impl->submitStaticMesh(transform, std::move(mesh), std::move(material), picking_id);
 }
 
 void SceneRenderer::submitStaticMesh(const glm::mat4& transform,
                                      std::shared_ptr<Mesh> mesh,
-                                     const std::vector<std::shared_ptr<Material>>& submesh_materials)
+                                     const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                                     uint32_t picking_id)
 {
-    m_impl->submitStaticMesh(transform, std::move(mesh), submesh_materials);
+    m_impl->submitStaticMesh(transform, std::move(mesh), submesh_materials, picking_id);
 }
 
 void SceneRenderer::buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context)

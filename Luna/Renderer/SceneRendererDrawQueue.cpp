@@ -21,7 +21,8 @@ void DrawQueue::clear() noexcept
 
 void DrawQueue::submitStaticMesh(const glm::mat4& transform,
                                  std::shared_ptr<Mesh> mesh,
-                                 std::shared_ptr<Material> material)
+                                 std::shared_ptr<Material> material,
+                                 uint32_t picking_id)
 {
     if (!mesh || !mesh->isValid()) {
         return;
@@ -29,12 +30,13 @@ void DrawQueue::submitStaticMesh(const glm::mat4& transform,
 
     const size_t sub_mesh_count = mesh->getSubMeshes().size();
     std::vector<std::shared_ptr<Material>> submesh_materials(sub_mesh_count, std::move(material));
-    submitStaticMesh(transform, std::move(mesh), submesh_materials);
+    submitStaticMesh(transform, std::move(mesh), submesh_materials, picking_id);
 }
 
 void DrawQueue::submitStaticMesh(const glm::mat4& transform,
                                  std::shared_ptr<Mesh> mesh,
-                                 const std::vector<std::shared_ptr<Material>>& submesh_materials)
+                                 const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                                 uint32_t picking_id)
 {
     if (!mesh || !mesh->isValid()) {
         return;
@@ -57,6 +59,7 @@ void DrawQueue::submitStaticMesh(const glm::mat4& transform,
             .mesh = mesh,
             .material = std::move(material),
             .sub_mesh_index = static_cast<uint32_t>(sub_mesh_index),
+            .picking_id = picking_id,
         };
 
         if (draw_command.material != nullptr && draw_command.material->isTransparent()) {

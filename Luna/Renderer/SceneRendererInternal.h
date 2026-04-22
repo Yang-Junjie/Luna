@@ -25,10 +25,12 @@ public:
     void clearSubmittedMeshes();
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          std::shared_ptr<Material> material);
+                          std::shared_ptr<Material> material,
+                          uint32_t picking_id);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
-                          const std::vector<std::shared_ptr<Material>>& submesh_materials);
+                          const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                          uint32_t picking_id);
     void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
 
 private:

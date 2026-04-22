@@ -10,6 +10,7 @@
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <Instance.h>
+#include <optional>
 #include <memory>
 #include <Surface.h>
 #include <vector>
@@ -82,6 +83,10 @@ public:
     void setSceneOutputSize(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getSceneOutputSize() const;
     const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
+    void setScenePickDebugVisualizationEnabled(bool enabled);
+    bool isScenePickDebugVisualizationEnabled() const;
+    void requestScenePick(uint32_t x, uint32_t y);
+    std::optional<uint32_t> consumeScenePickResult();
 
     GLFWwindow* getNativeWindow() const;
 
@@ -126,19 +131,42 @@ private:
     };
 
     struct SceneOutputState {
+        struct PickRequest {
+            uint32_t x{0};
+            uint32_t y{0};
+        };
+
+        struct PickDebugMarker {
+            uint32_t x{0};
+            uint32_t y{0};
+            bool valid{false};
+        };
+
         SceneOutputMode mode{SceneOutputMode::Swapchain};
         luna::RHI::Extent2D extent{0, 0};
         luna::RHI::Ref<luna::RHI::Texture> color;
         luna::RHI::Ref<luna::RHI::Texture> depth;
+        luna::RHI::Ref<luna::RHI::Texture> pick;
         luna::RHI::ResourceState color_state{luna::RHI::ResourceState::Undefined};
         luna::RHI::ResourceState depth_state{luna::RHI::ResourceState::Undefined};
+        luna::RHI::ResourceState pick_state{luna::RHI::ResourceState::Undefined};
+        bool pick_debug_visualization_enabled{false};
+        PickDebugMarker debug_pick_marker{};
+        std::optional<PickRequest> queued_pick_request;
+        std::optional<uint32_t> completed_pick_id;
     };
 
     struct FrameResources {
+        struct ScenePickReadbackSlot {
+            luna::RHI::Ref<luna::RHI::Buffer> buffer;
+            bool pending{false};
+        };
+
         luna::RHI::Ref<luna::RHI::CommandBufferEncoder> current_command_buffer;
         std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> command_buffers;
         std::vector<std::unique_ptr<luna::rhi::RenderGraph>> render_graphs;
         std::vector<luna::rhi::RenderGraphTransientTextureCache> transient_texture_caches;
+        std::vector<ScenePickReadbackSlot> scene_pick_readback_slots;
         uint32_t frames_in_flight{0};
         uint32_t frame_index{0};
         uint32_t image_index{0};
@@ -160,6 +188,8 @@ private:
     void handlePendingResize();
     bool hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const;
     void releaseFrameCommandBuffers();
+    void ensureScenePickReadbackBuffers();
+    void collectCompletedScenePickResult(uint32_t frame_index);
     void ensureSceneOutputTargets(uint32_t width, uint32_t height);
     void releaseSceneOutputTargets();
     void waitForGpuIdle() noexcept;
