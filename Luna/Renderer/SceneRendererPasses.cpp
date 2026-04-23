@@ -1,4 +1,5 @@
 #include "Core/Log.h"
+#include "Renderer/RendererInternal.h"
 #include "Renderer/SceneRendererInternal.h"
 
 #include <array>
@@ -13,18 +14,25 @@ void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint
     commands.SetScissor({0, 0, width, height});
 }
 
-void recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
-                        const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
-                        const std::vector<scene_renderer::DrawCommand>& draw_commands,
-                        const scene_renderer::ResourceManager& resources,
-                        const Material& default_material)
+size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
+                          const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
+                          const std::vector<scene_renderer::DrawCommand>& draw_commands,
+                          const scene_renderer::ResourceManager& resources,
+                          const Material& default_material)
 {
     using namespace scene_renderer_detail;
 
+    size_t recorded_count = 0;
     for (const auto& draw_command : draw_commands) {
         const scene_renderer::ResolvedDrawResources draw_resources =
             resources.resolveDrawResources(draw_command, default_material);
         if (!draw_resources.isValid()) {
+            LUNA_RENDERER_FRAME_TRACE(
+                "Skipping draw command because GPU resources are incomplete: mesh='{}' submesh={} "
+                "picking_id={}",
+                draw_command.mesh ? draw_command.mesh->getName() : "<null>",
+                draw_command.sub_mesh_index,
+                draw_command.picking_id);
             continue;
         }
 
@@ -42,7 +50,9 @@ void recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
         commands.BindVertexBuffer(0, draw_resources.vertex_buffer);
         commands.BindIndexBuffer(draw_resources.index_buffer, 0, luna::RHI::IndexType::UInt32);
         commands.DrawIndexed(draw_resources.index_count, 1, 0, 0, 0);
+        ++recorded_count;
     }
+    return recorded_count;
 }
 
 } // namespace
@@ -76,11 +86,10 @@ void SceneRenderer::Implementation::submitStaticMesh(const glm::mat4& transform,
     m_draw_queue.submitStaticMesh(transform, std::move(mesh), std::move(material), picking_id);
 }
 
-void SceneRenderer::Implementation::submitStaticMesh(
-    const glm::mat4& transform,
-    std::shared_ptr<Mesh> mesh,
-    const std::vector<std::shared_ptr<Material>>& submesh_materials,
-    uint32_t picking_id)
+void SceneRenderer::Implementation::submitStaticMesh(const glm::mat4& transform,
+                                                     std::shared_ptr<Mesh> mesh,
+                                                     const std::vector<std::shared_ptr<Material>>& submesh_materials,
+                                                     uint32_t picking_id)
 {
     m_draw_queue.submitStaticMesh(transform, std::move(mesh), submesh_materials, picking_id);
 }
@@ -133,8 +142,26 @@ SceneGBufferTextures SceneRenderer::Implementation::createGBufferTextures(rhi::R
 void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context)
 {
     if (!context.isValid()) {
+        LUNA_RENDERER_WARN("Scene render graph build skipped because context is invalid: device={} color={} depth={} "
+                           "size={}x{}",
+                           static_cast<bool>(context.device),
+                           context.color_target.isValid(),
+                           context.depth_target.isValid(),
+                           context.framebuffer_width,
+                           context.framebuffer_height);
         return;
     }
+
+    LUNA_RENDERER_FRAME_DEBUG("Building scene render graph: size={}x{} backend={} color_format={} ({}) opaque_draws={} "
+                              "transparent_draws={} pick_debug={}",
+                              context.framebuffer_width,
+                              context.framebuffer_height,
+                              renderer_detail::backendTypeToString(context.backend_type),
+                              renderer_detail::formatToString(context.color_format),
+                              static_cast<int>(context.color_format),
+                              m_draw_queue.opaqueDrawCommands().size(),
+                              m_draw_queue.transparentDrawCommands().size(),
+                              context.show_pick_debug_visualization);
 
     const SceneGBufferTextures gbuffer = createGBufferTextures(graph, context);
 
@@ -211,9 +238,13 @@ void SceneRenderer::Implementation::buildRenderGraph(rhi::RenderGraphBuilder& gr
 void SceneRenderer::Implementation::executeGeometryPass(rhi::RenderGraphRasterPassContext& pass_context,
                                                         const RenderContext& context)
 {
+    LUNA_RENDERER_FRAME_DEBUG("Executing scene geometry pass with {} opaque draw command(s)",
+                              m_draw_queue.opaqueDrawCommands().size());
     m_resources.ensurePipelines(context);
     if (!m_resources.geometryPipeline() || !m_resources.sceneDescriptorSet()) {
-        LUNA_RENDERER_ERROR("Scene geometry pass aborted: graphics pipeline is null");
+        LUNA_RENDERER_ERROR("Scene geometry pass aborted: graphics_pipeline={} scene_descriptor_set={}",
+                            static_cast<bool>(m_resources.geometryPipeline()),
+                            static_cast<bool>(m_resources.sceneDescriptorSet()));
         return;
     }
 
@@ -224,8 +255,11 @@ void SceneRenderer::Implementation::executeGeometryPass(rhi::RenderGraphRasterPa
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(m_resources.geometryPipeline());
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    recordDrawCommands(
+    const size_t recorded_draw_count = recordDrawCommands(
         commands, m_resources.geometryPipeline(), m_draw_queue.opaqueDrawCommands(), m_resources, m_default_material);
+    LUNA_RENDERER_FRAME_DEBUG("Scene geometry pass recorded {}/{} draw command(s)",
+                              recorded_draw_count,
+                              m_draw_queue.opaqueDrawCommands().size());
 
     pass_context.endRendering();
 }
@@ -234,10 +268,16 @@ void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPa
                                                         const RenderContext& context,
                                                         const SceneGBufferTextures& gbuffer)
 {
+    LUNA_RENDERER_FRAME_DEBUG("Executing scene lighting pass");
     m_resources.ensurePipelines(context);
     if (!m_resources.lightingPipeline() || !m_resources.gbufferDescriptorSet() || !m_resources.sceneDescriptorSet() ||
         !m_resources.gbufferSampler()) {
-        LUNA_RENDERER_ERROR("Scene lighting pass aborted: deferred lighting resources are incomplete");
+        LUNA_RENDERER_ERROR("Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} "
+                            "scene_descriptor_set={} gbuffer_sampler={}",
+                            static_cast<bool>(m_resources.lightingPipeline()),
+                            static_cast<bool>(m_resources.gbufferDescriptorSet()),
+                            static_cast<bool>(m_resources.sceneDescriptorSet()),
+                            static_cast<bool>(m_resources.gbufferSampler()));
         return;
     }
 
@@ -248,14 +288,24 @@ void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPa
     const auto& pick_texture = pass_context.getTexture(context.pick_target);
     if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao ||
         !pick_texture) {
+        LUNA_RENDERER_WARN("Scene lighting pass aborted because one or more GBuffer textures are missing: base={} "
+                           "normal={} position={} emissive={} pick={}",
+                           static_cast<bool>(gbuffer_base_color),
+                           static_cast<bool>(gbuffer_normal_metallic),
+                           static_cast<bool>(gbuffer_world_position_roughness),
+                           static_cast<bool>(gbuffer_emissive_ao),
+                           static_cast<bool>(pick_texture));
         return;
     }
 
     auto& commands = pass_context.commandBuffer();
     m_resources.uploadEnvironmentIfNeeded(commands);
     m_resources.updateSceneParameters(context, m_draw_queue.camera());
-    m_resources.updateLightingResources(
-        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
+    m_resources.updateLightingResources(gbuffer_base_color,
+                                        gbuffer_normal_metallic,
+                                        gbuffer_world_position_roughness,
+                                        gbuffer_emissive_ao,
+                                        pick_texture);
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(m_resources.lightingPipeline());
@@ -274,9 +324,16 @@ void SceneRenderer::Implementation::executeLightingPass(rhi::RenderGraphRasterPa
 void SceneRenderer::Implementation::executeTransparentPass(rhi::RenderGraphRasterPassContext& pass_context,
                                                            const RenderContext& context)
 {
+    LUNA_RENDERER_FRAME_DEBUG("Executing scene transparent pass with {} draw command(s)",
+                              m_draw_queue.transparentDrawCommands().size());
     m_resources.ensurePipelines(context);
     if (!m_resources.transparentPipeline() || !m_resources.sceneDescriptorSet() ||
         !m_draw_queue.hasTransparentDrawCommands()) {
+        LUNA_RENDERER_FRAME_DEBUG("Scene transparent pass skipped: transparent_pipeline={} scene_descriptor_set={} "
+                                  "has_draws={}",
+                                  static_cast<bool>(m_resources.transparentPipeline()),
+                                  static_cast<bool>(m_resources.sceneDescriptorSet()),
+                                  m_draw_queue.hasTransparentDrawCommands());
         return;
     }
 
@@ -289,11 +346,14 @@ void SceneRenderer::Implementation::executeTransparentPass(rhi::RenderGraphRaste
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(m_resources.transparentPipeline());
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    recordDrawCommands(commands,
-                       m_resources.transparentPipeline(),
-                       m_draw_queue.transparentDrawCommands(),
-                       m_resources,
-                       m_default_material);
+    const size_t recorded_draw_count = recordDrawCommands(commands,
+                                                          m_resources.transparentPipeline(),
+                                                          m_draw_queue.transparentDrawCommands(),
+                                                          m_resources,
+                                                          m_default_material);
+    LUNA_RENDERER_FRAME_DEBUG("Scene transparent pass recorded {}/{} draw command(s)",
+                              recorded_draw_count,
+                              m_draw_queue.transparentDrawCommands().size());
 
     pass_context.endRendering();
 }

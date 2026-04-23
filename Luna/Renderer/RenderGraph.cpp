@@ -1,4 +1,5 @@
 #include "Core/Log.h"
+#include "Renderer/RendererInternal.h"
 #include "Renderer/RenderGraph.h"
 
 #include <algorithm>
@@ -102,16 +103,30 @@ RenderGraph::RenderGraph(FrameContext frame_context,
 void RenderGraph::execute() const
 {
     if (!m_frame_context.command_buffer) {
+        LUNA_RENDERER_WARN("Skipping render graph execution because command buffer is null");
         return;
     }
 
+    LUNA_RENDERER_FRAME_DEBUG("Executing render graph with {} raster pass(es), {} texture(s), {} final barrier(s)",
+                              m_raster_passes.size(),
+                              m_textures.size(),
+                              m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
     for (const auto& pass : m_raster_passes) {
         if (!pass.PreTextureBarriers.empty()) {
+            LUNA_RENDERER_FRAME_TRACE("Render graph pass '{}' applying {} pre-texture barrier(s)",
+                                      pass.Pass.Name,
+                                      pass.PreTextureBarriers.size());
             command_buffer.PipelineBarrier(
                 luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, pass.PreTextureBarriers);
         }
 
+        LUNA_RENDERER_FRAME_TRACE("Executing render graph pass '{}' ({}x{}, color_attachments={}, has_depth={})",
+                                  pass.Pass.Name,
+                                  pass.FramebufferWidth,
+                                  pass.FramebufferHeight,
+                                  pass.RenderingInfo.ColorAttachments.size(),
+                                  static_cast<bool>(pass.RenderingInfo.DepthAttachment));
         command_buffer.BeginDebugLabel(pass.Pass.Name, 0.20f, 0.55f, 0.85f, 1.0f);
 
         RenderGraphRasterPassContext pass_context(m_frame_context.device,
@@ -128,9 +143,11 @@ void RenderGraph::execute() const
     }
 
     if (!m_final_texture_barriers.empty()) {
+        LUNA_RENDERER_FRAME_TRACE("Applying {} final render graph texture barrier(s)", m_final_texture_barriers.size());
         command_buffer.PipelineBarrier(
             luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, m_final_texture_barriers);
     }
+    LUNA_RENDERER_FRAME_DEBUG("Render graph execution complete");
 }
 
 const RenderGraphPass* RenderGraph::findPass(std::string_view name) const

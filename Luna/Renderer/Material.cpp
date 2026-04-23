@@ -1,15 +1,46 @@
+#include "Core/Log.h"
 #include "Material.h"
 
 #include <utility>
 
 namespace luna {
 
+namespace {
+
+const char* blendModeToString(Material::BlendMode blend_mode)
+{
+    switch (blend_mode) {
+        case Material::BlendMode::Opaque:
+            return "Opaque";
+        case Material::BlendMode::Masked:
+            return "Masked";
+        case Material::BlendMode::Transparent:
+            return "Transparent";
+        case Material::BlendMode::Additive:
+            return "Additive";
+        default:
+            return "Unknown";
+    }
+}
+
+} // namespace
+
 Material::Material(std::string name, TextureSet textures, SurfaceProperties surface)
     : m_name(std::move(name)),
       m_textures(std::move(textures)),
       m_surface(surface),
       m_blend_mode(surface.BlendModeValue)
-{}
+{
+    LUNA_RENDERER_DEBUG("Created material '{}' blend={} textures: base_color={} normal={} metallic_roughness={} "
+                        "emissive={} occlusion={}",
+                        m_name.empty() ? "<unnamed>" : m_name,
+                        blendModeToString(m_blend_mode),
+                        static_cast<bool>(m_textures.BaseColor),
+                        static_cast<bool>(m_textures.Normal),
+                        static_cast<bool>(m_textures.MetallicRoughness),
+                        static_cast<bool>(m_textures.Emissive),
+                        static_cast<bool>(m_textures.Occlusion));
+}
 
 std::shared_ptr<Material> Material::create(std::string name, TextureSet textures, SurfaceProperties surface)
 {

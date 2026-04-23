@@ -3,10 +3,10 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererInternal.h"
 
+#include <array>
 #include <CommandBufferEncoder.h>
 #include <Device.h>
 #include <Queue.h>
-#include <array>
 #include <stdexcept>
 #include <Swapchain.h>
 #include <Synchronization.h>
@@ -20,16 +20,39 @@ bool supportsScenePickReadback(luna::RHI::BackendType backend_type)
     return backend_type == luna::RHI::BackendType::Vulkan || backend_type == luna::RHI::BackendType::DirectX12;
 }
 
+const char* swapchainResultToString(luna::RHI::Result result)
+{
+    switch (result) {
+        case luna::RHI::Result::Success:
+            return "Success";
+        case luna::RHI::Result::Timeout:
+            return "Timeout";
+        case luna::RHI::Result::NotReady:
+            return "NotReady";
+        case luna::RHI::Result::Suboptimal:
+            return "Suboptimal";
+        case luna::RHI::Result::OutOfDate:
+            return "OutOfDate";
+        case luna::RHI::Result::DeviceLost:
+            return "DeviceLost";
+        case luna::RHI::Result::Error:
+        default:
+            return "Error";
+    }
+}
+
 } // namespace
 
 void Renderer::startFrame()
 {
     if (!isRenderingEnabled()) {
+        LUNA_RENDERER_FRAME_TRACE("Skipping StartFrame because rendering is disabled");
         return;
     }
 
     handlePendingResize();
     if (!isRenderingEnabled()) {
+        LUNA_RENDERER_FRAME_TRACE("Skipping StartFrame after resize handling because rendering is disabled");
         return;
     }
 
@@ -57,11 +80,17 @@ void Renderer::startFrame()
         const auto acquire_result = device_context.swapchain->AcquireNextImage(
             device_context.synchronization, static_cast<int>(frame_resources.frame_index), acquired_image_index);
         if (acquire_result != luna::RHI::Result::Success || acquired_image_index < 0) {
+            LUNA_RENDERER_WARN("AcquireNextImage failed for frame {}: result={} image_index={}",
+                               frame_resources.frame_index,
+                               swapchainResultToString(acquire_result),
+                               acquired_image_index);
             throw std::runtime_error("Failed to acquire a swapchain image");
         }
 
         frame_resources.image_index = static_cast<uint32_t>(acquired_image_index);
         device_context.synchronization->ResetFrameFence(frame_resources.frame_index);
+        LUNA_RENDERER_FRAME_DEBUG(
+            "Started frame {} using swapchain image {}", frame_resources.frame_index, frame_resources.image_index);
 
         frame_resources.current_command_buffer = device_context.device->CreateCommandBufferEncoder();
         frame_resources.current_command_buffer->Begin();
@@ -86,6 +115,8 @@ void Renderer::renderFrame()
     auto& scene_output = m_scene_output;
 
     if (!runtime.frame_started || !frame_resources.current_command_buffer || !device_context.swapchain) {
+        LUNA_RENDERER_FRAME_TRACE(
+            "Skipping RenderFrame because the frame has not started or swapchain state is incomplete");
         return;
     }
 
@@ -97,6 +128,14 @@ void Renderer::renderFrame()
     const auto backend_type =
         device_context.instance ? device_context.instance->GetType() : runtime.initialization_options.backend;
     const bool offscreen_scene_output = scene_output.mode == SceneOutputMode::OffscreenTexture;
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Building frame {} render graph: swapchain_extent={}x{} backend={} scene_output_mode={} imgui={}",
+        frame_resources.frame_index,
+        extent.width,
+        extent.height,
+        renderer_detail::backendTypeToString(backend_type),
+        offscreen_scene_output ? "OffscreenTexture" : "Swapchain",
+        runtime.imgui_enabled);
 
     const bool render_scene_to_offscreen = offscreen_scene_output && scene_output.extent.width > 0 &&
                                            scene_output.extent.height > 0 && scene_output.color && scene_output.depth &&
@@ -166,34 +205,41 @@ void Renderer::renderFrame()
     }
 
     const bool scene_output_valid = scene_color_handle.isValid() && scene_width > 0 && scene_height > 0;
+    if (!scene_output_valid) {
+        LUNA_RENDERER_FRAME_DEBUG("Scene output is invalid for frame {}: color_handle={} size={}x{}",
+                                  frame_resources.frame_index,
+                                  scene_color_handle.isValid(),
+                                  scene_width,
+                                  scene_height);
+    }
+
     const bool pick_readback_supported = supportsScenePickReadback(backend_type);
     const bool scene_pick_available = scene_pick_handle.isValid();
-    const bool issue_pick_readback =
-        render_scene_to_offscreen && scene_output_valid && scene_pick_available && pick_readback_supported &&
-        scene_output.queued_pick_request.has_value() &&
-        frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
-        frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
+    const bool issue_pick_readback = render_scene_to_offscreen && scene_output_valid && scene_pick_available &&
+                                     pick_readback_supported && scene_output.queued_pick_request.has_value() &&
+                                     frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
+                                     frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
     if (scene_output_valid) {
         if (renderer_detail::usesSceneRenderer(backend_type) && scene_depth_handle.isValid()) {
-            m_scene_renderer.buildRenderGraph(graph_builder,
-                                              SceneRenderer::RenderContext{
-                                                  .device = device_context.device,
-                                                  .compiler = device_context.shader_compiler,
-                                                  .backend_type = backend_type,
-                                                  .color_target = scene_color_handle,
-                                                  .depth_target = scene_depth_handle,
-                                                  .pick_target = scene_pick_handle,
-                                                  .color_format = scene_color_format,
-                                                  .clear_color = runtime.clear_color,
-                                                  .show_pick_debug_visualization =
-                                                      scene_output.pick_debug_visualization_enabled,
-                                                  .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
-                                                  .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
-                                                  .show_pick_debug_marker = scene_output.pick_debug_visualization_enabled &&
-                                                                            scene_output.debug_pick_marker.valid,
-                                                  .framebuffer_width = scene_width,
-                                                  .framebuffer_height = scene_height,
-                                              });
+            m_scene_renderer.buildRenderGraph(
+                graph_builder,
+                SceneRenderer::RenderContext{
+                    .device = device_context.device,
+                    .compiler = device_context.shader_compiler,
+                    .backend_type = backend_type,
+                    .color_target = scene_color_handle,
+                    .depth_target = scene_depth_handle,
+                    .pick_target = scene_pick_handle,
+                    .color_format = scene_color_format,
+                    .clear_color = runtime.clear_color,
+                    .show_pick_debug_visualization = scene_output.pick_debug_visualization_enabled,
+                    .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
+                    .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
+                    .show_pick_debug_marker =
+                        scene_output.pick_debug_visualization_enabled && scene_output.debug_pick_marker.valid,
+                    .framebuffer_width = scene_width,
+                    .framebuffer_height = scene_height,
+                });
         } else {
             graph_builder.AddRasterPass(
                 "ClearScene",
@@ -218,9 +264,9 @@ void Renderer::renderFrame()
             graph_builder.ExportTexture(scene_depth_handle, luna::RHI::ResourceState::Common);
         }
         if (scene_pick_handle.isValid()) {
-            graph_builder.ExportTexture(
-                scene_pick_handle,
-                issue_pick_readback ? luna::RHI::ResourceState::CopySource : luna::RHI::ResourceState::Common);
+            graph_builder.ExportTexture(scene_pick_handle,
+                                        issue_pick_readback ? luna::RHI::ResourceState::CopySource
+                                                            : luna::RHI::ResourceState::Common);
         }
     }
 
@@ -277,17 +323,28 @@ void Renderer::renderFrame()
     }
     frame_resources.render_graphs[frame_resources.frame_index] = graph_builder.Build();
     if (frame_resources.render_graphs[frame_resources.frame_index]) {
+        LUNA_RENDERER_FRAME_DEBUG("Executing frame {} render graph with {} compiled pass(es)",
+                                  frame_resources.frame_index,
+                                  frame_resources.render_graphs[frame_resources.frame_index]->passes().size());
         frame_resources.render_graphs[frame_resources.frame_index]->execute();
+    } else {
+        LUNA_RENDERER_WARN("Render graph build returned null for frame {}", frame_resources.frame_index);
     }
 
     if (render_scene_to_offscreen && scene_output_valid && scene_output.queued_pick_request.has_value() &&
         !pick_readback_supported) {
+        LUNA_RENDERER_WARN("Scene pick readback is not supported on backend '{}'; dropping pick request",
+                           renderer_detail::backendTypeToString(backend_type));
         scene_output.queued_pick_request.reset();
     }
 
     if (issue_pick_readback) {
         auto& readback_slot = frame_resources.scene_pick_readback_slots[frame_resources.frame_index];
         const auto pick_request = *scene_output.queued_pick_request;
+        LUNA_RENDERER_DEBUG("Queued scene pick readback at ({}, {}) on frame {}",
+                            pick_request.x,
+                            pick_request.y,
+                            frame_resources.frame_index);
         const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{luna::RHI::BufferImageCopy{
             .BufferOffset = 0,
             .BufferRowLength = 0,
@@ -317,10 +374,10 @@ void Renderer::renderFrame()
         scene_output.color_state = luna::RHI::ResourceState::ShaderRead;
         scene_output.depth_state =
             scene_depth_handle.isValid() ? luna::RHI::ResourceState::Common : luna::RHI::ResourceState::Undefined;
-        scene_output.pick_state = scene_pick_handle.isValid()
-                                      ? (issue_pick_readback ? luna::RHI::ResourceState::CopySource
-                                                             : luna::RHI::ResourceState::Common)
-                                      : luna::RHI::ResourceState::Undefined;
+        scene_output.pick_state =
+            scene_pick_handle.isValid()
+                ? (issue_pick_readback ? luna::RHI::ResourceState::CopySource : luna::RHI::ResourceState::Common)
+                : luna::RHI::ResourceState::Undefined;
     }
 
     if (frame_resources.image_index < frame_resources.swapchain_images_presented.size()) {
@@ -335,6 +392,7 @@ void Renderer::endFrame()
     auto& runtime = m_runtime;
 
     if (!runtime.frame_started || !frame_resources.current_command_buffer) {
+        LUNA_RENDERER_FRAME_TRACE("Skipping EndFrame because no frame is active");
         return;
     }
 
@@ -345,7 +403,15 @@ void Renderer::endFrame()
         const auto present_result = device_context.swapchain->Present(
             device_context.graphics_queue, device_context.synchronization, frame_resources.frame_index);
         if (present_result == luna::RHI::Result::OutOfDate || present_result == luna::RHI::Result::Suboptimal) {
+            LUNA_RENDERER_WARN("Present returned {}; scheduling swapchain recreation",
+                               swapchainResultToString(present_result));
             runtime.resize_requested = true;
+        } else if (present_result != luna::RHI::Result::Success) {
+            LUNA_RENDERER_WARN("Present returned {}", swapchainResultToString(present_result));
+        } else {
+            LUNA_RENDERER_FRAME_DEBUG("Presented frame {} using swapchain image {}",
+                                      frame_resources.frame_index,
+                                      frame_resources.image_index);
         }
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
@@ -358,6 +424,7 @@ void Renderer::endFrame()
     if (frame_resources.frames_in_flight > 0) {
         frame_resources.frame_index = (frame_resources.frame_index + 1) % frame_resources.frames_in_flight;
     }
+    LUNA_RENDERER_FRAME_TRACE("Advanced to frame index {}", frame_resources.frame_index);
 }
 
 } // namespace luna

@@ -1,12 +1,13 @@
-#include "Renderer/SceneRendererResourceManager.h"
-
 #include "Asset/Editor/ImageLoader.h"
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/RendererInternal.h"
 #include "Renderer/SceneRendererCommon.h"
 #include "Renderer/SceneRendererDrawQueue.h"
+#include "Renderer/SceneRendererResourceManager.h"
 
+#include <array>
 #include <Buffer.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -14,16 +15,14 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
 #include <ShaderModule.h>
-#include <Texture.h>
-
-#include <array>
-#include <filesystem>
 #include <span>
+#include <Texture.h>
 #include <unordered_map>
 #include <utility>
 
@@ -96,8 +95,7 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -144,8 +142,7 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createBrdfComputeLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createBrdfComputeLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -365,6 +362,12 @@ class ResourceManager::Implementation final {
 public:
     void setShaderPaths(ShaderPaths shader_paths)
     {
+        LUNA_RENDERER_INFO("Scene renderer shader paths updated: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' "
+                           "lighting_fs='{}'",
+                           shader_paths.geometry_vertex_path.string(),
+                           shader_paths.geometry_fragment_path.string(),
+                           shader_paths.lighting_vertex_path.string(),
+                           shader_paths.lighting_fragment_path.string());
         m_shader_paths = std::move(shader_paths);
         clearUploadCaches(false);
         resetPipelineState();
@@ -372,12 +375,23 @@ public:
 
     void shutdown()
     {
+        const bool had_gpu_state = m_gpu.device || m_gpu.geometry_pipeline || m_gpu.lighting_pipeline ||
+                                   m_gpu.transparent_pipeline || !m_upload_cache.uploaded_meshes.empty() ||
+                                   !m_upload_cache.uploaded_textures.empty() ||
+                                   !m_upload_cache.uploaded_materials.empty();
+        if (had_gpu_state) {
+            LUNA_RENDERER_INFO("Shutting down scene renderer resource manager");
+        }
         clearUploadCaches(true);
         resetPipelineState();
         m_gpu.device.reset();
+        if (had_gpu_state) {
+            LUNA_RENDERER_INFO("Scene renderer resource manager shutdown complete");
+        }
     }
 
     void ensurePipelines(const RenderContext& context);
+
     void prepareOpaqueDraws(luna::RHI::CommandBufferEncoder& commands,
                             const DrawQueue& draw_queue,
                             const Material& default_material)
@@ -450,6 +464,7 @@ private:
         luna::RHI::Ref<luna::RHI::Sampler> sampler;
         luna::RHI::Ref<luna::RHI::Buffer> staging_buffer;
         std::vector<luna::RHI::BufferImageCopy> copy_regions;
+        std::string debug_name;
         bool uploaded{false};
     };
 
@@ -578,6 +593,15 @@ private:
 
 void ResourceManager::Implementation::clearUploadCaches(bool include_meshes)
 {
+    if (!m_upload_cache.uploaded_materials.empty() || !m_upload_cache.uploaded_textures.empty() ||
+        (include_meshes && !m_upload_cache.uploaded_meshes.empty())) {
+        LUNA_RENDERER_DEBUG("Clearing scene renderer upload caches: materials={} textures={} meshes={} "
+                            "include_meshes={}",
+                            m_upload_cache.uploaded_materials.size(),
+                            m_upload_cache.uploaded_textures.size(),
+                            m_upload_cache.uploaded_meshes.size(),
+                            include_meshes);
+    }
     m_upload_cache.uploaded_materials.clear();
     m_upload_cache.uploaded_textures.clear();
     if (include_meshes) {
@@ -587,6 +611,11 @@ void ResourceManager::Implementation::clearUploadCaches(bool include_meshes)
 
 void ResourceManager::Implementation::resetPipelineState()
 {
+    if (m_gpu.geometry_pipeline || m_gpu.lighting_pipeline || m_gpu.transparent_pipeline ||
+        m_gpu.equirect_to_cube_pipeline || m_gpu.descriptor_pool || m_gpu.scene_descriptor_set) {
+        LUNA_RENDERER_DEBUG("Resetting scene renderer pipeline state for backend '{}'",
+                            renderer_detail::backendTypeToString(m_gpu.backend_type));
+    }
     m_gpu.backend_type = luna::RHI::BackendType::Auto;
     m_gpu.geometry_pipeline.reset();
     m_gpu.lighting_pipeline.reset();
@@ -670,22 +699,38 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
     using namespace scene_renderer_detail;
 
     if (!context.device || !context.compiler) {
+        LUNA_RENDERER_WARN("Cannot ensure scene renderer pipelines: device={} compiler={}",
+                           static_cast<bool>(context.device),
+                           static_cast<bool>(context.compiler));
         return;
     }
 
     if (m_gpu.device != context.device) {
+        LUNA_RENDERER_INFO("Scene renderer device changed; rebuilding GPU resources for backend '{}'",
+                           renderer_detail::backendTypeToString(context.backend_type));
         clearUploadCaches(true);
         resetPipelineState();
         m_gpu.device = context.device;
         m_gpu.backend_type = context.backend_type;
     } else if (m_gpu.backend_type != context.backend_type) {
+        LUNA_RENDERER_INFO("Scene renderer backend changed from '{}' to '{}'; rebuilding pipeline state",
+                           renderer_detail::backendTypeToString(m_gpu.backend_type),
+                           renderer_detail::backendTypeToString(context.backend_type));
         clearUploadCaches(false);
         resetPipelineState();
         m_gpu.device = context.device;
         m_gpu.backend_type = context.backend_type;
     } else if (hasCompletePipelineState(context.color_format)) {
+        LUNA_RENDERER_FRAME_TRACE("Scene renderer pipeline state is already valid for color format {} ({})",
+                                  renderer_detail::formatToString(context.color_format),
+                                  static_cast<int>(context.color_format));
         return;
     } else {
+        LUNA_RENDERER_INFO("Scene renderer color format changed from {} ({}) to {} ({}); rebuilding pipeline state",
+                           renderer_detail::formatToString(m_gpu.surface_format),
+                           static_cast<int>(m_gpu.surface_format),
+                           renderer_detail::formatToString(context.color_format),
+                           static_cast<int>(context.color_format));
         clearUploadCaches(false);
         resetPipelineState();
         m_gpu.device = context.device;
@@ -693,6 +738,12 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
     }
 
     const ShaderPaths shader_paths = resolveShaderPaths();
+    LUNA_RENDERER_DEBUG("Loading scene renderer shaders: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' "
+                        "lighting_fs='{}'",
+                        shader_paths.geometry_vertex_path.string(),
+                        shader_paths.geometry_fragment_path.string(),
+                        shader_paths.lighting_vertex_path.string(),
+                        shader_paths.lighting_fragment_path.string());
     m_gpu.geometry_vertex_shader = loadShaderModule(m_gpu.device,
                                                     context.compiler,
                                                     shader_paths.geometry_vertex_path,
@@ -721,9 +772,16 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
 
     if (!m_gpu.geometry_vertex_shader || !m_gpu.geometry_fragment_shader || !m_gpu.lighting_vertex_shader ||
         !m_gpu.lighting_fragment_shader || !m_gpu.transparent_fragment_shader) {
-        LUNA_RENDERER_ERROR("Failed to load scene renderer shaders");
+        LUNA_RENDERER_ERROR("Failed to load scene renderer shaders: geometry_vs={} geometry_fs={} lighting_vs={} "
+                            "lighting_fs={} transparent_fs={}",
+                            static_cast<bool>(m_gpu.geometry_vertex_shader),
+                            static_cast<bool>(m_gpu.geometry_fragment_shader),
+                            static_cast<bool>(m_gpu.lighting_vertex_shader),
+                            static_cast<bool>(m_gpu.lighting_fragment_shader),
+                            static_cast<bool>(m_gpu.transparent_fragment_shader));
         return;
     }
+    LUNA_RENDERER_INFO("Loaded scene renderer shader modules");
 
     m_gpu.material_layout = createMaterialLayout(m_gpu.device);
     m_gpu.gbuffer_layout = createGBufferLayout(m_gpu.device);
@@ -732,6 +790,15 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
     m_gpu.gbuffer_sampler = createGBufferSampler(m_gpu.device);
     m_gpu.environment_source_sampler = createEnvironmentSourceSampler(m_gpu.device);
     m_gpu.ibl_sampler = createIblSampler(m_gpu.device);
+    LUNA_RENDERER_DEBUG("Created scene renderer layouts/samplers: material_layout={} gbuffer_layout={} scene_layout={} "
+                        "descriptor_pool={} gbuffer_sampler={} environment_sampler={} ibl_sampler={}",
+                        static_cast<bool>(m_gpu.material_layout),
+                        static_cast<bool>(m_gpu.gbuffer_layout),
+                        static_cast<bool>(m_gpu.scene_layout),
+                        static_cast<bool>(m_gpu.descriptor_pool),
+                        static_cast<bool>(m_gpu.gbuffer_sampler),
+                        static_cast<bool>(m_gpu.environment_source_sampler),
+                        static_cast<bool>(m_gpu.ibl_sampler));
 
     if (m_gpu.descriptor_pool && m_gpu.gbuffer_layout) {
         m_gpu.gbuffer_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.gbuffer_layout);
@@ -752,20 +819,45 @@ void ResourceManager::Implementation::ensurePipelines(const RenderContext& conte
 
     m_gpu.geometry_pipeline = createGeometryPipeline(
         m_gpu.device, m_gpu.geometry_pipeline_layout, m_gpu.geometry_vertex_shader, m_gpu.geometry_fragment_shader);
-    m_gpu.lighting_pipeline = createLightingPipeline(
-        m_gpu.device, m_gpu.lighting_pipeline_layout, context.color_format, m_gpu.lighting_vertex_shader, m_gpu.lighting_fragment_shader);
-    m_gpu.transparent_pipeline = createTransparentPipeline(
-        m_gpu.device, m_gpu.transparent_pipeline_layout, context.color_format, m_gpu.geometry_vertex_shader, m_gpu.transparent_fragment_shader);
+    m_gpu.lighting_pipeline = createLightingPipeline(m_gpu.device,
+                                                     m_gpu.lighting_pipeline_layout,
+                                                     context.color_format,
+                                                     m_gpu.lighting_vertex_shader,
+                                                     m_gpu.lighting_fragment_shader);
+    m_gpu.transparent_pipeline = createTransparentPipeline(m_gpu.device,
+                                                           m_gpu.transparent_pipeline_layout,
+                                                           context.color_format,
+                                                           m_gpu.geometry_vertex_shader,
+                                                           m_gpu.transparent_fragment_shader);
+    if (!m_gpu.geometry_pipeline || !m_gpu.lighting_pipeline || !m_gpu.transparent_pipeline) {
+        LUNA_RENDERER_ERROR("Failed to create complete scene renderer pipeline set: geometry={} lighting={} "
+                            "transparent={}",
+                            static_cast<bool>(m_gpu.geometry_pipeline),
+                            static_cast<bool>(m_gpu.lighting_pipeline),
+                            static_cast<bool>(m_gpu.transparent_pipeline));
+    } else {
+        LUNA_RENDERER_INFO("Created scene renderer graphics pipelines for color format {} ({})",
+                           renderer_detail::formatToString(context.color_format),
+                           static_cast<int>(context.color_format));
+    }
 
     ensureSceneResources();
 
     m_gpu.surface_format = context.color_format;
+    LUNA_RENDERER_DEBUG("Scene renderer pipeline state ready: scene_descriptor_set={} gbuffer_descriptor_set={} "
+                        "scene_params_buffer={} environment_texture={}",
+                        static_cast<bool>(m_gpu.scene_descriptor_set),
+                        static_cast<bool>(m_gpu.gbuffer_descriptor_set),
+                        static_cast<bool>(m_gpu.scene_params_buffer),
+                        static_cast<bool>(m_gpu.environment_source_texture.texture));
 }
 
-ResourceManager::Implementation::UploadedMesh& ResourceManager::Implementation::getOrCreateUploadedMesh(const Mesh& mesh)
+ResourceManager::Implementation::UploadedMesh&
+    ResourceManager::Implementation::getOrCreateUploadedMesh(const Mesh& mesh)
 {
     const auto it = m_upload_cache.uploaded_meshes.find(&mesh);
     if (it != m_upload_cache.uploaded_meshes.end()) {
+        LUNA_RENDERER_FRAME_TRACE("Reusing uploaded mesh '{}'", mesh.getName().empty() ? "<unnamed>" : mesh.getName());
         return it->second;
     }
 
@@ -773,12 +865,18 @@ ResourceManager::Implementation::UploadedMesh& ResourceManager::Implementation::
     auto& uploaded_mesh = inserted_it->second;
     const auto& sub_meshes = mesh.getSubMeshes();
     uploaded_mesh.sub_meshes.resize(sub_meshes.size());
+    LUNA_RENDERER_DEBUG("Uploading mesh '{}' with {} submesh(es)",
+                        mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                        sub_meshes.size());
 
     for (size_t sub_mesh_index = 0; sub_mesh_index < sub_meshes.size(); ++sub_mesh_index) {
         const auto& sub_mesh = sub_meshes[sub_mesh_index];
         auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[sub_mesh_index];
 
         if (sub_mesh.Vertices.empty() || sub_mesh.Indices.empty()) {
+            LUNA_RENDERER_WARN("Skipping upload for empty submesh {} in mesh '{}'",
+                               sub_mesh_index,
+                               mesh.getName().empty() ? "<unnamed>" : mesh.getName());
             continue;
         }
 
@@ -803,10 +901,19 @@ ResourceManager::Implementation::UploadedMesh& ResourceManager::Implementation::
 
         if (uploaded_sub_mesh.vertex_buffer) {
             if (void* vertex_memory = uploaded_sub_mesh.vertex_buffer->Map()) {
-                std::memcpy(vertex_memory, sub_mesh.Vertices.data(), sub_mesh.Vertices.size() * sizeof(StaticMeshVertex));
+                std::memcpy(
+                    vertex_memory, sub_mesh.Vertices.data(), sub_mesh.Vertices.size() * sizeof(StaticMeshVertex));
                 uploaded_sub_mesh.vertex_buffer->Flush();
                 uploaded_sub_mesh.vertex_buffer->Unmap();
+            } else {
+                LUNA_RENDERER_WARN("Failed to map vertex buffer for mesh '{}' submesh '{}'",
+                                   mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                                   sub_mesh_name);
             }
+        } else {
+            LUNA_RENDERER_WARN("Failed to create vertex buffer for mesh '{}' submesh '{}'",
+                               mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                               sub_mesh_name);
         }
 
         if (uploaded_sub_mesh.index_buffer) {
@@ -814,10 +921,24 @@ ResourceManager::Implementation::UploadedMesh& ResourceManager::Implementation::
                 std::memcpy(index_memory, sub_mesh.Indices.data(), sub_mesh.Indices.size() * sizeof(uint32_t));
                 uploaded_sub_mesh.index_buffer->Flush();
                 uploaded_sub_mesh.index_buffer->Unmap();
+            } else {
+                LUNA_RENDERER_WARN("Failed to map index buffer for mesh '{}' submesh '{}'",
+                                   mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                                   sub_mesh_name);
             }
+        } else {
+            LUNA_RENDERER_WARN("Failed to create index buffer for mesh '{}' submesh '{}'",
+                               mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                               sub_mesh_name);
         }
+        LUNA_RENDERER_FRAME_TRACE("Uploaded mesh '{}' submesh '{}' (vertices={} indices={})",
+                                  mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                                  sub_mesh_name,
+                                  sub_mesh.Vertices.size(),
+                                  sub_mesh.Indices.size());
     }
 
+    LUNA_RENDERER_DEBUG("Mesh '{}' upload cached", mesh.getName().empty() ? "<unnamed>" : mesh.getName());
     return uploaded_mesh;
 }
 
@@ -829,7 +950,12 @@ ResourceManager::Implementation::UploadedTexture
     using namespace scene_renderer_detail;
 
     UploadedTexture uploaded_texture;
+    uploaded_texture.debug_name = debug_name;
     if (!m_gpu.device || !image.isValid()) {
+        LUNA_RENDERER_WARN("Cannot create uploaded texture '{}': device_available={} image_valid={}",
+                           debug_name,
+                           static_cast<bool>(m_gpu.device),
+                           image.isValid());
         return uploaded_texture;
     }
 
@@ -837,19 +963,27 @@ ResourceManager::Implementation::UploadedTexture
     constexpr uint32_t kTextureDataPitchAlignment = 256;
 
     const uint32_t mip_level_count = 1u + static_cast<uint32_t>(image.MipLevels.size());
-    uploaded_texture.texture = m_gpu.device->CreateTexture(luna::RHI::TextureBuilder()
-                                                               .SetSize(image.Width, image.Height)
-                                                               .SetMipLevels(mip_level_count)
-                                                               .SetFormat(image.ImageFormat)
-                                                               .SetUsage(luna::RHI::TextureUsageFlags::Sampled |
-                                                                         luna::RHI::TextureUsageFlags::TransferDst)
-                                                               .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                               .SetName(debug_name)
-                                                               .Build());
+    LUNA_RENDERER_DEBUG("Creating uploaded texture '{}' ({}x{}, mips={}, format={} ({}), bytes={})",
+                        debug_name,
+                        image.Width,
+                        image.Height,
+                        mip_level_count,
+                        renderer_detail::formatToString(image.ImageFormat),
+                        static_cast<int>(image.ImageFormat),
+                        image.ByteData.size());
+    uploaded_texture.texture = m_gpu.device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(image.Width, image.Height)
+            .SetMipLevels(mip_level_count)
+            .SetFormat(image.ImageFormat)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName(debug_name)
+            .Build());
 
     const float max_lod = sampler_settings.MipFilter == rhi::Texture::MipFilterMode::None
                               ? 0.0f
-                              : static_cast<float>((std::max)(mip_level_count, 1u) - 1u);
+                              : static_cast<float>((std::max) (mip_level_count, 1u) - 1u);
     uploaded_texture.sampler =
         m_gpu.device->CreateSampler(luna::RHI::SamplerBuilder()
                                         .SetMinFilter(toRhiFilter(sampler_settings.MinFilter))
@@ -883,14 +1017,12 @@ ResourceManager::Implementation::UploadedTexture
     uint32_t mip_height = image.Height;
 
     auto append_region = [&](const std::vector<uint8_t>& bytes, uint32_t mip_level) {
-        const uint32_t safe_width = (std::max)(mip_width, 1u);
-        const uint32_t safe_height = (std::max)(mip_height, 1u);
+        const uint32_t safe_width = (std::max) (mip_width, 1u);
+        const uint32_t safe_height = (std::max) (mip_height, 1u);
         const uint32_t row_pitch_bytes = safe_height > 0 ? static_cast<uint32_t>(bytes.size() / safe_height) : 0;
         const uint32_t bytes_per_texel = safe_width > 0 ? row_pitch_bytes / safe_width : 0;
-        const uint32_t aligned_row_pitch =
-            static_cast<uint32_t>(align_up(row_pitch_bytes, kTextureDataPitchAlignment));
-        const uint32_t row_length_texels =
-            bytes_per_texel > 0 ? aligned_row_pitch / bytes_per_texel : safe_width;
+        const uint32_t aligned_row_pitch = static_cast<uint32_t>(align_up(row_pitch_bytes, kTextureDataPitchAlignment));
+        const uint32_t row_length_texels = bytes_per_texel > 0 ? aligned_row_pitch / bytes_per_texel : safe_width;
 
         buffer_offset = align_up(buffer_offset, kTextureDataPlacementAlignment);
         uploaded_texture.copy_regions.push_back(luna::RHI::BufferImageCopy{
@@ -922,12 +1054,17 @@ ResourceManager::Implementation::UploadedTexture
 
     append_region(image.ByteData, 0);
     for (uint32_t mip_level = 1; mip_level < mip_level_count; ++mip_level) {
-        mip_width = (std::max)(mip_width / 2, 1u);
-        mip_height = (std::max)(mip_height / 2, 1u);
+        mip_width = (std::max) (mip_width / 2, 1u);
+        mip_height = (std::max) (mip_height / 2, 1u);
         append_region(image.MipLevels[mip_level - 1], mip_level);
     }
 
     if (!uploaded_texture.texture || !uploaded_texture.sampler || buffer_offset == 0) {
+        LUNA_RENDERER_WARN("Failed to create uploaded texture '{}': texture={} sampler={} staging_size={}",
+                           debug_name,
+                           static_cast<bool>(uploaded_texture.texture),
+                           static_cast<bool>(uploaded_texture.sampler),
+                           buffer_offset);
         return uploaded_texture;
     }
 
@@ -940,6 +1077,7 @@ ResourceManager::Implementation::UploadedTexture
                                        .Build());
 
     if (!uploaded_texture.staging_buffer) {
+        LUNA_RENDERER_WARN("Failed to create staging buffer for texture '{}' ({} bytes)", debug_name, buffer_offset);
         return uploaded_texture;
     }
 
@@ -952,15 +1090,22 @@ ResourceManager::Implementation::UploadedTexture
 
             const size_t source_row_pitch = packed_region.source->size() / packed_region.height;
             for (uint32_t row = 0; row < packed_region.height; ++row) {
-                std::memcpy(destination + packed_region.offset + static_cast<size_t>(row) * packed_region.row_pitch_bytes,
+                std::memcpy(destination + packed_region.offset +
+                                static_cast<size_t>(row) * packed_region.row_pitch_bytes,
                             packed_region.source->data() + static_cast<size_t>(row) * source_row_pitch,
                             source_row_pitch);
             }
         }
         uploaded_texture.staging_buffer->Flush();
         uploaded_texture.staging_buffer->Unmap();
+    } else {
+        LUNA_RENDERER_WARN("Failed to map staging buffer for texture '{}'", debug_name);
     }
 
+    LUNA_RENDERER_DEBUG("Prepared uploaded texture '{}' with {} copy region(s) and {} staging bytes",
+                        debug_name,
+                        uploaded_texture.copy_regions.size(),
+                        buffer_offset);
     return uploaded_texture;
 }
 
@@ -975,24 +1120,26 @@ ResourceManager::Implementation::IblTexture
 
     IblTexture ibl_texture;
     if (!m_gpu.device) {
+        LUNA_RENDERER_WARN("Cannot create IBL texture '{}' because device is unavailable", debug_name);
         return ibl_texture;
     }
 
     const uint32_t array_layers = (type == luna::RHI::TextureType::TextureCube) ? 6u : 1u;
-    ibl_texture.texture = m_gpu.device->CreateTexture(luna::RHI::TextureBuilder()
-                                                          .SetType(type)
-                                                          .SetSize(width, height)
-                                                          .SetArrayLayers(array_layers)
-                                                          .SetMipLevels(mip_levels)
-                                                          .SetFormat(type == luna::RHI::TextureType::Texture2D
-                                                                         ? kEnvironmentBrdfFormat
-                                                                         : kEnvironmentCubeFormat)
-                                                          .SetUsage(luna::RHI::TextureUsageFlags::Sampled |
-                                                                    luna::RHI::TextureUsageFlags::Storage)
-                                                          .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                          .SetName(debug_name)
-                                                          .Build());
+    LUNA_RENDERER_DEBUG(
+        "Creating IBL texture '{}' ({}x{}, mips={}, layers={})", debug_name, width, height, mip_levels, array_layers);
+    ibl_texture.texture = m_gpu.device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetType(type)
+            .SetSize(width, height)
+            .SetArrayLayers(array_layers)
+            .SetMipLevels(mip_levels)
+            .SetFormat(type == luna::RHI::TextureType::Texture2D ? kEnvironmentBrdfFormat : kEnvironmentCubeFormat)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::Storage)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName(debug_name)
+            .Build());
     if (!ibl_texture.texture) {
+        LUNA_RENDERER_WARN("Failed to create IBL texture '{}'", debug_name);
         return ibl_texture;
     }
 
@@ -1010,7 +1157,7 @@ ResourceManager::Implementation::IblTexture
 
     luna::RHI::TextureViewDesc storage_view_desc = sample_view_desc;
     storage_view_desc.ViewType = type == luna::RHI::TextureType::TextureCube ? luna::RHI::TextureType::Texture2DArray
-                                                                              : luna::RHI::TextureType::Texture2D;
+                                                                             : luna::RHI::TextureType::Texture2D;
     storage_view_desc.MipLevelCount = 1;
     storage_view_desc.Name = debug_name + "_StorageView";
     ibl_texture.storage_view = ibl_texture.texture->CreateView(storage_view_desc);
@@ -1026,6 +1173,11 @@ ResourceManager::Implementation::IblTexture
         }
     }
 
+    LUNA_RENDERER_DEBUG("Created IBL texture '{}' sample_view={} storage_view={} mip_storage_views={}",
+                        debug_name,
+                        static_cast<bool>(ibl_texture.sample_view),
+                        static_cast<bool>(ibl_texture.storage_view),
+                        ibl_texture.mip_storage_views.size());
     return ibl_texture;
 }
 
@@ -1033,17 +1185,25 @@ std::shared_ptr<ResourceManager::Implementation::UploadedTexture>
     ResourceManager::Implementation::getOrCreateUploadedTexture(const std::shared_ptr<rhi::Texture>& texture)
 {
     if (texture == nullptr || !texture->isValid()) {
+        LUNA_RENDERER_WARN("Ignoring texture upload request because texture is null or invalid");
         return {};
     }
 
     const auto it = m_upload_cache.uploaded_textures.find(texture.get());
     if (it != m_upload_cache.uploaded_textures.end()) {
+        LUNA_RENDERER_FRAME_TRACE("Reusing uploaded texture '{}'",
+                                  texture->getName().empty() ? "Texture" : texture->getName());
         return it->second;
     }
 
     const std::string debug_name = texture->getName().empty() ? std::string("Texture") : texture->getName();
-    auto uploaded_texture =
-        std::make_shared<UploadedTexture>(createUploadedTexture(texture->getImageData(), texture->getSamplerSettings(), debug_name));
+    auto uploaded_texture = std::make_shared<UploadedTexture>(
+        createUploadedTexture(texture->getImageData(), texture->getSamplerSettings(), debug_name));
+    LUNA_RENDERER_DEBUG("Cached uploaded texture '{}' (texture={} sampler={} staging={})",
+                        debug_name,
+                        static_cast<bool>(uploaded_texture->texture),
+                        static_cast<bool>(uploaded_texture->sampler),
+                        static_cast<bool>(uploaded_texture->staging_buffer));
     m_upload_cache.uploaded_textures.emplace(texture.get(), uploaded_texture);
     return uploaded_texture;
 }
@@ -1055,6 +1215,8 @@ ResourceManager::Implementation::UploadedMaterial&
 
     const auto it = m_upload_cache.uploaded_materials.find(&material);
     if (it != m_upload_cache.uploaded_materials.end()) {
+        LUNA_RENDERER_FRAME_TRACE("Reusing uploaded material '{}'",
+                                  material.getName().empty() ? "Material" : material.getName());
         return it->second;
     }
 
@@ -1065,11 +1227,11 @@ ResourceManager::Implementation::UploadedMaterial&
 
     auto [inserted_it, _] = m_upload_cache.uploaded_materials.emplace(&material, UploadedMaterial{});
     auto& uploaded_material = inserted_it->second;
+    LUNA_RENDERER_DEBUG("Uploading material '{}'", material_name);
 
-    const auto create_material_texture =
-        [&](const std::shared_ptr<rhi::Texture>& texture,
-            const rhi::ImageData& fallback_image,
-            std::string_view suffix) -> std::shared_ptr<UploadedTexture> {
+    const auto create_material_texture = [&](const std::shared_ptr<rhi::Texture>& texture,
+                                             const rhi::ImageData& fallback_image,
+                                             std::string_view suffix) -> std::shared_ptr<UploadedTexture> {
         if (texture != nullptr && texture->isValid()) {
             return getOrCreateUploadedTexture(texture);
         }
@@ -1085,8 +1247,8 @@ ResourceManager::Implementation::UploadedMaterial&
         textures.Normal, createFallbackColorImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)), "Normal");
     uploaded_material.metallic_roughness_texture = create_material_texture(
         textures.MetallicRoughness, createFallbackMetallicRoughnessImageData(1.0f, 0.0f), "MetallicRoughness");
-    uploaded_material.emissive_texture =
-        create_material_texture(textures.Emissive, createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)), "Emissive");
+    uploaded_material.emissive_texture = create_material_texture(
+        textures.Emissive, createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)), "Emissive");
     uploaded_material.occlusion_texture =
         create_material_texture(textures.Occlusion, createFallbackColorImageData(glm::vec4(1.0f)), "Occlusion");
 
@@ -1097,16 +1259,17 @@ ResourceManager::Implementation::UploadedMaterial&
                                        .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
                                        .SetName(material_name + "_Params")
                                        .Build());
+    if (!uploaded_material.params_buffer) {
+        LUNA_RENDERER_WARN("Failed to create parameter buffer for material '{}'", material_name);
+    }
 
     if (uploaded_material.params_buffer) {
         if (void* mapped = uploaded_material.params_buffer->Map()) {
             const MaterialGpuParams params{
                 .base_color_factor = surface.BaseColorFactor,
                 .emissive_factor_normal_scale = glm::vec4(surface.EmissiveFactor, surface.NormalScale),
-                .material_factors = glm::vec4(surface.MetallicFactor,
-                                              surface.RoughnessFactor,
-                                              surface.OcclusionStrength,
-                                              surface.AlphaCutoff),
+                .material_factors = glm::vec4(
+                    surface.MetallicFactor, surface.RoughnessFactor, surface.OcclusionStrength, surface.AlphaCutoff),
                 .material_flags = glm::vec4(materialBlendModeToFloat(material.getBlendMode()),
                                             surface.Unlit ? 1.0f : 0.0f,
                                             surface.DoubleSided ? 1.0f : 0.0f,
@@ -1115,23 +1278,44 @@ ResourceManager::Implementation::UploadedMaterial&
             std::memcpy(mapped, &params, sizeof(params));
             uploaded_material.params_buffer->Flush();
             uploaded_material.params_buffer->Unmap();
+        } else {
+            LUNA_RENDERER_WARN("Failed to map parameter buffer for material '{}'", material_name);
         }
     }
 
-    if (!m_gpu.descriptor_pool || !m_gpu.material_layout ||
-        !uploaded_material.base_color_texture || !uploaded_material.normal_texture ||
-        !uploaded_material.metallic_roughness_texture || !uploaded_material.emissive_texture ||
-        !uploaded_material.occlusion_texture || !uploaded_material.base_color_texture->texture ||
-        !uploaded_material.normal_texture->texture || !uploaded_material.metallic_roughness_texture->texture ||
-        !uploaded_material.emissive_texture->texture || !uploaded_material.occlusion_texture->texture ||
-        !uploaded_material.base_color_texture->sampler || !uploaded_material.normal_texture->sampler ||
-        !uploaded_material.metallic_roughness_texture->sampler || !uploaded_material.emissive_texture->sampler ||
-        !uploaded_material.occlusion_texture->sampler || !uploaded_material.params_buffer) {
+    if (!m_gpu.descriptor_pool || !m_gpu.material_layout || !uploaded_material.base_color_texture ||
+        !uploaded_material.normal_texture || !uploaded_material.metallic_roughness_texture ||
+        !uploaded_material.emissive_texture || !uploaded_material.occlusion_texture ||
+        !uploaded_material.base_color_texture->texture || !uploaded_material.normal_texture->texture ||
+        !uploaded_material.metallic_roughness_texture->texture || !uploaded_material.emissive_texture->texture ||
+        !uploaded_material.occlusion_texture->texture || !uploaded_material.base_color_texture->sampler ||
+        !uploaded_material.normal_texture->sampler || !uploaded_material.metallic_roughness_texture->sampler ||
+        !uploaded_material.emissive_texture->sampler || !uploaded_material.occlusion_texture->sampler ||
+        !uploaded_material.params_buffer) {
+        LUNA_RENDERER_WARN(
+            "Material '{}' upload is incomplete: descriptor_pool={} material_layout={} base={} normal={} "
+            "metallic_roughness={} emissive={} occlusion={} params_buffer={}",
+            material_name,
+            static_cast<bool>(m_gpu.descriptor_pool),
+            static_cast<bool>(m_gpu.material_layout),
+            static_cast<bool>(uploaded_material.base_color_texture && uploaded_material.base_color_texture->texture &&
+                              uploaded_material.base_color_texture->sampler),
+            static_cast<bool>(uploaded_material.normal_texture && uploaded_material.normal_texture->texture &&
+                              uploaded_material.normal_texture->sampler),
+            static_cast<bool>(uploaded_material.metallic_roughness_texture &&
+                              uploaded_material.metallic_roughness_texture->texture &&
+                              uploaded_material.metallic_roughness_texture->sampler),
+            static_cast<bool>(uploaded_material.emissive_texture && uploaded_material.emissive_texture->texture &&
+                              uploaded_material.emissive_texture->sampler),
+            static_cast<bool>(uploaded_material.occlusion_texture && uploaded_material.occlusion_texture->texture &&
+                              uploaded_material.occlusion_texture->sampler),
+            static_cast<bool>(uploaded_material.params_buffer));
         return uploaded_material;
     }
 
     uploaded_material.descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.material_layout);
     if (!uploaded_material.descriptor_set) {
+        LUNA_RENDERER_WARN("Failed to allocate descriptor set for material '{}'", material_name);
         return uploaded_material;
     }
 
@@ -1194,6 +1378,7 @@ ResourceManager::Implementation::UploadedMaterial&
         .Type = luna::RHI::DescriptorType::UniformBuffer,
     });
     uploaded_material.descriptor_set->Update();
+    LUNA_RENDERER_DEBUG("Material '{}' upload cached with descriptor set", material_name);
 
     return uploaded_material;
 }
@@ -1205,6 +1390,14 @@ void ResourceManager::Implementation::uploadTextureIfNeeded(luna::RHI::CommandBu
 {
     if (uploaded_texture.uploaded || !uploaded_texture.texture || !uploaded_texture.staging_buffer ||
         uploaded_texture.copy_regions.empty()) {
+        if (!uploaded_texture.uploaded &&
+            (!uploaded_texture.texture || !uploaded_texture.staging_buffer || uploaded_texture.copy_regions.empty())) {
+            LUNA_RENDERER_WARN("Skipping texture upload '{}': texture={} staging_buffer={} copy_regions={}",
+                               uploaded_texture.debug_name,
+                               static_cast<bool>(uploaded_texture.texture),
+                               static_cast<bool>(uploaded_texture.staging_buffer),
+                               uploaded_texture.copy_regions.size());
+        }
         return;
     }
 
@@ -1231,11 +1424,15 @@ void ResourceManager::Implementation::uploadTextureIfNeeded(luna::RHI::CommandBu
                              }});
 
     uploaded_texture.uploaded = true;
+    LUNA_RENDERER_DEBUG("Uploaded texture '{}' to GPU with {} copy region(s)",
+                        uploaded_texture.debug_name,
+                        uploaded_texture.copy_regions.size());
 }
 
 void ResourceManager::Implementation::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands,
                                                              UploadedMaterial& uploaded_material)
 {
+    LUNA_RENDERER_FRAME_TRACE("Ensuring material textures are uploaded");
     if (uploaded_material.base_color_texture) {
         uploadTextureIfNeeded(commands, *uploaded_material.base_color_texture);
     }
@@ -1258,21 +1455,34 @@ void ResourceManager::Implementation::ensureSceneResources()
     using namespace scene_renderer_detail;
 
     if (!m_gpu.device || !m_gpu.descriptor_pool || !m_gpu.scene_layout || !m_gpu.environment_source_sampler) {
+        LUNA_RENDERER_WARN("Cannot ensure scene resources: device={} descriptor_pool={} scene_layout={} "
+                           "environment_sampler={}",
+                           static_cast<bool>(m_gpu.device),
+                           static_cast<bool>(m_gpu.descriptor_pool),
+                           static_cast<bool>(m_gpu.scene_layout),
+                           static_cast<bool>(m_gpu.environment_source_sampler));
         return;
     }
 
     if (!m_gpu.scene_params_buffer) {
-        m_gpu.scene_params_buffer = m_gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                   .SetSize(sizeof(SceneGpuParams))
-                                                                   .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                                   .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
-                                                                   .SetName("SceneParams")
-                                                                   .Build());
+        m_gpu.scene_params_buffer =
+            m_gpu.device->CreateBuffer(luna::RHI::BufferBuilder()
+                                           .SetSize(sizeof(SceneGpuParams))
+                                           .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
+                                           .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                           .SetName("SceneParams")
+                                           .Build());
+        if (!m_gpu.scene_params_buffer) {
+            LUNA_RENDERER_WARN("Failed to create scene parameter buffer");
+        } else {
+            LUNA_RENDERER_DEBUG("Created scene parameter buffer");
+        }
     }
 
     if (!m_gpu.environment_source_texture.texture) {
         std::filesystem::path environment_path = defaultEnvironmentPath();
         rhi::ImageData environment_image;
+        LUNA_RENDERER_INFO("Loading scene environment map from '{}'", environment_path.string());
 
         if (std::filesystem::exists(environment_path)) {
             environment_image = rhi::ImageLoader::LoadImageFromFile(environment_path.string());
@@ -1295,13 +1505,27 @@ void ResourceManager::Implementation::ensureSceneResources()
         m_gpu.environment_source_texture =
             createUploadedTexture(environment_image, rhi::Texture::SamplerSettings{}, "SceneEnvironmentSource");
         m_gpu.ibl_generated = false;
+        LUNA_RENDERER_INFO("Prepared scene environment source texture ({}x{}, mips={})",
+                           environment_image.Width,
+                           environment_image.Height,
+                           1u + static_cast<uint32_t>(environment_image.MipLevels.size()));
     }
 
     if (!m_gpu.scene_descriptor_set) {
         m_gpu.scene_descriptor_set = m_gpu.descriptor_pool->AllocateDescriptorSet(m_gpu.scene_layout);
+        if (!m_gpu.scene_descriptor_set) {
+            LUNA_RENDERER_WARN("Failed to allocate scene descriptor set");
+        } else {
+            LUNA_RENDERER_DEBUG("Allocated scene descriptor set");
+        }
     }
 
     if (!m_gpu.scene_descriptor_set || !m_gpu.scene_params_buffer || !m_gpu.environment_source_texture.texture) {
+        LUNA_RENDERER_WARN("Scene resources are incomplete: scene_descriptor_set={} scene_params_buffer={} "
+                           "environment_source_texture={}",
+                           static_cast<bool>(m_gpu.scene_descriptor_set),
+                           static_cast<bool>(m_gpu.scene_params_buffer),
+                           static_cast<bool>(m_gpu.environment_source_texture.texture));
         return;
     }
 
@@ -1324,10 +1548,14 @@ void ResourceManager::Implementation::ensureSceneResources()
         .Sampler = m_gpu.environment_source_sampler,
     });
     m_gpu.scene_descriptor_set->Update();
+    LUNA_RENDERER_FRAME_TRACE("Updated scene descriptor set");
 }
 
 void ResourceManager::Implementation::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
 {
+    if (!m_gpu.environment_source_texture.uploaded) {
+        LUNA_RENDERER_DEBUG("Uploading environment source texture '{}'", m_gpu.environment_source_texture.debug_name);
+    }
     uploadTextureIfNeeded(commands,
                           m_gpu.environment_source_texture,
                           luna::RHI::ResourceState::ShaderRead,
@@ -1344,6 +1572,24 @@ void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::Comman
         !m_gpu.irradiance_descriptor_set || m_gpu.prefilter_descriptor_sets.empty() || !m_gpu.brdf_lut_descriptor_set ||
         !m_gpu.environment_sky_texture.texture || !m_gpu.environment_irradiance_texture.texture ||
         !m_gpu.environment_prefilter_texture.texture || !m_gpu.environment_brdf_lut.texture) {
+        LUNA_RENDERER_FRAME_TRACE(
+            "Skipping Vulkan IBL generation: backend={} ibl_generated={} environment_uploaded={} "
+            "compute_pipelines=({}, {}, {}, {}) descriptor_sets=({}, {}, {}, {}) textures=({}, {}, {}, {})",
+            renderer_detail::backendTypeToString(m_gpu.backend_type),
+            m_gpu.ibl_generated,
+            m_gpu.environment_source_texture.uploaded,
+            static_cast<bool>(m_gpu.equirect_to_cube_pipeline),
+            static_cast<bool>(m_gpu.irradiance_pipeline),
+            static_cast<bool>(m_gpu.prefilter_pipeline),
+            static_cast<bool>(m_gpu.brdf_lut_pipeline),
+            static_cast<bool>(m_gpu.equirect_to_cube_descriptor_set),
+            static_cast<bool>(m_gpu.irradiance_descriptor_set),
+            !m_gpu.prefilter_descriptor_sets.empty(),
+            static_cast<bool>(m_gpu.brdf_lut_descriptor_set),
+            static_cast<bool>(m_gpu.environment_sky_texture.texture),
+            static_cast<bool>(m_gpu.environment_irradiance_texture.texture),
+            static_cast<bool>(m_gpu.environment_prefilter_texture.texture),
+            static_cast<bool>(m_gpu.environment_brdf_lut.texture));
         return;
     }
 
@@ -1376,15 +1622,16 @@ void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::Comman
         .AspectMask = luna::RHI::ImageAspectFlags::Color,
     };
 
-    commands.TransitionImage(m_gpu.environment_sky_texture.texture, luna::RHI::ImageTransition::UndefinedToGeneral, sky_range);
+    commands.TransitionImage(
+        m_gpu.environment_sky_texture.texture, luna::RHI::ImageTransition::UndefinedToGeneral, sky_range);
     commands.TransitionImage(
         m_gpu.environment_irradiance_texture.texture, luna::RHI::ImageTransition::UndefinedToGeneral, irradiance_range);
     commands.TransitionImage(
         m_gpu.environment_prefilter_texture.texture, luna::RHI::ImageTransition::UndefinedToGeneral, prefilter_range);
-    commands.TransitionImage(m_gpu.environment_brdf_lut.texture, luna::RHI::ImageTransition::UndefinedToGeneral, brdf_range);
+    commands.TransitionImage(
+        m_gpu.environment_brdf_lut.texture, luna::RHI::ImageTransition::UndefinedToGeneral, brdf_range);
 
-    LUNA_RENDERER_INFO("Generating Vulkan IBL resources from '{}' once per device",
-                       defaultEnvironmentPath().string());
+    LUNA_RENDERER_INFO("Generating Vulkan IBL resources from '{}' once per device", defaultEnvironmentPath().string());
 
     const EnvironmentIblDispatchParams equirect_params{
         .output_size = kEnvironmentCubeFaceSize,
@@ -1393,7 +1640,8 @@ void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::Comman
         .reserved = 0,
     };
     commands.BindComputePipeline(m_gpu.equirect_to_cube_pipeline);
-    commands.BindComputeDescriptorSets(m_gpu.equirect_to_cube_pipeline, 0, std::array{m_gpu.equirect_to_cube_descriptor_set});
+    commands.BindComputeDescriptorSets(
+        m_gpu.equirect_to_cube_pipeline, 0, std::array{m_gpu.equirect_to_cube_descriptor_set});
     commands.ComputePushConstants(m_gpu.equirect_to_cube_pipeline,
                                   luna::RHI::ShaderStage::Compute,
                                   0,
@@ -1427,9 +1675,10 @@ void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::Comman
     commands.BindComputePipeline(m_gpu.prefilter_pipeline);
     const uint32_t prefilter_mip_count = m_gpu.environment_prefilter_texture.texture->GetMipLevels();
     for (uint32_t mip_level = 0; mip_level < prefilter_mip_count; ++mip_level) {
-        const uint32_t mip_size = (std::max)(kEnvironmentPrefilterFaceSize >> mip_level, 1u);
-        const float roughness =
-            prefilter_mip_count > 1 ? static_cast<float>(mip_level) / static_cast<float>(prefilter_mip_count - 1) : 0.0f;
+        const uint32_t mip_size = (std::max) (kEnvironmentPrefilterFaceSize >> mip_level, 1u);
+        const float roughness = prefilter_mip_count > 1
+                                    ? static_cast<float>(mip_level) / static_cast<float>(prefilter_mip_count - 1)
+                                    : 0.0f;
         const EnvironmentIblDispatchParams prefilter_params{
             .output_size = mip_size,
             .sample_count = kEnvironmentPrefilterSamples,
@@ -1463,37 +1712,39 @@ void ResourceManager::Implementation::ensureImageBasedLighting(luna::RHI::Comman
 
     commands.PipelineBarrier(luna::RHI::SyncScope::ComputeStage,
                              luna::RHI::SyncScope::FragmentStage,
-                             std::array{
-                                 luna::RHI::TextureBarrier{
-                                     .Texture = m_gpu.environment_irradiance_texture.texture,
-                                     .OldState = luna::RHI::ResourceState::UnorderedAccess,
-                                     .NewState = luna::RHI::ResourceState::ShaderRead,
-                                     .SubresourceRange = irradiance_range,
-                                 },
-                                 luna::RHI::TextureBarrier{
-                                     .Texture = m_gpu.environment_prefilter_texture.texture,
-                                     .OldState = luna::RHI::ResourceState::UnorderedAccess,
-                                     .NewState = luna::RHI::ResourceState::ShaderRead,
-                                     .SubresourceRange = prefilter_range,
-                                 },
-                                 luna::RHI::TextureBarrier{
-                                     .Texture = m_gpu.environment_brdf_lut.texture,
-                                     .OldState = luna::RHI::ResourceState::UnorderedAccess,
-                                     .NewState = luna::RHI::ResourceState::ShaderRead,
-                                     .SubresourceRange = brdf_range,
-                                 }});
+                             std::array{luna::RHI::TextureBarrier{
+                                            .Texture = m_gpu.environment_irradiance_texture.texture,
+                                            .OldState = luna::RHI::ResourceState::UnorderedAccess,
+                                            .NewState = luna::RHI::ResourceState::ShaderRead,
+                                            .SubresourceRange = irradiance_range,
+                                        },
+                                        luna::RHI::TextureBarrier{
+                                            .Texture = m_gpu.environment_prefilter_texture.texture,
+                                            .OldState = luna::RHI::ResourceState::UnorderedAccess,
+                                            .NewState = luna::RHI::ResourceState::ShaderRead,
+                                            .SubresourceRange = prefilter_range,
+                                        },
+                                        luna::RHI::TextureBarrier{
+                                            .Texture = m_gpu.environment_brdf_lut.texture,
+                                            .OldState = luna::RHI::ResourceState::UnorderedAccess,
+                                            .NewState = luna::RHI::ResourceState::ShaderRead,
+                                            .SubresourceRange = brdf_range,
+                                        }});
 
     m_gpu.ibl_generated = true;
+    LUNA_RENDERER_INFO("Finished generating Vulkan IBL resources");
 }
 
 void ResourceManager::Implementation::prepareDraws(luna::RHI::CommandBufferEncoder& commands,
                                                    std::span<const DrawCommand> draw_commands,
                                                    const Material& default_material)
 {
+    LUNA_RENDERER_FRAME_TRACE("Preparing {} draw command(s) for GPU submission", draw_commands.size());
     (void) getOrCreateUploadedMaterial(default_material);
 
     for (const auto& draw_command : draw_commands) {
         if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+            LUNA_RENDERER_WARN("Skipping draw preparation because mesh is null or invalid");
             continue;
         }
 
@@ -1508,16 +1759,20 @@ void ResourceManager::Implementation::updateSceneParameters(const RenderContext&
     using namespace scene_renderer_detail;
 
     if (!m_gpu.scene_params_buffer || context.framebuffer_width == 0 || context.framebuffer_height == 0) {
+        LUNA_RENDERER_WARN("Cannot update scene parameters: scene_params_buffer={} framebuffer={}x{}",
+                           static_cast<bool>(m_gpu.scene_params_buffer),
+                           context.framebuffer_width,
+                           context.framebuffer_height);
         return;
     }
 
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
     const glm::mat4 view_projection = buildViewProjection(camera, aspect_ratio, context.backend_type);
-    const float environment_mip_count = m_gpu.environment_source_texture.texture != nullptr
-                                            ? static_cast<float>(
-                                                  (std::max)(m_gpu.environment_source_texture.texture->GetMipLevels(), 1u) - 1u)
-                                            : 0.0f;
+    const float environment_mip_count =
+        m_gpu.environment_source_texture.texture != nullptr
+            ? static_cast<float>((std::max) (m_gpu.environment_source_texture.texture->GetMipLevels(), 1u) - 1u)
+            : 0.0f;
 
     SceneGpuParams params;
     params.view_projection = view_projection;
@@ -1526,19 +1781,20 @@ void ResourceManager::Implementation::updateSceneParameters(const RenderContext&
     params.light_direction_intensity = glm::vec4(glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f)), 4.0f);
     params.light_color_exposure = glm::vec4(1.0f, 0.98f, 0.95f, 1.0f);
     params.ibl_factors = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
-    params.debug_overlay_params =
-        glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f, 0.65f, 0.0f, 0.0f);
-    params.debug_pick_marker = glm::vec4(static_cast<float>(context.debug_pick_pixel_x),
-                                         static_cast<float>(context.debug_pick_pixel_y),
-                                         (context.show_pick_debug_visualization && context.show_pick_debug_marker) ? 1.0f
-                                                                                                                   : 0.0f,
-                                         1.0f);
+    params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f, 0.65f, 0.0f, 0.0f);
+    params.debug_pick_marker =
+        glm::vec4(static_cast<float>(context.debug_pick_pixel_x),
+                  static_cast<float>(context.debug_pick_pixel_y),
+                  (context.show_pick_debug_visualization && context.show_pick_debug_marker) ? 1.0f : 0.0f,
+                  1.0f);
     params.irradiance_sh = m_gpu.environment_irradiance_sh;
 
     if (void* mapped = m_gpu.scene_params_buffer->Map()) {
         std::memcpy(mapped, &params, sizeof(params));
         m_gpu.scene_params_buffer->Flush();
         m_gpu.scene_params_buffer->Unmap();
+    } else {
+        LUNA_RENDERER_WARN("Failed to map scene parameter buffer");
     }
 }
 
@@ -1551,6 +1807,15 @@ void ResourceManager::Implementation::updateLightingResources(
 {
     if (!m_gpu.gbuffer_descriptor_set || !m_gpu.gbuffer_sampler || !gbuffer_base_color || !gbuffer_normal_metallic ||
         !gbuffer_world_position_roughness || !gbuffer_emissive_ao || !pick_texture) {
+        LUNA_RENDERER_WARN("Cannot update lighting resources: gbuffer_descriptor_set={} gbuffer_sampler={} base={} "
+                           "normal={} position={} emissive={} pick={}",
+                           static_cast<bool>(m_gpu.gbuffer_descriptor_set),
+                           static_cast<bool>(m_gpu.gbuffer_sampler),
+                           static_cast<bool>(gbuffer_base_color),
+                           static_cast<bool>(gbuffer_normal_metallic),
+                           static_cast<bool>(gbuffer_world_position_roughness),
+                           static_cast<bool>(gbuffer_emissive_ao),
+                           static_cast<bool>(pick_texture));
         return;
     }
 
@@ -1589,29 +1854,40 @@ void ResourceManager::Implementation::updateLightingResources(
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     m_gpu.gbuffer_descriptor_set->Update();
+    LUNA_RENDERER_FRAME_TRACE("Updated GBuffer descriptor set");
 }
 
 ResolvedDrawResources ResourceManager::Implementation::resolveDrawResources(const DrawCommand& draw_command,
-                                                                           const Material& default_material) const
+                                                                            const Material& default_material) const
 {
     ResolvedDrawResources resolved;
     if (!draw_command.mesh || !draw_command.mesh->isValid()) {
+        LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources because mesh is null or invalid");
         return resolved;
     }
 
     const auto uploaded_mesh_it = m_upload_cache.uploaded_meshes.find(draw_command.mesh.get());
     if (uploaded_mesh_it == m_upload_cache.uploaded_meshes.end()) {
+        LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources for mesh '{}' because it has not been uploaded",
+                                  draw_command.mesh->getName().empty() ? "<unnamed>" : draw_command.mesh->getName());
         return resolved;
     }
 
     const Material& material = resolveMaterial(draw_command.material, default_material);
     const auto uploaded_material_it = m_upload_cache.uploaded_materials.find(&material);
-    if (uploaded_material_it == m_upload_cache.uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
+    if (uploaded_material_it == m_upload_cache.uploaded_materials.end() ||
+        !uploaded_material_it->second.descriptor_set) {
+        LUNA_RENDERER_FRAME_TRACE(
+            "Cannot resolve draw resources for material '{}' because descriptor set is unavailable",
+            material.getName().empty() ? "Material" : material.getName());
         return resolved;
     }
 
     const auto& uploaded_mesh = uploaded_mesh_it->second;
     if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
+        LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources because submesh index {} is out of range ({})",
+                                  draw_command.sub_mesh_index,
+                                  uploaded_mesh.sub_meshes.size());
         return resolved;
     }
 
@@ -1671,18 +1947,22 @@ void ResourceManager::updateSceneParameters(const SceneRenderer::RenderContext& 
     m_impl->updateSceneParameters(context, camera);
 }
 
-void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& pick_texture)
+void ResourceManager::updateLightingResources(
+    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
+    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
+    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
+    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+    const luna::RHI::Ref<luna::RHI::Texture>& pick_texture)
 {
-    m_impl->updateLightingResources(
-        gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
+    m_impl->updateLightingResources(gbuffer_base_color,
+                                    gbuffer_normal_metallic,
+                                    gbuffer_world_position_roughness,
+                                    gbuffer_emissive_ao,
+                                    pick_texture);
 }
 
 ResolvedDrawResources ResourceManager::resolveDrawResources(const DrawCommand& draw_command,
-                                                           const Material& default_material) const
+                                                            const Material& default_material) const
 {
     return m_impl->resolveDrawResources(draw_command, default_material);
 }

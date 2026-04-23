@@ -61,6 +61,21 @@ inline const char* presentModeToString(luna::RHI::PresentMode mode)
     }
 }
 
+inline const char* adapterTypeToString(luna::RHI::AdapterType type)
+{
+    switch (type) {
+        case luna::RHI::AdapterType::Discrete:
+            return "Discrete";
+        case luna::RHI::AdapterType::Integrated:
+            return "Integrated";
+        case luna::RHI::AdapterType::Software:
+            return "Software";
+        case luna::RHI::AdapterType::Unknown:
+        default:
+            return "Unknown";
+    }
+}
+
 inline const char* backendTypeToString(luna::RHI::BackendType type)
 {
     switch (type) {
@@ -80,6 +95,32 @@ inline const char* backendTypeToString(luna::RHI::BackendType type)
             return "OpenGLES";
         case luna::RHI::BackendType::WebGPU:
             return "WebGPU";
+        default:
+            return "Unknown";
+    }
+}
+
+inline const char* formatToString(luna::RHI::Format format)
+{
+    switch (format) {
+        case luna::RHI::Format::RGBA8_UNORM:
+            return "RGBA8_UNORM";
+        case luna::RHI::Format::RGBA8_SRGB:
+            return "RGBA8_SRGB";
+        case luna::RHI::Format::BGRA8_UNORM:
+            return "BGRA8_UNORM";
+        case luna::RHI::Format::BGRA8_SRGB:
+            return "BGRA8_SRGB";
+        case luna::RHI::Format::R32_UINT:
+            return "R32_UINT";
+        case luna::RHI::Format::D32_FLOAT:
+            return "D32_FLOAT";
+        case luna::RHI::Format::RGBA16_FLOAT:
+            return "RGBA16_FLOAT";
+        case luna::RHI::Format::RGBA32_FLOAT:
+            return "RGBA32_FLOAT";
+        case luna::RHI::Format::UNDEFINED:
+            return "UNDEFINED";
         default:
             return "Unknown";
     }
@@ -161,3 +202,11 @@ inline luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::Pre
 }
 
 } // namespace luna::renderer_detail
+
+#if defined(LUNA_RENDERER_ENABLE_FRAME_LOGS)
+#define LUNA_RENDERER_FRAME_TRACE(...) LUNA_RENDERER_TRACE(__VA_ARGS__)
+#define LUNA_RENDERER_FRAME_DEBUG(...) LUNA_RENDERER_DEBUG(__VA_ARGS__)
+#else
+#define LUNA_RENDERER_FRAME_TRACE(...) ((void) 0)
+#define LUNA_RENDERER_FRAME_DEBUG(...) ((void) 0)
+#endif

@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include "Core/Log.h"
 
 #include <algorithm>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -66,6 +67,7 @@ void Camera::lookAt(const glm::vec3& target, const glm::vec3& up)
 {
     const glm::vec3 direction = target - m_position;
     if (glm::length2(direction) <= kMinLookDirectionLengthSquared) {
+        LUNA_RENDERER_WARN("Ignoring camera lookAt request because target is too close to the camera position");
         return;
     }
 
@@ -83,18 +85,27 @@ void Camera::lookAt(const glm::vec3& target, const glm::vec3& up)
 
 void Camera::setPerspective(float vertical_fov_radians, float near_clip, float far_clip)
 {
+    if (near_clip < kMinPerspectiveNear || far_clip <= near_clip) {
+        LUNA_RENDERER_DEBUG("Clamping perspective camera clip planes: requested near={} far={}", near_clip, far_clip);
+    }
     m_projection_type = ProjectionType::Perspective;
     m_perspective.vertical_fov_radians = vertical_fov_radians;
-    m_perspective.near_clip = (std::max)(near_clip, kMinPerspectiveNear);
-    m_perspective.far_clip = (std::max)(far_clip, m_perspective.near_clip + kMinPerspectiveNear);
+    m_perspective.near_clip = (std::max) (near_clip, kMinPerspectiveNear);
+    m_perspective.far_clip = (std::max) (far_clip, m_perspective.near_clip + kMinPerspectiveNear);
 }
 
 void Camera::setOrthographic(float vertical_size, float near_clip, float far_clip)
 {
+    if (vertical_size < kMinOrthoSize || far_clip <= near_clip) {
+        LUNA_RENDERER_DEBUG("Clamping orthographic camera parameters: requested vertical_size={} near={} far={}",
+                            vertical_size,
+                            near_clip,
+                            far_clip);
+    }
     m_projection_type = ProjectionType::Orthographic;
-    m_orthographic.vertical_size = (std::max)(vertical_size, kMinOrthoSize);
-    m_orthographic.near_clip = (std::min)(near_clip, far_clip);
-    m_orthographic.far_clip = (std::max)(far_clip, m_orthographic.near_clip + kMinPerspectiveNear);
+    m_orthographic.vertical_size = (std::max) (vertical_size, kMinOrthoSize);
+    m_orthographic.near_clip = (std::min) (near_clip, far_clip);
+    m_orthographic.far_clip = (std::max) (far_clip, m_orthographic.near_clip + kMinPerspectiveNear);
 }
 
 Camera::ProjectionType Camera::getProjectionType() const
@@ -136,16 +147,12 @@ glm::mat4 Camera::getViewMatrix() const
 
 glm::mat4 Camera::getProjectionMatrix(float aspect_ratio) const
 {
-    const float clamped_aspect_ratio = (std::max)(aspect_ratio, kMinAspectRatio);
+    const float clamped_aspect_ratio = (std::max) (aspect_ratio, kMinAspectRatio);
     if (m_projection_type == ProjectionType::Orthographic) {
         const float half_height = m_orthographic.vertical_size * 0.5f;
         const float half_width = half_height * clamped_aspect_ratio;
-        return glm::orthoRH_ZO(-half_width,
-                               half_width,
-                               -half_height,
-                               half_height,
-                               m_orthographic.near_clip,
-                               m_orthographic.far_clip);
+        return glm::orthoRH_ZO(
+            -half_width, half_width, -half_height, half_height, m_orthographic.near_clip, m_orthographic.far_clip);
     }
 
     return glm::perspectiveRH_ZO(

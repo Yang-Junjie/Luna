@@ -1,3 +1,5 @@
+#include "Core/Log.h"
+#include "Renderer/RendererInternal.h"
 #include "Renderer/RenderGraphBuilder.h"
 
 #include <Builders.h>
@@ -35,17 +37,42 @@ luna::RHI::Ref<luna::RHI::Texture> createTransientTexture(const luna::RHI::Ref<l
                                                           const RenderGraphTextureDesc& desc)
 {
     if (!device || desc.Width == 0 || desc.Height == 0 || desc.Format == luna::RHI::Format::UNDEFINED) {
+        LUNA_RENDERER_WARN(
+            "Cannot create transient render graph texture '{}': device_available={} size={}x{} format={}",
+            desc.Name,
+            static_cast<bool>(device),
+            desc.Width,
+            desc.Height,
+            renderer_detail::formatToString(desc.Format));
         return {};
     }
 
-    return device->CreateTexture(luna::RHI::TextureBuilder()
-                                     .SetSize(desc.Width, desc.Height)
-                                     .SetFormat(desc.Format)
-                                     .SetUsage(desc.Usage)
-                                     .SetInitialState(desc.InitialState)
-                                     .SetSampleCount(desc.SampleCount)
-                                     .SetName(desc.Name)
-                                     .Build());
+    auto texture = device->CreateTexture(luna::RHI::TextureBuilder()
+                                             .SetSize(desc.Width, desc.Height)
+                                             .SetFormat(desc.Format)
+                                             .SetUsage(desc.Usage)
+                                             .SetInitialState(desc.InitialState)
+                                             .SetSampleCount(desc.SampleCount)
+                                             .SetName(desc.Name)
+                                             .Build());
+    if (!texture) {
+        LUNA_RENDERER_WARN("Failed to create transient render graph texture '{}' ({}x{}, format={} ({}) usage=0x{:x})",
+                           desc.Name,
+                           desc.Width,
+                           desc.Height,
+                           renderer_detail::formatToString(desc.Format),
+                           static_cast<int>(desc.Format),
+                           static_cast<uint32_t>(desc.Usage));
+    } else {
+        LUNA_RENDERER_FRAME_TRACE("Created transient render graph texture '{}' ({}x{}, format={} ({}) usage=0x{:x})",
+                                  desc.Name,
+                                  desc.Width,
+                                  desc.Height,
+                                  renderer_detail::formatToString(desc.Format),
+                                  static_cast<int>(desc.Format),
+                                  static_cast<uint32_t>(desc.Usage));
+    }
+    return texture;
 }
 
 void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
@@ -107,6 +134,7 @@ luna::RHI::Extent2D
 
 void RenderGraphTransientTextureCache::BeginFrame()
 {
+    LUNA_RENDERER_FRAME_TRACE("Resetting render graph transient texture cache with {} entrie(s)", m_entries.size());
     for (auto& entry : m_entries) {
         entry.InUse = false;
     }
@@ -119,13 +147,19 @@ luna::RHI::Ref<luna::RHI::Texture>
     for (auto& entry : m_entries) {
         if (!entry.InUse && IsCompatible(entry, desc) && entry.Texture) {
             entry.InUse = true;
+            LUNA_RENDERER_FRAME_TRACE(
+                "Reusing transient render graph texture '{}' ({}x{})", desc.Name, desc.Width, desc.Height);
             return entry.Texture;
         }
     }
 
-    std::erase_if(m_entries, [&desc](const TextureEntry& entry) {
+    const size_t removed_count = std::erase_if(m_entries, [&desc](const TextureEntry& entry) {
         return !entry.InUse && !IsCompatible(entry, desc);
     });
+    if (removed_count > 0) {
+        LUNA_RENDERER_FRAME_DEBUG("Pruned {} incompatible transient render graph texture cache entrie(s)",
+                                  removed_count);
+    }
 
     auto texture = createTransientTexture(device, desc);
     if (!texture) {
@@ -137,6 +171,12 @@ luna::RHI::Ref<luna::RHI::Texture>
         .Texture = texture,
         .InUse = true,
     });
+    LUNA_RENDERER_FRAME_DEBUG("Cached new transient render graph texture '{}' ({}x{}, format={} ({}))",
+                              desc.Name,
+                              desc.Width,
+                              desc.Height,
+                              renderer_detail::formatToString(desc.Format),
+                              static_cast<int>(desc.Format));
     return texture;
 }
 
@@ -203,6 +243,7 @@ RenderGraphTextureHandle RenderGraphBuilder::ImportTexture(std::string name,
                                                            luna::RHI::ResourceState final_state)
 {
     if (!isValidTextureRef(texture)) {
+        LUNA_RENDERER_WARN("Ignoring render graph import for '{}' because texture is null", name);
         return {};
     }
 
@@ -224,12 +265,23 @@ RenderGraphTextureHandle RenderGraphBuilder::ImportTexture(std::string name,
         .Imported = true,
         .Exported = false,
     });
+    LUNA_RENDERER_FRAME_DEBUG("Imported render graph texture '{}' as handle {} ({}x{}, format={} ({}))",
+                              m_texture_nodes.back().Desc.Name,
+                              index,
+                              m_texture_nodes.back().Desc.Width,
+                              m_texture_nodes.back().Desc.Height,
+                              renderer_detail::formatToString(m_texture_nodes.back().Desc.Format),
+                              static_cast<int>(m_texture_nodes.back().Desc.Format));
     return RenderGraphTextureHandle{index};
 }
 
 RenderGraphTextureHandle RenderGraphBuilder::CreateTexture(RenderGraphTextureDesc desc)
 {
     if (desc.Width == 0 || desc.Height == 0) {
+        LUNA_RENDERER_WARN("Ignoring render graph texture creation for '{}' because size is {}x{}",
+                           desc.Name,
+                           desc.Width,
+                           desc.Height);
         return {};
     }
 
@@ -247,6 +299,15 @@ RenderGraphTextureHandle RenderGraphBuilder::CreateTexture(RenderGraphTextureDes
         .Exported = false,
     });
     m_texture_nodes.back().InitialState = m_texture_nodes.back().Desc.InitialState;
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Declared transient render graph texture '{}' as handle {} ({}x{}, format={} ({}) usage=0x{:x})",
+        m_texture_nodes.back().Desc.Name,
+        index,
+        m_texture_nodes.back().Desc.Width,
+        m_texture_nodes.back().Desc.Height,
+        renderer_detail::formatToString(m_texture_nodes.back().Desc.Format),
+        static_cast<int>(m_texture_nodes.back().Desc.Format),
+        static_cast<uint32_t>(m_texture_nodes.back().Desc.Usage));
     return RenderGraphTextureHandle{index};
 }
 
@@ -257,6 +318,12 @@ RenderGraphBuilder& RenderGraphBuilder::ExportTexture(RenderGraphTextureHandle h
         auto& texture_node = m_texture_nodes[handle.Index];
         texture_node.Exported = true;
         texture_node.FinalState = final_state;
+        LUNA_RENDERER_FRAME_DEBUG("Exported render graph texture '{}' (handle {}) to final state 0x{:x}",
+                                  texture_node.Desc.Name,
+                                  handle.Index,
+                                  static_cast<uint32_t>(final_state));
+    } else {
+        LUNA_RENDERER_WARN("Ignoring render graph texture export for invalid handle {}", handle.Index);
     }
     return *this;
 }
@@ -280,12 +347,22 @@ RenderGraphBuilder& RenderGraphBuilder::AddRasterPass(const std::string& name,
         setup(builder);
     }
 
+    LUNA_RENDERER_FRAME_DEBUG("Added raster render graph pass '{}' (reads={}, colors={}, has_depth={}, side_effect={})",
+                              name,
+                              m_raster_pass_nodes.back().Reads.size(),
+                              m_raster_pass_nodes.back().ColorAttachments.size(),
+                              m_raster_pass_nodes.back().DepthAttachment.has_value(),
+                              side_effect);
     return *this;
 }
 
 std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
 {
     if (!m_frame_context.device || !m_frame_context.command_buffer) {
+        LUNA_RENDERER_WARN(
+            "Building empty render graph because frame context is incomplete: device={} command_buffer={}",
+            static_cast<bool>(m_frame_context.device),
+            static_cast<bool>(m_frame_context.command_buffer));
         return std::make_unique<RenderGraph>();
     }
 
@@ -359,6 +436,11 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             current_states[i] =
                 physical_textures[i] ? physical_textures[i]->GetCurrentState() : texture_node.InitialState;
         }
+
+        if (!physical_textures[i]) {
+            LUNA_RENDERER_WARN(
+                "Render graph texture '{}' (handle {}) is live but has no physical texture", texture_node.Desc.Name, i);
+        }
     }
 
     RenderGraph::PassList pass_list;
@@ -367,6 +449,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
 
     for (size_t i = 0; i < m_raster_pass_nodes.size(); ++i) {
         if (!live_passes[i]) {
+            LUNA_RENDERER_FRAME_TRACE("Culled render graph pass '{}'", m_raster_pass_nodes[i].Name);
             continue;
         }
 
@@ -452,6 +535,18 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
         });
         current_states[i] = final_state;
     }
+
+    const size_t live_resource_count =
+        static_cast<size_t>(std::count(live_resources.begin(), live_resources.end(), true));
+    const size_t live_pass_count = static_cast<size_t>(std::count(live_passes.begin(), live_passes.end(), true));
+    LUNA_RENDERER_FRAME_DEBUG("Built render graph: declared_passes={} compiled_passes={} live_passes={} textures={} "
+                              "live_textures={} final_barriers={}",
+                              m_raster_pass_nodes.size(),
+                              compiled_passes.size(),
+                              live_pass_count,
+                              texture_count,
+                              live_resource_count,
+                              final_texture_barriers.size());
 
     return std::make_unique<RenderGraph>(m_frame_context,
                                          std::move(pass_list),
