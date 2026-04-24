@@ -3,6 +3,7 @@
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
@@ -17,6 +18,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <glm/gtc/type_ptr.hpp>
+#include <ImGuizmo.h>
 #include <imgui.h>
 #include <optional>
 #include <string>
@@ -50,6 +53,37 @@ const char* backendTypeToString(luna::RHI::BackendType type)
         default:
             return "Unknown";
     }
+}
+
+const char* gizmoOperationToString(luna::GizmoOperation operation)
+{
+    switch (operation) {
+        case luna::GizmoOperation::Translate:
+            return "Translate";
+        case luna::GizmoOperation::Rotate:
+            return "Rotate";
+        case luna::GizmoOperation::Scale:
+            return "Scale";
+    }
+    return "Unknown";
+}
+
+ImGuizmo::OPERATION toImGuizmoOperation(luna::GizmoOperation operation)
+{
+    switch (operation) {
+        case luna::GizmoOperation::Translate:
+            return ImGuizmo::TRANSLATE;
+        case luna::GizmoOperation::Rotate:
+            return ImGuizmo::ROTATE;
+        case luna::GizmoOperation::Scale:
+            return ImGuizmo::SCALE;
+    }
+    return ImGuizmo::TRANSLATE;
+}
+
+ImGuizmo::MODE toImGuizmoMode(luna::GizmoMode mode)
+{
+    return mode == luna::GizmoMode::World ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
 }
 
 void logEditorAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
@@ -157,7 +191,8 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     AssetManager::get().updateAsyncLoads();
     consumePendingScenePick();
 
-    const bool allow_editor_camera = m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured();
+    const bool allow_editor_camera =
+        (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
     m_editor_camera.onUpdate(dt);
     m_scene.onUpdateRuntime(m_editor_camera.getCamera());
@@ -169,7 +204,7 @@ void LunaEditorLayer::onEvent(Event& event)
         return;
     }
 
-    if (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) {
+    if ((m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing()) {
         m_editor_camera.onEvent(event);
     }
 }
@@ -179,6 +214,8 @@ void LunaEditorLayer::onImGuiRender()
     if (m_application == nullptr) {
         return;
     }
+
+    ImGuizmo::BeginFrame();
 
     auto& application = *m_application;
     const float delta_seconds = Application::get().getTimestep().getSeconds();
@@ -197,6 +234,8 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
+    ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
+    ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();
     }
@@ -298,6 +337,7 @@ void LunaEditorLayer::drawViewport()
     ImGui::Begin("Viewport");
     m_viewport_focused = ImGui::IsWindowFocused();
     m_viewport_hovered = ImGui::IsWindowHovered();
+    updateGizmoShortcuts();
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float dpi_scale = ImGui::GetWindowViewport() != nullptr ? ImGui::GetWindowViewport()->DpiScale : 1.0f;
@@ -317,12 +357,17 @@ void LunaEditorLayer::drawViewport()
         }
 
         ImGui::Image(texture_id, available, uv0, uv1);
-        requestViewportPick(ImGui::GetItemRectMin(),
-                            ImGui::GetItemRectMax(),
-                            uv0,
-                            uv1,
-                            scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
-                                          : luna::RHI::Extent2D{0, 0});
+        const ImVec2 viewport_min = ImGui::GetItemRectMin();
+        const ImVec2 viewport_size = ImGui::GetItemRectSize();
+        const bool gizmo_active = drawViewportGizmo(viewport_min, viewport_size);
+        if (!gizmo_active) {
+            requestViewportPick(ImGui::GetItemRectMin(),
+                                ImGui::GetItemRectMax(),
+                                uv0,
+                                uv1,
+                                scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
+                                              : luna::RHI::Extent2D{0, 0});
+        }
     } else if (available.x > 0.0f && available.y > 0.0f) {
         ImGui::SetCursorPos(ImVec2(16.0f, 16.0f));
         ImGui::TextUnformatted("Viewport texture will appear after the first rendered frame.");
@@ -330,6 +375,66 @@ void LunaEditorLayer::drawViewport()
 
     ImGui::End();
     ImGui::PopStyleVar();
+}
+
+void LunaEditorLayer::updateGizmoShortcuts()
+{
+    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput || !m_selected_entity ||
+        !m_selected_entity.isValid()) {
+        return;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_W, false)) {
+        m_gizmo_operation = GizmoOperation::Translate;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_E, false)) {
+        m_gizmo_operation = GizmoOperation::Rotate;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+        m_gizmo_operation = GizmoOperation::Scale;
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
+        m_gizmo_mode = m_gizmo_mode == GizmoMode::Local ? GizmoMode::World : GizmoMode::Local;
+    }
+}
+
+bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size)
+{
+    Entity selected_entity = getSelectedEntity();
+    if (!selected_entity || !selected_entity.isValid() || !selected_entity.hasComponent<TransformComponent>()) {
+        return false;
+    }
+
+    if (viewport_size.x <= 0.0f || viewport_size.y <= 0.0f) {
+        return false;
+    }
+
+    const auto& camera = m_editor_camera.getCamera();
+    const float aspect_ratio = viewport_size.x / viewport_size.y;
+    glm::mat4 view = camera.getViewMatrix();
+    glm::mat4 projection = camera.getProjectionMatrix(aspect_ratio);
+    projection[1][1] *= -1.0f;
+    glm::mat4 transform = m_scene.entityManager().getWorldSpaceTransformMatrix(selected_entity);
+
+    ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
+    ImGuizmo::SetDrawlist();
+    ImGuizmo::SetRect(viewport_min.x, viewport_min.y, viewport_size.x, viewport_size.y);
+    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7fffffff));
+
+    const ImGuizmo::MODE mode = m_gizmo_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_gizmo_mode);
+    ImGuizmo::Manipulate(glm::value_ptr(view),
+                         glm::value_ptr(projection),
+                         toImGuizmoOperation(m_gizmo_operation),
+                         mode,
+                         glm::value_ptr(transform));
+
+    if (ImGuizmo::IsUsing()) {
+        m_scene.entityManager().setWorldSpaceTransform(selected_entity, transform);
+    }
+
+    const bool gizmo_active = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+    ImGuizmo::PopID();
+    return gizmo_active;
 }
 
 void LunaEditorLayer::consumePendingScenePick()
@@ -374,7 +479,8 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
                                           const luna::RHI::Extent2D& texture_extent) const
 {
     if (m_application == nullptr || texture_extent.width == 0 || texture_extent.height == 0 ||
-        m_editor_camera.isMouseCaptured() || !ImGui::IsItemHovered() || !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        m_editor_camera.isMouseCaptured() || ImGuizmo::IsOver() || ImGuizmo::IsUsing() ||
+        !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return;
     }
 
@@ -382,6 +488,11 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const float image_width = image_max.x - image_min.x;
     const float image_height = image_max.y - image_min.y;
     if (image_width <= 0.0f || image_height <= 0.0f) {
+        return;
+    }
+
+    if (mouse_position.x < image_min.x || mouse_position.x >= image_max.x || mouse_position.y < image_min.y ||
+        mouse_position.y >= image_max.y) {
         return;
     }
 

@@ -18,12 +18,14 @@ add_executable(
     LunaEditorLayer.cpp
     SceneHierarchyPanel.h
     SceneHierarchyPanel.cpp
+    ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
 )
 
 target_include_directories(
     LunaEditor
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo
 )
 
 target_link_libraries(

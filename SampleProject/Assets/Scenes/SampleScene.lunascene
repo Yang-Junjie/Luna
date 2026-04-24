@@ -1,44 +1,28 @@
 Scene: SampleScene
 Entities:
   - IDComponent:
-      ID: 11992674823270389302
+      ID: 6422384645588011490
     TagComponent:
-      Tag: Plane
+      Tag: Empty Entity
     TransformComponent:
-      Translation: [-6.7, 0, 0]
-      Rotation: [0, 0, 0]
+      Translation: [-2.7216005, -0.11617562, 0.07573263]
+      Rotation: [-2.0751965, 0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
-      ParentHandle: 0
+      ParentHandle: 6652629833754950424
       Children:
         []
     MeshComponent:
-      MeshHandle: 1003
+      MeshHandle: 5963794263514486561
       SubmeshMaterials:
-        - 2001
-  - IDComponent:
-      ID: 4597209426252840243
-    TagComponent:
-      Tag: Sphere
-    TransformComponent:
-      Translation: [-5.6, 0, 0]
-      Rotation: [0, 0, 0]
-      Scale: [1, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1002
-      SubmeshMaterials:
-        - 2001
+        - 2003
   - IDComponent:
       ID: 6296757327198945537
     TagComponent:
       Tag: Cube
     TransformComponent:
-      Translation: [-3.2, 0, 0]
-      Rotation: [0, 0, 0]
+      Translation: [-3.0049448, 0.11518596, -0.15800995]
+      Rotation: [0, -0, 0.68598604]
       Scale: [1, 1, 1]
     RelationshipComponent:
       ParentHandle: 0
@@ -49,21 +33,21 @@ Entities:
       SubmeshMaterials:
         - 2003
   - IDComponent:
-      ID: 6422384645588011490
+      ID: 4597209426252840243
     TagComponent:
-      Tag: Empty Entity
+      Tag: Sphere
     TransformComponent:
-      Translation: [-2.8, 0, 0]
-      Rotation: [-2.0751965, 0, 0]
-      Scale: [1, 1, 1]
+      Translation: [-4.4830613, -0.11565052, 0]
+      Rotation: [0, -0, 3.1384962]
+      Scale: [0.9999373, 0.9999373, 1]
     RelationshipComponent:
-      ParentHandle: 6652629833754950424
+      ParentHandle: 0
       Children:
         []
     MeshComponent:
-      MeshHandle: 5963794263514486561
+      MeshHandle: 1005
       SubmeshMaterials:
-        - 11748804957849404480
+        - 2003
   - IDComponent:
       ID: 6652629833754950424
     TagComponent:

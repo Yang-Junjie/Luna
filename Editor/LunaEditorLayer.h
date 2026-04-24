@@ -11,6 +11,7 @@
 #include "Scene/Scene.h"
 #include "SceneHierarchyPanel.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -23,6 +24,17 @@ struct Extent2D;
 namespace luna {
 
 class LunaEditorApplication;
+
+enum class GizmoOperation : uint8_t {
+    Translate,
+    Rotate,
+    Scale,
+};
+
+enum class GizmoMode : uint8_t {
+    Local,
+    World,
+};
 
 class LunaEditorLayer final : public Layer {
 public:
@@ -54,6 +66,8 @@ private:
                              const luna::RHI::Extent2D& texture_extent) const;
     void onImGuiMenuBar();
     void drawViewport();
+    void updateGizmoShortcuts();
+    bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size);
     void resetEditorState();
 
     bool syncProjectAssets();
@@ -82,6 +96,8 @@ private:
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     bool m_show_builtin_materials_panel{false};
+    GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
+    GizmoMode m_gizmo_mode{GizmoMode::Local};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
     AssetLoadingPanel m_asset_loading_panel;
