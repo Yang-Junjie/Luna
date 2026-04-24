@@ -1,4 +1,5 @@
 #include "EditorAssetDragDrop.h"
+#include "Asset/BuiltinAssets.h"
 #include "LunaEditorLayer.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
@@ -36,6 +37,21 @@ luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity
     }
 
     return entity;
+}
+
+void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
+{
+    if (!ImGui::BeginMenu("3D Object")) {
+        return;
+    }
+
+    for (const auto& mesh : luna::BuiltinAssets::getBuiltinMeshes()) {
+        if (ImGui::MenuItem(mesh.Name)) {
+            editor_layer.createPrimitiveEntity(mesh.Handle, parent);
+        }
+    }
+
+    ImGui::EndMenu();
 }
 
 void applyMeshAssetToEntity(luna::LunaEditorLayer& editor_layer,
@@ -122,6 +138,8 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         if (ImGui::MenuItem("Create Child")) {
             createEmptyEntity(editor_layer, entity);
         }
+
+        drawCreatePrimitiveMenu(editor_layer, entity);
 
         if (entity.hasParent() && ImGui::MenuItem("Detach From Parent")) {
             entity.clearParent(true);
@@ -220,6 +238,7 @@ void SceneHierarchyPanel::onImGuiRender()
             if (ImGui::MenuItem("Create Empty Entity")) {
                 createEmptyEntity(*m_editor_layer);
             }
+            drawCreatePrimitiveMenu(*m_editor_layer);
             ImGui::EndPopup();
         }
 

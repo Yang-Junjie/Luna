@@ -7,6 +7,8 @@
 #include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
 #include "Renderer/SceneRenderer/SceneRendererSupport.h"
 
+#include "Asset/Asset.h"
+
 #include <memory>
 #include <span>
 #include <unordered_map>
@@ -88,7 +90,7 @@ private:
                                                          const Material& default_material);
 
 private:
-    std::unordered_map<const Mesh*, UploadedMesh> m_uploaded_meshes;
+    std::unordered_map<AssetHandle, UploadedMesh> m_uploaded_meshes;
     std::unordered_map<const Texture*, std::shared_ptr<scene_renderer_detail::PendingTextureUpload>>
         m_uploaded_textures;
     std::unordered_map<const Material*, UploadedMaterial> m_uploaded_materials;

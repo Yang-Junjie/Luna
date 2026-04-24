@@ -39,6 +39,7 @@ public:
     void setSelectedEntity(Entity entity);
     bool openSceneFile(const std::filesystem::path& scene_file_path);
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
+    Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
 
 private:

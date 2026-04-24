@@ -61,7 +61,7 @@ AssetCache::DrawResources AssetCache::resolveDrawResources(const DrawCommand& dr
         return resolved;
     }
 
-    const auto uploaded_mesh_it = m_uploaded_meshes.find(draw_command.mesh.get());
+    const auto uploaded_mesh_it = m_uploaded_meshes.find(draw_command.mesh->handle);
     if (uploaded_mesh_it == m_uploaded_meshes.end()) {
         LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources for mesh '{}' because it has not been uploaded",
                                   draw_command.mesh->getName().empty() ? "<unnamed>" : draw_command.mesh->getName());
@@ -94,18 +94,22 @@ AssetCache::DrawResources AssetCache::resolveDrawResources(const DrawCommand& dr
 
 AssetCache::UploadedMesh& AssetCache::getOrCreateUploadedMesh(const Mesh& mesh, const Bindings& bindings)
 {
-    const auto it = m_uploaded_meshes.find(&mesh);
+    const auto mesh_key = mesh.handle.isValid() ? mesh.handle : AssetHandle(reinterpret_cast<uint64_t>(&mesh));
+    const auto it = m_uploaded_meshes.find(mesh_key);
     if (it != m_uploaded_meshes.end()) {
-        LUNA_RENDERER_FRAME_TRACE("Reusing uploaded mesh '{}'", mesh.getName().empty() ? "<unnamed>" : mesh.getName());
+        LUNA_RENDERER_FRAME_TRACE("Reusing uploaded mesh '{}' handle={}",
+                                  mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                                  mesh_key.toString());
         return it->second;
     }
 
-    auto [inserted_it, _] = m_uploaded_meshes.emplace(&mesh, UploadedMesh{});
+    auto [inserted_it, _] = m_uploaded_meshes.emplace(mesh_key, UploadedMesh{});
     auto& uploaded_mesh = inserted_it->second;
     const auto& sub_meshes = mesh.getSubMeshes();
     uploaded_mesh.sub_meshes.resize(sub_meshes.size());
-    LUNA_RENDERER_DEBUG("Uploading mesh '{}' with {} submesh(es)",
+    LUNA_RENDERER_DEBUG("Uploading mesh '{}' handle={} with {} submesh(es)",
                         mesh.getName().empty() ? "<unnamed>" : mesh.getName(),
+                        mesh_key.toString(),
                         sub_meshes.size());
 
     if (!bindings.device) {

@@ -2,6 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Asset/BuiltinAssets.h"
 #include "EditorAssetDragDrop.h"
 #include "LunaEditorLayer.h"
 #include "Renderer/Material.h"
@@ -187,6 +188,15 @@ void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
     mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
 }
 
+void assignDefaultMaterialSlots(luna::MeshComponent& mesh_component)
+{
+    for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
+        if (!mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
+            mesh_component.setSubmeshMaterial(submesh_index, luna::BuiltinMaterials::DefaultLit);
+        }
+    }
+}
+
 } // namespace
 
 namespace luna {
@@ -292,12 +302,33 @@ void InspectorPanel::onImGuiRender()
     drawComponentSection<MeshComponent>(
         "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
             const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
+            const std::string current_builtin_label = BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle)
+                                                        ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
+                                                        : "None";
+            if (ImGui::BeginCombo("Primitive", current_builtin_label.c_str())) {
+                if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle))) {
+                    mesh_component.meshHandle = AssetHandle(0);
+                }
+
+                for (const auto& mesh : BuiltinAssets::getBuiltinMeshes()) {
+                    const bool selected = mesh_component.meshHandle == mesh.Handle;
+                    if (ImGui::Selectable(mesh.Name, selected)) {
+                        mesh_component.meshHandle = mesh.Handle;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
             drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
             ImGui::TextDisabled("Mesh Asset: %s", getAssetDisplayLabel(mesh_component.meshHandle).c_str());
 
             if (mesh_component.meshHandle != previous_mesh_handle) {
                 mesh_component.clearAllSubmeshMaterials();
                 syncMeshMaterialSlots(mesh_component);
+                assignDefaultMaterialSlots(mesh_component);
             }
 
             const auto mesh = mesh_component.meshHandle.isValid()

@@ -1,5 +1,6 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
 #include "Events/MouseEvent.h"
@@ -445,6 +446,15 @@ Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entit
     return entity;
 }
 
+Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity parent)
+{
+    if (!BuiltinAssets::isBuiltinMesh(mesh_handle)) {
+        return {};
+    }
+
+    return createEntityFromMeshAsset(mesh_handle, parent);
+}
+
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
     if (!entity || !mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
@@ -470,6 +480,11 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
     const auto mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
     if (mesh && mesh->isValid()) {
         mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+        for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
+            if (!mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
+                mesh_component.setSubmeshMaterial(submesh_index, BuiltinMaterials::DefaultLit);
+            }
+        }
     }
 }
 

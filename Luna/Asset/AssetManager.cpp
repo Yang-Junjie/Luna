@@ -1,5 +1,6 @@
 #include "AssetManager.h"
 
+#include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/LoaderManager.h"
 #include "Core/Log.h"
 
@@ -27,6 +28,7 @@ AssetManager& AssetManager::get()
 void AssetManager::init()
 {
     LoaderManager::init();
+    BuiltinAssets::registerAll();
 }
 
 void AssetManager::clear()

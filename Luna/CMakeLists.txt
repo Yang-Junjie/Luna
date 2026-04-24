@@ -16,6 +16,8 @@ set(RENDERER_SOURCE
     Renderer/Material.cpp
     Renderer/Mesh.h
     Renderer/Mesh.cpp
+    Renderer/PrimitiveMeshFactory.h
+    Renderer/PrimitiveMeshFactory.cpp
     Renderer/RenderGraph.h
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
@@ -68,6 +70,8 @@ set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h)
 
 set(ASSET_SOURCE 
+    Asset/BuiltinAssets.h
+    Asset/BuiltinAssets.cpp
     Asset/AssetManager.h
     Asset/AssetManager.cpp
     Asset/Asset.h
