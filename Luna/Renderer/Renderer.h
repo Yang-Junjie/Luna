@@ -4,7 +4,6 @@
 // Owns device-facing frame state, scene output targets, and the public frame loop,
 // while delegating scene-specific drawing to SceneRenderer.
 
-#include "Renderer/Camera.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/SceneRenderer/SceneRenderer.h"
 
@@ -112,9 +111,6 @@ public:
 
     uint32_t getFramesInFlight() const;
 
-    Camera& getMainCamera();
-    const Camera& getMainCamera() const;
-
     SceneRenderer& getSceneRenderer();
     const SceneRenderer& getSceneRenderer() const;
 
@@ -184,7 +180,6 @@ private:
 
     struct RuntimeState {
         InitializationOptions initialization_options{};
-        Camera main_camera{};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         bool initialized{false};
         bool imgui_enabled{false};

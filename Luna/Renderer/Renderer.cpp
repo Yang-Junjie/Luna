@@ -184,9 +184,6 @@ bool Renderer::init(Window& window, InitializationOptions options)
         return false;
     }
 
-    // TODO:Need to delete this because camera will be created by entity
-    runtime.main_camera.setPerspective(glm::radians(50.0f), 0.05f, 200.0f);
-    runtime.main_camera.setPosition(glm::vec3(0.0f, 0.0f, 5.0f));
     runtime.initialized = device_context.instance && device_context.adapter && device_context.device &&
                           device_context.surface && device_context.swapchain && device_context.graphics_queue &&
                           device_context.synchronization;
@@ -814,16 +811,6 @@ const luna::RHI::Ref<luna::RHI::Synchronization>& Renderer::getSynchronization()
 uint32_t Renderer::getFramesInFlight() const
 {
     return m_frame_resources.frames_in_flight;
-}
-
-Camera& Renderer::getMainCamera()
-{
-    return m_runtime.main_camera;
-}
-
-const Camera& Renderer::getMainCamera() const
-{
-    return m_runtime.main_camera;
 }
 
 SceneRenderer& Renderer::getSceneRenderer()

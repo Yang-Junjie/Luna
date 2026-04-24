@@ -2,6 +2,7 @@
 
 #include "Asset/Asset.h"
 #include "Core/UUID.h"
+#include "Renderer/Camera.h"
 
 #include <cstdint>
 
@@ -10,6 +11,7 @@
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/mat4x4.hpp>
+#include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <string>
 #include <utility>
@@ -90,6 +92,32 @@ struct TransformComponent {
     glm::vec3 getForward() const
     {
         return glm::normalize(glm::rotate(glm::quat(rotation), glm::vec3(0.0f, 0.0f, -1.0f)));
+    }
+};
+
+struct CameraComponent {
+    bool primary = true;
+    bool fixedAspectRatio = false;
+    Camera::ProjectionType projectionType = Camera::ProjectionType::Perspective;
+    float perspectiveVerticalFovRadians = glm::radians(50.0f);
+    float perspectiveNear = 0.05f;
+    float perspectiveFar = 500.0f;
+    float orthographicSize = 10.0f;
+    float orthographicNear = -100.0f;
+    float orthographicFar = 100.0f;
+
+    CameraComponent() = default;
+    CameraComponent(const CameraComponent&) = default;
+
+    Camera createCamera() const
+    {
+        Camera camera;
+        if (projectionType == Camera::ProjectionType::Orthographic) {
+            camera.setOrthographic(orthographicSize, orthographicNear, orthographicFar);
+        } else {
+            camera.setPerspective(perspectiveVerticalFovRadians, perspectiveNear, perspectiveFar);
+        }
+        return camera;
     }
 };
 

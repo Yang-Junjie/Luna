@@ -19,7 +19,6 @@ protected:
     void onUpdate(Timestep timestep) override;
 
 private:
-    void resetCamera();
     bool loadStartupScene();
 
 private:

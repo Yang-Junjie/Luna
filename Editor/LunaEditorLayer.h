@@ -53,6 +53,7 @@ public:
     bool openSceneFile(const std::filesystem::path& scene_file_path);
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
     Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
+    Entity createCameraEntity(Entity parent = {});
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0));
 
@@ -96,6 +97,7 @@ private:
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     bool m_show_builtin_materials_panel{false};
+    bool m_runtime_viewport_enabled{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
     SceneHierarchyPanel m_scene_hierarchy_panel;

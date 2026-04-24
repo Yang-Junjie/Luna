@@ -5,6 +5,7 @@
 #include "Scene.h"
 
 #include <fstream>
+#include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <string>
 #include <utility>
@@ -19,6 +20,8 @@ struct SerializedEntityData {
     luna::TransformComponent transform;
     uint64_t parent_id = 0;
     std::vector<uint64_t> serialized_children;
+    bool has_camera_component = false;
+    luna::CameraComponent camera;
     bool has_mesh_component = false;
     luna::MeshComponent mesh;
 };
@@ -120,6 +123,24 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
                 out << static_cast<uint64_t>(child_uuid);
             }
             out << YAML::EndSeq;
+            out << YAML::EndMap;
+        }
+
+        if (registry.all_of<CameraComponent>(entity_handle)) {
+            const auto& camera_component = registry.get<const CameraComponent>(entity_handle);
+            out << YAML::Key << "CameraComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "Primary" << YAML::Value << camera_component.primary;
+            out << YAML::Key << "FixedAspectRatio" << YAML::Value << camera_component.fixedAspectRatio;
+            out << YAML::Key << "ProjectionType" << YAML::Value
+                << (camera_component.projectionType == Camera::ProjectionType::Orthographic ? "Orthographic"
+                                                                                             : "Perspective");
+            out << YAML::Key << "PerspectiveFOV" << YAML::Value
+                << glm::degrees(camera_component.perspectiveVerticalFovRadians);
+            out << YAML::Key << "PerspectiveNear" << YAML::Value << camera_component.perspectiveNear;
+            out << YAML::Key << "PerspectiveFar" << YAML::Value << camera_component.perspectiveFar;
+            out << YAML::Key << "OrthographicSize" << YAML::Value << camera_component.orthographicSize;
+            out << YAML::Key << "OrthographicNear" << YAML::Value << camera_component.orthographicNear;
+            out << YAML::Key << "OrthographicFar" << YAML::Value << camera_component.orthographicFar;
             out << YAML::EndMap;
         }
 
@@ -234,6 +255,41 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                     }
                 }
 
+                if (const YAML::Node camera_component = entity_node["CameraComponent"]; camera_component) {
+                    entity_data.has_camera_component = true;
+                    if (camera_component["Primary"]) {
+                        entity_data.camera.primary = camera_component["Primary"].as<bool>();
+                    }
+                    if (camera_component["FixedAspectRatio"]) {
+                        entity_data.camera.fixedAspectRatio = camera_component["FixedAspectRatio"].as<bool>();
+                    }
+                    if (camera_component["ProjectionType"]) {
+                        const std::string projection_type = camera_component["ProjectionType"].as<std::string>();
+                        entity_data.camera.projectionType = projection_type == "Orthographic"
+                                                             ? Camera::ProjectionType::Orthographic
+                                                             : Camera::ProjectionType::Perspective;
+                    }
+                    if (camera_component["PerspectiveFOV"]) {
+                        entity_data.camera.perspectiveVerticalFovRadians =
+                            glm::radians(camera_component["PerspectiveFOV"].as<float>());
+                    }
+                    if (camera_component["PerspectiveNear"]) {
+                        entity_data.camera.perspectiveNear = camera_component["PerspectiveNear"].as<float>();
+                    }
+                    if (camera_component["PerspectiveFar"]) {
+                        entity_data.camera.perspectiveFar = camera_component["PerspectiveFar"].as<float>();
+                    }
+                    if (camera_component["OrthographicSize"]) {
+                        entity_data.camera.orthographicSize = camera_component["OrthographicSize"].as<float>();
+                    }
+                    if (camera_component["OrthographicNear"]) {
+                        entity_data.camera.orthographicNear = camera_component["OrthographicNear"].as<float>();
+                    }
+                    if (camera_component["OrthographicFar"]) {
+                        entity_data.camera.orthographicFar = camera_component["OrthographicFar"].as<float>();
+                    }
+                }
+
                 if (const YAML::Node mesh_component = entity_node["MeshComponent"]; mesh_component) {
                     entity_data.has_mesh_component = true;
 
@@ -268,6 +324,11 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
 
         auto& transform_component = entity.getComponent<TransformComponent>();
         transform_component = entity_data.transform;
+
+        if (entity_data.has_camera_component) {
+            auto& camera_component = entity.addComponent<CameraComponent>();
+            camera_component = entity_data.camera;
+        }
 
         if (entity_data.has_mesh_component) {
             auto& mesh_component = entity.addComponent<MeshComponent>();

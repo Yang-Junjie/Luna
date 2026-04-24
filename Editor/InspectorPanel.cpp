@@ -245,6 +245,11 @@ void InspectorPanel::onImGuiRender()
             ImGui::CloseCurrentPopup();
         }
 
+        if (!selected_entity.hasComponent<CameraComponent>() && ImGui::MenuItem("Camera")) {
+            selected_entity.addComponent<CameraComponent>();
+            ImGui::CloseCurrentPopup();
+        }
+
         ImGui::EndPopup();
     }
 
@@ -298,6 +303,41 @@ void InspectorPanel::onImGuiRender()
             }
         },
         false);
+
+    drawComponentSection<CameraComponent>(
+        "Camera", selected_entity, [&](CameraComponent& camera_component) {
+            ImGui::Checkbox("Primary", &camera_component.primary);
+            ImGui::Checkbox("Fixed Aspect Ratio", &camera_component.fixedAspectRatio);
+
+            const char* projection_label = camera_component.projectionType == Camera::ProjectionType::Orthographic
+                                               ? "Orthographic"
+                                               : "Perspective";
+            if (ImGui::BeginCombo("Projection", projection_label)) {
+                if (ImGui::Selectable("Perspective",
+                                      camera_component.projectionType == Camera::ProjectionType::Perspective)) {
+                    camera_component.projectionType = Camera::ProjectionType::Perspective;
+                }
+                if (ImGui::Selectable("Orthographic",
+                                      camera_component.projectionType == Camera::ProjectionType::Orthographic)) {
+                    camera_component.projectionType = Camera::ProjectionType::Orthographic;
+                }
+                ImGui::EndCombo();
+            }
+
+            if (camera_component.projectionType == Camera::ProjectionType::Perspective) {
+                float fov_degrees = glm::degrees(camera_component.perspectiveVerticalFovRadians);
+                if (ImGui::DragFloat("Vertical FOV", &fov_degrees, 0.25f, 1.0f, 179.0f, "%.2f deg")) {
+                    camera_component.perspectiveVerticalFovRadians = glm::radians(fov_degrees);
+                }
+                ImGui::DragFloat("Near", &camera_component.perspectiveNear, 0.01f, 0.001f, 1000.0f);
+                ImGui::DragFloat("Far", &camera_component.perspectiveFar, 1.0f, 0.001f, 10000.0f);
+            } else {
+                ImGui::DragFloat("Size", &camera_component.orthographicSize, 0.1f, 0.001f, 10000.0f);
+                ImGui::DragFloat("Near", &camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
+                ImGui::DragFloat("Far", &camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
+            }
+        },
+        true);
 
     drawComponentSection<MeshComponent>(
         "Mesh", selected_entity, [&](MeshComponent& mesh_component) {

@@ -191,11 +191,17 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     AssetManager::get().updateAsyncLoads();
     consumePendingScenePick();
 
-    const bool allow_editor_camera =
-        (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing();
+    const bool allow_editor_camera = !m_runtime_viewport_enabled &&
+                                     (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
+                                     !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
-    m_editor_camera.onUpdate(dt);
-    m_scene.onUpdateRuntime(m_editor_camera.getCamera());
+    if (!m_runtime_viewport_enabled) {
+        m_editor_camera.onUpdate(dt);
+        m_scene.onUpdateEditor(m_editor_camera.getCamera());
+    } else {
+        m_editor_camera.releaseMouseCapture();
+        m_scene.onUpdateRuntime();
+    }
 }
 
 void LunaEditorLayer::onEvent(Event& event)
@@ -232,6 +238,7 @@ void LunaEditorLayer::onImGuiRender()
 
     const auto viewport_extent = application.getRenderer().getSceneOutputSize();
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
+    ImGui::Text("Viewport Mode: %s", m_runtime_viewport_enabled ? "Runtime" : "Editor");
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
@@ -318,6 +325,11 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Viewport")) {
+        ImGui::MenuItem("Runtime Viewport", nullptr, &m_runtime_viewport_enabled);
+        ImGui::EndMenu();
+    }
+
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
         ImGui::EndMenu();
@@ -359,14 +371,17 @@ void LunaEditorLayer::drawViewport()
         ImGui::Image(texture_id, available, uv0, uv1);
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
         const ImVec2 viewport_size = ImGui::GetItemRectSize();
-        const bool gizmo_active = drawViewportGizmo(viewport_min, viewport_size);
+        const bool gizmo_active = !m_runtime_viewport_enabled && drawViewportGizmo(viewport_min, viewport_size);
         if (!gizmo_active) {
-            requestViewportPick(ImGui::GetItemRectMin(),
-                                ImGui::GetItemRectMax(),
-                                uv0,
-                                uv1,
-                                scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
-                                              : luna::RHI::Extent2D{0, 0});
+            if (!m_runtime_viewport_enabled) {
+                requestViewportPick(
+                    ImGui::GetItemRectMin(),
+                    ImGui::GetItemRectMax(),
+                    uv0,
+                    uv1,
+                    scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
+                                  : luna::RHI::Extent2D{0, 0});
+            }
         }
     } else if (available.x > 0.0f && available.y > 0.0f) {
         ImGui::SetCursorPos(ImVec2(16.0f, 16.0f));
@@ -573,6 +588,22 @@ Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity pa
     return createEntityFromMeshAsset(mesh_handle, parent);
 }
 
+Entity LunaEditorLayer::createCameraEntity(Entity parent)
+{
+    auto& entity_manager = m_scene.entityManager();
+    Entity entity = parent ? entity_manager.createChildEntity(parent, "Camera") : entity_manager.createEntity("Camera");
+    if (!entity) {
+        return {};
+    }
+
+    entity.addComponent<CameraComponent>();
+    auto& transform = entity.transform();
+    transform.translation = {0.0f, 1.0f, 6.0f};
+    transform.rotation = {0.0f, 0.0f, 0.0f};
+    setSelectedEntity(entity);
+    return entity;
+}
+
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
     if (!entity || !mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
@@ -628,8 +659,9 @@ void LunaEditorLayer::resetEditorState()
 void LunaEditorLayer::createScene()
 {
     resetEditorState();
+    createCameraEntity();
     updateSceneLabel();
-    LUNA_EDITOR_INFO("Created a new empty scene");
+    LUNA_EDITOR_INFO("Created a new scene with a primary camera");
 }
 
 bool LunaEditorLayer::syncProjectAssets()

@@ -39,6 +39,17 @@ luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity
     return entity;
 }
 
+void drawCreateEntityMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
+{
+    if (ImGui::MenuItem(parent ? "Create Child" : "Create Empty Entity")) {
+        createEmptyEntity(editor_layer, parent);
+    }
+
+    if (ImGui::MenuItem(parent ? "Create Child Camera" : "Create Camera")) {
+        editor_layer.createCameraEntity(parent);
+    }
+}
+
 void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
 {
     if (!ImGui::BeginMenu("3D Object")) {
@@ -135,9 +146,7 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
 
     bool delete_entity = false;
     if (ImGui::BeginPopupContextItem()) {
-        if (ImGui::MenuItem("Create Child")) {
-            createEmptyEntity(editor_layer, entity);
-        }
+        drawCreateEntityMenu(editor_layer, entity);
 
         drawCreatePrimitiveMenu(editor_layer, entity);
 
@@ -235,9 +244,7 @@ void SceneHierarchyPanel::onImGuiRender()
         }
 
         if (ImGui::BeginPopupContextItem("HierarchyContext", ImGuiPopupFlags_MouseButtonRight)) {
-            if (ImGui::MenuItem("Create Empty Entity")) {
-                createEmptyEntity(*m_editor_layer);
-            }
+            drawCreateEntityMenu(*m_editor_layer);
             drawCreatePrimitiveMenu(*m_editor_layer);
             ImGui::EndPopup();
         }

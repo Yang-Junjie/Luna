@@ -4,6 +4,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
 
@@ -208,20 +209,11 @@ Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializatio
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
 
-void LunaRuntimeApplication::resetCamera()
-{
-    auto& camera = getRenderer().getMainCamera();
-    camera.setPerspective(glm::radians(50.0f), 0.05f, 200.0f);
-    camera.setPosition(glm::vec3(0.0f, 0.45f, 4.75f));
-    camera.setYawPitchRoll(0.0f, -0.12f);
-}
-
 void LunaRuntimeApplication::onInit()
 {
     auto& renderer = getRenderer();
     renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
     renderer.getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
-    resetCamera();
     m_scene.setName("Untitled");
 
     if (!loadStartupScene()) {
@@ -250,6 +242,7 @@ bool LunaRuntimeApplication::loadStartupScene()
     const ImporterManager::ImportStats sync_stats = ImporterManager::syncProjectAssets(&getTaskSystem());
     logRuntimeAssetSyncStats(sync_stats);
     AssetManager::get().init();
+    BuiltinMaterialOverrides::load();
 
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     const auto project_info = ProjectManager::instance().getProjectInfo();

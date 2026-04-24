@@ -18,7 +18,7 @@ public:
     ~Scene() = default;
 
     void onUpdateRuntime();
-    void onUpdateRuntime(const Camera& camera);
+    void onUpdateEditor(const Camera& camera);
     void setAssetLoadBehavior(AssetLoadBehavior behavior);
     AssetLoadBehavior getAssetLoadBehavior() const;
 
@@ -27,6 +27,10 @@ public:
 
     EntityManager& entityManager();
     const EntityManager& entityManager() const;
+
+private:
+    void submitScene(const Camera& camera);
+    bool findPrimaryRuntimeCamera(Camera& camera) const;
 
 private:
     std::string m_name{"Untitled"};
