@@ -121,13 +121,15 @@ public:
         m_environment.uploadIfNeeded(commands);
     }
 
-    void updateSceneParameters(const RenderContext& context, const Camera& camera)
+    void updateSceneParameters(const RenderContext& context,
+                               const Camera& camera,
+                               const DrawQueue& draw_queue)
     {
         const float environment_mip_count =
             m_environment.sourceTexture().texture != nullptr
                 ? static_cast<float>((std::max)(m_environment.sourceTexture().texture->GetMipLevels(), 1u) - 1u)
                 : 0.0f;
-        m_pipelines.updateSceneParameters(context, camera, environment_mip_count, m_environment.irradianceSH());
+        m_pipelines.updateSceneParameters(context, camera, draw_queue, environment_mip_count, m_environment.irradianceSH());
     }
 
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -264,9 +266,11 @@ void ResourceManager::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder&
     m_impl->uploadEnvironmentIfNeeded(commands);
 }
 
-void ResourceManager::updateSceneParameters(const SceneRenderer::RenderContext& context, const Camera& camera)
+void ResourceManager::updateSceneParameters(const SceneRenderer::RenderContext& context,
+                                            const Camera& camera,
+                                            const DrawQueue& draw_queue)
 {
-    m_impl->updateSceneParameters(context, camera);
+    m_impl->updateSceneParameters(context, camera, draw_queue);
 }
 
 void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,

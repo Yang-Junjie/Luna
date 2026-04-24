@@ -1,57 +1,36 @@
 Scene: SampleScene
 Entities:
   - IDComponent:
-      ID: 8795389863366798160
+      ID: 16951615904058710475
     TagComponent:
-      Tag: Empty Entity
+      Tag: Directional Light
     TransformComponent:
-      Translation: [-0.541266, 0, 6.217166]
-      Rotation: [0, -0, 0]
-      Scale: [1, 1, 1]
+      Translation: [3.38, 1.7081349, 1.399224]
+      Rotation: [-0.80285144, 0.5969026, 9.0954764e-08]
+      Scale: [0.9999999, 0.9999998, 0.9999999]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
-    CameraComponent:
-      Primary: true
-      FixedAspectRatio: false
-      ProjectionType: Perspective
-      PerspectiveFOV: 50
-      PerspectiveNear: 0.05
-      PerspectiveFar: 500
-      OrthographicSize: 10
-      OrthographicNear: -100
-      OrthographicFar: 100
+    LightComponent:
+      Type: Directional
+      Enabled: true
+      Color: [1, 1, 1]
+      Intensity: 4
   - IDComponent:
-      ID: 6652629833754950424
+      ID: 6422384645588011490
     TagComponent:
       Tag: Empty Entity
     TransformComponent:
-      Translation: [-0.9, 0, 0]
-      Rotation: [-0.99309236, -3.6564648, 0]
+      Translation: [-2.7216005, -0.11617562, 0.07573263]
+      Rotation: [-2.0751965, 0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        - 6422384645588011490
-    MeshComponent:
-      MeshHandle: 17196472838577284151
-      SubmeshMaterials:
-        - 8706604916645388531
-  - IDComponent:
-      ID: 4597209426252840243
-    TagComponent:
-      Tag: Sphere
-    TransformComponent:
-      Translation: [-4.4830613, -0.11565052, 0]
-      Rotation: [0, -0, 3.1384962]
-      Scale: [0.9999373, 0.9999373, 1]
-    RelationshipComponent:
-      ParentHandle: 0
+      ParentHandle: 6652629833754950424
       Children:
         []
     MeshComponent:
-      MeshHandle: 1005
+      MeshHandle: 5963794263514486561
       SubmeshMaterials:
         - 2003
   - IDComponent:
@@ -71,18 +50,56 @@ Entities:
       SubmeshMaterials:
         - 2003
   - IDComponent:
-      ID: 6422384645588011490
+      ID: 4597209426252840243
     TagComponent:
-      Tag: Empty Entity
+      Tag: Sphere
     TransformComponent:
-      Translation: [-2.7216005, -0.11617562, 0.07573263]
-      Rotation: [-2.0751965, 0, 0]
-      Scale: [1, 1, 1]
+      Translation: [-4.4830613, -0.11565052, 0]
+      Rotation: [0, -0, 3.1384962]
+      Scale: [0.9999373, 0.9999373, 1]
     RelationshipComponent:
-      ParentHandle: 6652629833754950424
+      ParentHandle: 0
       Children:
         []
     MeshComponent:
-      MeshHandle: 5963794263514486561
+      MeshHandle: 1005
       SubmeshMaterials:
         - 2003
+  - IDComponent:
+      ID: 6652629833754950424
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [-0.9, 0, 0]
+      Rotation: [-0.99309236, -3.6564648, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        - 6422384645588011490
+    MeshComponent:
+      MeshHandle: 17196472838577284151
+      SubmeshMaterials:
+        - 8706604916645388531
+  - IDComponent:
+      ID: 8795389863366798160
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Translation: [-0.541266, 0, 6.217166]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    CameraComponent:
+      Primary: true
+      FixedAspectRatio: false
+      ProjectionType: Perspective
+      PerspectiveFOV: 50
+      PerspectiveNear: 0.05
+      PerspectiveFar: 500
+      OrthographicSize: 10
+      OrthographicNear: -100
+      OrthographicFar: 100

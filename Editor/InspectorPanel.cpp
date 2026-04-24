@@ -250,6 +250,11 @@ void InspectorPanel::onImGuiRender()
             ImGui::CloseCurrentPopup();
         }
 
+        if (!selected_entity.hasComponent<LightComponent>() && ImGui::MenuItem("Light")) {
+            selected_entity.addComponent<LightComponent>();
+            ImGui::CloseCurrentPopup();
+        }
+
         ImGui::EndPopup();
     }
 
@@ -335,6 +340,54 @@ void InspectorPanel::onImGuiRender()
                 ImGui::DragFloat("Size", &camera_component.orthographicSize, 0.1f, 0.001f, 10000.0f);
                 ImGui::DragFloat("Near", &camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
                 ImGui::DragFloat("Far", &camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
+            }
+        },
+        true);
+
+    drawComponentSection<LightComponent>(
+        "Light", selected_entity, [](LightComponent& light_component) {
+            ImGui::Checkbox("Enabled", &light_component.enabled);
+
+            const char* type_label = "Directional";
+            if (light_component.type == LightComponent::Type::Point) {
+                type_label = "Point";
+            } else if (light_component.type == LightComponent::Type::Spot) {
+                type_label = "Spot";
+            }
+            if (ImGui::BeginCombo("Type", type_label)) {
+                if (ImGui::Selectable("Directional", light_component.type == LightComponent::Type::Directional)) {
+                    light_component.type = LightComponent::Type::Directional;
+                }
+                if (ImGui::Selectable("Point", light_component.type == LightComponent::Type::Point)) {
+                    light_component.type = LightComponent::Type::Point;
+                }
+                if (ImGui::Selectable("Spot", light_component.type == LightComponent::Type::Spot)) {
+                    light_component.type = LightComponent::Type::Spot;
+                }
+                ImGui::EndCombo();
+            }
+
+            ImGui::ColorEdit3("Color", &light_component.color.x);
+            ImGui::DragFloat("Intensity", &light_component.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
+            if (light_component.type == LightComponent::Type::Point || light_component.type == LightComponent::Type::Spot) {
+                ImGui::DragFloat("Range", &light_component.range, 0.1f, 0.001f, 1000.0f, "%.2f");
+            }
+            if (light_component.type == LightComponent::Type::Spot) {
+                glm::vec2 cone_angles = glm::degrees(glm::vec2(light_component.innerConeAngleRadians,
+                                                               light_component.outerConeAngleRadians));
+                if (ImGui::DragFloat2("Cone Angles", &cone_angles.x, 0.5f, 0.1f, 89.0f, "%.1f")) {
+                    cone_angles.x = (std::clamp)(cone_angles.x, 0.1f, 89.0f);
+                    cone_angles.y = (std::clamp)(cone_angles.y, cone_angles.x, 89.0f);
+                    light_component.innerConeAngleRadians = glm::radians(cone_angles.x);
+                    light_component.outerConeAngleRadians = glm::radians(cone_angles.y);
+                }
+            }
+            if (light_component.type == LightComponent::Type::Directional) {
+                ImGui::TextDisabled("Directional light uses -entity forward as light direction.");
+            } else if (light_component.type == LightComponent::Type::Spot) {
+                ImGui::TextDisabled("Spot light emits along entity forward direction.");
+            } else {
+                ImGui::TextDisabled("Point light uses entity world position.");
             }
         },
         true);

@@ -22,6 +22,8 @@ struct SerializedEntityData {
     std::vector<uint64_t> serialized_children;
     bool has_camera_component = false;
     luna::CameraComponent camera;
+    bool has_light_component = false;
+    luna::LightComponent light;
     bool has_mesh_component = false;
     luna::MeshComponent mesh;
 };
@@ -39,6 +41,40 @@ glm::vec3 readVec3(const YAML::Node& node, const glm::vec3& fallback)
     }
 
     return {node[0].as<float>(), node[1].as<float>(), node[2].as<float>()};
+}
+
+const char* lightTypeToString(luna::LightComponent::Type type)
+{
+    switch (type) {
+        case luna::LightComponent::Type::Directional:
+            return "Directional";
+        case luna::LightComponent::Type::Point:
+            return "Point";
+        case luna::LightComponent::Type::Spot:
+            return "Spot";
+    }
+
+    return "Directional";
+}
+
+luna::LightComponent::Type readLightType(const YAML::Node& node, luna::LightComponent::Type fallback)
+{
+    if (!node) {
+        return fallback;
+    }
+
+    const std::string type = node.as<std::string>();
+    if (type == "Directional") {
+        return luna::LightComponent::Type::Directional;
+    }
+    if (type == "Point") {
+        return luna::LightComponent::Type::Point;
+    }
+    if (type == "Spot") {
+        return luna::LightComponent::Type::Spot;
+    }
+
+    return fallback;
 }
 
 } // namespace
@@ -141,6 +177,20 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             out << YAML::Key << "OrthographicSize" << YAML::Value << camera_component.orthographicSize;
             out << YAML::Key << "OrthographicNear" << YAML::Value << camera_component.orthographicNear;
             out << YAML::Key << "OrthographicFar" << YAML::Value << camera_component.orthographicFar;
+            out << YAML::EndMap;
+        }
+
+        if (registry.all_of<LightComponent>(entity_handle)) {
+            const auto& light_component = registry.get<const LightComponent>(entity_handle);
+            out << YAML::Key << "LightComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "Type" << YAML::Value << lightTypeToString(light_component.type);
+            out << YAML::Key << "Enabled" << YAML::Value << light_component.enabled;
+            out << YAML::Key << "Color" << YAML::Value;
+            emitVec3(out, light_component.color);
+            out << YAML::Key << "Intensity" << YAML::Value << light_component.intensity;
+            out << YAML::Key << "Range" << YAML::Value << light_component.range;
+            out << YAML::Key << "InnerConeAngle" << YAML::Value << glm::degrees(light_component.innerConeAngleRadians);
+            out << YAML::Key << "OuterConeAngle" << YAML::Value << glm::degrees(light_component.outerConeAngleRadians);
             out << YAML::EndMap;
         }
 
@@ -290,6 +340,29 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                     }
                 }
 
+                if (const YAML::Node light_component = entity_node["LightComponent"]; light_component) {
+                    entity_data.has_light_component = true;
+                    entity_data.light.type = readLightType(light_component["Type"], entity_data.light.type);
+                    if (light_component["Enabled"]) {
+                        entity_data.light.enabled = light_component["Enabled"].as<bool>();
+                    }
+                    entity_data.light.color = readVec3(light_component["Color"], entity_data.light.color);
+                    if (light_component["Intensity"]) {
+                        entity_data.light.intensity = light_component["Intensity"].as<float>();
+                    }
+                    if (light_component["Range"]) {
+                        entity_data.light.range = light_component["Range"].as<float>();
+                    }
+                    if (light_component["InnerConeAngle"]) {
+                        entity_data.light.innerConeAngleRadians =
+                            glm::radians(light_component["InnerConeAngle"].as<float>());
+                    }
+                    if (light_component["OuterConeAngle"]) {
+                        entity_data.light.outerConeAngleRadians =
+                            glm::radians(light_component["OuterConeAngle"].as<float>());
+                    }
+                }
+
                 if (const YAML::Node mesh_component = entity_node["MeshComponent"]; mesh_component) {
                     entity_data.has_mesh_component = true;
 
@@ -328,6 +401,11 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
         if (entity_data.has_camera_component) {
             auto& camera_component = entity.addComponent<CameraComponent>();
             camera_component = entity_data.camera;
+        }
+
+        if (entity_data.has_light_component) {
+            auto& light_component = entity.addComponent<LightComponent>();
+            light_component = entity_data.light;
         }
 
         if (entity_data.has_mesh_component) {

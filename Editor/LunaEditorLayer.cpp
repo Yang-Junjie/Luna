@@ -604,6 +604,74 @@ Entity LunaEditorLayer::createCameraEntity(Entity parent)
     return entity;
 }
 
+Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
+{
+    auto& entity_manager = m_scene.entityManager();
+    Entity entity = parent ? entity_manager.createChildEntity(parent, "Directional Light")
+                           : entity_manager.createEntity("Directional Light");
+    if (!entity) {
+        return {};
+    }
+
+    auto& light = entity.addComponent<LightComponent>();
+    light.type = LightComponent::Type::Directional;
+    light.enabled = true;
+    light.color = {1.0f, 0.98f, 0.95f};
+    light.intensity = 4.0f;
+
+    auto& transform = entity.transform();
+    transform.rotation = glm::radians(glm::vec3{-45.0f, 35.0f, 0.0f});
+    setSelectedEntity(entity);
+    return entity;
+}
+
+Entity LunaEditorLayer::createPointLightEntity(Entity parent)
+{
+    auto& entity_manager = m_scene.entityManager();
+    Entity entity = parent ? entity_manager.createChildEntity(parent, "Point Light")
+                           : entity_manager.createEntity("Point Light");
+    if (!entity) {
+        return {};
+    }
+
+    auto& light = entity.addComponent<LightComponent>();
+    light.type = LightComponent::Type::Point;
+    light.enabled = true;
+    light.color = {1.0f, 1.0f, 1.0f};
+    light.intensity = 20.0f;
+    light.range = 10.0f;
+
+    auto& transform = entity.transform();
+    transform.translation = {0.0f, 2.0f, 0.0f};
+    setSelectedEntity(entity);
+    return entity;
+}
+
+Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
+{
+    auto& entity_manager = m_scene.entityManager();
+    Entity entity = parent ? entity_manager.createChildEntity(parent, "Spot Light")
+                           : entity_manager.createEntity("Spot Light");
+    if (!entity) {
+        return {};
+    }
+
+    auto& light = entity.addComponent<LightComponent>();
+    light.type = LightComponent::Type::Spot;
+    light.enabled = true;
+    light.color = {1.0f, 0.96f, 0.86f};
+    light.intensity = 40.0f;
+    light.range = 15.0f;
+    light.innerConeAngleRadians = glm::radians(20.0f);
+    light.outerConeAngleRadians = glm::radians(35.0f);
+
+    auto& transform = entity.transform();
+    transform.translation = {0.0f, 3.0f, 3.0f};
+    transform.rotation = glm::radians(glm::vec3{-35.0f, 0.0f, 0.0f});
+    setSelectedEntity(entity);
+    return entity;
+}
+
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
     if (!entity || !mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
@@ -660,8 +728,9 @@ void LunaEditorLayer::createScene()
 {
     resetEditorState();
     createCameraEntity();
+    createDirectionalLightEntity();
     updateSceneLabel();
-    LUNA_EDITOR_INFO("Created a new scene with a primary camera");
+    LUNA_EDITOR_INFO("Created a new scene with a primary camera and directional light");
 }
 
 bool LunaEditorLayer::syncProjectAssets()

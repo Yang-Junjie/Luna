@@ -1,5 +1,7 @@
 static const float kPi = 3.14159265359;
 static const float kMinRoughness = 0.045;
+static const uint kMaxPointLights = 32;
+static const uint kMaxSpotLights = 32;
 
 struct SceneLightingVertexOutput
 {
@@ -17,6 +19,13 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
+    float4 lightCounts;
+    float4 pointLightPositionIntensity[kMaxPointLights];
+    float4 pointLightColorRange[kMaxPointLights];
+    float4 spotLightPositionIntensity[kMaxSpotLights];
+    float4 spotLightDirectionRange[kMaxSpotLights];
+    float4 spotLightColorCones[kMaxSpotLights];
+    float4 spotLightConeParams[kMaxSpotLights];
     float4 irradianceSh[9];
 };
 
@@ -254,25 +263,18 @@ float2 envBrdfApprox(float roughness, float NdotV)
     return float2(-1.04, 1.04) * a004 + r.zw;
 }
 
-float3 evaluatePbrLighting(float3 worldPosition,
-                           float3 normalWS,
+float3 evaluateDirectLight(float3 N,
+                           float3 V,
+                           float3 L,
+                           float3 radiance,
                            float3 baseColor,
                            float metallic,
                            float roughness,
-                           float3 emissive,
-                           float ao)
+                           float3 F0)
 {
-    const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
-    const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
-    const float3 L = safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0));
     const float NdotL = saturate(dot(N, L));
     const float NdotV = saturate(dot(N, V));
 
-    const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
-    const float3 radiance = gSceneParams.lightColorExposure.rgb * gSceneParams.lightDirectionIntensity.w;
-
-    // When V ~= -L, the microfacet half vector becomes undefined. Treat that direct-specular case as zero
-    // instead of falling back to N, otherwise the Fresnel split can produce the black ring + white dot artifact.
     const float3 directHalfVector = V + L;
     const float directHalfVectorLengthSq = dot(directHalfVector, directHalfVector);
     const bool hasValidDirectHalfVector = NdotL > 0.0 && NdotV > 0.0 && directHalfVectorLengthSq > 1e-6;
@@ -294,7 +296,79 @@ float3 evaluatePbrLighting(float3 worldPosition,
 
     const float3 directKd = (1.0 - directKs) * (1.0 - metallic);
     const float3 directDiffuse = directKd * baseColor / kPi * radiance * NdotL;
-    const float3 directLighting = directDiffuse + directSpecular;
+    return directDiffuse + directSpecular;
+}
+
+float calculateRangeAttenuation(float distanceToLight, float range)
+{
+    const float normalizedDistance = saturate(distanceToLight / max(range, 0.001));
+    const float smoothFalloff = saturate(1.0 - normalizedDistance * normalizedDistance);
+    return smoothFalloff * smoothFalloff / max(distanceToLight * distanceToLight, 0.01);
+}
+
+float3 evaluatePbrLighting(float3 worldPosition,
+                           float3 normalWS,
+                           float3 baseColor,
+                           float metallic,
+                           float roughness,
+                           float3 emissive,
+                           float ao)
+{
+    const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
+    const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
+    const float NdotV = saturate(dot(N, V));
+
+    const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+    float3 directLighting = evaluateDirectLight(N,
+                                                V,
+                                                safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0)),
+                                                gSceneParams.lightColorExposure.rgb * gSceneParams.lightDirectionIntensity.w,
+                                                baseColor,
+                                                metallic,
+                                                roughness,
+                                                F0);
+
+    const uint pointLightCount = min((uint)gSceneParams.lightCounts.x, kMaxPointLights);
+    for (uint lightIndex = 0; lightIndex < pointLightCount; ++lightIndex)
+    {
+        const float4 positionIntensity = gSceneParams.pointLightPositionIntensity[lightIndex];
+        const float4 colorRange = gSceneParams.pointLightColorRange[lightIndex];
+        const float3 lightVector = positionIntensity.xyz - worldPosition;
+        const float distanceToLight = length(lightVector);
+        const float3 pointL = safeNormalize(lightVector, float3(0.0, 1.0, 0.0));
+        const float attenuation = calculateRangeAttenuation(distanceToLight, colorRange.w);
+        directLighting += evaluateDirectLight(N,
+                                             V,
+                                             pointL,
+                                             colorRange.rgb * positionIntensity.w * attenuation,
+                                             baseColor,
+                                             metallic,
+                                             roughness,
+                                             F0);
+    }
+
+    const uint spotLightCount = min((uint)gSceneParams.lightCounts.y, kMaxSpotLights);
+    for (uint lightIndex = 0; lightIndex < spotLightCount; ++lightIndex)
+    {
+        const float4 positionIntensity = gSceneParams.spotLightPositionIntensity[lightIndex];
+        const float4 directionRange = gSceneParams.spotLightDirectionRange[lightIndex];
+        const float4 colorCones = gSceneParams.spotLightColorCones[lightIndex];
+        const float4 coneParams = gSceneParams.spotLightConeParams[lightIndex];
+        const float3 lightVector = positionIntensity.xyz - worldPosition;
+        const float distanceToLight = length(lightVector);
+        const float3 spotL = safeNormalize(lightVector, float3(0.0, 1.0, 0.0));
+        const float spotCos = dot(-spotL, safeNormalize(directionRange.xyz, float3(0.0, -1.0, 0.0)));
+        const float coneAttenuation = saturate((spotCos - coneParams.y) / max(coneParams.x - coneParams.y, 0.001));
+        const float attenuation = calculateRangeAttenuation(distanceToLight, directionRange.w) * coneAttenuation * coneAttenuation;
+        directLighting += evaluateDirectLight(N,
+                                             V,
+                                             spotL,
+                                             colorCones.rgb * positionIntensity.w * attenuation,
+                                             baseColor,
+                                             metallic,
+                                             roughness,
+                                             F0);
+    }
 
     const float maxEnvMip = gSceneParams.cameraPositionEnvMip.w;
     const float3 ambientKs = fresnelSchlickRoughness(NdotV, F0, roughness);

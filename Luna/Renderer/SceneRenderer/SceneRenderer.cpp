@@ -129,6 +129,38 @@ public:
         m_draw_queue.beginScene(camera);
     }
 
+    void submitDirectionalLight(const DirectionalLight& light)
+    {
+        m_draw_queue.submitDirectionalLight(scene_renderer::DirectionalLightSubmission{
+            .direction = light.direction,
+            .intensity = light.intensity,
+            .color = light.color,
+        });
+    }
+
+    void submitPointLight(const PointLight& light)
+    {
+        m_draw_queue.submitPointLight(scene_renderer::PointLightSubmission{
+            .position = light.position,
+            .intensity = light.intensity,
+            .color = light.color,
+            .range = light.range,
+        });
+    }
+
+    void submitSpotLight(const SpotLight& light)
+    {
+        m_draw_queue.submitSpotLight(scene_renderer::SpotLightSubmission{
+            .position = light.position,
+            .intensity = light.intensity,
+            .direction = light.direction,
+            .range = light.range,
+            .color = light.color,
+            .innerConeCos = light.innerConeCos,
+            .outerConeCos = light.outerConeCos,
+        });
+    }
+
     void clearSubmittedMeshes()
     {
         m_draw_queue.clear();
@@ -259,7 +291,7 @@ private:
         }
 
         auto& commands = pass_context.commandBuffer();
-        m_resources.updateSceneParameters(context, m_draw_queue.camera());
+        m_resources.updateSceneParameters(context, m_draw_queue.camera(), m_draw_queue);
         m_resources.prepareOpaqueDraws(commands, m_draw_queue, m_default_material);
 
         pass_context.beginRendering();
@@ -309,7 +341,7 @@ private:
 
         auto& commands = pass_context.commandBuffer();
         m_resources.uploadEnvironmentIfNeeded(commands);
-        m_resources.updateSceneParameters(context, m_draw_queue.camera());
+        m_resources.updateSceneParameters(context, m_draw_queue.camera(), m_draw_queue);
         m_resources.updateLightingResources(
             gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
 
@@ -343,7 +375,7 @@ private:
         m_draw_queue.sortTransparentBackToFront();
 
         auto& commands = pass_context.commandBuffer();
-        m_resources.updateSceneParameters(context, m_draw_queue.camera());
+        m_resources.updateSceneParameters(context, m_draw_queue.camera(), m_draw_queue);
         m_resources.uploadEnvironmentIfNeeded(commands);
         m_resources.prepareTransparentDraws(commands, m_draw_queue, m_default_material);
 
@@ -389,6 +421,21 @@ void SceneRenderer::shutdown()
 void SceneRenderer::beginScene(const Camera& camera)
 {
     m_impl->beginScene(camera);
+}
+
+void SceneRenderer::submitDirectionalLight(const DirectionalLight& light)
+{
+    m_impl->submitDirectionalLight(light);
+}
+
+void SceneRenderer::submitPointLight(const PointLight& light)
+{
+    m_impl->submitPointLight(light);
+}
+
+void SceneRenderer::submitSpotLight(const SpotLight& light)
+{
+    m_impl->submitSpotLight(light);
 }
 
 void SceneRenderer::clearSubmittedMeshes()

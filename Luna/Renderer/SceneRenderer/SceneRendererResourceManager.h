@@ -5,8 +5,10 @@
 // and uploaded draw assets so passes can ask for ready-to-use GPU resources.
 
 #include "Renderer/SceneRenderer/SceneRenderer.h"
+#include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
 
 #include <memory>
+#include <optional>
 
 namespace luna::RHI {
 class Buffer;
@@ -53,7 +55,9 @@ public:
                                  const DrawQueue& draw_queue,
                                  const Material& default_material);
     void uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands);
-    void updateSceneParameters(const SceneRenderer::RenderContext& context, const Camera& camera);
+    void updateSceneParameters(const SceneRenderer::RenderContext& context,
+                               const Camera& camera,
+                               const DrawQueue& draw_queue);
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,

@@ -373,6 +373,7 @@ void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Textur
 
 void PipelineLibrary::updateSceneParameters(const SceneRenderer::RenderContext& context,
                                             const Camera& camera,
+                                            const DrawQueue& draw_queue,
                                             float environment_mip_count,
                                             const std::array<glm::vec4, 9>& irradiance_sh)
 {
@@ -393,8 +394,33 @@ void PipelineLibrary::updateSceneParameters(const SceneRenderer::RenderContext& 
     params.view_projection = view_projection;
     params.inverse_view_projection = glm::inverse(view_projection);
     params.camera_position_env_mip = glm::vec4(scene_renderer_detail::resolveCameraPosition(camera), environment_mip_count);
-    params.light_direction_intensity = glm::vec4(glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f)), 4.0f);
-    params.light_color_exposure = glm::vec4(1.0f, 0.98f, 0.95f, 1.0f);
+    if (draw_queue.directionalLight().has_value() && draw_queue.directionalLight()->intensity > 0.0f) {
+        const auto& directional_light = *draw_queue.directionalLight();
+        params.light_direction_intensity = glm::vec4(glm::normalize(directional_light.direction), directional_light.intensity);
+        params.light_color_exposure = glm::vec4(directional_light.color, 1.0f);
+    } else {
+        params.light_direction_intensity = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
+        params.light_color_exposure = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    const uint32_t point_light_count =
+        (std::min)(static_cast<uint32_t>(draw_queue.pointLights().size()), scene_renderer_detail::kMaxPointLights);
+    const uint32_t spot_light_count =
+        (std::min)(static_cast<uint32_t>(draw_queue.spotLights().size()), scene_renderer_detail::kMaxSpotLights);
+    params.light_counts = glm::vec4(static_cast<float>(point_light_count), static_cast<float>(spot_light_count), 0.0f, 0.0f);
+
+    for (uint32_t light_index = 0; light_index < point_light_count; ++light_index) {
+        const auto& light = draw_queue.pointLights()[light_index];
+        params.point_light_position_intensity[light_index] = glm::vec4(light.position, light.intensity);
+        params.point_light_color_range[light_index] = glm::vec4(light.color, light.range);
+    }
+
+    for (uint32_t light_index = 0; light_index < spot_light_count; ++light_index) {
+        const auto& light = draw_queue.spotLights()[light_index];
+        params.spot_light_position_intensity[light_index] = glm::vec4(light.position, light.intensity);
+        params.spot_light_direction_range[light_index] = glm::vec4(light.direction, light.range);
+        params.spot_light_color_cones[light_index] = glm::vec4(light.color, 0.0f);
+        params.spot_light_cone_params[light_index] = glm::vec4(light.innerConeCos, light.outerConeCos, 0.0f, 0.0f);
+    }
     params.ibl_factors = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f, 0.65f, 0.0f, 0.0f);
     params.debug_pick_marker = glm::vec4(static_cast<float>(context.debug_pick_pixel_x),

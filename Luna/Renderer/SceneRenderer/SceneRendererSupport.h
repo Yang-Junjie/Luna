@@ -35,6 +35,8 @@ inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
 inline constexpr float kDefaultMaterialAlphaCutoff = 0.5f;
 inline constexpr float kEnvironmentFallbackValue = 0.08f;
+inline constexpr uint32_t kMaxPointLights = 32;
+inline constexpr uint32_t kMaxSpotLights = 32;
 
 struct MeshPushConstants {
     glm::mat4 model{1.0f};
@@ -46,11 +48,18 @@ struct SceneGpuParams {
     glm::mat4 view_projection{1.0f};
     glm::mat4 inverse_view_projection{1.0f};
     glm::vec4 camera_position_env_mip{0.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec4 light_direction_intensity{0.45f, 0.80f, 0.35f, 4.0f};
-    glm::vec4 light_color_exposure{1.0f, 0.98f, 0.95f, 1.0f};
+    glm::vec4 light_direction_intensity{0.0f, 1.0f, 0.0f, 0.0f};
+    glm::vec4 light_color_exposure{1.0f, 1.0f, 1.0f, 1.0f};
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
     glm::vec4 debug_overlay_params{0.0f, 0.65f, 0.0f, 0.0f};
     glm::vec4 debug_pick_marker{0.0f, 0.0f, 0.0f, 1.0f};
+    glm::vec4 light_counts{0.0f, 0.0f, 0.0f, 0.0f};
+    std::array<glm::vec4, kMaxPointLights> point_light_position_intensity{};
+    std::array<glm::vec4, kMaxPointLights> point_light_color_range{};
+    std::array<glm::vec4, kMaxSpotLights> spot_light_position_intensity{};
+    std::array<glm::vec4, kMaxSpotLights> spot_light_direction_range{};
+    std::array<glm::vec4, kMaxSpotLights> spot_light_color_cones{};
+    std::array<glm::vec4, kMaxSpotLights> spot_light_cone_params{};
     std::array<glm::vec4, 9> irradiance_sh{};
 };
 

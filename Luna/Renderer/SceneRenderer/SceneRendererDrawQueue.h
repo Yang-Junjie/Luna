@@ -9,7 +9,9 @@
 #include <cstdint>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace luna {
@@ -27,6 +29,29 @@ struct DrawCommand {
     uint32_t picking_id{0};
 };
 
+struct DirectionalLightSubmission {
+    glm::vec3 direction{0.0f, 1.0f, 0.0f};
+    float intensity{0.0f};
+    glm::vec3 color{1.0f, 1.0f, 1.0f};
+};
+
+struct PointLightSubmission {
+    glm::vec3 position{0.0f, 0.0f, 0.0f};
+    float intensity{0.0f};
+    glm::vec3 color{1.0f, 1.0f, 1.0f};
+    float range{10.0f};
+};
+
+struct SpotLightSubmission {
+    glm::vec3 position{0.0f, 0.0f, 0.0f};
+    float intensity{0.0f};
+    glm::vec3 direction{0.0f, -1.0f, 0.0f};
+    float range{10.0f};
+    glm::vec3 color{1.0f, 1.0f, 1.0f};
+    float innerConeCos{0.0f};
+    float outerConeCos{0.0f};
+};
+
 class DrawQueue final {
 public:
     void beginScene(const Camera& camera);
@@ -40,12 +65,30 @@ public:
                           std::shared_ptr<Mesh> mesh,
                           const std::vector<std::shared_ptr<Material>>& submesh_materials,
                           uint32_t picking_id = 0);
+    void submitDirectionalLight(const DirectionalLightSubmission& light);
+    void submitPointLight(const PointLightSubmission& light);
+    void submitSpotLight(const SpotLightSubmission& light);
 
     void sortTransparentBackToFront();
 
     [[nodiscard]] const Camera& camera() const noexcept
     {
         return m_camera;
+    }
+
+    [[nodiscard]] const std::optional<DirectionalLightSubmission>& directionalLight() const noexcept
+    {
+        return m_directional_light;
+    }
+
+    [[nodiscard]] const std::vector<PointLightSubmission>& pointLights() const noexcept
+    {
+        return m_point_lights;
+    }
+
+    [[nodiscard]] const std::vector<SpotLightSubmission>& spotLights() const noexcept
+    {
+        return m_spot_lights;
     }
 
     [[nodiscard]] const std::vector<DrawCommand>& opaqueDrawCommands() const noexcept
@@ -65,6 +108,9 @@ public:
 
 private:
     Camera m_camera{};
+    std::optional<DirectionalLightSubmission> m_directional_light;
+    std::vector<PointLightSubmission> m_point_lights;
+    std::vector<SpotLightSubmission> m_spot_lights;
     std::vector<DrawCommand> m_opaque_draw_commands;
     std::vector<DrawCommand> m_transparent_draw_commands;
 };

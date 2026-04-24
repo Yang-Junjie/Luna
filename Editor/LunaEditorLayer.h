@@ -54,6 +54,9 @@ public:
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
     Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
     Entity createCameraEntity(Entity parent = {});
+    Entity createDirectionalLightEntity(Entity parent = {});
+    Entity createPointLightEntity(Entity parent = {});
+    Entity createSpotLightEntity(Entity parent = {});
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0));
 

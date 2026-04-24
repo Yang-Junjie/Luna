@@ -10,6 +10,7 @@
 #include <Core.h>
 #include <Instance.h>
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 #include <memory>
@@ -38,6 +39,29 @@ public:
             return !geometry_vertex_path.empty() && !geometry_fragment_path.empty() &&
                    !lighting_vertex_path.empty() && !lighting_fragment_path.empty();
         }
+    };
+
+    struct DirectionalLight {
+        glm::vec3 direction{0.0f, 1.0f, 0.0f};
+        float intensity{0.0f};
+        glm::vec3 color{1.0f, 1.0f, 1.0f};
+    };
+
+    struct PointLight {
+        glm::vec3 position{0.0f, 0.0f, 0.0f};
+        float intensity{0.0f};
+        glm::vec3 color{1.0f, 1.0f, 1.0f};
+        float range{10.0f};
+    };
+
+    struct SpotLight {
+        glm::vec3 position{0.0f, 0.0f, 0.0f};
+        float intensity{0.0f};
+        glm::vec3 direction{0.0f, -1.0f, 0.0f};
+        float range{10.0f};
+        glm::vec3 color{1.0f, 1.0f, 1.0f};
+        float innerConeCos{0.0f};
+        float outerConeCos{0.0f};
     };
 
     struct RenderContext {
@@ -70,6 +94,9 @@ public:
     SceneRenderer& operator=(const SceneRenderer&) = delete;
 
     void beginScene(const Camera& camera);
+    void submitDirectionalLight(const DirectionalLight& light);
+    void submitPointLight(const PointLight& light);
+    void submitSpotLight(const SpotLight& light);
     void submitStaticMesh(const glm::mat4& transform,
                           std::shared_ptr<Mesh> mesh,
                           std::shared_ptr<Material> material = {},

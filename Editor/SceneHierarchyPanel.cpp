@@ -48,6 +48,18 @@ void drawCreateEntityMenu(luna::LunaEditorLayer& editor_layer, luna::Entity pare
     if (ImGui::MenuItem(parent ? "Create Child Camera" : "Create Camera")) {
         editor_layer.createCameraEntity(parent);
     }
+
+    if (ImGui::MenuItem(parent ? "Create Child Directional Light" : "Create Directional Light")) {
+        editor_layer.createDirectionalLightEntity(parent);
+    }
+
+    if (ImGui::MenuItem(parent ? "Create Child Point Light" : "Create Point Light")) {
+        editor_layer.createPointLightEntity(parent);
+    }
+
+    if (ImGui::MenuItem(parent ? "Create Child Spot Light" : "Create Spot Light")) {
+        editor_layer.createSpotLightEntity(parent);
+    }
 }
 
 void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})

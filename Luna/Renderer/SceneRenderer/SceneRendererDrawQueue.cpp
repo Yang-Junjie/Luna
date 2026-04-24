@@ -25,6 +25,54 @@ void DrawQueue::clear() noexcept
     }
     m_opaque_draw_commands.clear();
     m_transparent_draw_commands.clear();
+    m_directional_light.reset();
+    m_point_lights.clear();
+    m_spot_lights.clear();
+}
+
+void DrawQueue::submitDirectionalLight(const DirectionalLightSubmission& light)
+{
+    m_directional_light = light;
+    LUNA_RENDERER_FRAME_DEBUG("Submitted directional light: direction=({}, {}, {}) color=({}, {}, {}) intensity={}",
+                              light.direction.x,
+                              light.direction.y,
+                              light.direction.z,
+                              light.color.r,
+                              light.color.g,
+                              light.color.b,
+                              light.intensity);
+}
+
+void DrawQueue::submitPointLight(const PointLightSubmission& light)
+{
+    m_point_lights.push_back(light);
+    LUNA_RENDERER_FRAME_DEBUG("Submitted point light: position=({}, {}, {}) color=({}, {}, {}) intensity={} range={}",
+                              light.position.x,
+                              light.position.y,
+                              light.position.z,
+                              light.color.r,
+                              light.color.g,
+                              light.color.b,
+                              light.intensity,
+                              light.range);
+}
+
+void DrawQueue::submitSpotLight(const SpotLightSubmission& light)
+{
+    m_spot_lights.push_back(light);
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Submitted spot light: position=({}, {}, {}) direction=({}, {}, {}) color=({}, {}, {}) intensity={} range={}",
+        light.position.x,
+        light.position.y,
+        light.position.z,
+        light.direction.x,
+        light.direction.y,
+        light.direction.z,
+        light.color.r,
+        light.color.g,
+        light.color.b,
+        light.intensity,
+        light.range);
 }
 
 void DrawQueue::submitStaticMesh(const glm::mat4& transform,

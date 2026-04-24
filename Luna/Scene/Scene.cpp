@@ -41,6 +41,15 @@ uint32_t encodePickingId(Entity entity)
     return entity ? (static_cast<uint32_t>(entity) + 1u) : 0u;
 }
 
+glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
+{
+    const float length_squared = glm::dot(value, value);
+    if (length_squared <= 0.000001f) {
+        return fallback;
+    }
+    return glm::normalize(value);
+}
+
 } // namespace
 
 Scene::Scene()
@@ -74,6 +83,53 @@ void Scene::submitScene(const Camera& camera)
     auto& entity_manager = m_entity_manager;
     scene_renderer.beginScene(camera);
     auto& registry = entity_manager.registry();
+
+    bool has_directional_light = false;
+    auto light_view = registry.view<TransformComponent, LightComponent>();
+    for (const auto entity_handle : light_view) {
+        const auto& light_component = light_view.get<LightComponent>(entity_handle);
+        if (!light_component.enabled) {
+            continue;
+        }
+
+        Entity light_entity(entity_handle, &entity_manager);
+        const TransformComponent world_transform = entity_manager.getWorldSpaceTransform(light_entity);
+        const float intensity = (std::max)(light_component.intensity, 0.0f);
+        const float range = (std::max)(light_component.range, 0.001f);
+
+        switch (light_component.type) {
+            case LightComponent::Type::Directional:
+                if (!has_directional_light) {
+                    scene_renderer.submitDirectionalLight(SceneRenderer::DirectionalLight{
+                        .direction = safeNormalize(-world_transform.getForward(), glm::vec3(0.0f, 1.0f, 0.0f)),
+                        .intensity = intensity,
+                        .color = light_component.color,
+                    });
+                    has_directional_light = true;
+                }
+                break;
+            case LightComponent::Type::Point:
+                scene_renderer.submitPointLight(SceneRenderer::PointLight{
+                    .position = world_transform.translation,
+                    .intensity = intensity,
+                    .color = light_component.color,
+                    .range = range,
+                });
+                break;
+            case LightComponent::Type::Spot:
+                scene_renderer.submitSpotLight(SceneRenderer::SpotLight{
+                    .position = world_transform.translation,
+                    .intensity = intensity,
+                    .direction = safeNormalize(world_transform.getForward(), glm::vec3(0.0f, -1.0f, 0.0f)),
+                    .range = range,
+                    .color = light_component.color,
+                    .innerConeCos = glm::cos(light_component.innerConeAngleRadians),
+                    .outerConeCos = glm::cos(light_component.outerConeAngleRadians),
+                });
+                break;
+        }
+    }
+
     auto view = registry.view<TransformComponent, MeshComponent>();
     for (const auto entity_handle : view) {
         Entity entity(entity_handle, &entity_manager);

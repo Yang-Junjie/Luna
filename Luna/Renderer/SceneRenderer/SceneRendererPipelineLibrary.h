@@ -5,8 +5,10 @@
 // but not uploaded mesh/material asset caches.
 
 #include "Renderer/SceneRenderer/SceneRenderer.h"
+#include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
 
 #include <array>
+#include <optional>
 
 namespace luna {
 class Camera;
@@ -33,6 +35,7 @@ public:
     void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture);
     void updateSceneParameters(const SceneRenderer::RenderContext& context,
                                const Camera& camera,
+                               const DrawQueue& draw_queue,
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh);
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
