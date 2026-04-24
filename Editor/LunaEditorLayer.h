@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetLoadingPanel.h"
+#include "BuiltinMaterialsPanel.h"
 #include "ContentBrowserPanel.h"
 #include "Core/Layer.h"
 #include "EditorCamera.h"
@@ -41,6 +42,7 @@ public:
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
     Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
+    void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0));
 
 private:
     void consumePendingScenePick();
@@ -79,9 +81,11 @@ private:
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
+    bool m_show_builtin_materials_panel{false};
     SceneHierarchyPanel m_scene_hierarchy_panel;
     InspectorPanel m_inspector_panel;
     AssetLoadingPanel m_asset_loading_panel;
+    BuiltinMaterialsPanel m_builtin_materials_panel;
     ContentBrowserPanel m_content_browser_panel;
 };
 

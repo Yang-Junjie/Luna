@@ -45,9 +45,9 @@ Entities:
       Children:
         []
     MeshComponent:
-      MeshHandle: 1001
+      MeshHandle: 1002
       SubmeshMaterials:
-        - 2001
+        - 2003
   - IDComponent:
       ID: 6422384645588011490
     TagComponent:

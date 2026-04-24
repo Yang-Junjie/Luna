@@ -3,6 +3,8 @@ add_executable(
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
     AssetLoadingPanel.h
     AssetLoadingPanel.cpp
+    BuiltinMaterialsPanel.h
+    BuiltinMaterialsPanel.cpp
     ContentBrowserPanel.h
     ContentBrowserPanel.cpp
     EditorCamera.h

@@ -79,12 +79,14 @@ private:
         std::shared_ptr<scene_renderer_detail::PendingTextureUpload> occlusion_texture;
         luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
         luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
+        uint64_t uploaded_version{0};
     };
 
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh, const Bindings& bindings);
     std::shared_ptr<scene_renderer_detail::PendingTextureUpload>
         getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings);
+    static void uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material);
     void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
     [[nodiscard]] static const Material& resolveMaterial(const std::shared_ptr<Material>& material,
                                                          const Material& default_material);

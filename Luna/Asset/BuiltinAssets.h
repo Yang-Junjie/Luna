@@ -17,9 +17,19 @@ inline const AssetHandle Cone{1005};
 
 namespace BuiltinMaterials {
 inline const AssetHandle DefaultLit{2001};
+inline const AssetHandle DefaultUnlit{2002};
+inline const AssetHandle DebugRed{2003};
+inline const AssetHandle DebugGreen{2004};
+inline const AssetHandle DebugBlue{2005};
+inline const AssetHandle Transparent{2006};
 } // namespace BuiltinMaterials
 
 struct BuiltinMeshDescriptor {
+    AssetHandle Handle;
+    const char* Name;
+};
+
+struct BuiltinMaterialDescriptor {
     AssetHandle Handle;
     const char* Name;
 };
@@ -32,6 +42,7 @@ public:
     static bool isBuiltinMaterial(AssetHandle handle);
     static const char* getDisplayName(AssetHandle handle);
     static const std::array<BuiltinMeshDescriptor, 5>& getBuiltinMeshes();
+    static const std::array<BuiltinMaterialDescriptor, 6>& getBuiltinMaterials();
 };
 
 } // namespace luna

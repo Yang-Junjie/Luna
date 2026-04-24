@@ -62,6 +62,8 @@ set(RHI_RUNTIME_SOURCE
     Imgui/Shaders/ImGui.slang)
 
 set(PROJECT_SOURCE
+    Project/BuiltinMaterialOverrides.h
+    Project/BuiltinMaterialOverrides.cpp
     Project/ProjectInfo.h
     Project/ProjectManager.h
     Project/ProjectManager.cpp)

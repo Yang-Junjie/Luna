@@ -62,6 +62,11 @@ public:
 
     const TextureSet& getTextures() const;
     const SurfaceProperties& getSurface() const;
+    const SurfaceProperties& getDefaultSurface() const;
+    uint64_t getVersion() const;
+
+    void setSurface(const SurfaceProperties& surface);
+    void resetSurface();
 
     AssetType getAssetsType() const override
     {
@@ -84,8 +89,10 @@ private:
 
     TextureSet m_textures;
     SurfaceProperties m_surface;
+    SurfaceProperties m_default_surface;
 
     BlendMode m_blend_mode{BlendMode::Opaque};
+    uint64_t m_version{1};
 };
 
 } // namespace luna

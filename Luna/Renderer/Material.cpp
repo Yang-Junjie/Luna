@@ -29,6 +29,7 @@ Material::Material(std::string name, TextureSet textures, SurfaceProperties surf
     : m_name(std::move(name)),
       m_textures(std::move(textures)),
       m_surface(surface),
+      m_default_surface(surface),
       m_blend_mode(surface.BlendModeValue)
 {
     LUNA_RENDERER_DEBUG("Created material '{}' blend={} textures: base_color={} normal={} metallic_roughness={} "
@@ -60,6 +61,28 @@ const Material::TextureSet& Material::getTextures() const
 const Material::SurfaceProperties& Material::getSurface() const
 {
     return m_surface;
+}
+
+const Material::SurfaceProperties& Material::getDefaultSurface() const
+{
+    return m_default_surface;
+}
+
+uint64_t Material::getVersion() const
+{
+    return m_version;
+}
+
+void Material::setSurface(const SurfaceProperties& surface)
+{
+    m_surface = surface;
+    m_blend_mode = m_surface.BlendModeValue;
+    ++m_version;
+}
+
+void Material::resetSurface()
+{
+    setSurface(m_default_surface);
 }
 
 Material::BlendMode Material::getBlendMode() const

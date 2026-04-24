@@ -212,11 +212,11 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
     if (it != m_uploaded_materials.end()) {
         LUNA_RENDERER_FRAME_TRACE("Reusing uploaded material '{}'",
                                   material.getName().empty() ? "Material" : material.getName());
+        uploadMaterialParamsIfNeeded(material, it->second);
         return it->second;
     }
 
     const auto& textures = material.getTextures();
-    const auto& surface = material.getSurface();
     const std::string material_name = material.getName().empty() ? "Material" : material.getName();
     const Texture::SamplerSettings default_sampler_settings{};
 
@@ -258,25 +258,7 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
                                                                             .SetName(material_name + "_Params")
                                                                             .Build());
     }
-    if (!uploaded_material.params_buffer) {
-        LUNA_RENDERER_WARN("Failed to create parameter buffer for material '{}'", material_name);
-    } else if (void* mapped = uploaded_material.params_buffer->Map()) {
-        const scene_renderer_detail::MaterialGpuParams params{
-            .base_color_factor = surface.BaseColorFactor,
-            .emissive_factor_normal_scale = glm::vec4(surface.EmissiveFactor, surface.NormalScale),
-            .material_factors = glm::vec4(
-                surface.MetallicFactor, surface.RoughnessFactor, surface.OcclusionStrength, surface.AlphaCutoff),
-            .material_flags = glm::vec4(scene_renderer_detail::materialBlendModeToFloat(material.getBlendMode()),
-                                        surface.Unlit ? 1.0f : 0.0f,
-                                        surface.DoubleSided ? 1.0f : 0.0f,
-                                        0.0f),
-        };
-        std::memcpy(mapped, &params, sizeof(params));
-        uploaded_material.params_buffer->Flush();
-        uploaded_material.params_buffer->Unmap();
-    } else {
-        LUNA_RENDERER_WARN("Failed to map parameter buffer for material '{}'", material_name);
-    }
+    uploadMaterialParamsIfNeeded(material, uploaded_material);
 
     if (!bindings.isValid() || !uploaded_material.base_color_texture || !uploaded_material.normal_texture ||
         !uploaded_material.metallic_roughness_texture || !uploaded_material.emissive_texture ||
@@ -390,6 +372,41 @@ void AssetCache::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& command
     }
     if (uploaded_material.occlusion_texture) {
         scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.occlusion_texture);
+    }
+}
+
+void AssetCache::uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material)
+{
+    if (uploaded_material.uploaded_version == material.getVersion()) {
+        return;
+    }
+
+    const std::string material_name = material.getName().empty() ? "Material" : material.getName();
+    if (!uploaded_material.params_buffer) {
+        LUNA_RENDERER_WARN("Failed to update parameter buffer for material '{}' because buffer is unavailable",
+                           material_name);
+        return;
+    }
+
+    const auto& surface = material.getSurface();
+    if (void* mapped = uploaded_material.params_buffer->Map()) {
+        const scene_renderer_detail::MaterialGpuParams params{
+            .base_color_factor = surface.BaseColorFactor,
+            .emissive_factor_normal_scale = glm::vec4(surface.EmissiveFactor, surface.NormalScale),
+            .material_factors = glm::vec4(
+                surface.MetallicFactor, surface.RoughnessFactor, surface.OcclusionStrength, surface.AlphaCutoff),
+            .material_flags = glm::vec4(scene_renderer_detail::materialBlendModeToFloat(material.getBlendMode()),
+                                        surface.Unlit ? 1.0f : 0.0f,
+                                        surface.DoubleSided ? 1.0f : 0.0f,
+                                        0.0f),
+        };
+        std::memcpy(mapped, &params, sizeof(params));
+        uploaded_material.params_buffer->Flush();
+        uploaded_material.params_buffer->Unmap();
+        uploaded_material.uploaded_version = material.getVersion();
+        LUNA_RENDERER_FRAME_TRACE("Updated material '{}' params version={}", material_name, material.getVersion());
+    } else {
+        LUNA_RENDERER_WARN("Failed to map parameter buffer for material '{}'", material_name);
     }
 }
 

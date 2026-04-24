@@ -363,9 +363,35 @@ void InspectorPanel::onImGuiRender()
                     ImGui::Text("Submesh %u", submesh_index);
 
                     AssetHandle material_handle = mesh_component.getSubmeshMaterial(submesh_index);
+                    const std::string current_builtin_material_label = BuiltinAssets::isBuiltinMaterial(material_handle)
+                                                                     ? BuiltinAssets::getDisplayName(material_handle)
+                                                                     : "None";
+                    if (ImGui::BeginCombo("Builtin Material", current_builtin_material_label.c_str())) {
+                        if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMaterial(material_handle))) {
+                            material_handle = AssetHandle(0);
+                        }
+
+                        for (const auto& material : BuiltinAssets::getBuiltinMaterials()) {
+                            const bool selected = material_handle == material.Handle;
+                            if (ImGui::Selectable(material.Name, selected)) {
+                                material_handle = material.Handle;
+                            }
+                            if (selected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+
                     drawAssetHandleEditor("Material Handle", material_handle, {AssetType::Material});
                     mesh_component.setSubmeshMaterial(submesh_index, material_handle);
                     ImGui::TextDisabled("Material Asset: %s", getAssetDisplayLabel(material_handle).c_str());
+                    if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
+                        ImGui::TextDisabled("Global builtin material; edits affect all users.");
+                        if (ImGui::Button("Edit Builtin Material", ImVec2(-1.0f, 0.0f))) {
+                            m_editor_layer->openBuiltinMaterialsPanel(material_handle);
+                        }
+                    }
 
                     if (ImGui::Button("Clear Material", ImVec2(-1.0f, 0.0f))) {
                         mesh_component.clearSubmeshMaterial(submesh_index);

@@ -1,0 +1,43 @@
+BuiltinMaterialOverrides:
+  2001:
+    BaseColorFactor: [1, 1, 1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    AlphaCutoff: 0.5
+    Unlit: false
+  2002:
+    BaseColorFactor: [1, 1, 1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    AlphaCutoff: 0.5
+    Unlit: true
+  2003:
+    BaseColorFactor: [0.11215992, 0.112745106, 0.10279701, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 1
+    RoughnessFactor: 0.168
+    AlphaCutoff: 0.5
+    Unlit: false
+  2004:
+    BaseColorFactor: [0.1, 1, 0.1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    AlphaCutoff: 0.5
+    Unlit: true
+  2005:
+    BaseColorFactor: [0.1, 0.25, 1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    AlphaCutoff: 0.5
+    Unlit: true
+  2006:
+    BaseColorFactor: [1, 1, 1, 0.35]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    AlphaCutoff: 0.5
+    Unlit: false

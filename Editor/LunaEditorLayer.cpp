@@ -8,6 +8,7 @@
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 #include "Platform/Common/FileDialogs.h"
+#include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
 #include "Renderer/Mesh.h"
@@ -207,6 +208,7 @@ void LunaEditorLayer::onImGuiRender()
     m_scene_hierarchy_panel.onImGuiRender();
     m_inspector_panel.onImGuiRender();
     m_asset_loading_panel.onImGuiRender();
+    m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
     drawViewport();
 }
@@ -274,6 +276,11 @@ void LunaEditorLayer::onImGuiMenuBar()
         if (ImGui::MenuItem("Save Scene")) {
             saveScene();
         }
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Window")) {
+        ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
         ImGui::EndMenu();
     }
 }
@@ -488,6 +495,14 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
     }
 }
 
+void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
+{
+    if (material_handle.isValid()) {
+        m_builtin_materials_panel.focusMaterial(material_handle);
+    }
+    m_show_builtin_materials_panel = true;
+}
+
 void LunaEditorLayer::resetEditorState()
 {
     m_scene.entityManager().clear();
@@ -536,6 +551,7 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
     AssetDatabase::clear();
     syncProjectAssets();
     AssetManager::get().init();
+    BuiltinMaterialOverrides::load();
 
     createScene();
 
