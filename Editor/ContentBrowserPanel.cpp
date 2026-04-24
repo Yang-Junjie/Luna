@@ -262,7 +262,7 @@ std::filesystem::path editorAssetPath(std::string_view file_name)
 luna::RHI::Ref<luna::RHI::Texture> uploadEditorIconTexture(const std::filesystem::path& path,
                                                            std::string_view debug_name)
 {
-    const luna::rhi::ImageData image = luna::rhi::ImageLoader::LoadImageFromFile(path.string());
+    const luna::ImageData image = luna::ImageLoader::LoadImageFromFile(path.string());
     if (!image.isValid()) {
         LUNA_EDITOR_WARN("Content Browser failed to load icon '{}'", path.string());
         return {};
@@ -494,10 +494,10 @@ void ensureIconsLoaded(luna::ContentBrowserPanelState& state)
     }
 
     if (state.DirectoryIconTextureId == 0 && state.DirectoryIconTexture) {
-        state.DirectoryIconTextureId = luna::rhi::ImGuiRhiContext::GetTextureId(state.DirectoryIconTexture);
+        state.DirectoryIconTextureId = luna::ImGuiRhiContext::GetTextureId(state.DirectoryIconTexture);
     }
     if (state.FileIconTextureId == 0 && state.FileIconTexture) {
-        state.FileIconTextureId = luna::rhi::ImGuiRhiContext::GetTextureId(state.FileIconTexture);
+        state.FileIconTextureId = luna::ImGuiRhiContext::GetTextureId(state.FileIconTexture);
     }
 }
 

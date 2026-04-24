@@ -1,11 +1,11 @@
 #include "Core/Log.h"
-#include "Renderer/RendererInternal.h"
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/RendererUtilities.h"
 
 #include <Builders.h>
 #include <Device.h>
 
-namespace luna::rhi {
+namespace luna {
 namespace {
 
 bool isValidTextureRef(const luna::RHI::Ref<luna::RHI::Texture>& texture)
@@ -560,4 +560,4 @@ bool RenderGraphBuilder::isHandleValid(RenderGraphTextureHandle handle, size_t r
     return handle.isValid() && handle.Index < resource_count;
 }
 
-} // namespace luna::rhi
+} // namespace luna

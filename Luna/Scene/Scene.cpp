@@ -1,9 +1,9 @@
-#include "Core/Application.h"
+﻿#include "Core/Application.h"
 #include "Asset/AssetManager.h"
 #include "Entity.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/SceneRenderer.h"
+#include "Renderer/SceneRenderer/SceneRenderer.h"
 #include "Scene.h"
 
 #include <utility>

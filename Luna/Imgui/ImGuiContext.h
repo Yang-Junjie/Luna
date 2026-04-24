@@ -15,7 +15,7 @@ namespace luna {
 class Renderer;
 }
 
-namespace luna::rhi {
+namespace luna {
 
 class ImGuiRhiContext {
 public:
@@ -34,4 +34,4 @@ public:
     static void NotifyFrameResourcesChanged(uint32_t frames_in_flight);
 };
 
-} // namespace luna::rhi
+} // namespace luna

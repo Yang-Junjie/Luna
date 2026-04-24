@@ -1,5 +1,9 @@
 #pragma once
 
+// Defines mesh asset data used by scene submission and GPU upload paths.
+// Holds vertex/index buffers in CPU memory and groups them into submeshes
+// that the renderer can upload and draw independently.
+
 #include "Asset/Asset.h"
 
 #include <cstdint>

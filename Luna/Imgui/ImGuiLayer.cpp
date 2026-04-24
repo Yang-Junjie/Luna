@@ -45,13 +45,13 @@ void ImGuiLayer::onAttach()
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
 
-    if (!luna::rhi::ImGuiRhiContext::Init(*m_renderer)) {
+    if (!luna::ImGuiRhiContext::Init(*m_renderer)) {
         LUNA_IMGUI_ERROR("Failed to initialize ImGui RHI backend");
         ImGui::DestroyContext();
         return;
     }
     m_attached = true;
-    LUNA_IMGUI_INFO("Initialized ImGui for luna::rhi");
+    LUNA_IMGUI_INFO("Initialized ImGui for luna");
 }
 
 void ImGuiLayer::onDetach()
@@ -60,7 +60,7 @@ void ImGuiLayer::onDetach()
         return;
     }
 
-    luna::rhi::ImGuiRhiContext::Destroy();
+    luna::ImGuiRhiContext::Destroy();
     m_attached = false;
 }
 
@@ -81,7 +81,7 @@ void ImGuiLayer::begin()
         return;
     }
 
-    luna::rhi::ImGuiRhiContext::StartFrame();
+    luna::ImGuiRhiContext::StartFrame();
 
     ImGuiIO& io = ImGui::GetIO();
     if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {

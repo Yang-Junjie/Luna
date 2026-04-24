@@ -1,10 +1,14 @@
 #pragma once
 
+// Builds a frame-local render graph from imported textures and declared passes.
+// Tracks temporary resources, access patterns, and exported states before
+// producing the compiled RenderGraph executed later in the frame.
+
 #include "Renderer/RenderGraph.h"
 
 #include <optional>
 
-namespace luna::rhi::detail {
+namespace luna::detail {
 
 struct RenderGraphTextureNode {
     RenderGraphTextureDesc Desc;
@@ -42,9 +46,9 @@ struct RenderGraphRasterPassNode {
     bool SideEffect{false};
 };
 
-} // namespace luna::rhi::detail
+} // namespace luna::detail
 
-namespace luna::rhi {
+namespace luna {
 
 class RenderGraphTransientTextureCache {
 public:
@@ -118,4 +122,4 @@ private:
     std::vector<detail::RenderGraphRasterPassNode> m_raster_pass_nodes;
 };
 
-} // namespace luna::rhi
+} // namespace luna

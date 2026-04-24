@@ -9,7 +9,7 @@
 #define TINYDDSLOADER_IMPLEMENTATION
 #include "third_party/tinyddsloader/tinyddsloader.h"
 
-namespace luna::rhi {
+namespace luna {
 namespace {
 
 bool isDDSImage(const std::string& filepath)
@@ -403,4 +403,4 @@ CubemapData ImageLoader::LoadCubemapImageFromFile(const std::string& filepath)
     return createCubemapFromSingleImage(LoadImageFromFile(filepath));
 }
 
-} // namespace luna::rhi
+} // namespace luna

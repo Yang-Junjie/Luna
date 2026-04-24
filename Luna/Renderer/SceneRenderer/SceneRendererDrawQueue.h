@@ -1,5 +1,9 @@
 #pragma once
 
+// Stores scene draw submissions for the current frame.
+// Splits work into opaque and transparent queues and keeps the camera snapshot
+// needed for sorting and later pass execution.
+
 #include "Renderer/Camera.h"
 
 #include <cstdint>

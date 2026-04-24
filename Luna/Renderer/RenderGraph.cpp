@@ -1,10 +1,10 @@
 #include "Core/Log.h"
-#include "Renderer/RendererInternal.h"
 #include "Renderer/RenderGraph.h"
+#include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
 
-namespace luna::rhi {
+namespace luna {
 namespace {
 
 const luna::RHI::Ref<luna::RHI::Texture>& emptyTextureRef()
@@ -166,4 +166,4 @@ RenderGraphPass* RenderGraph::findPass(std::string_view name)
     return it == m_passes.end() ? nullptr : &(*it);
 }
 
-} // namespace luna::rhi
+} // namespace luna

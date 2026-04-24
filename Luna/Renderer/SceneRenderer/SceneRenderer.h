@@ -1,5 +1,9 @@
 #pragma once
 
+// Public facade for scene rendering.
+// Collects scene draw submissions from the game/editor side and translates them
+// into render-graph passes without exposing internal pipeline or resource details.
+
 #include "Renderer/Camera.h"
 #include "Renderer/RenderGraphBuilder.h"
 
@@ -40,9 +44,9 @@ public:
         luna::RHI::Ref<luna::RHI::Device> device;
         luna::RHI::Ref<luna::RHI::ShaderCompiler> compiler;
         luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
-        rhi::RenderGraphTextureHandle color_target;
-        rhi::RenderGraphTextureHandle depth_target;
-        rhi::RenderGraphTextureHandle pick_target;
+        RenderGraphTextureHandle color_target;
+        RenderGraphTextureHandle depth_target;
+        RenderGraphTextureHandle pick_target;
         luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         bool show_pick_debug_visualization{false};
@@ -74,7 +78,7 @@ public:
                           std::shared_ptr<Mesh> mesh,
                           const std::vector<std::shared_ptr<Material>>& submesh_materials,
                           uint32_t picking_id = 0);
-    void buildRenderGraph(rhi::RenderGraphBuilder& graph, const RenderContext& context);
+    void buildRenderGraph(RenderGraphBuilder& graph, const RenderContext& context);
     void clearSubmittedMeshes();
     void setShaderPaths(ShaderPaths shader_paths);
     void shutdown();

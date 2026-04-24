@@ -27,7 +27,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace luna::rhi {
+namespace luna {
 namespace {
 
 constexpr uint32_t kImGuiDescriptorPoolSize = 2'048;
@@ -779,4 +779,4 @@ void ImGuiRhiContext::NotifyFrameResourcesChanged(uint32_t frames_in_flight)
     g_frame_resources.resize((std::max)(frames_in_flight, 1u));
 }
 
-} // namespace luna::rhi
+} // namespace luna

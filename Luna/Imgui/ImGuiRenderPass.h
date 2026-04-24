@@ -4,7 +4,7 @@
 
 #include <Core.h>
 
-namespace luna::rhi {
+namespace luna {
 
 struct ImGuiRenderPass {
     static void Render(luna::RHI::CommandBufferEncoder& command_buffer,
@@ -18,4 +18,4 @@ struct ImGuiRenderPass {
     }
 };
 
-} // namespace luna::rhi
+} // namespace luna

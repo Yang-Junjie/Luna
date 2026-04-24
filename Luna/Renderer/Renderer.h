@@ -1,8 +1,12 @@
-#pragma once
+﻿#pragma once
+
+// Main renderer framwork for the engine runtime.
+// Owns device-facing frame state, scene output targets, and the public frame loop,
+// while delegating scene-specific drawing to SceneRenderer.
 
 #include "Renderer/Camera.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/SceneRenderer.h"
+#include "Renderer/SceneRenderer/SceneRenderer.h"
 
 #include <cstdint>
 
@@ -10,8 +14,8 @@
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <Instance.h>
-#include <optional>
 #include <memory>
+#include <optional>
 #include <Surface.h>
 #include <vector>
 
@@ -19,6 +23,7 @@ struct GLFWwindow;
 
 namespace luna::RHI {
 class Adapter;
+class Buffer;
 class CommandBufferEncoder;
 class Device;
 class Instance;
@@ -30,9 +35,9 @@ class Synchronization;
 class Texture;
 } // namespace luna::RHI
 
-namespace luna::rhi {
+namespace luna {
 class RenderGraph;
-}
+} // namespace luna
 
 namespace luna {
 class Window;
@@ -77,12 +82,15 @@ public:
 
     void requestResize();
     bool isResizeRequested() const;
+
     void setImGuiEnabled(bool enabled);
+
     SceneOutputMode getSceneOutputMode() const;
     void setSceneOutputMode(SceneOutputMode mode);
     void setSceneOutputSize(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getSceneOutputSize() const;
     const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
+
     void setScenePickDebugVisualizationEnabled(bool enabled);
     bool isScenePickDebugVisualizationEnabled() const;
     void requestScenePick(uint32_t x, uint32_t y);
@@ -106,6 +114,7 @@ public:
 
     Camera& getMainCamera();
     const Camera& getMainCamera() const;
+
     SceneRenderer& getSceneRenderer();
     const SceneRenderer& getSceneRenderer() const;
 
@@ -164,8 +173,8 @@ private:
 
         luna::RHI::Ref<luna::RHI::CommandBufferEncoder> current_command_buffer;
         std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> command_buffers;
-        std::vector<std::unique_ptr<luna::rhi::RenderGraph>> render_graphs;
-        std::vector<luna::rhi::RenderGraphTransientTextureCache> transient_texture_caches;
+        std::vector<std::unique_ptr<luna::RenderGraph>> render_graphs;
+        std::vector<luna::RenderGraphTransientTextureCache> transient_texture_caches;
         std::vector<ScenePickReadbackSlot> scene_pick_readback_slots;
         uint32_t frames_in_flight{0};
         uint32_t frame_index{0};

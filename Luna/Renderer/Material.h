@@ -1,5 +1,9 @@
 #pragma once
 
+// Defines material assets consumed by the scene renderer.
+// Stores texture references, surface parameters, and blend behavior,
+// but does not perform any GPU upload work by itself.
+
 #include "Asset/Asset.h"
 
 #include <cstdint>
@@ -11,9 +15,7 @@
 
 namespace luna {
 
-namespace rhi {
 class Texture;
-}
 
 class Material final : public Asset {
 public:
@@ -25,11 +27,11 @@ public:
     };
 
     struct TextureSet {
-        std::shared_ptr<rhi::Texture> BaseColor;
-        std::shared_ptr<rhi::Texture> Normal;
-        std::shared_ptr<rhi::Texture> MetallicRoughness;
-        std::shared_ptr<rhi::Texture> Emissive;
-        std::shared_ptr<rhi::Texture> Occlusion;
+        std::shared_ptr<Texture> BaseColor;
+        std::shared_ptr<Texture> Normal;
+        std::shared_ptr<Texture> MetallicRoughness;
+        std::shared_ptr<Texture> Emissive;
+        std::shared_ptr<Texture> Occlusion;
     };
 
     struct SurfaceProperties {

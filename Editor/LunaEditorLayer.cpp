@@ -299,7 +299,7 @@ void LunaEditorLayer::drawViewport()
     m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
 
     const auto& scene_texture = renderer.getSceneOutputTexture();
-    const ImTextureID texture_id = rhi::ImGuiRhiContext::GetTextureId(scene_texture);
+    const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
         ImVec2 uv0(0.0f, 1.0f);
         ImVec2 uv1(1.0f, 0.0f);

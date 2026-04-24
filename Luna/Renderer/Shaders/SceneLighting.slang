@@ -39,13 +39,13 @@ SamplerState gGBufferSampler : register(s4);
 Texture2D<uint> gPickBuffer : register(t5);
 
 [[vk::binding(0, 1)]]
-ConstantBuffer<SceneParams> gSceneParams : register(b5);
+ConstantBuffer<SceneParams> gSceneParams : register(b6);
 
 [[vk::binding(1, 1)]]
-Texture2D<float4> gEnvironmentTexture : register(t6);
+Texture2D<float4> gEnvironmentTexture : register(t7);
 
 [[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s7);
+SamplerState gEnvironmentSampler : register(s8);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {

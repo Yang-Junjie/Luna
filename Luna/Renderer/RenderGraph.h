@@ -1,5 +1,9 @@
 #pragma once
 
+// Defines the compiled render-graph representation and pass execution contexts.
+// These types describe what a frame will execute after graph building is complete,
+// including pass metadata, texture access, and command-buffer facing callbacks.
+
 #include <cstdint>
 
 #include <Barrier.h>
@@ -16,7 +20,7 @@ class Device;
 class Texture;
 } // namespace luna::RHI
 
-namespace luna::rhi {
+namespace luna {
 
 enum class RenderGraphPassType : uint8_t {
     Raster,
@@ -139,4 +143,4 @@ private:
     std::vector<luna::RHI::TextureBarrier> m_final_texture_barriers;
 };
 
-} // namespace luna::rhi
+} // namespace luna

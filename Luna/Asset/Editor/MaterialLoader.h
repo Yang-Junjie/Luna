@@ -56,7 +56,7 @@ inline glm::vec4 readVec4(const YAML::Node& node, const glm::vec4& default_value
     return {node[0].as<float>(), node[1].as<float>(), node[2].as<float>(), node[3].as<float>()};
 }
 
-inline std::shared_ptr<rhi::Texture> loadTextureRelative(const std::filesystem::path& base_dir,
+inline std::shared_ptr<Texture> loadTextureRelative(const std::filesystem::path& base_dir,
                                                          const YAML::Node& textures_node,
                                                          const char* key,
                                                          const std::string& debug_name)
@@ -77,7 +77,7 @@ inline std::shared_ptr<rhi::Texture> loadTextureRelative(const std::filesystem::
         if (ec == std::errc{} && ptr == end) {
             const AssetHandle texture_handle(handle_value);
             if (texture_handle.isValid()) {
-                return AssetManager::get().loadAssetAs<rhi::Texture>(texture_handle);
+                return AssetManager::get().loadAssetAs<Texture>(texture_handle);
             }
 
             return {};
@@ -170,7 +170,7 @@ inline std::shared_ptr<Material> loadFromMtl(const std::filesystem::path& path, 
         asset_name = selected_material->name.empty() ? path.stem().string() : selected_material->name;
     }
 
-    auto load_texture = [&](const std::string& relative_path, const std::string& suffix) -> std::shared_ptr<rhi::Texture> {
+    auto load_texture = [&](const std::string& relative_path, const std::string& suffix) -> std::shared_ptr<Texture> {
         if (relative_path.empty()) {
             return {};
         }

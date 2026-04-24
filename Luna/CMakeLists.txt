@@ -1,4 +1,4 @@
-set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
+﻿set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
 
 add_subdirectory(RHI)
 
@@ -20,21 +20,25 @@ set(RENDERER_SOURCE
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
     Renderer/RenderGraphBuilder.cpp
-    Renderer/RendererInternal.h
-    Renderer/SceneRenderer.h
-    Renderer/SceneRendererInternal.h
-    Renderer/SceneRendererCommon.h
-    Renderer/SceneRendererDrawQueue.h
-    Renderer/SceneRendererDrawQueue.cpp
-    Renderer/SceneRendererResourceManager.h
-    Renderer/SceneRenderer.cpp
-    Renderer/SceneRendererResourceManager.cpp
-    Renderer/SceneRendererPasses.cpp
+    Renderer/RendererUtilities.h
+    Renderer/RendererUtilities.cpp
+    Renderer/SceneRenderer/SceneRenderer.h
+    Renderer/SceneRenderer/SceneRendererSupport.h
+    Renderer/SceneRenderer/SceneRendererSupport.cpp
+    Renderer/SceneRenderer/SceneRendererDrawQueue.h
+    Renderer/SceneRenderer/SceneRendererDrawQueue.cpp
+    Renderer/SceneRenderer/SceneRendererAssetCache.h
+    Renderer/SceneRenderer/SceneRendererAssetCache.cpp
+    Renderer/SceneRenderer/SceneRendererEnvironment.h
+    Renderer/SceneRenderer/SceneRendererEnvironment.cpp
+    Renderer/SceneRenderer/SceneRendererPipelineLibrary.h
+    Renderer/SceneRenderer/SceneRendererPipelineLibrary.cpp
+    Renderer/SceneRenderer/SceneRendererResourceManager.h
+    Renderer/SceneRenderer/SceneRenderer.cpp
+    Renderer/SceneRenderer/SceneRendererResourceManager.cpp
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp
-    Renderer/RendererFrame.cpp
-    Renderer/RendererSceneOutput.cpp
     
     Renderer/Texture.h
     )

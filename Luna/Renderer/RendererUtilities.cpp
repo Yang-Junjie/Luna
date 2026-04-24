@@ -1,16 +1,11 @@
-#pragma once
+#include "Renderer/RendererUtilities.h"
 
-#include <Adapter.h>
 #include <algorithm>
 #include <array>
-#include <Instance.h>
-#include <string>
-#include <Surface.h>
-#include <vector>
 
 namespace luna::renderer_detail {
 
-inline luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters)
+luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters)
 {
     if (adapters.empty()) {
         return {};
@@ -23,7 +18,7 @@ inline luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::
     return discrete_adapter != adapters.end() ? *discrete_adapter : adapters.front();
 }
 
-inline luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats)
+luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats)
 {
     const auto preferred = std::find_if(formats.begin(), formats.end(), [](const luna::RHI::SurfaceFormat& format) {
         return format.format == luna::RHI::Format::BGRA8_UNORM &&
@@ -45,7 +40,7 @@ inline luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI:
                : formats.front();
 }
 
-inline const char* presentModeToString(luna::RHI::PresentMode mode)
+const char* presentModeToString(luna::RHI::PresentMode mode)
 {
     switch (mode) {
         case luna::RHI::PresentMode::Immediate:
@@ -61,7 +56,7 @@ inline const char* presentModeToString(luna::RHI::PresentMode mode)
     }
 }
 
-inline const char* adapterTypeToString(luna::RHI::AdapterType type)
+const char* adapterTypeToString(luna::RHI::AdapterType type)
 {
     switch (type) {
         case luna::RHI::AdapterType::Discrete:
@@ -76,7 +71,7 @@ inline const char* adapterTypeToString(luna::RHI::AdapterType type)
     }
 }
 
-inline const char* backendTypeToString(luna::RHI::BackendType type)
+const char* backendTypeToString(luna::RHI::BackendType type)
 {
     switch (type) {
         case luna::RHI::BackendType::Auto:
@@ -100,7 +95,7 @@ inline const char* backendTypeToString(luna::RHI::BackendType type)
     }
 }
 
-inline const char* formatToString(luna::RHI::Format format)
+const char* formatToString(luna::RHI::Format format)
 {
     switch (format) {
         case luna::RHI::Format::RGBA8_UNORM:
@@ -126,19 +121,18 @@ inline const char* formatToString(luna::RHI::Format format)
     }
 }
 
-inline bool usesSceneRenderer(luna::RHI::BackendType type)
+bool usesSceneRenderer(luna::RHI::BackendType type)
 {
     return type == luna::RHI::BackendType::Vulkan || type == luna::RHI::BackendType::DirectX11 ||
            type == luna::RHI::BackendType::DirectX12;
 }
 
-inline bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes,
-                                   luna::RHI::PresentMode mode)
+bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)
 {
     return std::find(supported_modes.begin(), supported_modes.end(), mode) != supported_modes.end();
 }
 
-inline std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes)
+std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes)
 {
     if (supported_modes.empty()) {
         return "<none>";
@@ -154,8 +148,8 @@ inline std::string describePresentModes(const std::vector<luna::RHI::PresentMode
     return result;
 }
 
-inline luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
-                                                luna::RHI::PresentMode requested_mode)
+luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
+                                         luna::RHI::PresentMode requested_mode)
 {
     if (isPresentModeSupported(supported_modes, requested_mode)) {
         return requested_mode;
@@ -202,11 +196,3 @@ inline luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::Pre
 }
 
 } // namespace luna::renderer_detail
-
-#if defined(LUNA_RENDERER_ENABLE_FRAME_LOGS)
-#define LUNA_RENDERER_FRAME_TRACE(...) LUNA_RENDERER_TRACE(__VA_ARGS__)
-#define LUNA_RENDERER_FRAME_DEBUG(...) LUNA_RENDERER_DEBUG(__VA_ARGS__)
-#else
-#define LUNA_RENDERER_FRAME_TRACE(...) ((void) 0)
-#define LUNA_RENDERER_FRAME_DEBUG(...) ((void) 0)
-#endif

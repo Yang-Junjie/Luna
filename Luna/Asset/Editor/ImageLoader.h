@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace luna::rhi {
+namespace luna {
 
 struct ImageData {
     std::vector<uint8_t> ByteData;
@@ -37,4 +37,4 @@ public:
     static CubemapData LoadCubemapImageFromFile(const std::string& filepath);
 };
 
-} // namespace luna::rhi
+} // namespace luna

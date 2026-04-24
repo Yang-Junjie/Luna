@@ -1,9 +1,9 @@
-#include "Core/Log.h"
+﻿#include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/RendererInternal.h"
-#include "Renderer/SceneRendererCommon.h"
-#include "Renderer/SceneRendererDrawQueue.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
+#include "Renderer/SceneRenderer/SceneRendererSupport.h"
 
 #include <algorithm>
 

@@ -11,10 +11,10 @@
 
 namespace luna::texture_loader_detail {
 
-using FilterMode = rhi::Texture::FilterMode;
-using ImportSettings = rhi::Texture::ImportSettings;
-using MipFilterMode = rhi::Texture::MipFilterMode;
-using WrapMode = rhi::Texture::WrapMode;
+using FilterMode = Texture::FilterMode;
+using ImportSettings = Texture::ImportSettings;
+using MipFilterMode = Texture::MipFilterMode;
+using WrapMode = Texture::WrapMode;
 
 FilterMode parseFilterMode(const YAML::Node& node, FilterMode default_value)
 {
@@ -195,7 +195,7 @@ bool isFloatColorFormat(luna::RHI::Format format)
     return format == luna::RHI::Format::RGBA32_FLOAT;
 }
 
-rhi::ImageData generateMipChain(const rhi::ImageData& source)
+ImageData generateMipChain(const ImageData& source)
 {
     if (!source.isValid()) {
         return source;
@@ -205,7 +205,7 @@ rhi::ImageData generateMipChain(const rhi::ImageData& source)
         return source;
     }
 
-    rhi::ImageData result = source;
+    ImageData result = source;
     result.MipLevels.clear();
 
     if (isByteColorFormat(source.ImageFormat)) {
@@ -295,7 +295,7 @@ rhi::ImageData generateMipChain(const rhi::ImageData& source)
     return result;
 }
 
-rhi::ImageData applyImportSettings(rhi::ImageData image_data, const ImportSettings& import_settings)
+ImageData applyImportSettings(ImageData image_data, const ImportSettings& import_settings)
 {
     if (!image_data.isValid()) {
         return image_data;
@@ -332,15 +332,15 @@ std::shared_ptr<Asset> TextureLoader::load(const AssetMetadata& meta_data)
     return loadFromMetadata(*project_root_path / meta_data.FilePath, meta_data);
 }
 
-std::shared_ptr<rhi::Texture> TextureLoader::loadFromFile(const std::filesystem::path& path, std::string asset_name)
+std::shared_ptr<Texture> TextureLoader::loadFromFile(const std::filesystem::path& path, std::string asset_name)
 {
     return loadFromMetadata(path, texture_loader_detail::resolveTextureMetadata(path, asset_name));
 }
 
-std::shared_ptr<rhi::Texture> TextureLoader::loadFromMetadata(const std::filesystem::path& path,
+std::shared_ptr<Texture> TextureLoader::loadFromMetadata(const std::filesystem::path& path,
                                                               const AssetMetadata& meta_data)
 {
-    rhi::ImageData image_data = rhi::ImageLoader::LoadImageFromFile(path.string());
+    ImageData image_data = ImageLoader::LoadImageFromFile(path.string());
     if (!image_data.isValid()) {
         return {};
     }
@@ -348,7 +348,7 @@ std::shared_ptr<rhi::Texture> TextureLoader::loadFromMetadata(const std::filesys
     const auto import_settings = texture_loader_detail::parseImportSettings(meta_data.SpecializedConfig, path);
     image_data = texture_loader_detail::applyImportSettings(std::move(image_data), import_settings);
 
-    return rhi::Texture::create(meta_data.Name.empty() ? path.stem().string() : meta_data.Name,
+    return Texture::create(meta_data.Name.empty() ? path.stem().string() : meta_data.Name,
                                 std::move(image_data),
                                 import_settings);
 }

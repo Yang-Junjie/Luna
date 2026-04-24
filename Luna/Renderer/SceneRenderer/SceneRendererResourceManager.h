@@ -1,6 +1,10 @@
-#pragma once
+﻿#pragma once
 
-#include "Renderer/SceneRenderer.h"
+// Coordinates the internal subsystems behind SceneRenderer.
+// Serves as the boundary that ties together pipeline state, environment resources,
+// and uploaded draw assets so passes can ask for ready-to-use GPU resources.
+
+#include "Renderer/SceneRenderer/SceneRenderer.h"
 
 #include <memory>
 

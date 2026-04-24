@@ -1,5 +1,9 @@
 #pragma once
 
+// Defines texture assets used by materials and scene environment resources.
+// Wraps loaded image data together with sampler settings so upload code can
+// create GPU textures without depending on importer-specific logic.
+
 #include "Asset/Asset.h"
 #include "Asset/Editor/ImageLoader.h"
 
@@ -9,7 +13,7 @@
 #include <string>
 #include <utility>
 
-namespace luna::rhi {
+namespace luna {
 
 class Texture final : public Asset {
 public:
@@ -118,4 +122,4 @@ private:
     ImportSettings m_import_settings;
 };
 
-} // namespace luna::rhi
+} // namespace luna

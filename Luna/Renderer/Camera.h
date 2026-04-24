@@ -1,5 +1,9 @@
 #pragma once
 
+// Defines the runtime camera state used by rendering code.
+// Owns view/projection configuration and exposes helpers for movement,
+// orientation, and matrix generation.
+
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
