@@ -9,9 +9,11 @@ namespace luna {
 DefaultRenderFlow::DefaultRenderFlow()
     : m_scene_state(m_resources, m_draw_queue, m_default_material)
 {
-    addPass(std::make_unique<render_flow::default_scene::DefaultSceneGeometryPass>(m_scene_state));
-    addPass(std::make_unique<render_flow::default_scene::DefaultSceneLightingPass>(m_scene_state));
-    addPass(std::make_unique<render_flow::default_scene::DefaultSceneTransparentPass>(m_scene_state));
+    m_builder.addPass("Geometry", std::make_unique<render_flow::default_scene::DefaultSceneGeometryPass>(m_scene_state));
+    m_builder.insertPassAfter(
+        "Geometry", "Lighting", std::make_unique<render_flow::default_scene::DefaultSceneLightingPass>(m_scene_state));
+    m_builder.insertPassAfter(
+        "Lighting", "Transparent", std::make_unique<render_flow::default_scene::DefaultSceneTransparentPass>(m_scene_state));
 }
 
 DefaultRenderFlow::~DefaultRenderFlow()
@@ -21,18 +23,19 @@ DefaultRenderFlow::~DefaultRenderFlow()
 
 void DefaultRenderFlow::shutdown()
 {
-    m_passes.clear();
+    m_builder.clear();
     m_draw_queue.clear();
     m_resources.shutdown();
 }
 
-void DefaultRenderFlow::addPass(std::unique_ptr<render_flow::IRenderPass> pass)
+render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() noexcept
 {
-    if (!pass) {
-        return;
-    }
+    return m_builder;
+}
 
-    m_passes.push_back(std::move(pass));
+const render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() const noexcept
+{
+    return m_builder;
 }
 
 void DefaultRenderFlow::render(RenderFlowContext& context)
@@ -71,8 +74,8 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
 
     m_scene_state.setWorld(world);
     render_flow::RenderPassContext pass_context(context.graph(), world, scene_context);
-    for (const auto& pass : m_passes) {
-        pass->setup(pass_context);
+    for (const auto& entry : m_builder.passes()) {
+        entry.pass->setup(pass_context);
     }
 }
 

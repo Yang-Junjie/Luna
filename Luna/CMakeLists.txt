@@ -24,6 +24,8 @@ set(RENDERER_SOURCE
     Renderer/RenderGraphBuilder.cpp
     Renderer/RenderFlow/RenderFlow.h
     Renderer/RenderFlow/RenderFlow.cpp
+    Renderer/RenderFlow/RenderFlowBuilder.h
+    Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
     Renderer/RenderFlow/RenderPass.h
     Renderer/RenderFlow/RenderPass.cpp
