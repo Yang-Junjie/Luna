@@ -2,6 +2,7 @@
 
 #include "MaterialLoader.h"
 #include "MeshLoader.h"
+#include "ModelLoader.h"
 #include "TextureLoader.h"
 
 namespace luna {
@@ -19,6 +20,7 @@ void LoaderManager::init()
 
     register_loader(AssetType::Mesh, std::make_unique<MeshLoader>());
     register_loader(AssetType::Material, std::make_unique<MaterialLoader>());
+    register_loader(AssetType::Model, std::make_unique<ModelLoader>());
     register_loader(AssetType::Texture, std::make_unique<TextureLoader>());
 }
 

@@ -1,9 +1,11 @@
 #include "../AssetDatabase.h"
 #include "Core/Log.h"
+#include "GltfModelAssetGenerator.h"
 #include "ImporterManager.h"
 #include "JobSystem/TaskSystem.h"
 #include "MaterialImporter.h"
 #include "MeshImporter.h"
+#include "ModelImporter.h"
 #include "Project/ProjectManager.h"
 #include "TextureImporter.h"
 
@@ -42,6 +44,12 @@ bool shouldRebuildMetadata(const luna::AssetMetadata& metadata,
     const std::filesystem::path expected_relative_path = luna::tools::makeRelative(asset_path, project_root);
     return metadata.FilePath.lexically_normal().generic_string() !=
            expected_relative_path.lexically_normal().generic_string();
+}
+
+bool isGltfModelPath(const std::filesystem::path& path)
+{
+    const std::string extension = luna::importer_detail::normalizeExtension(path);
+    return extension == ".gltf" || extension == ".glb";
 }
 
 std::filesystem::path getMetadataPathForAsset(const std::filesystem::path& asset_path)
@@ -129,6 +137,7 @@ void ImporterManager::init()
 
     register_importer(std::make_unique<MeshImporter>());
     register_importer(std::make_unique<MaterialImporter>());
+    register_importer(std::make_unique<ModelImporter>());
     register_importer(std::make_unique<TextureImporter>());
 }
 
@@ -227,6 +236,37 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     }
 
     for (const SupportedAssetWorkItem& supported_asset : supported_assets) {
+        if (!isGltfModelPath(supported_asset.assetPath)) {
+            continue;
+        }
+
+        const AssetHandle mesh_handle = AssetDatabase::findHandleByFilePath(supported_asset.assetPath);
+        if (!mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
+            ++stats.failedGeneratedModelAssets;
+            continue;
+        }
+
+        const AssetMetadata& mesh_metadata = AssetDatabase::getAssetMetadata(mesh_handle);
+        if (mesh_metadata.Type != AssetType::Mesh) {
+            ++stats.failedGeneratedModelAssets;
+            continue;
+        }
+
+        const GltfModelAssetGenerator::GenerateResult generate_result =
+            GltfModelAssetGenerator::generateCompanionAssets(supported_asset.assetPath, mesh_metadata);
+        if (!generate_result.Success) {
+            ++stats.failedGeneratedModelAssets;
+            continue;
+        }
+
+        stats.generatedModelFiles += generate_result.CreatedModelFile ? 1 : 0;
+        stats.generatedModelMetadata += generate_result.CreatedModelMetadata ? 1 : 0;
+        stats.generatedMaterialFiles += generate_result.CreatedMaterialFiles;
+        stats.generatedMaterialMetadata += generate_result.CreatedMaterialMetadata;
+        stats.generatedTextureMetadata += generate_result.CreatedTextureMetadata;
+    }
+
+    for (const SupportedAssetWorkItem& supported_asset : supported_assets) {
         if (!std::filesystem::exists(supported_asset.metaPath)) {
             ++stats.missingMetadataAfterSync;
             LUNA_CORE_ERROR("Supported asset is still missing metadata after sync: '{}'",
@@ -236,14 +276,21 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
 
     LUNA_CORE_INFO(
         "Asset sync completed. discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
-        "failed={}, missing_after_sync={}",
+        "failed={}, missing_after_sync={}, generated_models={}, generated_model_meta={}, generated_materials={}, "
+        "generated_material_meta={}, generated_texture_meta={}, generated_model_failures={}",
         stats.discoveredAssets,
         stats.importedMissingAssets,
         stats.loadedExistingMetadata,
         stats.rebuiltMetadata,
         stats.unsupportedFilesSkipped,
         stats.failedAssets,
-        stats.missingMetadataAfterSync);
+        stats.missingMetadataAfterSync,
+        stats.generatedModelFiles,
+        stats.generatedModelMetadata,
+        stats.generatedMaterialFiles,
+        stats.generatedMaterialMetadata,
+        stats.generatedTextureMetadata,
+        stats.failedGeneratedModelAssets);
 
     return stats;
 }

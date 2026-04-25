@@ -51,6 +51,7 @@ public:
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
     bool openSceneFile(const std::filesystem::path& scene_file_path);
+    Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
     Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
     Entity createCameraEntity(Entity parent = {});

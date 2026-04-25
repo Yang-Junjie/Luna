@@ -1,7 +1,6 @@
-﻿#include "Renderer/RenderFlow/DefaultScene/Environment.h"
-
-#include "Asset/Editor/ImageLoader.h"
+﻿#include "Asset/Editor/ImageLoader.h"
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/DefaultScene/Environment.h"
 
 namespace luna::render_flow::default_scene {
 
@@ -9,7 +8,8 @@ namespace {
 
 std::filesystem::path defaultEnvironmentPath()
 {
-    return render_flow::default_scene_detail::projectRoot() / "SampleProject" / "Assets" / "Texture" / "newport_loft.hdr";
+    return render_flow::default_scene_detail::projectRoot() / "SampleProject" / "Assets" / "Texture" /
+           "newport_loft.hdr";
 }
 
 } // namespace
@@ -52,18 +52,19 @@ void EnvironmentResources::ensure(const luna::RHI::Ref<luna::RHI::Device>& devic
                            environment_path.string());
     }
 
-    if (!environment_image.isValid() || environment_image.ImageFormat != render_flow::default_scene_detail::kEnvironmentFormat) {
-        environment_image = render_flow::default_scene_detail::createFallbackFloatImageData(glm::vec4(
-            render_flow::default_scene_detail::kEnvironmentFallbackValue,
-            render_flow::default_scene_detail::kEnvironmentFallbackValue,
-            render_flow::default_scene_detail::kEnvironmentFallbackValue,
-            1.0f));
+    if (!environment_image.isValid() ||
+        environment_image.ImageFormat != render_flow::default_scene_detail::kEnvironmentFormat) {
+        environment_image = render_flow::default_scene_detail::createFallbackFloatImageData(
+            glm::vec4(render_flow::default_scene_detail::kEnvironmentFallbackValue,
+                      render_flow::default_scene_detail::kEnvironmentFallbackValue,
+                      render_flow::default_scene_detail::kEnvironmentFallbackValue,
+                      1.0f));
     }
 
     m_irradiance_sh = render_flow::default_scene_detail::computeDiffuseIrradianceSH(environment_image);
     environment_image = render_flow::default_scene_detail::generateEnvironmentMipChain(environment_image);
-    m_source_texture =
-        render_flow::default_scene_detail::createTextureUpload(device, environment_image, Texture::SamplerSettings{}, "SceneEnvironmentSource");
+    m_source_texture = render_flow::default_scene_detail::createTextureUpload(
+        device, environment_image, Texture::SamplerSettings{}, "SceneEnvironmentSource");
 
     LUNA_RENDERER_INFO("Prepared scene environment source texture ({}x{}, mips={})",
                        environment_image.Width,
@@ -81,8 +82,3 @@ void EnvironmentResources::uploadIfNeeded(luna::RHI::CommandBufferEncoder& comma
 }
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

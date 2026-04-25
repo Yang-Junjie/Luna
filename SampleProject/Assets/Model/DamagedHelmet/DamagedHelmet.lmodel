@@ -1,0 +1,16 @@
+Model:
+  Name: DamagedHelmet
+  Source: Assets/Model/DamagedHelmet/DamagedHelmet.gltf
+  SourceMesh: 17196472838577284151
+  Materials:
+    - SourceMaterialIndex: 0
+      Handle: 8227030149829513788
+      FilePath: Assets/Model/DamagedHelmet/Materials/0_DamagedHelmet_Material_MR.lunamat
+  Nodes:
+    - Name: DamagedHelmet
+      Parent: -1
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+      Mesh: 17196472838577284151
+      SubmeshMaterials: [8227030149829513788]

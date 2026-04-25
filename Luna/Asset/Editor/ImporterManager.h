@@ -17,6 +17,12 @@ public:
         size_t unsupportedFilesSkipped = 0;
         size_t failedAssets = 0;
         size_t missingMetadataAfterSync = 0;
+        size_t generatedModelFiles = 0;
+        size_t generatedModelMetadata = 0;
+        size_t generatedMaterialFiles = 0;
+        size_t generatedMaterialMetadata = 0;
+        size_t generatedTextureMetadata = 0;
+        size_t failedGeneratedModelAssets = 0;
     };
 
     static void init();

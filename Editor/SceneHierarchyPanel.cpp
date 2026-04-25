@@ -150,8 +150,12 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         }
 
         luna::editor::AssetDragDropData asset_payload{};
-        if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh})) {
-            applyMeshAssetToEntity(editor_layer, entity, asset_payload);
+        if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh, luna::AssetType::Model})) {
+            if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Mesh) {
+                applyMeshAssetToEntity(editor_layer, entity, asset_payload);
+            } else if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Model) {
+                editor_layer.createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload), entity);
+            }
         }
         ImGui::EndDragDropTarget();
     }
@@ -270,8 +274,12 @@ void SceneHierarchyPanel::onImGuiRender()
             }
 
             luna::editor::AssetDragDropData asset_payload{};
-            if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh})) {
-                m_editor_layer->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
+            if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh, luna::AssetType::Model})) {
+                if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Mesh) {
+                    m_editor_layer->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
+                } else if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Model) {
+                    m_editor_layer->createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload));
+                }
             }
             ImGui::EndDragDropTarget();
         }

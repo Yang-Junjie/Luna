@@ -89,6 +89,8 @@ set(PLATFORM_SOURCE
 set(ASSET_SOURCE 
     Asset/BuiltinAssets.h
     Asset/BuiltinAssets.cpp
+    Asset/Model.h
+    Asset/Model.cpp
     Asset/AssetManager.h
     Asset/AssetManager.cpp
     Asset/Asset.h
@@ -99,6 +101,8 @@ set(ASSET_SOURCE
     Asset/Editor/Importer.h
     Asset/Editor/ImporterManager.h
     Asset/Editor/ImporterManager.cpp
+    Asset/Editor/GltfModelAssetGenerator.h
+    Asset/Editor/GltfModelAssetGenerator.cpp
     Asset/Editor/ImageLoader.h
     Asset/Editor/ImageLoader.cpp
     Asset/Editor/Loader.h
@@ -111,6 +115,8 @@ set(ASSET_SOURCE
     Asset/Editor/MeshImporter.h
     Asset/Editor/MeshLoader.h
     Asset/Editor/MeshLoader.cpp
+    Asset/Editor/ModelImporter.h
+    Asset/Editor/ModelLoader.h
     Asset/Editor/TextureImporter.h
     Asset/Editor/TextureLoader.h
     Asset/Editor/TextureLoader.cpp

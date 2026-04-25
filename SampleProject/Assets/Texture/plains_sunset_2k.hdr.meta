@@ -1,0 +1,14 @@
+Asset:
+  Name: plains_sunset_2k
+  Handle: 13967129362711134369
+  Type: Texture
+  FilePath: Assets/Texture/plains_sunset_2k.hdr
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

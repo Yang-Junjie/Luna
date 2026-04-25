@@ -2,6 +2,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/ImporterManager.h"
+#include "Asset/Model.h"
 #include "Core/Log.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
@@ -24,6 +25,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <vector>
 
 namespace {
 
@@ -90,14 +92,21 @@ void logEditorAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
 {
     LUNA_EDITOR_INFO(
         "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
-        "failed={}, missing_after_sync={}",
+        "failed={}, missing_after_sync={}, generated_models={}, generated_model_meta={}, generated_materials={}, "
+        "generated_material_meta={}, generated_texture_meta={}, generated_model_failures={}",
         stats.discoveredAssets,
         stats.importedMissingAssets,
         stats.loadedExistingMetadata,
         stats.rebuiltMetadata,
         stats.unsupportedFilesSkipped,
         stats.failedAssets,
-        stats.missingMetadataAfterSync);
+        stats.missingMetadataAfterSync,
+        stats.generatedModelFiles,
+        stats.generatedModelMetadata,
+        stats.generatedMaterialFiles,
+        stats.generatedMaterialMetadata,
+        stats.generatedTextureMetadata,
+        stats.failedGeneratedModelAssets);
 }
 
 std::filesystem::path projectDialogDefaultPath()
@@ -551,6 +560,89 @@ void LunaEditorLayer::setSelectedEntity(Entity entity)
 bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
 {
     return openScene(scene_file_path, true);
+}
+
+Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Entity parent)
+{
+    if (!model_handle.isValid() || !AssetDatabase::exists(model_handle)) {
+        return {};
+    }
+
+    const auto& metadata = AssetDatabase::getAssetMetadata(model_handle);
+    if (metadata.Type != AssetType::Model) {
+        return {};
+    }
+
+    const auto model = AssetManager::get().loadAssetAs<Model>(model_handle);
+    if (!model || !model->isValid()) {
+        return {};
+    }
+
+    const std::string root_name =
+        !model->getName().empty()
+            ? model->getName()
+            : (!metadata.Name.empty() ? metadata.Name
+                                      : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Model"));
+
+    auto& entity_manager = m_scene.entityManager();
+    Entity root = parent ? entity_manager.createChildEntity(parent, root_name) : entity_manager.createEntity(root_name);
+    if (!root) {
+        return {};
+    }
+
+    const auto& nodes = model->getNodes();
+    std::vector<Entity> node_entities(nodes.size());
+    for (size_t node_index = 0; node_index < nodes.size(); ++node_index) {
+        const ModelNode& model_node = nodes[node_index];
+        const std::string node_name =
+            model_node.Name.empty() ? root_name + "_Node_" + std::to_string(node_index) : model_node.Name;
+
+        Entity node_entity = entity_manager.createChildEntity(root, node_name);
+        if (!node_entity) {
+            continue;
+        }
+
+        auto& transform = node_entity.transform();
+        transform.translation = model_node.Translation;
+        transform.rotation = model_node.Rotation;
+        transform.scale = model_node.Scale;
+
+        if (model_node.MeshHandle.isValid()) {
+            applyMeshAssetToEntity(node_entity, model_node.MeshHandle);
+            if (node_entity.hasComponent<MeshComponent>()) {
+                auto& mesh_component = node_entity.getComponent<MeshComponent>();
+                for (uint32_t material_index = 0; material_index < model_node.SubmeshMaterials.size();
+                     ++material_index) {
+                    const AssetHandle material_handle = model_node.SubmeshMaterials[material_index];
+                    if (material_handle.isValid()) {
+                        mesh_component.setSubmeshMaterial(material_index, material_handle);
+                    }
+                }
+            }
+        }
+
+        node_entities[node_index] = node_entity;
+    }
+
+    for (size_t node_index = 0; node_index < nodes.size(); ++node_index) {
+        Entity node_entity = node_entities[node_index];
+        if (!node_entity) {
+            continue;
+        }
+
+        const int32_t parent_index = nodes[node_index].Parent;
+        if (parent_index < 0 || static_cast<size_t>(parent_index) >= node_entities.size()) {
+            continue;
+        }
+
+        Entity parent_entity = node_entities[static_cast<size_t>(parent_index)];
+        if (parent_entity) {
+            entity_manager.setParent(node_entity, parent_entity, false);
+        }
+    }
+
+    setSelectedEntity(root);
+    return root;
 }
 
 Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent)
