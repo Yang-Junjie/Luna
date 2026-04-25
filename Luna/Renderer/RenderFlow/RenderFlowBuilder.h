@@ -26,6 +26,7 @@ public:
 
     [[nodiscard]] bool contains(std::string_view name) const noexcept;
     [[nodiscard]] IRenderPass* find(std::string_view name) const noexcept;
+    [[nodiscard]] std::string_view lastError() const noexcept;
     [[nodiscard]] CompileResult compile() const;
 
     bool addPass(std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
@@ -33,7 +34,7 @@ public:
     bool insertPassBefore(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
     bool insertPassAfter(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
     bool replacePass(std::string_view name, std::unique_ptr<IRenderPass> pass);
-    bool removePass(std::string_view name) noexcept;
+    bool removePass(std::string_view name);
     void clear() noexcept;
 
 private:
@@ -56,10 +57,13 @@ private:
     [[nodiscard]] bool canInsert(std::string_view name, const std::unique_ptr<IRenderPass>& pass) const noexcept;
     [[nodiscard]] bool hasDependency(std::string_view before_name, std::string_view after_name) const noexcept;
     void removeDependenciesFor(std::string_view name) noexcept;
+    void clearError() const noexcept;
+    void setError(std::string error) const;
 
 private:
     NodeList m_nodes;
     std::vector<Edge> m_edges;
+    mutable std::string m_last_error;
     uint64_t m_next_registration_index{0};
 };
 

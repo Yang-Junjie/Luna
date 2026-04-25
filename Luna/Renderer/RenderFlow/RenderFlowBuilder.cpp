@@ -111,8 +111,14 @@ IRenderPass* RenderFlowBuilder::find(std::string_view name) const noexcept
     return node != m_nodes.end() ? node->pass.get() : nullptr;
 }
 
+std::string_view RenderFlowBuilder::lastError() const noexcept
+{
+    return m_last_error;
+}
+
 RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
 {
+    clearError();
     CompileResult result;
     result.passes.reserve(m_nodes.size());
 
@@ -134,6 +140,7 @@ RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
         const auto after = indices.find(edge.after);
         if (before == indices.end() || after == indices.end()) {
             result.error = "RenderFlow dependency references a missing pass: '" + edge.before + "' -> '" + edge.after + "'";
+            setError(result.error);
             return result;
         }
 
@@ -176,6 +183,7 @@ RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
 
     if (result.passes.size() != m_nodes.size()) {
         result.error = formatCycle(findCycle(outgoing), names);
+        setError(result.error);
         return result;
     }
 
@@ -185,7 +193,18 @@ RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
 
 bool RenderFlowBuilder::addPass(std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority)
 {
-    if (!canInsert(name, pass)) {
+    clearError();
+    const std::string pass_name = name;
+    if (name.empty()) {
+        setError("RenderFlow pass name must not be empty");
+        return false;
+    }
+    if (!pass) {
+        setError("RenderFlow pass '" + pass_name + "' is null");
+        return false;
+    }
+    if (contains(name)) {
+        setError("RenderFlow pass '" + pass_name + "' already exists");
         return false;
     }
 
@@ -200,8 +219,26 @@ bool RenderFlowBuilder::addPass(std::string name, std::unique_ptr<IRenderPass> p
 
 bool RenderFlowBuilder::addDependency(std::string_view before_name, std::string_view after_name)
 {
-    if (before_name.empty() || after_name.empty() || before_name == after_name || !contains(before_name) ||
-        !contains(after_name) || hasDependency(before_name, after_name)) {
+    clearError();
+    if (before_name.empty() || after_name.empty()) {
+        setError("RenderFlow dependency pass names must not be empty");
+        return false;
+    }
+    if (before_name == after_name) {
+        setError("RenderFlow pass '" + std::string(before_name) + "' cannot depend on itself");
+        return false;
+    }
+    if (!contains(before_name)) {
+        setError("RenderFlow dependency source pass '" + std::string(before_name) + "' does not exist");
+        return false;
+    }
+    if (!contains(after_name)) {
+        setError("RenderFlow dependency target pass '" + std::string(after_name) + "' does not exist");
+        return false;
+    }
+    if (hasDependency(before_name, after_name)) {
+        setError("RenderFlow dependency already exists: '" + std::string(before_name) + "' -> '" +
+                 std::string(after_name) + "'");
         return false;
     }
 
@@ -217,11 +254,22 @@ bool RenderFlowBuilder::insertPassBefore(std::string_view anchor_name,
                                          std::unique_ptr<IRenderPass> pass,
                                          int32_t priority)
 {
-    if (!contains(anchor_name) || !addPass(name, std::move(pass), priority)) {
+    clearError();
+    if (!contains(anchor_name)) {
+        setError("RenderFlow anchor pass '" + std::string(anchor_name) + "' does not exist");
         return false;
     }
 
-    return addDependency(m_nodes.back().name, anchor_name);
+    const std::string inserted_name = name;
+    if (!addPass(name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(inserted_name, anchor_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
 }
 
 bool RenderFlowBuilder::insertPassAfter(std::string_view anchor_name,
@@ -229,21 +277,39 @@ bool RenderFlowBuilder::insertPassAfter(std::string_view anchor_name,
                                         std::unique_ptr<IRenderPass> pass,
                                         int32_t priority)
 {
-    if (!contains(anchor_name) || !addPass(name, std::move(pass), priority)) {
+    clearError();
+    if (!contains(anchor_name)) {
+        setError("RenderFlow anchor pass '" + std::string(anchor_name) + "' does not exist");
         return false;
     }
 
-    return addDependency(anchor_name, m_nodes.back().name);
+    const std::string inserted_name = name;
+    if (!addPass(name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(anchor_name, inserted_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
 }
 
 bool RenderFlowBuilder::replacePass(std::string_view name, std::unique_ptr<IRenderPass> pass)
 {
+    clearError();
+    if (name.empty()) {
+        setError("RenderFlow replacement pass name must not be empty");
+        return false;
+    }
     if (!pass) {
+        setError("RenderFlow replacement pass for '" + std::string(name) + "' is null");
         return false;
     }
 
     auto node = findNode(name);
     if (node == m_nodes.end()) {
+        setError("RenderFlow pass '" + std::string(name) + "' does not exist");
         return false;
     }
 
@@ -251,10 +317,17 @@ bool RenderFlowBuilder::replacePass(std::string_view name, std::unique_ptr<IRend
     return true;
 }
 
-bool RenderFlowBuilder::removePass(std::string_view name) noexcept
+bool RenderFlowBuilder::removePass(std::string_view name)
 {
+    clearError();
+    if (name.empty()) {
+        setError("RenderFlow pass name must not be empty");
+        return false;
+    }
+
     auto node = findNode(name);
     if (node == m_nodes.end()) {
+        setError("RenderFlow pass '" + std::string(name) + "' does not exist");
         return false;
     }
 
@@ -267,6 +340,7 @@ void RenderFlowBuilder::clear() noexcept
 {
     m_nodes.clear();
     m_edges.clear();
+    clearError();
     m_next_registration_index = 0;
 }
 
@@ -301,6 +375,16 @@ void RenderFlowBuilder::removeDependenciesFor(std::string_view name) noexcept
     std::erase_if(m_edges, [name](const Edge& edge) {
         return edge.before == name || edge.after == name;
     });
+}
+
+void RenderFlowBuilder::clearError() const noexcept
+{
+    m_last_error.clear();
+}
+
+void RenderFlowBuilder::setError(std::string error) const
+{
+    m_last_error = std::move(error);
 }
 
 } // namespace luna::render_flow

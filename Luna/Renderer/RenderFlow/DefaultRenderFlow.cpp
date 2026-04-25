@@ -1,6 +1,7 @@
 ﻿#include "Renderer/RenderFlow/DefaultRenderFlow.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -9,11 +10,18 @@ namespace luna {
 DefaultRenderFlow::DefaultRenderFlow()
     : m_scene_state(m_resources, m_draw_queue, m_default_material)
 {
-    m_builder.addPass("Geometry", std::make_unique<render_flow::default_scene::DefaultSceneGeometryPass>(m_scene_state));
+    namespace pass_names = render_flow::default_scene::pass_names;
+
+    m_builder.addPass(std::string(pass_names::Geometry),
+                      std::make_unique<render_flow::default_scene::DefaultSceneGeometryPass>(m_scene_state));
     m_builder.insertPassAfter(
-        "Geometry", "Lighting", std::make_unique<render_flow::default_scene::DefaultSceneLightingPass>(m_scene_state));
+        pass_names::Geometry,
+        std::string(pass_names::Lighting),
+        std::make_unique<render_flow::default_scene::DefaultSceneLightingPass>(m_scene_state));
     m_builder.insertPassAfter(
-        "Lighting", "Transparent", std::make_unique<render_flow::default_scene::DefaultSceneTransparentPass>(m_scene_state));
+        pass_names::Lighting,
+        std::string(pass_names::Transparent),
+        std::make_unique<render_flow::default_scene::DefaultSceneTransparentPass>(m_scene_state));
 }
 
 DefaultRenderFlow::~DefaultRenderFlow()

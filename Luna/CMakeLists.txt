@@ -31,6 +31,7 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderPass.cpp
     Renderer/RenderFlow/DefaultRenderFlow.h
     Renderer/RenderFlow/DefaultRenderFlow.cpp
+    Renderer/RenderFlow/DefaultScene/PassNames.h
     Renderer/RenderFlow/DefaultScene/Passes.h
     Renderer/RenderFlow/DefaultScene/Passes.cpp
     Renderer/RenderWorld/RenderWorld.h
