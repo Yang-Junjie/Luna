@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Defines the compiled render-graph representation and pass execution contexts.
 // These types describe what a frame will execute after graph building is complete,
@@ -144,3 +144,7 @@ private:
 };
 
 } // namespace luna
+
+
+
+

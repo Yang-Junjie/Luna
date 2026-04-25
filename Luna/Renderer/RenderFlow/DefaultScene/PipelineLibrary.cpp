@@ -1,9 +1,10 @@
-﻿#include "Renderer/SceneRenderer/SceneRendererPipelineLibrary.h"
+﻿#include "Renderer/RenderFlow/DefaultScene/PipelineLibrary.h"
 
 #include "Core/Log.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
-#include "Renderer/SceneRenderer/SceneRendererSupport.h"
+#include "Renderer/RenderFlow/DefaultScene/Support.h"
 
 #include <Builders.h>
 #include <DescriptorPool.h>
@@ -20,8 +21,9 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <span>
+#include <vector>
 
-namespace luna::scene_renderer {
+namespace luna::render_flow::default_scene {
 
 namespace {
 
@@ -155,7 +157,7 @@ luna::RHI::Ref<luna::RHI::PipelineLayout>
         builder.AddSetLayout(set_layout);
     }
     if (include_mesh_push_constants) {
-        builder.AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(scene_renderer_detail::MeshPushConstants));
+        builder.AddPushConstant(luna::RHI::ShaderStage::Vertex, 0, sizeof(render_flow::default_scene_detail::MeshPushConstants));
     }
 
     return device->CreatePipelineLayout(builder.Build());
@@ -180,11 +182,11 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
         .AddColorAttachmentDefault(false)
         .AddColorAttachmentDefault(false)
         .AddColorAttachmentDefault(false)
-        .AddColorFormat(scene_renderer_detail::kGBufferBaseColorFormat)
-        .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
-        .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
-        .AddColorFormat(scene_renderer_detail::kGBufferLightingFormat)
-        .AddColorFormat(scene_renderer_detail::kScenePickingFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kGBufferBaseColorFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kGBufferLightingFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kGBufferLightingFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kGBufferLightingFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kScenePickingFormat)
         .SetDepthStencilFormat(luna::RHI::Format::D32_FLOAT)
         .SetLayout(layout);
 
@@ -229,10 +231,10 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     builder.SetShaders({vertex_shader, fragment_shader});
     addStaticMeshVertexLayout(builder);
     builder.SetDepthTest(true, false, luna::RHI::CompareOp::Less)
-        .AddColorAttachment(scene_renderer_detail::makeAlphaBlendAttachment())
+        .AddColorAttachment(render_flow::default_scene_detail::makeAlphaBlendAttachment())
         .AddColorAttachmentDefault(false)
         .AddColorFormat(color_format)
-        .AddColorFormat(scene_renderer_detail::kScenePickingFormat)
+        .AddColorFormat(render_flow::default_scene_detail::kScenePickingFormat)
         .SetDepthStencilFormat(luna::RHI::Format::D32_FLOAT)
         .SetLayout(layout);
 
@@ -246,7 +248,7 @@ void PipelineLibrary::shutdown()
     reset();
 }
 
-bool PipelineLibrary::hasCompleteState(const SceneRenderer::RenderContext& context) const noexcept
+bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const noexcept
 {
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.lighting_pipeline &&
@@ -255,39 +257,39 @@ bool PipelineLibrary::hasCompleteState(const SceneRenderer::RenderContext& conte
            m_state.gbuffer_sampler && m_state.environment_source_sampler;
 }
 
-void PipelineLibrary::rebuild(const SceneRenderer::RenderContext& context, const SceneRenderer::ShaderPaths& shader_paths)
+void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
 {
     reset();
     m_state.device = context.device;
     m_state.backend_type = context.backend_type;
 
     if (!m_state.device || !context.compiler) {
-        LUNA_RENDERER_WARN("Cannot rebuild scene renderer pipelines: device={} compiler={}",
+        LUNA_RENDERER_WARN("Cannot rebuild scene render flow pipelines: device={} compiler={}",
                            static_cast<bool>(m_state.device),
                            static_cast<bool>(context.compiler));
         return;
     }
 
-    LUNA_RENDERER_DEBUG("Loading scene renderer shaders: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
+    LUNA_RENDERER_DEBUG("Loading scene render flow shaders: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
                         shader_paths.geometry_vertex_path.string(),
                         shader_paths.geometry_fragment_path.string(),
                         shader_paths.lighting_vertex_path.string(),
                         shader_paths.lighting_fragment_path.string());
 
-    m_state.geometry_vertex_shader = scene_renderer_detail::loadShaderModule(
+    m_state.geometry_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_vertex_path, "sceneGeometryVertexMain", luna::RHI::ShaderStage::Vertex);
-    m_state.geometry_fragment_shader = scene_renderer_detail::loadShaderModule(
+    m_state.geometry_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneGeometryFragmentMain", luna::RHI::ShaderStage::Fragment);
-    m_state.lighting_vertex_shader = scene_renderer_detail::loadShaderModule(
+    m_state.lighting_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.lighting_vertex_path, "sceneLightingVertexMain", luna::RHI::ShaderStage::Vertex);
-    m_state.lighting_fragment_shader = scene_renderer_detail::loadShaderModule(
+    m_state.lighting_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.lighting_fragment_path, "sceneLightingFragmentMain", luna::RHI::ShaderStage::Fragment);
-    m_state.transparent_fragment_shader = scene_renderer_detail::loadShaderModule(
+    m_state.transparent_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneTransparentFragmentMain", luna::RHI::ShaderStage::Fragment);
 
     if (!m_state.geometry_vertex_shader || !m_state.geometry_fragment_shader || !m_state.lighting_vertex_shader ||
         !m_state.lighting_fragment_shader || !m_state.transparent_fragment_shader) {
-        LUNA_RENDERER_ERROR("Failed to load scene renderer shaders");
+        LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
 
@@ -306,7 +308,7 @@ void PipelineLibrary::rebuild(const SceneRenderer::RenderContext& context, const
     }
     if (m_state.device) {
         m_state.scene_params_buffer = m_state.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                       .SetSize(sizeof(scene_renderer_detail::SceneGpuParams))
+                                                                       .SetSize(sizeof(render_flow::default_scene_detail::SceneGpuParams))
                                                                        .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
                                                                        .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
                                                                        .SetName("SceneParams")
@@ -334,7 +336,7 @@ void PipelineLibrary::rebuild(const SceneRenderer::RenderContext& context, const
         m_state.device, m_state.transparent_pipeline_layout, context.color_format, m_state.geometry_vertex_shader, m_state.transparent_fragment_shader);
     m_state.surface_format = context.color_format;
 
-    LUNA_RENDERER_INFO("Created scene renderer graphics pipelines for color format {} ({})",
+    LUNA_RENDERER_INFO("Created scene render flow graphics pipelines for color format {} ({})",
                        renderer_detail::formatToString(context.color_format),
                        static_cast<int>(context.color_format));
 }
@@ -354,8 +356,8 @@ void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Textur
         .Binding = 0,
         .Buffer = m_state.scene_params_buffer,
         .Offset = 0,
-        .Stride = sizeof(scene_renderer_detail::SceneGpuParams),
-        .Size = sizeof(scene_renderer_detail::SceneGpuParams),
+        .Stride = sizeof(render_flow::default_scene_detail::SceneGpuParams),
+        .Size = sizeof(render_flow::default_scene_detail::SceneGpuParams),
         .Type = luna::RHI::DescriptorType::UniformBuffer,
     });
     m_state.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
@@ -371,15 +373,24 @@ void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Textur
     m_state.scene_descriptor_set->Update();
 }
 
-void PipelineLibrary::updateSceneParameters(const SceneRenderer::RenderContext& context,
-                                            const Camera& camera,
-                                            const DrawQueue& draw_queue,
-                                            float environment_mip_count,
-                                            const std::array<glm::vec4, 9>& irradiance_sh)
+namespace {
+
+struct SceneLightView {
+    const RenderDirectionalLight* directional_light{nullptr};
+    std::span<const RenderPointLight> point_lights;
+    std::span<const RenderSpotLight> spot_lights;
+};
+
+void updateSceneParameterBuffer(const SceneRenderContext& context,
+                                const Camera& camera,
+                                const SceneLightView& lights,
+                                float environment_mip_count,
+                                const std::array<glm::vec4, 9>& irradiance_sh,
+                                const luna::RHI::Ref<luna::RHI::Buffer>& scene_params_buffer)
 {
-    if (!m_state.scene_params_buffer || context.framebuffer_width == 0 || context.framebuffer_height == 0) {
+    if (!scene_params_buffer || context.framebuffer_width == 0 || context.framebuffer_height == 0) {
         LUNA_RENDERER_WARN("Cannot update scene parameters: scene_params_buffer={} framebuffer={}x{}",
-                           static_cast<bool>(m_state.scene_params_buffer),
+                           static_cast<bool>(scene_params_buffer),
                            context.framebuffer_width,
                            context.framebuffer_height);
         return;
@@ -388,34 +399,35 @@ void PipelineLibrary::updateSceneParameters(const SceneRenderer::RenderContext& 
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
     const glm::mat4 view_projection =
-        scene_renderer_detail::buildViewProjection(camera, aspect_ratio, context.backend_type);
+        render_flow::default_scene_detail::buildViewProjection(camera, aspect_ratio, context.backend_type);
 
-    scene_renderer_detail::SceneGpuParams params;
+    render_flow::default_scene_detail::SceneGpuParams params;
     params.view_projection = view_projection;
     params.inverse_view_projection = glm::inverse(view_projection);
-    params.camera_position_env_mip = glm::vec4(scene_renderer_detail::resolveCameraPosition(camera), environment_mip_count);
-    if (draw_queue.directionalLight().has_value() && draw_queue.directionalLight()->intensity > 0.0f) {
-        const auto& directional_light = *draw_queue.directionalLight();
+    params.camera_position_env_mip = glm::vec4(render_flow::default_scene_detail::resolveCameraPosition(camera), environment_mip_count);
+    if (lights.directional_light && lights.directional_light->intensity > 0.0f) {
+        const auto& directional_light = *lights.directional_light;
         params.light_direction_intensity = glm::vec4(glm::normalize(directional_light.direction), directional_light.intensity);
         params.light_color_exposure = glm::vec4(directional_light.color, 1.0f);
     } else {
         params.light_direction_intensity = glm::vec4(0.0f, 1.0f, 0.0f, 0.0f);
         params.light_color_exposure = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
+
     const uint32_t point_light_count =
-        (std::min)(static_cast<uint32_t>(draw_queue.pointLights().size()), scene_renderer_detail::kMaxPointLights);
+        (std::min)(static_cast<uint32_t>(lights.point_lights.size()), render_flow::default_scene_detail::kMaxPointLights);
     const uint32_t spot_light_count =
-        (std::min)(static_cast<uint32_t>(draw_queue.spotLights().size()), scene_renderer_detail::kMaxSpotLights);
+        (std::min)(static_cast<uint32_t>(lights.spot_lights.size()), render_flow::default_scene_detail::kMaxSpotLights);
     params.light_counts = glm::vec4(static_cast<float>(point_light_count), static_cast<float>(spot_light_count), 0.0f, 0.0f);
 
     for (uint32_t light_index = 0; light_index < point_light_count; ++light_index) {
-        const auto& light = draw_queue.pointLights()[light_index];
+        const auto& light = lights.point_lights[light_index];
         params.point_light_position_intensity[light_index] = glm::vec4(light.position, light.intensity);
         params.point_light_color_range[light_index] = glm::vec4(light.color, light.range);
     }
 
     for (uint32_t light_index = 0; light_index < spot_light_count; ++light_index) {
-        const auto& light = draw_queue.spotLights()[light_index];
+        const auto& light = lights.spot_lights[light_index];
         params.spot_light_position_intensity[light_index] = glm::vec4(light.position, light.intensity);
         params.spot_light_direction_range[light_index] = glm::vec4(light.direction, light.range);
         params.spot_light_color_cones[light_index] = glm::vec4(light.color, 0.0f);
@@ -429,15 +441,34 @@ void PipelineLibrary::updateSceneParameters(const SceneRenderer::RenderContext& 
                                          1.0f);
     params.irradiance_sh = irradiance_sh;
 
-    if (void* mapped = m_state.scene_params_buffer->Map()) {
+    if (void* mapped = scene_params_buffer->Map()) {
         std::memcpy(mapped, &params, sizeof(params));
-        m_state.scene_params_buffer->Flush();
-        m_state.scene_params_buffer->Unmap();
+        scene_params_buffer->Flush();
+        scene_params_buffer->Unmap();
     } else {
         LUNA_RENDERER_WARN("Failed to map scene parameter buffer");
     }
 }
 
+} // namespace
+
+void PipelineLibrary::updateSceneParameters(const SceneRenderContext& context,
+                                            const RenderWorld& world,
+                                            float environment_mip_count,
+                                            const std::array<glm::vec4, 9>& irradiance_sh)
+{
+    const RenderDirectionalLight* directional_light = world.directionalLights().empty() ? nullptr : &world.directionalLights().front();
+    updateSceneParameterBuffer(context,
+                               world.camera(),
+                               SceneLightView{
+                                   .directional_light = directional_light,
+                                   .point_lights = world.pointLights(),
+                                   .spot_lights = world.spotLights(),
+                               },
+                               environment_mip_count,
+                               irradiance_sh,
+                               m_state.scene_params_buffer);
+}
 void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
@@ -544,4 +575,10 @@ void PipelineLibrary::reset() noexcept
     m_state = {};
 }
 
-} // namespace luna::scene_renderer
+} // namespace luna::render_flow::default_scene
+
+
+
+
+
+

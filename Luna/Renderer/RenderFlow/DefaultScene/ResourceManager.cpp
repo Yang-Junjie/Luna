@@ -1,25 +1,26 @@
-﻿#include "Renderer/SceneRenderer/SceneRendererResourceManager.h"
+﻿#include "Renderer/RenderFlow/DefaultScene/ResourceManager.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
-#include "Renderer/SceneRenderer/SceneRendererAssetCache.h"
-#include "Renderer/SceneRenderer/SceneRendererEnvironment.h"
-#include "Renderer/SceneRenderer/SceneRendererPipelineLibrary.h"
-#include "Renderer/SceneRenderer/SceneRendererSupport.h"
+#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
+#include "Renderer/RenderFlow/DefaultScene/Environment.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineLibrary.h"
+#include "Renderer/RenderFlow/DefaultScene/Support.h"
 
 #include <algorithm>
 #include <utility>
 
-namespace luna::scene_renderer {
+namespace luna::render_flow::default_scene {
 
 namespace {
 
-using ShaderPaths = SceneRenderer::ShaderPaths;
-using RenderContext = SceneRenderer::RenderContext;
+using ShaderPaths = SceneShaderPaths;
+using RenderContext = SceneRenderContext;
 
 ShaderPaths defaultShaderPaths()
 {
-    const std::filesystem::path shader_root = scene_renderer_detail::projectRoot() / "Luna" / "Renderer" / "Shaders";
+    const std::filesystem::path shader_root = render_flow::default_scene_detail::projectRoot() / "Luna" / "Renderer" / "Shaders";
     const std::filesystem::path geometry_shader_path = shader_root / "SceneGeometry.slang";
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
     return ShaderPaths{
@@ -36,7 +37,7 @@ class ResourceManager::Implementation final {
 public:
     void setShaderPaths(ShaderPaths shader_paths)
     {
-        LUNA_RENDERER_INFO("Scene renderer shader paths updated: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
+        LUNA_RENDERER_INFO("Scene render flow shader paths updated: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
                            shader_paths.geometry_vertex_path.string(),
                            shader_paths.geometry_fragment_path.string(),
                            shader_paths.lighting_vertex_path.string(),
@@ -52,7 +53,7 @@ public:
         const bool had_state = m_pipelines.device() || m_pipelines.geometryPipeline() || m_pipelines.sceneDescriptorSet() ||
                                m_environment.sourceTexture().texture;
         if (had_state) {
-            LUNA_RENDERER_INFO("Shutting down scene renderer resource manager");
+            LUNA_RENDERER_INFO("Shutting down scene render flow resource manager");
         }
 
         m_assets.clear(AssetCache::ClearMode::All);
@@ -60,14 +61,14 @@ public:
         m_pipelines.shutdown();
 
         if (had_state) {
-            LUNA_RENDERER_INFO("Scene renderer resource manager shutdown complete");
+            LUNA_RENDERER_INFO("Scene render flow resource manager shutdown complete");
         }
     }
 
     void ensurePipelines(const RenderContext& context)
     {
         if (!context.device || !context.compiler) {
-            LUNA_RENDERER_WARN("Cannot ensure scene renderer pipelines: device={} compiler={}",
+            LUNA_RENDERER_WARN("Cannot ensure scene render flow pipelines: device={} compiler={}",
                                static_cast<bool>(context.device),
                                static_cast<bool>(context.compiler));
             return;
@@ -76,13 +77,13 @@ public:
         const bool device_changed = m_pipelines.device() && m_pipelines.device() != context.device;
         const bool needs_rebuild = !m_pipelines.hasCompleteState(context);
         if (device_changed) {
-            LUNA_RENDERER_INFO("Scene renderer device changed; rebuilding GPU resources for backend '{}'",
+            LUNA_RENDERER_INFO("Scene render flow device changed; rebuilding GPU resources for backend '{}'",
                                renderer_detail::backendTypeToString(context.backend_type));
             m_assets.clear(AssetCache::ClearMode::All);
             m_environment.reset();
             m_pipelines.shutdown();
         } else if (needs_rebuild) {
-            LUNA_RENDERER_INFO("Rebuilding scene renderer pipeline state for backend '{}' and color format {} ({})",
+            LUNA_RENDERER_INFO("Rebuilding scene render flow pipeline state for backend '{}' and color format {} ({})",
                                renderer_detail::backendTypeToString(context.backend_type),
                                renderer_detail::formatToString(context.color_format),
                                static_cast<int>(context.color_format));
@@ -102,18 +103,11 @@ public:
         }
     }
 
-    void prepareOpaqueDraws(luna::RHI::CommandBufferEncoder& commands,
-                            const DrawQueue& draw_queue,
-                            const Material& default_material)
+    void prepareDraws(luna::RHI::CommandBufferEncoder& commands,
+                      std::span<const DrawCommand> draw_commands,
+                      const Material& default_material)
     {
-        m_assets.prepareDraws(commands, draw_queue.opaqueDrawCommands(), default_material, makeBindings());
-    }
-
-    void prepareTransparentDraws(luna::RHI::CommandBufferEncoder& commands,
-                                 const DrawQueue& draw_queue,
-                                 const Material& default_material)
-    {
-        m_assets.prepareDraws(commands, draw_queue.transparentDrawCommands(), default_material, makeBindings());
+        m_assets.prepareDraws(commands, draw_commands, default_material, makeBindings());
     }
 
     void uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
@@ -121,15 +115,12 @@ public:
         m_environment.uploadIfNeeded(commands);
     }
 
-    void updateSceneParameters(const RenderContext& context,
-                               const Camera& camera,
-                               const DrawQueue& draw_queue)
+    void updateSceneParameters(const RenderContext& context, const RenderWorld& world)
     {
-        const float environment_mip_count =
-            m_environment.sourceTexture().texture != nullptr
-                ? static_cast<float>((std::max)(m_environment.sourceTexture().texture->GetMipLevels(), 1u) - 1u)
-                : 0.0f;
-        m_pipelines.updateSceneParameters(context, camera, draw_queue, environment_mip_count, m_environment.irradianceSH());
+        const float environment_mip_count = static_cast<float>(m_environment.sourceTexture().texture
+                                                                   ? m_environment.sourceTexture().texture->GetMipLevels()
+                                                                   : 1);
+        m_pipelines.updateSceneParameters(context, world, environment_mip_count, m_environment.irradianceSH());
     }
 
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -232,7 +223,7 @@ ResourceManager::~ResourceManager()
     shutdown();
 }
 
-void ResourceManager::setShaderPaths(SceneRenderer::ShaderPaths shader_paths)
+void ResourceManager::setShaderPaths(SceneShaderPaths shader_paths)
 {
     m_impl->setShaderPaths(std::move(shader_paths));
 }
@@ -242,23 +233,16 @@ void ResourceManager::shutdown()
     m_impl->shutdown();
 }
 
-void ResourceManager::ensurePipelines(const SceneRenderer::RenderContext& context)
+void ResourceManager::ensurePipelines(const SceneRenderContext& context)
 {
     m_impl->ensurePipelines(context);
 }
 
-void ResourceManager::prepareOpaqueDraws(luna::RHI::CommandBufferEncoder& commands,
-                                         const DrawQueue& draw_queue,
-                                         const Material& default_material)
+void ResourceManager::prepareDraws(luna::RHI::CommandBufferEncoder& commands,
+                                   std::span<const DrawCommand> draw_commands,
+                                   const Material& default_material)
 {
-    m_impl->prepareOpaqueDraws(commands, draw_queue, default_material);
-}
-
-void ResourceManager::prepareTransparentDraws(luna::RHI::CommandBufferEncoder& commands,
-                                              const DrawQueue& draw_queue,
-                                              const Material& default_material)
-{
-    m_impl->prepareTransparentDraws(commands, draw_queue, default_material);
+    m_impl->prepareDraws(commands, draw_commands, default_material);
 }
 
 void ResourceManager::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
@@ -266,11 +250,9 @@ void ResourceManager::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder&
     m_impl->uploadEnvironmentIfNeeded(commands);
 }
 
-void ResourceManager::updateSceneParameters(const SceneRenderer::RenderContext& context,
-                                            const Camera& camera,
-                                            const DrawQueue& draw_queue)
+void ResourceManager::updateSceneParameters(const SceneRenderContext& context, const RenderWorld& world)
 {
-    m_impl->updateSceneParameters(context, camera, draw_queue);
+    m_impl->updateSceneParameters(context, world);
 }
 
 void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -319,4 +301,10 @@ const luna::RHI::Ref<luna::RHI::Sampler>& ResourceManager::gbufferSampler() cons
     return m_impl->gbufferSampler();
 }
 
-} // namespace luna::scene_renderer
+} // namespace luna::render_flow::default_scene
+
+
+
+
+
+

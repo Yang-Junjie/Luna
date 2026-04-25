@@ -1,4 +1,4 @@
-#include "Core/Log.h"
+﻿#include "Core/Log.h"
 #include "Renderer/Mesh.h"
 
 #include <numeric>
@@ -54,3 +54,7 @@ bool Mesh::isValid() const
 }
 
 } // namespace luna
+
+
+
+

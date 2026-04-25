@@ -1,14 +1,15 @@
 ﻿#pragma once
 
-// Coordinates the internal subsystems behind SceneRenderer.
+// Coordinates scene render flow resources.
 // Serves as the boundary that ties together pipeline state, environment resources,
 // and uploaded draw assets so passes can ask for ready-to-use GPU resources.
 
-#include "Renderer/SceneRenderer/SceneRenderer.h"
-#include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
+#include "Renderer/RenderFlow/RenderFlowTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 
 #include <memory>
 #include <optional>
+#include <span>
 
 namespace luna::RHI {
 class Buffer;
@@ -19,10 +20,13 @@ class Sampler;
 class Texture;
 } // namespace luna::RHI
 
-namespace luna::scene_renderer {
+namespace luna {
+class RenderWorld;
+}
+
+namespace luna::render_flow::default_scene {
 
 class DrawQueue;
-struct DrawCommand;
 
 struct ResolvedDrawResources {
     luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
@@ -44,20 +48,15 @@ public:
     ResourceManager(const ResourceManager&) = delete;
     ResourceManager& operator=(const ResourceManager&) = delete;
 
-    void setShaderPaths(SceneRenderer::ShaderPaths shader_paths);
+    void setShaderPaths(SceneShaderPaths shader_paths);
     void shutdown();
 
-    void ensurePipelines(const SceneRenderer::RenderContext& context);
-    void prepareOpaqueDraws(luna::RHI::CommandBufferEncoder& commands,
-                            const DrawQueue& draw_queue,
-                            const Material& default_material);
-    void prepareTransparentDraws(luna::RHI::CommandBufferEncoder& commands,
-                                 const DrawQueue& draw_queue,
-                                 const Material& default_material);
+    void ensurePipelines(const SceneRenderContext& context);
+    void prepareDraws(luna::RHI::CommandBufferEncoder& commands,
+                      std::span<const DrawCommand> draw_commands,
+                      const Material& default_material);
     void uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands);
-    void updateSceneParameters(const SceneRenderer::RenderContext& context,
-                               const Camera& camera,
-                               const DrawQueue& draw_queue);
+    void updateSceneParameters(const SceneRenderContext& context, const RenderWorld& world);
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
@@ -79,4 +78,10 @@ private:
     std::unique_ptr<Implementation> m_impl;
 };
 
-} // namespace luna::scene_renderer
+} // namespace luna::render_flow::default_scene
+
+
+
+
+
+

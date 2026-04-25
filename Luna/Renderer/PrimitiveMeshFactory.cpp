@@ -1,4 +1,4 @@
-#include "Renderer/PrimitiveMeshFactory.h"
+﻿#include "Renderer/PrimitiveMeshFactory.h"
 
 #include <algorithm>
 #include <cmath>
@@ -306,3 +306,7 @@ std::shared_ptr<Mesh> PrimitiveMeshFactory::createCone(uint32_t segments)
 }
 
 } // namespace luna
+
+
+
+

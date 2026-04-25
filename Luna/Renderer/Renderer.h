@@ -2,10 +2,10 @@
 
 // Main renderer framwork for the engine runtime.
 // Owns device-facing frame state, scene output targets, and the public frame loop,
-// while delegating scene-specific drawing to SceneRenderer.
+// while delegating scene-specific drawing to RenderFlow.
 
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/SceneRenderer/SceneRenderer.h"
+#include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <cstdint>
 
@@ -39,6 +39,7 @@ class RenderGraph;
 } // namespace luna
 
 namespace luna {
+class IRenderFlow;
 class Window;
 
 class Renderer {
@@ -111,8 +112,8 @@ public:
 
     uint32_t getFramesInFlight() const;
 
-    SceneRenderer& getSceneRenderer();
-    const SceneRenderer& getSceneRenderer() const;
+    RenderWorld& getRenderWorld();
+    const RenderWorld& getRenderWorld() const;
 
     glm::vec4& getClearColor();
     const glm::vec4& getClearColor() const;
@@ -204,7 +205,12 @@ private:
     SceneOutputState m_scene_output{};
     FrameResources m_frame_resources{};
     RuntimeState m_runtime{};
-    SceneRenderer m_scene_renderer{};
+    RenderWorld m_render_world{};
+    std::unique_ptr<IRenderFlow> m_render_flow;
 };
 
 } // namespace luna
+
+
+
+

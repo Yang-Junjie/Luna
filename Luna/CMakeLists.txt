@@ -22,22 +22,34 @@ set(RENDERER_SOURCE
     Renderer/RenderGraph.cpp
     Renderer/RenderGraphBuilder.h
     Renderer/RenderGraphBuilder.cpp
+    Renderer/RenderFlow/RenderFlow.h
+    Renderer/RenderFlow/RenderFlow.cpp
+    Renderer/RenderFlow/RenderFlowTypes.h
+    Renderer/RenderFlow/RenderPass.h
+    Renderer/RenderFlow/RenderPass.cpp
+    Renderer/RenderFlow/DefaultRenderFlow.h
+    Renderer/RenderFlow/DefaultRenderFlow.cpp
+    Renderer/RenderFlow/DefaultScene/Passes.h
+    Renderer/RenderFlow/DefaultScene/Passes.cpp
+    Renderer/RenderWorld/RenderWorld.h
+    Renderer/RenderWorld/RenderWorld.cpp
+    Renderer/RenderWorld/RenderTypes.h
+    Renderer/RenderWorld/RenderWorldExtractor.h
+    Renderer/RenderWorld/RenderWorldExtractor.cpp
     Renderer/RendererUtilities.h
     Renderer/RendererUtilities.cpp
-    Renderer/SceneRenderer/SceneRenderer.h
-    Renderer/SceneRenderer/SceneRendererSupport.h
-    Renderer/SceneRenderer/SceneRendererSupport.cpp
-    Renderer/SceneRenderer/SceneRendererDrawQueue.h
-    Renderer/SceneRenderer/SceneRendererDrawQueue.cpp
-    Renderer/SceneRenderer/SceneRendererAssetCache.h
-    Renderer/SceneRenderer/SceneRendererAssetCache.cpp
-    Renderer/SceneRenderer/SceneRendererEnvironment.h
-    Renderer/SceneRenderer/SceneRendererEnvironment.cpp
-    Renderer/SceneRenderer/SceneRendererPipelineLibrary.h
-    Renderer/SceneRenderer/SceneRendererPipelineLibrary.cpp
-    Renderer/SceneRenderer/SceneRendererResourceManager.h
-    Renderer/SceneRenderer/SceneRenderer.cpp
-    Renderer/SceneRenderer/SceneRendererResourceManager.cpp
+    Renderer/RenderFlow/DefaultScene/Support.h
+    Renderer/RenderFlow/DefaultScene/Support.cpp
+    Renderer/RenderFlow/DefaultScene/DrawQueue.h
+    Renderer/RenderFlow/DefaultScene/DrawQueue.cpp
+    Renderer/RenderFlow/DefaultScene/AssetCache.h
+    Renderer/RenderFlow/DefaultScene/AssetCache.cpp
+    Renderer/RenderFlow/DefaultScene/Environment.h
+    Renderer/RenderFlow/DefaultScene/Environment.cpp
+    Renderer/RenderFlow/DefaultScene/PipelineLibrary.h
+    Renderer/RenderFlow/DefaultScene/PipelineLibrary.cpp
+    Renderer/RenderFlow/DefaultScene/ResourceManager.h
+    Renderer/RenderFlow/DefaultScene/ResourceManager.cpp
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp
@@ -190,3 +202,7 @@ target_compile_definitions(
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
 )
+
+
+
+

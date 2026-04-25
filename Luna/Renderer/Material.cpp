@@ -1,4 +1,4 @@
-#include "Core/Log.h"
+﻿#include "Core/Log.h"
 #include "Material.h"
 
 #include <utility>
@@ -126,3 +126,7 @@ bool Material::hasOcclusionTexture() const
 }
 
 } // namespace luna
+
+
+
+

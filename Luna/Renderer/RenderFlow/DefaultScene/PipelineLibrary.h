@@ -1,17 +1,18 @@
 ﻿#pragma once
 
-// Owns the long-lived GPU objects required by the scene renderer.
+// Owns the long-lived GPU objects required by the scene render flow.
 // This includes pipelines, descriptor layouts, descriptor sets, and scene-wide buffers,
 // but not uploaded mesh/material asset caches.
 
-#include "Renderer/SceneRenderer/SceneRenderer.h"
-#include "Renderer/SceneRenderer/SceneRendererDrawQueue.h"
+#include "Renderer/RenderFlow/RenderFlowTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 
 #include <array>
 #include <optional>
 
 namespace luna {
 class Camera;
+class RenderWorld;
 }
 
 namespace luna::RHI {
@@ -25,17 +26,16 @@ class Sampler;
 class ShaderModule;
 } // namespace luna::RHI
 
-namespace luna::scene_renderer {
+namespace luna::render_flow::default_scene {
 
 class PipelineLibrary final {
 public:
     void shutdown();
-    [[nodiscard]] bool hasCompleteState(const SceneRenderer::RenderContext& context) const noexcept;
-    void rebuild(const SceneRenderer::RenderContext& context, const SceneRenderer::ShaderPaths& shader_paths);
+    [[nodiscard]] bool hasCompleteState(const SceneRenderContext& context) const noexcept;
+    void rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths);
     void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture);
-    void updateSceneParameters(const SceneRenderer::RenderContext& context,
-                               const Camera& camera,
-                               const DrawQueue& draw_queue,
+    void updateSceneParameters(const SceneRenderContext& context,
+                               const RenderWorld& world,
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh);
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -93,4 +93,10 @@ private:
     State m_state{};
 };
 
-} // namespace luna::scene_renderer
+} // namespace luna::render_flow::default_scene
+
+
+
+
+
+

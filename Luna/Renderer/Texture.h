@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Defines texture assets used by materials and scene environment resources.
 // Wraps loaded image data together with sampler settings so upload code can
@@ -123,3 +123,7 @@ private:
 };
 
 } // namespace luna
+
+
+
+

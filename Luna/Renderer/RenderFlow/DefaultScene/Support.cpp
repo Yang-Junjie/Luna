@@ -1,4 +1,4 @@
-﻿#include "Renderer/SceneRenderer/SceneRendererSupport.h"
+﻿#include "Renderer/RenderFlow/DefaultScene/Support.h"
 
 #include "Core/Log.h"
 #include "Renderer/RendererUtilities.h"
@@ -14,7 +14,7 @@
 #include <glm/gtx/norm.hpp>
 #include <glm/trigonometric.hpp>
 
-namespace luna::scene_renderer_detail {
+namespace luna::render_flow::default_scene_detail {
 
 namespace {
 
@@ -511,4 +511,9 @@ void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands,
                         uploaded_texture.copy_regions.size());
 }
 
-} // namespace luna::scene_renderer_detail
+} // namespace luna::render_flow::default_scene_detail
+
+
+
+
+

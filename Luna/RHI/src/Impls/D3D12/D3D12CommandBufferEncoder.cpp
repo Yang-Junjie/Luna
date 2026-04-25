@@ -375,6 +375,10 @@ void D3D12CommandBufferEncoder::PipelineBarrier(SyncScope srcStage,
     barriers.reserve(textureBarriers.size() + bufferBarriers.size());
 
     for (auto& tb : textureBarriers) {
+        if (!tb.Texture || tb.OldState == tb.NewState) {
+            continue;
+        }
+
         auto* d3dTex = static_cast<D3D12Texture*>(tb.Texture.get());
         D3D12_RESOURCE_BARRIER b{};
         b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;

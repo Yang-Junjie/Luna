@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-// Defines material assets consumed by the scene renderer.
+// Defines material assets consumed by scene render flows.
 // Stores texture references, surface parameters, and blend behavior,
 // but does not perform any GPU upload work by itself.
 
@@ -96,3 +96,7 @@ private:
 };
 
 } // namespace luna
+
+
+
+

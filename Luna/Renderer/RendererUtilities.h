@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Shared helper functions for renderer setup and diagnostics.
 // Keeps small backend-independent decisions such as adapter selection,
@@ -19,7 +19,7 @@ const char* presentModeToString(luna::RHI::PresentMode mode);
 const char* adapterTypeToString(luna::RHI::AdapterType type);
 const char* backendTypeToString(luna::RHI::BackendType type);
 const char* formatToString(luna::RHI::Format format);
-bool usesSceneRenderer(luna::RHI::BackendType type);
+bool supportsDefaultRenderFlow(luna::RHI::BackendType type);
 bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode);
 std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes);
 luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
@@ -34,3 +34,7 @@ luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMod
 #define LUNA_RENDERER_FRAME_TRACE(...) ((void) 0)
 #define LUNA_RENDERER_FRAME_DEBUG(...) ((void) 0)
 #endif
+
+
+
+

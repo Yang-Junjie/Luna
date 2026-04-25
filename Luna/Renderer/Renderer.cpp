@@ -1,6 +1,8 @@
-#include "Core/Log.h"
+﻿#include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
+#include "Renderer/RenderFlow/DefaultRenderFlow.h"
+#include "Renderer/RenderFlow/RenderFlow.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -178,6 +180,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         LUNA_RENDERER_INFO("Initialized renderer backend '{}' with {} frame(s) in flight",
                            renderer_detail::backendTypeToString(device_context.instance->GetType()),
                            m_frame_resources.frames_in_flight);
+        m_render_flow = std::make_unique<DefaultRenderFlow>();
     } catch (const std::exception& error) {
         LUNA_RENDERER_ERROR("Failed to initialize Renderer: {}", error.what());
         shutdown();
@@ -204,11 +207,12 @@ void Renderer::shutdown()
     waitForGpuIdle();
 
     releaseFrameCommandBuffers();
+    m_render_flow.reset();
+    m_render_world.clear();
     m_frame_resources.current_command_buffer.reset();
     m_frame_resources.render_graphs.clear();
     m_frame_resources.transient_texture_caches.clear();
     releaseSceneOutputTargets();
-    m_scene_renderer.shutdown();
     m_device_context.synchronization.reset();
     m_device_context.swapchain.reset();
     m_device_context.graphics_queue.reset();
@@ -359,7 +363,7 @@ void Renderer::renderFrame()
         scene_width = extent.width;
         scene_height = extent.height;
 
-        if (renderer_detail::usesSceneRenderer(backend_type)) {
+        if (renderer_detail::supportsDefaultRenderFlow(backend_type)) {
             scene_depth_handle = graph_builder.CreateTexture(luna::RenderGraphTextureDesc{
                 .Name = "SceneDepthTexture",
                 .Width = extent.width,
@@ -407,26 +411,25 @@ void Renderer::renderFrame()
                                      frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
                                      frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
     if (scene_output_valid) {
-        if (renderer_detail::usesSceneRenderer(backend_type) && scene_depth_handle.isValid()) {
-            m_scene_renderer.buildRenderGraph(
-                graph_builder,
-                SceneRenderer::RenderContext{
-                    .device = device_context.device,
-                    .compiler = device_context.shader_compiler,
-                    .backend_type = backend_type,
-                    .color_target = scene_color_handle,
-                    .depth_target = scene_depth_handle,
-                    .pick_target = scene_pick_handle,
-                    .color_format = scene_color_format,
-                    .clear_color = runtime.clear_color,
-                    .show_pick_debug_visualization = scene_output.pick_debug_visualization_enabled,
-                    .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
-                    .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
-                    .show_pick_debug_marker =
-                        scene_output.pick_debug_visualization_enabled && scene_output.debug_pick_marker.valid,
-                    .framebuffer_width = scene_width,
-                    .framebuffer_height = scene_height,
-                });
+        if (renderer_detail::supportsDefaultRenderFlow(backend_type) && scene_depth_handle.isValid() && m_render_flow) {
+            SceneRenderContext scene_context{
+                .device = device_context.device,
+                .compiler = device_context.shader_compiler,
+                .backend_type = backend_type,
+                .color_target = scene_color_handle,
+                .depth_target = scene_depth_handle,
+                .pick_target = scene_pick_handle,
+                .color_format = scene_color_format,
+                .clear_color = runtime.clear_color,
+                .show_pick_debug_visualization = scene_output.pick_debug_visualization_enabled,
+                .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
+                .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
+                .show_pick_debug_marker = scene_output.pick_debug_visualization_enabled && scene_output.debug_pick_marker.valid,
+                .framebuffer_width = scene_width,
+                .framebuffer_height = scene_height,
+            };
+            RenderFlowContext flow_context(graph_builder, m_render_world, scene_context);
+            m_render_flow->render(flow_context);
         } else {
             graph_builder.AddRasterPass(
                 "ClearScene",
@@ -604,7 +607,6 @@ void Renderer::endFrame()
         runtime.resize_requested = true;
     }
 
-    m_scene_renderer.clearSubmittedMeshes();
     frame_resources.current_command_buffer.reset();
     runtime.frame_started = false;
     if (frame_resources.frames_in_flight > 0) {
@@ -813,14 +815,14 @@ uint32_t Renderer::getFramesInFlight() const
     return m_frame_resources.frames_in_flight;
 }
 
-SceneRenderer& Renderer::getSceneRenderer()
+RenderWorld& Renderer::getRenderWorld()
 {
-    return m_scene_renderer;
+    return m_render_world;
 }
 
-const SceneRenderer& Renderer::getSceneRenderer() const
+const RenderWorld& Renderer::getRenderWorld() const
 {
-    return m_scene_renderer;
+    return m_render_world;
 }
 
 glm::vec4& Renderer::getClearColor()
@@ -1163,3 +1165,9 @@ void Renderer::waitForGpuIdle() noexcept
 }
 
 } // namespace luna
+
+
+
+
+
+

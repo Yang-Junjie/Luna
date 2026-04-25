@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Defines the runtime camera state used by rendering code.
 // Owns view/projection configuration and exposes helpers for movement,
@@ -66,3 +66,7 @@ private:
 };
 
 } // namespace luna
+
+
+
+

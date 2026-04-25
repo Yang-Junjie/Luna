@@ -1,4 +1,4 @@
-﻿#include "Renderer/SceneRenderer/SceneRendererAssetCache.h"
+﻿#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
 
 #include "Core/Log.h"
 #include "Renderer/Mesh.h"
@@ -12,13 +12,13 @@
 
 #include <cstring>
 
-namespace luna::scene_renderer {
+namespace luna::render_flow::default_scene {
 
 void AssetCache::clear(ClearMode mode)
 {
     const bool clear_meshes = mode == ClearMode::All;
     if (!m_uploaded_materials.empty() || !m_uploaded_textures.empty() || (clear_meshes && !m_uploaded_meshes.empty())) {
-        LUNA_RENDERER_DEBUG("Clearing scene renderer asset cache: materials={} textures={} meshes={} clear_meshes={}",
+        LUNA_RENDERER_DEBUG("Clearing scene render flow asset cache: materials={} textures={} meshes={} clear_meshes={}",
                             m_uploaded_materials.size(),
                             m_uploaded_textures.size(),
                             m_uploaded_meshes.size(),
@@ -77,14 +77,14 @@ AssetCache::DrawResources AssetCache::resolveDrawResources(const DrawCommand& dr
     }
 
     const auto& uploaded_mesh = uploaded_mesh_it->second;
-    if (draw_command.sub_mesh_index >= uploaded_mesh.sub_meshes.size()) {
+    if (draw_command.submesh_index >= uploaded_mesh.sub_meshes.size()) {
         LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources because submesh index {} is out of range ({})",
-                                  draw_command.sub_mesh_index,
+                                  draw_command.submesh_index,
                                   uploaded_mesh.sub_meshes.size());
         return resolved;
     }
 
-    const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.sub_mesh_index];
+    const auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[draw_command.submesh_index];
     resolved.vertex_buffer = uploaded_sub_mesh.vertex_buffer;
     resolved.index_buffer = uploaded_sub_mesh.index_buffer;
     resolved.material_descriptor_set = uploaded_material_it->second.descriptor_set;
@@ -118,19 +118,19 @@ AssetCache::UploadedMesh& AssetCache::getOrCreateUploadedMesh(const Mesh& mesh, 
         return uploaded_mesh;
     }
 
-    for (size_t sub_mesh_index = 0; sub_mesh_index < sub_meshes.size(); ++sub_mesh_index) {
-        const auto& sub_mesh = sub_meshes[sub_mesh_index];
-        auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[sub_mesh_index];
+    for (size_t submesh_index = 0; submesh_index < sub_meshes.size(); ++submesh_index) {
+        const auto& sub_mesh = sub_meshes[submesh_index];
+        auto& uploaded_sub_mesh = uploaded_mesh.sub_meshes[submesh_index];
 
         if (sub_mesh.Vertices.empty() || sub_mesh.Indices.empty()) {
             LUNA_RENDERER_WARN("Skipping upload for empty submesh {} in mesh '{}'",
-                               sub_mesh_index,
+                               submesh_index,
                                mesh.getName().empty() ? "<unnamed>" : mesh.getName());
             continue;
         }
 
         const std::string sub_mesh_name =
-            sub_mesh.Name.empty() ? mesh.getName() + "_SubMesh_" + std::to_string(sub_mesh_index) : sub_mesh.Name;
+            sub_mesh.Name.empty() ? mesh.getName() + "_SubMesh_" + std::to_string(submesh_index) : sub_mesh.Name;
 
         uploaded_sub_mesh.vertex_buffer = bindings.device->CreateBuffer(luna::RHI::BufferBuilder()
                                                                             .SetSize(sub_mesh.Vertices.size() *
@@ -183,7 +183,7 @@ AssetCache::UploadedMesh& AssetCache::getOrCreateUploadedMesh(const Mesh& mesh, 
     return uploaded_mesh;
 }
 
-std::shared_ptr<scene_renderer_detail::PendingTextureUpload>
+std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload>
     AssetCache::getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings)
 {
     if (texture == nullptr || !texture->isValid()) {
@@ -199,8 +199,8 @@ std::shared_ptr<scene_renderer_detail::PendingTextureUpload>
     }
 
     const std::string debug_name = texture->getName().empty() ? std::string("Texture") : texture->getName();
-    auto uploaded_texture = std::make_shared<scene_renderer_detail::PendingTextureUpload>(
-        scene_renderer_detail::createTextureUpload(
+    auto uploaded_texture = std::make_shared<render_flow::default_scene_detail::PendingTextureUpload>(
+        render_flow::default_scene_detail::createTextureUpload(
             bindings.device, texture->getImageData(), texture->getSamplerSettings(), debug_name));
     m_uploaded_textures.emplace(texture.get(), uploaded_texture);
     return uploaded_texture;
@@ -227,32 +227,32 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
     const auto create_material_texture =
         [&](const std::shared_ptr<Texture>& texture,
             const ImageData& fallback_image,
-            std::string_view suffix) -> std::shared_ptr<scene_renderer_detail::PendingTextureUpload> {
+            std::string_view suffix) -> std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> {
         if (texture != nullptr && texture->isValid()) {
             return getOrCreateUploadedTexture(texture, bindings);
         }
 
         const std::string texture_name = material_name + "_" + std::string(suffix);
-        return std::make_shared<scene_renderer_detail::PendingTextureUpload>(
-            scene_renderer_detail::createTextureUpload(bindings.device, fallback_image, default_sampler_settings, texture_name));
+        return std::make_shared<render_flow::default_scene_detail::PendingTextureUpload>(
+            render_flow::default_scene_detail::createTextureUpload(bindings.device, fallback_image, default_sampler_settings, texture_name));
     };
 
     uploaded_material.base_color_texture =
-        create_material_texture(textures.BaseColor, scene_renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "BaseColor");
+        create_material_texture(textures.BaseColor, render_flow::default_scene_detail::createFallbackColorImageData(glm::vec4(1.0f)), "BaseColor");
     uploaded_material.normal_texture = create_material_texture(
-        textures.Normal, scene_renderer_detail::createFallbackColorImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)), "Normal");
+        textures.Normal, render_flow::default_scene_detail::createFallbackColorImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)), "Normal");
     uploaded_material.metallic_roughness_texture = create_material_texture(
         textures.MetallicRoughness,
-        scene_renderer_detail::createFallbackMetallicRoughnessImageData(1.0f, 0.0f),
+        render_flow::default_scene_detail::createFallbackMetallicRoughnessImageData(1.0f, 0.0f),
         "MetallicRoughness");
     uploaded_material.emissive_texture = create_material_texture(
-        textures.Emissive, scene_renderer_detail::createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)), "Emissive");
+        textures.Emissive, render_flow::default_scene_detail::createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)), "Emissive");
     uploaded_material.occlusion_texture =
-        create_material_texture(textures.Occlusion, scene_renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "Occlusion");
+        create_material_texture(textures.Occlusion, render_flow::default_scene_detail::createFallbackColorImageData(glm::vec4(1.0f)), "Occlusion");
 
     if (bindings.device) {
         uploaded_material.params_buffer = bindings.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                            .SetSize(sizeof(scene_renderer_detail::MaterialGpuParams))
+                                                                            .SetSize(sizeof(render_flow::default_scene_detail::MaterialGpuParams))
                                                                             .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
                                                                             .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
                                                                             .SetName(material_name + "_Params")
@@ -347,8 +347,8 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
         .Binding = 10,
         .Buffer = uploaded_material.params_buffer,
         .Offset = 0,
-        .Stride = sizeof(scene_renderer_detail::MaterialGpuParams),
-        .Size = sizeof(scene_renderer_detail::MaterialGpuParams),
+        .Stride = sizeof(render_flow::default_scene_detail::MaterialGpuParams),
+        .Size = sizeof(render_flow::default_scene_detail::MaterialGpuParams),
         .Type = luna::RHI::DescriptorType::UniformBuffer,
     });
     uploaded_material.descriptor_set->Update();
@@ -359,19 +359,19 @@ void AssetCache::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& command
 {
     LUNA_RENDERER_FRAME_TRACE("Ensuring material textures are uploaded");
     if (uploaded_material.base_color_texture) {
-        scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.base_color_texture);
+        render_flow::default_scene_detail::uploadTextureIfNeeded(commands, *uploaded_material.base_color_texture);
     }
     if (uploaded_material.normal_texture) {
-        scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.normal_texture);
+        render_flow::default_scene_detail::uploadTextureIfNeeded(commands, *uploaded_material.normal_texture);
     }
     if (uploaded_material.metallic_roughness_texture) {
-        scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.metallic_roughness_texture);
+        render_flow::default_scene_detail::uploadTextureIfNeeded(commands, *uploaded_material.metallic_roughness_texture);
     }
     if (uploaded_material.emissive_texture) {
-        scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.emissive_texture);
+        render_flow::default_scene_detail::uploadTextureIfNeeded(commands, *uploaded_material.emissive_texture);
     }
     if (uploaded_material.occlusion_texture) {
-        scene_renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.occlusion_texture);
+        render_flow::default_scene_detail::uploadTextureIfNeeded(commands, *uploaded_material.occlusion_texture);
     }
 }
 
@@ -390,12 +390,12 @@ void AssetCache::uploadMaterialParamsIfNeeded(const Material& material, Uploaded
 
     const auto& surface = material.getSurface();
     if (void* mapped = uploaded_material.params_buffer->Map()) {
-        const scene_renderer_detail::MaterialGpuParams params{
+        const render_flow::default_scene_detail::MaterialGpuParams params{
             .base_color_factor = surface.BaseColorFactor,
             .emissive_factor_normal_scale = glm::vec4(surface.EmissiveFactor, surface.NormalScale),
             .material_factors = glm::vec4(
                 surface.MetallicFactor, surface.RoughnessFactor, surface.OcclusionStrength, surface.AlphaCutoff),
-            .material_flags = glm::vec4(scene_renderer_detail::materialBlendModeToFloat(material.getBlendMode()),
+            .material_flags = glm::vec4(render_flow::default_scene_detail::materialBlendModeToFloat(material.getBlendMode()),
                                         surface.Unlit ? 1.0f : 0.0f,
                                         surface.DoubleSided ? 1.0f : 0.0f,
                                         0.0f),
@@ -415,4 +415,9 @@ const Material& AssetCache::resolveMaterial(const std::shared_ptr<Material>& mat
     return material != nullptr ? *material : default_material;
 }
 
-} // namespace luna::scene_renderer
+} // namespace luna::render_flow::default_scene
+
+
+
+
+

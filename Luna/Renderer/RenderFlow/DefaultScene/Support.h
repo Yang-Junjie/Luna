@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // Shared helper types and utility functions used across scene-renderer internals.
 // Centralizes common GPU parameter structs, texture upload helpers, math helpers,
@@ -27,7 +27,7 @@
 #include <string_view>
 #include <vector>
 
-namespace luna::scene_renderer_detail {
+namespace luna::render_flow::default_scene_detail {
 
 inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
 inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
@@ -114,4 +114,9 @@ void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands,
                            luna::RHI::ResourceState final_state = luna::RHI::ResourceState::ShaderRead,
                            luna::RHI::SyncScope final_stage = luna::RHI::SyncScope::FragmentStage);
 
-} // namespace luna::scene_renderer_detail
+} // namespace luna::render_flow::default_scene_detail
+
+
+
+
+

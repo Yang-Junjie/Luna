@@ -1,4 +1,4 @@
-#include "Core/Log.h"
+﻿#include "Core/Log.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -561,3 +561,7 @@ bool RenderGraphBuilder::isHandleValid(RenderGraphTextureHandle handle, size_t r
 }
 
 } // namespace luna
+
+
+
+

@@ -1,4 +1,4 @@
-#include "Renderer/RendererUtilities.h"
+﻿#include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
 #include <array>
@@ -121,7 +121,7 @@ const char* formatToString(luna::RHI::Format format)
     }
 }
 
-bool usesSceneRenderer(luna::RHI::BackendType type)
+bool supportsDefaultRenderFlow(luna::RHI::BackendType type)
 {
     return type == luna::RHI::BackendType::Vulkan || type == luna::RHI::BackendType::DirectX11 ||
            type == luna::RHI::BackendType::DirectX12;
@@ -196,3 +196,7 @@ luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMod
 }
 
 } // namespace luna::renderer_detail
+
+
+
+
