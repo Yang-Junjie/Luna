@@ -11,8 +11,10 @@
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
+#include <ufbx.h>
 
 #if defined(_MSC_VER)
 #define TINYOBJLOADER_DISABLE_FAST_FLOAT
@@ -33,15 +35,73 @@ glm::vec3 toVec3(const fastgltf::math::fvec3& value)
     return {value[0], value[1], value[2]};
 }
 
+glm::vec2 toVec2(const ufbx_vec2& value)
+{
+    return {static_cast<float>(value.x), static_cast<float>(value.y)};
+}
+
+glm::vec3 toVec3(const ufbx_vec3& value)
+{
+    return {static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z)};
+}
+
+glm::vec4 toVec4(const ufbx_vec4& value)
+{
+    return {
+        static_cast<float>(value.x),
+        static_cast<float>(value.y),
+        static_cast<float>(value.z),
+        static_cast<float>(value.w),
+    };
+}
+
+std::string toString(ufbx_string value)
+{
+    if (value.data == nullptr || value.length == 0) {
+        return {};
+    }
+
+    return std::string(value.data, value.length);
+}
+
 bool isObjModel(const std::filesystem::path& path)
 {
     return path.extension() == ".obj";
+}
+
+bool isFbxModel(const std::filesystem::path& path)
+{
+    return path.extension() == ".fbx";
 }
 
 bool isGltfModel(const std::filesystem::path& path)
 {
     const auto extension = path.extension();
     return extension == ".gltf" || extension == ".glb";
+}
+
+uint32_t findSceneMaterialIndex(const ufbx_scene* scene, const ufbx_material* material)
+{
+    if (scene == nullptr || material == nullptr) {
+        return UINT32_MAX;
+    }
+
+    for (size_t material_index = 0; material_index < scene->materials.count; ++material_index) {
+        if (scene->materials.data[material_index] == material) {
+            return static_cast<uint32_t>(material_index);
+        }
+    }
+
+    return UINT32_MAX;
+}
+
+uint32_t materialIndexForMeshPart(const ufbx_scene* scene, const ufbx_mesh* mesh, uint32_t mesh_part_index)
+{
+    if (mesh == nullptr || mesh_part_index >= mesh->materials.count) {
+        return UINT32_MAX;
+    }
+
+    return findSceneMaterialIndex(scene, mesh->materials.data[mesh_part_index]);
 }
 
 std::pair<glm::vec3, glm::vec3> computeTangentSpace(const glm::vec3& p1,
@@ -142,6 +202,71 @@ std::shared_ptr<Mesh> buildMesh(std::string asset_name, std::vector<SubMesh> sub
     return Mesh::create(std::move(asset_name), std::move(sub_meshes));
 }
 
+void appendFbxFace(const ufbx_mesh* mesh, const ufbx_face& face, std::vector<uint32_t>& tri_indices, SubMesh& sub_mesh)
+{
+    if (mesh == nullptr || tri_indices.empty()) {
+        return;
+    }
+
+    const uint32_t triangle_count = ufbx_triangulate_face(tri_indices.data(), tri_indices.size(), mesh, face);
+    const uint32_t index_count = triangle_count * 3;
+    const uint32_t base_index = static_cast<uint32_t>(sub_mesh.Vertices.size());
+
+    for (uint32_t vertex_index = 0; vertex_index < index_count; ++vertex_index) {
+        const uint32_t fbx_index = tri_indices[vertex_index];
+
+        StaticMeshVertex vertex{};
+        vertex.Position = toVec3(ufbx_get_vertex_vec3(&mesh->vertex_position, fbx_index));
+
+        if (mesh->vertex_normal.exists) {
+            vertex.Normal = toVec3(ufbx_get_vertex_vec3(&mesh->vertex_normal, fbx_index));
+            if (glm::length2(vertex.Normal) > 0.0f) {
+                vertex.Normal = glm::normalize(vertex.Normal);
+            }
+        }
+
+        if (mesh->vertex_uv.exists) {
+            vertex.TexCoord = toVec2(ufbx_get_vertex_vec2(&mesh->vertex_uv, fbx_index));
+        }
+
+        if (mesh->vertex_color.exists) {
+            vertex.Color = toVec4(ufbx_get_vertex_vec4(&mesh->vertex_color, fbx_index));
+        }
+
+        sub_mesh.Vertices.push_back(vertex);
+        sub_mesh.Indices.push_back(base_index + vertex_index);
+    }
+}
+
+void appendFbxMeshPart(const ufbx_mesh* mesh, const ufbx_mesh_part& mesh_part, SubMesh& sub_mesh)
+{
+    if (mesh == nullptr || mesh->max_face_triangles == 0) {
+        return;
+    }
+
+    std::vector<uint32_t> tri_indices(mesh->max_face_triangles * 3);
+    for (size_t face_index = 0; face_index < mesh_part.num_faces; ++face_index) {
+        const uint32_t mesh_face_index = mesh_part.face_indices.data[face_index];
+        if (mesh_face_index >= mesh->faces.count) {
+            continue;
+        }
+
+        appendFbxFace(mesh, mesh->faces.data[mesh_face_index], tri_indices, sub_mesh);
+    }
+}
+
+void appendFbxWholeMesh(const ufbx_mesh* mesh, SubMesh& sub_mesh)
+{
+    if (mesh == nullptr || mesh->max_face_triangles == 0) {
+        return;
+    }
+
+    std::vector<uint32_t> tri_indices(mesh->max_face_triangles * 3);
+    for (size_t face_index = 0; face_index < mesh->faces.count; ++face_index) {
+        appendFbxFace(mesh, mesh->faces.data[face_index], tri_indices, sub_mesh);
+    }
+}
+
 } // namespace luna::mesh_loader_detail
 
 namespace luna {
@@ -164,6 +289,9 @@ std::shared_ptr<Mesh> MeshLoader::loadFromFile(const std::filesystem::path& path
 
     if (mesh_loader_detail::isObjModel(path)) {
         return loadFromObj(path, std::move(asset_name));
+    }
+    if (mesh_loader_detail::isFbxModel(path)) {
+        return loadFromFbx(path, std::move(asset_name));
     }
     if (mesh_loader_detail::isGltfModel(path)) {
         return loadFromGltf(path, std::move(asset_name));
@@ -251,6 +379,79 @@ std::shared_ptr<Mesh> MeshLoader::loadFromObj(const std::filesystem::path& path,
             }
 
             index_offset += face_vertex_count;
+        }
+    }
+
+    return mesh_loader_detail::buildMesh(std::move(asset_name), std::move(sub_meshes));
+}
+
+std::shared_ptr<Mesh> MeshLoader::loadFromFbx(const std::filesystem::path& path, std::string asset_name)
+{
+    ufbx_load_opts opts{};
+    opts.load_external_files = true;
+    opts.ignore_missing_external_files = true;
+    opts.generate_missing_normals = true;
+    opts.use_blender_pbr_material = true;
+    opts.target_axes.right = UFBX_COORDINATE_AXIS_POSITIVE_X;
+    opts.target_axes.up = UFBX_COORDINATE_AXIS_POSITIVE_Y;
+    opts.target_axes.front = UFBX_COORDINATE_AXIS_POSITIVE_Z;
+    opts.target_unit_meters = 1.0f;
+
+    const std::string path_string = path.string();
+    ufbx_error error{};
+    ufbx_scene* raw_scene = ufbx_load_file_len(path_string.data(), path_string.size(), &opts, &error);
+    if (raw_scene == nullptr) {
+        return {};
+    }
+
+    std::unique_ptr<ufbx_scene, decltype(&ufbx_free_scene)> scene(raw_scene, ufbx_free_scene);
+
+    std::vector<SubMesh> sub_meshes;
+    for (size_t mesh_index = 0; mesh_index < scene->meshes.count; ++mesh_index) {
+        const ufbx_mesh* fbx_mesh = scene->meshes.data[mesh_index];
+        if (fbx_mesh == nullptr || !fbx_mesh->vertex_position.exists || fbx_mesh->num_triangles == 0) {
+            continue;
+        }
+
+        std::string mesh_name = mesh_loader_detail::toString(fbx_mesh->name);
+        if (mesh_name.empty()) {
+            mesh_name = asset_name + "_Mesh_" + std::to_string(mesh_index);
+        }
+
+        bool emitted_material_part = false;
+        for (size_t part_index = 0; part_index < fbx_mesh->material_parts.count; ++part_index) {
+            const ufbx_mesh_part& mesh_part = fbx_mesh->material_parts.data[part_index];
+            if (mesh_part.num_triangles == 0) {
+                continue;
+            }
+
+            SubMesh sub_mesh;
+            sub_mesh.MaterialIndex =
+                mesh_loader_detail::materialIndexForMeshPart(scene.get(), fbx_mesh, mesh_part.index);
+            sub_mesh.Name = mesh_name + "_Part_" + std::to_string(part_index);
+            if (sub_mesh.MaterialIndex != UINT32_MAX) {
+                sub_mesh.Name += "_Mat_" + std::to_string(sub_mesh.MaterialIndex);
+            }
+
+            mesh_loader_detail::appendFbxMeshPart(fbx_mesh, mesh_part, sub_mesh);
+            if (!sub_mesh.Vertices.empty() && !sub_mesh.Indices.empty()) {
+                sub_meshes.push_back(std::move(sub_mesh));
+                emitted_material_part = true;
+            }
+        }
+
+        if (!emitted_material_part) {
+            SubMesh sub_mesh;
+            sub_mesh.Name = mesh_name;
+            if (fbx_mesh->materials.count == 1) {
+                sub_mesh.MaterialIndex =
+                    mesh_loader_detail::findSceneMaterialIndex(scene.get(), fbx_mesh->materials.data[0]);
+            }
+
+            mesh_loader_detail::appendFbxWholeMesh(fbx_mesh, sub_mesh);
+            if (!sub_mesh.Vertices.empty() && !sub_mesh.Indices.empty()) {
+                sub_meshes.push_back(std::move(sub_mesh));
+            }
         }
     }
 

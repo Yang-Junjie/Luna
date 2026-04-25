@@ -101,6 +101,8 @@ set(ASSET_SOURCE
     Asset/Editor/Importer.h
     Asset/Editor/ImporterManager.h
     Asset/Editor/ImporterManager.cpp
+    Asset/Editor/FbxModelAssetGenerator.h
+    Asset/Editor/FbxModelAssetGenerator.cpp
     Asset/Editor/GltfModelAssetGenerator.h
     Asset/Editor/GltfModelAssetGenerator.cpp
     Asset/Editor/ImageLoader.h
@@ -195,6 +197,7 @@ target_link_libraries(LunaCore
         LunaRHI
         spdlog::spdlog
         fastgltf::fastgltf
+        ufbx
         # add_subdirectory(third_party/VMA)
         Vulkan::Vulkan
         glfw

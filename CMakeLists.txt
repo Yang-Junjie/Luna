@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Luna LANGUAGES CXX)
+project(Luna LANGUAGES C CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -47,6 +47,10 @@ add_subdirectory(third_party/stb)
 add_subdirectory(third_party/simdjson)
 add_subdirectory(third_party/fastgltf)
 add_subdirectory(third_party/yaml-cpp)
+
+add_library(ufbx STATIC third_party/ufbx/ufbx.c)
+target_include_directories(ufbx PUBLIC third_party/ufbx)
+target_compile_definitions(ufbx PUBLIC UFBX_NO_ASSERT)
 
 add_subdirectory(Luna)
 

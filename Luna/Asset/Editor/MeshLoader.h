@@ -16,6 +16,7 @@ public:
 
 private:
     static std::shared_ptr<Mesh> loadFromObj(const std::filesystem::path& path, std::string asset_name);
+    static std::shared_ptr<Mesh> loadFromFbx(const std::filesystem::path& path, std::string asset_name);
     static std::shared_ptr<Mesh> loadFromGltf(const std::filesystem::path& path, std::string asset_name);
 };
 

@@ -1,5 +1,6 @@
 #include "../AssetDatabase.h"
 #include "Core/Log.h"
+#include "FbxModelAssetGenerator.h"
 #include "GltfModelAssetGenerator.h"
 #include "ImporterManager.h"
 #include "JobSystem/TaskSystem.h"
@@ -50,6 +51,12 @@ bool isGltfModelPath(const std::filesystem::path& path)
 {
     const std::string extension = luna::importer_detail::normalizeExtension(path);
     return extension == ".gltf" || extension == ".glb";
+}
+
+bool isFbxModelPath(const std::filesystem::path& path)
+{
+    const std::string extension = luna::importer_detail::normalizeExtension(path);
+    return extension == ".fbx";
 }
 
 std::filesystem::path getMetadataPathForAsset(const std::filesystem::path& asset_path)
@@ -236,7 +243,9 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     }
 
     for (const SupportedAssetWorkItem& supported_asset : supported_assets) {
-        if (!isGltfModelPath(supported_asset.assetPath)) {
+        const bool is_gltf_model = isGltfModelPath(supported_asset.assetPath);
+        const bool is_fbx_model = isFbxModelPath(supported_asset.assetPath);
+        if (!is_gltf_model && !is_fbx_model) {
             continue;
         }
 
@@ -252,18 +261,43 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
             continue;
         }
 
-        const GltfModelAssetGenerator::GenerateResult generate_result =
-            GltfModelAssetGenerator::generateCompanionAssets(supported_asset.assetPath, mesh_metadata);
-        if (!generate_result.Success) {
+        size_t created_material_files = 0;
+        size_t created_material_metadata = 0;
+        size_t created_texture_metadata = 0;
+        bool created_model_file = false;
+        bool created_model_metadata = false;
+        bool generated_success = false;
+
+        if (is_gltf_model) {
+            const GltfModelAssetGenerator::GenerateResult generate_result =
+                GltfModelAssetGenerator::generateCompanionAssets(supported_asset.assetPath, mesh_metadata);
+            generated_success = generate_result.Success;
+            created_model_file = generate_result.CreatedModelFile;
+            created_model_metadata = generate_result.CreatedModelMetadata;
+            created_material_files = generate_result.CreatedMaterialFiles;
+            created_material_metadata = generate_result.CreatedMaterialMetadata;
+            created_texture_metadata = generate_result.CreatedTextureMetadata;
+        } else {
+            const FbxModelAssetGenerator::GenerateResult generate_result =
+                FbxModelAssetGenerator::generateCompanionAssets(supported_asset.assetPath, mesh_metadata);
+            generated_success = generate_result.Success;
+            created_model_file = generate_result.CreatedModelFile;
+            created_model_metadata = generate_result.CreatedModelMetadata;
+            created_material_files = generate_result.CreatedMaterialFiles;
+            created_material_metadata = generate_result.CreatedMaterialMetadata;
+            created_texture_metadata = generate_result.CreatedTextureMetadata;
+        }
+
+        if (!generated_success) {
             ++stats.failedGeneratedModelAssets;
             continue;
         }
 
-        stats.generatedModelFiles += generate_result.CreatedModelFile ? 1 : 0;
-        stats.generatedModelMetadata += generate_result.CreatedModelMetadata ? 1 : 0;
-        stats.generatedMaterialFiles += generate_result.CreatedMaterialFiles;
-        stats.generatedMaterialMetadata += generate_result.CreatedMaterialMetadata;
-        stats.generatedTextureMetadata += generate_result.CreatedTextureMetadata;
+        stats.generatedModelFiles += created_model_file ? 1 : 0;
+        stats.generatedModelMetadata += created_model_metadata ? 1 : 0;
+        stats.generatedMaterialFiles += created_material_files;
+        stats.generatedMaterialMetadata += created_material_metadata;
+        stats.generatedTextureMetadata += created_texture_metadata;
     }
 
     for (const SupportedAssetWorkItem& supported_asset : supported_assets) {
