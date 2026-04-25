@@ -5,9 +5,11 @@
 // while delegating scene-specific drawing to RenderFlow.
 
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <cstdint>
+#include <functional>
 
 #include <Barrier.h>
 #include <Core.h>
@@ -44,6 +46,8 @@ class Window;
 
 class Renderer {
 public:
+    using DefaultRenderFlowConfigureFunction = std::function<void(render_flow::RenderFlowBuilder&)>;
+
     struct InitializationOptions {
         InitializationOptions()
             : backend(luna::RHI::BackendType::Vulkan),
@@ -114,6 +118,7 @@ public:
 
     RenderWorld& getRenderWorld();
     const RenderWorld& getRenderWorld() const;
+    bool configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function);
 
     glm::vec4& getClearColor();
     const glm::vec4& getClearColor() const;

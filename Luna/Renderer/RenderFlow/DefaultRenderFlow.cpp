@@ -36,6 +36,29 @@ void DefaultRenderFlow::shutdown()
     m_resources.shutdown();
 }
 
+bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)
+{
+    if (!configure_function) {
+        LUNA_RENDERER_ERROR("Default render flow configuration failed: configure function is empty");
+        return false;
+    }
+
+    configure_function(m_builder);
+
+    if (!m_builder.lastError().empty()) {
+        LUNA_RENDERER_ERROR("Default render flow configuration failed: {}", m_builder.lastError());
+        return false;
+    }
+
+    const render_flow::RenderFlowBuilder::CompileResult compiled_flow = m_builder.compile();
+    if (!compiled_flow.success) {
+        LUNA_RENDERER_ERROR("Default render flow configuration failed: {}", compiled_flow.error);
+        return false;
+    }
+
+    return true;
+}
+
 render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() noexcept
 {
     return m_builder;
@@ -80,8 +103,15 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         m_draw_queue.drawCommands().size(),
         scene_context.show_pick_debug_visualization);
 
+    namespace blackboard = render_flow::default_scene::blackboard;
+
+    m_blackboard.clear();
+    m_blackboard.setTexture(blackboard::SceneColor, scene_context.color_target);
+    m_blackboard.setTexture(blackboard::Depth, scene_context.depth_target);
+    m_blackboard.setTexture(blackboard::Pick, scene_context.pick_target);
+
     m_scene_state.setWorld(world);
-    render_flow::RenderPassContext pass_context(context.graph(), world, scene_context);
+    render_flow::RenderPassContext pass_context(context.graph(), world, scene_context, m_blackboard);
     const render_flow::RenderFlowBuilder::CompileResult compiled_flow = m_builder.compile();
     if (!compiled_flow.success) {
         LUNA_RENDERER_ERROR("Default render flow compile failed: {}", compiled_flow.error);

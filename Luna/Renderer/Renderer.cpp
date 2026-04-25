@@ -825,6 +825,17 @@ const RenderWorld& Renderer::getRenderWorld() const
     return m_render_world;
 }
 
+bool Renderer::configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function)
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        LUNA_RENDERER_ERROR("Cannot configure default render flow because the active render flow is not DefaultRenderFlow");
+        return false;
+    }
+
+    return default_render_flow->configure(configure_function);
+}
+
 glm::vec4& Renderer::getClearColor()
 {
     return m_runtime.clear_color;
