@@ -2,6 +2,7 @@
 
 #include "Renderer/RenderFlow/RenderPass.h"
 
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -12,31 +13,54 @@ namespace luna::render_flow {
 
 class RenderFlowBuilder final {
 public:
-    struct Entry {
-        std::string name;
-        std::unique_ptr<IRenderPass> pass;
+    struct OrderedPass {
+        std::string_view name;
+        IRenderPass* pass{nullptr};
     };
 
-    using PassList = std::vector<Entry>;
+    struct CompileResult {
+        bool success{false};
+        std::string error;
+        std::vector<OrderedPass> passes;
+    };
 
     [[nodiscard]] bool contains(std::string_view name) const noexcept;
     [[nodiscard]] IRenderPass* find(std::string_view name) const noexcept;
-    [[nodiscard]] std::span<const Entry> passes() const noexcept;
+    [[nodiscard]] CompileResult compile() const;
 
-    bool addPass(std::string name, std::unique_ptr<IRenderPass> pass);
-    bool insertPassBefore(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass);
-    bool insertPassAfter(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass);
+    bool addPass(std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
+    bool addDependency(std::string_view before_name, std::string_view after_name);
+    bool insertPassBefore(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
+    bool insertPassAfter(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
     bool replacePass(std::string_view name, std::unique_ptr<IRenderPass> pass);
     bool removePass(std::string_view name) noexcept;
     void clear() noexcept;
 
 private:
-    [[nodiscard]] PassList::iterator findEntry(std::string_view name) noexcept;
-    [[nodiscard]] PassList::const_iterator findEntry(std::string_view name) const noexcept;
+    struct Node {
+        std::string name;
+        std::unique_ptr<IRenderPass> pass;
+        int32_t priority{0};
+        uint64_t registration_index{0};
+    };
+
+    struct Edge {
+        std::string before;
+        std::string after;
+    };
+
+    using NodeList = std::vector<Node>;
+
+    [[nodiscard]] NodeList::iterator findNode(std::string_view name) noexcept;
+    [[nodiscard]] NodeList::const_iterator findNode(std::string_view name) const noexcept;
     [[nodiscard]] bool canInsert(std::string_view name, const std::unique_ptr<IRenderPass>& pass) const noexcept;
+    [[nodiscard]] bool hasDependency(std::string_view before_name, std::string_view after_name) const noexcept;
+    void removeDependenciesFor(std::string_view name) noexcept;
 
 private:
-    PassList m_passes;
+    NodeList m_nodes;
+    std::vector<Edge> m_edges;
+    uint64_t m_next_registration_index{0};
 };
 
 } // namespace luna::render_flow

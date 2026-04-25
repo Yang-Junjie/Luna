@@ -74,8 +74,16 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
 
     m_scene_state.setWorld(world);
     render_flow::RenderPassContext pass_context(context.graph(), world, scene_context);
-    for (const auto& entry : m_builder.passes()) {
-        entry.pass->setup(pass_context);
+    const render_flow::RenderFlowBuilder::CompileResult compiled_flow = m_builder.compile();
+    if (!compiled_flow.success) {
+        LUNA_RENDERER_ERROR("Default render flow compile failed: {}", compiled_flow.error);
+        return;
+    }
+
+    for (const auto& entry : compiled_flow.passes) {
+        if (entry.pass) {
+            entry.pass->setup(pass_context);
+        }
     }
 }
 
