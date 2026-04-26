@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Renderer/RenderGraph.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneAssetResources.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 
 namespace luna {
 class Material;
@@ -13,7 +13,7 @@ namespace luna::render_flow::default_scene {
 
 class DrawQueue;
 class EnvironmentResources;
-class ScenePipelineResources;
+class PipelineResources;
 
 struct GBufferTextures {
     RenderGraphTextureHandle base_color;
@@ -30,15 +30,15 @@ struct ShadowResources {
 
 class PassSharedState final {
 public:
-    PassSharedState(SceneAssetResources& assets,
-                    ScenePipelineResources& pipelines,
+    PassSharedState(AssetCache& assets,
+                    PipelineResources& pipelines,
                     DrawQueue& draw_queue,
                     EnvironmentResources& environment,
                     Material& default_material);
 
     void setWorld(const RenderWorld& world) noexcept;
-    [[nodiscard]] SceneAssetResources& assets() const noexcept;
-    [[nodiscard]] ScenePipelineResources& pipelines() const noexcept;
+    [[nodiscard]] AssetCache& assets() const noexcept;
+    [[nodiscard]] PipelineResources& pipelines() const noexcept;
     [[nodiscard]] DrawQueue& drawQueue() const noexcept;
     [[nodiscard]] EnvironmentResources& environment() const noexcept;
     [[nodiscard]] Material& defaultMaterial() const noexcept;
@@ -47,8 +47,8 @@ public:
     [[nodiscard]] const render_flow::default_scene_detail::ShadowRenderParams& shadowParams() const noexcept;
 
 private:
-    SceneAssetResources* m_assets{nullptr};
-    ScenePipelineResources* m_pipelines{nullptr};
+    AssetCache* m_assets{nullptr};
+    PipelineResources* m_pipelines{nullptr};
     DrawQueue* m_draw_queue{nullptr};
     EnvironmentResources* m_environment{nullptr};
     Material* m_default_material{nullptr};

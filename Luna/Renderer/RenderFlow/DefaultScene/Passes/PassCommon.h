@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneAssetResources.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePassResources.h"
+#include "Renderer/RenderFlow/DefaultScene/PassResources.h"
 #include "Renderer/RenderFlow/DefaultScene/SharedState.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 
@@ -23,15 +23,15 @@ namespace luna::render_flow::default_scene {
 void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t width, uint32_t height);
 
 [[nodiscard]] size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
-                                        const SceneDrawPassResources& pass_resources,
+                                        const DrawPassResources& pass_resources,
                                         const std::vector<DrawCommand>& draw_commands,
-                                        const SceneAssetResources& assets,
+                                        const AssetCache& assets,
                                         const Material& default_material);
 
 [[nodiscard]] size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
-                                              const SceneDrawPassResources& pass_resources,
+                                              const DrawPassResources& pass_resources,
                                               const std::vector<DrawCommand>& draw_commands,
-                                              const SceneAssetResources& assets,
+                                              const AssetCache& assets,
                                               const Material& default_material);
 
 void updateSceneParameters(PassSharedState& state, const SceneRenderContext& context);

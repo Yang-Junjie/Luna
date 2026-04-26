@@ -3,8 +3,8 @@
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/PassUtilities.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -44,14 +44,14 @@ void TransparentPass::setup(RenderPassContext& context)
 
 void TransparentPass::execute(RenderGraphRasterPassContext& pass_context, const SceneRenderContext& context)
 {
-    SceneAssetResources& assets = m_state->assets();
-    ScenePipelineResources& pipelines = m_state->pipelines();
+    AssetCache& assets = m_state->assets();
+    PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
     auto transparent_draw_commands = draw_queue.drawCommands(luna::RenderPhase::Transparent);
     LUNA_RENDERER_FRAME_DEBUG("Executing scene transparent pass with {} draw command(s)", transparent_draw_commands.size());
 
-    const SceneDrawPassResources pass_resources = pipelines.transparentPassResources();
+    const DrawPassResources pass_resources = pipelines.transparentPassResources();
     if (!pass_resources.isValid() || transparent_draw_commands.empty()) {
         LUNA_RENDERER_FRAME_DEBUG("Scene transparent pass skipped: transparent_pipeline={} scene_descriptor_set={} has_draws={}",
                                   static_cast<bool>(pass_resources.pipeline),
@@ -63,7 +63,7 @@ void TransparentPass::execute(RenderGraphRasterPassContext& pass_context, const 
     draw_queue.sortBackToFront(transparent_draw_commands);
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, transparent_draw_commands, default_material, SceneAssetBindings{
+    assets.prepareDraws(commands, transparent_draw_commands, default_material, AssetCache::Bindings{
         .device = pipelines.device(),
         .descriptor_pool = pipelines.descriptorPool(),
         .material_layout = pipelines.materialLayout(),

@@ -1,4 +1,4 @@
-﻿set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
+set(THIRD_PARTY_DIR ${PROJECT_SOURCE_DIR}/third_party)
 
 add_subdirectory(RHI)
 
@@ -36,9 +36,24 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultRenderFlow.cpp
     Renderer/RenderFlow/DefaultScene/Feature.h
     Renderer/RenderFlow/DefaultScene/Feature.cpp
-    Renderer/RenderFlow/DefaultScene/PassNames.h
-    Renderer/RenderFlow/DefaultScene/PassUtilities.h
-    Renderer/RenderFlow/DefaultScene/PassUtilities.cpp
+    Renderer/RenderFlow/DefaultScene/Blackboard.h
+    Renderer/RenderFlow/DefaultScene/Constants.h
+    Renderer/RenderFlow/DefaultScene/GpuTypes.h
+    Renderer/RenderFlow/DefaultScene/PassResources.h
+    Renderer/RenderFlow/DefaultScene/SharedState.h
+    Renderer/RenderFlow/DefaultScene/SharedState.cpp
+    Renderer/RenderFlow/DefaultScene/DrawQueue.h
+    Renderer/RenderFlow/DefaultScene/DrawQueue.cpp
+    Renderer/RenderFlow/DefaultScene/AssetCache.h
+    Renderer/RenderFlow/DefaultScene/AssetCache.cpp
+    Renderer/RenderFlow/DefaultScene/Environment.h
+    Renderer/RenderFlow/DefaultScene/Environment.cpp
+    Renderer/RenderFlow/DefaultScene/PipelineResources.h
+    Renderer/RenderFlow/DefaultScene/PipelineResources.cpp
+    Renderer/RenderFlow/DefaultScene/PipelineState.h
+    Renderer/RenderFlow/DefaultScene/PipelineState.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h
+    Renderer/RenderFlow/DefaultScene/Passes/PassCommon.cpp
     Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h
     Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h
@@ -49,12 +64,6 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Passes/LightingPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.cpp
-    Renderer/RenderFlow/DefaultScene/SceneAssetResources.h
-    Renderer/RenderFlow/DefaultScene/ScenePassResources.h
-    Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h
-    Renderer/RenderFlow/DefaultScene/ScenePipelineResources.cpp
-    Renderer/RenderFlow/DefaultScene/SharedState.h
-    Renderer/RenderFlow/DefaultScene/SharedState.cpp
     Renderer/RenderWorld/RenderWorld.h
     Renderer/RenderWorld/RenderWorld.cpp
     Renderer/RenderWorld/RenderTypes.h
@@ -62,22 +71,12 @@ set(RENDERER_SOURCE
     Renderer/RenderWorld/RenderWorldExtractor.cpp
     Renderer/RendererUtilities.h
     Renderer/RendererUtilities.cpp
-    Renderer/RenderFlow/DefaultScene/SceneConstants.h
-    Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h
     Renderer/Image/ImageDataUtils.h
     Renderer/Image/ImageDataUtils.cpp
     Renderer/Resources/ShaderModuleLoader.h
     Renderer/Resources/ShaderModuleLoader.cpp
     Renderer/Resources/TextureUpload.h
     Renderer/Resources/TextureUpload.cpp
-    Renderer/RenderFlow/DefaultScene/DrawQueue.h
-    Renderer/RenderFlow/DefaultScene/DrawQueue.cpp
-    Renderer/RenderFlow/DefaultScene/AssetCache.h
-    Renderer/RenderFlow/DefaultScene/AssetCache.cpp
-    Renderer/RenderFlow/DefaultScene/Environment.h
-    Renderer/RenderFlow/DefaultScene/Environment.cpp
-    Renderer/RenderFlow/DefaultScene/PipelineLibrary.h
-    Renderer/RenderFlow/DefaultScene/PipelineLibrary.cpp
     Renderer/Shaders/EnvironmentIBL.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang

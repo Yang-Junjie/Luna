@@ -1,7 +1,7 @@
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
 
 #include "Core/Log.h"
-#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
+#include "Renderer/RenderFlow/DefaultScene/Blackboard.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
@@ -14,9 +14,18 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace luna::render_flow::default_scene {
 namespace {
+
+namespace pass_names {
+inline constexpr std::string_view Geometry = "Geometry";
+inline constexpr std::string_view Environment = "Environment";
+inline constexpr std::string_view ShadowDepth = "ShadowDepth";
+inline constexpr std::string_view Lighting = "Lighting";
+inline constexpr std::string_view Transparent = "Transparent";
+} // namespace pass_names
 
 bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
 {
@@ -36,10 +45,10 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
                                    std::make_unique<TransparentPass>(state));
 }
 
-SceneAssetResources::ClearMode toClearMode(ScenePipelineResources::Invalidation invalidation)
+AssetCache::ClearMode toClearMode(PipelineResources::Invalidation invalidation)
 {
-    return invalidation == ScenePipelineResources::Invalidation::All ? SceneAssetResources::ClearMode::All
-                                                                     : SceneAssetResources::ClearMode::MaterialsAndTextures;
+    return invalidation == PipelineResources::Invalidation::All ? AssetCache::ClearMode::All
+                                                                : AssetCache::ClearMode::MaterialsAndTextures;
 }
 
 } // namespace
@@ -93,18 +102,18 @@ void Feature::prepareResources(const SceneRenderContext& scene_context)
         return;
     }
 
-    const ScenePipelineResources::Invalidation invalidation = m_pipelines.invalidationFor(scene_context);
-    if (invalidation == ScenePipelineResources::Invalidation::All) {
+    const PipelineResources::Invalidation invalidation = m_pipelines.invalidationFor(scene_context);
+    if (invalidation == PipelineResources::Invalidation::All) {
         LUNA_RENDERER_INFO("Scene render flow device changed; rebuilding GPU resources for backend '{}'",
                            renderer_detail::backendTypeToString(scene_context.backend_type));
-    } else if (invalidation == ScenePipelineResources::Invalidation::MaterialsAndTextures) {
+    } else if (invalidation == PipelineResources::Invalidation::MaterialsAndTextures) {
         LUNA_RENDERER_INFO("Rebuilding scene render flow pipeline state for backend '{}' and color format {} ({})",
                            renderer_detail::backendTypeToString(scene_context.backend_type),
                            renderer_detail::formatToString(scene_context.color_format),
                            static_cast<int>(scene_context.color_format));
     }
 
-    if (invalidation != ScenePipelineResources::Invalidation::None) {
+    if (invalidation != PipelineResources::Invalidation::None) {
         m_assets.clear(toClearMode(invalidation));
         m_pipelines.shutdown();
         m_pipelines.rebuild(scene_context);
@@ -123,7 +132,7 @@ void Feature::shutdown()
     if (had_pipeline_state) {
         LUNA_RENDERER_INFO("Shutting down scene render flow resources");
     }
-    m_assets.clear(SceneAssetResources::ClearMode::All);
+    m_assets.clear(AssetCache::ClearMode::All);
     m_pipelines.shutdown();
     if (had_pipeline_state) {
         LUNA_RENDERER_INFO("Scene render flow resources shutdown complete");

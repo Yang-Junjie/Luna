@@ -3,12 +3,12 @@
 #include "Core/Log.h"
 #include "Math/Math.h"
 #include "Renderer/Material.h"
+#include "Renderer/RenderFlow/DefaultScene/Blackboard.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
-#include "Renderer/RenderFlow/DefaultScene/PassUtilities.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
@@ -133,15 +133,15 @@ void ShadowDepthPass::setup(RenderPassContext& context)
 
 void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const SceneRenderContext& context)
 {
-    SceneAssetResources& assets = m_state->assets();
-    ScenePipelineResources& pipelines = m_state->pipelines();
+    AssetCache& assets = m_state->assets();
+    PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
     const auto shadow_draw_commands = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
     LUNA_RENDERER_FRAME_DEBUG("Executing scene shadow pass with {} shadow caster draw command(s)",
                               shadow_draw_commands.size());
 
-    const SceneDrawPassResources pass_resources = pipelines.shadowPassResources();
+    const DrawPassResources pass_resources = pipelines.shadowPassResources();
     if (!pass_resources.isValid()) {
         LUNA_RENDERER_ERROR("Scene shadow pass aborted: shadow_pipeline={} scene_descriptor_set={}",
                             static_cast<bool>(pass_resources.pipeline),
@@ -150,7 +150,7 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
     }
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, shadow_draw_commands, default_material, SceneAssetBindings{
+    assets.prepareDraws(commands, shadow_draw_commands, default_material, AssetCache::Bindings{
         .device = pipelines.device(),
         .descriptor_pool = pipelines.descriptorPool(),
         .material_layout = pipelines.materialLayout(),

@@ -1,11 +1,11 @@
-#include "Renderer/RenderFlow/DefaultScene/PassUtilities.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderFlow/DefaultScene/Environment.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -21,14 +21,14 @@ void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint
 }
 
 size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
-                          const SceneDrawPassResources& pass_resources,
+                          const DrawPassResources& pass_resources,
                           const std::vector<DrawCommand>& draw_commands,
-                          const SceneAssetResources& assets,
+                          const AssetCache& assets,
                           const Material& default_material)
 {
     size_t recorded_count = 0;
     for (const auto& draw_command : draw_commands) {
-        const ResolvedDrawResources draw_resources = assets.resolveDrawResources(draw_command, default_material);
+        const AssetCache::DrawResources draw_resources = assets.resolveDrawResources(draw_command, default_material);
         if (!draw_resources.isValid()) {
             LUNA_RENDERER_FRAME_TRACE(
                 "Skipping draw command because GPU resources are incomplete: mesh='{}' submesh={} picking_id={}",
@@ -62,14 +62,14 @@ size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
 }
 
 size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
-                                const SceneDrawPassResources& pass_resources,
+                                const DrawPassResources& pass_resources,
                                 const std::vector<DrawCommand>& draw_commands,
-                                const SceneAssetResources& assets,
+                                const AssetCache& assets,
                                 const Material& default_material)
 {
     size_t recorded_count = 0;
     for (const auto& draw_command : draw_commands) {
-        const ResolvedDrawResources draw_resources = assets.resolveDrawResources(draw_command, default_material);
+        const AssetCache::DrawResources draw_resources = assets.resolveDrawResources(draw_command, default_material);
         if (!draw_resources.hasGeometry()) {
             LUNA_RENDERER_FRAME_TRACE(
                 "Skipping shadow draw command because geometry resources are incomplete: mesh='{}' submesh={}",

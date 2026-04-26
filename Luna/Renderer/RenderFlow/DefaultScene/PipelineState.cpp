@@ -1,9 +1,9 @@
-﻿#include "Renderer/RenderFlow/DefaultScene/PipelineLibrary.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
 
 #include "Core/Log.h"
 #include "Math/Math.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
@@ -312,17 +312,17 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
 
 } // namespace
 
-void PipelineLibrary::shutdown()
+void PipelineState::shutdown()
 {
     reset();
 }
 
-bool PipelineLibrary::hasAnyState() const noexcept
+bool PipelineState::hasAnyState() const noexcept
 {
     return m_state.device || m_state.geometry_pipeline || m_state.scene_descriptor_set;
 }
 
-bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const noexcept
+bool PipelineState::hasCompleteState(const SceneRenderContext& context) const noexcept
 {
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
@@ -332,7 +332,7 @@ bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const 
            m_state.gbuffer_sampler && m_state.environment_source_sampler && m_state.shadow_sampler;
 }
 
-void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
+void PipelineState::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
 {
     reset();
     m_state.device = context.device;
@@ -432,7 +432,7 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
                        static_cast<int>(context.color_format));
 }
 
-void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
+void PipelineState::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
                                           const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
                                           const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture)
 {
@@ -583,7 +583,7 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
 
 } // namespace
 
-void PipelineLibrary::updateSceneParameters(const SceneRenderContext& context,
+void PipelineState::updateSceneParameters(const SceneRenderContext& context,
                                             const RenderWorld& world,
                                             float environment_mip_count,
                                             const std::array<glm::vec4, 9>& irradiance_sh,
@@ -603,7 +603,7 @@ void PipelineLibrary::updateSceneParameters(const SceneRenderContext& context,
                                m_state.scene_params_buffer);
 }
 
-void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
+void PipelineState::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
@@ -659,7 +659,7 @@ void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Te
     m_state.gbuffer_descriptor_set->Update();
 }
 
-void PipelineLibrary::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
+void PipelineState::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
 {
     if (!m_state.lighting_scene_descriptor_set || !m_state.scene_bindings_valid || !shadow_map ||
         !m_state.shadow_sampler) {
@@ -691,48 +691,48 @@ void PipelineLibrary::updateShadowResources(const luna::RHI::Ref<luna::RHI::Text
     m_state.shadow_bindings_valid = true;
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& PipelineLibrary::device() const noexcept
+const luna::RHI::Ref<luna::RHI::Device>& PipelineState::device() const noexcept
 {
     return m_state.device;
 }
 
-const luna::RHI::Ref<luna::RHI::DescriptorPool>& PipelineLibrary::descriptorPool() const noexcept
+const luna::RHI::Ref<luna::RHI::DescriptorPool>& PipelineState::descriptorPool() const noexcept
 {
     return m_state.descriptor_pool;
 }
 
-const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& PipelineLibrary::materialLayout() const noexcept
+const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& PipelineState::materialLayout() const noexcept
 {
     return m_state.material_layout;
 }
 
-SceneDrawPassResources PipelineLibrary::geometryPassResources() const noexcept
+DrawPassResources PipelineState::geometryPassResources() const noexcept
 {
-    return SceneDrawPassResources{
+    return DrawPassResources{
         .pipeline = m_state.geometry_pipeline,
         .scene_descriptor_set = m_state.scene_descriptor_set,
     };
 }
 
-SceneDrawPassResources PipelineLibrary::shadowPassResources() const noexcept
+DrawPassResources PipelineState::shadowPassResources() const noexcept
 {
-    return SceneDrawPassResources{
+    return DrawPassResources{
         .pipeline = m_state.shadow_pipeline,
         .scene_descriptor_set = m_state.scene_descriptor_set,
     };
 }
 
-SceneDrawPassResources PipelineLibrary::transparentPassResources() const noexcept
+DrawPassResources PipelineState::transparentPassResources() const noexcept
 {
-    return SceneDrawPassResources{
+    return DrawPassResources{
         .pipeline = m_state.transparent_pipeline,
         .scene_descriptor_set = m_state.scene_descriptor_set,
     };
 }
 
-SceneLightingPassResources PipelineLibrary::lightingPassResources() const noexcept
+LightingPassResources PipelineState::lightingPassResources() const noexcept
 {
-    return SceneLightingPassResources{
+    return LightingPassResources{
         .pipeline = m_state.lighting_pipeline,
         .gbuffer_descriptor_set = m_state.gbuffer_descriptor_set,
         .scene_descriptor_set = m_state.lighting_scene_descriptor_set,
@@ -740,7 +740,7 @@ SceneLightingPassResources PipelineLibrary::lightingPassResources() const noexce
     };
 }
 
-void PipelineLibrary::reset() noexcept
+void PipelineState::reset() noexcept
 {
     m_state = {};
 }

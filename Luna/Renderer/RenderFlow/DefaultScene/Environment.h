@@ -1,10 +1,10 @@
-﻿#pragma once
+#pragma once
 
 // Manages environment textures used by scene lighting.
 // Loads fallback or project-provided environment data, prepares upload state,
 // and exposes irradiance data needed by scene parameter updates.
 
-#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/Resources/TextureUpload.h"
 

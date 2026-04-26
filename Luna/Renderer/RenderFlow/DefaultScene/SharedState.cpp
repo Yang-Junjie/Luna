@@ -2,8 +2,8 @@
 
 namespace luna::render_flow::default_scene {
 
-PassSharedState::PassSharedState(SceneAssetResources& assets,
-                                 ScenePipelineResources& pipelines,
+PassSharedState::PassSharedState(AssetCache& assets,
+                                 PipelineResources& pipelines,
                                  DrawQueue& draw_queue,
                                  EnvironmentResources& environment,
                                  Material& default_material)
@@ -19,12 +19,12 @@ void PassSharedState::setWorld(const RenderWorld& world) noexcept
     m_world = &world;
 }
 
-SceneAssetResources& PassSharedState::assets() const noexcept
+AssetCache& PassSharedState::assets() const noexcept
 {
     return *m_assets;
 }
 
-ScenePipelineResources& PassSharedState::pipelines() const noexcept
+PipelineResources& PassSharedState::pipelines() const noexcept
 {
     return *m_pipelines;
 }

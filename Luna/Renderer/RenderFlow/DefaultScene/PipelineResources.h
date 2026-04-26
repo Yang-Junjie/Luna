@@ -1,9 +1,13 @@
 #pragma once
 
+// Feature-facing pipeline resource facade.
+// Owns rebuild invalidation policy and default shader path resolution; concrete GPU objects
+// live in PipelineState.
+
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/PipelineLibrary.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePassResources.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/PassResources.h"
 
 #include <array>
 #include <cstdint>
@@ -22,7 +26,7 @@ class Texture;
 
 namespace luna::render_flow::default_scene {
 
-class ScenePipelineResources final {
+class PipelineResources final {
 public:
     enum class Invalidation : uint8_t {
         None,
@@ -54,17 +58,13 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& materialLayout() const noexcept;
-    [[nodiscard]] SceneDrawPassResources geometryPassResources() const noexcept;
-    [[nodiscard]] SceneDrawPassResources shadowPassResources() const noexcept;
-    [[nodiscard]] SceneDrawPassResources transparentPassResources() const noexcept;
-    [[nodiscard]] SceneLightingPassResources lightingPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources geometryPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources shadowPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
+    [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
 
 private:
-    [[nodiscard]] SceneShaderPaths resolveShaderPaths() const;
-
-private:
-    SceneShaderPaths m_shader_paths{};
-    PipelineLibrary m_library{};
+    PipelineState m_pipeline_state{};
 };
 
 } // namespace luna::render_flow::default_scene

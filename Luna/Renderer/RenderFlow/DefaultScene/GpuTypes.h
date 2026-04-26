@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 
 #include <array>
 #include <cstdint>

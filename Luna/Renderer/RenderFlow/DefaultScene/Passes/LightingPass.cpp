@@ -1,9 +1,9 @@
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 
 #include "Core/Log.h"
-#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
-#include "Renderer/RenderFlow/DefaultScene/PassUtilities.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/Blackboard.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -61,10 +61,10 @@ void LightingPass::execute(RenderGraphRasterPassContext& pass_context,
                            RenderGraphTextureHandle shadow_map_handle,
                            RenderGraphTextureHandle pick_texture_handle)
 {
-    ScenePipelineResources& pipelines = m_state->pipelines();
+    PipelineResources& pipelines = m_state->pipelines();
     LUNA_RENDERER_FRAME_DEBUG("Executing scene lighting pass");
 
-    const SceneLightingPassResources pass_resources = pipelines.lightingPassResources();
+    const LightingPassResources pass_resources = pipelines.lightingPassResources();
     if (!pass_resources.isValid()) {
         LUNA_RENDERER_ERROR(
             "Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} lighting_scene_descriptor_set={} gbuffer_sampler={}",

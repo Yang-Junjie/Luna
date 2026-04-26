@@ -2,11 +2,11 @@
 
 #include "Core/Log.h"
 #include "Renderer/Material.h"
+#include "Renderer/RenderFlow/DefaultScene/Blackboard.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
-#include "Renderer/RenderFlow/DefaultScene/PassUtilities.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -112,14 +112,14 @@ void GeometryPass::setup(RenderPassContext& context)
 
 void GeometryPass::execute(RenderGraphRasterPassContext& pass_context, const SceneRenderContext& context)
 {
-    SceneAssetResources& assets = m_state->assets();
-    ScenePipelineResources& pipelines = m_state->pipelines();
+    AssetCache& assets = m_state->assets();
+    PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
     const auto geometry_draw_commands = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
     LUNA_RENDERER_FRAME_DEBUG("Executing scene geometry pass with {} GBuffer draw command(s)", geometry_draw_commands.size());
 
-    const SceneDrawPassResources pass_resources = pipelines.geometryPassResources();
+    const DrawPassResources pass_resources = pipelines.geometryPassResources();
     if (!pass_resources.isValid()) {
         LUNA_RENDERER_ERROR("Scene geometry pass aborted: graphics_pipeline={} scene_descriptor_set={}",
                             static_cast<bool>(pass_resources.pipeline),
@@ -128,7 +128,7 @@ void GeometryPass::execute(RenderGraphRasterPassContext& pass_context, const Sce
     }
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, geometry_draw_commands, default_material, SceneAssetBindings{
+    assets.prepareDraws(commands, geometry_draw_commands, default_material, AssetCache::Bindings{
         .device = pipelines.device(),
         .descriptor_pool = pipelines.descriptorPool(),
         .material_layout = pipelines.materialLayout(),

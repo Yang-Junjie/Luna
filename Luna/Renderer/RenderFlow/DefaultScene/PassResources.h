@@ -10,7 +10,7 @@ class Sampler;
 
 namespace luna::render_flow::default_scene {
 
-struct SceneDrawPassResources {
+struct DrawPassResources {
     luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
     luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
 
@@ -20,7 +20,7 @@ struct SceneDrawPassResources {
     }
 };
 
-struct SceneLightingPassResources {
+struct LightingPassResources {
     luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
     luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
     luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;

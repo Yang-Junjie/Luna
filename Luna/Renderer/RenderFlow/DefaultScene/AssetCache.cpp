@@ -1,10 +1,10 @@
-﻿#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
+#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
 
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/Image/ImageDataUtils.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RendererUtilities.h"
 
 #include <Builders.h>

@@ -1,13 +1,13 @@
-﻿#pragma once
+#pragma once
 
-// Owns the long-lived GPU objects required by the scene render flow.
-// This includes pipelines, descriptor layouts, descriptor sets, and scene-wide buffers,
-// but not uploaded mesh/material asset caches.
+// Concrete GPU state for the default scene feature.
+// Owns pipelines, descriptor layouts, descriptor sets, samplers, and scene-wide buffers.
+// Rebuild policy and shader path defaults stay in PipelineResources.
 
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/ScenePassResources.h"
+#include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/PassResources.h"
 
 #include <array>
 #include <optional>
@@ -31,7 +31,7 @@ class Texture;
 
 namespace luna::render_flow::default_scene {
 
-class PipelineLibrary final {
+class PipelineState final {
 public:
     void shutdown();
     [[nodiscard]] bool hasAnyState() const noexcept;
@@ -55,10 +55,10 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& materialLayout() const noexcept;
-    [[nodiscard]] SceneDrawPassResources geometryPassResources() const noexcept;
-    [[nodiscard]] SceneDrawPassResources shadowPassResources() const noexcept;
-    [[nodiscard]] SceneDrawPassResources transparentPassResources() const noexcept;
-    [[nodiscard]] SceneLightingPassResources lightingPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources geometryPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources shadowPassResources() const noexcept;
+    [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
+    [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
 
 private:
     struct State {
