@@ -1,5 +1,7 @@
 static const float kPi = 3.14159265359;
 static const float kMinRoughness = 0.045;
+static const uint kMaxPointLights = 32;
+static const uint kMaxSpotLights = 32;
 
 struct SceneVertexInput
 {
@@ -61,6 +63,13 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
+    float4 lightCounts;
+    float4 pointLightPositionIntensity[kMaxPointLights];
+    float4 pointLightColorRange[kMaxPointLights];
+    float4 spotLightPositionIntensity[kMaxSpotLights];
+    float4 spotLightDirectionRange[kMaxSpotLights];
+    float4 spotLightColorCones[kMaxSpotLights];
+    float4 spotLightConeParams[kMaxSpotLights];
     float4 irradianceSh[9];
 };
 
