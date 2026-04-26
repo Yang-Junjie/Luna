@@ -2,8 +2,6 @@
 #include "Renderer/RenderGraph.h"
 #include "Renderer/RendererUtilities.h"
 
-#include <algorithm>
-
 namespace luna {
 namespace {
 
@@ -181,22 +179,6 @@ void RenderGraph::execute() const
             luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, m_final_texture_barriers);
     }
     LUNA_RENDERER_FRAME_DEBUG("Render graph execution complete");
-}
-
-const RenderGraphPass* RenderGraph::findPass(std::string_view name) const
-{
-    const auto it = std::find_if(m_passes.begin(), m_passes.end(), [name](const RenderGraphPass& pass) {
-        return pass.Name == name;
-    });
-    return it == m_passes.end() ? nullptr : &(*it);
-}
-
-RenderGraphPass* RenderGraph::findPass(std::string_view name)
-{
-    const auto it = std::find_if(m_passes.begin(), m_passes.end(), [name](const RenderGraphPass& pass) {
-        return pass.Name == name;
-    });
-    return it == m_passes.end() ? nullptr : &(*it);
 }
 
 } // namespace luna

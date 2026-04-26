@@ -144,9 +144,6 @@ public:
 
     void execute() const;
 
-    const RenderGraphPass* findPass(std::string_view name) const;
-    RenderGraphPass* findPass(std::string_view name);
-
     const PassList& passes() const
     {
         return m_passes;

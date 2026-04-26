@@ -1,10 +1,12 @@
 ﻿#include "Renderer/RenderFlow/DefaultScene/PipelineLibrary.h"
 
 #include "Core/Log.h"
+#include "Math/Math.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
-#include "Renderer/RenderFlow/DefaultScene/Support.h"
+#include "Renderer/Resources/ShaderModuleLoader.h"
 
 #include <Builders.h>
 #include <DescriptorPool.h>
@@ -150,6 +152,30 @@ luna::RHI::Ref<luna::RHI::Sampler> createShadowSampler(const luna::RHI::Ref<luna
                                      .Build());
 }
 
+glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
+{
+    return backend_type == luna::RHI::BackendType::Vulkan ? luna::flipProjectionY(projection) : projection;
+}
+
+glm::mat4 buildViewProjection(const Camera& camera, float aspect_ratio, luna::RHI::BackendType backend_type)
+{
+    return adjustProjectionForBackend(camera.getProjectionMatrix(aspect_ratio), backend_type) * camera.getViewMatrix();
+}
+
+luna::RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
+{
+    luna::RHI::ColorBlendAttachmentState blend_attachment{};
+    blend_attachment.BlendEnable = true;
+    blend_attachment.SrcColorBlendFactor = luna::RHI::BlendFactor::SrcAlpha;
+    blend_attachment.DstColorBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.ColorBlendOp = luna::RHI::BlendOp::Add;
+    blend_attachment.SrcAlphaBlendFactor = luna::RHI::BlendFactor::One;
+    blend_attachment.DstAlphaBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.AlphaBlendOp = luna::RHI::BlendOp::Add;
+    blend_attachment.ColorWriteMask = luna::RHI::ColorComponentFlags::All;
+    return blend_attachment;
+}
+
 void addStaticMeshVertexLayout(luna::RHI::GraphicsPipelineBuilder& builder)
 {
     builder.AddVertexBinding(0, sizeof(StaticMeshVertex), luna::RHI::VertexInputRate::Vertex)
@@ -274,7 +300,7 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     builder.SetShaders({vertex_shader, fragment_shader});
     addStaticMeshVertexLayout(builder);
     builder.SetDepthTest(true, false, luna::RHI::CompareOp::Less)
-        .AddColorAttachment(render_flow::default_scene_detail::makeAlphaBlendAttachment())
+        .AddColorAttachment(makeAlphaBlendAttachment())
         .AddColorAttachmentDefault(false)
         .AddColorFormat(color_format)
         .AddColorFormat(render_flow::default_scene_detail::kScenePickingFormat)
@@ -289,6 +315,11 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
 void PipelineLibrary::shutdown()
 {
     reset();
+}
+
+bool PipelineLibrary::hasAnyState() const noexcept
+{
+    return m_state.device || m_state.geometry_pipeline || m_state.scene_descriptor_set;
 }
 
 bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const noexcept
@@ -323,19 +354,19 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
         shader_paths.lighting_vertex_path.string(),
         shader_paths.lighting_fragment_path.string());
 
-    m_state.geometry_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.geometry_vertex_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_vertex_path, "sceneGeometryVertexMain", luna::RHI::ShaderStage::Vertex);
-    m_state.geometry_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.geometry_fragment_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneGeometryFragmentMain", luna::RHI::ShaderStage::Fragment);
-    m_state.shadow_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.shadow_vertex_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.shadow_vertex_path, "sceneShadowVertexMain", luna::RHI::ShaderStage::Vertex);
-    m_state.shadow_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.shadow_fragment_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain", luna::RHI::ShaderStage::Fragment);
-    m_state.lighting_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.lighting_vertex_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.lighting_vertex_path, "sceneLightingVertexMain", luna::RHI::ShaderStage::Vertex);
-    m_state.lighting_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.lighting_fragment_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.lighting_fragment_path, "sceneLightingFragmentMain", luna::RHI::ShaderStage::Fragment);
-    m_state.transparent_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
+    m_state.transparent_fragment_shader = renderer_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneTransparentFragmentMain", luna::RHI::ShaderStage::Fragment);
 
     if (!m_state.geometry_vertex_shader || !m_state.geometry_fragment_shader || !m_state.shadow_vertex_shader ||
@@ -497,13 +528,12 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
 
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
-    const glm::mat4 view_projection =
-        render_flow::default_scene_detail::buildViewProjection(camera, aspect_ratio, context.backend_type);
+    const glm::mat4 view_projection = buildViewProjection(camera, aspect_ratio, context.backend_type);
 
     render_flow::default_scene_detail::SceneGpuParams params;
     params.view_projection = view_projection;
     params.inverse_view_projection = glm::inverse(view_projection);
-    params.camera_position_env_mip = glm::vec4(render_flow::default_scene_detail::resolveCameraPosition(camera), environment_mip_count);
+    params.camera_position_env_mip = glm::vec4(camera.getPosition(), environment_mip_count);
     if (lights.directional_light && lights.directional_light->intensity > 0.0f) {
         const auto& directional_light = *lights.directional_light;
         params.light_direction_intensity = glm::vec4(glm::normalize(directional_light.direction), directional_light.intensity);
@@ -676,44 +706,38 @@ const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& PipelineLibrary::materialL
     return m_state.material_layout;
 }
 
-const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::geometryPipeline() const noexcept
+SceneDrawPassResources PipelineLibrary::geometryPassResources() const noexcept
 {
-    return m_state.geometry_pipeline;
+    return SceneDrawPassResources{
+        .pipeline = m_state.geometry_pipeline,
+        .scene_descriptor_set = m_state.scene_descriptor_set,
+    };
 }
 
-const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::shadowPipeline() const noexcept
+SceneDrawPassResources PipelineLibrary::shadowPassResources() const noexcept
 {
-    return m_state.shadow_pipeline;
+    return SceneDrawPassResources{
+        .pipeline = m_state.shadow_pipeline,
+        .scene_descriptor_set = m_state.scene_descriptor_set,
+    };
 }
 
-const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::lightingPipeline() const noexcept
+SceneDrawPassResources PipelineLibrary::transparentPassResources() const noexcept
 {
-    return m_state.lighting_pipeline;
+    return SceneDrawPassResources{
+        .pipeline = m_state.transparent_pipeline,
+        .scene_descriptor_set = m_state.scene_descriptor_set,
+    };
 }
 
-const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::transparentPipeline() const noexcept
+SceneLightingPassResources PipelineLibrary::lightingPassResources() const noexcept
 {
-    return m_state.transparent_pipeline;
-}
-
-const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::sceneDescriptorSet() const noexcept
-{
-    return m_state.scene_descriptor_set;
-}
-
-const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::lightingSceneDescriptorSet() const noexcept
-{
-    return m_state.lighting_scene_descriptor_set;
-}
-
-const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::gbufferDescriptorSet() const noexcept
-{
-    return m_state.gbuffer_descriptor_set;
-}
-
-const luna::RHI::Ref<luna::RHI::Sampler>& PipelineLibrary::gbufferSampler() const noexcept
-{
-    return m_state.gbuffer_sampler;
+    return SceneLightingPassResources{
+        .pipeline = m_state.lighting_pipeline,
+        .gbuffer_descriptor_set = m_state.gbuffer_descriptor_set,
+        .scene_descriptor_set = m_state.lighting_scene_descriptor_set,
+        .gbuffer_sampler = m_state.gbuffer_sampler,
+    };
 }
 
 void PipelineLibrary::reset() noexcept

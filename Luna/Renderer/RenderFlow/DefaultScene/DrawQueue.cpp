@@ -3,7 +3,7 @@
 #include "Renderer/Mesh.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Support.h"
+#include "Math/Math.h"
 
 #include <algorithm>
 
@@ -73,15 +73,13 @@ std::vector<DrawCommand> DrawQueue::drawCommands(RenderPhase phase) const
 
 void DrawQueue::sortBackToFront(std::vector<DrawCommand>& draw_commands) const
 {
-    using namespace render_flow::default_scene_detail;
-
     LUNA_RENDERER_FRAME_TRACE("Sorting {} draw command(s) back-to-front", draw_commands.size());
-    const glm::vec3 camera_position = resolveCameraPosition(m_camera);
+    const glm::vec3 camera_position = m_camera.getPosition();
     std::sort(draw_commands.begin(),
               draw_commands.end(),
               [camera_position](const DrawCommand& lhs, const DrawCommand& rhs) {
-                  return transparentSortDistanceSq(lhs.transform, camera_position) >
-                         transparentSortDistanceSq(rhs.transform, camera_position);
+                  return luna::translationDistanceSquared(lhs.transform, camera_position) >
+                         luna::translationDistanceSquared(rhs.transform, camera_position);
               });
 }
 

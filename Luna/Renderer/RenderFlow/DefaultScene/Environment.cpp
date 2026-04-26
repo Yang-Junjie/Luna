@@ -1,6 +1,8 @@
 #include "Asset/Editor/ImageLoader.h"
 #include "Core/Log.h"
+#include "Renderer/Image/ImageDataUtils.h"
 #include "Renderer/RenderFlow/DefaultScene/Environment.h"
+#include "Renderer/Resources/ShaderModuleLoader.h"
 
 #include <Builders.h>
 #include <DescriptorPool.h>
@@ -13,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 
 namespace luna::render_flow::default_scene {
 
@@ -27,13 +30,13 @@ struct IblDispatchParams {
 
 std::filesystem::path defaultEnvironmentPath()
 {
-    return render_flow::default_scene_detail::projectRoot() / "SampleProject" / "Assets" / "Texture" /
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "SampleProject" / "Assets" / "Texture" /
            "newport_loft.hdr";
 }
 
 std::filesystem::path defaultEnvironmentIblShaderPath()
 {
-    return render_flow::default_scene_detail::projectRoot() / "Luna" / "Renderer" / "Shaders" /
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
            "EnvironmentIBL.slang";
 }
 
@@ -262,16 +265,19 @@ void EnvironmentResources::ensure(const SceneRenderContext& context)
 
         if (!environment_image.isValid() ||
             environment_image.ImageFormat != render_flow::default_scene_detail::kEnvironmentFormat) {
-            environment_image = render_flow::default_scene_detail::createFallbackFloatImageData(
+            environment_image = renderer_detail::createFallbackFloatImageData(
                 glm::vec4(render_flow::default_scene_detail::kEnvironmentFallbackValue,
                           render_flow::default_scene_detail::kEnvironmentFallbackValue,
                           render_flow::default_scene_detail::kEnvironmentFallbackValue,
-                          1.0f));
+                          1.0f),
+                render_flow::default_scene_detail::kEnvironmentFormat);
         }
 
-        m_irradiance_sh = render_flow::default_scene_detail::computeDiffuseIrradianceSH(environment_image);
-        environment_image = render_flow::default_scene_detail::generateEnvironmentMipChain(environment_image);
-        m_source_texture = render_flow::default_scene_detail::createTextureUpload(
+        m_irradiance_sh =
+            renderer_detail::computeDiffuseIrradianceSH(environment_image, render_flow::default_scene_detail::kEnvironmentFormat);
+        environment_image =
+            renderer_detail::generateEnvironmentMipChain(environment_image, render_flow::default_scene_detail::kEnvironmentFormat);
+        m_source_texture = renderer_detail::createTextureUpload(
             context.device, environment_image, Texture::SamplerSettings{}, "SceneEnvironmentSource");
 
         LUNA_RENDERER_INFO("Prepared scene environment source texture ({}x{}, mips={})",
@@ -376,13 +382,13 @@ void EnvironmentResources::ensure(const SceneRenderContext& context)
 
     if (!m_equirect_to_cube_shader) {
         const std::filesystem::path shader_path = defaultEnvironmentIblShaderPath();
-        m_equirect_to_cube_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_equirect_to_cube_shader = renderer_detail::loadShaderModule(
             context.device, context.compiler, shader_path, "environmentEquirectToCubeMain", luna::RHI::ShaderStage::Compute);
-        m_irradiance_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_irradiance_shader = renderer_detail::loadShaderModule(
             context.device, context.compiler, shader_path, "environmentIrradianceMain", luna::RHI::ShaderStage::Compute);
-        m_prefilter_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_prefilter_shader = renderer_detail::loadShaderModule(
             context.device, context.compiler, shader_path, "environmentPrefilterMain", luna::RHI::ShaderStage::Compute);
-        m_brdf_lut_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_brdf_lut_shader = renderer_detail::loadShaderModule(
             context.device, context.compiler, shader_path, "environmentBrdfLutMain", luna::RHI::ShaderStage::Compute);
     }
 
@@ -402,7 +408,7 @@ void EnvironmentResources::uploadIfNeeded(luna::RHI::CommandBufferEncoder& comma
     if (!m_source_texture.uploaded) {
         LUNA_RENDERER_DEBUG("Uploading environment source texture '{}'", m_source_texture.debug_name);
     }
-    render_flow::default_scene_detail::uploadTextureIfNeeded(
+    renderer_detail::uploadTextureIfNeeded(
         commands,
         m_source_texture,
         luna::RHI::ResourceState::ShaderRead,

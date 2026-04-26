@@ -10,6 +10,8 @@ set(IMGUI_SOURCE ${THIRD_PARTY_DIR}/imgui/imgui.cpp
     ${THIRD_PARTY_DIR}/imgui/backends/imgui_impl_glfw.cpp)
 
 set(RENDERER_SOURCE
+    Math/Math.h
+    Math/Math.cpp
     Renderer/Camera.h
     Renderer/Camera.cpp
     Renderer/Material.h
@@ -27,13 +29,32 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFlowBuilder.h
     Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
+    Renderer/RenderFlow/RenderFeature.h
     Renderer/RenderFlow/RenderPass.h
     Renderer/RenderFlow/RenderPass.cpp
     Renderer/RenderFlow/DefaultRenderFlow.h
     Renderer/RenderFlow/DefaultRenderFlow.cpp
+    Renderer/RenderFlow/DefaultScene/Feature.h
+    Renderer/RenderFlow/DefaultScene/Feature.cpp
     Renderer/RenderFlow/DefaultScene/PassNames.h
-    Renderer/RenderFlow/DefaultScene/Passes.h
-    Renderer/RenderFlow/DefaultScene/Passes.cpp
+    Renderer/RenderFlow/DefaultScene/PassUtilities.h
+    Renderer/RenderFlow/DefaultScene/PassUtilities.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/LightingPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.cpp
+    Renderer/RenderFlow/DefaultScene/SceneAssetResources.h
+    Renderer/RenderFlow/DefaultScene/ScenePassResources.h
+    Renderer/RenderFlow/DefaultScene/ScenePipelineResources.h
+    Renderer/RenderFlow/DefaultScene/ScenePipelineResources.cpp
+    Renderer/RenderFlow/DefaultScene/SharedState.h
+    Renderer/RenderFlow/DefaultScene/SharedState.cpp
     Renderer/RenderWorld/RenderWorld.h
     Renderer/RenderWorld/RenderWorld.cpp
     Renderer/RenderWorld/RenderTypes.h
@@ -41,8 +62,14 @@ set(RENDERER_SOURCE
     Renderer/RenderWorld/RenderWorldExtractor.cpp
     Renderer/RendererUtilities.h
     Renderer/RendererUtilities.cpp
-    Renderer/RenderFlow/DefaultScene/Support.h
-    Renderer/RenderFlow/DefaultScene/Support.cpp
+    Renderer/RenderFlow/DefaultScene/SceneConstants.h
+    Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h
+    Renderer/Image/ImageDataUtils.h
+    Renderer/Image/ImageDataUtils.cpp
+    Renderer/Resources/ShaderModuleLoader.h
+    Renderer/Resources/ShaderModuleLoader.cpp
+    Renderer/Resources/TextureUpload.h
+    Renderer/Resources/TextureUpload.cpp
     Renderer/RenderFlow/DefaultScene/DrawQueue.h
     Renderer/RenderFlow/DefaultScene/DrawQueue.cpp
     Renderer/RenderFlow/DefaultScene/AssetCache.h
@@ -51,8 +78,6 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Environment.cpp
     Renderer/RenderFlow/DefaultScene/PipelineLibrary.h
     Renderer/RenderFlow/DefaultScene/PipelineLibrary.cpp
-    Renderer/RenderFlow/DefaultScene/ResourceManager.h
-    Renderer/RenderFlow/DefaultScene/ResourceManager.cpp
     Renderer/Shaders/EnvironmentIBL.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang

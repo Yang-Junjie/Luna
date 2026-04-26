@@ -1,35 +1,15 @@
-﻿#include "Renderer/RenderFlow/DefaultRenderFlow.h"
+#include "Renderer/RenderFlow/DefaultRenderFlow.h"
 
 #include "Core/Log.h"
-#include "Renderer/RenderFlow/DefaultScene/PassNames.h"
+#include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
 namespace luna {
 
 DefaultRenderFlow::DefaultRenderFlow()
-    : m_scene_state(m_resources, m_draw_queue, m_default_material)
 {
-    namespace pass_names = render_flow::default_scene::pass_names;
-
-    m_builder.addPass(std::string(pass_names::Environment),
-                      std::make_unique<render_flow::default_scene::DefaultSceneEnvironmentPass>(m_scene_state));
-    m_builder.insertPassAfter(
-        pass_names::Environment,
-        std::string(pass_names::ShadowDepth),
-        std::make_unique<render_flow::default_scene::DefaultSceneShadowDepthPass>(m_scene_state));
-    m_builder.insertPassAfter(
-        pass_names::ShadowDepth,
-        std::string(pass_names::Geometry),
-        std::make_unique<render_flow::default_scene::DefaultSceneGeometryPass>(m_scene_state));
-    m_builder.insertPassAfter(
-        pass_names::Geometry,
-        std::string(pass_names::Lighting),
-        std::make_unique<render_flow::default_scene::DefaultSceneLightingPass>(m_scene_state));
-    m_builder.insertPassAfter(
-        pass_names::Lighting,
-        std::string(pass_names::Transparent),
-        std::make_unique<render_flow::default_scene::DefaultSceneTransparentPass>(m_scene_state));
+    addFeature(std::make_unique<render_flow::default_scene::Feature>());
 }
 
 DefaultRenderFlow::~DefaultRenderFlow()
@@ -40,8 +20,26 @@ DefaultRenderFlow::~DefaultRenderFlow()
 void DefaultRenderFlow::shutdown()
 {
     m_builder.clear();
-    m_draw_queue.clear();
-    m_resources.shutdown();
+    for (const auto& feature : m_features) {
+        feature->shutdown();
+    }
+    m_features.clear();
+}
+
+bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> feature)
+{
+    if (!feature) {
+        LUNA_RENDERER_ERROR("Default render flow feature registration failed: feature is null");
+        return false;
+    }
+
+    if (!feature->registerPasses(m_builder)) {
+        LUNA_RENDERER_ERROR("Default render flow feature registration failed: {}", m_builder.lastError());
+        return false;
+    }
+
+    m_features.push_back(std::move(feature));
+    return true;
 }
 
 bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)
@@ -86,11 +84,6 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         return;
     }
 
-    m_draw_queue.beginScene(world.camera());
-    for (const auto& packet : world.drawPackets()) {
-        m_draw_queue.submitDrawPacket(packet);
-    }
-
     if (!scene_context.isValid()) {
         LUNA_RENDERER_WARN("Scene render graph build skipped because context is invalid: device={} color={} depth={} size={}x{}",
                            static_cast<bool>(scene_context.device),
@@ -108,17 +101,14 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         renderer_detail::backendTypeToString(scene_context.backend_type),
         renderer_detail::formatToString(scene_context.color_format),
         static_cast<int>(scene_context.color_format),
-        m_draw_queue.drawCommands().size(),
+        world.drawPackets().size(),
         scene_context.show_pick_debug_visualization);
 
-    namespace blackboard = render_flow::default_scene::blackboard;
-
     m_blackboard.clear();
-    m_blackboard.setTexture(blackboard::SceneColor, scene_context.color_target);
-    m_blackboard.setTexture(blackboard::Depth, scene_context.depth_target);
-    m_blackboard.setTexture(blackboard::Pick, scene_context.pick_target);
+    for (const auto& feature : m_features) {
+        feature->prepareFrame(world, scene_context, m_blackboard);
+    }
 
-    m_scene_state.setWorld(world);
     render_flow::RenderPassContext pass_context(context.graph(), world, scene_context, m_blackboard);
     const render_flow::RenderFlowBuilder::CompileResult compiled_flow = m_builder.compile();
     if (!compiled_flow.success) {
@@ -134,9 +124,3 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
 }
 
 } // namespace luna
-
-
-
-
-
-

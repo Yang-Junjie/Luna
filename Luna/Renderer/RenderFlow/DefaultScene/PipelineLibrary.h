@@ -6,7 +6,8 @@
 
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Support.h"
+#include "Renderer/RenderFlow/DefaultScene/SceneGpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/ScenePassResources.h"
 
 #include <array>
 #include <optional>
@@ -33,6 +34,7 @@ namespace luna::render_flow::default_scene {
 class PipelineLibrary final {
 public:
     void shutdown();
+    [[nodiscard]] bool hasAnyState() const noexcept;
     [[nodiscard]] bool hasCompleteState(const SceneRenderContext& context) const noexcept;
     void rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths);
     void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
@@ -53,14 +55,10 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& materialLayout() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& geometryPipeline() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& shadowPipeline() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& lightingPipeline() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& transparentPipeline() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& sceneDescriptorSet() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& lightingSceneDescriptorSet() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& gbufferDescriptorSet() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Sampler>& gbufferSampler() const noexcept;
+    [[nodiscard]] SceneDrawPassResources geometryPassResources() const noexcept;
+    [[nodiscard]] SceneDrawPassResources shadowPassResources() const noexcept;
+    [[nodiscard]] SceneDrawPassResources transparentPassResources() const noexcept;
+    [[nodiscard]] SceneLightingPassResources lightingPassResources() const noexcept;
 
 private:
     struct State {

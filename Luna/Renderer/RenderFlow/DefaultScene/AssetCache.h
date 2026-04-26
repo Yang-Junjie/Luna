@@ -5,7 +5,7 @@
 // then reuses them across frames until pipeline/device state changes.
 
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Support.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include "Asset/Asset.h"
 
@@ -41,9 +41,14 @@ public:
         luna::RHI::Ref<luna::RHI::DescriptorSet> material_descriptor_set;
         uint32_t index_count{0};
 
+        [[nodiscard]] bool hasGeometry() const noexcept
+        {
+            return vertex_buffer && index_buffer && index_count > 0;
+        }
+
         [[nodiscard]] bool isValid() const noexcept
         {
-            return vertex_buffer && index_buffer && material_descriptor_set && index_count > 0;
+            return hasGeometry() && material_descriptor_set;
         }
     };
 
@@ -72,18 +77,18 @@ private:
     };
 
     struct UploadedMaterial {
-        std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> base_color_texture;
-        std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> normal_texture;
-        std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> metallic_roughness_texture;
-        std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> emissive_texture;
-        std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload> occlusion_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> base_color_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> normal_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> metallic_roughness_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> emissive_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> occlusion_texture;
         luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
         luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
         uint64_t uploaded_version{0};
     };
 
     UploadedMesh& getOrCreateUploadedMesh(const Mesh& mesh, const Bindings& bindings);
-    std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload>
+    std::shared_ptr<renderer_detail::PendingTextureUpload>
         getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings);
     static void uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material);
@@ -93,8 +98,7 @@ private:
 
 private:
     std::unordered_map<AssetHandle, UploadedMesh> m_uploaded_meshes;
-    std::unordered_map<const Texture*, std::shared_ptr<render_flow::default_scene_detail::PendingTextureUpload>>
-        m_uploaded_textures;
+    std::unordered_map<const Texture*, std::shared_ptr<renderer_detail::PendingTextureUpload>> m_uploaded_textures;
     std::unordered_map<const Material*, UploadedMaterial> m_uploaded_materials;
 };
 

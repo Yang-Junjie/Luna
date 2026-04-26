@@ -4,8 +4,9 @@
 // Loads fallback or project-provided environment data, prepares upload state,
 // and exposes irradiance data needed by scene parameter updates.
 
-#include "Renderer/RenderFlow/DefaultScene/Support.h"
+#include "Renderer/RenderFlow/DefaultScene/SceneConstants.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include <array>
 
@@ -30,7 +31,7 @@ public:
     void uploadIfNeeded(luna::RHI::CommandBufferEncoder& commands);
     void precomputeIfNeeded(luna::RHI::CommandBufferEncoder& commands);
 
-    [[nodiscard]] const render_flow::default_scene_detail::PendingTextureUpload& sourceTexture() const noexcept
+    [[nodiscard]] const renderer_detail::PendingTextureUpload& sourceTexture() const noexcept
     {
         return m_source_texture;
     }
@@ -59,7 +60,7 @@ public:
 private:
     luna::RHI::Ref<luna::RHI::Device> m_device;
     luna::RHI::BackendType m_backend_type{luna::RHI::BackendType::Auto};
-    render_flow::default_scene_detail::PendingTextureUpload m_source_texture;
+    renderer_detail::PendingTextureUpload m_source_texture;
     std::array<glm::vec4, 9> m_irradiance_sh{};
 
     luna::RHI::Ref<luna::RHI::Texture> m_environment_cube_texture;
