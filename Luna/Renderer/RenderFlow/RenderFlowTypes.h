@@ -17,13 +17,15 @@ namespace luna {
 struct SceneShaderPaths {
     std::filesystem::path geometry_vertex_path;
     std::filesystem::path geometry_fragment_path;
+    std::filesystem::path shadow_vertex_path;
+    std::filesystem::path shadow_fragment_path;
     std::filesystem::path lighting_vertex_path;
     std::filesystem::path lighting_fragment_path;
 
     [[nodiscard]] bool isComplete() const
     {
-        return !geometry_vertex_path.empty() && !geometry_fragment_path.empty() && !lighting_vertex_path.empty() &&
-               !lighting_fragment_path.empty();
+        return !geometry_vertex_path.empty() && !geometry_fragment_path.empty() && !shadow_vertex_path.empty() &&
+               !shadow_fragment_path.empty() && !lighting_vertex_path.empty() && !lighting_fragment_path.empty();
     }
 };
 

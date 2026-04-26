@@ -32,6 +32,8 @@ namespace luna::render_flow::default_scene_detail {
 inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
 inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
 inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_UINT;
+inline constexpr luna::RHI::Format kShadowMapFormat = luna::RHI::Format::R32_FLOAT;
+inline constexpr uint32_t kShadowMapSize = 2048;
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
 inline constexpr float kDefaultMaterialAlphaCutoff = 0.5f;
 inline constexpr float kEnvironmentFallbackValue = 0.08f;
@@ -53,6 +55,8 @@ struct SceneGpuParams {
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
     glm::vec4 debug_overlay_params{0.0f, 0.65f, 0.0f, 0.0f};
     glm::vec4 debug_pick_marker{0.0f, 0.0f, 0.0f, 1.0f};
+    glm::mat4 shadow_view_projection{1.0f};
+    glm::vec4 shadow_params{0.0f, 0.0015f, 0.0f, 1.0f / static_cast<float>(kShadowMapSize)};
     glm::vec4 light_counts{0.0f, 0.0f, 0.0f, 0.0f};
     std::array<glm::vec4, kMaxPointLights> point_light_position_intensity{};
     std::array<glm::vec4, kMaxPointLights> point_light_color_range{};
@@ -68,6 +72,11 @@ struct MaterialGpuParams {
     glm::vec4 emissive_factor_normal_scale{0.0f, 0.0f, 0.0f, 1.0f};
     glm::vec4 material_factors{0.0f, 1.0f, 1.0f, kDefaultMaterialAlphaCutoff};
     glm::vec4 material_flags{0.0f};
+};
+
+struct ShadowRenderParams {
+    glm::mat4 view_projection{1.0f};
+    glm::vec4 params{0.0f, 0.0015f, 0.0f, 1.0f / static_cast<float>(kShadowMapSize)};
 };
 
 struct PendingTextureUpload {

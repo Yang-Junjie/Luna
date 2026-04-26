@@ -80,6 +80,8 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI
                         luna::RHI::ShaderStage::Vertex | luna::RHI::ShaderStage::Fragment)
             .AddBinding(1, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(2, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(3, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(4, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 }
 
@@ -130,6 +132,22 @@ luna::RHI::Ref<luna::RHI::Sampler> createEnvironmentSampler(const luna::RHI::Ref
                                      .Build());
 }
 
+luna::RHI::Ref<luna::RHI::Sampler> createShadowSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+{
+    if (!device) {
+        return {};
+    }
+
+    return device->CreateSampler(luna::RHI::SamplerBuilder()
+                                     .SetFilter(luna::RHI::Filter::Nearest, luna::RHI::Filter::Nearest)
+                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
+                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToBorder)
+                                     .SetBorderColor(luna::RHI::BorderColor::FloatOpaqueWhite)
+                                     .SetAnisotropy(false)
+                                     .SetName("SceneShadowMapSampler")
+                                     .Build());
+}
+
 void addStaticMeshVertexLayout(luna::RHI::GraphicsPipelineBuilder& builder)
 {
     builder.AddVertexBinding(0, sizeof(StaticMeshVertex), luna::RHI::VertexInputRate::Vertex)
@@ -161,6 +179,29 @@ luna::RHI::Ref<luna::RHI::PipelineLayout>
     }
 
     return device->CreatePipelineLayout(builder.Build());
+}
+
+luna::RHI::Ref<luna::RHI::GraphicsPipeline>
+    createShadowPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
+                         const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
+                         const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
+                         const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader)
+{
+    if (!device || !layout || !vertex_shader || !fragment_shader) {
+        return {};
+    }
+
+    luna::RHI::GraphicsPipelineBuilder builder;
+    builder.SetShaders({vertex_shader, fragment_shader});
+    addStaticMeshVertexLayout(builder);
+    builder.SetDepthTest(true, true, luna::RHI::CompareOp::Less)
+        .SetDepthBias(true, 1.25f, 0.0f, 1.75f)
+        .AddColorAttachmentDefault(false)
+        .AddColorFormat(render_flow::default_scene_detail::kShadowMapFormat)
+        .SetDepthStencilFormat(luna::RHI::Format::D32_FLOAT)
+        .SetLayout(layout);
+
+    return device->CreateGraphicsPipeline(builder.Build());
 }
 
 luna::RHI::Ref<luna::RHI::GraphicsPipeline>
@@ -251,10 +292,10 @@ void PipelineLibrary::shutdown()
 bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const noexcept
 {
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
-           m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.lighting_pipeline &&
-           m_state.transparent_pipeline && m_state.material_layout && m_state.descriptor_pool &&
+           m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
+           m_state.lighting_pipeline && m_state.transparent_pipeline && m_state.material_layout && m_state.descriptor_pool &&
            m_state.gbuffer_descriptor_set && m_state.scene_descriptor_set && m_state.scene_params_buffer &&
-           m_state.gbuffer_sampler && m_state.environment_source_sampler;
+           m_state.gbuffer_sampler && m_state.environment_source_sampler && m_state.shadow_sampler;
 }
 
 void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
@@ -270,16 +311,23 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
         return;
     }
 
-    LUNA_RENDERER_DEBUG("Loading scene render flow shaders: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
-                        shader_paths.geometry_vertex_path.string(),
-                        shader_paths.geometry_fragment_path.string(),
-                        shader_paths.lighting_vertex_path.string(),
-                        shader_paths.lighting_fragment_path.string());
+    LUNA_RENDERER_DEBUG(
+        "Loading scene render flow shaders: geometry_vs='{}' geometry_fs='{}' shadow_vs='{}' shadow_fs='{}' lighting_vs='{}' lighting_fs='{}'",
+        shader_paths.geometry_vertex_path.string(),
+        shader_paths.geometry_fragment_path.string(),
+        shader_paths.shadow_vertex_path.string(),
+        shader_paths.shadow_fragment_path.string(),
+        shader_paths.lighting_vertex_path.string(),
+        shader_paths.lighting_fragment_path.string());
 
     m_state.geometry_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_vertex_path, "sceneGeometryVertexMain", luna::RHI::ShaderStage::Vertex);
     m_state.geometry_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneGeometryFragmentMain", luna::RHI::ShaderStage::Fragment);
+    m_state.shadow_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_state.device, context.compiler, shader_paths.shadow_vertex_path, "sceneShadowVertexMain", luna::RHI::ShaderStage::Vertex);
+    m_state.shadow_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
+        m_state.device, context.compiler, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain", luna::RHI::ShaderStage::Fragment);
     m_state.lighting_vertex_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.lighting_vertex_path, "sceneLightingVertexMain", luna::RHI::ShaderStage::Vertex);
     m_state.lighting_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
@@ -287,8 +335,9 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
     m_state.transparent_fragment_shader = render_flow::default_scene_detail::loadShaderModule(
         m_state.device, context.compiler, shader_paths.geometry_fragment_path, "sceneTransparentFragmentMain", luna::RHI::ShaderStage::Fragment);
 
-    if (!m_state.geometry_vertex_shader || !m_state.geometry_fragment_shader || !m_state.lighting_vertex_shader ||
-        !m_state.lighting_fragment_shader || !m_state.transparent_fragment_shader) {
+    if (!m_state.geometry_vertex_shader || !m_state.geometry_fragment_shader || !m_state.shadow_vertex_shader ||
+        !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader || !m_state.lighting_fragment_shader ||
+        !m_state.transparent_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -299,6 +348,7 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
     m_state.descriptor_pool = createDescriptorPool(m_state.device);
     m_state.gbuffer_sampler = createGBufferSampler(m_state.device);
     m_state.environment_source_sampler = createEnvironmentSampler(m_state.device);
+    m_state.shadow_sampler = createShadowSampler(m_state.device);
 
     if (m_state.descriptor_pool && m_state.gbuffer_layout) {
         m_state.gbuffer_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.gbuffer_layout);
@@ -323,13 +373,19 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
         m_state.gbuffer_layout,
         m_state.scene_layout,
     };
+    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSetLayout>, 1> shadow_set_layouts{
+        m_state.scene_layout,
+    };
 
     m_state.geometry_pipeline_layout = createPipelineLayout(m_state.device, geometry_set_layouts, true);
+    m_state.shadow_pipeline_layout = createPipelineLayout(m_state.device, shadow_set_layouts, true);
     m_state.lighting_pipeline_layout = createPipelineLayout(m_state.device, lighting_set_layouts, false);
     m_state.transparent_pipeline_layout = createPipelineLayout(m_state.device, geometry_set_layouts, true);
 
     m_state.geometry_pipeline = createGeometryPipeline(
         m_state.device, m_state.geometry_pipeline_layout, m_state.geometry_vertex_shader, m_state.geometry_fragment_shader);
+    m_state.shadow_pipeline = createShadowPipeline(
+        m_state.device, m_state.shadow_pipeline_layout, m_state.shadow_vertex_shader, m_state.shadow_fragment_shader);
     m_state.lighting_pipeline = createLightingPipeline(
         m_state.device, m_state.lighting_pipeline_layout, context.color_format, m_state.lighting_vertex_shader, m_state.lighting_fragment_shader);
     m_state.transparent_pipeline = createTransparentPipeline(
@@ -386,6 +442,7 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
                                 const SceneLightView& lights,
                                 float environment_mip_count,
                                 const std::array<glm::vec4, 9>& irradiance_sh,
+                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params,
                                 const luna::RHI::Ref<luna::RHI::Buffer>& scene_params_buffer)
 {
     if (!scene_params_buffer || context.framebuffer_width == 0 || context.framebuffer_height == 0) {
@@ -439,6 +496,8 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
                                          static_cast<float>(context.debug_pick_pixel_y),
                                          (context.show_pick_debug_visualization && context.show_pick_debug_marker) ? 1.0f : 0.0f,
                                          1.0f);
+    params.shadow_view_projection = shadow_params.view_projection;
+    params.shadow_params = shadow_params.params;
     params.irradiance_sh = irradiance_sh;
 
     if (void* mapped = scene_params_buffer->Map()) {
@@ -455,7 +514,8 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
 void PipelineLibrary::updateSceneParameters(const SceneRenderContext& context,
                                             const RenderWorld& world,
                                             float environment_mip_count,
-                                            const std::array<glm::vec4, 9>& irradiance_sh)
+                                            const std::array<glm::vec4, 9>& irradiance_sh,
+                                            const render_flow::default_scene_detail::ShadowRenderParams& shadow_params)
 {
     const RenderDirectionalLight* directional_light = world.directionalLights().empty() ? nullptr : &world.directionalLights().front();
     updateSceneParameterBuffer(context,
@@ -467,8 +527,10 @@ void PipelineLibrary::updateSceneParameters(const SceneRenderContext& context,
                                },
                                environment_mip_count,
                                irradiance_sh,
+                               shadow_params,
                                m_state.scene_params_buffer);
 }
+
 void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                               const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
@@ -525,6 +587,29 @@ void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Te
     m_state.gbuffer_descriptor_set->Update();
 }
 
+void PipelineLibrary::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
+{
+    if (!m_state.scene_descriptor_set || !shadow_map || !m_state.shadow_sampler) {
+        LUNA_RENDERER_WARN("Cannot update shadow resources: scene_descriptor_set={} shadow_map={} shadow_sampler={}",
+                           static_cast<bool>(m_state.scene_descriptor_set),
+                           static_cast<bool>(shadow_map),
+                           static_cast<bool>(m_state.shadow_sampler));
+        return;
+    }
+
+    m_state.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 3,
+        .TextureView = shadow_map->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        .Binding = 4,
+        .Sampler = m_state.shadow_sampler,
+    });
+    m_state.scene_descriptor_set->Update();
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& PipelineLibrary::device() const noexcept
 {
     return m_state.device;
@@ -543,6 +628,11 @@ const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& PipelineLibrary::materialL
 const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::geometryPipeline() const noexcept
 {
     return m_state.geometry_pipeline;
+}
+
+const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::shadowPipeline() const noexcept
+{
+    return m_state.shadow_pipeline;
 }
 
 const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::lightingPipeline() const noexcept

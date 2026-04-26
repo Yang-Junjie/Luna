@@ -5,6 +5,7 @@
 namespace luna::render_flow::default_scene::pass_names {
 
 inline constexpr std::string_view Geometry = "Geometry";
+inline constexpr std::string_view ShadowDepth = "ShadowDepth";
 inline constexpr std::string_view Lighting = "Lighting";
 inline constexpr std::string_view Transparent = "Transparent";
 
@@ -19,5 +20,6 @@ inline constexpr std::string_view GBufferBaseColor = "DefaultScene.GBuffer.BaseC
 inline constexpr std::string_view GBufferNormalMetallic = "DefaultScene.GBuffer.NormalMetallic";
 inline constexpr std::string_view GBufferWorldPositionRoughness = "DefaultScene.GBuffer.WorldPositionRoughness";
 inline constexpr std::string_view GBufferEmissiveAo = "DefaultScene.GBuffer.EmissiveAo";
+inline constexpr std::string_view ShadowMap = "DefaultScene.ShadowMap";
 
 } // namespace luna::render_flow::default_scene::blackboard

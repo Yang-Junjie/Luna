@@ -19,6 +19,8 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
+    float4x4 shadowViewProjection;
+    float4 shadowParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
     float4 pointLightColorRange[kMaxPointLights];
@@ -55,6 +57,12 @@ Texture2D<float4> gEnvironmentTexture : register(t7);
 
 [[vk::binding(2, 1)]]
 SamplerState gEnvironmentSampler : register(s8);
+
+[[vk::binding(3, 1)]]
+Texture2D<float> gShadowMap : register(t9);
+
+[[vk::binding(4, 1)]]
+SamplerState gShadowSampler : register(s10);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -203,6 +211,60 @@ float2 sampleEnvironmentBrdf(float roughness, float NdotV)
     return envBrdfApprox(roughness, NdotV);
 }
 
+float2 shadowUvFromClip(float2 clipXY)
+{
+    float2 uv;
+    uv.x = clipXY.x * 0.5 + 0.5;
+#if defined(LUNA_BACKEND_VULKAN) || defined(LUNA_BACKEND_D3D12)
+    uv.y = clipXY.y * 0.5 + 0.5;
+#else
+    uv.y = 0.5 - clipXY.y * 0.5;
+#endif
+    return uv;
+}
+
+float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 lightDirection)
+{
+    if (gSceneParams.shadowParams.x <= 0.5)
+    {
+        return 1.0;
+    }
+
+    const float4 shadowClip = mul(gSceneParams.shadowViewProjection, float4(worldPosition, 1.0));
+    if (abs(shadowClip.w) <= 1e-6)
+    {
+        return 1.0;
+    }
+
+    const float3 shadowNdc = shadowClip.xyz / shadowClip.w;
+    const float2 shadowUv = shadowUvFromClip(shadowNdc.xy);
+    if (shadowUv.x < 0.0 || shadowUv.x > 1.0 || shadowUv.y < 0.0 || shadowUv.y > 1.0 ||
+        shadowNdc.z < 0.0 || shadowNdc.z > 1.0)
+    {
+        return 1.0;
+    }
+
+    const float normalLightFactor = 1.0 - saturate(dot(safeNormalize(normalWS, float3(0.0, 0.0, 1.0)),
+                                                       safeNormalize(lightDirection, float3(0.0, 1.0, 0.0))));
+    const float bias = max(gSceneParams.shadowParams.y * normalLightFactor, gSceneParams.shadowParams.y * 0.25);
+    const float texelSize = gSceneParams.shadowParams.w;
+    float visibility = 0.0;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            const float sampledDepth =
+                gShadowMap.SampleLevel(gShadowSampler, shadowUv + float2(x, y) * texelSize, 0.0);
+            visibility += (shadowNdc.z - bias) <= sampledDepth ? 1.0 : 0.0;
+        }
+    }
+
+    return visibility / 9.0;
+}
+
 float3 reconstructViewDirection(float2 uv)
 {
     // This converts fullscreen UVs back into clip-space using the backend's screen-space Y convention.
@@ -319,14 +381,17 @@ float3 evaluatePbrLighting(float3 worldPosition,
     const float NdotV = saturate(dot(N, V));
 
     const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+    const float3 directionalL = safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0));
+    const float directionalShadow = evaluateDirectionalShadow(worldPosition, N, directionalL);
     float3 directLighting = evaluateDirectLight(N,
                                                 V,
-                                                safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0)),
+                                                directionalL,
                                                 gSceneParams.lightColorExposure.rgb * gSceneParams.lightDirectionIntensity.w,
                                                 baseColor,
                                                 metallic,
                                                 roughness,
-                                                F0);
+                                                F0) *
+                            directionalShadow;
 
     const uint pointLightCount = min((uint)gSceneParams.lightCounts.x, kMaxPointLights);
     for (uint lightIndex = 0; lightIndex < pointLightCount; ++lightIndex)

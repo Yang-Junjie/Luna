@@ -1,53 +1,57 @@
 Scene: SampleScene
 Entities:
   - IDComponent:
-      ID: 6296757327198945537
+      ID: 1575925757346616929
     TagComponent:
-      Tag: Cube
+      Tag: Plane
     TransformComponent:
-      Translation: [-3.0049448, 0.11518596, -0.15800995]
-      Rotation: [0, -0, 0.68598604]
-      Scale: [1, 1, 1]
+      Translation: [0.004538013, 0.58948356, 0]
+      Rotation: [0, -0, 3.1387298]
+      Scale: [16.081938, 16.081938, 16.082]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
     MeshComponent:
-      MeshHandle: 1002
+      MeshHandle: 1003
       SubmeshMaterials:
-        - 2003
+        - 2001
   - IDComponent:
-      ID: 4597209426252840243
+      ID: 16951615904058710475
     TagComponent:
-      Tag: Sphere
+      Tag: Directional Light
     TransformComponent:
-      Translation: [-4.4830613, -0.11565052, 0]
-      Rotation: [0, -0, 3.1384962]
-      Scale: [0.9999373, 0.9999373, 1]
+      Translation: [-0.6801461, -0.61538255, 3.585527]
+      Rotation: [0.3885663, -0, 0]
+      Scale: [0.9999998, 0.9999993, 1]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
-    MeshComponent:
-      MeshHandle: 1005
-      SubmeshMaterials:
-        - 2003
+    LightComponent:
+      Type: Directional
+      Enabled: true
+      Color: [1, 1, 1]
+      Intensity: 4
+      Range: 10
+      InnerConeAngle: 20
+      OuterConeAngle: 35
   - IDComponent:
-      ID: 6652629833754950424
+      ID: 6422384645588011490
     TagComponent:
       Tag: Empty Entity
     TransformComponent:
-      Translation: [-0.9, 0, 0]
-      Rotation: [-0.99309236, -3.6564648, 0]
+      Translation: [-2.7216005, -0.11617562, 0.07573263]
+      Rotation: [-2.0751965, 0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
-      ParentHandle: 0
+      ParentHandle: 6652629833754950424
       Children:
-        - 6422384645588011490
+        []
     MeshComponent:
-      MeshHandle: 17196472838577284151
+      MeshHandle: 5963794263514486561
       SubmeshMaterials:
-        - 8706604916645388531
+        - 2003
   - IDComponent:
       ID: 8795389863366798160
     TagComponent:
@@ -71,38 +75,50 @@ Entities:
       OrthographicNear: -100
       OrthographicFar: 100
   - IDComponent:
-      ID: 6422384645588011490
+      ID: 6652629833754950424
     TagComponent:
       Tag: Empty Entity
     TransformComponent:
-      Translation: [-2.7216005, -0.11617562, 0.07573263]
-      Rotation: [-2.0751965, 0, 0]
+      Translation: [-0.9, 0, 0]
+      Rotation: [-0.99309236, -3.6564648, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
-      ParentHandle: 6652629833754950424
+      ParentHandle: 0
       Children:
-        []
+        - 6422384645588011490
     MeshComponent:
-      MeshHandle: 5963794263514486561
+      MeshHandle: 17196472838577284151
       SubmeshMaterials:
-        - 2003
+        - 8706604916645388531
   - IDComponent:
-      ID: 16951615904058710475
+      ID: 4597209426252840243
     TagComponent:
-      Tag: Directional Light
+      Tag: Sphere
     TransformComponent:
-      Translation: [3.38, 1.7081349, 1.399224]
-      Rotation: [-0.80285144, 0.5969026, 9.0954764e-08]
-      Scale: [0.9999999, 0.9999998, 0.9999999]
+      Translation: [-4.4830613, -0.11565052, 0]
+      Rotation: [0, -0, 3.1384962]
+      Scale: [0.9999373, 0.9999373, 1]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
-    LightComponent:
-      Type: Directional
-      Enabled: true
-      Color: [1, 1, 1]
-      Intensity: 4
-      Range: 10
-      InnerConeAngle: 20
-      OuterConeAngle: 35
+    MeshComponent:
+      MeshHandle: 1005
+      SubmeshMaterials:
+        - 2003
+  - IDComponent:
+      ID: 6296757327198945537
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-3.0049448, 0.11518596, -0.15800995]
+      Rotation: [0, -0, 0.68598604]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1002
+      SubmeshMaterials:
+        - 2003

@@ -22,10 +22,13 @@ ShaderPaths defaultShaderPaths()
 {
     const std::filesystem::path shader_root = render_flow::default_scene_detail::projectRoot() / "Luna" / "Renderer" / "Shaders";
     const std::filesystem::path geometry_shader_path = shader_root / "SceneGeometry.slang";
+    const std::filesystem::path shadow_shader_path = shader_root / "ShadowMapping.slang";
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
     return ShaderPaths{
         .geometry_vertex_path = geometry_shader_path,
         .geometry_fragment_path = geometry_shader_path,
+        .shadow_vertex_path = shadow_shader_path,
+        .shadow_fragment_path = shadow_shader_path,
         .lighting_vertex_path = lighting_shader_path,
         .lighting_fragment_path = lighting_shader_path,
     };
@@ -37,9 +40,12 @@ class ResourceManager::Implementation final {
 public:
     void setShaderPaths(ShaderPaths shader_paths)
     {
-        LUNA_RENDERER_INFO("Scene render flow shader paths updated: geometry_vs='{}' geometry_fs='{}' lighting_vs='{}' lighting_fs='{}'",
+        LUNA_RENDERER_INFO(
+            "Scene render flow shader paths updated: geometry_vs='{}' geometry_fs='{}' shadow_vs='{}' shadow_fs='{}' lighting_vs='{}' lighting_fs='{}'",
                            shader_paths.geometry_vertex_path.string(),
                            shader_paths.geometry_fragment_path.string(),
+                           shader_paths.shadow_vertex_path.string(),
+                           shader_paths.shadow_fragment_path.string(),
                            shader_paths.lighting_vertex_path.string(),
                            shader_paths.lighting_fragment_path.string());
         m_shader_paths = std::move(shader_paths);
@@ -115,12 +121,15 @@ public:
         m_environment.uploadIfNeeded(commands);
     }
 
-    void updateSceneParameters(const RenderContext& context, const RenderWorld& world)
+    void updateSceneParameters(const RenderContext& context,
+                               const RenderWorld& world,
+                               const render_flow::default_scene_detail::ShadowRenderParams& shadow_params)
     {
         const float environment_mip_count = static_cast<float>(m_environment.sourceTexture().texture
                                                                    ? m_environment.sourceTexture().texture->GetMipLevels()
                                                                    : 1);
-        m_pipelines.updateSceneParameters(context, world, environment_mip_count, m_environment.irradianceSH());
+        m_pipelines.updateSceneParameters(
+            context, world, environment_mip_count, m_environment.irradianceSH(), shadow_params);
     }
 
     void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -134,6 +143,11 @@ public:
                                             gbuffer_world_position_roughness,
                                             gbuffer_emissive_ao,
                                             pick_texture);
+    }
+
+    void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
+    {
+        m_pipelines.updateShadowResources(shadow_map);
     }
 
     [[nodiscard]] ResolvedDrawResources resolveDrawResources(const DrawCommand& draw_command,
@@ -151,6 +165,11 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& geometryPipeline() const
     {
         return m_pipelines.geometryPipeline();
+    }
+
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& shadowPipeline() const
+    {
+        return m_pipelines.shadowPipeline();
     }
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& lightingPipeline() const
@@ -188,6 +207,12 @@ private:
         }
         if (shader_paths.geometry_fragment_path.empty()) {
             shader_paths.geometry_fragment_path = default_paths.geometry_fragment_path;
+        }
+        if (shader_paths.shadow_vertex_path.empty()) {
+            shader_paths.shadow_vertex_path = default_paths.shadow_vertex_path;
+        }
+        if (shader_paths.shadow_fragment_path.empty()) {
+            shader_paths.shadow_fragment_path = default_paths.shadow_fragment_path;
         }
         if (shader_paths.lighting_vertex_path.empty()) {
             shader_paths.lighting_vertex_path = default_paths.lighting_vertex_path;
@@ -250,9 +275,12 @@ void ResourceManager::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder&
     m_impl->uploadEnvironmentIfNeeded(commands);
 }
 
-void ResourceManager::updateSceneParameters(const SceneRenderContext& context, const RenderWorld& world)
+void ResourceManager::updateSceneParameters(
+    const SceneRenderContext& context,
+    const RenderWorld& world,
+    const render_flow::default_scene_detail::ShadowRenderParams& shadow_params)
 {
-    m_impl->updateSceneParameters(context, world);
+    m_impl->updateSceneParameters(context, world, shadow_params);
 }
 
 void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
@@ -265,6 +293,11 @@ void ResourceManager::updateLightingResources(const luna::RHI::Ref<luna::RHI::Te
         gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
 }
 
+void ResourceManager::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
+{
+    m_impl->updateShadowResources(shadow_map);
+}
+
 ResolvedDrawResources ResourceManager::resolveDrawResources(const DrawCommand& draw_command,
                                                             const Material& default_material) const
 {
@@ -274,6 +307,11 @@ ResolvedDrawResources ResourceManager::resolveDrawResources(const DrawCommand& d
 const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& ResourceManager::geometryPipeline() const
 {
     return m_impl->geometryPipeline();
+}
+
+const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& ResourceManager::shadowPipeline() const
+{
+    return m_impl->shadowPipeline();
 }
 
 const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& ResourceManager::lightingPipeline() const

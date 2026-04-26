@@ -63,6 +63,8 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
+    float4x4 shadowViewProjection;
+    float4 shadowParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
     float4 pointLightColorRange[kMaxPointLights];
