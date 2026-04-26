@@ -1,9 +1,11 @@
 #include "Core/Log.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
+#include "Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h"
 
 #include <cctype>
 #include <algorithm>
+#include <memory>
 #include <optional>
 #include <string_view>
 
@@ -143,6 +145,12 @@ Renderer::InitializationOptions LunaEditorApplication::getRendererInitialization
 
 void LunaEditorApplication::onInit()
 {
+    auto& renderer = getRenderer();
+    if (!renderer.addDefaultRenderFeature(
+            std::make_unique<render_flow::ScreenSpaceAmbientOcclusionFeature>())) {
+        LUNA_EDITOR_WARN("Failed to register ScreenSpaceAmbientOcclusionFeature");
+    }
+
     pushOverlay(std::make_unique<LunaEditorLayer>(*this));
 }
 

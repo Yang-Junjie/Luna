@@ -49,26 +49,38 @@ SamplerState gGBufferSampler : register(s4);
 [[vk::binding(5, 0)]]
 Texture2D<uint> gPickBuffer : register(t5);
 
+[[vk::binding(6, 0)]]
+Texture2D<float4> gAmbientOcclusionTexture : register(t6);
+
+[[vk::binding(7, 0)]]
+Texture2D<float4> gReflectionTexture : register(t7);
+
+[[vk::binding(8, 0)]]
+Texture2D<float4> gIndirectDiffuseTexture : register(t8);
+
+[[vk::binding(9, 0)]]
+Texture2D<float4> gIndirectSpecularTexture : register(t9);
+
 [[vk::binding(0, 1)]]
-ConstantBuffer<SceneParams> gSceneParams : register(b6);
+ConstantBuffer<SceneParams> gSceneParams : register(b10);
 
 [[vk::binding(1, 1)]]
-Texture2D<float4> gEnvironmentTexture : register(t7);
+Texture2D<float4> gEnvironmentTexture : register(t11);
 
 [[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s8);
+SamplerState gEnvironmentSampler : register(s12);
 
 [[vk::binding(3, 1)]]
-Texture2D<float> gShadowMap : register(t9);
+Texture2D<float> gShadowMap : register(t13);
 
 [[vk::binding(4, 1)]]
-SamplerState gShadowSampler : register(s10);
+SamplerState gShadowSampler : register(s14);
 
 [[vk::binding(5, 1)]]
-TextureCube<float4> gEnvironmentPrefilterTexture : register(t11);
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t15);
 
 [[vk::binding(6, 1)]]
-Texture2D<float4> gEnvironmentBrdfLut : register(t12);
+Texture2D<float4> gEnvironmentBrdfLut : register(t16);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -383,7 +395,8 @@ float3 evaluatePbrLighting(float3 worldPosition,
                            float metallic,
                            float roughness,
                            float3 emissive,
-                           float ao)
+                           float ao,
+                           float2 uv)
 {
     const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
     const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
@@ -453,10 +466,13 @@ float3 evaluatePbrLighting(float3 worldPosition,
     const float3 prefilteredColor = sampleEnvironmentPrefilter(R, roughness * maxEnvMip);
     const float2 envBrdf = sampleEnvironmentBrdf(roughness, NdotV);
     const float3 specularIbl = prefilteredColor * (ambientKs * envBrdf.x + envBrdf.y);
+    const float3 extensionDiffuse = gIndirectDiffuseTexture.Sample(gGBufferSampler, uv).rgb;
+    const float3 extensionSpecular =
+        gIndirectSpecularTexture.Sample(gGBufferSampler, uv).rgb + gReflectionTexture.Sample(gGBufferSampler, uv).rgb;
     const float3 ambient = (ambientKd * diffuseIbl * gSceneParams.iblFactors.x + specularIbl * gSceneParams.iblFactors.y) *
                            ao * gSceneParams.iblFactors.z;
 
-    return emissive + directLighting + ambient;
+    return emissive + directLighting + ambient + extensionDiffuse * ao + extensionSpecular;
 }
 
 [shader("vertex")]
@@ -504,12 +520,20 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
     const float roughness = clamp(worldPositionRoughness.w, kMinRoughness, 1.0);
     const float3 emissive = emissiveAo.rgb;
     const bool unlit = emissiveAo.a < 0.0;
-    const float ao = abs(emissiveAo.a);
+    const float extensionAo = gAmbientOcclusionTexture.Sample(gGBufferSampler, input.uv).r;
+    const float ao = abs(emissiveAo.a) * saturate(extensionAo);
 
     float3 color = baseColor + emissive;
     if (!unlit)
     {
-        color = evaluatePbrLighting(worldPositionRoughness.xyz, normalWS, baseColor, metallic, roughness, emissive, ao);
+        color = evaluatePbrLighting(worldPositionRoughness.xyz,
+                                    normalWS,
+                                    baseColor,
+                                    metallic,
+                                    roughness,
+                                    emissive,
+                                    ao,
+                                    input.uv);
     }
 
     color *= gSceneParams.lightColorExposure.a;

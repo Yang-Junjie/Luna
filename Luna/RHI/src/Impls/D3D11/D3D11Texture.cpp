@@ -24,6 +24,51 @@ DXGI_FORMAT resolveViewFormat(const D3D11Texture& texture, const TextureViewDesc
     return D3D11_ToDXGIFormat(desc.FormatOverride != Format::UNDEFINED ? desc.FormatOverride : texture.GetFormat());
 }
 
+DXGI_FORMAT resolveSampledDepthResourceFormat(Format format)
+{
+    switch (format) {
+        case Format::D16_UNORM:
+            return DXGI_FORMAT_R16_TYPELESS;
+        case Format::D24_UNORM_S8_UINT:
+            return DXGI_FORMAT_R24G8_TYPELESS;
+        case Format::D32_FLOAT:
+            return DXGI_FORMAT_R32_TYPELESS;
+        case Format::D32_FLOAT_S8_UINT:
+            return DXGI_FORMAT_R32G8X24_TYPELESS;
+        default:
+            return D3D11_ToDXGIFormat(format);
+    }
+}
+
+DXGI_FORMAT resolveSampledDepthSrvFormat(Format format)
+{
+    switch (format) {
+        case Format::D16_UNORM:
+            return DXGI_FORMAT_R16_UNORM;
+        case Format::D24_UNORM_S8_UINT:
+            return DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+        case Format::D32_FLOAT:
+            return DXGI_FORMAT_R32_FLOAT;
+        case Format::D32_FLOAT_S8_UINT:
+            return DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
+        default:
+            return D3D11_ToDXGIFormat(format);
+    }
+}
+
+DXGI_FORMAT resolveSrvFormat(const D3D11Texture& texture, const TextureViewDesc& desc)
+{
+    if (desc.FormatOverride != Format::UNDEFINED) {
+        return D3D11_ToDXGIFormat(desc.FormatOverride);
+    }
+
+    if (texture.IsDepthStencil() && (texture.GetUsage() & TextureUsageFlags::Sampled)) {
+        return resolveSampledDepthSrvFormat(texture.GetFormat());
+    }
+
+    return D3D11_ToDXGIFormat(texture.GetFormat());
+}
+
 } // namespace
 
 D3D11TextureView::D3D11TextureView(Ref<D3D11Texture> texture, Ref<D3D11Device> device, TextureViewDesc desc)
@@ -36,12 +81,13 @@ D3D11TextureView::D3D11TextureView(Ref<D3D11Texture> texture, Ref<D3D11Device> d
 
     auto* native_device = device->GetNativeDevice();
     const DXGI_FORMAT view_format = resolveViewFormat(*texture, m_desc);
+    const DXGI_FORMAT srv_format = resolveSrvFormat(*texture, m_desc);
     const UINT mip_count = static_cast<UINT>(resolveMipLevelCount(*texture, m_desc));
     const UINT array_layer_count = static_cast<UINT>(resolveArrayLayerCount(*texture, m_desc));
 
     if (texture->GetUsage() & TextureUsageFlags::Sampled) {
         D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
-        srv_desc.Format = view_format;
+        srv_desc.Format = srv_format;
         switch (m_desc.ViewType) {
             case TextureType::Texture2DArray:
                 srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
@@ -144,7 +190,9 @@ D3D11Texture::D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& cre
     desc.Height = m_height;
     desc.MipLevels = m_mipLevels;
     desc.ArraySize = m_arrayLayers;
-    desc.Format = D3D11_ToDXGIFormat(m_format);
+    const bool sampled_depth =
+        (m_usage & TextureUsageFlags::Sampled) && (m_usage & TextureUsageFlags::DepthStencilAttachment);
+    desc.Format = sampled_depth ? resolveSampledDepthResourceFormat(m_format) : D3D11_ToDXGIFormat(m_format);
     desc.SampleDesc.Count = static_cast<UINT>(m_sampleCount);
     desc.SampleDesc.Quality = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -246,13 +294,30 @@ void D3D11Texture::CreateViews()
     auto* dev = m_device->GetNativeDevice();
 
     if (m_usage & TextureUsageFlags::Sampled) {
-        dev->CreateShaderResourceView(m_texture.Get(), nullptr, &m_srv);
+        if (IsDepthStencil()) {
+            D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+            srv_desc.Format = resolveSampledDepthSrvFormat(m_format);
+            srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            srv_desc.Texture2D.MostDetailedMip = 0;
+            srv_desc.Texture2D.MipLevels = m_mipLevels;
+            dev->CreateShaderResourceView(m_texture.Get(), &srv_desc, &m_srv);
+        } else {
+            dev->CreateShaderResourceView(m_texture.Get(), nullptr, &m_srv);
+        }
     }
     if (m_usage & TextureUsageFlags::ColorAttachment) {
         dev->CreateRenderTargetView(m_texture.Get(), nullptr, &m_rtv);
     }
     if (m_usage & TextureUsageFlags::DepthStencilAttachment) {
-        dev->CreateDepthStencilView(m_texture.Get(), nullptr, &m_dsv);
+        if (m_usage & TextureUsageFlags::Sampled) {
+            D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+            dsv_desc.Format = D3D11_ToDXGIFormat(m_format);
+            dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+            dsv_desc.Texture2D.MipSlice = 0;
+            dev->CreateDepthStencilView(m_texture.Get(), &dsv_desc, &m_dsv);
+        } else {
+            dev->CreateDepthStencilView(m_texture.Get(), nullptr, &m_dsv);
+        }
     }
     if (m_usage & TextureUsageFlags::Storage) {
         dev->CreateUnorderedAccessView(m_texture.Get(), nullptr, &m_uav);

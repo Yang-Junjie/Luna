@@ -8,6 +8,7 @@
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/PassResources.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include <array>
 #include <optional>
@@ -19,6 +20,7 @@ class RenderWorld;
 
 namespace luna::RHI {
 class Buffer;
+class CommandBufferEncoder;
 class DescriptorPool;
 class DescriptorSet;
 class DescriptorSetLayout;
@@ -45,11 +47,16 @@ public:
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params);
-    void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
+    void updateLightingResources(luna::RHI::CommandBufferEncoder& commands,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture);
+                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& reflection,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
@@ -94,6 +101,10 @@ private:
         luna::RHI::Ref<luna::RHI::Texture> bound_prefiltered_environment_texture;
         luna::RHI::Ref<luna::RHI::Texture> bound_brdf_lut_texture;
         luna::RHI::Ref<luna::RHI::Texture> bound_shadow_map_texture;
+        renderer_detail::PendingTextureUpload default_ambient_occlusion_texture;
+        renderer_detail::PendingTextureUpload default_reflection_texture;
+        renderer_detail::PendingTextureUpload default_indirect_diffuse_texture;
+        renderer_detail::PendingTextureUpload default_indirect_specular_texture;
         bool scene_bindings_valid{false};
         bool shadow_bindings_valid{false};
 

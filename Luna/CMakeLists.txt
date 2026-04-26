@@ -30,13 +30,20 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
     Renderer/RenderFlow/RenderFeature.h
+    Renderer/RenderFlow/Features/FeatureProbe.h
+    Renderer/RenderFlow/Features/FeatureProbe.cpp
+    Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
+    Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.cpp
+    Renderer/RenderFlow/RenderBlackboardKeys.h
+    Renderer/RenderFlow/RenderSlots.h
+    Renderer/RenderFlow/RenderSlotPass.h
+    Renderer/RenderFlow/RenderSlotPass.cpp
     Renderer/RenderFlow/RenderPass.h
     Renderer/RenderFlow/RenderPass.cpp
     Renderer/RenderFlow/DefaultRenderFlow.h
     Renderer/RenderFlow/DefaultRenderFlow.cpp
     Renderer/RenderFlow/DefaultScene/Feature.h
     Renderer/RenderFlow/DefaultScene/Feature.cpp
-    Renderer/RenderFlow/DefaultScene/Blackboard.h
     Renderer/RenderFlow/DefaultScene/Constants.h
     Renderer/RenderFlow/DefaultScene/GpuTypes.h
     Renderer/RenderFlow/DefaultScene/PassResources.h
@@ -80,6 +87,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/EnvironmentIBL.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang
+    Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp

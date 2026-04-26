@@ -1,6 +1,38 @@
 Scene: SampleScene
 Entities:
   - IDComponent:
+      ID: 14702620125449447707
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-6.6599393, 0.16055065, -7.32053]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 15137094438280049332
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-7.2446747, 0.30549136, -6.7512374]
+      Rotation: [0, -0, 0]
+      Scale: [0.2671559, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
       ID: 1575925757346616929
     TagComponent:
       Tag: Plane
@@ -22,8 +54,8 @@ Entities:
       Tag: Directional Light
     TransformComponent:
       Translation: [-0.6801461, -0.61538255, 3.585527]
-      Rotation: [0.3885663, -0, 0]
-      Scale: [0.9999998, 0.9999993, 1]
+      Rotation: [0.4096293, 0.31345832, 0.13309059]
+      Scale: [1, 1, 1.0000001]
     RelationshipComponent:
       ParentHandle: 0
       Children:
@@ -41,9 +73,9 @@ Entities:
     TagComponent:
       Tag: Empty Entity
     TransformComponent:
-      Translation: [-2.7216005, -0.11617562, 0.07573263]
-      Rotation: [-2.0751965, 0, 0]
-      Scale: [1, 1, 1]
+      Translation: [-2.6970932, -0.023859411, 0.53117526]
+      Rotation: [-2.0751965, -1.363403e-06, -1.2069469e-06]
+      Scale: [1.000039, 0.99999964, 0.99999976]
     RelationshipComponent:
       ParentHandle: 6652629833754950424
       Children:
@@ -80,8 +112,8 @@ Entities:
       Tag: Empty Entity
     TransformComponent:
       Translation: [-0.98545384, -0.5444564, 0.1510384]
-      Rotation: [1.7775226, 0.5148769, -3.1415925]
-      Scale: [0.99999917, 1.0000002, 0.9999989]
+      Rotation: [1.756707, 0.2596222, 3.0869305]
+      Scale: [1.0000069, 0.99999845, 0.9999992]
     RelationshipComponent:
       ParentHandle: 0
       Children:
@@ -111,7 +143,7 @@ Entities:
     TagComponent:
       Tag: Cube
     TransformComponent:
-      Translation: [-3.0049448, 0.09377615, -0.15800995]
+      Translation: [-3.052795, 0.054605745, -0.15800995]
       Rotation: [0, -0, 0.68598604]
       Scale: [1, 1, 1]
     RelationshipComponent:

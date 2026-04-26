@@ -369,7 +369,8 @@ void Renderer::renderFrame()
                 .Width = extent.width,
                 .Height = extent.height,
                 .Format = luna::RHI::Format::D32_FLOAT,
-                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment,
+                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment |
+                         luna::RHI::TextureUsageFlags::Sampled,
                 .InitialState = luna::RHI::ResourceState::Undefined,
                 .SampleCount = luna::RHI::SampleCount::Count1,
             });
@@ -825,6 +826,17 @@ const RenderWorld& Renderer::getRenderWorld() const
     return m_render_world;
 }
 
+bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature)
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        LUNA_RENDERER_ERROR("Cannot add default render feature because the active render flow is not DefaultRenderFlow");
+        return false;
+    }
+
+    return default_render_flow->addFeature(std::move(feature));
+}
+
 bool Renderer::configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function)
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
@@ -1032,7 +1044,8 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
         m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
                                                    .SetSize(width, height)
                                                    .SetFormat(luna::RHI::Format::D32_FLOAT)
-                                                   .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment)
+                                                   .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment |
+                                                             luna::RHI::TextureUsageFlags::Sampled)
                                                    .SetInitialState(luna::RHI::ResourceState::Undefined)
                                                    .SetName("SceneOutputDepth")
                                                    .Build());

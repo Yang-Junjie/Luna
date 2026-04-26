@@ -18,6 +18,7 @@ class RenderWorld;
 }
 
 namespace luna::RHI {
+class CommandBufferEncoder;
 class DescriptorPool;
 class DescriptorSetLayout;
 class Device;
@@ -48,11 +49,16 @@ public:
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params);
-    void updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
+    void updateLightingResources(luna::RHI::CommandBufferEncoder& commands,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture);
+                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& reflection,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;

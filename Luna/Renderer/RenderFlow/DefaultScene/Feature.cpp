@@ -1,48 +1,59 @@
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
 
 #include "Core/Log.h"
-#include "Renderer/RenderFlow/DefaultScene/Blackboard.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h"
+#include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
+#include "Renderer/RenderFlow/RenderSlotPass.h"
+#include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
 #include <memory>
 #include <string>
-#include <string_view>
 
 namespace luna::render_flow::default_scene {
 namespace {
 
-namespace pass_names {
-inline constexpr std::string_view Geometry = "Geometry";
-inline constexpr std::string_view Environment = "Environment";
-inline constexpr std::string_view ShadowDepth = "ShadowDepth";
-inline constexpr std::string_view Lighting = "Lighting";
-inline constexpr std::string_view Transparent = "Transparent";
-} // namespace pass_names
-
 bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
 {
-    return builder.addPass(std::string(pass_names::Environment),
+    namespace pass_slots = luna::render_flow::slots::passes;
+    namespace extension_slots = luna::render_flow::slots::extension_points;
+
+    return builder.addPass(std::string(pass_slots::Environment),
                            std::make_unique<EnvironmentPass>(state)) &&
-           builder.insertPassAfter(pass_names::Environment,
-                                   std::string(pass_names::ShadowDepth),
+           builder.insertPassAfter(pass_slots::Environment,
+                                   std::string(pass_slots::ShadowDepth),
                                    std::make_unique<ShadowDepthPass>(state)) &&
-           builder.insertPassAfter(pass_names::ShadowDepth,
-                                   std::string(pass_names::Geometry),
+           builder.insertPassAfter(pass_slots::ShadowDepth,
+                                   std::string(pass_slots::GBuffer),
                                    std::make_unique<GeometryPass>(state)) &&
-           builder.insertPassAfter(pass_names::Geometry,
-                                   std::string(pass_names::Lighting),
+           builder.insertPassAfter(pass_slots::GBuffer,
+                                   std::string(extension_slots::AfterGBuffer),
+                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterGBuffer))) &&
+           builder.insertPassAfter(extension_slots::AfterGBuffer,
+                                   std::string(extension_slots::BeforeLighting),
+                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeLighting))) &&
+           builder.insertPassAfter(extension_slots::BeforeLighting,
+                                   std::string(pass_slots::Lighting),
                                    std::make_unique<LightingPass>(state)) &&
-           builder.insertPassAfter(pass_names::Lighting,
-                                   std::string(pass_names::Transparent),
-                                   std::make_unique<TransparentPass>(state));
+           builder.insertPassAfter(pass_slots::Lighting,
+                                   std::string(extension_slots::AfterLighting),
+                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterLighting))) &&
+           builder.insertPassAfter(extension_slots::AfterLighting,
+                                   std::string(extension_slots::BeforeTransparent),
+                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeTransparent))) &&
+           builder.insertPassAfter(extension_slots::BeforeTransparent,
+                                   std::string(pass_slots::Transparent),
+                                   std::make_unique<TransparentPass>(state)) &&
+           builder.insertPassAfter(pass_slots::Transparent,
+                                   std::string(extension_slots::AfterTransparent),
+                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterTransparent)));
 }
 
 AssetCache::ClearMode toClearMode(PipelineResources::Invalidation invalidation)
@@ -76,7 +87,7 @@ void Feature::prepareFrame(const RenderWorld& world,
                            const SceneRenderContext& scene_context,
                            RenderPassBlackboard& blackboard)
 {
-    namespace blackboard_names = luna::render_flow::default_scene::blackboard;
+    namespace blackboard_names = luna::render_flow::blackboard;
 
     prepareResources(scene_context);
 

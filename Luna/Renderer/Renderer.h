@@ -40,6 +40,10 @@ namespace luna {
 class RenderGraph;
 } // namespace luna
 
+namespace luna::render_flow {
+class IRenderFeature;
+} // namespace luna::render_flow
+
 namespace luna {
 class IRenderFlow;
 class Window;
@@ -118,6 +122,7 @@ public:
 
     RenderWorld& getRenderWorld();
     const RenderWorld& getRenderWorld() const;
+    bool addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
     bool configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function);
 
     glm::vec4& getClearColor();

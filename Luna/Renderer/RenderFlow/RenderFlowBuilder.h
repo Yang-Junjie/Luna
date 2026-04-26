@@ -33,6 +33,11 @@ public:
     bool addDependency(std::string_view before_name, std::string_view after_name);
     bool insertPassBefore(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
     bool insertPassAfter(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
+    bool insertPassBetween(std::string_view after_name,
+                           std::string_view before_name,
+                           std::string name,
+                           std::unique_ptr<IRenderPass> pass,
+                           int32_t priority = 0);
     bool replacePass(std::string_view name, std::unique_ptr<IRenderPass> pass);
     bool removePass(std::string_view name);
     void clear() noexcept;

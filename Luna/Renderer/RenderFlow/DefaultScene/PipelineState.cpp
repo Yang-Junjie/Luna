@@ -2,11 +2,13 @@
 
 #include "Core/Log.h"
 #include "Math/Math.h"
+#include "Renderer/Image/ImageDataUtils.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include <Builders.h>
 #include <DescriptorPool.h>
@@ -23,6 +25,7 @@
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace luna::render_flow::default_scene {
@@ -65,6 +68,10 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
             .AddBinding(3, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(4, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(5, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(6, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(7, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(8, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(9, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 }
 
@@ -150,6 +157,27 @@ luna::RHI::Ref<luna::RHI::Sampler> createShadowSampler(const luna::RHI::Ref<luna
                                      .SetAnisotropy(false)
                                      .SetName("SceneShadowMapSampler")
                                      .Build());
+}
+
+renderer_detail::PendingTextureUpload
+    createDefaultLightingInputTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                      const glm::vec4& value,
+                                      std::string_view name)
+{
+    luna::Texture::SamplerSettings sampler_settings;
+    sampler_settings.MipFilter = luna::Texture::MipFilterMode::None;
+    sampler_settings.WrapU = luna::Texture::WrapMode::ClampToEdge;
+    sampler_settings.WrapV = luna::Texture::WrapMode::ClampToEdge;
+    sampler_settings.WrapW = luna::Texture::WrapMode::ClampToEdge;
+    return renderer_detail::createTextureUpload(
+        device, renderer_detail::createFallbackColorImageData(value), sampler_settings, name);
+}
+
+const luna::RHI::Ref<luna::RHI::Texture>&
+    textureOrFallback(const luna::RHI::Ref<luna::RHI::Texture>& texture,
+                      const renderer_detail::PendingTextureUpload& fallback)
+{
+    return texture ? texture : fallback.texture;
 }
 
 glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
@@ -383,6 +411,14 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     m_state.gbuffer_sampler = createGBufferSampler(m_state.device);
     m_state.environment_source_sampler = createEnvironmentSampler(m_state.device);
     m_state.shadow_sampler = createShadowSampler(m_state.device);
+    m_state.default_ambient_occlusion_texture =
+        createDefaultLightingInputTexture(m_state.device, glm::vec4(1.0f), "DefaultAmbientOcclusion");
+    m_state.default_reflection_texture =
+        createDefaultLightingInputTexture(m_state.device, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), "DefaultReflection");
+    m_state.default_indirect_diffuse_texture =
+        createDefaultLightingInputTexture(m_state.device, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), "DefaultIndirectDiffuse");
+    m_state.default_indirect_specular_texture =
+        createDefaultLightingInputTexture(m_state.device, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), "DefaultIndirectSpecular");
 
     if (m_state.descriptor_pool && m_state.gbuffer_layout) {
         m_state.gbuffer_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.gbuffer_layout);
@@ -603,22 +639,45 @@ void PipelineState::updateSceneParameters(const SceneRenderContext& context,
                                m_state.scene_params_buffer);
 }
 
-void PipelineState::updateLightingResources(const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-                                              const luna::RHI::Ref<luna::RHI::Texture>& pick_texture)
+void PipelineState::updateLightingResources(luna::RHI::CommandBufferEncoder& commands,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& reflection,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular)
 {
+    renderer_detail::uploadTextureIfNeeded(commands, m_state.default_ambient_occlusion_texture);
+    renderer_detail::uploadTextureIfNeeded(commands, m_state.default_reflection_texture);
+    renderer_detail::uploadTextureIfNeeded(commands, m_state.default_indirect_diffuse_texture);
+    renderer_detail::uploadTextureIfNeeded(commands, m_state.default_indirect_specular_texture);
+
+    const auto& ambient_occlusion_texture =
+        textureOrFallback(ambient_occlusion, m_state.default_ambient_occlusion_texture);
+    const auto& reflection_texture = textureOrFallback(reflection, m_state.default_reflection_texture);
+    const auto& indirect_diffuse_texture =
+        textureOrFallback(indirect_diffuse, m_state.default_indirect_diffuse_texture);
+    const auto& indirect_specular_texture =
+        textureOrFallback(indirect_specular, m_state.default_indirect_specular_texture);
+
     if (!m_state.gbuffer_descriptor_set || !m_state.gbuffer_sampler || !gbuffer_base_color || !gbuffer_normal_metallic ||
-        !gbuffer_world_position_roughness || !gbuffer_emissive_ao || !pick_texture) {
-        LUNA_RENDERER_WARN("Cannot update lighting resources: gbuffer_descriptor_set={} gbuffer_sampler={} base={} normal={} position={} emissive={} pick={}",
+        !gbuffer_world_position_roughness || !gbuffer_emissive_ao || !pick_texture ||
+        !ambient_occlusion_texture || !reflection_texture || !indirect_diffuse_texture || !indirect_specular_texture) {
+        LUNA_RENDERER_WARN("Cannot update lighting resources: gbuffer_descriptor_set={} gbuffer_sampler={} base={} normal={} position={} emissive={} pick={} ao={} reflection={} indirect_diffuse={} indirect_specular={}",
                            static_cast<bool>(m_state.gbuffer_descriptor_set),
                            static_cast<bool>(m_state.gbuffer_sampler),
                            static_cast<bool>(gbuffer_base_color),
                            static_cast<bool>(gbuffer_normal_metallic),
                            static_cast<bool>(gbuffer_world_position_roughness),
                            static_cast<bool>(gbuffer_emissive_ao),
-                           static_cast<bool>(pick_texture));
+                           static_cast<bool>(pick_texture),
+                           static_cast<bool>(ambient_occlusion_texture),
+                           static_cast<bool>(reflection_texture),
+                           static_cast<bool>(indirect_diffuse_texture),
+                           static_cast<bool>(indirect_specular_texture));
         return;
     }
 
@@ -653,6 +712,30 @@ void PipelineState::updateLightingResources(const luna::RHI::Ref<luna::RHI::Text
     m_state.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 5,
         .TextureView = pick_texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 6,
+        .TextureView = ambient_occlusion_texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 7,
+        .TextureView = reflection_texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 8,
+        .TextureView = indirect_diffuse_texture->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.gbuffer_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = 9,
+        .TextureView = indirect_specular_texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });

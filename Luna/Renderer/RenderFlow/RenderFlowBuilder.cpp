@@ -295,6 +295,34 @@ bool RenderFlowBuilder::insertPassAfter(std::string_view anchor_name,
     return true;
 }
 
+bool RenderFlowBuilder::insertPassBetween(std::string_view after_name,
+                                          std::string_view before_name,
+                                          std::string name,
+                                          std::unique_ptr<IRenderPass> pass,
+                                          int32_t priority)
+{
+    clearError();
+    if (!contains(after_name)) {
+        setError("RenderFlow after-anchor pass '" + std::string(after_name) + "' does not exist");
+        return false;
+    }
+    if (!contains(before_name)) {
+        setError("RenderFlow before-anchor pass '" + std::string(before_name) + "' does not exist");
+        return false;
+    }
+
+    const std::string inserted_name = name;
+    if (!addPass(name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(after_name, inserted_name) || !addDependency(inserted_name, before_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
+}
+
 bool RenderFlowBuilder::replacePass(std::string_view name, std::unique_ptr<IRenderPass> pass)
 {
     clearError();
