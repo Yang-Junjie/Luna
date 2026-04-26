@@ -100,11 +100,14 @@ public:
 
         if (needs_rebuild) {
             m_pipelines.rebuild(context, resolveShaderPaths());
-            m_environment.ensure(context.device);
-            if (m_environment.sourceTexture().texture) {
+            m_environment.ensure(context);
+            if (m_environment.sourceTexture().texture && m_environment.prefilteredTexture() &&
+                m_environment.brdfLutTexture()) {
                 // Scene descriptors are bound during the geometry pass, so only rewrite them
                 // when the pipeline state has been rebuilt.
-                m_pipelines.updateSceneBindings(m_environment.sourceTexture().texture);
+                m_pipelines.updateSceneBindings(m_environment.sourceTexture().texture,
+                                                m_environment.prefilteredTexture(),
+                                                m_environment.brdfLutTexture());
             }
         }
     }
@@ -116,18 +119,24 @@ public:
         m_assets.prepareDraws(commands, draw_commands, default_material, makeBindings());
     }
 
-    void uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
+    void prepareEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands, const RenderContext& context)
     {
+        m_environment.ensure(context);
         m_environment.uploadIfNeeded(commands);
+        m_environment.precomputeIfNeeded(commands);
+        if (m_environment.sourceTexture().texture && m_environment.prefilteredTexture() &&
+            m_environment.brdfLutTexture()) {
+            m_pipelines.updateSceneBindings(m_environment.sourceTexture().texture,
+                                            m_environment.prefilteredTexture(),
+                                            m_environment.brdfLutTexture());
+        }
     }
 
     void updateSceneParameters(const RenderContext& context,
                                const RenderWorld& world,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params)
     {
-        const float environment_mip_count = static_cast<float>(m_environment.sourceTexture().texture
-                                                                   ? m_environment.sourceTexture().texture->GetMipLevels()
-                                                                   : 1);
+        const float environment_mip_count = m_environment.prefilteredMaxMipLevel();
         m_pipelines.updateSceneParameters(
             context, world, environment_mip_count, m_environment.irradianceSH(), shadow_params);
     }
@@ -185,6 +194,11 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& sceneDescriptorSet() const
     {
         return m_pipelines.sceneDescriptorSet();
+    }
+
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& lightingSceneDescriptorSet() const
+    {
+        return m_pipelines.lightingSceneDescriptorSet();
     }
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& gbufferDescriptorSet() const
@@ -270,9 +284,10 @@ void ResourceManager::prepareDraws(luna::RHI::CommandBufferEncoder& commands,
     m_impl->prepareDraws(commands, draw_commands, default_material);
 }
 
-void ResourceManager::uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands)
+void ResourceManager::prepareEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands,
+                                                 const SceneRenderContext& context)
 {
-    m_impl->uploadEnvironmentIfNeeded(commands);
+    m_impl->prepareEnvironmentIfNeeded(commands, context);
 }
 
 void ResourceManager::updateSceneParameters(
@@ -327,6 +342,11 @@ const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& ResourceManager::transparentP
 const luna::RHI::Ref<luna::RHI::DescriptorSet>& ResourceManager::sceneDescriptorSet() const
 {
     return m_impl->sceneDescriptorSet();
+}
+
+const luna::RHI::Ref<luna::RHI::DescriptorSet>& ResourceManager::lightingSceneDescriptorSet() const
+{
+    return m_impl->lightingSceneDescriptorSet();
 }
 
 const luna::RHI::Ref<luna::RHI::DescriptorSet>& ResourceManager::gbufferDescriptorSet() const

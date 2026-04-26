@@ -25,6 +25,7 @@ class GraphicsPipeline;
 class PipelineLayout;
 class Sampler;
 class ShaderModule;
+class Texture;
 } // namespace luna::RHI
 
 namespace luna::render_flow::default_scene {
@@ -34,7 +35,9 @@ public:
     void shutdown();
     [[nodiscard]] bool hasCompleteState(const SceneRenderContext& context) const noexcept;
     void rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths);
-    void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture);
+    void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
+                             const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
+                             const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture);
     void updateSceneParameters(const SceneRenderContext& context,
                                const RenderWorld& world,
                                float environment_mip_count,
@@ -55,6 +58,7 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& lightingPipeline() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& transparentPipeline() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& sceneDescriptorSet() const noexcept;
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& lightingSceneDescriptorSet() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& gbufferDescriptorSet() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Sampler>& gbufferSampler() const noexcept;
 
@@ -85,7 +89,15 @@ private:
 
         luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
         luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
+        luna::RHI::Ref<luna::RHI::DescriptorSet> lighting_scene_descriptor_set;
         luna::RHI::Ref<luna::RHI::Buffer> scene_params_buffer;
+
+        luna::RHI::Ref<luna::RHI::Texture> bound_environment_texture;
+        luna::RHI::Ref<luna::RHI::Texture> bound_prefiltered_environment_texture;
+        luna::RHI::Ref<luna::RHI::Texture> bound_brdf_lut_texture;
+        luna::RHI::Ref<luna::RHI::Texture> bound_shadow_map_texture;
+        bool scene_bindings_valid{false};
+        bool shadow_bindings_valid{false};
 
         luna::RHI::Ref<luna::RHI::ShaderModule> geometry_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> shadow_vertex_shader;

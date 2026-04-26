@@ -65,7 +65,7 @@ public:
                           uint64_t offset,
                           uint64_t size) override;
 
-    void MemoryBarrierFast(MemoryTransition transition) override {}
+    void MemoryBarrierFast(MemoryTransition transition) override;
 
     void ExecuteNative(const std::function<void(void* nativeCommandBuffer)>& func) override;
     void* GetNativeHandle() override;

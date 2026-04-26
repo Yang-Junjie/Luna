@@ -148,6 +148,12 @@ Texture2D<float4> gEnvironmentTexture : register(t12);
 [[vk::binding(2, 1)]]
 SamplerState gEnvironmentSampler : register(s13);
 
+[[vk::binding(5, 1)]]
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t16);
+
+[[vk::binding(6, 1)]]
+Texture2D<float4> gEnvironmentBrdfLut : register(t17);
+
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
     const float lengthSq = dot(value, value);
@@ -233,12 +239,15 @@ float3 sampleEnvironmentIrradiance(float3 direction)
 
 float3 sampleEnvironmentPrefilter(float3 direction, float lod)
 {
-    return sampleEnvironment(direction, lod);
+    return gEnvironmentPrefilterTexture.SampleLevel(gEnvironmentSampler,
+                                                    safeNormalize(direction, float3(0.0, 1.0, 0.0)),
+                                                    lod)
+        .rgb;
 }
 
 float2 sampleEnvironmentBrdf(float roughness, float NdotV)
 {
-    return envBrdfApprox(roughness, NdotV);
+    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, float2(NdotV, roughness), 0.0).rg;
 }
 
 float distributionGGX(float3 N, float3 H, float roughness)

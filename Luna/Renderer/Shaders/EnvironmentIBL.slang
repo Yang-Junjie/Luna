@@ -8,11 +8,25 @@ struct IblDispatchParams
     uint reserved;
 };
 
+#if defined(LUNA_BACKEND_D3D11)
+[[vk::push_constant]]
+cbuffer PushConstants : register(b13)
+{
+    IblDispatchParams gDispatchParams;
+}
+#elif defined(LUNA_BACKEND_D3D12)
+[[vk::push_constant]]
+cbuffer PushConstants : register(b15)
+{
+    IblDispatchParams gDispatchParams;
+}
+#else
 [[vk::push_constant]]
 cbuffer PushConstants
 {
     IblDispatchParams gDispatchParams;
 }
+#endif
 
 [[vk::binding(0, 0)]]
 Texture2D<float4> gEnvironmentEquirectTexture : register(t0);

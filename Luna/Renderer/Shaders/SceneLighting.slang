@@ -64,6 +64,12 @@ Texture2D<float> gShadowMap : register(t9);
 [[vk::binding(4, 1)]]
 SamplerState gShadowSampler : register(s10);
 
+[[vk::binding(5, 1)]]
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t11);
+
+[[vk::binding(6, 1)]]
+Texture2D<float4> gEnvironmentBrdfLut : register(t12);
+
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
     const float lengthSq = dot(value, value);
@@ -203,12 +209,15 @@ float3 sampleEnvironmentIrradiance(float3 direction)
 
 float3 sampleEnvironmentPrefilter(float3 direction, float lod)
 {
-    return sampleEnvironment(direction, lod);
+    return gEnvironmentPrefilterTexture.SampleLevel(gEnvironmentSampler,
+                                                    safeNormalize(direction, float3(0.0, 1.0, 0.0)),
+                                                    lod)
+        .rgb;
 }
 
 float2 sampleEnvironmentBrdf(float roughness, float NdotV)
 {
-    return envBrdfApprox(roughness, NdotV);
+    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, float2(NdotV, roughness), 0.0).rg;
 }
 
 float2 shadowUvFromClip(float2 clipXY)

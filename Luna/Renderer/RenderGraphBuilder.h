@@ -23,6 +23,10 @@ struct RenderGraphTextureReadDesc {
     RenderGraphTextureHandle Handle{};
 };
 
+struct RenderGraphTextureWriteDesc {
+    RenderGraphTextureHandle Handle{};
+};
+
 struct RenderGraphColorAttachmentDesc {
     RenderGraphTextureHandle Handle{};
     luna::RHI::AttachmentLoadOp LoadOp{luna::RHI::AttachmentLoadOp::Clear};
@@ -44,6 +48,19 @@ struct RenderGraphRasterPassNode {
     std::optional<RenderGraphDepthAttachmentDesc> DepthAttachment;
     std::function<void(RenderGraphRasterPassContext&)> Execute;
     bool SideEffect{false};
+};
+
+struct RenderGraphComputePassNode {
+    std::string Name;
+    std::vector<RenderGraphTextureReadDesc> Reads;
+    std::vector<RenderGraphTextureWriteDesc> Writes;
+    std::function<void(RenderGraphComputePassContext&)> Execute;
+    bool SideEffect{false};
+};
+
+struct RenderGraphPassOrderEntry {
+    RenderGraphPassType Type{RenderGraphPassType::Raster};
+    size_t Index{0};
 };
 
 } // namespace luna::detail
@@ -90,11 +107,26 @@ private:
     detail::RenderGraphRasterPassNode* m_pass_node{nullptr};
 };
 
+class RenderGraphComputePassBuilder {
+public:
+    RenderGraphComputePassBuilder& ReadTexture(RenderGraphTextureHandle handle);
+    RenderGraphComputePassBuilder& WriteTexture(RenderGraphTextureHandle handle);
+
+private:
+    friend class RenderGraphBuilder;
+
+    explicit RenderGraphComputePassBuilder(detail::RenderGraphComputePassNode* pass_node);
+
+    detail::RenderGraphComputePassNode* m_pass_node{nullptr};
+};
+
 class RenderGraphBuilder {
 public:
     using FrameContext = RenderGraph::FrameContext;
     using RasterPassSetupCallback = std::function<void(RenderGraphRasterPassBuilder&)>;
     using RasterPassExecuteCallback = std::function<void(RenderGraphRasterPassContext&)>;
+    using ComputePassSetupCallback = std::function<void(RenderGraphComputePassBuilder&)>;
+    using ComputePassExecuteCallback = std::function<void(RenderGraphComputePassContext&)>;
 
     explicit RenderGraphBuilder(FrameContext frame_context,
                                 RenderGraphTransientTextureCache* transient_texture_cache = nullptr);
@@ -109,6 +141,10 @@ public:
                                       RasterPassSetupCallback setup,
                                       RasterPassExecuteCallback execute,
                                       bool side_effect = false);
+    RenderGraphBuilder& AddComputePass(const std::string& name,
+                                       ComputePassSetupCallback setup,
+                                       ComputePassExecuteCallback execute,
+                                       bool side_effect = false);
 
     std::unique_ptr<RenderGraph> Build();
 
@@ -120,6 +156,8 @@ private:
     RenderGraphTransientTextureCache* m_transient_texture_cache{nullptr};
     std::vector<detail::RenderGraphTextureNode> m_texture_nodes;
     std::vector<detail::RenderGraphRasterPassNode> m_raster_pass_nodes;
+    std::vector<detail::RenderGraphComputePassNode> m_compute_pass_nodes;
+    std::vector<detail::RenderGraphPassOrderEntry> m_pass_order;
 };
 
 } // namespace luna

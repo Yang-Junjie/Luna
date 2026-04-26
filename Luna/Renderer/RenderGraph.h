@@ -24,6 +24,7 @@ namespace luna {
 
 enum class RenderGraphPassType : uint8_t {
     Raster,
+    Compute,
 };
 
 struct RenderGraphTextureHandle {
@@ -42,8 +43,12 @@ struct RenderGraphTextureHandle {
 
 struct RenderGraphTextureDesc {
     std::string Name;
+    luna::RHI::TextureType Type{luna::RHI::TextureType::Texture2D};
     uint32_t Width{1};
     uint32_t Height{1};
+    uint32_t Depth{1};
+    uint32_t ArrayLayers{1};
+    uint32_t MipLevels{1};
     luna::RHI::Format Format{luna::RHI::Format::UNDEFINED};
     luna::RHI::TextureUsageFlags Usage{luna::RHI::TextureUsageFlags::None};
     luna::RHI::ResourceState InitialState{luna::RHI::ResourceState::Undefined};
@@ -97,19 +102,31 @@ private:
     const luna::RHI::RenderingInfo* m_rendering_info{nullptr};
 };
 
-struct RenderGraphCompiledRasterPass {
+class RenderGraphComputePassContext final : public RenderGraphPassContext {
+private:
+    friend class RenderGraph;
+
+    RenderGraphComputePassContext(luna::RHI::Ref<luna::RHI::Device> device,
+                                  luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer,
+                                  const std::vector<luna::RHI::Ref<luna::RHI::Texture>>* textures,
+                                  uint32_t framebuffer_width,
+                                  uint32_t framebuffer_height);
+};
+
+struct RenderGraphCompiledPass {
     RenderGraphPass Pass;
     std::vector<luna::RHI::TextureBarrier> PreTextureBarriers;
     luna::RHI::RenderingInfo RenderingInfo;
     uint32_t FramebufferWidth{0};
     uint32_t FramebufferHeight{0};
-    std::function<void(RenderGraphRasterPassContext&)> Execute;
+    std::function<void(RenderGraphRasterPassContext&)> ExecuteRaster;
+    std::function<void(RenderGraphComputePassContext&)> ExecuteCompute;
 };
 
 class RenderGraph {
 public:
     using PassList = std::vector<RenderGraphPass>;
-    using CompiledRasterPassList = std::vector<RenderGraphCompiledRasterPass>;
+    using CompiledPassList = std::vector<RenderGraphCompiledPass>;
 
     struct FrameContext {
         luna::RHI::Ref<luna::RHI::Device> device;
@@ -122,7 +139,7 @@ public:
     RenderGraph(FrameContext frame_context,
                 PassList passes,
                 std::vector<luna::RHI::Ref<luna::RHI::Texture>> textures,
-                CompiledRasterPassList raster_passes,
+                CompiledPassList compiled_passes,
                 std::vector<luna::RHI::TextureBarrier> final_texture_barriers);
 
     void execute() const;
@@ -139,7 +156,7 @@ private:
     FrameContext m_frame_context;
     PassList m_passes;
     std::vector<luna::RHI::Ref<luna::RHI::Texture>> m_textures;
-    CompiledRasterPassList m_raster_passes;
+    CompiledPassList m_compiled_passes;
     std::vector<luna::RHI::TextureBarrier> m_final_texture_barriers;
 };
 

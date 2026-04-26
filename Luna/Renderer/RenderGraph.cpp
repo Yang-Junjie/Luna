@@ -88,15 +88,25 @@ void RenderGraphRasterPassContext::endRendering()
     }
 }
 
+RenderGraphComputePassContext::RenderGraphComputePassContext(
+    luna::RHI::Ref<luna::RHI::Device> device,
+    luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer,
+    const std::vector<luna::RHI::Ref<luna::RHI::Texture>>* textures,
+    uint32_t framebuffer_width,
+    uint32_t framebuffer_height)
+    : RenderGraphPassContext(
+          std::move(device), std::move(command_buffer), textures, framebuffer_width, framebuffer_height)
+{}
+
 RenderGraph::RenderGraph(FrameContext frame_context,
                          PassList passes,
                          std::vector<luna::RHI::Ref<luna::RHI::Texture>> textures,
-                         CompiledRasterPassList raster_passes,
+                         CompiledPassList compiled_passes,
                          std::vector<luna::RHI::TextureBarrier> final_texture_barriers)
     : m_frame_context(std::move(frame_context)),
       m_passes(std::move(passes)),
       m_textures(std::move(textures)),
-      m_raster_passes(std::move(raster_passes)),
+      m_compiled_passes(std::move(compiled_passes)),
       m_final_texture_barriers(std::move(final_texture_barriers))
 {}
 
@@ -107,12 +117,20 @@ void RenderGraph::execute() const
         return;
     }
 
-    LUNA_RENDERER_FRAME_DEBUG("Executing render graph with {} raster pass(es), {} texture(s), {} final barrier(s)",
-                              m_raster_passes.size(),
+    const size_t raster_pass_count =
+        static_cast<size_t>(std::count_if(m_compiled_passes.begin(), m_compiled_passes.end(), [](const auto& pass) {
+            return pass.Pass.Type == RenderGraphPassType::Raster;
+        }));
+    const size_t compute_pass_count = m_compiled_passes.size() - raster_pass_count;
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Executing render graph with {} pass(es) (raster={}, compute={}), {} texture(s), {} final barrier(s)",
+                              m_compiled_passes.size(),
+                              raster_pass_count,
+                              compute_pass_count,
                               m_textures.size(),
                               m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
-    for (const auto& pass : m_raster_passes) {
+    for (const auto& pass : m_compiled_passes) {
         if (!pass.PreTextureBarriers.empty()) {
             LUNA_RENDERER_FRAME_TRACE("Render graph pass '{}' applying {} pre-texture barrier(s)",
                                       pass.Pass.Name,
@@ -121,22 +139,37 @@ void RenderGraph::execute() const
                 luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, pass.PreTextureBarriers);
         }
 
-        LUNA_RENDERER_FRAME_TRACE("Executing render graph pass '{}' ({}x{}, color_attachments={}, has_depth={})",
-                                  pass.Pass.Name,
-                                  pass.FramebufferWidth,
-                                  pass.FramebufferHeight,
-                                  pass.RenderingInfo.ColorAttachments.size(),
-                                  static_cast<bool>(pass.RenderingInfo.DepthAttachment));
+        if (pass.Pass.Type == RenderGraphPassType::Raster) {
+            LUNA_RENDERER_FRAME_TRACE("Executing raster render graph pass '{}' ({}x{}, color_attachments={}, has_depth={})",
+                                      pass.Pass.Name,
+                                      pass.FramebufferWidth,
+                                      pass.FramebufferHeight,
+                                      pass.RenderingInfo.ColorAttachments.size(),
+                                      static_cast<bool>(pass.RenderingInfo.DepthAttachment));
+        } else {
+            LUNA_RENDERER_FRAME_TRACE("Executing compute render graph pass '{}'", pass.Pass.Name);
+        }
         command_buffer.BeginDebugLabel(pass.Pass.Name, 0.20f, 0.55f, 0.85f, 1.0f);
 
-        RenderGraphRasterPassContext pass_context(m_frame_context.device,
-                                                  m_frame_context.command_buffer,
-                                                  &m_textures,
-                                                  pass.FramebufferWidth,
-                                                  pass.FramebufferHeight,
-                                                  &pass.RenderingInfo);
-        if (pass.Execute) {
-            pass.Execute(pass_context);
+        if (pass.Pass.Type == RenderGraphPassType::Raster) {
+            RenderGraphRasterPassContext pass_context(m_frame_context.device,
+                                                      m_frame_context.command_buffer,
+                                                      &m_textures,
+                                                      pass.FramebufferWidth,
+                                                      pass.FramebufferHeight,
+                                                      &pass.RenderingInfo);
+            if (pass.ExecuteRaster) {
+                pass.ExecuteRaster(pass_context);
+            }
+        } else {
+            RenderGraphComputePassContext pass_context(m_frame_context.device,
+                                                       m_frame_context.command_buffer,
+                                                       &m_textures,
+                                                       m_frame_context.framebuffer_width,
+                                                       m_frame_context.framebuffer_height);
+            if (pass.ExecuteCompute) {
+                pass.ExecuteCompute(pass_context);
+            }
         }
 
         command_buffer.EndDebugLabel();

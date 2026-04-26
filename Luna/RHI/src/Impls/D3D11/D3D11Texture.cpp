@@ -1,19 +1,124 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Texture.h"
 
+#include <algorithm>
+
 namespace luna::RHI {
-D3D11TextureView::D3D11TextureView(Ref<D3D11Texture> texture, TextureViewDesc desc)
+namespace {
+
+uint32_t resolveMipLevelCount(const D3D11Texture& texture, const TextureViewDesc& desc)
+{
+    const uint32_t available = texture.GetMipLevels() > desc.BaseMipLevel ? texture.GetMipLevels() - desc.BaseMipLevel : 1u;
+    return desc.MipLevelCount == 0 ? available : std::min(desc.MipLevelCount, available);
+}
+
+uint32_t resolveArrayLayerCount(const D3D11Texture& texture, const TextureViewDesc& desc)
+{
+    const uint32_t available =
+        texture.GetArrayLayers() > desc.BaseArrayLayer ? texture.GetArrayLayers() - desc.BaseArrayLayer : 1u;
+    return desc.ArrayLayerCount == 0 ? available : std::min(desc.ArrayLayerCount, available);
+}
+
+DXGI_FORMAT resolveViewFormat(const D3D11Texture& texture, const TextureViewDesc& desc)
+{
+    return D3D11_ToDXGIFormat(desc.FormatOverride != Format::UNDEFINED ? desc.FormatOverride : texture.GetFormat());
+}
+
+} // namespace
+
+D3D11TextureView::D3D11TextureView(Ref<D3D11Texture> texture, Ref<D3D11Device> device, TextureViewDesc desc)
     : m_texture(texture),
       m_desc(std::move(desc))
 {
-    if (!texture) {
+    if (!texture || !device || !device->GetNativeDevice()) {
         return;
     }
 
-    m_srv = texture->GetSRV();
-    m_rtv = texture->GetRTV();
-    m_dsv = texture->GetDSV();
-    m_uav = texture->GetUAV();
+    auto* native_device = device->GetNativeDevice();
+    const DXGI_FORMAT view_format = resolveViewFormat(*texture, m_desc);
+    const UINT mip_count = static_cast<UINT>(resolveMipLevelCount(*texture, m_desc));
+    const UINT array_layer_count = static_cast<UINT>(resolveArrayLayerCount(*texture, m_desc));
+
+    if (texture->GetUsage() & TextureUsageFlags::Sampled) {
+        D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+        srv_desc.Format = view_format;
+        switch (m_desc.ViewType) {
+            case TextureType::Texture2DArray:
+                srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+                srv_desc.Texture2DArray.MostDetailedMip = m_desc.BaseMipLevel;
+                srv_desc.Texture2DArray.MipLevels = mip_count;
+                srv_desc.Texture2DArray.FirstArraySlice = m_desc.BaseArrayLayer;
+                srv_desc.Texture2DArray.ArraySize = array_layer_count;
+                break;
+            case TextureType::TextureCube:
+                srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+                srv_desc.TextureCube.MostDetailedMip = m_desc.BaseMipLevel;
+                srv_desc.TextureCube.MipLevels = mip_count;
+                break;
+            case TextureType::TextureCubeArray:
+                srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+                srv_desc.TextureCubeArray.MostDetailedMip = m_desc.BaseMipLevel;
+                srv_desc.TextureCubeArray.MipLevels = mip_count;
+                srv_desc.TextureCubeArray.First2DArrayFace = m_desc.BaseArrayLayer;
+                srv_desc.TextureCubeArray.NumCubes = std::max<UINT>(array_layer_count / 6u, 1u);
+                break;
+            case TextureType::Texture2D:
+            default:
+                srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+                srv_desc.Texture2D.MostDetailedMip = m_desc.BaseMipLevel;
+                srv_desc.Texture2D.MipLevels = mip_count;
+                break;
+        }
+        native_device->CreateShaderResourceView(texture->GetNativeTexture(), &srv_desc, &m_srv);
+    }
+
+    if (!texture->IsDepthStencil() && (texture->GetUsage() & TextureUsageFlags::ColorAttachment)) {
+        D3D11_RENDER_TARGET_VIEW_DESC rtv_desc{};
+        rtv_desc.Format = view_format;
+        if (m_desc.ViewType == TextureType::Texture2DArray || m_desc.ViewType == TextureType::TextureCube ||
+            m_desc.ViewType == TextureType::TextureCubeArray) {
+            rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+            rtv_desc.Texture2DArray.MipSlice = m_desc.BaseMipLevel;
+            rtv_desc.Texture2DArray.FirstArraySlice = m_desc.BaseArrayLayer;
+            rtv_desc.Texture2DArray.ArraySize = array_layer_count;
+        } else {
+            rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            rtv_desc.Texture2D.MipSlice = m_desc.BaseMipLevel;
+        }
+        native_device->CreateRenderTargetView(texture->GetNativeTexture(), &rtv_desc, &m_rtv);
+    }
+
+    if (texture->IsDepthStencil() && (texture->GetUsage() & TextureUsageFlags::DepthStencilAttachment)) {
+        D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+        dsv_desc.Format = D3D11_ToDXGIFormat(texture->GetFormat());
+        if (m_desc.ViewType == TextureType::Texture2DArray || m_desc.ViewType == TextureType::TextureCube ||
+            m_desc.ViewType == TextureType::TextureCubeArray) {
+            dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+            dsv_desc.Texture2DArray.MipSlice = m_desc.BaseMipLevel;
+            dsv_desc.Texture2DArray.FirstArraySlice = m_desc.BaseArrayLayer;
+            dsv_desc.Texture2DArray.ArraySize = array_layer_count;
+        } else {
+            dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+            dsv_desc.Texture2D.MipSlice = m_desc.BaseMipLevel;
+        }
+        native_device->CreateDepthStencilView(texture->GetNativeTexture(), &dsv_desc, &m_dsv);
+    }
+
+    if (texture->GetUsage() & TextureUsageFlags::Storage) {
+        D3D11_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
+        uav_desc.Format = view_format;
+        if (m_desc.ViewType == TextureType::Texture2DArray || m_desc.ViewType == TextureType::TextureCube ||
+            m_desc.ViewType == TextureType::TextureCubeArray) {
+            uav_desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2DARRAY;
+            uav_desc.Texture2DArray.MipSlice = m_desc.BaseMipLevel;
+            uav_desc.Texture2DArray.FirstArraySlice = m_desc.BaseArrayLayer;
+            uav_desc.Texture2DArray.ArraySize = array_layer_count;
+        } else {
+            uav_desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+            uav_desc.Texture2D.MipSlice = m_desc.BaseMipLevel;
+        }
+        native_device->CreateUnorderedAccessView(texture->GetNativeTexture(), &uav_desc, &m_uav);
+    }
 }
 
 Ref<Texture> D3D11TextureView::GetTexture() const
@@ -44,6 +149,10 @@ D3D11Texture::D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& cre
     desc.SampleDesc.Quality = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+    if (m_type == TextureType::TextureCube || m_type == TextureType::TextureCubeArray) {
+        desc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+    }
 
     if (m_usage & TextureUsageFlags::Sampled) {
         desc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
@@ -152,7 +261,7 @@ void D3D11Texture::CreateViews()
 
 Ref<TextureView> D3D11Texture::CreateView(const TextureViewDesc& desc)
 {
-    return CreateRef<D3D11TextureView>(std::static_pointer_cast<D3D11Texture>(shared_from_this()), desc);
+    return CreateRef<D3D11TextureView>(std::static_pointer_cast<D3D11Texture>(shared_from_this()), m_device, desc);
 }
 
 Ref<TextureView> D3D11Texture::GetDefaultView()

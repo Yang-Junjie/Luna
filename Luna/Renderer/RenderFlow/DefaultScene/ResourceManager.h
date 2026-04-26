@@ -61,7 +61,7 @@ public:
     void prepareDraws(luna::RHI::CommandBufferEncoder& commands,
                       std::span<const DrawCommand> draw_commands,
                       const Material& default_material);
-    void uploadEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands);
+    void prepareEnvironmentIfNeeded(luna::RHI::CommandBufferEncoder& commands, const SceneRenderContext& context);
     void updateSceneParameters(const SceneRenderContext& context,
                                const RenderWorld& world,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params);
@@ -80,6 +80,7 @@ public:
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& lightingPipeline() const;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& transparentPipeline() const;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& sceneDescriptorSet() const;
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& lightingSceneDescriptorSet() const;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSet>& gbufferDescriptorSet() const;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Sampler>& gbufferSampler() const;
 

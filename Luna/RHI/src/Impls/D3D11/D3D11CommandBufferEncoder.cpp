@@ -17,6 +17,19 @@ uint32_t GetSetRegisterBase(const Ref<PipelineLayout>& layout, uint32_t setIndex
     auto d3dLayout = std::dynamic_pointer_cast<D3D11PipelineLayout>(layout);
     return d3dLayout ? d3dLayout->GetSetRegisterBase(setIndex) : 0;
 }
+
+void ClearComputeResourceBindings(ID3D11DeviceContext* context)
+{
+    if (!context) {
+        return;
+    }
+
+    ID3D11UnorderedAccessView* nullUavs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {};
+    context->CSSetUnorderedAccessViews(0, D3D11_PS_CS_UAV_REGISTER_COUNT, nullUavs, nullptr);
+
+    ID3D11ShaderResourceView* nullSrvs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
+    context->CSSetShaderResources(0, D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, nullSrvs);
+}
 }
 
 D3D11CommandBufferEncoder::D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type)
@@ -262,7 +275,15 @@ void D3D11CommandBufferEncoder::PipelineBarrier(SyncScope srcStage,
                                                 std::span<const BufferBarrier> bufferBarriers,
                                                 std::span<const TextureBarrier> textureBarriers)
 {
-    // DX11: no explicit barriers, driver manages resource hazards
+    // DX11 has no explicit resource barriers. Clearing compute SRV/UAV bindings
+    // prevents write-after-read/read-after-write conflicts when later passes bind
+    // the same resources through another stage or access type.
+    const auto src_stage_bits = static_cast<uint32_t>(srcStage);
+    const auto dst_stage_bits = static_cast<uint32_t>(dstStage);
+    const auto compute_stage_bit = static_cast<uint32_t>(SyncScope::ComputeStage);
+    if ((src_stage_bits & compute_stage_bit) != 0 || (dst_stage_bits & compute_stage_bit) != 0) {
+        ClearComputeResourceBindings(m_context.Get());
+    }
 #ifndef NDEBUG
     for (const auto& barrier : textureBarriers) {
         if (barrier.Texture) {
@@ -289,6 +310,11 @@ void D3D11CommandBufferEncoder::TransitionBuffer(const Ref<Buffer>& buffer,
                                                  uint64_t size)
 {
     // DX11: no-op
+}
+
+void D3D11CommandBufferEncoder::MemoryBarrierFast(MemoryTransition transition)
+{
+    ClearComputeResourceBindings(m_context.Get());
 }
 
 void D3D11CommandBufferEncoder::ExecuteNative(const std::function<void(void*)>& func)

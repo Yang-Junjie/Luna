@@ -64,6 +64,20 @@ private:
     DefaultScenePassSharedState* m_state{nullptr};
 };
 
+class DefaultSceneEnvironmentPass final : public IRenderPass {
+public:
+    explicit DefaultSceneEnvironmentPass(DefaultScenePassSharedState& state);
+
+    [[nodiscard]] const char* name() const noexcept override;
+    void setup(RenderPassContext& context) override;
+
+private:
+    void execute(RenderGraphComputePassContext& pass_context, const SceneRenderContext& context);
+
+private:
+    DefaultScenePassSharedState* m_state{nullptr};
+};
+
 class DefaultSceneGeometryPass final : public IRenderPass {
 public:
     explicit DefaultSceneGeometryPass(DefaultScenePassSharedState& state);

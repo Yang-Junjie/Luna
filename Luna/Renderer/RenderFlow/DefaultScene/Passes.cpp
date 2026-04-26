@@ -284,6 +284,32 @@ const DefaultSceneShadowResources& DefaultScenePassSharedState::shadow() const n
     return m_shadow;
 }
 
+DefaultSceneEnvironmentPass::DefaultSceneEnvironmentPass(DefaultScenePassSharedState& state) : m_state(&state) {}
+
+const char* DefaultSceneEnvironmentPass::name() const noexcept
+{
+    return "SceneEnvironment";
+}
+
+void DefaultSceneEnvironmentPass::setup(RenderPassContext& context)
+{
+    context.graph().AddComputePass(
+        name(),
+        [](RenderGraphComputePassBuilder&) {},
+        [this, scene_context = context.sceneContext()](RenderGraphComputePassContext& pass_context) {
+            execute(pass_context, scene_context);
+        },
+        true);
+}
+
+void DefaultSceneEnvironmentPass::execute(RenderGraphComputePassContext& pass_context,
+                                          const SceneRenderContext& context)
+{
+    ResourceManager& resources = m_state->resources();
+    resources.ensurePipelines(context);
+    resources.prepareEnvironmentIfNeeded(pass_context.commandBuffer(), context);
+}
+
 DefaultSceneShadowDepthPass::DefaultSceneShadowDepthPass(DefaultScenePassSharedState& state) : m_state(&state) {}
 
 const char* DefaultSceneShadowDepthPass::name() const noexcept
@@ -475,13 +501,13 @@ void DefaultSceneLightingPass::execute(RenderGraphRasterPassContext& pass_contex
     LUNA_RENDERER_FRAME_DEBUG("Executing scene lighting pass");
 
     resources.ensurePipelines(context);
-    if (!resources.lightingPipeline() || !resources.gbufferDescriptorSet() || !resources.sceneDescriptorSet() ||
-        !resources.gbufferSampler()) {
+    if (!resources.lightingPipeline() || !resources.gbufferDescriptorSet() ||
+        !resources.lightingSceneDescriptorSet() || !resources.gbufferSampler()) {
         LUNA_RENDERER_ERROR(
-            "Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} scene_descriptor_set={} gbuffer_sampler={}",
+            "Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} lighting_scene_descriptor_set={} gbuffer_sampler={}",
             static_cast<bool>(resources.lightingPipeline()),
             static_cast<bool>(resources.gbufferDescriptorSet()),
-            static_cast<bool>(resources.sceneDescriptorSet()),
+            static_cast<bool>(resources.lightingSceneDescriptorSet()),
             static_cast<bool>(resources.gbufferSampler()));
         return;
     }
@@ -505,7 +531,7 @@ void DefaultSceneLightingPass::execute(RenderGraphRasterPassContext& pass_contex
     }
 
     auto& commands = pass_context.commandBuffer();
-    resources.uploadEnvironmentIfNeeded(commands);
+    resources.prepareEnvironmentIfNeeded(commands, context);
     updateSceneParameters(*m_state, context);
     resources.updateLightingResources(
         gbuffer_base_color, gbuffer_normal_metallic, gbuffer_world_position_roughness, gbuffer_emissive_ao, pick_texture);
@@ -516,7 +542,7 @@ void DefaultSceneLightingPass::execute(RenderGraphRasterPassContext& pass_contex
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
     const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
         resources.gbufferDescriptorSet(),
-        resources.sceneDescriptorSet(),
+        resources.lightingSceneDescriptorSet(),
     };
     commands.BindDescriptorSets(resources.lightingPipeline(), 0, descriptor_sets);
     commands.Draw(3, 1, 0, 0);
@@ -576,7 +602,7 @@ void DefaultSceneTransparentPass::execute(RenderGraphRasterPassContext& pass_con
 
     auto& commands = pass_context.commandBuffer();
     updateSceneParameters(*m_state, context);
-    resources.uploadEnvironmentIfNeeded(commands);
+    resources.prepareEnvironmentIfNeeded(commands, context);
     resources.prepareDraws(commands, transparent_draw_commands, default_material);
 
     pass_context.beginRendering();

@@ -12,8 +12,12 @@ DefaultRenderFlow::DefaultRenderFlow()
 {
     namespace pass_names = render_flow::default_scene::pass_names;
 
-    m_builder.addPass(std::string(pass_names::ShadowDepth),
-                      std::make_unique<render_flow::default_scene::DefaultSceneShadowDepthPass>(m_scene_state));
+    m_builder.addPass(std::string(pass_names::Environment),
+                      std::make_unique<render_flow::default_scene::DefaultSceneEnvironmentPass>(m_scene_state));
+    m_builder.insertPassAfter(
+        pass_names::Environment,
+        std::string(pass_names::ShadowDepth),
+        std::make_unique<render_flow::default_scene::DefaultSceneShadowDepthPass>(m_scene_state));
     m_builder.insertPassAfter(
         pass_names::ShadowDepth,
         std::string(pass_names::Geometry),

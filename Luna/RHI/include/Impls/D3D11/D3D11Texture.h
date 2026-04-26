@@ -11,7 +11,7 @@ class D3D11Texture;
 
 class LUNA_RHI_API D3D11TextureView : public TextureView {
 public:
-    D3D11TextureView(Ref<D3D11Texture> texture, TextureViewDesc desc);
+    D3D11TextureView(Ref<D3D11Texture> texture, Ref<D3D11Device> device, TextureViewDesc desc);
 
     Ref<Texture> GetTexture() const override;
 
@@ -151,6 +151,8 @@ private:
     SampleCount m_sampleCount = SampleCount::Count1;
     TextureUsageFlags m_usage = TextureUsageFlags::Sampled;
     ResourceState m_currentState = ResourceState::Undefined;
+
+    friend class D3D11TextureView;
 };
 } // namespace luna::RHI
 #endif

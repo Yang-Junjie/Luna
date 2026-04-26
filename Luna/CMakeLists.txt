@@ -53,7 +53,9 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/PipelineLibrary.cpp
     Renderer/RenderFlow/DefaultScene/ResourceManager.h
     Renderer/RenderFlow/DefaultScene/ResourceManager.cpp
+    Renderer/Shaders/EnvironmentIBL.slang
     Renderer/Shaders/SceneGeometry.slang
+    Renderer/Shaders/SceneLighting.slang
     Renderer/Shaders/ShadowMapping.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp

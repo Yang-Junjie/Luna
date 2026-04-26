@@ -82,6 +82,8 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI
             .AddBinding(2, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(3, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .AddBinding(4, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(5, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(6, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 }
 
@@ -294,7 +296,8 @@ bool PipelineLibrary::hasCompleteState(const SceneRenderContext& context) const 
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
            m_state.lighting_pipeline && m_state.transparent_pipeline && m_state.material_layout && m_state.descriptor_pool &&
-           m_state.gbuffer_descriptor_set && m_state.scene_descriptor_set && m_state.scene_params_buffer &&
+           m_state.gbuffer_descriptor_set && m_state.scene_descriptor_set && m_state.lighting_scene_descriptor_set &&
+           m_state.scene_params_buffer &&
            m_state.gbuffer_sampler && m_state.environment_source_sampler && m_state.shadow_sampler;
 }
 
@@ -355,6 +358,7 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
     }
     if (m_state.descriptor_pool && m_state.scene_layout) {
         m_state.scene_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.scene_layout);
+        m_state.lighting_scene_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.scene_layout);
     }
     if (m_state.device) {
         m_state.scene_params_buffer = m_state.device->CreateBuffer(luna::RHI::BufferBuilder()
@@ -397,36 +401,74 @@ void PipelineLibrary::rebuild(const SceneRenderContext& context, const SceneShad
                        static_cast<int>(context.color_format));
 }
 
-void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture)
+void PipelineLibrary::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
+                                          const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
+                                          const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture)
 {
-    if (!m_state.scene_descriptor_set || !m_state.scene_params_buffer || !environment_texture || !m_state.environment_source_sampler) {
-        LUNA_RENDERER_WARN("Scene resources are incomplete: scene_descriptor_set={} scene_params_buffer={} environment_texture={} environment_sampler={}",
+    if (!m_state.scene_descriptor_set || !m_state.lighting_scene_descriptor_set || !m_state.scene_params_buffer ||
+        !environment_texture || !prefiltered_environment_texture || !brdf_lut_texture ||
+        !m_state.environment_source_sampler) {
+        LUNA_RENDERER_WARN("Scene resources are incomplete: scene_descriptor_set={} lighting_scene_descriptor_set={} scene_params_buffer={} environment_texture={} prefiltered_environment={} brdf_lut={} environment_sampler={}",
                            static_cast<bool>(m_state.scene_descriptor_set),
+                           static_cast<bool>(m_state.lighting_scene_descriptor_set),
                            static_cast<bool>(m_state.scene_params_buffer),
                            static_cast<bool>(environment_texture),
+                           static_cast<bool>(prefiltered_environment_texture),
+                           static_cast<bool>(brdf_lut_texture),
                            static_cast<bool>(m_state.environment_source_sampler));
         return;
     }
 
-    m_state.scene_descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
-        .Binding = 0,
-        .Buffer = m_state.scene_params_buffer,
-        .Offset = 0,
-        .Stride = sizeof(render_flow::default_scene_detail::SceneGpuParams),
-        .Size = sizeof(render_flow::default_scene_detail::SceneGpuParams),
-        .Type = luna::RHI::DescriptorType::UniformBuffer,
-    });
-    m_state.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 1,
-        .TextureView = environment_texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
-    });
-    m_state.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 2,
-        .Sampler = m_state.environment_source_sampler,
-    });
-    m_state.scene_descriptor_set->Update();
+    if (m_state.scene_bindings_valid && m_state.bound_environment_texture == environment_texture &&
+        m_state.bound_prefiltered_environment_texture == prefiltered_environment_texture &&
+        m_state.bound_brdf_lut_texture == brdf_lut_texture) {
+        return;
+    }
+
+    auto write_scene_bindings = [this,
+                                 &environment_texture,
+                                 &prefiltered_environment_texture,
+                                 &brdf_lut_texture](const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set) {
+        descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+            .Binding = 0,
+            .Buffer = m_state.scene_params_buffer,
+            .Offset = 0,
+            .Stride = sizeof(render_flow::default_scene_detail::SceneGpuParams),
+            .Size = sizeof(render_flow::default_scene_detail::SceneGpuParams),
+            .Type = luna::RHI::DescriptorType::UniformBuffer,
+        });
+        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+            .Binding = 1,
+            .TextureView = environment_texture->GetDefaultView(),
+            .Layout = luna::RHI::ResourceState::ShaderRead,
+            .Type = luna::RHI::DescriptorType::SampledImage,
+        });
+        descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+            .Binding = 2,
+            .Sampler = m_state.environment_source_sampler,
+        });
+        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+            .Binding = 5,
+            .TextureView = prefiltered_environment_texture->GetDefaultView(),
+            .Layout = luna::RHI::ResourceState::ShaderRead,
+            .Type = luna::RHI::DescriptorType::SampledImage,
+        });
+        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+            .Binding = 6,
+            .TextureView = brdf_lut_texture->GetDefaultView(),
+            .Layout = luna::RHI::ResourceState::ShaderRead,
+            .Type = luna::RHI::DescriptorType::SampledImage,
+        });
+        descriptor_set->Update();
+    };
+
+    write_scene_bindings(m_state.scene_descriptor_set);
+    write_scene_bindings(m_state.lighting_scene_descriptor_set);
+
+    m_state.bound_environment_texture = environment_texture;
+    m_state.bound_prefiltered_environment_texture = prefiltered_environment_texture;
+    m_state.bound_brdf_lut_texture = brdf_lut_texture;
+    m_state.scene_bindings_valid = true;
 }
 
 namespace {
@@ -589,25 +631,34 @@ void PipelineLibrary::updateLightingResources(const luna::RHI::Ref<luna::RHI::Te
 
 void PipelineLibrary::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
 {
-    if (!m_state.scene_descriptor_set || !shadow_map || !m_state.shadow_sampler) {
-        LUNA_RENDERER_WARN("Cannot update shadow resources: scene_descriptor_set={} shadow_map={} shadow_sampler={}",
-                           static_cast<bool>(m_state.scene_descriptor_set),
+    if (!m_state.lighting_scene_descriptor_set || !m_state.scene_bindings_valid || !shadow_map ||
+        !m_state.shadow_sampler) {
+        LUNA_RENDERER_WARN("Cannot update shadow resources: lighting_scene_descriptor_set={} scene_bindings_valid={} shadow_map={} shadow_sampler={}",
+                           static_cast<bool>(m_state.lighting_scene_descriptor_set),
+                           m_state.scene_bindings_valid,
                            static_cast<bool>(shadow_map),
                            static_cast<bool>(m_state.shadow_sampler));
         return;
     }
 
-    m_state.scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    if (m_state.shadow_bindings_valid && m_state.bound_shadow_map_texture == shadow_map) {
+        return;
+    }
+
+    m_state.lighting_scene_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
         .Binding = 3,
         .TextureView = shadow_map->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
-    m_state.scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    m_state.lighting_scene_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
         .Binding = 4,
         .Sampler = m_state.shadow_sampler,
     });
-    m_state.scene_descriptor_set->Update();
+    m_state.lighting_scene_descriptor_set->Update();
+
+    m_state.bound_shadow_map_texture = shadow_map;
+    m_state.shadow_bindings_valid = true;
 }
 
 const luna::RHI::Ref<luna::RHI::Device>& PipelineLibrary::device() const noexcept
@@ -648,6 +699,11 @@ const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& PipelineLibrary::transparentP
 const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::sceneDescriptorSet() const noexcept
 {
     return m_state.scene_descriptor_set;
+}
+
+const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::lightingSceneDescriptorSet() const noexcept
+{
+    return m_state.lighting_scene_descriptor_set;
 }
 
 const luna::RHI::Ref<luna::RHI::DescriptorSet>& PipelineLibrary::gbufferDescriptorSet() const noexcept

@@ -5,6 +5,7 @@
 namespace luna::render_flow::default_scene::pass_names {
 
 inline constexpr std::string_view Geometry = "Geometry";
+inline constexpr std::string_view Environment = "Environment";
 inline constexpr std::string_view ShadowDepth = "ShadowDepth";
 inline constexpr std::string_view Lighting = "Lighting";
 inline constexpr std::string_view Transparent = "Transparent";
