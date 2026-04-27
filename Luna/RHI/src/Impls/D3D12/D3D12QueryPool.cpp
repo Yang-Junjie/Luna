@@ -48,6 +48,14 @@ D3D12QueryPool::D3D12QueryPool(const Ref<Device>& device, const QueryPoolCreateI
                                               IID_PPV_ARGS(&m_readbackBuffer));
 }
 
+D3D12QueryPool::~D3D12QueryPool()
+{
+    if (m_readbackAllocation != nullptr) {
+        m_readbackAllocation->Release();
+        m_readbackAllocation = nullptr;
+    }
+}
+
 void D3D12QueryPool::Reset(uint32_t firstQuery, uint32_t count) {}
 
 bool D3D12QueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::vector<uint64_t>& outResults, bool wait)

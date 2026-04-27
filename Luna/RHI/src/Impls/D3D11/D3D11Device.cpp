@@ -5,6 +5,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Pipeline.h"
 #include "Impls/D3D11/D3D11PipelineLayout.h"
+#include "Impls/D3D11/D3D11QueryPool.h"
 #include "Impls/D3D11/D3D11Sampler.h"
 #include "Impls/D3D11/D3D11ShaderModule.h"
 #include "Impls/D3D11/D3D11Swapchain.h"
@@ -134,5 +135,10 @@ Ref<Synchronization> D3D11Device::CreateSynchronization(uint32_t maxFramesInFlig
 {
     return CreateRef<D3D11Synchronization>(std::static_pointer_cast<D3D11Device>(shared_from_this()),
                                            maxFramesInFlight);
+}
+
+Ref<QueryPool> D3D11Device::CreateQueryPool(const QueryPoolCreateInfo& info)
+{
+    return CreateRef<D3D11QueryPool>(std::static_pointer_cast<D3D11Device>(shared_from_this()), info);
 }
 } // namespace luna::RHI

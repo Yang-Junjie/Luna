@@ -86,6 +86,7 @@ public:
     Ref<GraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& info) override;
     Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& info) override;
     Ref<Synchronization> CreateSynchronization(uint32_t maxFramesInFlight) override;
+    Ref<QueryPool> CreateQueryPool(const QueryPoolCreateInfo& info) override;
 
     Ref<AccelerationStructure> CreateAccelerationStructure(const AccelerationStructureCreateInfo& info) override;
     Ref<RayTracingPipeline> CreateRayTracingPipeline(const RayTracingPipelineCreateInfo& info) override;

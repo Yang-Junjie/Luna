@@ -8,6 +8,7 @@
 #include "Impls/Vulkan/VKInstance.h"
 #include "Impls/Vulkan/VKPipeline.h"
 #include "Impls/Vulkan/VKPipelineLayout.h"
+#include "Impls/Vulkan/VKQueryPool.h"
 #include "Impls/Vulkan/VKQueue.h"
 #include "Impls/Vulkan/VKRayTracingPipeline.h"
 #include "Impls/Vulkan/VKSampler.h"
@@ -392,6 +393,11 @@ Ref<ComputePipeline> VKDevice::CreateComputePipeline(const ComputePipelineCreate
 Ref<Synchronization> VKDevice::CreateSynchronization(uint32_t maxFramesInFlight)
 {
     return VKSynchronization::Create(shared_from_this(), maxFramesInFlight);
+}
+
+Ref<QueryPool> VKDevice::CreateQueryPool(const QueryPoolCreateInfo& info)
+{
+    return std::make_shared<VKQueryPool>(std::static_pointer_cast<VKDevice>(shared_from_this()), info);
 }
 
 Ref<AccelerationStructure> VKDevice::CreateAccelerationStructure(const AccelerationStructureCreateInfo& info)

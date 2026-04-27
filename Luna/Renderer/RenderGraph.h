@@ -17,6 +17,7 @@
 
 namespace luna::RHI {
 class Device;
+class QueryPool;
 class Texture;
 } // namespace luna::RHI
 
@@ -63,7 +64,11 @@ struct RenderGraphPass {
 struct RenderGraphPassProfile {
     std::string Name;
     RenderGraphPassType Type{RenderGraphPassType::Raster};
+    double CpuStartMs{0.0};
     double CpuTimeMs{0.0};
+    double GpuStartMs{0.0};
+    double GpuTimeMs{0.0};
+    bool HasGpuTime{false};
     uint32_t FramebufferWidth{0};
     uint32_t FramebufferHeight{0};
     uint32_t ReadTextureCount{0};
@@ -74,7 +79,11 @@ struct RenderGraphPassProfile {
 };
 
 struct RenderGraphProfileSnapshot {
+    uint64_t FrameIndex{0};
     double TotalCpuTimeMs{0.0};
+    double TotalGpuTimeMs{0.0};
+    bool GpuTimingSupported{false};
+    bool GpuTimingPending{false};
     uint32_t TextureCount{0};
     uint32_t FinalBarrierCount{0};
     std::vector<RenderGraphPassProfile> Passes;
@@ -153,6 +162,11 @@ public:
     struct FrameContext {
         luna::RHI::Ref<luna::RHI::Device> device;
         luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer;
+        luna::RHI::Ref<luna::RHI::QueryPool> timestamp_query_pool;
+        luna::RHI::Ref<luna::RHI::QueryPool> timestamp_disjoint_query_pool;
+        uint32_t timestamp_query_capacity{0};
+        uint64_t frame_index{0};
+        bool profiling_enabled{false};
         uint32_t framebuffer_width{0};
         uint32_t framebuffer_height{0};
     };

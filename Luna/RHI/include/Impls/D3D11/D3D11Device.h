@@ -75,6 +75,7 @@ public:
     Ref<GraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& info) override;
     Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& info) override;
     Ref<Synchronization> CreateSynchronization(uint32_t maxFramesInFlight) override;
+    Ref<QueryPool> CreateQueryPool(const QueryPoolCreateInfo& info) override;
 
     ID3D11Device5* GetNativeDevice() const
     {

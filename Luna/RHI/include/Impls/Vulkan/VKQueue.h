@@ -34,6 +34,7 @@ public:
                 uint32_t frameIndex) override;
     void Submit(const Ref<CommandBufferEncoder>& cmd) override;
     void WaitIdle() override;
+    double GetTimestampPeriodNs() const override;
 
     const vk::Queue& GetNativeHandle() const
     {

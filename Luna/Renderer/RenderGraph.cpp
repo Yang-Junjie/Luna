@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <QueryPool.h>
 
 namespace luna {
 namespace {
@@ -120,14 +121,24 @@ RenderGraph::RenderGraph(FrameContext frame_context,
 void RenderGraph::execute() const
 {
     m_profile = {};
-    m_profile.TextureCount = static_cast<uint32_t>(m_textures.size());
-    m_profile.FinalBarrierCount = static_cast<uint32_t>(m_final_texture_barriers.size());
-    m_profile.Passes.reserve(m_compiled_passes.size());
+    m_profile.FrameIndex = m_frame_context.frame_index;
+    const bool profiling_enabled = m_frame_context.profiling_enabled;
+    if (profiling_enabled) {
+        m_profile.TextureCount = static_cast<uint32_t>(m_textures.size());
+        m_profile.FinalBarrierCount = static_cast<uint32_t>(m_final_texture_barriers.size());
+        m_profile.Passes.reserve(m_compiled_passes.size());
+    }
 
     if (!m_frame_context.command_buffer) {
         LUNA_RENDERER_WARN("Skipping render graph execution because command buffer is null");
         return;
     }
+
+    const uint32_t requested_timestamp_queries = static_cast<uint32_t>(m_compiled_passes.size() * 2);
+    const bool gpu_timing_enabled = profiling_enabled && m_frame_context.timestamp_query_pool && requested_timestamp_queries > 0 &&
+                                    requested_timestamp_queries <= m_frame_context.timestamp_query_capacity;
+    m_profile.GpuTimingSupported = gpu_timing_enabled;
+    m_profile.GpuTimingPending = gpu_timing_enabled;
 
     const size_t raster_pass_count =
         static_cast<size_t>(std::count_if(m_compiled_passes.begin(), m_compiled_passes.end(), [](const auto& pass) {
@@ -142,21 +153,45 @@ void RenderGraph::execute() const
                               m_textures.size(),
                               m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
-    const auto graph_begin = std::chrono::steady_clock::now();
+    if (gpu_timing_enabled) {
+        command_buffer.ResetQueryPool(m_frame_context.timestamp_query_pool, 0, requested_timestamp_queries);
+        if (m_frame_context.timestamp_disjoint_query_pool) {
+            command_buffer.ResetQueryPool(m_frame_context.timestamp_disjoint_query_pool, 0, 1);
+            command_buffer.BeginQuery(m_frame_context.timestamp_disjoint_query_pool, 0);
+        }
+    }
+
+    std::chrono::steady_clock::time_point graph_begin{};
+    if (profiling_enabled) {
+        graph_begin = std::chrono::steady_clock::now();
+    }
+    uint32_t timestamp_query_index = 0;
     for (const auto& pass : m_compiled_passes) {
-        RenderGraphPassProfile pass_profile{
-            .Name = pass.Pass.Name,
-            .Type = pass.Pass.Type,
-            .CpuTimeMs = 0.0,
-            .FramebufferWidth = pass.FramebufferWidth,
-            .FramebufferHeight = pass.FramebufferHeight,
-            .ReadTextureCount = pass.ReadTextureCount,
-            .WriteTextureCount = pass.WriteTextureCount,
-            .ColorAttachmentCount = static_cast<uint32_t>(pass.RenderingInfo.ColorAttachments.size()),
-            .HasDepthAttachment = static_cast<bool>(pass.RenderingInfo.DepthAttachment),
-            .PreBarrierCount = static_cast<uint32_t>(pass.PreTextureBarriers.size()),
-        };
-        const auto pass_begin = std::chrono::steady_clock::now();
+        RenderGraphPassProfile pass_profile{};
+        std::chrono::steady_clock::time_point pass_begin{};
+        if (profiling_enabled) {
+            pass_profile = RenderGraphPassProfile{
+                .Name = pass.Pass.Name,
+                .Type = pass.Pass.Type,
+                .CpuStartMs = 0.0,
+                .CpuTimeMs = 0.0,
+                .GpuStartMs = 0.0,
+                .GpuTimeMs = 0.0,
+                .HasGpuTime = false,
+                .FramebufferWidth = pass.FramebufferWidth,
+                .FramebufferHeight = pass.FramebufferHeight,
+                .ReadTextureCount = pass.ReadTextureCount,
+                .WriteTextureCount = pass.WriteTextureCount,
+                .ColorAttachmentCount = static_cast<uint32_t>(pass.RenderingInfo.ColorAttachments.size()),
+                .HasDepthAttachment = static_cast<bool>(pass.RenderingInfo.DepthAttachment),
+                .PreBarrierCount = static_cast<uint32_t>(pass.PreTextureBarriers.size()),
+            };
+            pass_begin = std::chrono::steady_clock::now();
+            pass_profile.CpuStartMs = elapsedMilliseconds(graph_begin, pass_begin);
+        }
+        if (gpu_timing_enabled) {
+            command_buffer.WriteTimestamp(m_frame_context.timestamp_query_pool, timestamp_query_index++);
+        }
 
         if (!pass.PreTextureBarriers.empty()) {
             LUNA_RENDERER_FRAME_TRACE("Render graph pass '{}' applying {} pre-texture barrier(s)",
@@ -200,8 +235,13 @@ void RenderGraph::execute() const
         }
 
         command_buffer.EndDebugLabel();
-        pass_profile.CpuTimeMs = elapsedMilliseconds(pass_begin, std::chrono::steady_clock::now());
-        m_profile.Passes.push_back(std::move(pass_profile));
+        if (gpu_timing_enabled) {
+            command_buffer.WriteTimestamp(m_frame_context.timestamp_query_pool, timestamp_query_index++);
+        }
+        if (profiling_enabled) {
+            pass_profile.CpuTimeMs = elapsedMilliseconds(pass_begin, std::chrono::steady_clock::now());
+            m_profile.Passes.push_back(std::move(pass_profile));
+        }
     }
 
     if (!m_final_texture_barriers.empty()) {
@@ -209,7 +249,15 @@ void RenderGraph::execute() const
         command_buffer.PipelineBarrier(
             luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, m_final_texture_barriers);
     }
-    m_profile.TotalCpuTimeMs = elapsedMilliseconds(graph_begin, std::chrono::steady_clock::now());
+    if (gpu_timing_enabled) {
+        if (m_frame_context.timestamp_disjoint_query_pool) {
+            command_buffer.EndQuery(m_frame_context.timestamp_disjoint_query_pool, 0);
+        }
+        command_buffer.ResolveQueryPool(m_frame_context.timestamp_query_pool, 0, requested_timestamp_queries);
+    }
+    if (profiling_enabled) {
+        m_profile.TotalCpuTimeMs = elapsedMilliseconds(graph_begin, std::chrono::steady_clock::now());
+    }
     LUNA_RENDERER_FRAME_DEBUG("Render graph execution complete");
 }
 

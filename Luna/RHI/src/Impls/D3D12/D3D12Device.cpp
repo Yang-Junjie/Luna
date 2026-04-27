@@ -8,6 +8,7 @@
 #include "Impls/D3D12/D3D12Pipeline.h"
 #include "Impls/D3D12/D3D12PipelineCache.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
+#include "Impls/D3D12/D3D12QueryPool.h"
 #include "Impls/D3D12/D3D12Queue.h"
 #include "Impls/D3D12/D3D12RayTracingPipeline.h"
 #include "Impls/D3D12/D3D12Sampler.h"
@@ -474,6 +475,11 @@ Ref<ComputePipeline> D3D12Device::CreateComputePipeline(const ComputePipelineCre
 Ref<Synchronization> D3D12Device::CreateSynchronization(uint32_t maxFramesInFlight)
 {
     return std::make_shared<D3D12Synchronization>(shared_from_this(), maxFramesInFlight);
+}
+
+Ref<QueryPool> D3D12Device::CreateQueryPool(const QueryPoolCreateInfo& info)
+{
+    return std::make_shared<D3D12QueryPool>(shared_from_this(), info);
 }
 
 Ref<AccelerationStructure> D3D12Device::CreateAccelerationStructure(const AccelerationStructureCreateInfo& info)

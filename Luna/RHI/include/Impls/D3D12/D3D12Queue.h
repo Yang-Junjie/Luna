@@ -43,6 +43,7 @@ public:
                 uint32_t frameIndex) override;
     void Submit(const Ref<CommandBufferEncoder>& cmd) override;
     void WaitIdle() override;
+    double GetTimestampPeriodNs() const override;
 
     uint64_t Signal();
     void WaitForFence(uint64_t value);

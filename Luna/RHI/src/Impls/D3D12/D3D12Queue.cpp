@@ -74,6 +74,16 @@ void D3D12Queue::WaitIdle()
     WaitForFence(val);
 }
 
+double D3D12Queue::GetTimestampPeriodNs() const
+{
+    UINT64 frequency = 0;
+    if (!m_queue || FAILED(m_queue->GetTimestampFrequency(&frequency)) || frequency == 0) {
+        return 0.0;
+    }
+
+    return 1000000000.0 / static_cast<double>(frequency);
+}
+
 uint64_t D3D12Queue::Signal()
 {
     m_fenceValue++;

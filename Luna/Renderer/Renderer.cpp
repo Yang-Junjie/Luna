@@ -10,6 +10,7 @@
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
 #include <Device.h>
+#include <QueryPool.h>
 #include <Queue.h>
 #include <Swapchain.h>
 #include <Synchronization.h>
@@ -32,6 +33,7 @@ namespace luna {
 namespace {
 
 constexpr uint64_t kScenePickReadbackBufferSize = 256;
+constexpr uint32_t kRenderGraphGpuTimestampQueryCount = 512;
 
 const char* sceneOutputModeToString(Renderer::SceneOutputMode mode)
 {
@@ -252,6 +254,7 @@ void Renderer::startFrame()
 
     try {
         device_context.synchronization->WaitForFrame(frame_resources.frame_index);
+        collectCompletedGpuTiming(frame_resources.frame_index);
         collectCompletedScenePickResult(frame_resources.frame_index);
 
         if (frame_resources.frame_index < frame_resources.command_buffers.size() &&
@@ -336,11 +339,22 @@ void Renderer::renderFrame()
         (frame_resources.frame_index < frame_resources.transient_texture_caches.size())
             ? &frame_resources.transient_texture_caches[frame_resources.frame_index]
             : nullptr;
+    FrameResources::GpuTimingSlot* gpu_timing_slot =
+        (frame_resources.frame_index < frame_resources.gpu_timing_slots.size())
+            ? &frame_resources.gpu_timing_slots[frame_resources.frame_index]
+            : nullptr;
 
     luna::RenderGraphBuilder graph_builder(
         luna::RenderGraphBuilder::FrameContext{
             .device = device_context.device,
             .command_buffer = frame_resources.current_command_buffer,
+            .timestamp_query_pool = gpu_timing_slot != nullptr ? gpu_timing_slot->query_pool : nullptr,
+            .timestamp_disjoint_query_pool =
+                gpu_timing_slot != nullptr ? gpu_timing_slot->disjoint_query_pool : nullptr,
+            .timestamp_query_capacity =
+                gpu_timing_slot != nullptr && gpu_timing_slot->query_pool ? gpu_timing_slot->query_pool->GetCount() : 0,
+            .frame_index = frame_resources.frame_index,
+            .profiling_enabled = runtime.render_graph_profiling_enabled,
             .framebuffer_width = extent.width,
             .framebuffer_height = extent.height,
         },
@@ -518,9 +532,18 @@ void Renderer::renderFrame()
                                   frame_resources.frame_index,
                                   frame_resources.render_graphs[frame_resources.frame_index]->passes().size());
         frame_resources.render_graphs[frame_resources.frame_index]->execute();
-        m_last_render_graph_profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
+        const RenderGraphProfileSnapshot& profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
+        if (runtime.render_graph_profiling_enabled) {
+            if (!storePendingGpuTimingProfile(frame_resources.frame_index, profile)) {
+                m_last_render_graph_profile = profile;
+            } else if (m_last_render_graph_profile.Passes.empty()) {
+                m_last_render_graph_profile = profile;
+            }
+        }
     } else {
-        m_last_render_graph_profile = {};
+        if (runtime.render_graph_profiling_enabled) {
+            m_last_render_graph_profile = {};
+        }
         LUNA_RENDERER_WARN("Render graph build returned null for frame {}", frame_resources.frame_index);
     }
 
@@ -834,6 +857,31 @@ const RenderGraphProfileSnapshot& Renderer::getLastRenderGraphProfile() const
     return m_last_render_graph_profile;
 }
 
+void Renderer::setRenderGraphProfilingEnabled(bool enabled)
+{
+    if (m_runtime.render_graph_profiling_enabled == enabled) {
+        return;
+    }
+
+    m_runtime.render_graph_profiling_enabled = enabled;
+    if (enabled) {
+        ensureGpuTimingResources();
+        LUNA_RENDERER_INFO("RenderGraph profiling enabled");
+        return;
+    }
+
+    for (auto& slot : m_frame_resources.gpu_timing_slots) {
+        slot.pending = false;
+        slot.query_count = 0;
+    }
+    LUNA_RENDERER_INFO("RenderGraph profiling disabled");
+}
+
+bool Renderer::isRenderGraphProfilingEnabled() const
+{
+    return m_runtime.render_graph_profiling_enabled;
+}
+
 bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature)
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
@@ -985,6 +1033,11 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     frame_resources.render_graphs.resize(frame_resources.frames_in_flight);
     frame_resources.transient_texture_caches.clear();
     frame_resources.transient_texture_caches.resize(frame_resources.frames_in_flight);
+    if (runtime.render_graph_profiling_enabled) {
+        ensureGpuTimingResources();
+    } else {
+        frame_resources.gpu_timing_slots.clear();
+    }
     ensureScenePickReadbackBuffers();
     frame_resources.swapchain_images_presented.assign(device_context.swapchain->GetImageCount(), false);
     if (frame_resources.frames_in_flight > 0) {
@@ -1154,16 +1207,175 @@ void Renderer::releaseFrameCommandBuffers()
         }
     }
     if (released_count > 0 || !m_frame_resources.scene_pick_readback_slots.empty() ||
-        !m_frame_resources.transient_texture_caches.empty()) {
+        !m_frame_resources.gpu_timing_slots.empty() || !m_frame_resources.transient_texture_caches.empty()) {
         LUNA_RENDERER_DEBUG(
-            "Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback slot(s)",
+            "Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback slot(s), {} GPU timing slot(s)",
             released_count,
             m_frame_resources.transient_texture_caches.size(),
-            m_frame_resources.scene_pick_readback_slots.size());
+            m_frame_resources.scene_pick_readback_slots.size(),
+            m_frame_resources.gpu_timing_slots.size());
     }
     m_frame_resources.command_buffers.clear();
     m_frame_resources.transient_texture_caches.clear();
     m_frame_resources.scene_pick_readback_slots.clear();
+    m_frame_resources.gpu_timing_slots.clear();
+}
+
+void Renderer::ensureGpuTimingResources()
+{
+    auto& frame_resources = m_frame_resources;
+    if (!m_device_context.device || !m_device_context.graphics_queue || frame_resources.frames_in_flight == 0) {
+        frame_resources.gpu_timing_slots.clear();
+        return;
+    }
+
+    const double timestamp_period_ns = m_device_context.graphics_queue->GetTimestampPeriodNs();
+    const bool use_disjoint_timestamps =
+        timestamp_period_ns <= 0.0 && m_device_context.instance &&
+        m_device_context.instance->GetType() == luna::RHI::BackendType::DirectX11;
+    if (timestamp_period_ns <= 0.0 && !use_disjoint_timestamps) {
+        frame_resources.gpu_timing_slots.clear();
+        LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on this RHI backend");
+        return;
+    }
+
+    frame_resources.gpu_timing_slots.clear();
+    frame_resources.gpu_timing_slots.resize(frame_resources.frames_in_flight);
+    LUNA_RENDERER_INFO("Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
+                       frame_resources.frames_in_flight,
+                       kRenderGraphGpuTimestampQueryCount,
+                       use_disjoint_timestamps ? "disjoint" : "fixed-period",
+                       timestamp_period_ns);
+    for (uint32_t frame_index = 0; frame_index < frame_resources.frames_in_flight; ++frame_index) {
+        auto& slot = frame_resources.gpu_timing_slots[frame_index];
+        slot.query_pool = m_device_context.device->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
+            .Type = luna::RHI::QueryType::Timestamp,
+            .Count = kRenderGraphGpuTimestampQueryCount,
+        });
+        if (use_disjoint_timestamps) {
+            slot.disjoint_query_pool = m_device_context.device->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
+                .Type = luna::RHI::QueryType::TimestampDisjoint,
+                .Count = 1,
+            });
+        } else {
+            slot.disjoint_query_pool.reset();
+        }
+        slot.profile = {};
+        slot.query_count = 0;
+        slot.pending = false;
+        slot.uses_disjoint_timestamps = use_disjoint_timestamps;
+        if (!slot.query_pool || (use_disjoint_timestamps && !slot.disjoint_query_pool)) {
+            LUNA_RENDERER_WARN("Failed to create RenderGraph GPU timing query pool for frame {}", frame_index);
+            slot.query_pool.reset();
+            slot.disjoint_query_pool.reset();
+            slot.uses_disjoint_timestamps = false;
+        }
+    }
+}
+
+void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
+{
+    if (frame_index >= m_frame_resources.gpu_timing_slots.size()) {
+        return;
+    }
+
+    auto& slot = m_frame_resources.gpu_timing_slots[frame_index];
+    if (!slot.pending || !slot.query_pool || slot.query_count == 0) {
+        return;
+    }
+
+    std::vector<uint64_t> timestamps;
+    if (!slot.query_pool->GetResults(0, slot.query_count, timestamps, false)) {
+        LUNA_RENDERER_FRAME_TRACE("RenderGraph GPU timing results are not ready for frame {}", frame_index);
+        return;
+    }
+
+    double timestamp_period_ns =
+        m_device_context.graphics_queue ? m_device_context.graphics_queue->GetTimestampPeriodNs() : 0.0;
+    if (slot.uses_disjoint_timestamps) {
+        if (!slot.disjoint_query_pool) {
+            slot.pending = false;
+            return;
+        }
+
+        luna::RHI::TimestampDisjointResult disjoint_result{};
+        if (!slot.disjoint_query_pool->GetTimestampDisjointResult(0, disjoint_result, false)) {
+            LUNA_RENDERER_FRAME_TRACE("RenderGraph GPU timing disjoint result is not ready for frame {}", frame_index);
+            return;
+        }
+
+        if (disjoint_result.Disjoint || disjoint_result.Frequency == 0) {
+            RenderGraphProfileSnapshot completed_profile = slot.profile;
+            completed_profile.TotalGpuTimeMs = 0.0;
+            completed_profile.GpuTimingSupported = true;
+            completed_profile.GpuTimingPending = false;
+            slot.pending = false;
+            m_last_render_graph_profile = std::move(completed_profile);
+            LUNA_RENDERER_FRAME_TRACE("Discarded D3D11 GPU timing for frame {} because timestamp disjoint was reported",
+                                      frame_index);
+            return;
+        }
+
+        timestamp_period_ns = 1000000000.0 / static_cast<double>(disjoint_result.Frequency);
+    }
+
+    if (timestamp_period_ns <= 0.0) {
+        slot.pending = false;
+        return;
+    }
+
+    RenderGraphProfileSnapshot completed_profile = slot.profile;
+    completed_profile.TotalGpuTimeMs = 0.0;
+    completed_profile.GpuTimingSupported = true;
+    completed_profile.GpuTimingPending = false;
+
+    const size_t pass_count = (std::min) (completed_profile.Passes.size(), timestamps.size() / 2);
+    const uint64_t first_timestamp = !timestamps.empty() ? timestamps.front() : 0;
+    for (size_t pass_index = 0; pass_index < pass_count; ++pass_index) {
+        const uint64_t begin_timestamp = timestamps[pass_index * 2];
+        const uint64_t end_timestamp = timestamps[pass_index * 2 + 1];
+        if (end_timestamp < begin_timestamp || begin_timestamp < first_timestamp) {
+            continue;
+        }
+
+        const double gpu_start_ms =
+            static_cast<double>(begin_timestamp - first_timestamp) * timestamp_period_ns / 1000000.0;
+        const double gpu_time_ms =
+            static_cast<double>(end_timestamp - begin_timestamp) * timestamp_period_ns / 1000000.0;
+        auto& pass = completed_profile.Passes[pass_index];
+        pass.GpuStartMs = gpu_start_ms;
+        pass.GpuTimeMs = gpu_time_ms;
+        pass.HasGpuTime = true;
+        completed_profile.TotalGpuTimeMs += gpu_time_ms;
+    }
+
+    slot.pending = false;
+    m_last_render_graph_profile = std::move(completed_profile);
+}
+
+bool Renderer::storePendingGpuTimingProfile(uint32_t frame_index, const RenderGraphProfileSnapshot& profile)
+{
+    if (frame_index >= m_frame_resources.gpu_timing_slots.size() || !profile.GpuTimingSupported ||
+        !profile.GpuTimingPending) {
+        return false;
+    }
+
+    auto& slot = m_frame_resources.gpu_timing_slots[frame_index];
+    if (!slot.query_pool) {
+        return false;
+    }
+
+    const uint32_t query_count = static_cast<uint32_t>(profile.Passes.size() * 2);
+    if (query_count == 0 || query_count > slot.query_pool->GetCount()) {
+        slot.pending = false;
+        slot.query_count = 0;
+        return false;
+    }
+
+    slot.profile = profile;
+    slot.query_count = query_count;
+    slot.pending = true;
+    return true;
 }
 
 void Renderer::ensureScenePickReadbackBuffers()

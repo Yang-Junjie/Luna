@@ -16,6 +16,8 @@ add_executable(
     LunaEditorApp.cpp
     LunaEditorLayer.h
     LunaEditorLayer.cpp
+    RenderFeaturesPanel.h
+    RenderFeaturesPanel.cpp
     RenderProfilerPanel.h
     RenderProfilerPanel.cpp
     SceneHierarchyPanel.h

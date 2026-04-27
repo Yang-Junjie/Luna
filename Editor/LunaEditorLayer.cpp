@@ -24,6 +24,7 @@
 #include <imgui.h>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -188,6 +189,7 @@ void LunaEditorLayer::onDetach()
 
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
+    m_application->getRenderer().setRenderGraphProfilingEnabled(false);
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
 
     if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
@@ -233,6 +235,7 @@ void LunaEditorLayer::onImGuiRender()
     ImGuizmo::BeginFrame();
 
     auto& application = *m_application;
+    auto& renderer = application.getRenderer();
     const float delta_seconds = Application::get().getTimestep().getSeconds();
     const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
 
@@ -245,94 +248,13 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Entities: %zu", m_scene.entityManager().entityCount());
     ImGui::Separator();
 
-    const auto viewport_extent = application.getRenderer().getSceneOutputSize();
+    const auto viewport_extent = renderer.getSceneOutputSize();
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
     ImGui::Text("Viewport Mode: %s", m_runtime_viewport_enabled ? "Runtime" : "Editor");
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
     ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
-    const auto render_features = application.getRenderer().getDefaultRenderFeatureInfos();
-    if (!render_features.empty()) {
-        ImGui::Separator();
-        ImGui::TextUnformatted("Render Features");
-        for (const auto& feature : render_features) {
-            std::string label(feature.display_name);
-            label += "##";
-            label.append(feature.name.data(), feature.name.size());
-
-            bool enabled = feature.enabled;
-            if (!feature.runtime_toggleable) {
-                ImGui::BeginDisabled();
-            }
-
-            if (ImGui::Checkbox(label.c_str(), &enabled) && feature.runtime_toggleable) {
-                application.getRenderer().setDefaultRenderFeatureEnabled(feature.name, enabled);
-            }
-
-            if (!feature.runtime_toggleable) {
-                ImGui::EndDisabled();
-            }
-
-            ImGui::SameLine();
-            ImGui::TextDisabled("[%.*s]", static_cast<int>(feature.category.size()), feature.category.data());
-
-            const auto parameters = application.getRenderer().getDefaultRenderFeatureParameters(feature.name);
-            if (!parameters.empty()) {
-                ImGui::Indent();
-                for (const auto& parameter : parameters) {
-                    std::string parameter_label(parameter.display_name);
-                    parameter_label += "##";
-                    parameter_label.append(feature.name.data(), feature.name.size());
-                    parameter_label += ".";
-                    parameter_label.append(parameter.name.data(), parameter.name.size());
-
-                    if (parameter.read_only) {
-                        ImGui::BeginDisabled();
-                    }
-
-                    bool changed = false;
-                    auto value = parameter.value;
-                    switch (parameter.type) {
-                        case render_flow::RenderFeatureParameterType::Bool: {
-                            changed = ImGui::Checkbox(parameter_label.c_str(), &value.bool_value);
-                            break;
-                        }
-                        case render_flow::RenderFeatureParameterType::Int: {
-                            changed = ImGui::DragInt(parameter_label.c_str(),
-                                                     &value.int_value,
-                                                     parameter.step,
-                                                     parameter.min.int_value,
-                                                     parameter.max.int_value);
-                            break;
-                        }
-                        case render_flow::RenderFeatureParameterType::Float: {
-                            changed = ImGui::DragFloat(parameter_label.c_str(),
-                                                       &value.float_value,
-                                                       parameter.step,
-                                                       parameter.min.float_value,
-                                                       parameter.max.float_value,
-                                                       "%.3f");
-                            break;
-                        }
-                        case render_flow::RenderFeatureParameterType::Color: {
-                            changed = ImGui::ColorEdit4(parameter_label.c_str(), glm::value_ptr(value.color_value));
-                            break;
-                        }
-                    }
-
-                    if (changed && !parameter.read_only) {
-                        application.getRenderer().setDefaultRenderFeatureParameter(feature.name, parameter.name, value);
-                    }
-
-                    if (parameter.read_only) {
-                        ImGui::EndDisabled();
-                    }
-                }
-                ImGui::Unindent();
-            }
-        }
-    }
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();
     }
@@ -346,8 +268,27 @@ void LunaEditorLayer::onImGuiRender()
     m_asset_loading_panel.onImGuiRender();
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
+    m_render_features_panel.onImGuiRender(m_show_render_features_panel,
+                                          renderer.getDefaultRenderFeatureInfos(),
+                                          [&renderer](std::string_view feature_name) {
+                                              return renderer.getDefaultRenderFeatureParameters(feature_name);
+                                          },
+                                          [&renderer](std::string_view feature_name, bool enabled) {
+                                              return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
+                                          },
+                                          [&renderer](std::string_view feature_name,
+                                                      std::string_view parameter_name,
+                                                      const render_flow::RenderFeatureParameterValue& value) {
+                                              return renderer.setDefaultRenderFeatureParameter(
+                                                  feature_name, parameter_name, value);
+                                          });
     m_render_profiler_panel.onImGuiRender(m_show_render_profiler_panel,
-                                          application.getRenderer().getLastRenderGraphProfile());
+                                          renderer.getLastRenderGraphProfile(),
+                                          backendTypeToString(application.getBackend()),
+                                          renderer.isRenderGraphProfilingEnabled(),
+                                          [&renderer](bool enabled) {
+                                              renderer.setRenderGraphProfilingEnabled(enabled);
+                                          });
     drawViewport();
 }
 
@@ -424,6 +365,7 @@ void LunaEditorLayer::onImGuiMenuBar()
 
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
+        ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
         ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
         ImGui::EndMenu();
     }

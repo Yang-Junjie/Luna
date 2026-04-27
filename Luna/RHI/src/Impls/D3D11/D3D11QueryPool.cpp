@@ -7,6 +7,8 @@ static D3D11_QUERY ToD3D11QueryType(QueryType type)
     switch (type) {
         case QueryType::Timestamp:
             return D3D11_QUERY_TIMESTAMP;
+        case QueryType::TimestampDisjoint:
+            return D3D11_QUERY_TIMESTAMP_DISJOINT;
         case QueryType::Occlusion:
             return D3D11_QUERY_OCCLUSION;
         case QueryType::PipelineStatistics:
@@ -36,6 +38,10 @@ void D3D11QueryPool::Reset(uint32_t firstQuery, uint32_t queryCount)
 
 bool D3D11QueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::vector<uint64_t>& outResults, bool wait)
 {
+    if (m_createInfo.Type == QueryType::TimestampDisjoint) {
+        return false;
+    }
+
     auto* ctx = m_device->GetImmediateContext();
     outResults.resize(queryCount);
 
@@ -46,8 +52,33 @@ bool D3D11QueryPool::GetResults(uint32_t firstQuery, uint32_t queryCount, std::v
         if (hr == S_FALSE) {
             return false;
         }
+        if (FAILED(hr)) {
+            return false;
+        }
         outResults[i] = result;
     }
+    return true;
+}
+
+bool D3D11QueryPool::GetTimestampDisjointResult(uint32_t queryIndex,
+                                                TimestampDisjointResult& outResult,
+                                                bool wait)
+{
+    if (m_createInfo.Type != QueryType::TimestampDisjoint || queryIndex >= m_queries.size()) {
+        return false;
+    }
+
+    D3D11_QUERY_DATA_TIMESTAMP_DISJOINT result{};
+    const HRESULT hr = m_device->GetImmediateContext()->GetData(m_queries[queryIndex].Get(),
+                                                                &result,
+                                                                sizeof(result),
+                                                                wait ? 0 : D3D11_ASYNC_GETDATA_DONOTFLUSH);
+    if (hr == S_FALSE || FAILED(hr)) {
+        return false;
+    }
+
+    outResult.Frequency = result.Frequency;
+    outResult.Disjoint = result.Disjoint != FALSE;
     return true;
 }
 } // namespace luna::RHI

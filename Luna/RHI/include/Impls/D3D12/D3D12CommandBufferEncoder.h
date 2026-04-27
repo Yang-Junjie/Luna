@@ -141,6 +141,7 @@ public:
     void EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) override;
     void WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex) override;
     void ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) override;
+    void ResolveQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) override;
 
     void TraceRays(const Ref<ShaderBindingTable>& sbt, uint32_t w, uint32_t h, uint32_t d) override;
     void BuildAccelerationStructure(const Ref<AccelerationStructure>& as) override;

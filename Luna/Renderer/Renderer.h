@@ -30,6 +30,7 @@ class Buffer;
 class CommandBufferEncoder;
 class Device;
 class Instance;
+class QueryPool;
 class Queue;
 class ShaderCompiler;
 class Surface;
@@ -125,6 +126,8 @@ public:
     RenderWorld& getRenderWorld();
     const RenderWorld& getRenderWorld() const;
     [[nodiscard]] const RenderGraphProfileSnapshot& getLastRenderGraphProfile() const;
+    void setRenderGraphProfilingEnabled(bool enabled);
+    [[nodiscard]] bool isRenderGraphProfilingEnabled() const;
     bool addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
     [[nodiscard]] std::vector<render_flow::RenderFeatureInfo> getDefaultRenderFeatureInfos() const;
     bool setDefaultRenderFeatureEnabled(std::string_view name, bool enabled);
@@ -188,11 +191,21 @@ private:
             bool pending{false};
         };
 
+        struct GpuTimingSlot {
+            luna::RHI::Ref<luna::RHI::QueryPool> query_pool;
+            luna::RHI::Ref<luna::RHI::QueryPool> disjoint_query_pool;
+            RenderGraphProfileSnapshot profile;
+            uint32_t query_count{0};
+            bool pending{false};
+            bool uses_disjoint_timestamps{false};
+        };
+
         luna::RHI::Ref<luna::RHI::CommandBufferEncoder> current_command_buffer;
         std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> command_buffers;
         std::vector<std::unique_ptr<luna::RenderGraph>> render_graphs;
         std::vector<luna::RenderGraphTransientTextureCache> transient_texture_caches;
         std::vector<ScenePickReadbackSlot> scene_pick_readback_slots;
+        std::vector<GpuTimingSlot> gpu_timing_slots;
         uint32_t frames_in_flight{0};
         uint32_t frame_index{0};
         uint32_t image_index{0};
@@ -206,6 +219,7 @@ private:
         bool imgui_enabled{false};
         bool resize_requested{false};
         bool frame_started{false};
+        bool render_graph_profiling_enabled{false};
     };
 
     void createSwapchain(uint32_t width, uint32_t height);
@@ -215,6 +229,9 @@ private:
     void releaseFrameCommandBuffers();
     void ensureScenePickReadbackBuffers();
     void collectCompletedScenePickResult(uint32_t frame_index);
+    void ensureGpuTimingResources();
+    void collectCompletedGpuTiming(uint32_t frame_index);
+    bool storePendingGpuTimingProfile(uint32_t frame_index, const RenderGraphProfileSnapshot& profile);
     void ensureSceneOutputTargets(uint32_t width, uint32_t height);
     void releaseSceneOutputTargets();
     void waitForGpuIdle() noexcept;

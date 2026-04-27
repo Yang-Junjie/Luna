@@ -302,6 +302,7 @@ public:
     virtual void EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) = 0;
     virtual void WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex) = 0;
     virtual void ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) = 0;
+    virtual void ResolveQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) {}
 
     virtual void
         TraceRays(const Ref<class ShaderBindingTable>& sbt, uint32_t width, uint32_t height, uint32_t depth = 1)

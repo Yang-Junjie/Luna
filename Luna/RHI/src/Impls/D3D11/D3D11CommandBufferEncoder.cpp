@@ -5,6 +5,7 @@
 #include "Impls/D3D11/D3D11Device.h"
 #include "Impls/D3D11/D3D11Pipeline.h"
 #include "Impls/D3D11/D3D11PipelineLayout.h"
+#include "Impls/D3D11/D3D11QueryPool.h"
 #include "Impls/D3D11/D3D11Texture.h"
 #include "Logging.h"
 
@@ -432,5 +433,40 @@ void D3D11CommandBufferEncoder::DispatchIndirect(const Ref<Buffer>& argBuffer, u
 {
     auto* buf = static_cast<D3D11Buffer*>(argBuffer.get());
     m_context->DispatchIndirect(buf->GetNativeBuffer(), static_cast<UINT>(offset));
+}
+
+void D3D11CommandBufferEncoder::BeginQuery(const Ref<QueryPool>& pool, uint32_t queryIndex)
+{
+    auto* d3dPool = static_cast<D3D11QueryPool*>(pool.get());
+    if (d3dPool == nullptr || pool->GetType() == QueryType::Timestamp || queryIndex >= pool->GetCount()) {
+        return;
+    }
+
+    m_context->Begin(d3dPool->GetQuery(queryIndex));
+}
+
+void D3D11CommandBufferEncoder::EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex)
+{
+    auto* d3dPool = static_cast<D3D11QueryPool*>(pool.get());
+    if (d3dPool == nullptr || queryIndex >= pool->GetCount()) {
+        return;
+    }
+
+    m_context->End(d3dPool->GetQuery(queryIndex));
+}
+
+void D3D11CommandBufferEncoder::WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex)
+{
+    auto* d3dPool = static_cast<D3D11QueryPool*>(pool.get());
+    if (d3dPool == nullptr || pool->GetType() != QueryType::Timestamp || queryIndex >= pool->GetCount()) {
+        return;
+    }
+
+    m_context->End(d3dPool->GetQuery(queryIndex));
+}
+
+void D3D11CommandBufferEncoder::ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count)
+{
+    // D3D11 queries are implicitly reset when issued again.
 }
 } // namespace luna::RHI

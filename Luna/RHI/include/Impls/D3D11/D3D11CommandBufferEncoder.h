@@ -98,13 +98,13 @@ public:
                              uint32_t stride) override;
     void DispatchIndirect(const Ref<Buffer>& argBuffer, uint64_t offset) override;
 
-    void BeginQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) override {}
+    void BeginQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) override;
 
-    void EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) override {}
+    void EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) override;
 
-    void WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex) override {}
+    void WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex) override;
 
-    void ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) override {}
+    void ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) override;
 
 private:
     Ref<D3D11Device> m_device;

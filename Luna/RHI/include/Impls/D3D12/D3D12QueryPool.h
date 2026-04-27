@@ -15,6 +15,7 @@ private:
 
 public:
     D3D12QueryPool(const Ref<Device>& device, const QueryPoolCreateInfo& info);
+    ~D3D12QueryPool() override;
 
     QueryType GetType() const override
     {

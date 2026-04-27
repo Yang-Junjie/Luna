@@ -764,6 +764,24 @@ void D3D12CommandBufferEncoder::ResetQueryPool(const Ref<QueryPool>& pool, uint3
     // D3D12: query pools don't need explicit reset
 }
 
+void D3D12CommandBufferEncoder::ResolveQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count)
+{
+    auto* d3dPool = static_cast<D3D12QueryPool*>(pool.get());
+    if (d3dPool == nullptr || count == 0) {
+        return;
+    }
+
+    D3D12_QUERY_TYPE qtype = D3D12_QUERY_TYPE_OCCLUSION;
+    if (pool->GetType() == QueryType::Timestamp) {
+        qtype = D3D12_QUERY_TYPE_TIMESTAMP;
+    } else if (pool->GetType() == QueryType::PipelineStatistics) {
+        qtype = D3D12_QUERY_TYPE_PIPELINE_STATISTICS;
+    }
+
+    m_commandList->ResolveQueryData(
+        d3dPool->GetHeap(), qtype, first, count, d3dPool->GetReadbackBuffer(), first * sizeof(uint64_t));
+}
+
 void D3D12CommandBufferEncoder::TraceRays(const Ref<ShaderBindingTable>& sbt, uint32_t w, uint32_t h, uint32_t d)
 {
     auto* d3dSBT = static_cast<D3D12ShaderBindingTable*>(sbt.get());

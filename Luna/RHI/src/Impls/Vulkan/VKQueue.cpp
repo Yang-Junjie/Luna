@@ -1,6 +1,8 @@
 #include "Impls/Vulkan/VKCommandBufferEncoder.h"
+#include "Impls/Vulkan/VKAdapter.h"
 #include "Impls/Vulkan/VKQueue.h"
 #include "Impls/Vulkan/VKSynchronization.h"
+#include "Device.h"
 
 #include <mutex>
 
@@ -110,5 +112,20 @@ void VKQueue::Submit(const Ref<CommandBufferEncoder>& cmd)
 void VKQueue::WaitIdle()
 {
     m_queue.waitIdle();
+}
+
+double VKQueue::GetTimestampPeriodNs() const
+{
+    if (!m_device) {
+        return 0.0;
+    }
+
+    auto adapter = std::dynamic_pointer_cast<VKAdapter>(m_device->GetParentAdapter());
+    if (!adapter) {
+        return 0.0;
+    }
+
+    const vk::PhysicalDeviceProperties properties = adapter->GetNativeHandle().getProperties();
+    return static_cast<double>(properties.limits.timestampPeriod);
 }
 } // namespace luna::RHI
