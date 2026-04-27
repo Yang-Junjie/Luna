@@ -2,6 +2,9 @@
 #include "Renderer/RenderGraph.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <algorithm>
+#include <chrono>
+
 namespace luna {
 namespace {
 
@@ -9,6 +12,12 @@ const luna::RHI::Ref<luna::RHI::Texture>& emptyTextureRef()
 {
     static const luna::RHI::Ref<luna::RHI::Texture> empty_ref{};
     return empty_ref;
+}
+
+double elapsedMilliseconds(std::chrono::steady_clock::time_point begin,
+                           std::chrono::steady_clock::time_point end)
+{
+    return std::chrono::duration<double, std::milli>(end - begin).count();
 }
 
 } // namespace
@@ -110,6 +119,11 @@ RenderGraph::RenderGraph(FrameContext frame_context,
 
 void RenderGraph::execute() const
 {
+    m_profile = {};
+    m_profile.TextureCount = static_cast<uint32_t>(m_textures.size());
+    m_profile.FinalBarrierCount = static_cast<uint32_t>(m_final_texture_barriers.size());
+    m_profile.Passes.reserve(m_compiled_passes.size());
+
     if (!m_frame_context.command_buffer) {
         LUNA_RENDERER_WARN("Skipping render graph execution because command buffer is null");
         return;
@@ -128,7 +142,22 @@ void RenderGraph::execute() const
                               m_textures.size(),
                               m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
+    const auto graph_begin = std::chrono::steady_clock::now();
     for (const auto& pass : m_compiled_passes) {
+        RenderGraphPassProfile pass_profile{
+            .Name = pass.Pass.Name,
+            .Type = pass.Pass.Type,
+            .CpuTimeMs = 0.0,
+            .FramebufferWidth = pass.FramebufferWidth,
+            .FramebufferHeight = pass.FramebufferHeight,
+            .ReadTextureCount = pass.ReadTextureCount,
+            .WriteTextureCount = pass.WriteTextureCount,
+            .ColorAttachmentCount = static_cast<uint32_t>(pass.RenderingInfo.ColorAttachments.size()),
+            .HasDepthAttachment = static_cast<bool>(pass.RenderingInfo.DepthAttachment),
+            .PreBarrierCount = static_cast<uint32_t>(pass.PreTextureBarriers.size()),
+        };
+        const auto pass_begin = std::chrono::steady_clock::now();
+
         if (!pass.PreTextureBarriers.empty()) {
             LUNA_RENDERER_FRAME_TRACE("Render graph pass '{}' applying {} pre-texture barrier(s)",
                                       pass.Pass.Name,
@@ -171,6 +200,8 @@ void RenderGraph::execute() const
         }
 
         command_buffer.EndDebugLabel();
+        pass_profile.CpuTimeMs = elapsedMilliseconds(pass_begin, std::chrono::steady_clock::now());
+        m_profile.Passes.push_back(std::move(pass_profile));
     }
 
     if (!m_final_texture_barriers.empty()) {
@@ -178,7 +209,13 @@ void RenderGraph::execute() const
         command_buffer.PipelineBarrier(
             luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, m_final_texture_barriers);
     }
+    m_profile.TotalCpuTimeMs = elapsedMilliseconds(graph_begin, std::chrono::steady_clock::now());
     LUNA_RENDERER_FRAME_DEBUG("Render graph execution complete");
+}
+
+const RenderGraphProfileSnapshot& RenderGraph::profile() const
+{
+    return m_profile;
 }
 
 } // namespace luna

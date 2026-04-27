@@ -346,6 +346,8 @@ void LunaEditorLayer::onImGuiRender()
     m_asset_loading_panel.onImGuiRender();
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
+    m_render_profiler_panel.onImGuiRender(m_show_render_profiler_panel,
+                                          application.getRenderer().getLastRenderGraphProfile());
     drawViewport();
 }
 
@@ -422,6 +424,7 @@ void LunaEditorLayer::onImGuiMenuBar()
 
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
+        ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
         ImGui::EndMenu();
     }
 }

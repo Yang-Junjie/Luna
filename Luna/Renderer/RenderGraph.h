@@ -60,6 +60,26 @@ struct RenderGraphPass {
     RenderGraphPassType Type{RenderGraphPassType::Raster};
 };
 
+struct RenderGraphPassProfile {
+    std::string Name;
+    RenderGraphPassType Type{RenderGraphPassType::Raster};
+    double CpuTimeMs{0.0};
+    uint32_t FramebufferWidth{0};
+    uint32_t FramebufferHeight{0};
+    uint32_t ReadTextureCount{0};
+    uint32_t WriteTextureCount{0};
+    uint32_t ColorAttachmentCount{0};
+    bool HasDepthAttachment{false};
+    uint32_t PreBarrierCount{0};
+};
+
+struct RenderGraphProfileSnapshot {
+    double TotalCpuTimeMs{0.0};
+    uint32_t TextureCount{0};
+    uint32_t FinalBarrierCount{0};
+    std::vector<RenderGraphPassProfile> Passes;
+};
+
 class RenderGraphPassContext {
 public:
     const luna::RHI::Ref<luna::RHI::Device>& device() const;
@@ -119,6 +139,8 @@ struct RenderGraphCompiledPass {
     luna::RHI::RenderingInfo RenderingInfo;
     uint32_t FramebufferWidth{0};
     uint32_t FramebufferHeight{0};
+    uint32_t ReadTextureCount{0};
+    uint32_t WriteTextureCount{0};
     std::function<void(RenderGraphRasterPassContext&)> ExecuteRaster;
     std::function<void(RenderGraphComputePassContext&)> ExecuteCompute;
 };
@@ -143,6 +165,7 @@ public:
                 std::vector<luna::RHI::TextureBarrier> final_texture_barriers);
 
     void execute() const;
+    const RenderGraphProfileSnapshot& profile() const;
 
     const PassList& passes() const
     {
@@ -155,6 +178,7 @@ private:
     std::vector<luna::RHI::Ref<luna::RHI::Texture>> m_textures;
     CompiledPassList m_compiled_passes;
     std::vector<luna::RHI::TextureBarrier> m_final_texture_barriers;
+    mutable RenderGraphProfileSnapshot m_profile;
 };
 
 } // namespace luna

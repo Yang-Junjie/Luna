@@ -7,6 +7,7 @@
 #include "EditorCamera.h"
 #include "Events/Event.h"
 #include "InspectorPanel.h"
+#include "RenderProfilerPanel.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "SceneHierarchyPanel.h"
@@ -101,6 +102,8 @@ private:
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     bool m_show_builtin_materials_panel{false};
+
+    bool m_show_render_profiler_panel{false};
     bool m_runtime_viewport_enabled{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
@@ -109,6 +112,7 @@ private:
     AssetLoadingPanel m_asset_loading_panel;
     BuiltinMaterialsPanel m_builtin_materials_panel;
     ContentBrowserPanel m_content_browser_panel;
+    RenderProfilerPanel m_render_profiler_panel;
 };
 
 } // namespace luna

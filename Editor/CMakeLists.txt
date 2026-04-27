@@ -16,6 +16,8 @@ add_executable(
     LunaEditorApp.cpp
     LunaEditorLayer.h
     LunaEditorLayer.cpp
+    RenderProfilerPanel.h
+    RenderProfilerPanel.cpp
     SceneHierarchyPanel.h
     SceneHierarchyPanel.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp

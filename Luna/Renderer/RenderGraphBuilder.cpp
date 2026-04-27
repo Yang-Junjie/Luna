@@ -582,6 +582,9 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                 pass_node, physical_textures, m_frame_context.framebuffer_width, m_frame_context.framebuffer_height);
             compiled_pass.FramebufferWidth = pass_extent.width;
             compiled_pass.FramebufferHeight = pass_extent.height;
+            compiled_pass.ReadTextureCount = static_cast<uint32_t>(pass_node.Reads.size());
+            compiled_pass.WriteTextureCount = static_cast<uint32_t>(
+                pass_node.ColorAttachments.size() + (pass_node.DepthAttachment.has_value() ? 1u : 0u));
             compiled_pass.RenderingInfo.RenderArea = {0, 0, pass_extent.width, pass_extent.height};
             compiled_pass.RenderingInfo.LayerCount = 1;
 
@@ -645,6 +648,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             compiled_pass.ExecuteCompute = std::move(pass_node.Execute);
             compiled_pass.FramebufferWidth = m_frame_context.framebuffer_width;
             compiled_pass.FramebufferHeight = m_frame_context.framebuffer_height;
+            compiled_pass.ReadTextureCount = static_cast<uint32_t>(pass_node.Reads.size());
+            compiled_pass.WriteTextureCount = static_cast<uint32_t>(pass_node.Writes.size());
 
             for (const auto& read : pass_node.Reads) {
                 addBarrierIfNeeded(compiled_pass.PreTextureBarriers,

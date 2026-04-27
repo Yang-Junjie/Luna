@@ -124,6 +124,7 @@ public:
 
     RenderWorld& getRenderWorld();
     const RenderWorld& getRenderWorld() const;
+    [[nodiscard]] const RenderGraphProfileSnapshot& getLastRenderGraphProfile() const;
     bool addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
     [[nodiscard]] std::vector<render_flow::RenderFeatureInfo> getDefaultRenderFeatureInfos() const;
     bool setDefaultRenderFeatureEnabled(std::string_view name, bool enabled);
@@ -226,6 +227,7 @@ private:
     RuntimeState m_runtime{};
     RenderWorld m_render_world{};
     std::unique_ptr<IRenderFlow> m_render_flow;
+    RenderGraphProfileSnapshot m_last_render_graph_profile{};
 };
 
 } // namespace luna

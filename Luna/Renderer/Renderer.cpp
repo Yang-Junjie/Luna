@@ -226,6 +226,7 @@ void Renderer::shutdown()
     m_scene_output = {};
     m_frame_resources = {};
     m_runtime = {};
+    m_last_render_graph_profile = {};
 
     if (had_renderer_state) {
         LUNA_RENDERER_INFO("Renderer shutdown complete");
@@ -517,7 +518,9 @@ void Renderer::renderFrame()
                                   frame_resources.frame_index,
                                   frame_resources.render_graphs[frame_resources.frame_index]->passes().size());
         frame_resources.render_graphs[frame_resources.frame_index]->execute();
+        m_last_render_graph_profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
     } else {
+        m_last_render_graph_profile = {};
         LUNA_RENDERER_WARN("Render graph build returned null for frame {}", frame_resources.frame_index);
     }
 
@@ -824,6 +827,11 @@ RenderWorld& Renderer::getRenderWorld()
 const RenderWorld& Renderer::getRenderWorld() const
 {
     return m_render_world;
+}
+
+const RenderGraphProfileSnapshot& Renderer::getLastRenderGraphProfile() const
+{
+    return m_last_render_graph_profile;
 }
 
 bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature)
