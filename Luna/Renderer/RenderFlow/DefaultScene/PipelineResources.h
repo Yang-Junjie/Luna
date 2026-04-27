@@ -8,6 +8,7 @@
 #include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/PassResources.h"
+#include "Renderer/RenderFlow/LightingExtensionInputs.h"
 
 #include <array>
 #include <cstdint>
@@ -55,10 +56,7 @@ public:
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
                                  const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& reflection,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular);
+                                 const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;

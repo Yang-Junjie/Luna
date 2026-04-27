@@ -1,7 +1,7 @@
 #include "Renderer/RenderFlow/Features/FeatureProbe.h"
 
 #include "Core/Log.h"
-#include "Renderer/RenderFlow/RenderBlackboardKeys.h"
+#include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
@@ -47,7 +47,7 @@ public:
             return;
         }
 
-        context.blackboard().setTexture(blackboard::AmbientOcclusion, ambient_occlusion);
+        setLightingExtensionInput(context.blackboard(), LightingExtensionInput::AmbientOcclusion, ambient_occlusion);
         context.graph().AddRasterPass(
             name(),
             [ambient_occlusion](RenderGraphRasterPassBuilder& pass_builder) {

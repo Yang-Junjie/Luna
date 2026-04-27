@@ -1,6 +1,7 @@
 #include "Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
@@ -369,9 +370,9 @@ public:
         const SceneRenderContext& scene_context = context.sceneContext();
         const ScreenSpaceAmbientOcclusionFeature::Options options = currentOptions();
 
-        const auto depth = context.blackboard().getTexture(blackboard::Depth);
-        const auto normal_metallic = context.blackboard().getTexture(blackboard::GBufferNormalMetallic);
-        const auto world_position_roughness = context.blackboard().getTexture(blackboard::GBufferWorldPositionRoughness);
+        const auto depth = context.blackboard().get(blackboard::Depth);
+        const auto normal_metallic = context.blackboard().get(blackboard::GBufferNormalMetallic);
+        const auto world_position_roughness = context.blackboard().get(blackboard::GBufferWorldPositionRoughness);
         if (options.enabled &&
             (!isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
              !isValidTextureHandle(world_position_roughness))) {
@@ -398,7 +399,7 @@ public:
             return;
         }
 
-        context.blackboard().setTexture(blackboard::AmbientOcclusion, ambient_occlusion);
+        setLightingExtensionInput(context.blackboard(), LightingExtensionInput::AmbientOcclusion, ambient_occlusion);
 
         const bool inputs_ready = isValidTextureHandle(depth) && isValidTextureHandle(normal_metallic) &&
                                   isValidTextureHandle(world_position_roughness);

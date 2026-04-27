@@ -38,7 +38,7 @@ void updateSceneParameters(PassSharedState& state, const SceneRenderContext& con
 void updateEnvironmentBindings(PassSharedState& state);
 
 [[nodiscard]] RenderGraphTextureHandle readBlackboardTexture(const RenderPassBlackboard& blackboard,
-                                                             std::string_view name,
+                                                             RenderResourceKey<RenderGraphTextureHandle> key,
                                                              std::string_view pass_name);
 
 } // namespace luna::render_flow::default_scene

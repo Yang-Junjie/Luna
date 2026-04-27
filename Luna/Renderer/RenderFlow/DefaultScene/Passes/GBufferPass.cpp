@@ -69,13 +69,13 @@ void GeometryPass::setup(RenderPassContext& context)
     const SceneRenderContext& scene_context = context.sceneContext();
     const GBufferTextures gbuffer = createGBufferTextures(context.graph(), scene_context);
 
-    context.blackboard().setTexture(blackboard::GBufferBaseColor, gbuffer.base_color);
-    context.blackboard().setTexture(blackboard::GBufferNormalMetallic, gbuffer.normal_metallic);
-    context.blackboard().setTexture(blackboard::GBufferWorldPositionRoughness, gbuffer.world_position_roughness);
-    context.blackboard().setTexture(blackboard::GBufferEmissiveAo, gbuffer.emissive_ao);
-    context.blackboard().setTexture(blackboard::SceneColor, scene_context.color_target);
-    context.blackboard().setTexture(blackboard::Depth, scene_context.depth_target);
-    context.blackboard().setTexture(blackboard::Pick, scene_context.pick_target);
+    context.blackboard().set(blackboard::GBufferBaseColor, gbuffer.base_color);
+    context.blackboard().set(blackboard::GBufferNormalMetallic, gbuffer.normal_metallic);
+    context.blackboard().set(blackboard::GBufferWorldPositionRoughness, gbuffer.world_position_roughness);
+    context.blackboard().set(blackboard::GBufferEmissiveAo, gbuffer.emissive_ao);
+    context.blackboard().set(blackboard::SceneColor, scene_context.color_target);
+    context.blackboard().set(blackboard::Depth, scene_context.depth_target);
+    context.blackboard().set(blackboard::Pick, scene_context.pick_target);
 
     context.graph().AddRasterPass(
         name(),

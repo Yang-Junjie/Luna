@@ -4,14 +4,15 @@
 
 namespace luna::render_flow {
 
-void RenderPassBlackboard::setTexture(std::string_view name, RenderGraphTextureHandle handle)
+void RenderPassBlackboard::set(RenderResourceKey<RenderGraphTextureHandle> key, RenderGraphTextureHandle handle)
 {
-    m_textures[std::string(name)] = handle;
+    m_textures[std::string(key.name)] = handle;
 }
 
-std::optional<RenderGraphTextureHandle> RenderPassBlackboard::getTexture(std::string_view name) const
+std::optional<RenderGraphTextureHandle> RenderPassBlackboard::get(
+    RenderResourceKey<RenderGraphTextureHandle> key) const
 {
-    const auto iterator = m_textures.find(std::string(name));
+    const auto iterator = m_textures.find(std::string(key.name));
     if (iterator == m_textures.end()) {
         return std::nullopt;
     }
@@ -19,9 +20,9 @@ std::optional<RenderGraphTextureHandle> RenderPassBlackboard::getTexture(std::st
     return iterator->second;
 }
 
-bool RenderPassBlackboard::hasTexture(std::string_view name) const
+bool RenderPassBlackboard::has(RenderResourceKey<RenderGraphTextureHandle> key) const
 {
-    return m_textures.find(std::string(name)) != m_textures.end();
+    return m_textures.find(std::string(key.name)) != m_textures.end();
 }
 
 void RenderPassBlackboard::clear() noexcept

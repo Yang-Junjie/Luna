@@ -1,11 +1,11 @@
 ﻿#pragma once
 
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
+#include "Renderer/RenderFlow/RenderResourceKey.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <optional>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 
 namespace luna {
@@ -16,9 +16,9 @@ namespace luna::render_flow {
 
 class RenderPassBlackboard final {
 public:
-    void setTexture(std::string_view name, RenderGraphTextureHandle handle);
-    [[nodiscard]] std::optional<RenderGraphTextureHandle> getTexture(std::string_view name) const;
-    [[nodiscard]] bool hasTexture(std::string_view name) const;
+    void set(RenderResourceKey<RenderGraphTextureHandle> key, RenderGraphTextureHandle handle);
+    [[nodiscard]] std::optional<RenderGraphTextureHandle> get(RenderResourceKey<RenderGraphTextureHandle> key) const;
+    [[nodiscard]] bool has(RenderResourceKey<RenderGraphTextureHandle> key) const;
     void clear() noexcept;
 
 private:

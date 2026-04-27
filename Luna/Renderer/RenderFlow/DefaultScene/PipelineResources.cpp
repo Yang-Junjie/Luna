@@ -82,10 +82,7 @@ void PipelineResources::updateLightingResources(
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
     const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
-    const luna::RHI::Ref<luna::RHI::Texture>& reflection,
-    const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
-    const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular)
+    const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions)
 {
     m_pipeline_state.updateLightingResources(
         commands,
@@ -94,10 +91,7 @@ void PipelineResources::updateLightingResources(
         gbuffer_world_position_roughness,
         gbuffer_emissive_ao,
         pick_texture,
-        ambient_occlusion,
-        reflection,
-        indirect_diffuse,
-        indirect_specular);
+        lighting_extensions);
 }
 
 void PipelineResources::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)

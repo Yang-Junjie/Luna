@@ -645,10 +645,7 @@ void PipelineState::updateLightingResources(luna::RHI::CommandBufferEncoder& com
                                             const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                             const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
                                             const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
-                                            const luna::RHI::Ref<luna::RHI::Texture>& ambient_occlusion,
-                                            const luna::RHI::Ref<luna::RHI::Texture>& reflection,
-                                            const luna::RHI::Ref<luna::RHI::Texture>& indirect_diffuse,
-                                            const luna::RHI::Ref<luna::RHI::Texture>& indirect_specular)
+                                            const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions)
 {
     renderer_detail::uploadTextureIfNeeded(commands, m_state.default_ambient_occlusion_texture);
     renderer_detail::uploadTextureIfNeeded(commands, m_state.default_reflection_texture);
@@ -656,12 +653,13 @@ void PipelineState::updateLightingResources(luna::RHI::CommandBufferEncoder& com
     renderer_detail::uploadTextureIfNeeded(commands, m_state.default_indirect_specular_texture);
 
     const auto& ambient_occlusion_texture =
-        textureOrFallback(ambient_occlusion, m_state.default_ambient_occlusion_texture);
-    const auto& reflection_texture = textureOrFallback(reflection, m_state.default_reflection_texture);
+        textureOrFallback(lighting_extensions.ambient_occlusion, m_state.default_ambient_occlusion_texture);
+    const auto& reflection_texture =
+        textureOrFallback(lighting_extensions.reflection, m_state.default_reflection_texture);
     const auto& indirect_diffuse_texture =
-        textureOrFallback(indirect_diffuse, m_state.default_indirect_diffuse_texture);
+        textureOrFallback(lighting_extensions.indirect_diffuse, m_state.default_indirect_diffuse_texture);
     const auto& indirect_specular_texture =
-        textureOrFallback(indirect_specular, m_state.default_indirect_specular_texture);
+        textureOrFallback(lighting_extensions.indirect_specular, m_state.default_indirect_specular_texture);
 
     if (!m_state.gbuffer_descriptor_set || !m_state.gbuffer_sampler || !gbuffer_base_color || !gbuffer_normal_metallic ||
         !gbuffer_world_position_roughness || !gbuffer_emissive_ao || !pick_texture ||

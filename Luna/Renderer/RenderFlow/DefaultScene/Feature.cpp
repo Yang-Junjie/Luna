@@ -102,9 +102,9 @@ void Feature::prepareFrame(const RenderWorld& world,
 
     prepareResources(scene_context);
 
-    blackboard.setTexture(blackboard_names::SceneColor, scene_context.color_target);
-    blackboard.setTexture(blackboard_names::Depth, scene_context.depth_target);
-    blackboard.setTexture(blackboard_names::Pick, scene_context.pick_target);
+    blackboard.set(blackboard_names::SceneColor, scene_context.color_target);
+    blackboard.set(blackboard_names::Depth, scene_context.depth_target);
+    blackboard.set(blackboard_names::Pick, scene_context.pick_target);
 
     m_draw_queue.beginScene(world.camera());
     for (const auto& packet : world.drawPackets()) {

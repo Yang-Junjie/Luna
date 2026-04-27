@@ -124,15 +124,15 @@ void updateEnvironmentBindings(PassSharedState& state)
 }
 
 RenderGraphTextureHandle readBlackboardTexture(const RenderPassBlackboard& blackboard,
-                                               std::string_view name,
+                                               RenderResourceKey<RenderGraphTextureHandle> key,
                                                std::string_view pass_name)
 {
-    const std::optional<RenderGraphTextureHandle> handle = blackboard.getTexture(name);
+    const std::optional<RenderGraphTextureHandle> handle = blackboard.get(key);
     if (handle.has_value() && handle->isValid()) {
         return *handle;
     }
 
-    LUNA_RENDERER_WARN("Render pass '{}' could not find blackboard texture '{}'", pass_name, name);
+    LUNA_RENDERER_WARN("Render pass '{}' could not find blackboard texture '{}'", pass_name, key.name);
     return {};
 }
 

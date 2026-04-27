@@ -26,6 +26,8 @@ set(RENDERER_SOURCE
     Renderer/RenderGraphBuilder.cpp
     Renderer/RenderProfileExporter.h
     Renderer/RenderProfileExporter.cpp
+    Renderer/RenderFlow/LightingExtensionInputs.h
+    Renderer/RenderFlow/LightingExtensionInputs.cpp
     Renderer/RenderFlow/RenderFlow.h
     Renderer/RenderFlow/RenderFlow.cpp
     Renderer/RenderFlow/RenderFlowBuilder.h
@@ -34,6 +36,7 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFeature.h
     Renderer/RenderFlow/RenderFeatureRegistry.h
     Renderer/RenderFlow/RenderFeatureRegistry.cpp
+    Renderer/RenderFlow/RenderResourceKey.h
     Renderer/RenderFlow/Features/FeatureProbe.h
     Renderer/RenderFlow/Features/FeatureProbe.cpp
     Renderer/RenderFlow/Features/RenderFeatureModules.h

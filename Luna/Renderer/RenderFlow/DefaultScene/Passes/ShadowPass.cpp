@@ -112,7 +112,7 @@ void ShadowDepthPass::setup(RenderPassContext& context)
     shadow.render_params = buildDirectionalShadowParams(m_state->world(), context.sceneContext(), m_state->drawQueue());
     m_state->setShadowParams(shadow.render_params);
 
-    context.blackboard().setTexture(blackboard::ShadowMap, shadow.shadow_map);
+    context.blackboard().set(blackboard::ShadowMap, shadow.shadow_map);
 
     context.graph().AddRasterPass(
         name(),
