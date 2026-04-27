@@ -34,6 +34,10 @@ public:
     [[nodiscard]] const render_flow::RenderFlowBuilder& builder() const noexcept;
 
 private:
+    void installRegisteredFeatures();
+    [[nodiscard]] bool hasFeature(std::string_view name) const;
+
+private:
     std::vector<std::unique_ptr<render_flow::IRenderFeature>> m_features;
     render_flow::RenderPassBlackboard m_blackboard;
     render_flow::RenderFlowBuilder m_builder;

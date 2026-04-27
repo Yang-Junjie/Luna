@@ -32,8 +32,12 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
     Renderer/RenderFlow/RenderFeature.h
+    Renderer/RenderFlow/RenderFeatureRegistry.h
+    Renderer/RenderFlow/RenderFeatureRegistry.cpp
     Renderer/RenderFlow/Features/FeatureProbe.h
     Renderer/RenderFlow/Features/FeatureProbe.cpp
+    Renderer/RenderFlow/Features/RenderFeatureModules.h
+    Renderer/RenderFlow/Features/RenderFeatureModules.cpp
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.cpp
     Renderer/RenderFlow/RenderBlackboardKeys.h

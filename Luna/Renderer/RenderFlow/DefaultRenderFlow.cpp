@@ -2,6 +2,8 @@
 
 #include "Core/Log.h"
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
+#include "Renderer/RenderFlow/Features/RenderFeatureModules.h"
+#include "Renderer/RenderFlow/RenderFeatureRegistry.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -11,7 +13,9 @@ namespace luna {
 
 DefaultRenderFlow::DefaultRenderFlow()
 {
+    render_flow::linkBuiltInRenderFeatureModules();
     addFeature(std::make_unique<render_flow::default_scene::Feature>());
+    installRegisteredFeatures();
 }
 
 DefaultRenderFlow::~DefaultRenderFlow()
@@ -35,13 +39,60 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
         return false;
     }
 
-    if (!feature->registerPasses(m_builder)) {
-        LUNA_RENDERER_ERROR("Default render flow feature registration failed: {}", m_builder.lastError());
+    const render_flow::RenderFeatureInfo info = feature->info();
+    if (info.name.empty()) {
+        LUNA_RENDERER_ERROR("Default render flow feature registration failed: feature name is empty");
         return false;
     }
 
+    if (hasFeature(info.name)) {
+        LUNA_RENDERER_WARN("Default render flow feature '{}' is already registered; skipping duplicate", info.name);
+        return false;
+    }
+
+    if (!feature->registerPasses(m_builder)) {
+        LUNA_RENDERER_ERROR("Default render flow feature '{}' registration failed: {}", info.name, m_builder.lastError());
+        return false;
+    }
+
+    LUNA_RENDERER_INFO("Registered default render flow feature '{}'", info.name);
     m_features.push_back(std::move(feature));
     return true;
+}
+
+void DefaultRenderFlow::installRegisteredFeatures()
+{
+    const auto descriptors =
+        render_flow::RenderFeatureRegistry::instance().descriptorsForFlow(render_flow::kDefaultRenderFlowName);
+    for (const auto& descriptor : descriptors) {
+        if (hasFeature(descriptor.name)) {
+            LUNA_RENDERER_WARN("Skipping auto-installed render feature '{}' because it is already registered",
+                               descriptor.name);
+            continue;
+        }
+
+        auto feature = render_flow::RenderFeatureRegistry::instance().createFeature(descriptor.name);
+        if (!feature) {
+            LUNA_RENDERER_WARN("Skipping auto-installed render feature '{}' because its factory returned null",
+                               descriptor.name);
+            continue;
+        }
+
+        if (!descriptor.enabled_by_default && !feature->setEnabled(false)) {
+            LUNA_RENDERER_WARN("Render feature '{}' could not apply enabled_by_default=false", descriptor.name);
+        }
+
+        if (!addFeature(std::move(feature))) {
+            LUNA_RENDERER_WARN("Failed to auto-install render feature '{}'", descriptor.name);
+        }
+    }
+}
+
+bool DefaultRenderFlow::hasFeature(std::string_view name) const
+{
+    return std::any_of(m_features.begin(), m_features.end(), [name](const auto& feature) {
+        return feature && feature->info().name == name;
+    });
 }
 
 bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)

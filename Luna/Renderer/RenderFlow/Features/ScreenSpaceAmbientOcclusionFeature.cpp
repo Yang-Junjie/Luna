@@ -2,6 +2,7 @@
 
 #include "Core/Log.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
+#include "Renderer/RenderFlow/RenderFeatureRegistry.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
@@ -33,6 +34,14 @@
 #include <utility>
 
 namespace luna::render_flow {
+
+LUNA_REGISTER_RENDER_FEATURE(ScreenSpaceAmbientOcclusionFeature,
+                             "ScreenSpaceAmbientOcclusion",
+                             "Screen Space Ambient Occlusion",
+                             "Lighting")
+
+void linkScreenSpaceAmbientOcclusionFeature() {}
+
 namespace {
 
 constexpr luna::RHI::Format kAmbientOcclusionFormat = luna::RHI::Format::RGBA8_UNORM;
