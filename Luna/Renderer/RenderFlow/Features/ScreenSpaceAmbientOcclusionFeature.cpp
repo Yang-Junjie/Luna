@@ -29,6 +29,7 @@
 #include <glm/vec4.hpp>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace luna::render_flow {
 namespace {
@@ -223,22 +224,7 @@ public:
             return;
         }
 
-        const SsaoGpuParams params{
-            .framebuffer = glm::vec4(1.0f / static_cast<float>(width),
-                                     1.0f / static_cast<float>(height),
-                                     static_cast<float>(width),
-                                     static_cast<float>(height)),
-            .settings = glm::vec4(std::max(options.radius, 0.01f),
-                                  std::max(options.intensity, 0.0f),
-                                  std::max(options.bias, 0.0f),
-                                  std::max(options.power, 0.01f)),
-        };
-        if (void* mapped = m_state.params_buffer->Map()) {
-            std::memcpy(mapped, &params, sizeof(params));
-            m_state.params_buffer->Flush();
-            m_state.params_buffer->Unmap();
-        }
-
+        updateParams(width, height, options);
         m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
             .Binding = 0,
             .TextureView = depth->GetDefaultView(),
@@ -296,6 +282,25 @@ public:
     }
 
 private:
+    void updateParams(uint32_t width, uint32_t height, const Options& options)
+    {
+        const SsaoGpuParams params{
+            .framebuffer = glm::vec4(1.0f / static_cast<float>(width),
+                                     1.0f / static_cast<float>(height),
+                                     static_cast<float>(width),
+                                     static_cast<float>(height)),
+            .settings = glm::vec4(std::max(options.radius, 0.01f),
+                                  std::max(options.intensity, 0.0f),
+                                  std::max(options.bias, 0.0f),
+                                  std::max(options.power, 0.01f)),
+        };
+        if (void* mapped = m_state.params_buffer->Map()) {
+            std::memcpy(mapped, &params, sizeof(params));
+            m_state.params_buffer->Flush();
+            m_state.params_buffer->Unmap();
+        }
+    }
+
     struct State {
         luna::RHI::Ref<luna::RHI::Device> device;
         luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
@@ -318,9 +323,9 @@ namespace {
 class ScreenSpaceAmbientOcclusionPass final : public IRenderPass {
 public:
     ScreenSpaceAmbientOcclusionPass(ScreenSpaceAmbientOcclusionFeature::Resources& resources,
-                                    ScreenSpaceAmbientOcclusionFeature::Options options)
+                                    ScreenSpaceAmbientOcclusionFeature::OptionsHandle options)
         : m_resources(&resources),
-          m_options(options)
+          m_options(std::move(options))
     {}
 
     [[nodiscard]] const char* name() const noexcept override
@@ -331,19 +336,19 @@ public:
     void setup(RenderPassContext& context) override
     {
         const SceneRenderContext& scene_context = context.sceneContext();
+        const ScreenSpaceAmbientOcclusionFeature::Options options = currentOptions();
 
         const auto depth = context.blackboard().getTexture(blackboard::Depth);
         const auto normal_metallic = context.blackboard().getTexture(blackboard::GBufferNormalMetallic);
         const auto world_position_roughness = context.blackboard().getTexture(blackboard::GBufferWorldPositionRoughness);
-        if (!isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
-            !isValidTextureHandle(world_position_roughness)) {
+        if (options.enabled &&
+            (!isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
+             !isValidTextureHandle(world_position_roughness))) {
             LUNA_RENDERER_WARN("ScreenSpaceAmbientOcclusion missing input texture(s): depth={} normal={} position={}",
                                isValidTextureHandle(depth),
                                isValidTextureHandle(normal_metallic),
                                isValidTextureHandle(world_position_roughness));
         }
-
-        const bool resources_ready = m_resources != nullptr && m_resources->ensure(scene_context);
 
         RenderGraphTextureHandle ambient_occlusion = context.graph().CreateTexture(RenderGraphTextureDesc{
             .Name = "ScreenSpaceAmbientOcclusion",
@@ -363,16 +368,23 @@ public:
         }
 
         context.blackboard().setTexture(blackboard::AmbientOcclusion, ambient_occlusion);
+
+        const bool inputs_ready = isValidTextureHandle(depth) && isValidTextureHandle(normal_metallic) &&
+                                  isValidTextureHandle(world_position_roughness);
+        const bool resources_ready = options.enabled && inputs_ready && m_resources != nullptr &&
+                                     m_resources->ensure(scene_context);
+
         context.graph().AddRasterPass(
             name(),
-            [ambient_occlusion, depth, normal_metallic, world_position_roughness](RenderGraphRasterPassBuilder& pass_builder) {
-                if (isValidTextureHandle(depth)) {
+            [ambient_occlusion, depth, normal_metallic, world_position_roughness, enabled = options.enabled](
+                RenderGraphRasterPassBuilder& pass_builder) {
+                if (enabled && isValidTextureHandle(depth)) {
                     pass_builder.ReadTexture(*depth);
                 }
-                if (isValidTextureHandle(normal_metallic)) {
+                if (enabled && isValidTextureHandle(normal_metallic)) {
                     pass_builder.ReadTexture(*normal_metallic);
                 }
-                if (isValidTextureHandle(world_position_roughness)) {
+                if (enabled && isValidTextureHandle(world_position_roughness)) {
                     pass_builder.ReadTexture(*world_position_roughness);
                 }
                 pass_builder.WriteColor(ambient_occlusion,
@@ -380,10 +392,10 @@ public:
                                         luna::RHI::AttachmentStoreOp::Store,
                                         luna::RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
             },
-            [this, resources_ready, depth, normal_metallic, world_position_roughness, scene_context](
+            [this, options, resources_ready, depth, normal_metallic, world_position_roughness, scene_context](
                 RenderGraphRasterPassContext& pass_context) {
-                if (!resources_ready || !isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
-                    !isValidTextureHandle(world_position_roughness)) {
+                if (!options.enabled || !resources_ready || !isValidTextureHandle(depth) ||
+                    !isValidTextureHandle(normal_metallic) || !isValidTextureHandle(world_position_roughness)) {
                     clearAmbientOcclusion(pass_context);
                     return;
                 }
@@ -401,36 +413,54 @@ public:
                                             position_texture,
                                             scene_context.framebuffer_width,
                                             scene_context.framebuffer_height,
-                                            m_options);
+                                            options);
                 m_resources->draw(pass_context);
             });
     }
 
 private:
+    [[nodiscard]] ScreenSpaceAmbientOcclusionFeature::Options currentOptions() const
+    {
+        return m_options ? *m_options : ScreenSpaceAmbientOcclusionFeature::Options{};
+    }
+
     ScreenSpaceAmbientOcclusionFeature::Resources* m_resources{nullptr};
-    ScreenSpaceAmbientOcclusionFeature::Options m_options{};
+    ScreenSpaceAmbientOcclusionFeature::OptionsHandle m_options;
 };
 
 } // namespace
 
 ScreenSpaceAmbientOcclusionFeature::ScreenSpaceAmbientOcclusionFeature()
-    : m_resources(std::make_unique<Resources>())
+    : ScreenSpaceAmbientOcclusionFeature(std::make_shared<Options>())
 {}
 
 ScreenSpaceAmbientOcclusionFeature::ScreenSpaceAmbientOcclusionFeature(Options options)
-    : m_options(options),
-      m_resources(std::make_unique<Resources>())
+    : ScreenSpaceAmbientOcclusionFeature(std::make_shared<Options>(options))
 {}
+
+ScreenSpaceAmbientOcclusionFeature::ScreenSpaceAmbientOcclusionFeature(OptionsHandle options)
+    : m_options(std::move(options)),
+      m_resources(std::make_unique<Resources>())
+{
+    if (!m_options) {
+        m_options = std::make_shared<Options>();
+    }
+}
 
 ScreenSpaceAmbientOcclusionFeature::~ScreenSpaceAmbientOcclusionFeature() = default;
 
+ScreenSpaceAmbientOcclusionFeature::Options& ScreenSpaceAmbientOcclusionFeature::options() noexcept
+{
+    return *m_options;
+}
+
+const ScreenSpaceAmbientOcclusionFeature::Options& ScreenSpaceAmbientOcclusionFeature::options() const noexcept
+{
+    return *m_options;
+}
+
 bool ScreenSpaceAmbientOcclusionFeature::registerPasses(RenderFlowBuilder& builder)
 {
-    if (!m_options.enabled) {
-        LUNA_RENDERER_INFO("ScreenSpaceAmbientOcclusionFeature disabled; no pass registered");
-        return true;
-    }
-
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered =

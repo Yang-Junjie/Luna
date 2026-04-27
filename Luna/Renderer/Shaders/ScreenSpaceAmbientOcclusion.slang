@@ -35,16 +35,37 @@ float2 screenUvFromPosition(float4 position)
     return saturate(position.xy * gSsaoParams.framebuffer.xy);
 }
 
-float sampleOcclusion(float2 uv,
-                      float2 offset,
+bool isInsideScreen(float2 uv)
+{
+    return uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0;
+}
+
+bool loadSurface(float2 uv, out float depth, out float3 normal, out float3 position)
+{
+    depth = gDepthTexture.SampleLevel(gSsaoSampler, uv, 0.0);
+    const float4 normalMetallic = gNormalMetallicTexture.SampleLevel(gSsaoSampler, uv, 0.0);
+    normal = safeNormalize(normalMetallic.xyz, float3(0.0, 0.0, 1.0));
+    position = gWorldPositionRoughnessTexture.SampleLevel(gSsaoSampler, uv, 0.0).xyz;
+    return depth < 0.9999 && dot(normalMetallic.xyz, normalMetallic.xyz) >= 1e-6;
+}
+
+float sampleOcclusion(float2 sampleUv,
                       float3 centerPosition,
                       float3 centerNormal,
-                      float centerDepth,
                       float radius,
                       float bias)
 {
-    const float2 sampleUv = saturate(uv + offset);
+    if (!isInsideScreen(sampleUv))
+    {
+        return 0.0;
+    }
+
     const float sampleDepth = gDepthTexture.SampleLevel(gSsaoSampler, sampleUv, 0.0);
+    if (sampleDepth >= 0.9999)
+    {
+        return 0.0;
+    }
+
     const float3 samplePosition = gWorldPositionRoughnessTexture.SampleLevel(gSsaoSampler, sampleUv, 0.0).xyz;
     const float3 delta = samplePosition - centerPosition;
     const float distanceToSample = length(delta);
@@ -53,10 +74,10 @@ float sampleOcclusion(float2 uv,
         return 0.0;
     }
 
+    const float3 sampleDirection = delta / distanceToSample;
     const float rangeWeight = saturate(1.0 - distanceToSample / radius);
-    const float normalOcclusion = saturate(dot(centerNormal, delta / distanceToSample) - bias);
-    const float depthOcclusion = saturate((centerDepth - sampleDepth - 0.0003) * 80.0);
-    return max(normalOcclusion, depthOcclusion * 0.4) * rangeWeight * rangeWeight;
+    const float normalOcclusion = saturate((dot(centerNormal, sampleDirection) - bias) / max(1.0 - bias, 0.001));
+    return normalOcclusion * rangeWeight * rangeWeight;
 }
 
 [shader("vertex")]
@@ -77,15 +98,14 @@ SsaoVertexOutput ssaoVertexMain(uint vertexID : SV_VertexID)
 float4 ssaoFragmentMain(SsaoVertexOutput input) : SV_Target
 {
     const float2 uv = screenUvFromPosition(input.position);
-    const float depth = gDepthTexture.SampleLevel(gSsaoSampler, uv, 0.0);
-    const float4 normalMetallic = gNormalMetallicTexture.SampleLevel(gSsaoSampler, uv, 0.0);
-    const float3 normal = safeNormalize(normalMetallic.xyz, float3(0.0, 0.0, 1.0));
-    if (depth >= 0.9999 || dot(normalMetallic.xyz, normalMetallic.xyz) < 1e-6)
+    float depth = 1.0;
+    float3 normal = float3(0.0, 0.0, 1.0);
+    float3 centerPosition = float3(0.0, 0.0, 0.0);
+    if (!loadSurface(uv, depth, normal, centerPosition))
     {
         return float4(1.0, 1.0, 1.0, 1.0);
     }
 
-    const float3 centerPosition = gWorldPositionRoughnessTexture.SampleLevel(gSsaoSampler, uv, 0.0).xyz;
     const float radius = gSsaoParams.settings.x;
     const float intensity = gSsaoParams.settings.y;
     const float bias = gSsaoParams.settings.z;
@@ -116,11 +136,9 @@ float4 ssaoFragmentMain(SsaoVertexOutput input) : SV_Target
     [unroll]
     for (int sampleIndex = 0; sampleIndex < 16; ++sampleIndex)
     {
-        occlusion += sampleOcclusion(uv,
-                                     offsets[sampleIndex] * texelRadius,
+        occlusion += sampleOcclusion(uv + offsets[sampleIndex] * texelRadius,
                                      centerPosition,
                                      normal,
-                                     depth,
                                      radius,
                                      bias);
     }

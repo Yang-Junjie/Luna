@@ -252,6 +252,10 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
     ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
+    bool ssao_enabled = application.isScreenSpaceAmbientOcclusionEnabled();
+    if (ImGui::Checkbox("SSAO", &ssao_enabled)) {
+        application.setScreenSpaceAmbientOcclusionEnabled(ssao_enabled);
+    }
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();
     }

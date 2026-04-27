@@ -127,12 +127,27 @@ LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend)
           .m_enable_imgui = backendSupportsImGui(backend),
           .m_enable_multi_viewport = false,
       }),
-      m_backend(backend)
+      m_backend(backend),
+      m_ssao_options(std::make_shared<render_flow::ScreenSpaceAmbientOcclusionOptions>())
 {}
 
 luna::RHI::BackendType LunaEditorApplication::getBackend() const
 {
     return m_backend;
+}
+
+bool LunaEditorApplication::isScreenSpaceAmbientOcclusionEnabled() const
+{
+    return m_ssao_options ? m_ssao_options->enabled : true;
+}
+
+void LunaEditorApplication::setScreenSpaceAmbientOcclusionEnabled(bool enabled)
+{
+    if (!m_ssao_options) {
+        m_ssao_options = std::make_shared<render_flow::ScreenSpaceAmbientOcclusionOptions>();
+    }
+
+    m_ssao_options->enabled = enabled;
 }
 
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()
@@ -146,8 +161,12 @@ Renderer::InitializationOptions LunaEditorApplication::getRendererInitialization
 void LunaEditorApplication::onInit()
 {
     auto& renderer = getRenderer();
+    if (!m_ssao_options) {
+        m_ssao_options = std::make_shared<render_flow::ScreenSpaceAmbientOcclusionOptions>();
+    }
+
     if (!renderer.addDefaultRenderFeature(
-            std::make_unique<render_flow::ScreenSpaceAmbientOcclusionFeature>())) {
+            std::make_unique<render_flow::ScreenSpaceAmbientOcclusionFeature>(m_ssao_options))) {
         LUNA_EDITOR_WARN("Failed to register ScreenSpaceAmbientOcclusionFeature");
     }
 

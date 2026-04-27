@@ -6,21 +6,27 @@
 
 namespace luna::render_flow {
 
+struct ScreenSpaceAmbientOcclusionOptions {
+    bool enabled{true};
+    float radius{1.2f};
+    float intensity{1.2f};
+    float bias{0.08f};
+    float power{1.0f};
+};
+
 class ScreenSpaceAmbientOcclusionFeature final : public IRenderFeature {
 public:
     class Resources;
-
-    struct Options {
-        bool enabled{true};
-        float radius{1.5f};
-        float intensity{1.25f};
-        float bias{0.03f};
-        float power{1.15f};
-    };
+    using Options = ScreenSpaceAmbientOcclusionOptions;
+    using OptionsHandle = std::shared_ptr<Options>;
 
     ScreenSpaceAmbientOcclusionFeature();
     explicit ScreenSpaceAmbientOcclusionFeature(Options options);
+    explicit ScreenSpaceAmbientOcclusionFeature(OptionsHandle options);
     ~ScreenSpaceAmbientOcclusionFeature() override;
+
+    [[nodiscard]] Options& options() noexcept;
+    [[nodiscard]] const Options& options() const noexcept;
 
     bool registerPasses(RenderFlowBuilder& builder) override;
     void prepareFrame(const RenderWorld& world,
@@ -29,7 +35,7 @@ public:
     void shutdown() override;
 
 private:
-    Options m_options;
+    OptionsHandle m_options;
     std::unique_ptr<Resources> m_resources;
 };
 
