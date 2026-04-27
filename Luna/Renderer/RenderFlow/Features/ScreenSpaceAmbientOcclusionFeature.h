@@ -25,6 +25,10 @@ public:
     explicit ScreenSpaceAmbientOcclusionFeature(OptionsHandle options);
     ~ScreenSpaceAmbientOcclusionFeature() override;
 
+    [[nodiscard]] RenderFeatureInfo info() const noexcept override;
+    [[nodiscard]] std::vector<RenderFeatureParameterInfo> parameters() const override;
+    bool setEnabled(bool enabled) noexcept override;
+    bool setParameter(std::string_view name, const RenderFeatureParameterValue& value) noexcept override;
     [[nodiscard]] Options& options() noexcept;
     [[nodiscard]] const Options& options() const noexcept;
 

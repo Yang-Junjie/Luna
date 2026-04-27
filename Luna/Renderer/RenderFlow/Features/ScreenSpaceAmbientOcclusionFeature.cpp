@@ -29,6 +29,7 @@
 #include <glm/vec4.hpp>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace luna::render_flow {
@@ -135,6 +136,27 @@ void clearAmbientOcclusion(RenderGraphRasterPassContext& pass_context)
 {
     pass_context.beginRendering();
     pass_context.endRendering();
+}
+
+RenderFeatureParameterInfo makeFloatParameter(std::string_view name,
+                                              std::string_view display_name,
+                                              float value,
+                                              float min_value,
+                                              float max_value,
+                                              float step)
+{
+    RenderFeatureParameterInfo parameter{};
+    parameter.name = name;
+    parameter.display_name = display_name;
+    parameter.type = RenderFeatureParameterType::Float;
+    parameter.value.type = RenderFeatureParameterType::Float;
+    parameter.value.float_value = value;
+    parameter.min.type = RenderFeatureParameterType::Float;
+    parameter.min.float_value = min_value;
+    parameter.max.type = RenderFeatureParameterType::Float;
+    parameter.max.float_value = max_value;
+    parameter.step = step;
+    return parameter;
 }
 
 } // namespace
@@ -448,6 +470,65 @@ ScreenSpaceAmbientOcclusionFeature::ScreenSpaceAmbientOcclusionFeature(OptionsHa
 }
 
 ScreenSpaceAmbientOcclusionFeature::~ScreenSpaceAmbientOcclusionFeature() = default;
+
+RenderFeatureInfo ScreenSpaceAmbientOcclusionFeature::info() const noexcept
+{
+    return RenderFeatureInfo{
+        .name = "ScreenSpaceAmbientOcclusion",
+        .display_name = "Screen Space Ambient Occlusion",
+        .category = "Lighting",
+        .enabled = m_options ? m_options->enabled : true,
+        .runtime_toggleable = true,
+    };
+}
+
+std::vector<RenderFeatureParameterInfo> ScreenSpaceAmbientOcclusionFeature::parameters() const
+{
+    const Options options = m_options ? *m_options : Options{};
+    return {
+        makeFloatParameter("radius", "Radius", options.radius, 0.05f, 5.0f, 0.02f),
+        makeFloatParameter("intensity", "Intensity", options.intensity, 0.0f, 4.0f, 0.02f),
+        makeFloatParameter("bias", "Bias", options.bias, 0.0f, 0.3f, 0.001f),
+        makeFloatParameter("power", "Power", options.power, 0.25f, 4.0f, 0.01f),
+    };
+}
+
+bool ScreenSpaceAmbientOcclusionFeature::setEnabled(bool enabled) noexcept
+{
+    if (!m_options) {
+        return false;
+    }
+
+    m_options->enabled = enabled;
+    return true;
+}
+
+bool ScreenSpaceAmbientOcclusionFeature::setParameter(std::string_view name,
+                                                      const RenderFeatureParameterValue& value) noexcept
+{
+    if (!m_options || value.type != RenderFeatureParameterType::Float) {
+        return false;
+    }
+
+    if (name == "radius") {
+        m_options->radius = std::clamp(value.float_value, 0.05f, 5.0f);
+        return true;
+    }
+    if (name == "intensity") {
+        m_options->intensity = std::clamp(value.float_value, 0.0f, 4.0f);
+        return true;
+    }
+    if (name == "bias") {
+        m_options->bias = std::clamp(value.float_value, 0.0f, 0.3f);
+        return true;
+    }
+    if (name == "power") {
+        m_options->power = std::clamp(value.float_value, 0.25f, 4.0f);
+        return true;
+    }
+
+    return false;
+}
 
 ScreenSpaceAmbientOcclusionFeature::Options& ScreenSpaceAmbientOcclusionFeature::options() noexcept
 {

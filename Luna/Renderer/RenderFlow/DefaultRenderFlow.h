@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 namespace luna {
@@ -22,6 +23,12 @@ public:
     void shutdown();
     bool addFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
     bool configure(const ConfigureFunction& configure_function);
+    [[nodiscard]] std::vector<render_flow::RenderFeatureInfo> featureInfos() const;
+    bool setFeatureEnabled(std::string_view name, bool enabled);
+    [[nodiscard]] std::vector<render_flow::RenderFeatureParameterInfo> featureParameters(std::string_view name) const;
+    bool setFeatureParameter(std::string_view feature_name,
+                             std::string_view parameter_name,
+                             const render_flow::RenderFeatureParameterValue& value);
 
     [[nodiscard]] render_flow::RenderFlowBuilder& builder() noexcept;
     [[nodiscard]] const render_flow::RenderFlowBuilder& builder() const noexcept;

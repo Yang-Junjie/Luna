@@ -68,6 +68,17 @@ private:
 
 } // namespace
 
+RenderFeatureInfo FeatureProbe::info() const noexcept
+{
+    return RenderFeatureInfo{
+        .name = "FeatureProbeAmbientOcclusion",
+        .display_name = "Feature Probe Ambient Occlusion",
+        .category = "Debug",
+        .enabled = true,
+        .runtime_toggleable = false,
+    };
+}
+
 bool FeatureProbe::registerPasses(RenderFlowBuilder& builder)
 {
     namespace extension_slots = luna::render_flow::slots::extension_points;

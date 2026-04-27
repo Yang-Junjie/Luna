@@ -6,6 +6,7 @@
 
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
+#include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <cstdint>
@@ -18,6 +19,7 @@
 #include <memory>
 #include <optional>
 #include <Surface.h>
+#include <string_view>
 #include <vector>
 
 struct GLFWwindow;
@@ -123,6 +125,13 @@ public:
     RenderWorld& getRenderWorld();
     const RenderWorld& getRenderWorld() const;
     bool addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
+    [[nodiscard]] std::vector<render_flow::RenderFeatureInfo> getDefaultRenderFeatureInfos() const;
+    bool setDefaultRenderFeatureEnabled(std::string_view name, bool enabled);
+    [[nodiscard]] std::vector<render_flow::RenderFeatureParameterInfo>
+        getDefaultRenderFeatureParameters(std::string_view name) const;
+    bool setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                          std::string_view parameter_name,
+                                          const render_flow::RenderFeatureParameterValue& value);
     bool configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function);
 
     glm::vec4& getClearColor();

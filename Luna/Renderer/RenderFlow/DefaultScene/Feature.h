@@ -20,6 +20,7 @@ public:
     Feature();
     ~Feature() override;
 
+    [[nodiscard]] RenderFeatureInfo info() const noexcept override;
     bool registerPasses(RenderFlowBuilder& builder) override;
     void prepareFrame(const RenderWorld& world,
                       const SceneRenderContext& scene_context,

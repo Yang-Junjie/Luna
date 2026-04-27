@@ -837,6 +837,50 @@ bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeatu
     return default_render_flow->addFeature(std::move(feature));
 }
 
+std::vector<render_flow::RenderFeatureInfo> Renderer::getDefaultRenderFeatureInfos() const
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        return {};
+    }
+
+    return default_render_flow->featureInfos();
+}
+
+bool Renderer::setDefaultRenderFeatureEnabled(std::string_view name, bool enabled)
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        LUNA_RENDERER_ERROR("Cannot toggle default render feature because the active render flow is not DefaultRenderFlow");
+        return false;
+    }
+
+    return default_render_flow->setFeatureEnabled(name, enabled);
+}
+
+std::vector<render_flow::RenderFeatureParameterInfo> Renderer::getDefaultRenderFeatureParameters(std::string_view name) const
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        return {};
+    }
+
+    return default_render_flow->featureParameters(name);
+}
+
+bool Renderer::setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                                std::string_view parameter_name,
+                                                const render_flow::RenderFeatureParameterValue& value)
+{
+    auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
+    if (!default_render_flow) {
+        LUNA_RENDERER_ERROR("Cannot set default render feature parameter because the active render flow is not DefaultRenderFlow");
+        return false;
+    }
+
+    return default_render_flow->setFeatureParameter(feature_name, parameter_name, value);
+}
+
 bool Renderer::configureDefaultRenderFlow(const DefaultRenderFlowConfigureFunction& configure_function)
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());

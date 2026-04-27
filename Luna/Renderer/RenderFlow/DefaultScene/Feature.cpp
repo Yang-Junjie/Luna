@@ -78,6 +78,17 @@ Feature::~Feature()
     shutdown();
 }
 
+RenderFeatureInfo Feature::info() const noexcept
+{
+    return RenderFeatureInfo{
+        .name = "DefaultScene",
+        .display_name = "Default Scene",
+        .category = "Scene",
+        .enabled = true,
+        .runtime_toggleable = false,
+    };
+}
+
 bool Feature::registerPasses(RenderFlowBuilder& builder)
 {
     return registerScenePasses(builder, m_scene_state);

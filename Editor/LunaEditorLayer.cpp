@@ -252,9 +252,86 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
     ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
-    bool ssao_enabled = application.isScreenSpaceAmbientOcclusionEnabled();
-    if (ImGui::Checkbox("SSAO", &ssao_enabled)) {
-        application.setScreenSpaceAmbientOcclusionEnabled(ssao_enabled);
+    const auto render_features = application.getRenderer().getDefaultRenderFeatureInfos();
+    if (!render_features.empty()) {
+        ImGui::Separator();
+        ImGui::TextUnformatted("Render Features");
+        for (const auto& feature : render_features) {
+            std::string label(feature.display_name);
+            label += "##";
+            label.append(feature.name.data(), feature.name.size());
+
+            bool enabled = feature.enabled;
+            if (!feature.runtime_toggleable) {
+                ImGui::BeginDisabled();
+            }
+
+            if (ImGui::Checkbox(label.c_str(), &enabled) && feature.runtime_toggleable) {
+                application.getRenderer().setDefaultRenderFeatureEnabled(feature.name, enabled);
+            }
+
+            if (!feature.runtime_toggleable) {
+                ImGui::EndDisabled();
+            }
+
+            ImGui::SameLine();
+            ImGui::TextDisabled("[%.*s]", static_cast<int>(feature.category.size()), feature.category.data());
+
+            const auto parameters = application.getRenderer().getDefaultRenderFeatureParameters(feature.name);
+            if (!parameters.empty()) {
+                ImGui::Indent();
+                for (const auto& parameter : parameters) {
+                    std::string parameter_label(parameter.display_name);
+                    parameter_label += "##";
+                    parameter_label.append(feature.name.data(), feature.name.size());
+                    parameter_label += ".";
+                    parameter_label.append(parameter.name.data(), parameter.name.size());
+
+                    if (parameter.read_only) {
+                        ImGui::BeginDisabled();
+                    }
+
+                    bool changed = false;
+                    auto value = parameter.value;
+                    switch (parameter.type) {
+                        case render_flow::RenderFeatureParameterType::Bool: {
+                            changed = ImGui::Checkbox(parameter_label.c_str(), &value.bool_value);
+                            break;
+                        }
+                        case render_flow::RenderFeatureParameterType::Int: {
+                            changed = ImGui::DragInt(parameter_label.c_str(),
+                                                     &value.int_value,
+                                                     parameter.step,
+                                                     parameter.min.int_value,
+                                                     parameter.max.int_value);
+                            break;
+                        }
+                        case render_flow::RenderFeatureParameterType::Float: {
+                            changed = ImGui::DragFloat(parameter_label.c_str(),
+                                                       &value.float_value,
+                                                       parameter.step,
+                                                       parameter.min.float_value,
+                                                       parameter.max.float_value,
+                                                       "%.3f");
+                            break;
+                        }
+                        case render_flow::RenderFeatureParameterType::Color: {
+                            changed = ImGui::ColorEdit4(parameter_label.c_str(), glm::value_ptr(value.color_value));
+                            break;
+                        }
+                    }
+
+                    if (changed && !parameter.read_only) {
+                        application.getRenderer().setDefaultRenderFeatureParameter(feature.name, parameter.name, value);
+                    }
+
+                    if (parameter.read_only) {
+                        ImGui::EndDisabled();
+                    }
+                }
+                ImGui::Unindent();
+            }
+        }
     }
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();

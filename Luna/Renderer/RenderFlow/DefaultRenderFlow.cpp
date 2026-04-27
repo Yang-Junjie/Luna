@@ -5,6 +5,8 @@
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <algorithm>
+
 namespace luna {
 
 DefaultRenderFlow::DefaultRenderFlow()
@@ -63,6 +65,100 @@ bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)
     }
 
     return true;
+}
+
+std::vector<render_flow::RenderFeatureInfo> DefaultRenderFlow::featureInfos() const
+{
+    std::vector<render_flow::RenderFeatureInfo> infos;
+    infos.reserve(m_features.size());
+    for (const auto& feature : m_features) {
+        if (feature) {
+            infos.push_back(feature->info());
+        }
+    }
+    return infos;
+}
+
+bool DefaultRenderFlow::setFeatureEnabled(std::string_view name, bool enabled)
+{
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        if (info.name != name) {
+            continue;
+        }
+
+        if (!info.runtime_toggleable) {
+            LUNA_RENDERER_WARN("Render feature '{}' does not support runtime toggling", name);
+            return false;
+        }
+
+        if (info.enabled == enabled) {
+            return true;
+        }
+
+        return feature->setEnabled(enabled);
+    }
+
+    LUNA_RENDERER_WARN("Render feature '{}' was not found", name);
+    return false;
+}
+
+std::vector<render_flow::RenderFeatureParameterInfo> DefaultRenderFlow::featureParameters(std::string_view name) const
+{
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        if (feature->info().name == name) {
+            return feature->parameters();
+        }
+    }
+
+    return {};
+}
+
+bool DefaultRenderFlow::setFeatureParameter(std::string_view feature_name,
+                                            std::string_view parameter_name,
+                                            const render_flow::RenderFeatureParameterValue& value)
+{
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        if (feature->info().name != feature_name) {
+            continue;
+        }
+
+        const auto parameters = feature->parameters();
+        const auto parameter_it = std::find_if(parameters.begin(), parameters.end(), [parameter_name](const auto& parameter) {
+            return parameter.name == parameter_name;
+        });
+        if (parameter_it == parameters.end()) {
+            LUNA_RENDERER_WARN("Render feature '{}' has no parameter '{}'", feature_name, parameter_name);
+            return false;
+        }
+        if (parameter_it->read_only) {
+            LUNA_RENDERER_WARN("Render feature parameter '{}.{}' is read-only", feature_name, parameter_name);
+            return false;
+        }
+        if (parameter_it->type != value.type) {
+            LUNA_RENDERER_WARN("Render feature parameter '{}.{}' received a mismatched value type",
+                               feature_name,
+                               parameter_name);
+            return false;
+        }
+
+        return feature->setParameter(parameter_name, value);
+    }
+
+    LUNA_RENDERER_WARN("Render feature '{}' was not found", feature_name);
+    return false;
 }
 
 render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() noexcept
