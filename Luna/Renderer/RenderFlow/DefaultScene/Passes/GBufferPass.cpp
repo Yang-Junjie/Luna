@@ -10,8 +10,20 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <array>
+
 namespace luna::render_flow::default_scene {
 namespace {
+
+constexpr std::array<RenderPassResourceUsage, 7> kGeometryPassResources{{
+    {.name = blackboard::GBufferBaseColor.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::GBufferNormalMetallic.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::GBufferWorldPositionRoughness.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::GBufferEmissiveAo.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::Velocity.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::Write},
+    {.name = blackboard::Depth.value(), .access = RenderPassResourceAccess::Write},
+}};
 
 GBufferTextures createGBufferTextures(RenderGraphBuilder& graph, const SceneRenderContext& context)
 {
@@ -71,6 +83,11 @@ GeometryPass::GeometryPass(PassSharedState& state) : m_state(&state) {}
 const char* GeometryPass::name() const noexcept
 {
     return "SceneGeometry";
+}
+
+std::span<const RenderPassResourceUsage> GeometryPass::resourceUsages() const noexcept
+{
+    return kGeometryPassResources;
 }
 
 void GeometryPass::setup(RenderPassContext& context)

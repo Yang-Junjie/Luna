@@ -8,8 +8,7 @@ namespace luna::render_flow {
 // without depending on DefaultScene internals.
 class FeatureProbe final : public IRenderFeature {
 public:
-    [[nodiscard]] RenderFeatureInfo info() const noexcept override;
-    [[nodiscard]] RenderFeatureRequirements requirements() const noexcept override;
+    [[nodiscard]] RenderFeatureContract contract() const noexcept override;
     bool registerPasses(RenderFlowBuilder& builder) override;
     void prepareFrame(const RenderWorld& world,
                       const SceneRenderContext& scene_context,

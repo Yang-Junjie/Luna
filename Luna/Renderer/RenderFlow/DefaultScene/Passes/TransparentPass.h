@@ -10,6 +10,7 @@ public:
     explicit TransparentPass(PassSharedState& state);
 
     [[nodiscard]] const char* name() const noexcept override;
+    [[nodiscard]] std::span<const RenderPassResourceUsage> resourceUsages() const noexcept override;
     void setup(RenderPassContext& context) override;
 
 private:

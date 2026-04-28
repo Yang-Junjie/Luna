@@ -20,11 +20,20 @@ constexpr std::array<RenderFeatureGraphResource, 1> kGraphOutputs{{
     {lighting_extension_keys::AmbientOcclusion},
 }};
 
+constexpr std::array<RenderPassResourceUsage, 1> kProbePassResources{{
+    {.name = lighting_extension_keys::AmbientOcclusion, .access = RenderPassResourceAccess::Write},
+}};
+
 class ProbePass final : public IRenderPass {
 public:
     [[nodiscard]] const char* name() const noexcept override
     {
         return "FeatureProbeAmbientOcclusion";
+    }
+
+    [[nodiscard]] std::span<const RenderPassResourceUsage> resourceUsages() const noexcept override
+    {
+        return kProbePassResources;
     }
 
     void setup(RenderPassContext& context) override
@@ -75,25 +84,20 @@ private:
 
 } // namespace
 
-RenderFeatureInfo FeatureProbe::info() const noexcept
+RenderFeatureContract FeatureProbe::contract() const noexcept
 {
-    return RenderFeatureInfo{
+    return RenderFeatureContract{
         .name = kFeatureName,
         .display_name = "Feature Probe Ambient Occlusion",
         .category = "Debug",
-        .enabled = true,
         .runtime_toggleable = false,
-    };
-}
-
-RenderFeatureRequirements FeatureProbe::requirements() const noexcept
-{
-    return RenderFeatureRequirements{
-        .resources = RenderFeatureResourceFlags::ColorAttachment,
-        .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
-        .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-        .graph_outputs = kGraphOutputs,
-        .requires_framebuffer_size = true,
+        .requirements = RenderFeatureRequirements{
+            .resources = RenderFeatureResourceFlags::ColorAttachment,
+            .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+            .graph_outputs = kGraphOutputs,
+            .requires_framebuffer_size = true,
+        },
     };
 }
 

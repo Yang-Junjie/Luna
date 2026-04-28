@@ -124,29 +124,24 @@ Feature::~Feature()
     shutdown();
 }
 
-RenderFeatureInfo Feature::info() const noexcept
+RenderFeatureContract Feature::contract() const noexcept
 {
-    return RenderFeatureInfo{
+    return RenderFeatureContract{
         .name = kFeatureName,
         .display_name = "Default Scene",
         .category = "Scene",
-        .enabled = true,
         .runtime_toggleable = false,
-    };
-}
-
-RenderFeatureRequirements Feature::requirements() const noexcept
-{
-    return RenderFeatureRequirements{
-        .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                     RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
-                     RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
-        .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-        .graph_inputs = kGraphInputs,
-        .graph_outputs = kGraphOutputs,
-        .requires_framebuffer_size = true,
-        .uses_persistent_resources = true,
-        .uses_history_resources = true,
+        .requirements = RenderFeatureRequirements{
+            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
+                         RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
+            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+            .graph_inputs = kGraphInputs,
+            .graph_outputs = kGraphOutputs,
+            .requires_framebuffer_size = true,
+            .uses_persistent_resources = true,
+            .uses_history_resources = true,
+        },
     };
 }
 

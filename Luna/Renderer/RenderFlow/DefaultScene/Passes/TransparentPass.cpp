@@ -5,16 +5,37 @@
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
+#include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <array>
+
 namespace luna::render_flow::default_scene {
+namespace {
+
+constexpr std::array<RenderPassResourceUsage, 3> kTransparentPassResources{{
+    {.name = blackboard::SceneColor.value(),
+     .access = RenderPassResourceAccess::ReadWrite,
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::ReadWrite},
+    {.name = blackboard::Depth.value(),
+     .access = RenderPassResourceAccess::ReadWrite,
+     .flags = RenderFeatureGraphResourceFlags::External},
+}};
+
+} // namespace
 
 TransparentPass::TransparentPass(PassSharedState& state) : m_state(&state) {}
 
 const char* TransparentPass::name() const noexcept
 {
     return "SceneTransparent";
+}
+
+std::span<const RenderPassResourceUsage> TransparentPass::resourceUsages() const noexcept
+{
+    return kTransparentPassResources;
 }
 
 void TransparentPass::setup(RenderPassContext& context)

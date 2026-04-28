@@ -38,6 +38,12 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFeature.h
     Renderer/RenderFlow/RenderFeatureSupport.h
     Renderer/RenderFlow/RenderFeatureSupport.cpp
+    Renderer/RenderFlow/RenderFeatureGraphContract.h
+    Renderer/RenderFlow/RenderFeatureGraphContract.cpp
+    Renderer/RenderFlow/RenderPassGraphContract.h
+    Renderer/RenderFlow/RenderPassGraphContract.cpp
+    Renderer/RenderFlow/RenderFeatureBindingContract.h
+    Renderer/RenderFlow/RenderFeatureBindingContract.cpp
     Renderer/RenderFlow/RenderFeatureResources.h
     Renderer/RenderFlow/RenderFeatureResources.cpp
     Renderer/RenderFlow/ShaderBindingContract.h

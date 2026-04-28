@@ -6,6 +6,7 @@
 #include "Renderer/RenderFlow/DefaultScene/BindingSchema.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
+#include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 #include "Renderer/Resources/TextureUpload.h"
@@ -46,29 +47,6 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     return createDescriptorSetLayoutFromSchema(device, sceneDescriptorSetSchema());
-}
-
-void validateShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
-                                  const ShaderBindingContract& contract,
-                                  const std::filesystem::path& shader_file,
-                                  std::string_view entry_point)
-{
-    if (!shader) {
-        return;
-    }
-
-    const std::string shader_file_string = shader_file.string();
-    const ShaderBindingValidationResult result = validateShaderBindingContract(
-        ShaderBindingValidationContext{
-            .shader_file = shader_file_string,
-            .entry_point = entry_point,
-            .shader_stage = shader->GetStage(),
-        },
-        contract,
-        shader->GetReflection());
-    for (const std::string& issue : result.issues) {
-        LUNA_RENDERER_WARN("Shader binding contract mismatch: {}", issue);
-    }
 }
 
 ShaderBindingAddressMode bindingAddressModeForBackend(luna::RHI::BackendType backend_type)
@@ -474,31 +452,31 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     const ShaderBindingContract transparent_contract =
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
 
-    validateShaderModuleBindings(m_state.geometry_vertex_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
                                  geometry_contract,
                                  shader_paths.geometry_vertex_path,
                                  "sceneGeometryVertexMain");
-    validateShaderModuleBindings(m_state.geometry_fragment_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_fragment_shader,
                                  geometry_contract,
                                  shader_paths.geometry_fragment_path,
                                  "sceneGeometryFragmentMain");
-    validateShaderModuleBindings(
+    validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_vertex_shader, shadow_contract, shader_paths.shadow_vertex_path, "sceneShadowVertexMain");
-    validateShaderModuleBindings(
+    validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_fragment_shader, shadow_contract, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain");
-    validateShaderModuleBindings(m_state.lighting_vertex_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_vertex_shader,
                                  lighting_contract,
                                  shader_paths.lighting_vertex_path,
                                  "sceneLightingVertexMain");
-    validateShaderModuleBindings(m_state.lighting_fragment_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_fragment_shader,
                                  lighting_contract,
                                  shader_paths.lighting_fragment_path,
                                  "sceneLightingFragmentMain");
-    validateShaderModuleBindings(m_state.debug_view_fragment_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.debug_view_fragment_shader,
                                  lighting_contract,
                                  shader_paths.lighting_fragment_path,
                                  "sceneDebugFragmentMain");
-    validateShaderModuleBindings(m_state.transparent_fragment_shader,
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_fragment_shader,
                                  transparent_contract,
                                  shader_paths.geometry_fragment_path,
                                  "sceneTransparentFragmentMain");

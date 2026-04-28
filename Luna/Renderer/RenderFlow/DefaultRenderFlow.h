@@ -45,6 +45,8 @@ private:
         std::string support_summary{"not evaluated"};
         bool graph_contract_valid{true};
         std::string graph_contract_summary{"not evaluated"};
+        bool pass_contract_valid{true};
+        std::string pass_contract_summary{"not evaluated"};
         std::vector<std::string> owned_passes;
     };
 
@@ -56,12 +58,14 @@ private:
     void logFeatureSupportDiagnostics(const render_flow::IRenderFeature& feature,
                                       const render_flow::RenderFeatureSupportResult& support);
     void validateFeatureGraphContracts();
+    void validatePassGraphContracts();
 
 private:
     std::vector<std::unique_ptr<render_flow::IRenderFeature>> m_features;
     render_flow::RenderPassBlackboard m_blackboard;
     render_flow::RenderFlowBuilder m_builder;
     std::unordered_map<std::string, FeatureRuntimeState> m_feature_runtime_states;
+    bool m_contract_diagnostics_dirty{true};
     bool m_frame_ready_to_commit{false};
 };
 

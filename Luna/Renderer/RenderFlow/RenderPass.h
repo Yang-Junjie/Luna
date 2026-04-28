@@ -1,10 +1,12 @@
 ﻿#pragma once
 
+#include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/RenderResourceKey.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <optional>
+#include <span>
 #include <string>
 #include <unordered_map>
 
@@ -49,6 +51,10 @@ public:
     virtual ~IRenderPass() = default;
 
     [[nodiscard]] virtual const char* name() const noexcept = 0;
+    [[nodiscard]] virtual std::span<const RenderPassResourceUsage> resourceUsages() const noexcept
+    {
+        return {};
+    }
     virtual void setup(RenderPassContext& context) = 0;
 };
 

@@ -3,44 +3,21 @@
 #include "Core/Log.h"
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderFlow/Features/RenderFeatureModules.h"
+#include "Renderer/RenderFlow/RenderFeatureGraphContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
 #include "Renderer/RenderFlow/RenderFeatureSupport.h"
+#include "Renderer/RenderFlow/RenderPassGraphContract.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
 #include <span>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace luna {
 namespace {
-
-std::string joinStrings(const std::vector<std::string>& values)
-{
-    std::string result;
-    for (size_t index = 0; index < values.size(); ++index) {
-        if (index > 0) {
-            result += "; ";
-        }
-        result += values[index];
-    }
-    return result;
-}
-
-std::string joinFeatureNames(const std::vector<std::string>& values)
-{
-    std::string result;
-    for (size_t index = 0; index < values.size(); ++index) {
-        if (index > 0) {
-            result += ", ";
-        }
-        result += values[index];
-    }
-    return result;
-}
 
 std::vector<render_flow::RenderFeatureGraphResource>
     copyGraphResources(std::span<const render_flow::RenderFeatureGraphResource> resources)
@@ -48,14 +25,10 @@ std::vector<render_flow::RenderFeatureGraphResource>
     return {resources.begin(), resources.end()};
 }
 
-bool isOptional(const render_flow::RenderFeatureGraphResource& resource) noexcept
+std::vector<render_flow::RenderPassResourceUsage>
+    copyPassResources(std::span<const render_flow::RenderPassResourceUsage> resources)
 {
-    return resource.flags & render_flow::RenderFeatureGraphResourceFlags::Optional;
-}
-
-bool isExternal(const render_flow::RenderFeatureGraphResource& resource) noexcept
-{
-    return resource.flags & render_flow::RenderFeatureGraphResourceFlags::External;
+    return {resources.begin(), resources.end()};
 }
 
 } // namespace
@@ -77,6 +50,7 @@ void DefaultRenderFlow::shutdown()
     m_frame_ready_to_commit = false;
     m_builder.clear();
     m_feature_runtime_states.clear();
+    m_contract_diagnostics_dirty = true;
     for (const auto& feature : m_features) {
         feature->releasePersistentResources();
         feature->shutdown();
@@ -91,23 +65,25 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
         return false;
     }
 
-    const render_flow::RenderFeatureInfo info = feature->info();
-    if (info.name.empty()) {
+    const render_flow::RenderFeatureContract contract = feature->contract();
+    if (contract.name.empty()) {
         LUNA_RENDERER_ERROR("Default render flow feature registration failed: feature name is empty");
         return false;
     }
 
-    if (hasFeature(info.name)) {
-        LUNA_RENDERER_WARN("Default render flow feature '{}' is already registered; skipping duplicate", info.name);
+    if (hasFeature(contract.name)) {
+        LUNA_RENDERER_WARN("Default render flow feature '{}' is already registered; skipping duplicate", contract.name);
         return false;
     }
 
     if (!feature->registerPasses(m_builder)) {
-        LUNA_RENDERER_ERROR("Default render flow feature '{}' registration failed: {}", info.name, m_builder.lastError());
+        LUNA_RENDERER_ERROR("Default render flow feature '{}' registration failed: {}",
+                            contract.name,
+                            m_builder.lastError());
         return false;
     }
 
-    const std::string feature_name(info.name);
+    const std::string feature_name(contract.name);
     auto& runtime_state = m_feature_runtime_states[feature_name];
     runtime_state.owned_passes.clear();
     for (std::string_view pass_name : m_builder.passesForFeature(feature_name)) {
@@ -119,13 +95,16 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
     runtime_state.support_summary = "not evaluated";
     runtime_state.graph_contract_valid = true;
     runtime_state.graph_contract_summary = "not evaluated";
+    runtime_state.pass_contract_valid = true;
+    runtime_state.pass_contract_summary = "not evaluated";
     if (runtime_state.owned_passes.empty()) {
         LUNA_RENDERER_WARN("Default render flow feature '{}' registered no owned passes; use RenderFlowBuilder feature pass APIs",
-                           info.name);
+                           contract.name);
     }
 
-    LUNA_RENDERER_INFO("Registered default render flow feature '{}'", info.name);
+    LUNA_RENDERER_INFO("Registered default render flow feature '{}'", contract.name);
     m_features.push_back(std::move(feature));
+    m_contract_diagnostics_dirty = true;
     return true;
 }
 
@@ -160,7 +139,7 @@ void DefaultRenderFlow::installRegisteredFeatures()
 bool DefaultRenderFlow::hasFeature(std::string_view name) const
 {
     return std::any_of(m_features.begin(), m_features.end(), [name](const auto& feature) {
-        return feature && feature->info().name == name;
+        return feature && feature->contract().name == name;
     });
 }
 
@@ -191,12 +170,12 @@ bool DefaultRenderFlow::isPassActive(std::string_view name) const
 void DefaultRenderFlow::logFeatureSupportDiagnostics(const render_flow::IRenderFeature& feature,
                                                      const render_flow::RenderFeatureSupportResult& support)
 {
-    const render_flow::RenderFeatureInfo info = feature.info();
-    if (info.name.empty()) {
+    const render_flow::RenderFeatureContract contract = feature.contract();
+    if (contract.name.empty()) {
         return;
     }
 
-    const std::string feature_name(info.name);
+    const std::string feature_name(contract.name);
     const std::string signature =
         support.supported ? std::string("supported") : render_flow::summarizeRenderFeatureSupport(support);
     auto& state = m_feature_runtime_states[feature_name];
@@ -208,9 +187,9 @@ void DefaultRenderFlow::logFeatureSupportDiagnostics(const render_flow::IRenderF
     state.support_summary = signature;
     state.supported = support.supported;
     if (!support.supported) {
-        LUNA_RENDERER_WARN("Render feature '{}' requirements are not satisfied: {}", info.name, signature);
+        LUNA_RENDERER_WARN("Render feature '{}' requirements are not satisfied: {}", contract.name, signature);
     } else if (had_previous) {
-        LUNA_RENDERER_INFO("Render feature '{}' requirements are satisfied", info.name);
+        LUNA_RENDERER_INFO("Render feature '{}' requirements are satisfied", contract.name);
     }
 }
 
@@ -234,6 +213,7 @@ bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)
         return false;
     }
 
+    m_contract_diagnostics_dirty = true;
     return true;
 }
 
@@ -243,6 +223,7 @@ std::vector<render_flow::RenderFeatureInfo> DefaultRenderFlow::featureInfos() co
     infos.reserve(m_features.size());
     for (const auto& feature : m_features) {
         if (feature) {
+            const render_flow::RenderFeatureContract contract = feature->contract();
             render_flow::RenderFeatureInfo info = feature->info();
             if (const FeatureRuntimeState* state = findFeatureRuntimeState(info.name)) {
                 info.supported = state->supported;
@@ -250,16 +231,31 @@ std::vector<render_flow::RenderFeatureInfo> DefaultRenderFlow::featureInfos() co
                 info.support_summary = state->support_summary;
                 info.graph_contract_valid = state->graph_contract_valid;
                 info.graph_contract_summary = state->graph_contract_summary;
+                info.pass_contract_valid = state->pass_contract_valid;
+                info.pass_contract_summary = state->pass_contract_summary;
             } else {
                 info.supported = true;
                 info.active = info.enabled;
                 info.support_summary = "not evaluated";
                 info.graph_contract_valid = true;
                 info.graph_contract_summary = "not evaluated";
+                info.pass_contract_valid = true;
+                info.pass_contract_summary = "not evaluated";
             }
-            const render_flow::RenderFeatureRequirements requirements = feature->requirements();
-            info.graph_inputs = copyGraphResources(requirements.graph_inputs);
-            info.graph_outputs = copyGraphResources(requirements.graph_outputs);
+            info.graph_inputs = copyGraphResources(contract.requirements.graph_inputs);
+            info.graph_outputs = copyGraphResources(contract.requirements.graph_outputs);
+            if (const FeatureRuntimeState* state = findFeatureRuntimeState(info.name)) {
+                info.passes.reserve(state->owned_passes.size());
+                for (const std::string& pass_name : state->owned_passes) {
+                    render_flow::RenderFeaturePassInfo pass_info;
+                    pass_info.name = pass_name;
+                    if (const render_flow::IRenderPass* pass = m_builder.find(pass_name)) {
+                        pass_info.resources = copyPassResources(pass->resourceUsages());
+                    }
+                    info.passes.push_back(std::move(pass_info));
+                }
+            }
+            info.diagnostics = feature->diagnostics();
             infos.push_back(std::move(info));
         }
     }
@@ -291,6 +287,7 @@ bool DefaultRenderFlow::setFeatureEnabled(std::string_view name, bool enabled)
             return false;
         }
 
+        m_contract_diagnostics_dirty = true;
         if (!enabled) {
             if (FeatureRuntimeState* state = findFeatureRuntimeState(info.name)) {
                 if (state->active_this_frame) {
@@ -314,7 +311,7 @@ std::vector<render_flow::RenderFeatureParameterInfo> DefaultRenderFlow::featureP
             continue;
         }
 
-        if (feature->info().name == name) {
+        if (feature->contract().name == name) {
             return feature->parameters();
         }
     }
@@ -331,7 +328,7 @@ bool DefaultRenderFlow::setFeatureParameter(std::string_view feature_name,
             continue;
         }
 
-        if (feature->info().name != feature_name) {
+        if (feature->contract().name != feature_name) {
             continue;
         }
 
@@ -373,93 +370,108 @@ const render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() const noexcep
 
 void DefaultRenderFlow::validateFeatureGraphContracts()
 {
-    std::unordered_map<std::string, std::vector<std::string>> producers;
-    std::unordered_map<std::string, std::vector<std::string>> consumers;
-
+    std::vector<render_flow::RenderFeatureGraphContractInput> graph_features;
+    graph_features.reserve(m_features.size());
     for (const auto& feature : m_features) {
         if (!feature) {
             continue;
         }
 
-        const render_flow::RenderFeatureInfo info = feature->info();
-        const FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
-        if (state == nullptr || !state->active_this_frame) {
-            continue;
-        }
-
-        const render_flow::RenderFeatureRequirements requirements = feature->requirements();
-        for (const render_flow::RenderFeatureGraphResource& output : requirements.graph_outputs) {
-            if (!output.name.empty()) {
-                producers[std::string(output.name)].emplace_back(info.name);
-            }
-        }
-        for (const render_flow::RenderFeatureGraphResource& input : requirements.graph_inputs) {
-            if (!input.name.empty()) {
-                consumers[std::string(input.name)].emplace_back(info.name);
-            }
-        }
+        const render_flow::RenderFeatureContract contract = feature->contract();
+        const FeatureRuntimeState* state = findFeatureRuntimeState(contract.name);
+        graph_features.push_back(render_flow::RenderFeatureGraphContractInput{
+            .feature_name = contract.name,
+            .active = state != nullptr && state->active_this_frame,
+            .requirements = contract.requirements,
+        });
     }
 
-    for (const auto& feature : m_features) {
-        if (!feature) {
-            continue;
-        }
-
-        const render_flow::RenderFeatureInfo info = feature->info();
-        FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+    const std::vector<render_flow::RenderFeatureGraphContractResult> results =
+        render_flow::validateRenderFeatureGraphContracts(graph_features);
+    for (const render_flow::RenderFeatureGraphContractResult& result : results) {
+        FeatureRuntimeState* state = findFeatureRuntimeState(result.feature_name);
         if (state == nullptr) {
-            state = &m_feature_runtime_states[std::string(info.name)];
+            state = &m_feature_runtime_states[result.feature_name];
         }
 
-        if (!state->active_this_frame) {
-            state->graph_contract_valid = true;
-            state->graph_contract_summary = "inactive";
-            continue;
-        }
-
-        std::vector<std::string> issues;
-        const render_flow::RenderFeatureRequirements requirements = feature->requirements();
-        for (const render_flow::RenderFeatureGraphResource& input : requirements.graph_inputs) {
-            if (input.name.empty() || isOptional(input)) {
-                continue;
-            }
-
-            if (!producers.contains(std::string(input.name))) {
-                issues.push_back("missing producer for graph input '" + std::string(input.name) + "'");
-            }
-        }
-
-        for (const render_flow::RenderFeatureGraphResource& output : requirements.graph_outputs) {
-            if (output.name.empty()) {
-                continue;
-            }
-
-            const auto producer_it = producers.find(std::string(output.name));
-            if (producer_it != producers.end() && producer_it->second.size() > 1) {
-                issues.push_back("graph output '" + std::string(output.name) +
-                                 "' has multiple active producers: " + joinFeatureNames(producer_it->second));
-            }
-
-            if (!isExternal(output) && !consumers.contains(std::string(output.name))) {
-                issues.push_back("graph output '" + std::string(output.name) + "' has no active consumer");
-            }
-        }
-
-        const bool valid = issues.empty();
-        const std::string summary = valid ? std::string("ok") : joinStrings(issues);
-        if (state->graph_contract_summary == summary) {
-            state->graph_contract_valid = valid;
+        if (state->graph_contract_summary == result.summary) {
+            state->graph_contract_valid = result.valid;
             continue;
         }
 
         const bool had_previous = state->graph_contract_summary != "not evaluated" &&
                                   state->graph_contract_summary != "inactive";
-        state->graph_contract_valid = valid;
-        state->graph_contract_summary = summary;
-        if (!valid) {
-            LUNA_RENDERER_WARN("Render feature '{}' graph contract diagnostics: {}", info.name, summary);
+        state->graph_contract_valid = result.valid;
+        state->graph_contract_summary = result.summary;
+        if (!result.valid) {
+            LUNA_RENDERER_WARN("Render feature '{}' graph contract diagnostics: {}",
+                               result.feature_name,
+                               result.summary);
         } else if (had_previous) {
-            LUNA_RENDERER_INFO("Render feature '{}' graph contract diagnostics are clear", info.name);
+            LUNA_RENDERER_INFO("Render feature '{}' graph contract diagnostics are clear", result.feature_name);
+        }
+    }
+}
+
+void DefaultRenderFlow::validatePassGraphContracts()
+{
+    std::vector<std::vector<render_flow::RenderPassGraphContractPassInput>> feature_passes;
+    feature_passes.reserve(m_features.size());
+    std::vector<render_flow::RenderPassGraphContractFeatureInput> graph_features;
+    graph_features.reserve(m_features.size());
+
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureContract contract = feature->contract();
+        const FeatureRuntimeState* state = findFeatureRuntimeState(contract.name);
+
+        std::vector<render_flow::RenderPassGraphContractPassInput>& passes = feature_passes.emplace_back();
+        if (state != nullptr) {
+            passes.reserve(state->owned_passes.size());
+            for (const std::string& pass_name : state->owned_passes) {
+                if (const render_flow::IRenderPass* pass = m_builder.find(pass_name)) {
+                    passes.push_back(render_flow::RenderPassGraphContractPassInput{
+                        .pass_name = pass_name,
+                        .resources = pass->resourceUsages(),
+                    });
+                }
+            }
+        }
+
+        graph_features.push_back(render_flow::RenderPassGraphContractFeatureInput{
+            .feature_name = contract.name,
+            .active = state != nullptr && state->active_this_frame,
+            .requirements = contract.requirements,
+            .passes = passes,
+        });
+    }
+
+    const std::vector<render_flow::RenderPassGraphContractResult> results =
+        render_flow::validateRenderPassGraphContracts(graph_features);
+    for (const render_flow::RenderPassGraphContractResult& result : results) {
+        FeatureRuntimeState* state = findFeatureRuntimeState(result.feature_name);
+        if (state == nullptr) {
+            state = &m_feature_runtime_states[result.feature_name];
+        }
+
+        if (state->pass_contract_summary == result.summary) {
+            state->pass_contract_valid = result.valid;
+            continue;
+        }
+
+        const bool had_previous = state->pass_contract_summary != "not evaluated" &&
+                                  state->pass_contract_summary != "inactive";
+        state->pass_contract_valid = result.valid;
+        state->pass_contract_summary = result.summary;
+        if (!result.valid) {
+            LUNA_RENDERER_WARN("Render feature '{}' pass contract diagnostics: {}",
+                               result.feature_name,
+                               result.summary);
+        } else if (had_previous) {
+            LUNA_RENDERER_INFO("Render feature '{}' pass contract diagnostics are clear", result.feature_name);
         }
     }
 }
@@ -514,13 +526,20 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         state->supported = support.supported;
         state->active_this_frame = info.enabled && support.supported;
         state->prepared_this_frame = false;
+        if (was_active != state->active_this_frame) {
+            m_contract_diagnostics_dirty = true;
+        }
 
         if (was_active && !state->active_this_frame) {
             feature->releasePersistentResources();
         }
     }
 
-    validateFeatureGraphContracts();
+    if (m_contract_diagnostics_dirty) {
+        validateFeatureGraphContracts();
+        validatePassGraphContracts();
+        m_contract_diagnostics_dirty = false;
+    }
 
     m_blackboard.clear();
     for (const auto& feature : m_features) {

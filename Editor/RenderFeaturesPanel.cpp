@@ -74,6 +74,30 @@ const char* graphResourceKindLabel(render_flow::RenderFeatureGraphResourceKind k
     return "Unknown";
 }
 
+const char* passResourceAccessLabel(render_flow::RenderPassResourceAccess access) noexcept
+{
+    switch (access) {
+        case render_flow::RenderPassResourceAccess::Read:
+            return "read";
+        case render_flow::RenderPassResourceAccess::Write:
+            return "write";
+        case render_flow::RenderPassResourceAccess::ReadWrite:
+            return "read/write";
+    }
+    return "unknown";
+}
+
+const char* statusValueLabel(bool valid, const std::string& summary) noexcept
+{
+    if (summary.empty() || summary == "not evaluated") {
+        return "Not Evaluated";
+    }
+    if (summary == "inactive") {
+        return "Inactive";
+    }
+    return valid ? "OK" : "Issues";
+}
+
 void drawGraphResourceList(const char* label, const std::vector<render_flow::RenderFeatureGraphResource>& resources)
 {
     ImGui::TextDisabled("%s", label);
@@ -97,6 +121,69 @@ void drawGraphResourceList(const char* label, const std::vector<render_flow::Ren
     ImGui::Unindent();
 }
 
+void drawPassResourceList(const std::vector<render_flow::RenderPassResourceUsage>& resources)
+{
+    ImGui::Indent();
+    if (resources.empty()) {
+        ImGui::TextDisabled("no declared graph resources");
+        ImGui::Unindent();
+        return;
+    }
+
+    for (const render_flow::RenderPassResourceUsage& resource : resources) {
+        const bool optional = resource.flags & render_flow::RenderFeatureGraphResourceFlags::Optional;
+        const bool external = resource.flags & render_flow::RenderFeatureGraphResourceFlags::External;
+        ImGui::BulletText("%.*s  [%s %s]%s%s",
+                          static_cast<int>(resource.name.size()),
+                          resource.name.data(),
+                          graphResourceKindLabel(resource.kind),
+                          passResourceAccessLabel(resource.access),
+                          optional ? " optional" : "",
+                          external ? " external" : "");
+    }
+    ImGui::Unindent();
+}
+
+void drawStatusLine(const char* label, bool valid, const std::string& summary)
+{
+    ImGui::TextDisabled("%s", label);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", statusValueLabel(valid, summary));
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", summary.empty() ? "not evaluated" : summary.c_str());
+    }
+}
+
+void drawFeatureArchitectureSummary(const render_flow::RenderFeatureInfo& feature)
+{
+    const std::string label = makeFeatureScopedLabel("Architecture", feature.name);
+    if (!ImGui::TreeNode(label.c_str())) {
+        return;
+    }
+
+    drawStatusLine("Support", feature.supported, feature.support_summary);
+    drawStatusLine("Graph Contract", feature.graph_contract_valid, feature.graph_contract_summary);
+    drawStatusLine("Pass Contract", feature.pass_contract_valid, feature.pass_contract_summary);
+    drawStatusLine("Binding Contract",
+                   feature.diagnostics.binding_contract_valid,
+                   feature.diagnostics.binding_contract_summary);
+    drawStatusLine("Pipeline Resources",
+                   feature.diagnostics.pipeline_resources_valid,
+                   feature.diagnostics.pipeline_resources_summary);
+    if (!feature.diagnostics.persistent_resources_summary.empty() ||
+        !feature.diagnostics.persistent_resources.empty()) {
+        drawStatusLine("Persistent Resources",
+                       feature.diagnostics.persistent_resources_valid,
+                       feature.diagnostics.persistent_resources_summary);
+    }
+    if (!feature.diagnostics.history_resources_summary.empty() || !feature.diagnostics.history_resources.empty()) {
+        drawStatusLine("History Resources",
+                       feature.diagnostics.history_resources_valid,
+                       feature.diagnostics.history_resources_summary);
+    }
+    ImGui::TreePop();
+}
+
 void drawFeatureGraphContract(const render_flow::RenderFeatureInfo& feature)
 {
     if (feature.graph_inputs.empty() && feature.graph_outputs.empty()) {
@@ -110,7 +197,7 @@ void drawFeatureGraphContract(const render_flow::RenderFeatureInfo& feature)
 
     ImGui::TextDisabled("Status");
     ImGui::SameLine();
-    ImGui::TextDisabled("%s", feature.graph_contract_valid ? "OK" : "Issues");
+    ImGui::TextDisabled("%s", statusValueLabel(feature.graph_contract_valid, feature.graph_contract_summary));
     if (ImGui::IsItemHovered()) {
         const char* summary = feature.graph_contract_summary.empty() ? "not evaluated"
                                                                      : feature.graph_contract_summary.c_str();
@@ -119,6 +206,98 @@ void drawFeatureGraphContract(const render_flow::RenderFeatureInfo& feature)
 
     drawGraphResourceList("Inputs", feature.graph_inputs);
     drawGraphResourceList("Outputs", feature.graph_outputs);
+    ImGui::TreePop();
+}
+
+void drawFeaturePassContract(const render_flow::RenderFeatureInfo& feature)
+{
+    if (feature.pass_contract_summary.empty() && feature.passes.empty()) {
+        return;
+    }
+
+    const std::string label = makeFeatureScopedLabel("Pass Contract", feature.name);
+    if (!ImGui::TreeNode(label.c_str())) {
+        return;
+    }
+
+    ImGui::TextDisabled("Status");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", statusValueLabel(feature.pass_contract_valid, feature.pass_contract_summary));
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", feature.pass_contract_summary.empty() ? "not evaluated"
+                                                                      : feature.pass_contract_summary.c_str());
+    }
+
+    ImGui::TextDisabled("Passes");
+    ImGui::Indent();
+    if (feature.passes.empty()) {
+        ImGui::TextDisabled("none");
+    } else {
+        for (const render_flow::RenderFeaturePassInfo& pass : feature.passes) {
+            const std::string pass_label = makeFeatureScopedLabel(pass.name, feature.name);
+            if (ImGui::TreeNode(pass_label.c_str())) {
+                drawPassResourceList(pass.resources);
+                ImGui::TreePop();
+            }
+        }
+    }
+    ImGui::Unindent();
+    ImGui::TreePop();
+}
+
+void drawStatusEntryList(const std::vector<render_flow::RenderFeatureStatusEntry>& entries)
+{
+    ImGui::Indent();
+    if (entries.empty()) {
+        ImGui::TextDisabled("none");
+        ImGui::Unindent();
+        return;
+    }
+
+    for (const render_flow::RenderFeatureStatusEntry& entry : entries) {
+        ImGui::BulletText("%s: %s", entry.name.c_str(), entry.ready ? "OK" : "Missing");
+    }
+    ImGui::Unindent();
+}
+
+void drawFeatureResourceDiagnostics(const render_flow::RenderFeatureInfo& feature)
+{
+    const auto& diagnostics = feature.diagnostics;
+    const bool has_diagnostics = !diagnostics.binding_contract_summary.empty() ||
+                                 !diagnostics.pipeline_resources_summary.empty() ||
+                                 !diagnostics.pipeline_resources.empty() ||
+                                 !diagnostics.persistent_resources_summary.empty() ||
+                                 !diagnostics.persistent_resources.empty() ||
+                                 !diagnostics.history_resources_summary.empty() ||
+                                 !diagnostics.history_resources.empty();
+    if (!has_diagnostics) {
+        return;
+    }
+
+    const std::string label = makeFeatureScopedLabel("Resource Diagnostics", feature.name);
+    if (!ImGui::TreeNode(label.c_str())) {
+        return;
+    }
+
+    drawStatusLine("Binding Contract",
+                   diagnostics.binding_contract_valid,
+                   diagnostics.binding_contract_summary);
+    drawStatusLine("Pipeline Resources",
+                   diagnostics.pipeline_resources_valid,
+                   diagnostics.pipeline_resources_summary);
+    drawStatusEntryList(diagnostics.pipeline_resources);
+    if (!diagnostics.persistent_resources_summary.empty() || !diagnostics.persistent_resources.empty()) {
+        drawStatusLine("Persistent Resources",
+                       diagnostics.persistent_resources_valid,
+                       diagnostics.persistent_resources_summary);
+        drawStatusEntryList(diagnostics.persistent_resources);
+    }
+    if (!diagnostics.history_resources_summary.empty() || !diagnostics.history_resources.empty()) {
+        drawStatusLine("History Resources",
+                       diagnostics.history_resources_valid,
+                       diagnostics.history_resources_summary);
+        drawStatusEntryList(diagnostics.history_resources);
+    }
     ImGui::TreePop();
 }
 
@@ -170,7 +349,10 @@ void RenderFeaturesPanel::onImGuiRender(bool& open,
         drawFeatureStatusTooltip(feature);
 
         ImGui::Indent();
+        drawFeatureArchitectureSummary(feature);
         drawFeatureGraphContract(feature);
+        drawFeaturePassContract(feature);
+        drawFeatureResourceDiagnostics(feature);
         ImGui::Unindent();
 
         const auto parameters = get_parameters ? get_parameters(feature.name) : ParameterList{};

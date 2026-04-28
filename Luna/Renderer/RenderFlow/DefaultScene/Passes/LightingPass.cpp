@@ -11,12 +11,45 @@
 #include <array>
 
 namespace luna::render_flow::default_scene {
+namespace {
+
+constexpr std::array<RenderPassResourceUsage, 12> kLightingPassResources{{
+    {.name = blackboard::GBufferBaseColor.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::GBufferNormalMetallic.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::GBufferWorldPositionRoughness.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::GBufferEmissiveAo.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::Velocity.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::ShadowMap.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::Read},
+    {.name = lighting_extension_keys::AmbientOcclusion,
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::Reflection,
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::IndirectDiffuse,
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::IndirectSpecular,
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = blackboard::SceneColor.value(),
+     .access = RenderPassResourceAccess::Write,
+     .flags = RenderFeatureGraphResourceFlags::External},
+}};
+
+} // namespace
 
 LightingPass::LightingPass(PassSharedState& state) : m_state(&state) {}
 
 const char* LightingPass::name() const noexcept
 {
     return "SceneLighting";
+}
+
+std::span<const RenderPassResourceUsage> LightingPass::resourceUsages() const noexcept
+{
+    return kLightingPassResources;
 }
 
 void LightingPass::setup(RenderPassContext& context)

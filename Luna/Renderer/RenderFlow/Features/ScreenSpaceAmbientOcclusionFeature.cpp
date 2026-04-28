@@ -3,12 +3,12 @@
 #include "Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
+#include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
 #include "Renderer/RenderFlow/RenderFeatureResources.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
-#include "Renderer/RenderFlow/ShaderBindingContract.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 
@@ -59,6 +59,13 @@ constexpr std::array<RenderFeatureGraphResource, 1> kGraphOutputs{{
     {lighting_extension_keys::AmbientOcclusion},
 }};
 
+constexpr std::array<RenderPassResourceUsage, 4> kSsaoPassResources{{
+    {.name = blackboard::Depth.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::GBufferNormalMetallic.value(), .access = RenderPassResourceAccess::Read},
+    {.name = blackboard::GBufferWorldPositionRoughness.value(), .access = RenderPassResourceAccess::Read},
+    {.name = lighting_extension_keys::AmbientOcclusion, .access = RenderPassResourceAccess::Write},
+}};
+
 struct SsaoGpuParams {
     glm::vec4 framebuffer;
     glm::vec4 settings;
@@ -72,16 +79,7 @@ constexpr uint32_t Sampler = 3;
 constexpr uint32_t Params = 4;
 } // namespace ssao_binding
 
-struct SsaoDescriptorBindingSchema {
-    const char* name{nullptr};
-    const char* shader_name{nullptr};
-    uint32_t binding{0};
-    luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
-    uint32_t count{1};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::Fragment};
-};
-
-const std::array<SsaoDescriptorBindingSchema, 5> kSsaoBindings{{
+const std::array<RenderFeatureDescriptorBinding, 5> kSsaoBindings{{
     {"Depth",
      "gDepthTexture",
      ssao_binding::Depth,
@@ -122,61 +120,18 @@ std::filesystem::path shaderPath()
 
 luna::RHI::DescriptorSetLayoutCreateInfo makeSsaoDescriptorSetLayoutCreateInfo()
 {
-    luna::RHI::DescriptorSetLayoutCreateInfo create_info;
-    create_info.Bindings.reserve(kSsaoBindings.size());
-    for (const SsaoDescriptorBindingSchema& binding : kSsaoBindings) {
-        create_info.Bindings.push_back(luna::RHI::DescriptorSetLayoutBinding{
-            .Binding = binding.binding,
-            .Type = binding.type,
-            .Count = binding.count,
-            .StageFlags = binding.stages,
-        });
-    }
-    return create_info;
+    return makeRenderFeatureDescriptorSetLayoutCreateInfo(kSsaoBindings);
 }
 
 ShaderBindingContract makeSsaoShaderBindingContract()
 {
-    ShaderBindingContract contract = makeShaderBindingContract("ScreenSpaceAmbientOcclusion");
-    contract.bindings.reserve(kSsaoBindings.size());
-    for (const SsaoDescriptorBindingSchema& binding : kSsaoBindings) {
-        contract.bindings.push_back(ShaderBindingRequirement{
-            .name = binding.name ? binding.name : "",
-            .shader_name = binding.shader_name ? binding.shader_name : "",
-            .set_name = "ScreenSpaceAmbientOcclusion",
-            .logical_set = 0,
-            .logical_binding = binding.binding,
-            .set = 0,
-            .binding = binding.binding,
-            .type = binding.type,
-            .count = binding.count,
-            .stages = binding.stages,
-        });
-    }
-    return contract;
-}
-
-void validateSsaoShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
-                                      const ShaderBindingContract& contract,
-                                      const std::filesystem::path& shader_file,
-                                      std::string_view entry_point)
-{
-    if (!shader) {
-        return;
-    }
-
-    const std::string shader_file_string = shader_file.string();
-    const ShaderBindingValidationResult result = validateShaderBindingContract(
-        ShaderBindingValidationContext{
-            .shader_file = shader_file_string,
-            .entry_point = entry_point,
-            .shader_stage = shader->GetStage(),
-        },
-        contract,
-        shader->GetReflection());
-    for (const std::string& issue : result.issues) {
-        LUNA_RENDERER_WARN("Shader binding contract mismatch: {}", issue);
-    }
+    return makeRenderFeatureShaderBindingContract(RenderFeatureDescriptorSetContract{
+        .contract_name = kFeatureName,
+        .set_name = kFeatureName,
+        .logical_set = 0,
+        .set = 0,
+        .bindings = kSsaoBindings,
+    });
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
@@ -317,96 +272,96 @@ public:
     {
         releasePersistentResources();
         m_state = {};
+        m_resource_set.resetGpuContext();
+        m_binding_contract_valid = true;
+        m_binding_contract_summary = "not evaluated";
     }
 
     void releasePersistentResources()
     {
-        m_ambient_occlusion.reset();
+        m_resource_set.releasePersistentTexture2D(m_ambient_occlusion);
+        m_ambient_occlusion_evaluated = false;
     }
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
     {
-        if (!context.device || !context.compiler) {
+        const RenderFeatureGpuResourceDecision decision = m_resource_set.evaluateGpuResources(context, isComplete());
+        if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
-
-        if (m_state.device && m_state.device != context.device) {
-            shutdown();
-        }
-
-        if (m_state.device == context.device && m_state.backend_type == context.backend_type && isComplete()) {
+        if (decision.action == RenderFeatureGpuResourceAction::Reuse) {
             return true;
         }
 
         shutdown();
-        m_state.device = context.device;
-        m_state.backend_type = context.backend_type;
+        m_resource_set.bindGpuContext(context);
+        const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
         m_state.vertex_shader = renderer_detail::loadShaderModule(
-            m_state.device, context.compiler, path, "ssaoVertexMain", luna::RHI::ShaderStage::Vertex);
+            device, context.compiler, path, "ssaoVertexMain", luna::RHI::ShaderStage::Vertex);
         m_state.fragment_shader = renderer_detail::loadShaderModule(
-            m_state.device, context.compiler, path, "ssaoFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "ssaoFragmentMain", luna::RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeSsaoShaderBindingContract();
-        validateSsaoShaderModuleBindings(m_state.vertex_shader, contract, path, "ssaoVertexMain");
-        validateSsaoShaderModuleBindings(m_state.fragment_shader, contract, path, "ssaoFragmentMain");
+        const bool vertex_bindings_valid =
+            m_state.vertex_shader &&
+            validateAndLogRenderFeatureShaderModuleBindings(m_state.vertex_shader, contract, path, "ssaoVertexMain");
+        const bool fragment_bindings_valid =
+            m_state.fragment_shader &&
+            validateAndLogRenderFeatureShaderModuleBindings(
+                m_state.fragment_shader, contract, path, "ssaoFragmentMain");
+        m_binding_contract_valid = vertex_bindings_valid && fragment_bindings_valid;
+        if (!m_state.vertex_shader || !m_state.fragment_shader) {
+            m_binding_contract_summary = "shader module missing";
+        } else if (!m_binding_contract_valid) {
+            m_binding_contract_summary = "shader reflection mismatch; see renderer log";
+        } else {
+            m_binding_contract_summary = "ok";
+        }
 
-        m_state.layout = createDescriptorSetLayout(m_state.device);
-        m_state.descriptor_pool = createDescriptorPool(m_state.device);
-        m_state.pipeline_layout = createPipelineLayout(m_state.device, m_state.layout);
+        m_state.layout = createDescriptorSetLayout(device);
+        m_state.descriptor_pool = createDescriptorPool(device);
+        m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
         m_state.pipeline =
-            createPipeline(m_state.device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader);
-        m_state.sampler = createSampler(m_state.device);
-        m_state.params_buffer = m_state.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                                 .SetSize(sizeof(SsaoGpuParams))
-                                                                 .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                                 .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
-                                                                 .SetName("ScreenSpaceAmbientOcclusionParams")
-                                                                 .Build());
+            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader);
+        m_state.sampler = createSampler(device);
+        m_state.params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+                                                         .SetSize(sizeof(SsaoGpuParams))
+                                                         .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
+                                                         .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                         .SetName("ScreenSpaceAmbientOcclusionParams")
+                                                         .Build());
 
         if (m_state.descriptor_pool && m_state.layout) {
             m_state.descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.layout);
         }
 
-        if (isComplete()) {
-            LUNA_RENDERER_INFO("Created ScreenSpaceAmbientOcclusion pipeline for backend '{}'",
-                               renderer_detail::backendTypeToString(context.backend_type));
-            return true;
-        }
-
-        LUNA_RENDERER_WARN("ScreenSpaceAmbientOcclusion resources are incomplete: vs={} fs={} layout={} pool={} "
-                           "pipeline_layout={} pipeline={} sampler={} params={} descriptor_set={}",
-                           static_cast<bool>(m_state.vertex_shader),
-                           static_cast<bool>(m_state.fragment_shader),
-                           static_cast<bool>(m_state.layout),
-                           static_cast<bool>(m_state.descriptor_pool),
-                           static_cast<bool>(m_state.pipeline_layout),
-                           static_cast<bool>(m_state.pipeline),
-                           static_cast<bool>(m_state.sampler),
-                           static_cast<bool>(m_state.params_buffer),
-                           static_cast<bool>(m_state.descriptor_set));
-        return false;
+        return m_resource_set.logGpuResourceBuildResult(resourceStatus());
     }
 
     [[nodiscard]] bool ensureAmbientOcclusion(const SceneRenderContext& context)
     {
-        return m_ambient_occlusion.ensure(context.device, makeAmbientOcclusionPersistentDesc(context));
+        m_ambient_occlusion_evaluated = true;
+        return m_resource_set.ensurePersistentTexture2D(m_ambient_occlusion,
+                                                        context,
+                                                        makeAmbientOcclusionPersistentDesc(context));
     }
 
     [[nodiscard]] RenderGraphTextureHandle importAmbientOcclusion(RenderGraphBuilder& graph)
     {
-        return importPersistentTexture2D(graph,
-                                         m_ambient_occlusion,
-                                         RenderFeatureTextureImportOptions{
-                                             .name = "ScreenSpaceAmbientOcclusion",
-                                             .final_state = luna::RHI::ResourceState::ShaderRead,
-                                         });
+        return m_resource_set.importPersistentTexture2D(
+            graph,
+            m_ambient_occlusion,
+            RenderFeatureTextureImportOptions{
+                .name = "ScreenSpaceAmbientOcclusion",
+                .final_state = luna::RHI::ResourceState::ShaderRead,
+            });
     }
 
     [[nodiscard]] bool isComplete() const noexcept
     {
-        return m_state.device && m_state.vertex_shader && m_state.fragment_shader && m_state.layout &&
+        return m_resource_set.hasGpuContext() && m_state.vertex_shader && m_state.fragment_shader && m_state.layout &&
                m_state.descriptor_pool && m_state.pipeline_layout && m_state.pipeline && m_state.sampler &&
                m_state.params_buffer && m_state.descriptor_set;
     }
@@ -479,6 +434,36 @@ public:
         pass_context.endRendering();
     }
 
+    [[nodiscard]] RenderFeatureDiagnostics diagnostics() const
+    {
+        RenderFeatureDiagnostics result;
+        result.binding_contract_valid = m_binding_contract_valid;
+        result.binding_contract_summary = m_binding_contract_summary;
+
+        const RenderFeatureResourceReport gpu_report =
+            m_resource_set.gpuResourceReport(isComplete(), resourceStatus());
+        result.pipeline_resources_valid = gpu_report.valid;
+        result.pipeline_resources_summary = gpu_report.summary;
+        for (const RenderFeatureResourceReportEntry& resource : gpu_report.resources) {
+            result.pipeline_resources.push_back(RenderFeatureStatusEntry{
+                .name = resource.name,
+                .ready = resource.ready,
+            });
+        }
+
+        const RenderFeatureResourceReport persistent_report =
+            m_resource_set.resourceReport(m_ambient_occlusion_evaluated, persistentResourceStatus());
+        result.persistent_resources_valid = persistent_report.valid;
+        result.persistent_resources_summary = persistent_report.summary;
+        for (const RenderFeatureResourceReportEntry& resource : persistent_report.resources) {
+            result.persistent_resources.push_back(RenderFeatureStatusEntry{
+                .name = resource.name,
+                .ready = resource.ready,
+            });
+        }
+        return result;
+    }
+
 private:
     void updateParams(uint32_t width, uint32_t height, const Options& options)
     {
@@ -500,8 +485,6 @@ private:
     }
 
     struct State {
-        luna::RHI::Ref<luna::RHI::Device> device;
-        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
         luna::RHI::Ref<luna::RHI::DescriptorSetLayout> layout;
         luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
         luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
@@ -513,8 +496,34 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderModule> fragment_shader;
     };
 
+    [[nodiscard]] std::array<RenderFeatureResourceStatus, 9> resourceStatus() const noexcept
+    {
+        return {{
+            {"vertex_shader", static_cast<bool>(m_state.vertex_shader)},
+            {"fragment_shader", static_cast<bool>(m_state.fragment_shader)},
+            {"layout", static_cast<bool>(m_state.layout)},
+            {"descriptor_pool", static_cast<bool>(m_state.descriptor_pool)},
+            {"pipeline_layout", static_cast<bool>(m_state.pipeline_layout)},
+            {"pipeline", static_cast<bool>(m_state.pipeline)},
+            {"sampler", static_cast<bool>(m_state.sampler)},
+            {"params_buffer", static_cast<bool>(m_state.params_buffer)},
+            {"descriptor_set", static_cast<bool>(m_state.descriptor_set)},
+        }};
+    }
+
+    [[nodiscard]] std::array<RenderFeatureResourceStatus, 1> persistentResourceStatus() const noexcept
+    {
+        return {{
+            {"ambient_occlusion", m_ambient_occlusion.isValid()},
+        }};
+    }
+
     State m_state{};
+    RenderFeatureResourceSet m_resource_set{std::string(kFeatureName)};
+    bool m_binding_contract_valid{true};
+    std::string m_binding_contract_summary{"not evaluated"};
     PersistentTexture2D m_ambient_occlusion;
+    bool m_ambient_occlusion_evaluated{false};
 };
 
 namespace {
@@ -530,6 +539,11 @@ public:
     [[nodiscard]] const char* name() const noexcept override
     {
         return "ScreenSpaceAmbientOcclusion";
+    }
+
+    [[nodiscard]] std::span<const RenderPassResourceUsage> resourceUsages() const noexcept override
+    {
+        return kSsaoPassResources;
     }
 
     void setup(RenderPassContext& context) override
@@ -641,15 +655,34 @@ ScreenSpaceAmbientOcclusionFeature::ScreenSpaceAmbientOcclusionFeature(OptionsHa
 
 ScreenSpaceAmbientOcclusionFeature::~ScreenSpaceAmbientOcclusionFeature() = default;
 
-RenderFeatureInfo ScreenSpaceAmbientOcclusionFeature::info() const noexcept
+RenderFeatureContract ScreenSpaceAmbientOcclusionFeature::contract() const noexcept
 {
-    return RenderFeatureInfo{
+    return RenderFeatureContract{
         .name = kFeatureName,
         .display_name = "Screen Space Ambient Occlusion",
         .category = "Lighting",
-        .enabled = m_options ? m_options->enabled : true,
         .runtime_toggleable = true,
+        .requirements = RenderFeatureRequirements{
+            .scene_inputs = RenderFeatureSceneInputFlags::Depth |
+                            RenderFeatureSceneInputFlags::GBufferNormalMetallic |
+                            RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
+            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                         RenderFeatureResourceFlags::Sampler,
+            .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+            .graph_inputs = kGraphInputs,
+            .graph_outputs = kGraphOutputs,
+            .requires_framebuffer_size = true,
+            .uses_persistent_resources = true,
+            .uses_history_resources = false,
+        },
     };
+}
+
+bool ScreenSpaceAmbientOcclusionFeature::enabled() const noexcept
+{
+    return m_options ? m_options->enabled : true;
 }
 
 std::vector<RenderFeatureParameterInfo> ScreenSpaceAmbientOcclusionFeature::parameters() const
@@ -663,23 +696,9 @@ std::vector<RenderFeatureParameterInfo> ScreenSpaceAmbientOcclusionFeature::para
     };
 }
 
-RenderFeatureRequirements ScreenSpaceAmbientOcclusionFeature::requirements() const noexcept
+RenderFeatureDiagnostics ScreenSpaceAmbientOcclusionFeature::diagnostics() const
 {
-    return RenderFeatureRequirements{
-        .scene_inputs = RenderFeatureSceneInputFlags::Depth |
-                        RenderFeatureSceneInputFlags::GBufferNormalMetallic |
-                        RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
-        .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                     RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
-                     RenderFeatureResourceFlags::Sampler,
-        .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
-        .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-        .graph_inputs = kGraphInputs,
-        .graph_outputs = kGraphOutputs,
-        .requires_framebuffer_size = true,
-        .uses_persistent_resources = true,
-        .uses_history_resources = false,
-    };
+    return m_resources ? m_resources->diagnostics() : RenderFeatureDiagnostics{};
 }
 
 bool ScreenSpaceAmbientOcclusionFeature::setEnabled(bool enabled) noexcept

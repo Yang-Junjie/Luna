@@ -9,7 +9,10 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace luna::RHI {
 class Device;
@@ -20,6 +23,61 @@ class RenderGraphBuilder;
 }
 
 namespace luna::render_flow {
+
+enum class RenderFeatureGpuResourceAction : uint8_t {
+    InvalidContext,
+    Reuse,
+    Rebuild,
+};
+
+struct RenderFeatureGpuResourceDecision {
+    RenderFeatureGpuResourceAction action{RenderFeatureGpuResourceAction::InvalidContext};
+    bool device_changed{false};
+    bool backend_changed{false};
+};
+
+struct RenderFeatureResourceStatus {
+    std::string_view name;
+    bool ready{false};
+};
+
+struct RenderFeatureResourceReportEntry {
+    std::string name;
+    bool ready{false};
+};
+
+struct RenderFeatureResourceReport {
+    bool evaluated{false};
+    bool valid{true};
+    std::string summary;
+    std::vector<RenderFeatureResourceReportEntry> resources;
+};
+
+class RenderFeatureGpuResourceState {
+public:
+    RenderFeatureGpuResourceState() = default;
+    explicit RenderFeatureGpuResourceState(std::string feature_name);
+
+    void setFeatureName(std::string feature_name);
+    [[nodiscard]] const std::string& featureName() const noexcept;
+    [[nodiscard]] RenderFeatureGpuResourceDecision evaluate(const SceneRenderContext& context,
+                                                            bool resources_complete) const noexcept;
+    void bindContext(const SceneRenderContext& context) noexcept;
+    void reset() noexcept;
+
+    [[nodiscard]] bool hasContext() const noexcept;
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
+    [[nodiscard]] luna::RHI::BackendType backendType() const noexcept;
+
+private:
+    std::string m_feature_name;
+    luna::RHI::Ref<luna::RHI::Device> m_device;
+    luna::RHI::BackendType m_backend_type{luna::RHI::BackendType::Auto};
+};
+
+[[nodiscard]] bool logRenderFeatureGpuResourceBuildResult(
+    const RenderFeatureGpuResourceState& state,
+    std::span<const RenderFeatureResourceStatus> resources);
 
 enum class RenderFeatureResourceScope : uint8_t {
     FrameTransient,
@@ -96,6 +154,51 @@ private:
     bool m_initialized{false};
     bool m_has_readable_history{false};
     bool m_frame_written{false};
+};
+
+class RenderFeatureResourceSet {
+public:
+    RenderFeatureResourceSet() = default;
+    explicit RenderFeatureResourceSet(std::string feature_name);
+
+    void setFeatureName(std::string feature_name);
+    [[nodiscard]] const std::string& featureName() const noexcept;
+
+    [[nodiscard]] RenderFeatureGpuResourceDecision evaluateGpuResources(const SceneRenderContext& context,
+                                                                        bool resources_complete) const noexcept;
+    void bindGpuContext(const SceneRenderContext& context) noexcept;
+    void resetGpuContext() noexcept;
+    [[nodiscard]] bool hasGpuContext() const noexcept;
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
+    [[nodiscard]] luna::RHI::BackendType backendType() const noexcept;
+
+    [[nodiscard]] bool logGpuResourceBuildResult(std::span<const RenderFeatureResourceStatus> resources) const;
+    [[nodiscard]] RenderFeatureResourceReport gpuResourceReport(
+        bool resources_complete,
+        std::span<const RenderFeatureResourceStatus> resources) const;
+    [[nodiscard]] RenderFeatureResourceReport resourceReport(
+        bool evaluated,
+        std::span<const RenderFeatureResourceStatus> resources) const;
+
+    [[nodiscard]] bool ensurePersistentTexture2D(PersistentTexture2D& texture,
+                                                 const SceneRenderContext& context,
+                                                 const PersistentTexture2DDesc& desc) const;
+    void releasePersistentTexture2D(PersistentTexture2D& texture) const noexcept;
+    [[nodiscard]] RenderGraphTextureHandle importPersistentTexture2D(
+        luna::RenderGraphBuilder& graph,
+        PersistentTexture2D& texture,
+        const RenderFeatureTextureImportOptions& options = {}) const;
+
+    [[nodiscard]] bool ensureHistoryTexture2D(HistoryTexture2D& history,
+                                              const SceneRenderContext& context,
+                                              const PersistentTexture2DDesc& desc) const;
+    void beginHistoryFrame(HistoryTexture2D& history,
+                           const RenderFeatureFrameContext& frame_context) const noexcept;
+    void commitHistoryTexture2D(HistoryTexture2D& history) const noexcept;
+    void resetHistoryTexture2D(HistoryTexture2D& history) const noexcept;
+
+private:
+    RenderFeatureGpuResourceState m_gpu_resources;
 };
 
 [[nodiscard]] RenderGraphTextureHandle importPersistentTexture2D(

@@ -176,7 +176,7 @@ RenderFeatureSupportResult evaluateRenderFeatureRequirements(const RenderFeature
 RenderFeatureSupportResult evaluateRenderFeatureSupport(const IRenderFeature& feature,
                                                         const SceneRenderContext& scene_context)
 {
-    return evaluateRenderFeatureRequirements(feature.requirements(), scene_context);
+    return evaluateRenderFeatureRequirements(feature.contract().requirements, scene_context);
 }
 
 std::string summarizeRenderFeatureSupport(const RenderFeatureSupportResult& result)

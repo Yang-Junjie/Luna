@@ -18,8 +18,14 @@
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 
+#include <array>
+
 namespace luna::render_flow::default_scene {
 namespace {
+
+constexpr std::array<RenderPassResourceUsage, 1> kShadowPassResources{{
+    {.name = blackboard::ShadowMap.value(), .access = RenderPassResourceAccess::Write},
+}};
 
 ShadowResources createShadowResources(RenderGraphBuilder& graph)
 {
@@ -104,6 +110,11 @@ ShadowDepthPass::ShadowDepthPass(PassSharedState& state) : m_state(&state) {}
 const char* ShadowDepthPass::name() const noexcept
 {
     return "SceneShadowDepth";
+}
+
+std::span<const RenderPassResourceUsage> ShadowDepthPass::resourceUsages() const noexcept
+{
+    return kShadowPassResources;
 }
 
 void ShadowDepthPass::setup(RenderPassContext& context)

@@ -53,6 +53,53 @@ struct RenderFeatureGraphResource {
     RenderFeatureGraphResourceFlags flags{RenderFeatureGraphResourceFlags::None};
 };
 
+enum class RenderPassResourceAccess : uint8_t {
+    Read,
+    Write,
+    ReadWrite,
+};
+
+struct RenderPassResourceUsage {
+    std::string_view name;
+    RenderFeatureGraphResourceKind kind{RenderFeatureGraphResourceKind::Texture};
+    RenderPassResourceAccess access{RenderPassResourceAccess::Read};
+    RenderFeatureGraphResourceFlags flags{RenderFeatureGraphResourceFlags::None};
+};
+
+inline bool readsResource(RenderPassResourceAccess access) noexcept
+{
+    return access == RenderPassResourceAccess::Read || access == RenderPassResourceAccess::ReadWrite;
+}
+
+inline bool writesResource(RenderPassResourceAccess access) noexcept
+{
+    return access == RenderPassResourceAccess::Write || access == RenderPassResourceAccess::ReadWrite;
+}
+
+struct RenderFeaturePassInfo {
+    std::string name;
+    std::vector<RenderPassResourceUsage> resources;
+};
+
+struct RenderFeatureStatusEntry {
+    std::string name;
+    bool ready{false};
+};
+
+struct RenderFeatureDiagnostics {
+    bool binding_contract_valid{true};
+    std::string binding_contract_summary;
+    bool pipeline_resources_valid{true};
+    std::string pipeline_resources_summary;
+    std::vector<RenderFeatureStatusEntry> pipeline_resources;
+    bool persistent_resources_valid{true};
+    std::string persistent_resources_summary;
+    std::vector<RenderFeatureStatusEntry> persistent_resources;
+    bool history_resources_valid{true};
+    std::string history_resources_summary;
+    std::vector<RenderFeatureStatusEntry> history_resources;
+};
+
 struct RenderFeatureInfo {
     std::string_view name;
     std::string_view display_name;
@@ -64,8 +111,12 @@ struct RenderFeatureInfo {
     std::string support_summary;
     bool graph_contract_valid{true};
     std::string graph_contract_summary;
+    bool pass_contract_valid{true};
+    std::string pass_contract_summary;
     std::vector<RenderFeatureGraphResource> graph_inputs;
     std::vector<RenderFeatureGraphResource> graph_outputs;
+    std::vector<RenderFeaturePassInfo> passes;
+    RenderFeatureDiagnostics diagnostics;
 };
 
 enum class RenderFeatureSceneInputFlags : uint32_t {
@@ -192,6 +243,14 @@ struct RenderFeatureRequirements {
     bool uses_history_resources{false};
 };
 
+struct RenderFeatureContract {
+    std::string_view name;
+    std::string_view display_name;
+    std::string_view category;
+    bool runtime_toggleable{false};
+    RenderFeatureRequirements requirements{};
+};
+
 enum class RenderFeatureParameterType : uint8_t {
     Bool,
     Int,
@@ -222,12 +281,31 @@ class IRenderFeature {
 public:
     virtual ~IRenderFeature() = default;
 
-    [[nodiscard]] virtual RenderFeatureInfo info() const noexcept = 0;
+    [[nodiscard]] virtual RenderFeatureContract contract() const noexcept = 0;
+    [[nodiscard]] virtual bool enabled() const noexcept
+    {
+        return true;
+    }
+    [[nodiscard]] virtual RenderFeatureInfo info() const noexcept
+    {
+        const RenderFeatureContract feature_contract = contract();
+        return RenderFeatureInfo{
+            .name = feature_contract.name,
+            .display_name = feature_contract.display_name,
+            .category = feature_contract.category,
+            .enabled = enabled(),
+            .runtime_toggleable = feature_contract.runtime_toggleable,
+        };
+    }
     [[nodiscard]] virtual std::vector<RenderFeatureParameterInfo> parameters() const
     {
         return {};
     }
     [[nodiscard]] virtual RenderFeatureRequirements requirements() const noexcept
+    {
+        return contract().requirements;
+    }
+    [[nodiscard]] virtual RenderFeatureDiagnostics diagnostics() const
     {
         return {};
     }

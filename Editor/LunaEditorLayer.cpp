@@ -270,20 +270,22 @@ void LunaEditorLayer::onImGuiRender()
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
     m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer);
-    m_render_features_panel.onImGuiRender(m_show_render_features_panel,
-                                          renderer.getDefaultRenderFeatureInfos(),
-                                          [&renderer](std::string_view feature_name) {
-                                              return renderer.getDefaultRenderFeatureParameters(feature_name);
-                                          },
-                                          [&renderer](std::string_view feature_name, bool enabled) {
-                                              return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
-                                          },
-                                          [&renderer](std::string_view feature_name,
-                                                      std::string_view parameter_name,
-                                                      const render_flow::RenderFeatureParameterValue& value) {
-                                              return renderer.setDefaultRenderFeatureParameter(
-                                                  feature_name, parameter_name, value);
-                                          });
+    if (m_show_render_features_panel) {
+        m_render_features_panel.onImGuiRender(m_show_render_features_panel,
+                                              renderer.getDefaultRenderFeatureInfos(),
+                                              [&renderer](std::string_view feature_name) {
+                                                  return renderer.getDefaultRenderFeatureParameters(feature_name);
+                                              },
+                                              [&renderer](std::string_view feature_name, bool enabled) {
+                                                  return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
+                                              },
+                                              [&renderer](std::string_view feature_name,
+                                                          std::string_view parameter_name,
+                                                          const render_flow::RenderFeatureParameterValue& value) {
+                                                  return renderer.setDefaultRenderFeatureParameter(
+                                                      feature_name, parameter_name, value);
+                                              });
+    }
     m_render_profiler_panel.onImGuiRender(m_show_render_profiler_panel,
                                           renderer.getLastRenderGraphProfile(),
                                           backendTypeToString(application.getBackend()),
