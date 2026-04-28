@@ -49,7 +49,7 @@ ImVec2 fitImageSize(uint32_t width, uint32_t height, ImVec2 available)
 
 } // namespace
 
-void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer, luna::RHI::BackendType backend_type)
+void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer)
 {
     if (!open) {
         if (renderer.getRenderDebugViewMode() != RenderDebugViewMode::None) {
@@ -114,12 +114,9 @@ void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer, luna::RHI::
         return;
     }
 
-    ImVec2 uv0(0.0f, 1.0f);
-    ImVec2 uv1(1.0f, 0.0f);
-    if (backend_type == luna::RHI::BackendType::Vulkan) {
-        uv0 = ImVec2(0.0f, 0.0f);
-        uv1 = ImVec2(1.0f, 1.0f);
-    }
+    const bool flip_uv_y = renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip;
+    const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
+    const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
 
     ImGui::Image(texture_id, image_size, uv0, uv1);
     ImGui::End();

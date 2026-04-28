@@ -11,9 +11,9 @@ namespace {
 constexpr float kFallbackAspectRatio = 1.0f;
 constexpr uint32_t kHaltonJitterSampleCount = 8;
 
-glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
+glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
 {
-    return backend_type == luna::RHI::BackendType::Vulkan ? luna::flipProjectionY(projection) : projection;
+    return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
 float halton(uint32_t index, uint32_t base)
@@ -58,7 +58,7 @@ glm::mat4 applyProjectionJitter(glm::mat4 projection, glm::vec2 jitter_ndc)
 }
 
 RenderViewMatrices buildViewMatrices(const Camera& camera,
-                                     luna::RHI::BackendType backend_type,
+                                     const luna::RHI::RHICapabilities& capabilities,
                                      uint32_t framebuffer_width,
                                      uint32_t framebuffer_height,
                                      glm::vec2 jitter_ndc = glm::vec2(0.0f))
@@ -69,7 +69,8 @@ RenderViewMatrices buildViewMatrices(const Camera& camera,
 
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForBackend(camera.getProjectionMatrix(aspect_ratio), backend_type);
+    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
+                                                         capabilities.conventions);
     matrices.projection = applyProjectionJitter(matrices.projection, jitter_ndc);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);
@@ -81,7 +82,7 @@ RenderViewMatrices buildViewMatrices(const Camera& camera,
 } // namespace
 
 RenderViewFrameState RenderViewHistory::beginFrame(const Camera& camera,
-                                                   luna::RHI::BackendType backend_type,
+                                                   const luna::RHI::RHICapabilities& capabilities,
                                                    uint64_t frame_index,
                                                    uint32_t framebuffer_width,
                                                    uint32_t framebuffer_height,
@@ -93,9 +94,9 @@ RenderViewFrameState RenderViewHistory::beginFrame(const Camera& camera,
     const glm::vec2 jitter_pixels = haltonJitterPixels(jitter_sample_index);
     const glm::vec2 jitter_ndc = jitterPixelsToNdc(jitter_pixels, framebuffer_width, framebuffer_height);
     const RenderViewMatrices current_matrices =
-        buildViewMatrices(camera, backend_type, framebuffer_width, framebuffer_height);
+        buildViewMatrices(camera, capabilities, framebuffer_width, framebuffer_height);
     const RenderViewMatrices current_jittered_matrices =
-        buildViewMatrices(camera, backend_type, framebuffer_width, framebuffer_height, jitter_ndc);
+        buildViewMatrices(camera, capabilities, framebuffer_width, framebuffer_height, jitter_ndc);
     const bool previous_frame_compatible =
         m_has_previous_frame && !invalidate_history && m_previous_viewport_size == viewport_size;
 

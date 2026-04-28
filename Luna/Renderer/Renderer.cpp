@@ -62,11 +62,6 @@ const char* renderDebugViewModeToString(RenderDebugViewMode mode)
     }
 }
 
-bool supportsScenePickReadback(luna::RHI::BackendType backend_type)
-{
-    return backend_type == luna::RHI::BackendType::Vulkan || backend_type == luna::RHI::BackendType::DirectX12;
-}
-
 const char* swapchainResultToString(luna::RHI::Result result)
 {
     switch (result) {
@@ -133,8 +128,18 @@ bool Renderer::init(Window& window, InitializationOptions options)
 #endif
 
         device_context.instance = luna::RHI::Instance::Create(instance_info);
+        device_context.capabilities = luna::RHI::makeCapabilitiesForBackend(device_context.instance->GetType());
         LUNA_RENDERER_DEBUG("Created RHI instance for backend '{}'",
                             renderer_detail::backendTypeToString(device_context.instance->GetType()));
+        LUNA_RENDERER_DEBUG("RHI capabilities: default_flow={} imgui={} scene_pick_readback={} gpu_timestamp={} "
+                            "projection_y_flip={} imgui_uv_y_flip={} pick_y_matches_display={}",
+                            device_context.capabilities.supports_default_render_flow,
+                            device_context.capabilities.supports_imgui,
+                            device_context.capabilities.supports_scene_pick_readback,
+                            device_context.capabilities.supports_gpu_timestamp,
+                            device_context.capabilities.conventions.requires_projection_y_flip,
+                            device_context.capabilities.conventions.imgui_render_target_requires_uv_y_flip,
+                            device_context.capabilities.conventions.scene_pick_y_matches_display_y);
         device_context.shader_compiler = device_context.instance->CreateShaderCompiler();
         device_context.surface = device_context.instance->CreateSurface(window_handle);
         if (!device_context.surface) {
@@ -240,6 +245,7 @@ void Renderer::shutdown()
     m_device_context.adapter.reset();
     m_device_context.instance.reset();
     m_device_context.surface_format = luna::RHI::Format::UNDEFINED;
+    m_device_context.capabilities = {};
     m_window_context = {};
     m_scene_output = {};
     m_frame_resources = {};
@@ -341,6 +347,7 @@ void Renderer::renderFrame()
                                    : false;
     const auto backend_type =
         device_context.instance ? device_context.instance->GetType() : runtime.initialization_options.backend;
+    const auto& capabilities = device_context.capabilities;
     const bool offscreen_scene_output = scene_output.mode == SceneOutputMode::OffscreenTexture;
     LUNA_RENDERER_FRAME_DEBUG(
         "Building frame {} render graph: swapchain_extent={}x{} backend={} scene_output_mode={} imgui={}",
@@ -401,7 +408,7 @@ void Renderer::renderFrame()
         scene_width = extent.width;
         scene_height = extent.height;
 
-        if (renderer_detail::supportsDefaultRenderFlow(backend_type)) {
+        if (capabilities.supports_default_render_flow) {
             scene_depth_handle = graph_builder.CreateTexture(luna::RenderGraphTextureDesc{
                 .Name = "SceneDepthTexture",
                 .Width = extent.width,
@@ -450,18 +457,19 @@ void Renderer::renderFrame()
                                   scene_height);
     }
 
-    const bool pick_readback_supported = supportsScenePickReadback(backend_type);
+    const bool pick_readback_supported = capabilities.supports_scene_pick_readback;
     const bool scene_pick_available = scene_pick_handle.isValid();
     const bool issue_pick_readback = render_scene_to_offscreen && scene_output_valid && scene_pick_available &&
                                      pick_readback_supported && scene_output.queued_pick_request.has_value() &&
                                      frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
                                      frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
     if (scene_output_valid) {
-        if (renderer_detail::supportsDefaultRenderFlow(backend_type) && scene_depth_handle.isValid() && m_render_flow) {
+        if (capabilities.supports_default_render_flow && scene_depth_handle.isValid() && m_render_flow) {
             SceneRenderContext scene_context{
                 .device = device_context.device,
                 .compiler = device_context.shader_compiler,
                 .backend_type = backend_type,
+                .capabilities = device_context.capabilities,
                 .color_target = scene_color_handle,
                 .depth_target = scene_depth_handle,
                 .pick_target = scene_pick_handle,
@@ -487,7 +495,7 @@ void Renderer::renderFrame()
             render_flow::RenderFeatureFrameContext feature_frame_context_with_view = feature_frame_context;
             feature_frame_context_with_view.view =
                 m_render_view_history.beginFrame(m_render_world.camera(),
-                                                 backend_type,
+                                                 device_context.capabilities,
                                                  frame_resources.frame_index,
                                                  scene_width,
                                                  scene_height,
@@ -938,6 +946,11 @@ const luna::RHI::Ref<luna::RHI::Adapter>& Renderer::getAdapter() const
     return m_device_context.adapter;
 }
 
+const luna::RHI::RHICapabilities& Renderer::getCapabilities() const noexcept
+{
+    return m_device_context.capabilities;
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& Renderer::getDevice() const
 {
     return m_device_context.device;
@@ -1261,6 +1274,7 @@ render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
     return render_flow::RenderFeatureFrameContext{
         .device = m_device_context.device,
         .backend_type = backend_type,
+        .capabilities = m_device_context.capabilities,
         .frame_index = frame_index,
         .framebuffer_width = framebuffer_width,
         .framebuffer_height = framebuffer_height,
@@ -1443,6 +1457,12 @@ void Renderer::ensureGpuTimingResources()
     auto& frame_resources = m_frame_resources;
     if (!m_device_context.device || !m_device_context.graphics_queue || frame_resources.frames_in_flight == 0) {
         frame_resources.gpu_timing_slots.clear();
+        return;
+    }
+    if (!m_device_context.capabilities.supports_gpu_timestamp) {
+        frame_resources.gpu_timing_slots.clear();
+        LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on backend '{}'",
+                           renderer_detail::backendTypeToString(m_device_context.capabilities.backend_type));
         return;
     }
 

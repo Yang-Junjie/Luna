@@ -269,7 +269,7 @@ void LunaEditorLayer::onImGuiRender()
     m_asset_loading_panel.onImGuiRender();
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
-    m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer, application.getBackend());
+    m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer);
     m_render_features_panel.onImGuiRender(m_show_render_features_panel,
                                           renderer.getDefaultRenderFeatureInfos(),
                                           [&renderer](std::string_view feature_name) {
@@ -399,12 +399,9 @@ void LunaEditorLayer::drawViewport()
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
-        ImVec2 uv0(0.0f, 1.0f);
-        ImVec2 uv1(1.0f, 0.0f);
-        if (m_application != nullptr && m_application->getBackend() == luna::RHI::BackendType::Vulkan) {
-            uv0 = ImVec2(0.0f, 0.0f);
-            uv1 = ImVec2(1.0f, 1.0f);
-        }
+        const bool flip_uv_y = renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip;
+        const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
+        const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
 
         ImGui::Image(texture_id, available, uv0, uv1);
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
@@ -556,12 +553,15 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const float texture_v = std::clamp(uv0.y + (uv1.y - uv0.y) * local_y, 0.0f, 0.999999f);
 
     const uint32_t pixel_x = static_cast<uint32_t>(texture_u * static_cast<float>(texture_extent.width));
-    const uint32_t color_pixel_y = static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height));
+    const uint32_t color_pixel_y = (std::min) (
+        static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
 
     // The final scene color is produced by a fullscreen lighting pass before ImGui samples it.
-    // That pass introduces a vertical mapping difference versus the raw pick attachment, so convert
-    // the displayed color-space Y back into the pick texture's texel-space Y before issuing readback.
-    const uint32_t pick_pixel_y = (texture_extent.height - 1) - (std::min) (color_pixel_y, texture_extent.height - 1);
+    // Some backends need the displayed color-space Y converted back to the raw pick attachment Y.
+    const bool pick_y_matches_display_y =
+        m_application->getRenderer().getCapabilities().conventions.scene_pick_y_matches_display_y;
+    const uint32_t pick_pixel_y =
+        pick_y_matches_display_y ? color_pixel_y : (texture_extent.height - 1) - color_pixel_y;
 
     m_application->getRenderer().requestScenePick((std::min) (pixel_x, texture_extent.width - 1), pick_pixel_y);
 }

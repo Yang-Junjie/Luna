@@ -11,6 +11,7 @@
 #include <Barrier.h>
 #include <Buffer.h>
 #include <Builders.h>
+#include <Capabilities.h>
 #include <CommandBufferEncoder.h>
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
@@ -88,16 +89,8 @@ bool g_initialized = false;
 
 float imguiTopClipY(luna::RHI::BackendType backend_type)
 {
-    switch (backend_type) {
-        case luna::RHI::BackendType::Vulkan:
-        case luna::RHI::BackendType::DirectX12:
-            return -1.0f;
-        case luna::RHI::BackendType::DirectX11:
-        case luna::RHI::BackendType::OpenGL:
-        case luna::RHI::BackendType::OpenGLES:
-        default:
-            return 1.0f;
-    }
+    const auto capabilities = luna::RHI::makeCapabilitiesForBackend(backend_type);
+    return capabilities.conventions.imgui_clip_top_y_is_negative_one ? -1.0f : 1.0f;
 }
 
 std::filesystem::path projectRoot()

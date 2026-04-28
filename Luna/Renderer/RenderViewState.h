@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Capabilities.h>
 #include <Core.h>
-#include <Instance.h>
 
 #include <cstdint>
 #include <glm/mat4x4.hpp>
@@ -43,7 +43,7 @@ struct RenderViewFrameState {
 class RenderViewHistory final {
 public:
     [[nodiscard]] RenderViewFrameState beginFrame(const Camera& camera,
-                                                  luna::RHI::BackendType backend_type,
+                                                  const luna::RHI::RHICapabilities& capabilities,
                                                   uint64_t frame_index,
                                                   uint32_t framebuffer_width,
                                                   uint32_t framebuffer_height,

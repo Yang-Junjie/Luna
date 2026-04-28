@@ -6,7 +6,7 @@ namespace luna {
 
 class RenderDebugPanel {
 public:
-    void onImGuiRender(bool& open, Renderer& renderer, luna::RHI::BackendType backend_type);
+    void onImGuiRender(bool& open, Renderer& renderer);
 };
 
 } // namespace luna

@@ -9,6 +9,9 @@
 #include "Impls/D3D11/D3D11Texture.h"
 #include "Logging.h"
 
+#include <algorithm>
+#include <cstring>
+
 namespace luna::RHI {
 namespace {
 constexpr UINT kPushConstantSlot = 13;
@@ -370,6 +373,90 @@ void D3D11CommandBufferEncoder::CopyBufferToImage(const Ref<Buffer>& srcBuffer,
     }
 
     srcBuf->Unmap();
+}
+
+void D3D11CommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
+                                                  ResourceState srcImageLayout,
+                                                  const Ref<Buffer>& dstBuffer,
+                                                  std::span<const BufferImageCopy> regions)
+{
+#ifndef NDEBUG
+    if (srcImage && m_transitionedTextures.find(srcImage.get()) == m_transitionedTextures.end()) {
+        LogMessage(LogLevel::Warn, "DX11: CopyImageToBuffer without TransitionImage(). Vulkan/DX12 will fail.");
+    }
+#endif
+    auto* srcTex = static_cast<D3D11Texture*>(srcImage.get());
+    auto* dstBuf = static_cast<D3D11Buffer*>(dstBuffer.get());
+    if (!srcTex || !dstBuf || !srcTex->GetNativeTexture() || !dstBuf->GetNativeBuffer()) {
+        return;
+    }
+
+    uint8_t* dstMapped = static_cast<uint8_t*>(dstBuf->Map());
+    if (!dstMapped) {
+        return;
+    }
+
+    D3D11_TEXTURE2D_DESC srcDesc{};
+    srcTex->GetNativeTexture()->GetDesc(&srcDesc);
+    const uint32_t bytesPerPixel = D3D11GetFormatBytesPerPixel(D3D11_ToDXGIFormat(srcImage->GetFormat()));
+    for (const auto& region : regions) {
+        const uint32_t subresource = D3D11CalcSubresource(region.ImageSubresource.MipLevel,
+                                                          region.ImageSubresource.BaseArrayLayer,
+                                                          srcImage->GetMipLevels());
+        const uint32_t naturalRowPitch = region.ImageExtentWidth * bytesPerPixel;
+        const uint32_t rowPitch =
+            region.BufferRowLength > 0 ? region.BufferRowLength * bytesPerPixel : naturalRowPitch;
+
+        D3D11_TEXTURE2D_DESC stagingDesc = srcDesc;
+        stagingDesc.Width = region.ImageExtentWidth;
+        stagingDesc.Height = region.ImageExtentHeight;
+        stagingDesc.MipLevels = 1;
+        stagingDesc.ArraySize = 1;
+        stagingDesc.SampleDesc.Count = 1;
+        stagingDesc.SampleDesc.Quality = 0;
+        stagingDesc.Usage = D3D11_USAGE_STAGING;
+        stagingDesc.BindFlags = 0;
+        stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        stagingDesc.MiscFlags = 0;
+
+        ComPtr<ID3D11Texture2D> stagingTexture;
+        if (FAILED(m_device->GetNativeDevice()->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture)) ||
+            !stagingTexture) {
+            continue;
+        }
+
+        D3D11_BOX srcBox{};
+        srcBox.left = static_cast<UINT>(region.ImageOffsetX);
+        srcBox.top = static_cast<UINT>(region.ImageOffsetY);
+        srcBox.front = static_cast<UINT>(region.ImageOffsetZ);
+        srcBox.right = static_cast<UINT>(region.ImageOffsetX + static_cast<int32_t>(region.ImageExtentWidth));
+        srcBox.bottom = static_cast<UINT>(region.ImageOffsetY + static_cast<int32_t>(region.ImageExtentHeight));
+        srcBox.back = srcBox.front + 1u;
+        m_context->CopySubresourceRegion(stagingTexture.Get(),
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         srcTex->GetNativeTexture(),
+                                         subresource,
+                                         &srcBox);
+
+        D3D11_MAPPED_SUBRESOURCE mapped{};
+        if (FAILED(m_context->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped))) {
+            continue;
+        }
+
+        const auto* srcMapped = static_cast<const uint8_t*>(mapped.pData);
+        for (uint32_t y = 0; y < region.ImageExtentHeight; ++y) {
+            const uint64_t dstOffset = region.BufferOffset + static_cast<uint64_t>(y) * rowPitch;
+            std::memcpy(dstMapped + dstOffset,
+                        srcMapped + static_cast<uint64_t>(y) * mapped.RowPitch,
+                        naturalRowPitch);
+        }
+        m_context->Unmap(stagingTexture.Get(), 0);
+    }
+
+    dstBuf->Unmap();
 }
 
 void D3D11CommandBufferEncoder::CopyTexture2D(const Ref<Texture>& src, const Ref<Texture>& dst)

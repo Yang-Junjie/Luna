@@ -15,6 +15,7 @@
 #include <functional>
 
 #include <Barrier.h>
+#include <Capabilities.h>
 #include <Core.h>
 #include <glm/vec4.hpp>
 #include <Instance.h>
@@ -120,6 +121,7 @@ public:
 
     const luna::RHI::Ref<luna::RHI::Instance>& getInstance() const;
     const luna::RHI::Ref<luna::RHI::Adapter>& getAdapter() const;
+    [[nodiscard]] const luna::RHI::RHICapabilities& getCapabilities() const noexcept;
     const luna::RHI::Ref<luna::RHI::Device>& getDevice() const;
     const luna::RHI::Ref<luna::RHI::Queue>& getGraphicsQueue() const;
     const luna::RHI::Ref<luna::RHI::Swapchain>& getSwapchain() const;
@@ -166,6 +168,7 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderCompiler> shader_compiler;
         luna::RHI::Ref<luna::RHI::Synchronization> synchronization;
         luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
+        luna::RHI::RHICapabilities capabilities{};
     };
 
     struct SceneOutputState {

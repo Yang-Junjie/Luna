@@ -74,6 +74,10 @@ public:
                            const Ref<Texture>& dstImage,
                            ResourceState dstImageLayout,
                            std::span<const BufferImageCopy> regions) override;
+    void CopyImageToBuffer(const Ref<Texture>& srcImage,
+                           ResourceState srcImageLayout,
+                           const Ref<Buffer>& dstBuffer,
+                           std::span<const BufferImageCopy> regions) override;
 
     CommandBufferType GetCommandBufferType() const override
     {

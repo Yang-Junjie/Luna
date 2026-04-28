@@ -164,16 +164,19 @@ const luna::RHI::Ref<luna::RHI::Texture>& textureOrFallback(const luna::RHI::Ref
     return texture ? texture : fallback.texture;
 }
 
-glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
+glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
 {
-    return backend_type == luna::RHI::BackendType::Vulkan ? luna::flipProjectionY(projection) : projection;
+    return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
-RenderViewMatrices buildViewMatrices(const Camera& camera, float aspect_ratio, luna::RHI::BackendType backend_type)
+RenderViewMatrices buildViewMatrices(const Camera& camera,
+                                     float aspect_ratio,
+                                     const luna::RHI::RHICapabilities& capabilities)
 {
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForBackend(camera.getProjectionMatrix(aspect_ratio), backend_type);
+    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
+                                                         capabilities.conventions);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);
     matrices.inverse_projection = glm::inverse(matrices.projection);
@@ -214,7 +217,7 @@ RenderViewFrameState resolveViewState(const SceneRenderContext& context,
 
     const float aspect_ratio =
         static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height);
-    const RenderViewMatrices matrices = buildViewMatrices(camera, aspect_ratio, context.backend_type);
+    const RenderViewMatrices matrices = buildViewMatrices(camera, aspect_ratio, context.capabilities);
     return RenderViewFrameState{
         .current = matrices,
         .previous = matrices,
@@ -257,6 +260,15 @@ void addStaticMeshVertexLayout(luna::RHI::GraphicsPipelineBuilder& builder)
         .SetFrontFace(luna::RHI::FrontFace::CounterClockwise);
 }
 
+void addStaticMeshPositionOnlyVertexLayout(luna::RHI::GraphicsPipelineBuilder& builder)
+{
+    builder.AddVertexBinding(0, sizeof(StaticMeshVertex), luna::RHI::VertexInputRate::Vertex)
+        .AddVertexAttribute(0, 0, luna::RHI::Format::RGB32_FLOAT, offsetof(StaticMeshVertex, Position), "POSITION")
+        .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
+        .SetCullMode(luna::RHI::CullMode::None)
+        .SetFrontFace(luna::RHI::FrontFace::CounterClockwise);
+}
+
 luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     createShadowPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
                          const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
@@ -269,7 +281,7 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
 
     luna::RHI::GraphicsPipelineBuilder builder;
     builder.SetShaders({vertex_shader, fragment_shader});
-    addStaticMeshVertexLayout(builder);
+    addStaticMeshPositionOnlyVertexLayout(builder);
     builder.SetDepthTest(true, true, luna::RHI::CompareOp::Less)
         .SetDepthBias(true, 1.25f, 0.0f, 1.75f)
         .AddColorAttachmentDefault(false)

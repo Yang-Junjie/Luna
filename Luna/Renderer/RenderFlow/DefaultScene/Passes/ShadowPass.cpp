@@ -47,9 +47,9 @@ ShadowResources createShadowResources(RenderGraphBuilder& graph)
     };
 }
 
-glm::mat4 adjustProjectionForBackend(glm::mat4 projection, luna::RHI::BackendType backend_type)
+glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
 {
-    return backend_type == luna::RHI::BackendType::Vulkan ? luna::flipProjectionY(projection) : projection;
+    return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
 glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
@@ -92,7 +92,7 @@ render_flow::default_scene_detail::ShadowRenderParams
     const glm::mat4 view = glm::lookAtRH(shadow_eye, shadow_center, up);
     const glm::mat4 projection = glm::orthoRH_ZO(
         -kShadowHalfExtent, kShadowHalfExtent, -kShadowHalfExtent, kShadowHalfExtent, 0.0f, kShadowDepthRange);
-    params.view_projection = adjustProjectionForBackend(projection, context.backend_type) * view;
+    params.view_projection = adjustProjectionForConventions(projection, context.capabilities.conventions) * view;
     params.params.x = 1.0f;
     return params;
 }

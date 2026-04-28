@@ -3,6 +3,7 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderViewState.h"
 
+#include <Capabilities.h>
 #include <Core.h>
 #include <Instance.h>
 #include <filesystem>
@@ -40,6 +41,7 @@ struct SceneRenderContext {
     luna::RHI::Ref<luna::RHI::Device> device;
     luna::RHI::Ref<luna::RHI::ShaderCompiler> compiler;
     luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
+    luna::RHI::RHICapabilities capabilities{luna::RHI::makeCapabilitiesForBackend(luna::RHI::BackendType::Vulkan)};
     RenderGraphTextureHandle color_target;
     RenderGraphTextureHandle depth_target;
     RenderGraphTextureHandle pick_target;
@@ -99,6 +101,7 @@ inline bool operator&(RenderFeatureHistoryInvalidationFlags lhs,
 struct RenderFeatureFrameContext {
     luna::RHI::Ref<luna::RHI::Device> device;
     luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
+    luna::RHI::RHICapabilities capabilities{luna::RHI::makeCapabilitiesForBackend(luna::RHI::BackendType::Vulkan)};
     uint64_t frame_index{0};
     uint32_t framebuffer_width{0};
     uint32_t framebuffer_height{0};
