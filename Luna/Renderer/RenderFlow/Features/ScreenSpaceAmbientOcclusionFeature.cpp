@@ -46,7 +46,18 @@ void linkScreenSpaceAmbientOcclusionFeature() {}
 
 namespace {
 
+inline constexpr std::string_view kFeatureName = "ScreenSpaceAmbientOcclusion";
 constexpr luna::RHI::Format kAmbientOcclusionFormat = luna::RHI::Format::RGBA8_UNORM;
+
+constexpr std::array<RenderFeatureGraphResource, 3> kGraphInputs{{
+    {blackboard::Depth.value()},
+    {blackboard::GBufferNormalMetallic.value()},
+    {blackboard::GBufferWorldPositionRoughness.value()},
+}};
+
+constexpr std::array<RenderFeatureGraphResource, 1> kGraphOutputs{{
+    {lighting_extension_keys::AmbientOcclusion},
+}};
 
 struct SsaoGpuParams {
     glm::vec4 framebuffer;
@@ -633,7 +644,7 @@ ScreenSpaceAmbientOcclusionFeature::~ScreenSpaceAmbientOcclusionFeature() = defa
 RenderFeatureInfo ScreenSpaceAmbientOcclusionFeature::info() const noexcept
 {
     return RenderFeatureInfo{
-        .name = "ScreenSpaceAmbientOcclusion",
+        .name = kFeatureName,
         .display_name = "Screen Space Ambient Occlusion",
         .category = "Lighting",
         .enabled = m_options ? m_options->enabled : true,
@@ -649,6 +660,25 @@ std::vector<RenderFeatureParameterInfo> ScreenSpaceAmbientOcclusionFeature::para
         makeFloatParameter("intensity", "Intensity", options.intensity, 0.0f, 4.0f, 0.02f),
         makeFloatParameter("bias", "Bias", options.bias, 0.0f, 0.3f, 0.001f),
         makeFloatParameter("power", "Power", options.power, 0.25f, 4.0f, 0.01f),
+    };
+}
+
+RenderFeatureRequirements ScreenSpaceAmbientOcclusionFeature::requirements() const noexcept
+{
+    return RenderFeatureRequirements{
+        .scene_inputs = RenderFeatureSceneInputFlags::Depth |
+                        RenderFeatureSceneInputFlags::GBufferNormalMetallic |
+                        RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
+        .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                     RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                     RenderFeatureResourceFlags::Sampler,
+        .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+        .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+        .graph_inputs = kGraphInputs,
+        .graph_outputs = kGraphOutputs,
+        .requires_framebuffer_size = true,
+        .uses_persistent_resources = true,
+        .uses_history_resources = false,
     };
 }
 
@@ -704,10 +734,11 @@ bool ScreenSpaceAmbientOcclusionFeature::registerPasses(RenderFlowBuilder& build
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered =
-        builder.insertPassBetween(extension_slots::AfterGBuffer,
-                                  extension_slots::BeforeLighting,
-                                  "ScreenSpaceAmbientOcclusion",
-                                  std::make_unique<ScreenSpaceAmbientOcclusionPass>(*m_resources, m_options));
+        builder.insertFeaturePassBetween(kFeatureName,
+                                         extension_slots::AfterGBuffer,
+                                         extension_slots::BeforeLighting,
+                                         "ScreenSpaceAmbientOcclusion",
+                                         std::make_unique<ScreenSpaceAmbientOcclusionPass>(*m_resources, m_options));
     if (registered) {
         LUNA_RENDERER_INFO("Registered ScreenSpaceAmbientOcclusion between '{}' and '{}'",
                            extension_slots::AfterGBuffer,

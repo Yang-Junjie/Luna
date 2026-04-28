@@ -25,6 +25,103 @@ std::string makeParameterScopedLabel(std::string_view label,
     return scoped_label;
 }
 
+const char* featureStatusLabel(const render_flow::RenderFeatureInfo& feature) noexcept
+{
+    if (!feature.supported) {
+        return "Unsupported";
+    }
+    if (!feature.enabled) {
+        return "Disabled";
+    }
+    if (feature.active) {
+        return "Active";
+    }
+    return "Inactive";
+}
+
+void drawFeatureStatusTooltip(const render_flow::RenderFeatureInfo& feature)
+{
+    if (!ImGui::IsItemHovered()) {
+        return;
+    }
+
+    if (!feature.supported) {
+        const char* summary = feature.support_summary.empty() ? "Requirements are not satisfied."
+                                                               : feature.support_summary.c_str();
+        ImGui::SetTooltip("%s", summary);
+        return;
+    }
+    if (!feature.enabled) {
+        ImGui::SetTooltip("Feature is manually disabled.");
+        return;
+    }
+    if (feature.active) {
+        ImGui::SetTooltip("Feature is enabled and all evaluated requirements are satisfied.");
+        return;
+    }
+
+    ImGui::SetTooltip("Feature is not active this frame.");
+}
+
+const char* graphResourceKindLabel(render_flow::RenderFeatureGraphResourceKind kind) noexcept
+{
+    switch (kind) {
+        case render_flow::RenderFeatureGraphResourceKind::Texture:
+            return "Texture";
+        case render_flow::RenderFeatureGraphResourceKind::Buffer:
+            return "Buffer";
+    }
+    return "Unknown";
+}
+
+void drawGraphResourceList(const char* label, const std::vector<render_flow::RenderFeatureGraphResource>& resources)
+{
+    ImGui::TextDisabled("%s", label);
+    ImGui::Indent();
+    if (resources.empty()) {
+        ImGui::TextDisabled("none");
+        ImGui::Unindent();
+        return;
+    }
+
+    for (const render_flow::RenderFeatureGraphResource& resource : resources) {
+        const bool optional = resource.flags & render_flow::RenderFeatureGraphResourceFlags::Optional;
+        const bool external = resource.flags & render_flow::RenderFeatureGraphResourceFlags::External;
+        ImGui::BulletText("%.*s  [%s]%s%s",
+                          static_cast<int>(resource.name.size()),
+                          resource.name.data(),
+                          graphResourceKindLabel(resource.kind),
+                          optional ? " optional" : "",
+                          external ? " external" : "");
+    }
+    ImGui::Unindent();
+}
+
+void drawFeatureGraphContract(const render_flow::RenderFeatureInfo& feature)
+{
+    if (feature.graph_inputs.empty() && feature.graph_outputs.empty()) {
+        return;
+    }
+
+    const std::string label = makeFeatureScopedLabel("Graph Contract", feature.name);
+    if (!ImGui::TreeNode(label.c_str())) {
+        return;
+    }
+
+    ImGui::TextDisabled("Status");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", feature.graph_contract_valid ? "OK" : "Issues");
+    if (ImGui::IsItemHovered()) {
+        const char* summary = feature.graph_contract_summary.empty() ? "not evaluated"
+                                                                     : feature.graph_contract_summary.c_str();
+        ImGui::SetTooltip("%s", summary);
+    }
+
+    drawGraphResourceList("Inputs", feature.graph_inputs);
+    drawGraphResourceList("Outputs", feature.graph_outputs);
+    ImGui::TreePop();
+}
+
 } // namespace
 
 void RenderFeaturesPanel::onImGuiRender(bool& open,
@@ -53,25 +150,35 @@ void RenderFeaturesPanel::onImGuiRender(bool& open,
         const std::string feature_label = makeFeatureScopedLabel(feature.display_name, feature.name);
 
         bool enabled = feature.enabled;
-        if (!feature.runtime_toggleable) {
+        const bool can_toggle = feature.runtime_toggleable && feature.supported;
+        if (!can_toggle) {
             ImGui::BeginDisabled();
         }
 
-        if (ImGui::Checkbox(feature_label.c_str(), &enabled) && feature.runtime_toggleable &&
-            set_feature_enabled) {
+        if (ImGui::Checkbox(feature_label.c_str(), &enabled) && can_toggle && set_feature_enabled) {
             set_feature_enabled(feature.name, enabled);
         }
 
-        if (!feature.runtime_toggleable) {
+        if (!can_toggle) {
             ImGui::EndDisabled();
         }
 
         ImGui::SameLine();
         ImGui::TextDisabled("[%.*s]", static_cast<int>(feature.category.size()), feature.category.data());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", featureStatusLabel(feature));
+        drawFeatureStatusTooltip(feature);
+
+        ImGui::Indent();
+        drawFeatureGraphContract(feature);
+        ImGui::Unindent();
 
         const auto parameters = get_parameters ? get_parameters(feature.name) : ParameterList{};
         if (!parameters.empty()) {
             ImGui::Indent();
+            if (!feature.supported) {
+                ImGui::BeginDisabled();
+            }
             for (const auto& parameter : parameters) {
                 const std::string parameter_label =
                     makeParameterScopedLabel(parameter.display_name, feature.name, parameter.name);
@@ -117,6 +224,9 @@ void RenderFeaturesPanel::onImGuiRender(bool& open,
                 if (parameter.read_only) {
                     ImGui::EndDisabled();
                 }
+            }
+            if (!feature.supported) {
+                ImGui::EndDisabled();
             }
             ImGui::Unindent();
         }

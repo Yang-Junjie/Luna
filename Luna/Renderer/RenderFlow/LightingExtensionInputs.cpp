@@ -25,13 +25,13 @@ constexpr RenderResourceKey<RenderGraphTextureHandle> inputKey(LightingExtension
 {
     switch (input) {
         case LightingExtensionInput::AmbientOcclusion:
-            return {"Scene.LightingExtension.AmbientOcclusion"};
+            return {lighting_extension_keys::AmbientOcclusion};
         case LightingExtensionInput::Reflection:
-            return {"Scene.LightingExtension.Reflection"};
+            return {lighting_extension_keys::Reflection};
         case LightingExtensionInput::IndirectDiffuse:
-            return {"Scene.LightingExtension.IndirectDiffuse"};
+            return {lighting_extension_keys::IndirectDiffuse};
         case LightingExtensionInput::IndirectSpecular:
-            return {"Scene.LightingExtension.IndirectSpecular"};
+            return {lighting_extension_keys::IndirectSpecular};
         case LightingExtensionInput::Count:
             break;
     }

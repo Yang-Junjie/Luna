@@ -111,6 +111,33 @@ IRenderPass* RenderFlowBuilder::find(std::string_view name) const noexcept
     return node != m_nodes.end() ? node->pass.get() : nullptr;
 }
 
+std::vector<std::string_view> RenderFlowBuilder::passNames() const
+{
+    std::vector<std::string_view> names;
+    names.reserve(m_nodes.size());
+    for (const Node& node : m_nodes) {
+        names.push_back(node.name);
+    }
+    return names;
+}
+
+std::vector<std::string_view> RenderFlowBuilder::passesForFeature(std::string_view feature_name) const
+{
+    std::vector<std::string_view> names;
+    for (const Node& node : m_nodes) {
+        if (node.owner_feature == feature_name) {
+            names.push_back(node.name);
+        }
+    }
+    return names;
+}
+
+std::string_view RenderFlowBuilder::passOwner(std::string_view name) const noexcept
+{
+    const auto node = findNode(name);
+    return node != m_nodes.end() ? std::string_view(node->owner_feature) : std::string_view{};
+}
+
 std::string_view RenderFlowBuilder::lastError() const noexcept
 {
     return m_last_error;
@@ -193,6 +220,28 @@ RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
 
 bool RenderFlowBuilder::addPass(std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority)
 {
+    return addPassImpl({}, std::move(name), std::move(pass), priority);
+}
+
+bool RenderFlowBuilder::addFeaturePass(std::string_view feature_name,
+                                       std::string name,
+                                       std::unique_ptr<IRenderPass> pass,
+                                       int32_t priority)
+{
+    if (feature_name.empty()) {
+        clearError();
+        setError("RenderFlow feature pass owner must not be empty");
+        return false;
+    }
+
+    return addPassImpl(std::string(feature_name), std::move(name), std::move(pass), priority);
+}
+
+bool RenderFlowBuilder::addPassImpl(std::string owner_feature,
+                                    std::string name,
+                                    std::unique_ptr<IRenderPass> pass,
+                                    int32_t priority)
+{
     clearError();
     const std::string pass_name = name;
     if (name.empty()) {
@@ -210,6 +259,7 @@ bool RenderFlowBuilder::addPass(std::string name, std::unique_ptr<IRenderPass> p
 
     m_nodes.push_back(Node{
         .name = std::move(name),
+        .owner_feature = std::move(owner_feature),
         .pass = std::move(pass),
         .priority = priority,
         .registration_index = m_next_registration_index++,
@@ -313,6 +363,83 @@ bool RenderFlowBuilder::insertPassBetween(std::string_view after_name,
 
     const std::string inserted_name = name;
     if (!addPass(name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(after_name, inserted_name) || !addDependency(inserted_name, before_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
+}
+
+bool RenderFlowBuilder::insertFeaturePassBefore(std::string_view feature_name,
+                                                std::string_view anchor_name,
+                                                std::string name,
+                                                std::unique_ptr<IRenderPass> pass,
+                                                int32_t priority)
+{
+    clearError();
+    if (!contains(anchor_name)) {
+        setError("RenderFlow anchor pass '" + std::string(anchor_name) + "' does not exist");
+        return false;
+    }
+
+    const std::string inserted_name = name;
+    if (!addFeaturePass(feature_name, name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(inserted_name, anchor_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
+}
+
+bool RenderFlowBuilder::insertFeaturePassAfter(std::string_view feature_name,
+                                               std::string_view anchor_name,
+                                               std::string name,
+                                               std::unique_ptr<IRenderPass> pass,
+                                               int32_t priority)
+{
+    clearError();
+    if (!contains(anchor_name)) {
+        setError("RenderFlow anchor pass '" + std::string(anchor_name) + "' does not exist");
+        return false;
+    }
+
+    const std::string inserted_name = name;
+    if (!addFeaturePass(feature_name, name, std::move(pass), priority)) {
+        return false;
+    }
+
+    if (!addDependency(anchor_name, inserted_name)) {
+        removePass(inserted_name);
+        return false;
+    }
+    return true;
+}
+
+bool RenderFlowBuilder::insertFeaturePassBetween(std::string_view feature_name,
+                                                 std::string_view after_name,
+                                                 std::string_view before_name,
+                                                 std::string name,
+                                                 std::unique_ptr<IRenderPass> pass,
+                                                 int32_t priority)
+{
+    clearError();
+    if (!contains(after_name)) {
+        setError("RenderFlow after-anchor pass '" + std::string(after_name) + "' does not exist");
+        return false;
+    }
+    if (!contains(before_name)) {
+        setError("RenderFlow before-anchor pass '" + std::string(before_name) + "' does not exist");
+        return false;
+    }
+
+    const std::string inserted_name = name;
+    if (!addFeaturePass(feature_name, name, std::move(pass), priority)) {
         return false;
     }
 

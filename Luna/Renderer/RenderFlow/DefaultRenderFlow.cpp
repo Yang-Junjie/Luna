@@ -4,12 +4,61 @@
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderFlow/Features/RenderFeatureModules.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
+#include "Renderer/RenderFlow/RenderFeatureSupport.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
+#include <span>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace luna {
+namespace {
+
+std::string joinStrings(const std::vector<std::string>& values)
+{
+    std::string result;
+    for (size_t index = 0; index < values.size(); ++index) {
+        if (index > 0) {
+            result += "; ";
+        }
+        result += values[index];
+    }
+    return result;
+}
+
+std::string joinFeatureNames(const std::vector<std::string>& values)
+{
+    std::string result;
+    for (size_t index = 0; index < values.size(); ++index) {
+        if (index > 0) {
+            result += ", ";
+        }
+        result += values[index];
+    }
+    return result;
+}
+
+std::vector<render_flow::RenderFeatureGraphResource>
+    copyGraphResources(std::span<const render_flow::RenderFeatureGraphResource> resources)
+{
+    return {resources.begin(), resources.end()};
+}
+
+bool isOptional(const render_flow::RenderFeatureGraphResource& resource) noexcept
+{
+    return resource.flags & render_flow::RenderFeatureGraphResourceFlags::Optional;
+}
+
+bool isExternal(const render_flow::RenderFeatureGraphResource& resource) noexcept
+{
+    return resource.flags & render_flow::RenderFeatureGraphResourceFlags::External;
+}
+
+} // namespace
 
 DefaultRenderFlow::DefaultRenderFlow()
 {
@@ -27,6 +76,7 @@ void DefaultRenderFlow::shutdown()
 {
     m_frame_ready_to_commit = false;
     m_builder.clear();
+    m_feature_runtime_states.clear();
     for (const auto& feature : m_features) {
         feature->releasePersistentResources();
         feature->shutdown();
@@ -55,6 +105,23 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
     if (!feature->registerPasses(m_builder)) {
         LUNA_RENDERER_ERROR("Default render flow feature '{}' registration failed: {}", info.name, m_builder.lastError());
         return false;
+    }
+
+    const std::string feature_name(info.name);
+    auto& runtime_state = m_feature_runtime_states[feature_name];
+    runtime_state.owned_passes.clear();
+    for (std::string_view pass_name : m_builder.passesForFeature(feature_name)) {
+        runtime_state.owned_passes.emplace_back(pass_name);
+    }
+    runtime_state.supported = true;
+    runtime_state.active_this_frame = false;
+    runtime_state.prepared_this_frame = false;
+    runtime_state.support_summary = "not evaluated";
+    runtime_state.graph_contract_valid = true;
+    runtime_state.graph_contract_summary = "not evaluated";
+    if (runtime_state.owned_passes.empty()) {
+        LUNA_RENDERER_WARN("Default render flow feature '{}' registered no owned passes; use RenderFlowBuilder feature pass APIs",
+                           info.name);
     }
 
     LUNA_RENDERER_INFO("Registered default render flow feature '{}'", info.name);
@@ -97,6 +164,56 @@ bool DefaultRenderFlow::hasFeature(std::string_view name) const
     });
 }
 
+DefaultRenderFlow::FeatureRuntimeState* DefaultRenderFlow::findFeatureRuntimeState(std::string_view name)
+{
+    const auto state = m_feature_runtime_states.find(std::string(name));
+    return state != m_feature_runtime_states.end() ? &state->second : nullptr;
+}
+
+const DefaultRenderFlow::FeatureRuntimeState*
+    DefaultRenderFlow::findFeatureRuntimeState(std::string_view name) const
+{
+    const auto state = m_feature_runtime_states.find(std::string(name));
+    return state != m_feature_runtime_states.end() ? &state->second : nullptr;
+}
+
+bool DefaultRenderFlow::isPassActive(std::string_view name) const
+{
+    const std::string_view owner = m_builder.passOwner(name);
+    if (owner.empty()) {
+        return true;
+    }
+
+    const FeatureRuntimeState* state = findFeatureRuntimeState(owner);
+    return state == nullptr || state->active_this_frame;
+}
+
+void DefaultRenderFlow::logFeatureSupportDiagnostics(const render_flow::IRenderFeature& feature,
+                                                     const render_flow::RenderFeatureSupportResult& support)
+{
+    const render_flow::RenderFeatureInfo info = feature.info();
+    if (info.name.empty()) {
+        return;
+    }
+
+    const std::string feature_name(info.name);
+    const std::string signature =
+        support.supported ? std::string("supported") : render_flow::summarizeRenderFeatureSupport(support);
+    auto& state = m_feature_runtime_states[feature_name];
+    if (state.support_summary == signature) {
+        return;
+    }
+
+    const bool had_previous = state.support_summary != "not evaluated";
+    state.support_summary = signature;
+    state.supported = support.supported;
+    if (!support.supported) {
+        LUNA_RENDERER_WARN("Render feature '{}' requirements are not satisfied: {}", info.name, signature);
+    } else if (had_previous) {
+        LUNA_RENDERER_INFO("Render feature '{}' requirements are satisfied", info.name);
+    }
+}
+
 bool DefaultRenderFlow::configure(const ConfigureFunction& configure_function)
 {
     if (!configure_function) {
@@ -126,7 +243,24 @@ std::vector<render_flow::RenderFeatureInfo> DefaultRenderFlow::featureInfos() co
     infos.reserve(m_features.size());
     for (const auto& feature : m_features) {
         if (feature) {
-            infos.push_back(feature->info());
+            render_flow::RenderFeatureInfo info = feature->info();
+            if (const FeatureRuntimeState* state = findFeatureRuntimeState(info.name)) {
+                info.supported = state->supported;
+                info.active = info.enabled && state->supported;
+                info.support_summary = state->support_summary;
+                info.graph_contract_valid = state->graph_contract_valid;
+                info.graph_contract_summary = state->graph_contract_summary;
+            } else {
+                info.supported = true;
+                info.active = info.enabled;
+                info.support_summary = "not evaluated";
+                info.graph_contract_valid = true;
+                info.graph_contract_summary = "not evaluated";
+            }
+            const render_flow::RenderFeatureRequirements requirements = feature->requirements();
+            info.graph_inputs = copyGraphResources(requirements.graph_inputs);
+            info.graph_outputs = copyGraphResources(requirements.graph_outputs);
+            infos.push_back(std::move(info));
         }
     }
     return infos;
@@ -153,7 +287,20 @@ bool DefaultRenderFlow::setFeatureEnabled(std::string_view name, bool enabled)
             return true;
         }
 
-        return feature->setEnabled(enabled);
+        if (!feature->setEnabled(enabled)) {
+            return false;
+        }
+
+        if (!enabled) {
+            if (FeatureRuntimeState* state = findFeatureRuntimeState(info.name)) {
+                if (state->active_this_frame) {
+                    feature->releasePersistentResources();
+                }
+                state->active_this_frame = false;
+                state->prepared_this_frame = false;
+            }
+        }
+        return true;
     }
 
     LUNA_RENDERER_WARN("Render feature '{}' was not found", name);
@@ -224,6 +371,99 @@ const render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() const noexcep
     return m_builder;
 }
 
+void DefaultRenderFlow::validateFeatureGraphContracts()
+{
+    std::unordered_map<std::string, std::vector<std::string>> producers;
+    std::unordered_map<std::string, std::vector<std::string>> consumers;
+
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        const FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+        if (state == nullptr || !state->active_this_frame) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureRequirements requirements = feature->requirements();
+        for (const render_flow::RenderFeatureGraphResource& output : requirements.graph_outputs) {
+            if (!output.name.empty()) {
+                producers[std::string(output.name)].emplace_back(info.name);
+            }
+        }
+        for (const render_flow::RenderFeatureGraphResource& input : requirements.graph_inputs) {
+            if (!input.name.empty()) {
+                consumers[std::string(input.name)].emplace_back(info.name);
+            }
+        }
+    }
+
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+        if (state == nullptr) {
+            state = &m_feature_runtime_states[std::string(info.name)];
+        }
+
+        if (!state->active_this_frame) {
+            state->graph_contract_valid = true;
+            state->graph_contract_summary = "inactive";
+            continue;
+        }
+
+        std::vector<std::string> issues;
+        const render_flow::RenderFeatureRequirements requirements = feature->requirements();
+        for (const render_flow::RenderFeatureGraphResource& input : requirements.graph_inputs) {
+            if (input.name.empty() || isOptional(input)) {
+                continue;
+            }
+
+            if (!producers.contains(std::string(input.name))) {
+                issues.push_back("missing producer for graph input '" + std::string(input.name) + "'");
+            }
+        }
+
+        for (const render_flow::RenderFeatureGraphResource& output : requirements.graph_outputs) {
+            if (output.name.empty()) {
+                continue;
+            }
+
+            const auto producer_it = producers.find(std::string(output.name));
+            if (producer_it != producers.end() && producer_it->second.size() > 1) {
+                issues.push_back("graph output '" + std::string(output.name) +
+                                 "' has multiple active producers: " + joinFeatureNames(producer_it->second));
+            }
+
+            if (!isExternal(output) && !consumers.contains(std::string(output.name))) {
+                issues.push_back("graph output '" + std::string(output.name) + "' has no active consumer");
+            }
+        }
+
+        const bool valid = issues.empty();
+        const std::string summary = valid ? std::string("ok") : joinStrings(issues);
+        if (state->graph_contract_summary == summary) {
+            state->graph_contract_valid = valid;
+            continue;
+        }
+
+        const bool had_previous = state->graph_contract_summary != "not evaluated" &&
+                                  state->graph_contract_summary != "inactive";
+        state->graph_contract_valid = valid;
+        state->graph_contract_summary = summary;
+        if (!valid) {
+            LUNA_RENDERER_WARN("Render feature '{}' graph contract diagnostics: {}", info.name, summary);
+        } else if (had_previous) {
+            LUNA_RENDERER_INFO("Render feature '{}' graph contract diagnostics are clear", info.name);
+        }
+    }
+}
+
 void DefaultRenderFlow::render(RenderFlowContext& context)
 {
     m_frame_ready_to_commit = false;
@@ -255,9 +495,50 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         world.drawPackets().size(),
         scene_context.show_pick_debug_visualization);
 
+    for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        const render_flow::RenderFeatureSupportResult support =
+            render_flow::evaluateRenderFeatureSupport(*feature, scene_context);
+        logFeatureSupportDiagnostics(*feature, support);
+
+        FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+        if (state == nullptr) {
+            state = &m_feature_runtime_states[std::string(info.name)];
+        }
+
+        const bool was_active = state->active_this_frame;
+        state->supported = support.supported;
+        state->active_this_frame = info.enabled && support.supported;
+        state->prepared_this_frame = false;
+
+        if (was_active && !state->active_this_frame) {
+            feature->releasePersistentResources();
+        }
+    }
+
+    validateFeatureGraphContracts();
+
     m_blackboard.clear();
     for (const auto& feature : m_features) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+        if (state == nullptr) {
+            continue;
+        }
+        if (!state->active_this_frame) {
+            continue;
+        }
+
         feature->prepareFrame(world, scene_context, context.featureFrameContext(), m_blackboard);
+        state->prepared_this_frame = true;
     }
 
     render_flow::RenderPassContext pass_context(context.graph(), world, scene_context, m_blackboard);
@@ -268,7 +549,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
     }
 
     for (const auto& entry : compiled_flow.passes) {
-        if (entry.pass) {
+        if (entry.pass && isPassActive(entry.name)) {
             entry.pass->setup(pass_context);
         }
     }
@@ -284,7 +565,13 @@ bool DefaultRenderFlow::commitFrame()
 
     m_frame_ready_to_commit = false;
     for (const auto& feature : m_features) {
-        if (feature) {
+        if (!feature) {
+            continue;
+        }
+
+        const render_flow::RenderFeatureInfo info = feature->info();
+        const FeatureRuntimeState* state = findFeatureRuntimeState(info.name);
+        if (state == nullptr || (state->active_this_frame && state->prepared_this_frame)) {
             feature->commitFrame();
         }
     }

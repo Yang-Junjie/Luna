@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 #include <Core.h>
 
 namespace luna {
@@ -29,6 +30,13 @@ enum class LightingExtensionInput : uint8_t {
 };
 
 inline constexpr size_t kLightingExtensionInputCount = static_cast<size_t>(LightingExtensionInput::Count);
+
+namespace lighting_extension_keys {
+inline constexpr std::string_view AmbientOcclusion = "Scene.LightingExtension.AmbientOcclusion";
+inline constexpr std::string_view Reflection = "Scene.LightingExtension.Reflection";
+inline constexpr std::string_view IndirectDiffuse = "Scene.LightingExtension.IndirectDiffuse";
+inline constexpr std::string_view IndirectSpecular = "Scene.LightingExtension.IndirectSpecular";
+} // namespace lighting_extension_keys
 
 struct LightingExtensionInputSet {
     std::array<RenderGraphTextureHandle, kLightingExtensionInputCount> textures{};

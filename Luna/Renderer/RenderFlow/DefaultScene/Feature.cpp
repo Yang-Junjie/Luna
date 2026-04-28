@@ -6,6 +6,7 @@
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h"
+#include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
@@ -14,46 +15,91 @@
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace luna::render_flow::default_scene {
 namespace {
+
+inline constexpr std::string_view kFeatureName = "DefaultScene";
+
+constexpr std::array<RenderFeatureGraphResource, 9> kGraphOutputs{{
+    {.name = blackboard::SceneColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::Depth.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {blackboard::Pick.value()},
+    {blackboard::GBufferBaseColor.value()},
+    {blackboard::GBufferNormalMetallic.value()},
+    {blackboard::GBufferWorldPositionRoughness.value()},
+    {blackboard::GBufferEmissiveAo.value()},
+    {blackboard::Velocity.value()},
+    {blackboard::ShadowMap.value()},
+}};
+
+constexpr std::array<RenderFeatureGraphResource, 11> kGraphInputs{{
+    {blackboard::Pick.value()},
+    {blackboard::GBufferBaseColor.value()},
+    {blackboard::GBufferNormalMetallic.value()},
+    {blackboard::GBufferWorldPositionRoughness.value()},
+    {blackboard::GBufferEmissiveAo.value()},
+    {blackboard::Velocity.value()},
+    {blackboard::ShadowMap.value()},
+    {.name = lighting_extension_keys::AmbientOcclusion, .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::Reflection, .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::IndirectDiffuse, .flags = RenderFeatureGraphResourceFlags::Optional},
+    {.name = lighting_extension_keys::IndirectSpecular, .flags = RenderFeatureGraphResourceFlags::Optional},
+}};
 
 bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
 {
     namespace pass_slots = luna::render_flow::slots::passes;
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
-    return builder.addPass(std::string(pass_slots::Environment),
-                           std::make_unique<EnvironmentPass>(state)) &&
-           builder.insertPassAfter(pass_slots::Environment,
-                                   std::string(pass_slots::ShadowDepth),
-                                   std::make_unique<ShadowDepthPass>(state)) &&
-           builder.insertPassAfter(pass_slots::ShadowDepth,
-                                   std::string(pass_slots::GBuffer),
-                                   std::make_unique<GeometryPass>(state)) &&
-           builder.insertPassAfter(pass_slots::GBuffer,
-                                   std::string(extension_slots::AfterGBuffer),
-                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterGBuffer))) &&
-           builder.insertPassAfter(extension_slots::AfterGBuffer,
-                                   std::string(extension_slots::BeforeLighting),
-                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeLighting))) &&
-           builder.insertPassAfter(extension_slots::BeforeLighting,
-                                   std::string(pass_slots::Lighting),
-                                   std::make_unique<LightingPass>(state)) &&
-           builder.insertPassAfter(pass_slots::Lighting,
-                                   std::string(extension_slots::AfterLighting),
-                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterLighting))) &&
-           builder.insertPassAfter(extension_slots::AfterLighting,
-                                   std::string(extension_slots::BeforeTransparent),
-                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeTransparent))) &&
-           builder.insertPassAfter(extension_slots::BeforeTransparent,
-                                   std::string(pass_slots::Transparent),
-                                   std::make_unique<TransparentPass>(state)) &&
-           builder.insertPassAfter(pass_slots::Transparent,
-                                   std::string(extension_slots::AfterTransparent),
-                                   std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterTransparent)));
+    return builder.addFeaturePass(kFeatureName,
+                                  std::string(pass_slots::Environment),
+                                  std::make_unique<EnvironmentPass>(state)) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          pass_slots::Environment,
+                                          std::string(pass_slots::ShadowDepth),
+                                          std::make_unique<ShadowDepthPass>(state)) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          pass_slots::ShadowDepth,
+                                          std::string(pass_slots::GBuffer),
+                                          std::make_unique<GeometryPass>(state)) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               pass_slots::GBuffer,
+               std::string(extension_slots::AfterGBuffer),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterGBuffer))) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               extension_slots::AfterGBuffer,
+               std::string(extension_slots::BeforeLighting),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeLighting))) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          extension_slots::BeforeLighting,
+                                          std::string(pass_slots::Lighting),
+                                          std::make_unique<LightingPass>(state)) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               pass_slots::Lighting,
+               std::string(extension_slots::AfterLighting),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterLighting))) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               extension_slots::AfterLighting,
+               std::string(extension_slots::BeforeTransparent),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeTransparent))) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          extension_slots::BeforeTransparent,
+                                          std::string(pass_slots::Transparent),
+                                          std::make_unique<TransparentPass>(state)) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               pass_slots::Transparent,
+               std::string(extension_slots::AfterTransparent),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterTransparent)));
 }
 
 AssetCache::ClearMode toClearMode(PipelineResources::Invalidation invalidation)
@@ -81,11 +127,26 @@ Feature::~Feature()
 RenderFeatureInfo Feature::info() const noexcept
 {
     return RenderFeatureInfo{
-        .name = "DefaultScene",
+        .name = kFeatureName,
         .display_name = "Default Scene",
         .category = "Scene",
         .enabled = true,
         .runtime_toggleable = false,
+    };
+}
+
+RenderFeatureRequirements Feature::requirements() const noexcept
+{
+    return RenderFeatureRequirements{
+        .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                     RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
+                     RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
+        .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+        .graph_inputs = kGraphInputs,
+        .graph_outputs = kGraphOutputs,
+        .requires_framebuffer_size = true,
+        .uses_persistent_resources = true,
+        .uses_history_resources = true,
     };
 }
 

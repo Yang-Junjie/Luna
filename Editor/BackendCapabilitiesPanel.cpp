@@ -38,7 +38,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(430.0f, 360.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(430.0f, 520.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Backend Capabilities", &open)) {
         ImGui::End();
         return;
@@ -63,6 +63,25 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
                 capabilities.supports_gpu_timestamp
                     ? (capabilities.gpu_timestamp_uses_disjoint_query ? "Disjoint query" : "Fixed period")
                     : "Unavailable");
+
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
+    if (ImGui::BeginTable("BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableHeadersRow();
+
+        capabilityRow("Graphics Pipeline", capabilities.supports_graphics_pipeline);
+        capabilityRow("Compute Pipeline", capabilities.supports_compute_pipeline);
+        capabilityRow("Sampled Texture", capabilities.supports_sampled_texture);
+        capabilityRow("Storage Texture", capabilities.supports_storage_texture);
+        capabilityRow("Color Attachment", capabilities.supports_color_attachment);
+        capabilityRow("Depth Attachment", capabilities.supports_depth_attachment);
+        capabilityRow("Uniform Buffer", capabilities.supports_uniform_buffer);
+        capabilityRow("Storage Buffer", capabilities.supports_storage_buffer);
+        capabilityRow("Sampler", capabilities.supports_sampler);
 
         ImGui::EndTable();
     }

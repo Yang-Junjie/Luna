@@ -36,6 +36,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
     Renderer/RenderFlow/RenderFeature.h
+    Renderer/RenderFlow/RenderFeatureSupport.h
+    Renderer/RenderFlow/RenderFeatureSupport.cpp
     Renderer/RenderFlow/RenderFeatureResources.h
     Renderer/RenderFlow/RenderFeatureResources.cpp
     Renderer/RenderFlow/ShaderBindingContract.h
