@@ -24,6 +24,7 @@
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
+#include <ShaderModule.h>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -45,6 +46,40 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createGBufferLayout(const luna::R
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     return createDescriptorSetLayoutFromSchema(device, sceneDescriptorSetSchema());
+}
+
+void validateShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+                                  const ShaderBindingContract& contract,
+                                  const std::filesystem::path& shader_file,
+                                  std::string_view entry_point)
+{
+    if (!shader) {
+        return;
+    }
+
+    const std::string shader_file_string = shader_file.string();
+    const ShaderBindingValidationResult result = validateShaderBindingContract(
+        ShaderBindingValidationContext{
+            .shader_file = shader_file_string,
+            .entry_point = entry_point,
+            .shader_stage = shader->GetStage(),
+        },
+        contract,
+        shader->GetReflection());
+    for (const std::string& issue : result.issues) {
+        LUNA_RENDERER_WARN("Shader binding contract mismatch: {}", issue);
+    }
+}
+
+ShaderBindingAddressMode bindingAddressModeForBackend(luna::RHI::BackendType backend_type)
+{
+    switch (backend_type) {
+        case luna::RHI::BackendType::DirectX11:
+        case luna::RHI::BackendType::DirectX12:
+            return ShaderBindingAddressMode::FlattenedRegisterSpace;
+        default:
+            return ShaderBindingAddressMode::LogicalSetBinding;
+    }
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
@@ -416,6 +451,45 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
+
+    const ShaderBindingAddressMode binding_address_mode = bindingAddressModeForBackend(context.backend_type);
+    const ShaderBindingContract geometry_contract =
+        makePipelineShaderBindingContract(geometryPipelineLayoutSchema(), binding_address_mode);
+    const ShaderBindingContract shadow_contract =
+        makePipelineShaderBindingContract(shadowPipelineLayoutSchema(), binding_address_mode);
+    const ShaderBindingContract lighting_contract =
+        makePipelineShaderBindingContract(lightingPipelineLayoutSchema(), binding_address_mode);
+    const ShaderBindingContract transparent_contract =
+        makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
+
+    validateShaderModuleBindings(m_state.geometry_vertex_shader,
+                                 geometry_contract,
+                                 shader_paths.geometry_vertex_path,
+                                 "sceneGeometryVertexMain");
+    validateShaderModuleBindings(m_state.geometry_fragment_shader,
+                                 geometry_contract,
+                                 shader_paths.geometry_fragment_path,
+                                 "sceneGeometryFragmentMain");
+    validateShaderModuleBindings(
+        m_state.shadow_vertex_shader, shadow_contract, shader_paths.shadow_vertex_path, "sceneShadowVertexMain");
+    validateShaderModuleBindings(
+        m_state.shadow_fragment_shader, shadow_contract, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain");
+    validateShaderModuleBindings(m_state.lighting_vertex_shader,
+                                 lighting_contract,
+                                 shader_paths.lighting_vertex_path,
+                                 "sceneLightingVertexMain");
+    validateShaderModuleBindings(m_state.lighting_fragment_shader,
+                                 lighting_contract,
+                                 shader_paths.lighting_fragment_path,
+                                 "sceneLightingFragmentMain");
+    validateShaderModuleBindings(m_state.debug_view_fragment_shader,
+                                 lighting_contract,
+                                 shader_paths.lighting_fragment_path,
+                                 "sceneDebugFragmentMain");
+    validateShaderModuleBindings(m_state.transparent_fragment_shader,
+                                 transparent_contract,
+                                 shader_paths.geometry_fragment_path,
+                                 "sceneTransparentFragmentMain");
 
     m_state.material_layout = createMaterialLayout(m_state.device);
     m_state.gbuffer_layout = createGBufferLayout(m_state.device);

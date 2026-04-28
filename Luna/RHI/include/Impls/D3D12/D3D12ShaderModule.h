@@ -29,6 +29,11 @@ public:
     {
         return m_blob;
     }
+
+    const ShaderReflectionData& GetReflection() const override
+    {
+        return m_info.Reflection;
+    }
 };
 } // namespace luna::RHI
 

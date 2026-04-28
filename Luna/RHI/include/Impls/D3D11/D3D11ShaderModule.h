@@ -24,6 +24,11 @@ public:
         return m_blob;
     }
 
+    const ShaderReflectionData& GetReflection() const override
+    {
+        return m_reflection;
+    }
+
     std::span<const uint8_t> GetBytecode() const override
     {
         return {m_blob.Data.data(), m_blob.Data.size()};
@@ -33,6 +38,7 @@ private:
     ShaderStage m_stage;
     std::string m_entryPoint;
     ShaderBlob m_blob;
+    ShaderReflectionData m_reflection;
 };
 } // namespace luna::RHI
 #endif

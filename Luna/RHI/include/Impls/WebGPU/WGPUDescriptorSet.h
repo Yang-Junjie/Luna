@@ -78,10 +78,32 @@ public:
 class LUNA_RHI_API WGPUShaderModule : public ShaderModule {
 private:
     // TODO: WGPUShaderModule m_module;
+    ShaderBlob m_blob;
+    ShaderCreateInfo m_info;
 
 public:
     WGPUShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info);
     ~WGPUShaderModule() override = default;
+
+    const std::string& GetEntryPoint() const override
+    {
+        return m_info.EntryPoint;
+    }
+
+    ShaderStage GetStage() const override
+    {
+        return m_info.Stage;
+    }
+
+    const ShaderBlob& GetBlob() const override
+    {
+        return m_blob;
+    }
+
+    const ShaderReflectionData& GetReflection() const override
+    {
+        return m_info.Reflection;
+    }
 };
 } // namespace luna::RHI
 

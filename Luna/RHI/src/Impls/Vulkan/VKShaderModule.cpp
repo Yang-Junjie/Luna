@@ -47,6 +47,11 @@ const luna::RHI::ShaderBlob& luna::RHI::VKShaderModule::GetBlob() const
     return m_shaderBlob;
 }
 
+const luna::RHI::ShaderReflectionData& luna::RHI::VKShaderModule::GetReflection() const
+{
+    return m_createInfo.Reflection;
+}
+
 luna::RHI::VKShaderModule::~VKShaderModule()
 {
     if (m_module && m_device) {

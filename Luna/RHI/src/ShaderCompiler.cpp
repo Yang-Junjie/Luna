@@ -6,6 +6,7 @@
 #include <cctype>
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -139,6 +140,91 @@ slang::TargetDesc MakeTargetDesc(BackendType backend, slang::IGlobalSession* glo
     }
 
     return targetDesc;
+}
+
+DescriptorType MapSlangResourceDescriptorType(slang::TypeLayoutReflection* typeLayout)
+{
+    if (!typeLayout || !typeLayout->getType()) {
+        return DescriptorType::UniformBuffer;
+    }
+
+    const auto shape = typeLayout->getResourceShape();
+    const auto baseShape = shape & SLANG_RESOURCE_BASE_SHAPE_MASK;
+    const auto access = typeLayout->getResourceAccess();
+    const bool isWritableResource = access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED ||
+                                    access == SLANG_RESOURCE_ACCESS_APPEND || access == SLANG_RESOURCE_ACCESS_CONSUME ||
+                                    access == SLANG_RESOURCE_ACCESS_WRITE || access == SLANG_RESOURCE_ACCESS_FEEDBACK;
+
+    switch (baseShape) {
+        case SLANG_STRUCTURED_BUFFER:
+        case SLANG_BYTE_ADDRESS_BUFFER:
+            return DescriptorType::StorageBuffer;
+        case SLANG_ACCELERATION_STRUCTURE:
+            return DescriptorType::AccelerationStructure;
+        case SLANG_TEXTURE_SUBPASS:
+            return DescriptorType::InputAttachment;
+        case SLANG_TEXTURE_1D:
+        case SLANG_TEXTURE_2D:
+        case SLANG_TEXTURE_3D:
+        case SLANG_TEXTURE_CUBE:
+        case SLANG_TEXTURE_BUFFER:
+            if (isWritableResource) {
+                return DescriptorType::StorageImage;
+            }
+            if ((shape & SLANG_TEXTURE_COMBINED_FLAG) != 0) {
+                return DescriptorType::CombinedImageSampler;
+            }
+            return DescriptorType::SampledImage;
+        default:
+            return DescriptorType::SampledImage;
+    }
+}
+
+SlangParameterCategory SlangCategoryForDescriptorType(DescriptorType type)
+{
+    switch (type) {
+        case DescriptorType::Sampler:
+            return SLANG_PARAMETER_CATEGORY_SAMPLER_STATE;
+        case DescriptorType::SampledImage:
+        case DescriptorType::CombinedImageSampler:
+        case DescriptorType::AccelerationStructure:
+            return SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE;
+        case DescriptorType::StorageImage:
+        case DescriptorType::StorageBuffer:
+        case DescriptorType::StorageBufferDynamic:
+            return SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS;
+        case DescriptorType::UniformBuffer:
+        case DescriptorType::UniformBufferDynamic:
+            return SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER;
+        case DescriptorType::InputAttachment:
+            return SLANG_PARAMETER_CATEGORY_SUBPASS;
+        default:
+            return SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT;
+    }
+}
+
+bool QueryEntryPointBindingUsage(
+    slang::IMetadata* metadata, DescriptorType type, uint32_t set, uint32_t binding, bool& outUsed)
+{
+    if (!metadata) {
+        return false;
+    }
+
+    const std::array<SlangParameterCategory, 2> categories{
+        SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
+        SlangCategoryForDescriptorType(type),
+    };
+
+    for (const SlangParameterCategory category : categories) {
+        bool used = true;
+        if (SLANG_SUCCEEDED(metadata->isParameterLocationUsed(category, set, binding, used))) {
+            outUsed = used;
+            return true;
+        }
+    }
+
+    return false;
 }
 #endif
 } // namespace
@@ -332,6 +418,7 @@ std::shared_ptr<ShaderModule> ShaderCompiler::CompileOrLoad(const Ref<Device>& d
     size_t hash = CalculateHash(effectiveInfo);
     std::filesystem::path cachePath = m_cacheDir / (std::to_string(hash) + ".bin");
     ShaderBlob blob;
+    bool loadedFromCache = false;
 
     if (std::filesystem::exists(cachePath)) {
         std::ifstream ifs(cachePath, std::ios::binary | std::ios::ate);
@@ -348,7 +435,7 @@ std::shared_ptr<ShaderModule> ShaderCompiler::CompileOrLoad(const Ref<Device>& d
 
         blob.Hash = std::hash<std::string_view>()(
             std::string_view(reinterpret_cast<const char*>(blob.Data.data()), blob.Data.size()));
-        return device->CreateShaderModule(blob, effectiveInfo);
+        loadedFromCache = true;
     }
 
     const std::filesystem::path sourcePath = std::filesystem::absolute(effectiveInfo.SourcePath).lexically_normal();
@@ -396,26 +483,30 @@ std::shared_ptr<ShaderModule> ShaderCompiler::CompileOrLoad(const Ref<Device>& d
         return nullptr;
     }
 
-    Slang::ComPtr<slang::IBlob> codeBlob;
-    result = linkedProgram->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
-    PrintDiagnostics("Code generation diagnostics", diagnosticsBlob.get());
-    if (SLANG_FAILED(result) || !codeBlob) {
-        LogMessage(LogLevel::Error, "Failed to get entry point code");
-        return nullptr;
-    }
+    effectiveInfo.Reflection = ExtractReflection(linkedProgram.get(), effectiveInfo.Stage);
 
-    blob = ConvertBlob(codeBlob.get());
-    if (blob.Data.empty()) {
-        return nullptr;
-    }
+    if (!loadedFromCache) {
+        Slang::ComPtr<slang::IBlob> codeBlob;
+        result = linkedProgram->getEntryPointCode(0, 0, codeBlob.writeRef(), diagnosticsBlob.writeRef());
+        PrintDiagnostics("Code generation diagnostics", diagnosticsBlob.get());
+        if (SLANG_FAILED(result) || !codeBlob) {
+            LogMessage(LogLevel::Error, "Failed to get entry point code");
+            return nullptr;
+        }
 
-    if (!std::filesystem::exists(m_cacheDir)) {
-        std::filesystem::create_directories(m_cacheDir);
-    }
+        blob = ConvertBlob(codeBlob.get());
+        if (blob.Data.empty()) {
+            return nullptr;
+        }
 
-    std::ofstream ofs(cachePath, std::ios::binary);
-    if (ofs) {
-        ofs.write(reinterpret_cast<const char*>(blob.Data.data()), static_cast<std::streamsize>(blob.Data.size()));
+        if (!std::filesystem::exists(m_cacheDir)) {
+            std::filesystem::create_directories(m_cacheDir);
+        }
+
+        std::ofstream ofs(cachePath, std::ios::binary);
+        if (ofs) {
+            ofs.write(reinterpret_cast<const char*>(blob.Data.data()), static_cast<std::streamsize>(blob.Data.size()));
+        }
     }
 
     return device->CreateShaderModule(blob, effectiveInfo);
@@ -591,6 +682,13 @@ ShaderReflectionData ShaderCompiler::ExtractReflection(slang::IComponentType* li
         return data;
     }
 
+    Slang::ComPtr<slang::IMetadata> entryPointMetadata;
+    Slang::ComPtr<slang::IBlob> metadataDiagnostics;
+    if (SLANG_FAILED(linkedProgram->getEntryPointMetadata(
+            0, 0, entryPointMetadata.writeRef(), metadataDiagnostics.writeRef()))) {
+        entryPointMetadata.setNull();
+    }
+
     uint32_t paramCount = layout->getParameterCount();
     for (uint32_t i = 0; i < paramCount; i++) {
         auto* param = layout->getParameterByIndex(i);
@@ -615,14 +713,7 @@ ShaderReflectionData ShaderCompiler::ExtractReflection(slang::IComponentType* li
                 binding.Type = DescriptorType::UniformBuffer;
                 break;
             case slang::TypeReflection::Kind::Resource: {
-                auto shape = typeLayout->getType()->getResourceShape();
-                if (shape & SLANG_STRUCTURED_BUFFER) {
-                    binding.Type = DescriptorType::StorageBuffer;
-                } else if (shape & SLANG_TEXTURE_BUFFER) {
-                    binding.Type = DescriptorType::StorageBuffer;
-                } else {
-                    binding.Type = DescriptorType::SampledImage;
-                }
+                binding.Type = MapSlangResourceDescriptorType(typeLayout);
                 break;
             }
             case slang::TypeReflection::Kind::SamplerState:
@@ -631,6 +722,13 @@ ShaderReflectionData ShaderCompiler::ExtractReflection(slang::IComponentType* li
             default:
                 binding.Type = DescriptorType::UniformBuffer;
                 break;
+        }
+
+        bool usedByEntryPoint = true;
+        if (QueryEntryPointBindingUsage(
+                entryPointMetadata.get(), binding.Type, binding.Set, binding.Binding, usedByEntryPoint)) {
+            binding.EntryPointUsageKnown = true;
+            binding.UsedByEntryPoint = usedByEntryPoint;
         }
 
         data.ResourceBindings.push_back(binding);

@@ -124,6 +124,8 @@ std::vector<uint8_t> WGPUPipelineCache::GetData() const
 // Created via wgpuDeviceCreateShaderModule with SPIRV or WGSL source.
 // The ShaderBlob data is SPIRV bytecode compiled by the Slang compiler.
 WGPUShaderModule::WGPUShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info)
+    : m_blob(blob),
+      m_info(info)
 {
     // SPIRV data stored in blob.Data; native module created in pipeline construction
     // since shader modules in WebGPU require a device handle.

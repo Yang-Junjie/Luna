@@ -25,6 +25,11 @@ public:
         return m_blob;
     }
 
+    const ShaderReflectionData& GetReflection() const override
+    {
+        return m_reflection;
+    }
+
     GLuint GetProgram() const
     {
         return m_program;
@@ -42,6 +47,7 @@ private:
     GLuint m_compShader = 0;
     bool m_valid = false;
     ShaderBlob m_blob;
+    ShaderReflectionData m_reflection;
     ShaderStage m_stage = ShaderStage::Vertex;
     std::string m_entryPoint = "main";
 

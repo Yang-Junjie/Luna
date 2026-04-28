@@ -12,14 +12,6 @@ struct ShaderBlob {
 
 using ShaderDefines = std::map<std::string, std::string>;
 
-struct ShaderCreateInfo {
-    std::string SourcePath;
-    std::string EntryPoint = "main";
-    ShaderStage Stage = ShaderStage::Vertex;
-    ShaderDefines Defines;
-    std::string Profile;
-};
-
 struct ShaderResourceBinding {
     uint32_t Set = 0;
     uint32_t Binding = 0;
@@ -28,12 +20,23 @@ struct ShaderResourceBinding {
     uint32_t Count = 1;
     ShaderStage StageFlags = ShaderStage::All;
     std::string Name;
+    bool EntryPointUsageKnown = false;
+    bool UsedByEntryPoint = true;
 };
 
 struct ShaderReflectionData {
     std::vector<ShaderResourceBinding> ResourceBindings;
     uint32_t PushConstantSize = 0;
     ShaderStage PushConstantStages = ShaderStage::None;
+};
+
+struct ShaderCreateInfo {
+    std::string SourcePath;
+    std::string EntryPoint = "main";
+    ShaderStage Stage = ShaderStage::Vertex;
+    ShaderDefines Defines;
+    std::string Profile;
+    ShaderReflectionData Reflection;
 };
 
 class LUNA_RHI_API ShaderModule : public std::enable_shared_from_this<ShaderModule> {

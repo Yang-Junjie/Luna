@@ -38,6 +38,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFeature.h
     Renderer/RenderFlow/RenderFeatureResources.h
     Renderer/RenderFlow/RenderFeatureResources.cpp
+    Renderer/RenderFlow/ShaderBindingContract.h
+    Renderer/RenderFlow/ShaderBindingContract.cpp
     Renderer/RenderFlow/RenderFeatureRegistry.h
     Renderer/RenderFlow/RenderFeatureRegistry.cpp
     Renderer/RenderFlow/RenderResourceKey.h
@@ -106,7 +108,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/ShadowMapping.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp
-    
+
     Renderer/Texture.h
     )
 
@@ -136,7 +138,7 @@ set(PROJECT_SOURCE
 set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h)
 
-set(ASSET_SOURCE 
+set(ASSET_SOURCE
     Asset/BuiltinAssets.h
     Asset/BuiltinAssets.cpp
     Asset/Model.h
@@ -197,7 +199,7 @@ add_library(
     Core/Timestep.h
     Core/Window.h
     Core/Window.cpp
-    Core/UUID.h 
+    Core/UUID.h
     Core/UUID.cpp
 
     Events/ApplicationEvent.h
@@ -242,7 +244,7 @@ target_include_directories(
         ${PROJECT_SOURCE_DIR}
 )
 
-target_link_libraries(LunaCore 
+target_link_libraries(LunaCore
         PUBLIC
         LunaRHI
         spdlog::spdlog
@@ -264,7 +266,3 @@ target_compile_definitions(
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
 )
-
-
-
-

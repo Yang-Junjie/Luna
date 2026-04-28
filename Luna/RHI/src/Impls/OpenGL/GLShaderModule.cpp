@@ -168,6 +168,7 @@ static std::string FixupVulkanGLSLForOpenGL(const char* source)
 
 GLShaderModule::GLShaderModule(const ShaderBlob& blob, const ShaderCreateInfo& info)
     : m_blob(blob),
+      m_reflection(info.Reflection),
       m_stage(info.Stage),
       m_entryPoint(info.EntryPoint)
 {

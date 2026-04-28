@@ -8,6 +8,7 @@
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
+#include "Renderer/RenderFlow/ShaderBindingContract.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 
@@ -60,10 +61,111 @@ constexpr uint32_t Sampler = 3;
 constexpr uint32_t Params = 4;
 } // namespace ssao_binding
 
+struct SsaoDescriptorBindingSchema {
+    const char* name{nullptr};
+    const char* shader_name{nullptr};
+    uint32_t binding{0};
+    luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
+    uint32_t count{1};
+    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::Fragment};
+};
+
+const std::array<SsaoDescriptorBindingSchema, 5> kSsaoBindings{{
+    {"Depth",
+     "gDepthTexture",
+     ssao_binding::Depth,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     luna::RHI::ShaderStage::Fragment},
+    {"NormalMetallic",
+     "gNormalMetallicTexture",
+     ssao_binding::NormalMetallic,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     luna::RHI::ShaderStage::Fragment},
+    {"WorldPositionRoughness",
+     "gWorldPositionRoughnessTexture",
+     ssao_binding::WorldPositionRoughness,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     luna::RHI::ShaderStage::Fragment},
+    {"Sampler",
+     "gSsaoSampler",
+     ssao_binding::Sampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     luna::RHI::ShaderStage::Fragment},
+    {"Params",
+     "gSsaoParams",
+     ssao_binding::Params,
+     luna::RHI::DescriptorType::UniformBuffer,
+     1,
+     luna::RHI::ShaderStage::Fragment},
+}};
+
 std::filesystem::path shaderPath()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
            "ScreenSpaceAmbientOcclusion.slang";
+}
+
+luna::RHI::DescriptorSetLayoutCreateInfo makeSsaoDescriptorSetLayoutCreateInfo()
+{
+    luna::RHI::DescriptorSetLayoutCreateInfo create_info;
+    create_info.Bindings.reserve(kSsaoBindings.size());
+    for (const SsaoDescriptorBindingSchema& binding : kSsaoBindings) {
+        create_info.Bindings.push_back(luna::RHI::DescriptorSetLayoutBinding{
+            .Binding = binding.binding,
+            .Type = binding.type,
+            .Count = binding.count,
+            .StageFlags = binding.stages,
+        });
+    }
+    return create_info;
+}
+
+ShaderBindingContract makeSsaoShaderBindingContract()
+{
+    ShaderBindingContract contract = makeShaderBindingContract("ScreenSpaceAmbientOcclusion");
+    contract.bindings.reserve(kSsaoBindings.size());
+    for (const SsaoDescriptorBindingSchema& binding : kSsaoBindings) {
+        contract.bindings.push_back(ShaderBindingRequirement{
+            .name = binding.name ? binding.name : "",
+            .shader_name = binding.shader_name ? binding.shader_name : "",
+            .set_name = "ScreenSpaceAmbientOcclusion",
+            .logical_set = 0,
+            .logical_binding = binding.binding,
+            .set = 0,
+            .binding = binding.binding,
+            .type = binding.type,
+            .count = binding.count,
+            .stages = binding.stages,
+        });
+    }
+    return contract;
+}
+
+void validateSsaoShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+                                      const ShaderBindingContract& contract,
+                                      const std::filesystem::path& shader_file,
+                                      std::string_view entry_point)
+{
+    if (!shader) {
+        return;
+    }
+
+    const std::string shader_file_string = shader_file.string();
+    const ShaderBindingValidationResult result = validateShaderBindingContract(
+        ShaderBindingValidationContext{
+            .shader_file = shader_file_string,
+            .entry_point = entry_point,
+            .shader_stage = shader->GetStage(),
+        },
+        contract,
+        shader->GetReflection());
+    for (const std::string& issue : result.issues) {
+        LUNA_RENDERER_WARN("Shader binding contract mismatch: {}", issue);
+    }
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
@@ -73,22 +175,7 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
         return {};
     }
 
-    return device->CreateDescriptorSetLayout(
-        luna::RHI::DescriptorSetLayoutBuilder()
-            .AddBinding(
-                ssao_binding::Depth, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(ssao_binding::NormalMetallic,
-                        luna::RHI::DescriptorType::SampledImage,
-                        1,
-                        luna::RHI::ShaderStage::Fragment)
-            .AddBinding(ssao_binding::WorldPositionRoughness,
-                        luna::RHI::DescriptorType::SampledImage,
-                        1,
-                        luna::RHI::ShaderStage::Fragment)
-            .AddBinding(ssao_binding::Sampler, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(
-                ssao_binding::Params, luna::RHI::DescriptorType::UniformBuffer, 1, luna::RHI::ShaderStage::Fragment)
-            .Build());
+    return device->CreateDescriptorSetLayout(makeSsaoDescriptorSetLayoutCreateInfo());
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
@@ -249,6 +336,11 @@ public:
             m_state.device, context.compiler, path, "ssaoVertexMain", luna::RHI::ShaderStage::Vertex);
         m_state.fragment_shader = renderer_detail::loadShaderModule(
             m_state.device, context.compiler, path, "ssaoFragmentMain", luna::RHI::ShaderStage::Fragment);
+
+        const ShaderBindingContract contract = makeSsaoShaderBindingContract();
+        validateSsaoShaderModuleBindings(m_state.vertex_shader, contract, path, "ssaoVertexMain");
+        validateSsaoShaderModuleBindings(m_state.fragment_shader, contract, path, "ssaoFragmentMain");
+
         m_state.layout = createDescriptorSetLayout(m_state.device);
         m_state.descriptor_pool = createDescriptorPool(m_state.device);
         m_state.pipeline_layout = createPipelineLayout(m_state.device, m_state.layout);

@@ -20,6 +20,7 @@ public:
     const std::string& GetEntryPoint() const override;
     ShaderStage GetStage() const override;
     const ShaderBlob& GetBlob() const override;
+    const ShaderReflectionData& GetReflection() const override;
 
     vk::ShaderModule& GetHandle()
     {

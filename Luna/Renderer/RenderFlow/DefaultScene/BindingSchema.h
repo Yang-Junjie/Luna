@@ -4,6 +4,8 @@
 // This is the single source of truth for descriptor set layout creation, pipeline set layout
 // composition, push constants, and write binding slots.
 
+#include "Renderer/RenderFlow/ShaderBindingContract.h"
+
 #include <cstdint>
 
 #include <DescriptorSetLayout.h>
@@ -61,6 +63,7 @@ struct DescriptorBindingSchema {
     luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
     uint32_t count{1};
     luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::AllGraphics};
+    const char* shader_name{nullptr};
 };
 
 struct DescriptorSetSchema {
@@ -113,6 +116,10 @@ struct PipelineLayoutSchema {
 
 [[nodiscard]] luna::RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
                                                                                const DescriptorSetLayoutRefs& layouts);
+
+[[nodiscard]] luna::render_flow::ShaderBindingContract
+    makePipelineShaderBindingContract(const PipelineLayoutSchema& schema,
+                                      luna::render_flow::ShaderBindingAddressMode address_mode);
 
 [[nodiscard]] luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
     createDescriptorSetLayoutFromSchema(const luna::RHI::Ref<luna::RHI::Device>& device,

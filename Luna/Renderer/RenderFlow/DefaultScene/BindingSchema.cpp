@@ -16,73 +16,172 @@ const std::array<DescriptorBindingSchema, 11> kMaterialBindings{{
      material_binding::BaseColorTexture,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
-    {"BaseColorSampler", material_binding::BaseColorSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
-    {"NormalTexture", material_binding::NormalTexture, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"NormalSampler", material_binding::NormalSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
+     kFragmentStage,
+     "gBaseColorTexture"},
+    {"BaseColorSampler",
+     material_binding::BaseColorSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gBaseColorSampler"},
+    {"NormalTexture",
+     material_binding::NormalTexture,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gNormalTexture"},
+    {"NormalSampler",
+     material_binding::NormalSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gNormalSampler"},
     {"MetallicRoughnessTexture",
      material_binding::MetallicRoughnessTexture,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
+     kFragmentStage,
+     "gMetallicRoughnessTexture"},
     {"MetallicRoughnessSampler",
      material_binding::MetallicRoughnessSampler,
      luna::RHI::DescriptorType::Sampler,
      1,
-     kFragmentStage},
-    {"EmissiveTexture", material_binding::EmissiveTexture, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"EmissiveSampler", material_binding::EmissiveSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
+     kFragmentStage,
+     "gMetallicRoughnessSampler"},
+    {"EmissiveTexture",
+     material_binding::EmissiveTexture,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gEmissiveTexture"},
+    {"EmissiveSampler",
+     material_binding::EmissiveSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gEmissiveSampler"},
     {"OcclusionTexture",
      material_binding::OcclusionTexture,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
-    {"OcclusionSampler", material_binding::OcclusionSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
-    {"MaterialParams", material_binding::MaterialParams, luna::RHI::DescriptorType::UniformBuffer, 1, kFragmentStage},
+     kFragmentStage,
+     "gOcclusionTexture"},
+    {"OcclusionSampler",
+     material_binding::OcclusionSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gOcclusionSampler"},
+    {"MaterialParams",
+     material_binding::MaterialParams,
+     luna::RHI::DescriptorType::UniformBuffer,
+     1,
+     kFragmentStage,
+     "gMaterialParams"},
 }};
 
 const std::array<DescriptorBindingSchema, 11> kGBufferBindings{{
-    {"GBufferBaseColor", gbuffer_binding::BaseColor, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
+    {"GBufferBaseColor",
+     gbuffer_binding::BaseColor,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gGBufferBaseColor"},
     {"GBufferNormalMetallic",
      gbuffer_binding::NormalMetallic,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
+     kFragmentStage,
+     "gGBufferNormalMetallic"},
     {"GBufferWorldPositionRoughness",
      gbuffer_binding::WorldPositionRoughness,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
-    {"GBufferEmissiveAo", gbuffer_binding::EmissiveAo, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"GBufferSampler", gbuffer_binding::Sampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
-    {"PickBuffer", gbuffer_binding::Pick, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"AmbientOcclusion", gbuffer_binding::AmbientOcclusion, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"Reflection", gbuffer_binding::Reflection, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"IndirectDiffuse", gbuffer_binding::IndirectDiffuse, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"IndirectSpecular", gbuffer_binding::IndirectSpecular, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"Velocity", gbuffer_binding::Velocity, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
+     kFragmentStage,
+     "gGBufferWorldPositionRoughness"},
+    {"GBufferEmissiveAo",
+     gbuffer_binding::EmissiveAo,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gGBufferEmissiveAo"},
+    {"GBufferSampler",
+     gbuffer_binding::Sampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gGBufferSampler"},
+    {"PickBuffer", gbuffer_binding::Pick, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gPickBuffer"},
+    {"AmbientOcclusion",
+     gbuffer_binding::AmbientOcclusion,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gAmbientOcclusionTexture"},
+    {"Reflection",
+     gbuffer_binding::Reflection,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gReflectionTexture"},
+    {"IndirectDiffuse",
+     gbuffer_binding::IndirectDiffuse,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gIndirectDiffuseTexture"},
+    {"IndirectSpecular",
+     gbuffer_binding::IndirectSpecular,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gIndirectSpecularTexture"},
+    {"Velocity",
+     gbuffer_binding::Velocity,
+     luna::RHI::DescriptorType::SampledImage,
+     1,
+     kFragmentStage,
+     "gVelocityTexture"},
 }};
 
 const std::array<DescriptorBindingSchema, 7> kSceneBindings{{
-    {"SceneParams", scene_binding::SceneParams, luna::RHI::DescriptorType::UniformBuffer, 1, kVertexFragmentStages},
+    {"SceneParams",
+     scene_binding::SceneParams,
+     luna::RHI::DescriptorType::UniformBuffer,
+     1,
+     kVertexFragmentStages,
+     "gSceneParams"},
     {"EnvironmentTexture",
      scene_binding::EnvironmentTexture,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
-    {"EnvironmentSampler", scene_binding::EnvironmentSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
-    {"ShadowMap", scene_binding::ShadowMap, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage},
-    {"ShadowSampler", scene_binding::ShadowSampler, luna::RHI::DescriptorType::Sampler, 1, kFragmentStage},
+     kFragmentStage,
+     "gEnvironmentTexture"},
+    {"EnvironmentSampler",
+     scene_binding::EnvironmentSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gEnvironmentSampler"},
+    {"ShadowMap", scene_binding::ShadowMap, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gShadowMap"},
+    {"ShadowSampler",
+     scene_binding::ShadowSampler,
+     luna::RHI::DescriptorType::Sampler,
+     1,
+     kFragmentStage,
+     "gShadowSampler"},
     {"EnvironmentPrefilterTexture",
      scene_binding::EnvironmentPrefilterTexture,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
+     kFragmentStage,
+     "gEnvironmentPrefilterTexture"},
     {"EnvironmentBrdfLut",
      scene_binding::EnvironmentBrdfLut,
      luna::RHI::DescriptorType::SampledImage,
      1,
-     kFragmentStage},
+     kFragmentStage,
+     "gEnvironmentBrdfLut"},
 }};
 
 const DescriptorSetSchema kMaterialSchema{
@@ -254,6 +353,63 @@ luna::RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineL
     }
 
     return create_info;
+}
+
+luna::render_flow::ShaderBindingContract
+    makePipelineShaderBindingContract(const PipelineLayoutSchema& schema,
+                                      luna::render_flow::ShaderBindingAddressMode address_mode)
+{
+    luna::render_flow::ShaderBindingContract contract =
+        luna::render_flow::makeShaderBindingContract(schema.name ? schema.name : "");
+
+    uint32_t flattened_register_base = 0;
+    for (const PipelineLayoutSetSchema& set : schema.sets) {
+        const DescriptorSetSchema& set_schema = descriptorSetSchema(set.schema_id);
+        contract.bindings.reserve(contract.bindings.size() + set_schema.bindings.size());
+
+        uint32_t max_binding = 0;
+        bool has_bindings = false;
+        for (const DescriptorBindingSchema& binding : set_schema.bindings) {
+            uint32_t contract_set = set.set_index;
+            uint32_t contract_binding = binding.binding;
+            if (address_mode == luna::render_flow::ShaderBindingAddressMode::FlattenedRegisterSpace) {
+                contract_set = 0;
+                contract_binding = flattened_register_base + binding.binding;
+            }
+
+            contract.bindings.push_back(luna::render_flow::ShaderBindingRequirement{
+                .name = binding.name ? binding.name : "",
+                .shader_name = binding.shader_name ? binding.shader_name : "",
+                .set_name = set_schema.name ? set_schema.name : "",
+                .logical_set = set.set_index,
+                .logical_binding = binding.binding,
+                .set = contract_set,
+                .binding = contract_binding,
+                .type = binding.type,
+                .count = binding.count,
+                .stages = binding.stages,
+            });
+
+            max_binding = std::max(max_binding, binding.binding + binding.count - 1u);
+            has_bindings = true;
+        }
+
+        if (address_mode == luna::render_flow::ShaderBindingAddressMode::FlattenedRegisterSpace && has_bindings) {
+            flattened_register_base += max_binding + 1u;
+        }
+    }
+
+    contract.push_constants.reserve(schema.push_constants.size());
+    for (const PushConstantSchema& push_constant : schema.push_constants) {
+        contract.push_constants.push_back(luna::render_flow::ShaderPushConstantRequirement{
+            .name = push_constant.name ? push_constant.name : "",
+            .offset = push_constant.offset,
+            .size = push_constant.size,
+            .stages = push_constant.stages,
+        });
+    }
+
+    return contract;
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
