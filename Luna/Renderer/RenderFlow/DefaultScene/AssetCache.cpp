@@ -4,6 +4,7 @@
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/Image/ImageDataUtils.h"
+#include "Renderer/RenderFlow/DefaultScene/BindingSchema.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -313,57 +314,57 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
     }
 
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 0,
+        .Binding = material_binding::BaseColorTexture,
         .TextureView = uploaded_material.base_color_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 1,
+        .Binding = material_binding::BaseColorSampler,
         .Sampler = uploaded_material.base_color_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 2,
+        .Binding = material_binding::NormalTexture,
         .TextureView = uploaded_material.normal_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 3,
+        .Binding = material_binding::NormalSampler,
         .Sampler = uploaded_material.normal_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 4,
+        .Binding = material_binding::MetallicRoughnessTexture,
         .TextureView = uploaded_material.metallic_roughness_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 5,
+        .Binding = material_binding::MetallicRoughnessSampler,
         .Sampler = uploaded_material.metallic_roughness_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 6,
+        .Binding = material_binding::EmissiveTexture,
         .TextureView = uploaded_material.emissive_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 7,
+        .Binding = material_binding::EmissiveSampler,
         .Sampler = uploaded_material.emissive_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-        .Binding = 8,
+        .Binding = material_binding::OcclusionTexture,
         .TextureView = uploaded_material.occlusion_texture->texture->GetDefaultView(),
         .Layout = luna::RHI::ResourceState::ShaderRead,
         .Type = luna::RHI::DescriptorType::SampledImage,
     });
     uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-        .Binding = 9,
+        .Binding = material_binding::OcclusionSampler,
         .Sampler = uploaded_material.occlusion_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
-        .Binding = 10,
+        .Binding = material_binding::MaterialParams,
         .Buffer = uploaded_material.params_buffer,
         .Offset = 0,
         .Stride = sizeof(render_flow::default_scene_detail::MaterialGpuParams),

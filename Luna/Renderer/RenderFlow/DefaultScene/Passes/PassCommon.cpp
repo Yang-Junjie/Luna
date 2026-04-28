@@ -107,9 +107,16 @@ void updateSceneParameters(PassSharedState& state, const SceneRenderContext& con
         return;
     }
 
+    const RenderFeatureFrameContext* frame_context = state.frameContext();
+    if (frame_context == nullptr) {
+        LUNA_RENDERER_WARN("Scene parameter update skipped because no render feature frame context is active");
+        return;
+    }
+
     const EnvironmentResources& environment = state.environment();
     state.pipelines().updateSceneParameters(context,
                                             *state.world(),
+                                            *frame_context,
                                             environment.prefilteredMaxMipLevel(),
                                             environment.irradianceSH(),
                                             state.shadowParams());

@@ -8,6 +8,7 @@ namespace luna::render_flow::default_scene_detail {
 
 inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
 inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
+inline constexpr luna::RHI::Format kVelocityFormat = luna::RHI::Format::RG16_FLOAT;
 inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_UINT;
 inline constexpr luna::RHI::Format kShadowMapFormat = luna::RHI::Format::R32_FLOAT;
 inline constexpr uint32_t kShadowMapSize = 2048;

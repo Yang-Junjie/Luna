@@ -52,6 +52,15 @@ GBufferTextures createGBufferTextures(RenderGraphBuilder& graph, const SceneRend
             .InitialState = luna::RHI::ResourceState::Undefined,
             .SampleCount = luna::RHI::SampleCount::Count1,
         }),
+        .velocity = graph.CreateTexture(RenderGraphTextureDesc{
+            .Name = "SceneVelocity",
+            .Width = context.framebuffer_width,
+            .Height = context.framebuffer_height,
+            .Format = render_flow::default_scene_detail::kVelocityFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
     };
 }
 
@@ -73,6 +82,7 @@ void GeometryPass::setup(RenderPassContext& context)
     context.blackboard().set(blackboard::GBufferNormalMetallic, gbuffer.normal_metallic);
     context.blackboard().set(blackboard::GBufferWorldPositionRoughness, gbuffer.world_position_roughness);
     context.blackboard().set(blackboard::GBufferEmissiveAo, gbuffer.emissive_ao);
+    context.blackboard().set(blackboard::Velocity, gbuffer.velocity);
     context.blackboard().set(blackboard::SceneColor, scene_context.color_target);
     context.blackboard().set(blackboard::Depth, scene_context.depth_target);
     context.blackboard().set(blackboard::Pick, scene_context.pick_target);
@@ -93,6 +103,10 @@ void GeometryPass::setup(RenderPassContext& context)
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(gbuffer.emissive_ao,
+                                    luna::RHI::AttachmentLoadOp::Clear,
+                                    luna::RHI::AttachmentStoreOp::Store,
+                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+            pass_builder.WriteColor(gbuffer.velocity,
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));

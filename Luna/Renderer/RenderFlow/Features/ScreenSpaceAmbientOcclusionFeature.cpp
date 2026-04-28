@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
@@ -9,30 +9,29 @@
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 
-#include <Builders.h>
+#include <cstring>
+
+#include <algorithm>
+#include <array>
 #include <Buffer.h>
+#include <Builders.h>
 #include <CommandBufferEncoder.h>
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <glm/vec4.hpp>
+#include <memory>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
-#include <Texture.h>
-
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <filesystem>
-#include <glm/vec4.hpp>
-#include <memory>
 #include <string>
 #include <string_view>
+#include <Texture.h>
 #include <utility>
 
 namespace luna::render_flow {
@@ -53,6 +52,14 @@ struct SsaoGpuParams {
     glm::vec4 settings;
 };
 
+namespace ssao_binding {
+constexpr uint32_t Depth = 0;
+constexpr uint32_t NormalMetallic = 1;
+constexpr uint32_t WorldPositionRoughness = 2;
+constexpr uint32_t Sampler = 3;
+constexpr uint32_t Params = 4;
+} // namespace ssao_binding
+
 std::filesystem::path shaderPath()
 {
     return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
@@ -68,11 +75,19 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
 
     return device->CreateDescriptorSetLayout(
         luna::RHI::DescriptorSetLayoutBuilder()
-            .AddBinding(0, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(1, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(2, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(3, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
-            .AddBinding(4, luna::RHI::DescriptorType::UniformBuffer, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(
+                ssao_binding::Depth, luna::RHI::DescriptorType::SampledImage, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(ssao_binding::NormalMetallic,
+                        luna::RHI::DescriptorType::SampledImage,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .AddBinding(ssao_binding::WorldPositionRoughness,
+                        luna::RHI::DescriptorType::SampledImage,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .AddBinding(ssao_binding::Sampler, luna::RHI::DescriptorType::Sampler, 1, luna::RHI::ShaderStage::Fragment)
+            .AddBinding(
+                ssao_binding::Params, luna::RHI::DescriptorType::UniformBuffer, 1, luna::RHI::ShaderStage::Fragment)
             .Build());
 }
 
@@ -179,12 +194,8 @@ void clearAmbientOcclusion(RenderGraphRasterPassContext& pass_context)
     pass_context.endRendering();
 }
 
-RenderFeatureParameterInfo makeFloatParameter(std::string_view name,
-                                              std::string_view display_name,
-                                              float value,
-                                              float min_value,
-                                              float max_value,
-                                              float step)
+RenderFeatureParameterInfo makeFloatParameter(
+    std::string_view name, std::string_view display_name, float value, float min_value, float max_value, float step)
 {
     RenderFeatureParameterInfo parameter{};
     parameter.name = name;
@@ -310,29 +321,29 @@ public:
 
         updateParams(width, height, options);
         m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 0,
+            .Binding = ssao_binding::Depth,
             .TextureView = depth->GetDefaultView(),
             .Layout = luna::RHI::ResourceState::ShaderRead,
             .Type = luna::RHI::DescriptorType::SampledImage,
         });
         m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 1,
+            .Binding = ssao_binding::NormalMetallic,
             .TextureView = normal_metallic->GetDefaultView(),
             .Layout = luna::RHI::ResourceState::ShaderRead,
             .Type = luna::RHI::DescriptorType::SampledImage,
         });
         m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = 2,
+            .Binding = ssao_binding::WorldPositionRoughness,
             .TextureView = world_position_roughness->GetDefaultView(),
             .Layout = luna::RHI::ResourceState::ShaderRead,
             .Type = luna::RHI::DescriptorType::SampledImage,
         });
         m_state.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
-            .Binding = 3,
+            .Binding = ssao_binding::Sampler,
             .Sampler = m_state.sampler,
         });
         m_state.descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
-            .Binding = 4,
+            .Binding = ssao_binding::Params,
             .Buffer = m_state.params_buffer,
             .Offset = 0,
             .Stride = sizeof(SsaoGpuParams),
@@ -426,9 +437,8 @@ public:
         const auto depth = context.blackboard().get(blackboard::Depth);
         const auto normal_metallic = context.blackboard().get(blackboard::GBufferNormalMetallic);
         const auto world_position_roughness = context.blackboard().get(blackboard::GBufferWorldPositionRoughness);
-        if (options.enabled &&
-            (!isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
-             !isValidTextureHandle(world_position_roughness))) {
+        if (options.enabled && (!isValidTextureHandle(depth) || !isValidTextureHandle(normal_metallic) ||
+                                !isValidTextureHandle(world_position_roughness))) {
             LUNA_RENDERER_WARN("ScreenSpaceAmbientOcclusion missing input texture(s): depth={} normal={} position={}",
                                isValidTextureHandle(depth),
                                isValidTextureHandle(normal_metallic),
@@ -450,8 +460,8 @@ public:
 
         const bool inputs_ready = isValidTextureHandle(depth) && isValidTextureHandle(normal_metallic) &&
                                   isValidTextureHandle(world_position_roughness);
-        const bool resources_ready = options.enabled && inputs_ready && m_resources != nullptr &&
-                                     m_resources->ensure(scene_context);
+        const bool resources_ready =
+            options.enabled && inputs_ready && m_resources != nullptr && m_resources->ensure(scene_context);
 
         context.graph().AddRasterPass(
             name(),

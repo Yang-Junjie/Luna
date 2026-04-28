@@ -190,6 +190,7 @@ void LunaEditorLayer::onDetach()
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
+    m_application->getRenderer().setRenderDebugViewMode(RenderDebugViewMode::None);
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
 
     if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
@@ -268,6 +269,7 @@ void LunaEditorLayer::onImGuiRender()
     m_asset_loading_panel.onImGuiRender();
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
+    m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer, application.getBackend());
     m_render_features_panel.onImGuiRender(m_show_render_features_panel,
                                           renderer.getDefaultRenderFeatureInfos(),
                                           [&renderer](std::string_view feature_name) {
@@ -365,6 +367,7 @@ void LunaEditorLayer::onImGuiMenuBar()
 
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
+        ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
         ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
         ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
         ImGui::EndMenu();

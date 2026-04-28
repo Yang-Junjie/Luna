@@ -19,6 +19,12 @@ void PassSharedState::setWorld(const RenderWorld& world) noexcept
     m_world = &world;
 }
 
+void PassSharedState::setFrameContext(const RenderFeatureFrameContext& frame_context) noexcept
+{
+    m_frame_context = frame_context;
+    m_has_frame_context = true;
+}
+
 AssetCache& PassSharedState::assets() const noexcept
 {
     return *m_assets;
@@ -47,6 +53,11 @@ Material& PassSharedState::defaultMaterial() const noexcept
 const RenderWorld* PassSharedState::world() const noexcept
 {
     return m_world;
+}
+
+const RenderFeatureFrameContext* PassSharedState::frameContext() const noexcept
+{
+    return m_has_frame_context ? &m_frame_context : nullptr;
 }
 
 void PassSharedState::setShadowParams(

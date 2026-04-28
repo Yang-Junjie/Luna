@@ -27,7 +27,23 @@ struct SceneParams
 {
     float4x4 viewProjection;
     float4x4 inverseViewProjection;
+    float4x4 view;
+    float4x4 projection;
+    float4x4 inverseView;
+    float4x4 inverseProjection;
+    float4x4 jitteredViewProjection;
+    float4x4 inverseJitteredViewProjection;
+    float4x4 previousViewProjection;
+    float4x4 previousInverseViewProjection;
+    float4x4 previousJitteredViewProjection;
+    float4x4 previousInverseJitteredViewProjection;
     float4 cameraPositionEnvMip;
+    float4 viewportSize;
+    float4 previousViewportSize;
+    float4 jitterNdc;
+    float4 jitterPixels;
+    uint4 frameIndices;
+    uint4 viewFlags;
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;

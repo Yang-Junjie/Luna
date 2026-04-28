@@ -100,7 +100,6 @@ void Feature::prepareFrame(const RenderWorld& world,
                            RenderPassBlackboard& blackboard)
 {
     namespace blackboard_names = luna::render_flow::blackboard;
-    (void) frame_context;
 
     prepareResources(scene_context);
 
@@ -113,6 +112,7 @@ void Feature::prepareFrame(const RenderWorld& world,
         m_draw_queue.submitDrawPacket(packet);
     }
     m_scene_state.setWorld(world);
+    m_scene_state.setFrameContext(frame_context);
     m_scene_state.setShadowParams({});
 
 }

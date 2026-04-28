@@ -68,11 +68,13 @@ void PipelineResources::updateSceneBindings(
 void PipelineResources::updateSceneParameters(
     const SceneRenderContext& context,
     const RenderWorld& world,
+    const RenderFeatureFrameContext& frame_context,
     float environment_mip_count,
     const std::array<glm::vec4, 9>& irradiance_sh,
     const render_flow::default_scene_detail::ShadowRenderParams& shadow_params)
 {
-    m_pipeline_state.updateSceneParameters(context, world, environment_mip_count, irradiance_sh, shadow_params);
+    m_pipeline_state.updateSceneParameters(
+        context, world, frame_context, environment_mip_count, irradiance_sh, shadow_params);
 }
 
 void PipelineResources::updateLightingResources(
@@ -81,6 +83,7 @@ void PipelineResources::updateLightingResources(
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
     const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+    const luna::RHI::Ref<luna::RHI::Texture>& velocity_texture,
     const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
     const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions)
 {
@@ -90,6 +93,7 @@ void PipelineResources::updateLightingResources(
         gbuffer_normal_metallic,
         gbuffer_world_position_roughness,
         gbuffer_emissive_ao,
+        velocity_texture,
         pick_texture,
         lighting_extensions);
 }
@@ -132,6 +136,11 @@ DrawPassResources PipelineResources::transparentPassResources() const noexcept
 LightingPassResources PipelineResources::lightingPassResources() const noexcept
 {
     return m_pipeline_state.lightingPassResources();
+}
+
+DebugViewPassResources PipelineResources::debugViewPassResources() const noexcept
+{
+    return m_pipeline_state.debugViewPassResources();
 }
 
 } // namespace luna::render_flow::default_scene

@@ -29,7 +29,8 @@ struct GBufferOutput
     float4 normalMetallic : SV_Target1;
     float4 worldPositionRoughness : SV_Target2;
     float4 emissiveAo : SV_Target3;
-    uint pickingId : SV_Target4;
+    float2 velocity : SV_Target4;
+    uint pickingId : SV_Target5;
 };
 
 struct TransparentOutput
@@ -57,7 +58,23 @@ struct SceneParams
 {
     float4x4 viewProjection;
     float4x4 inverseViewProjection;
+    float4x4 view;
+    float4x4 projection;
+    float4x4 inverseView;
+    float4x4 inverseProjection;
+    float4x4 jitteredViewProjection;
+    float4x4 inverseJitteredViewProjection;
+    float4x4 previousViewProjection;
+    float4x4 previousInverseViewProjection;
+    float4x4 previousJitteredViewProjection;
+    float4x4 previousInverseJitteredViewProjection;
     float4 cameraPositionEnvMip;
+    float4 viewportSize;
+    float4 previousViewportSize;
+    float4 jitterNdc;
+    float4 jitterPixels;
+    uint4 frameIndices;
+    uint4 viewFlags;
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
@@ -158,6 +175,42 @@ float3 safeNormalize(float3 value, float3 fallbackValue)
 {
     const float lengthSq = dot(value, value);
     return lengthSq > 1e-6 ? value * rsqrt(lengthSq) : fallbackValue;
+}
+
+float2 screenUvFromPosition(float4 position)
+{
+    return position.xy * gSceneParams.viewportSize.zw;
+}
+
+float2 screenUvFromClip(float4 clipPosition)
+{
+    const float invW = abs(clipPosition.w) > 1e-6 ? 1.0 / clipPosition.w : 0.0;
+    const float2 ndc = clipPosition.xy * invW;
+    const float uvY =
+#if defined(LUNA_BACKEND_VULKAN) || defined(LUNA_BACKEND_D3D12)
+        ndc.y * 0.5 + 0.5;
+#else
+        0.5 - ndc.y * 0.5;
+#endif
+    return float2(ndc.x * 0.5 + 0.5, uvY);
+}
+
+float2 computeVelocity(float4 position, float3 worldPosition)
+{
+    if (gSceneParams.viewFlags.x == 0)
+    {
+        return float2(0.0, 0.0);
+    }
+
+    const float2 currentUv = screenUvFromPosition(position);
+    const float4 previousClip = mul(gSceneParams.previousViewProjection, float4(worldPosition, 1.0));
+    if (previousClip.w <= 1e-6)
+    {
+        return float2(0.0, 0.0);
+    }
+
+    const float2 previousUv = screenUvFromClip(previousClip);
+    return currentUv - previousUv;
 }
 
 float3 linearToSrgb(float3 color)
@@ -429,6 +482,7 @@ GBufferOutput sceneGeometryFragmentMain(SceneVertexOutput input)
     output.normalMetallic = float4(material.normalWS, material.metallic);
     output.worldPositionRoughness = float4(input.worldPosition, material.roughness);
     output.emissiveAo = float4(material.emissive, material.unlit > 0.5 ? -material.ao : material.ao);
+    output.velocity = computeVelocity(input.position, input.worldPosition);
     output.pickingId = input.pickingId;
     return output;
 }

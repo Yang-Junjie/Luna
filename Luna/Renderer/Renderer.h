@@ -6,7 +6,9 @@
 
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
+#include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/RenderFeature.h"
+#include "Renderer/RenderViewState.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <cstdint>
@@ -103,6 +105,12 @@ public:
     luna::RHI::Extent2D getSceneOutputSize() const;
     const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
 
+    void setRenderDebugViewMode(RenderDebugViewMode mode);
+    [[nodiscard]] RenderDebugViewMode getRenderDebugViewMode() const;
+    void setRenderDebugVelocityScale(float scale);
+    [[nodiscard]] float getRenderDebugVelocityScale() const;
+    const luna::RHI::Ref<luna::RHI::Texture>& getRenderDebugOutputTexture() const;
+
     void setScenePickDebugVisualizationEnabled(bool enabled);
     bool isScenePickDebugVisualizationEnabled() const;
     void requestScenePick(uint32_t x, uint32_t y);
@@ -177,9 +185,13 @@ private:
         luna::RHI::Ref<luna::RHI::Texture> color;
         luna::RHI::Ref<luna::RHI::Texture> depth;
         luna::RHI::Ref<luna::RHI::Texture> pick;
+        luna::RHI::Ref<luna::RHI::Texture> debug_color;
         luna::RHI::ResourceState color_state{luna::RHI::ResourceState::Undefined};
         luna::RHI::ResourceState depth_state{luna::RHI::ResourceState::Undefined};
         luna::RHI::ResourceState pick_state{luna::RHI::ResourceState::Undefined};
+        luna::RHI::ResourceState debug_color_state{luna::RHI::ResourceState::Undefined};
+        RenderDebugViewMode debug_view_mode{RenderDebugViewMode::None};
+        float debug_velocity_scale{20.0f};
         bool pick_debug_visualization_enabled{false};
         PickDebugMarker debug_pick_marker{};
         std::optional<PickRequest> queued_pick_request;
@@ -276,6 +288,7 @@ private:
     FrameResources m_frame_resources{};
     RuntimeState m_runtime{};
     RenderFeatureHistoryState m_render_feature_history{};
+    RenderViewHistory m_render_view_history{};
     RenderWorld m_render_world{};
     std::unique_ptr<IRenderFlow> m_render_flow;
     RenderGraphProfileSnapshot m_last_render_graph_profile{};

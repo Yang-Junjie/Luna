@@ -45,6 +45,7 @@ public:
                              const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture);
     void updateSceneParameters(const SceneRenderContext& context,
                                const RenderWorld& world,
+                               const RenderFeatureFrameContext& frame_context,
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params);
@@ -53,6 +54,7 @@ public:
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
                                  const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
+                                 const luna::RHI::Ref<luna::RHI::Texture>& velocity_texture,
                                  const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
                                  const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
@@ -64,6 +66,7 @@ public:
     [[nodiscard]] DrawPassResources shadowPassResources() const noexcept;
     [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
+    [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
 
 private:
     struct State {
@@ -74,6 +77,7 @@ private:
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> geometry_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> shadow_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> lighting_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> debug_view_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> transparent_pipeline;
 
         luna::RHI::Ref<luna::RHI::PipelineLayout> geometry_pipeline_layout;
@@ -112,6 +116,7 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderModule> geometry_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> lighting_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> lighting_fragment_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> debug_view_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> transparent_fragment_shader;
     };
 

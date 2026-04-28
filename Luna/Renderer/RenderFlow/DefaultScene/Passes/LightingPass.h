@@ -20,6 +20,9 @@ private:
                  RenderGraphTextureHandle shadow_map,
                  RenderGraphTextureHandle pick_texture,
                  LightingExtensionInputSet extension_inputs);
+    void executeDebugView(RenderGraphRasterPassContext& pass_context,
+                          GBufferTextures gbuffer,
+                          RenderGraphTextureHandle pick_texture);
 
 private:
     PassSharedState* m_state{nullptr};

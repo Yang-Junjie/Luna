@@ -32,4 +32,16 @@ struct LightingPassResources {
     }
 };
 
+struct DebugViewPassResources {
+    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
+    luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
+    luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
+    luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+
+    [[nodiscard]] bool isValid() const
+    {
+        return pipeline && gbuffer_descriptor_set && scene_descriptor_set && gbuffer_sampler;
+    }
+};
+
 } // namespace luna::render_flow::default_scene

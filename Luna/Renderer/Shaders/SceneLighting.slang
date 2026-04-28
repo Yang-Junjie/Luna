@@ -13,7 +13,23 @@ struct SceneParams
 {
     float4x4 viewProjection;
     float4x4 inverseViewProjection;
+    float4x4 view;
+    float4x4 projection;
+    float4x4 inverseView;
+    float4x4 inverseProjection;
+    float4x4 jitteredViewProjection;
+    float4x4 inverseJitteredViewProjection;
+    float4x4 previousViewProjection;
+    float4x4 previousInverseViewProjection;
+    float4x4 previousJitteredViewProjection;
+    float4x4 previousInverseJitteredViewProjection;
     float4 cameraPositionEnvMip;
+    float4 viewportSize;
+    float4 previousViewportSize;
+    float4 jitterNdc;
+    float4 jitterPixels;
+    uint4 frameIndices;
+    uint4 viewFlags;
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
@@ -61,26 +77,29 @@ Texture2D<float4> gIndirectDiffuseTexture : register(t8);
 [[vk::binding(9, 0)]]
 Texture2D<float4> gIndirectSpecularTexture : register(t9);
 
+[[vk::binding(10, 0)]]
+Texture2D<float2> gVelocityTexture : register(t10);
+
 [[vk::binding(0, 1)]]
-ConstantBuffer<SceneParams> gSceneParams : register(b10);
+ConstantBuffer<SceneParams> gSceneParams : register(b11);
 
 [[vk::binding(1, 1)]]
-Texture2D<float4> gEnvironmentTexture : register(t11);
+Texture2D<float4> gEnvironmentTexture : register(t12);
 
 [[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s12);
+SamplerState gEnvironmentSampler : register(s13);
 
 [[vk::binding(3, 1)]]
-Texture2D<float> gShadowMap : register(t13);
+Texture2D<float> gShadowMap : register(t14);
 
 [[vk::binding(4, 1)]]
-SamplerState gShadowSampler : register(s14);
+SamplerState gShadowSampler : register(s15);
 
 [[vk::binding(5, 1)]]
-TextureCube<float4> gEnvironmentPrefilterTexture : register(t15);
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t16);
 
 [[vk::binding(6, 1)]]
-Texture2D<float4> gEnvironmentBrdfLut : register(t16);
+Texture2D<float4> gEnvironmentBrdfLut : register(t17);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -539,4 +558,28 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
     color *= gSceneParams.lightColorExposure.a;
     const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(color)), pickingId, input.uv);
     return float4(finalColor, baseColorAlpha.a);
+}
+
+[shader("fragment")]
+float4 sceneDebugFragmentMain(SceneLightingVertexOutput input) : SV_Target
+{
+    const uint mode = (uint)(gSceneParams.debugOverlayParams.z + 0.5);
+    if (mode == 1u)
+    {
+        const float scale = max(gSceneParams.debugOverlayParams.w, 1.0);
+        const float2 velocity = gVelocityTexture.Sample(gGBufferSampler, input.uv);
+        const float2 scaledVelocity = velocity * scale;
+        return float4(saturate(0.5 + scaledVelocity.x),
+                      saturate(0.5 - scaledVelocity.y),
+                      saturate(length(scaledVelocity)),
+                      1.0);
+    }
+
+    if (mode == 2u)
+    {
+        return gSceneParams.viewFlags.x != 0u ? float4(0.05, 0.85, 0.25, 1.0)
+                                              : float4(0.90, 0.10, 0.08, 1.0);
+    }
+
+    return float4(0.0, 0.0, 0.0, 1.0);
 }

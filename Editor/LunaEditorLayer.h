@@ -7,6 +7,7 @@
 #include "EditorCamera.h"
 #include "Events/Event.h"
 #include "InspectorPanel.h"
+#include "RenderDebugPanel.h"
 #include "RenderFeaturesPanel.h"
 #include "RenderProfilerPanel.h"
 #include "Scene/Entity.h"
@@ -105,6 +106,7 @@ private:
     bool m_viewport_hovered{false};
     bool m_show_builtin_materials_panel{false};
 
+    bool m_show_render_debug_panel{false};
     bool m_show_render_features_panel{false};
     bool m_show_render_profiler_panel{false};
     bool m_runtime_viewport_enabled{false};
@@ -116,6 +118,7 @@ private:
     AssetLoadingPanel m_asset_loading_panel;
     BuiltinMaterialsPanel m_builtin_materials_panel;
     ContentBrowserPanel m_content_browser_panel;
+    RenderDebugPanel m_render_debug_panel;
     RenderFeaturesPanel m_render_features_panel;
     RenderProfilerPanel m_render_profiler_panel;
 };

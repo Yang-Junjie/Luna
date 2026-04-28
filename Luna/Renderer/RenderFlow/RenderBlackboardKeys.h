@@ -13,6 +13,7 @@ inline constexpr RenderResourceKey<RenderGraphTextureHandle> GBufferNormalMetall
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> GBufferWorldPositionRoughness{
     "Scene.GBuffer.WorldPositionRoughness"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> GBufferEmissiveAo{"Scene.GBuffer.EmissiveAo"};
+inline constexpr RenderResourceKey<RenderGraphTextureHandle> Velocity{"Scene.Velocity"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> ShadowMap{"Scene.ShadowMap"};
 
 } // namespace luna::render_flow::blackboard

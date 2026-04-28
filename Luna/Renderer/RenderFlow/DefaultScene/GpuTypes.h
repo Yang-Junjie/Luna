@@ -18,7 +18,23 @@ struct MeshPushConstants {
 struct SceneGpuParams {
     glm::mat4 view_projection{1.0f};
     glm::mat4 inverse_view_projection{1.0f};
+    glm::mat4 view{1.0f};
+    glm::mat4 projection{1.0f};
+    glm::mat4 inverse_view{1.0f};
+    glm::mat4 inverse_projection{1.0f};
+    glm::mat4 jittered_view_projection{1.0f};
+    glm::mat4 inverse_jittered_view_projection{1.0f};
+    glm::mat4 previous_view_projection{1.0f};
+    glm::mat4 previous_inverse_view_projection{1.0f};
+    glm::mat4 previous_jittered_view_projection{1.0f};
+    glm::mat4 previous_inverse_jittered_view_projection{1.0f};
     glm::vec4 camera_position_env_mip{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 viewport_size{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 previous_viewport_size{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 jitter_ndc{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 jitter_pixels{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::uvec4 frame_indices{0u, 0u, 0u, 0u};
+    glm::uvec4 view_flags{0u, 0u, 0u, 0u};
     glm::vec4 light_direction_intensity{0.0f, 1.0f, 0.0f, 0.0f};
     glm::vec4 light_color_exposure{1.0f, 1.0f, 1.0f, 1.0f};
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
@@ -35,6 +51,8 @@ struct SceneGpuParams {
     std::array<glm::vec4, kMaxSpotLights> spot_light_cone_params{};
     std::array<glm::vec4, 9> irradiance_sh{};
 };
+
+static_assert(sizeof(SceneGpuParams) % 16 == 0);
 
 struct MaterialGpuParams {
     glm::vec4 base_color_factor{1.0f};

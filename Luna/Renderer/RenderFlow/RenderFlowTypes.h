@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/RenderViewState.h"
 
 #include <Core.h>
 #include <Instance.h>
@@ -13,6 +14,12 @@ class ShaderCompiler;
 } // namespace luna::RHI
 
 namespace luna {
+
+enum class RenderDebugViewMode : uint8_t {
+    None,
+    Velocity,
+    HistoryValidity,
+};
 
 struct SceneShaderPaths {
     std::filesystem::path geometry_vertex_path;
@@ -42,6 +49,10 @@ struct SceneRenderContext {
     uint32_t debug_pick_pixel_x{0};
     uint32_t debug_pick_pixel_y{0};
     bool show_pick_debug_marker{false};
+    RenderGraphTextureHandle debug_target;
+    luna::RHI::Format debug_format{luna::RHI::Format::UNDEFINED};
+    luna::RenderDebugViewMode debug_view_mode{luna::RenderDebugViewMode::None};
+    float debug_velocity_scale{20.0f};
     uint32_t framebuffer_width{0};
     uint32_t framebuffer_height{0};
 
@@ -91,6 +102,7 @@ struct RenderFeatureFrameContext {
     uint64_t frame_index{0};
     uint32_t framebuffer_width{0};
     uint32_t framebuffer_height{0};
+    luna::RenderViewFrameState view;
     RenderFeatureHistoryInvalidationFlags history_invalidation_flags{
         RenderFeatureHistoryInvalidationFlags::None};
 

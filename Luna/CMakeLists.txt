@@ -26,6 +26,8 @@ set(RENDERER_SOURCE
     Renderer/RenderGraphBuilder.cpp
     Renderer/RenderProfileExporter.h
     Renderer/RenderProfileExporter.cpp
+    Renderer/RenderViewState.h
+    Renderer/RenderViewState.cpp
     Renderer/RenderFlow/LightingExtensionInputs.h
     Renderer/RenderFlow/LightingExtensionInputs.cpp
     Renderer/RenderFlow/RenderFlow.h
@@ -64,6 +66,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/DrawQueue.cpp
     Renderer/RenderFlow/DefaultScene/AssetCache.h
     Renderer/RenderFlow/DefaultScene/AssetCache.cpp
+    Renderer/RenderFlow/DefaultScene/BindingSchema.h
+    Renderer/RenderFlow/DefaultScene/BindingSchema.cpp
     Renderer/RenderFlow/DefaultScene/Environment.h
     Renderer/RenderFlow/DefaultScene/Environment.cpp
     Renderer/RenderFlow/DefaultScene/PipelineResources.h
