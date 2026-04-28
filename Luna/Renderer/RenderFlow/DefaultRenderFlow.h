@@ -20,6 +20,7 @@ public:
     ~DefaultRenderFlow() override;
 
     void render(RenderFlowContext& context) override;
+    bool commitFrame() override;
     void shutdown();
     bool addFeature(std::unique_ptr<render_flow::IRenderFeature> feature);
     bool configure(const ConfigureFunction& configure_function);
@@ -41,6 +42,7 @@ private:
     std::vector<std::unique_ptr<render_flow::IRenderFeature>> m_features;
     render_flow::RenderPassBlackboard m_blackboard;
     render_flow::RenderFlowBuilder m_builder;
+    bool m_frame_ready_to_commit{false};
 };
 
 } // namespace luna

@@ -228,6 +228,7 @@ void Renderer::shutdown()
     m_scene_output = {};
     m_frame_resources = {};
     m_runtime = {};
+    m_render_feature_history = {};
     m_last_render_graph_profile = {};
 
     if (had_renderer_state) {
@@ -297,6 +298,7 @@ void Renderer::startFrame()
         runtime.frame_started = false;
         frame_resources.current_command_buffer.reset();
         runtime.resize_requested = true;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     }
 }
 
@@ -312,6 +314,8 @@ void Renderer::renderFrame()
             "Skipping RenderFrame because the frame has not started or swapchain state is incomplete");
         return;
     }
+
+    m_render_feature_history.has_pending_frame = false;
 
     const auto extent = device_context.swapchain->GetExtent();
     const auto back_buffer = device_context.swapchain->GetBackBuffer(frame_resources.image_index);
@@ -444,8 +448,22 @@ void Renderer::renderFrame()
                 .framebuffer_width = scene_width,
                 .framebuffer_height = scene_height,
             };
-            RenderFlowContext flow_context(graph_builder, m_render_world, scene_context);
+            const render_flow::RenderFeatureFrameContext feature_frame_context =
+                makeRenderFeatureFrameContext(backend_type,
+                                              scene_output.mode,
+                                              frame_resources.frame_index,
+                                              scene_width,
+                                              scene_height);
+            if (feature_frame_context.historyInvalidated()) {
+                LUNA_RENDERER_FRAME_DEBUG("Render feature history invalidated for frame {}: flags=0x{:x}",
+                                          frame_resources.frame_index,
+                                          static_cast<uint32_t>(feature_frame_context.history_invalidation_flags));
+            }
+            RenderFlowContext flow_context(graph_builder, m_render_world, scene_context, feature_frame_context);
             m_render_flow->render(flow_context);
+            if (m_render_world.hasCamera()) {
+                stageRenderFeatureFrameContext(backend_type, scene_output.mode, scene_width, scene_height);
+            }
         } else {
             graph_builder.AddRasterPass(
                 "ClearScene",
@@ -532,6 +550,9 @@ void Renderer::renderFrame()
                                   frame_resources.frame_index,
                                   frame_resources.render_graphs[frame_resources.frame_index]->passes().size());
         frame_resources.render_graphs[frame_resources.frame_index]->execute();
+        if (m_render_flow && m_render_flow->commitFrame()) {
+            commitStagedRenderFeatureFrameContext();
+        }
         const RenderGraphProfileSnapshot& profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
         if (runtime.render_graph_profiling_enabled) {
             if (!storePendingGpuTimingProfile(frame_resources.frame_index, profile)) {
@@ -622,6 +643,7 @@ void Renderer::endFrame()
             LUNA_RENDERER_WARN("Present returned {}; scheduling swapchain recreation",
                                swapchainResultToString(present_result));
             runtime.resize_requested = true;
+            invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
         } else if (present_result != luna::RHI::Result::Success) {
             LUNA_RENDERER_WARN("Present returned {}", swapchainResultToString(present_result));
         } else {
@@ -632,6 +654,7 @@ void Renderer::endFrame()
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
         runtime.resize_requested = true;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     }
 
     frame_resources.current_command_buffer.reset();
@@ -662,12 +685,19 @@ bool Renderer::isImGuiEnabled() const
 void Renderer::requestResize()
 {
     m_runtime.resize_requested = true;
+    invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     LUNA_RENDERER_DEBUG("Renderer resize requested");
 }
 
 bool Renderer::isResizeRequested() const
 {
     return m_runtime.resize_requested;
+}
+
+void Renderer::notifyCameraCut()
+{
+    invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::CameraCut);
+    LUNA_RENDERER_DEBUG("Render feature history invalidated by camera cut");
 }
 
 void Renderer::setImGuiEnabled(bool enabled)
@@ -697,6 +727,8 @@ void Renderer::setSceneOutputMode(SceneOutputMode mode)
                        sceneOutputModeToString(m_scene_output.mode),
                        sceneOutputModeToString(mode));
     m_scene_output.mode = mode;
+    ++m_scene_output.generation;
+    invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
 
     if (m_scene_output.mode != SceneOutputMode::OffscreenTexture) {
         if (m_scene_output.color || m_scene_output.depth || m_scene_output.pick) {
@@ -719,6 +751,9 @@ void Renderer::setSceneOutputSize(uint32_t width, uint32_t height)
     m_scene_output.extent = {width, height};
     if (size_changed) {
         LUNA_RENDERER_INFO("Scene output size set to {}x{}", width, height);
+        ++m_scene_output.generation;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize |
+                                       render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
     }
 
     if (!size_changed || m_scene_output.mode != SceneOutputMode::OffscreenTexture || width == 0 || height == 0) {
@@ -1096,10 +1131,86 @@ void Renderer::handlePendingResize()
         device_context.synchronization.reset();
         createSwapchain(extent.width, extent.height);
         runtime.resize_requested = false;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
         LUNA_RENDERER_INFO("Swapchain recreation complete");
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("Swapchain recreation failed: {}", error.what());
     }
+}
+
+void Renderer::invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept
+{
+    m_render_feature_history.pending_flags |= flags;
+}
+
+render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
+    luna::RHI::BackendType backend_type,
+    SceneOutputMode scene_output_mode,
+    uint64_t frame_index,
+    uint32_t framebuffer_width,
+    uint32_t framebuffer_height) const
+{
+    render_flow::RenderFeatureHistoryInvalidationFlags invalidation_flags =
+        m_render_feature_history.pending_flags;
+
+    if (!m_render_feature_history.has_previous_frame) {
+        invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::FirstFrame;
+    } else {
+        if (m_render_feature_history.device != m_device_context.device.get()) {
+            invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::DeviceChanged;
+        }
+        if (m_render_feature_history.backend_type != backend_type) {
+            invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::BackendChanged;
+        }
+        if (m_render_feature_history.framebuffer_width != framebuffer_width ||
+            m_render_feature_history.framebuffer_height != framebuffer_height) {
+            invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::Resize;
+        }
+        if (m_render_feature_history.scene_output_mode != scene_output_mode ||
+            m_render_feature_history.scene_output_generation != m_scene_output.generation) {
+            invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged;
+        }
+    }
+
+    return render_flow::RenderFeatureFrameContext{
+        .device = m_device_context.device,
+        .backend_type = backend_type,
+        .frame_index = frame_index,
+        .framebuffer_width = framebuffer_width,
+        .framebuffer_height = framebuffer_height,
+        .history_invalidation_flags = invalidation_flags,
+    };
+}
+
+void Renderer::stageRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
+                                              SceneOutputMode scene_output_mode,
+                                              uint32_t framebuffer_width,
+                                              uint32_t framebuffer_height) noexcept
+{
+    m_render_feature_history.has_pending_frame = true;
+    m_render_feature_history.pending_device = m_device_context.device.get();
+    m_render_feature_history.pending_backend_type = backend_type;
+    m_render_feature_history.pending_scene_output_mode = scene_output_mode;
+    m_render_feature_history.pending_framebuffer_width = framebuffer_width;
+    m_render_feature_history.pending_framebuffer_height = framebuffer_height;
+    m_render_feature_history.pending_scene_output_generation = m_scene_output.generation;
+}
+
+void Renderer::commitStagedRenderFeatureFrameContext() noexcept
+{
+    if (!m_render_feature_history.has_pending_frame) {
+        return;
+    }
+
+    m_render_feature_history.has_previous_frame = true;
+    m_render_feature_history.device = m_render_feature_history.pending_device;
+    m_render_feature_history.backend_type = m_render_feature_history.pending_backend_type;
+    m_render_feature_history.scene_output_mode = m_render_feature_history.pending_scene_output_mode;
+    m_render_feature_history.framebuffer_width = m_render_feature_history.pending_framebuffer_width;
+    m_render_feature_history.framebuffer_height = m_render_feature_history.pending_framebuffer_height;
+    m_render_feature_history.scene_output_generation = m_render_feature_history.pending_scene_output_generation;
+    m_render_feature_history.pending_flags = render_flow::RenderFeatureHistoryInvalidationFlags::None;
+    m_render_feature_history.has_pending_frame = false;
 }
 
 bool Renderer::hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const
@@ -1175,6 +1286,8 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
                             static_cast<bool>(m_scene_output.depth),
                             static_cast<bool>(m_scene_output.pick));
     } else {
+        ++m_scene_output.generation;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
         LUNA_RENDERER_INFO("Created scene output targets {}x{}", width, height);
     }
 }
@@ -1192,6 +1305,8 @@ void Renderer::releaseSceneOutputTargets()
     m_scene_output.completed_pick_id.reset();
     m_scene_output.debug_pick_marker = {};
     if (had_targets) {
+        ++m_scene_output.generation;
+        invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
         LUNA_RENDERER_INFO("Released scene output targets");
     }
 }

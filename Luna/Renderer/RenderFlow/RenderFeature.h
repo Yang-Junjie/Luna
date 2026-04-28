@@ -73,7 +73,10 @@ public:
     virtual bool registerPasses(RenderFlowBuilder& builder) = 0;
     virtual void prepareFrame(const RenderWorld& world,
                               const SceneRenderContext& scene_context,
+                              const RenderFeatureFrameContext& frame_context,
                               RenderPassBlackboard& blackboard) = 0;
+    virtual void commitFrame() {}
+    virtual void releasePersistentResources() {}
     virtual void shutdown() = 0;
 };
 

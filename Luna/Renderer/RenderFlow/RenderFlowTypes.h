@@ -53,6 +53,60 @@ struct SceneRenderContext {
 
 } // namespace luna
 
+namespace luna::render_flow {
+
+enum class RenderFeatureHistoryInvalidationFlags : uint32_t {
+    None = 0,
+    FirstFrame = 1 << 0,
+    Resize = 1 << 1,
+    SceneOutputChanged = 1 << 2,
+    DeviceChanged = 1 << 3,
+    BackendChanged = 1 << 4,
+    CameraCut = 1 << 5,
+};
+
+inline RenderFeatureHistoryInvalidationFlags operator|(RenderFeatureHistoryInvalidationFlags lhs,
+                                                       RenderFeatureHistoryInvalidationFlags rhs) noexcept
+{
+    return static_cast<RenderFeatureHistoryInvalidationFlags>(static_cast<uint32_t>(lhs) |
+                                                              static_cast<uint32_t>(rhs));
+}
+
+inline RenderFeatureHistoryInvalidationFlags& operator|=(RenderFeatureHistoryInvalidationFlags& lhs,
+                                                         RenderFeatureHistoryInvalidationFlags rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+inline bool operator&(RenderFeatureHistoryInvalidationFlags lhs,
+                      RenderFeatureHistoryInvalidationFlags rhs) noexcept
+{
+    return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
+}
+
+struct RenderFeatureFrameContext {
+    luna::RHI::Ref<luna::RHI::Device> device;
+    luna::RHI::BackendType backend_type{luna::RHI::BackendType::Vulkan};
+    uint64_t frame_index{0};
+    uint32_t framebuffer_width{0};
+    uint32_t framebuffer_height{0};
+    RenderFeatureHistoryInvalidationFlags history_invalidation_flags{
+        RenderFeatureHistoryInvalidationFlags::None};
+
+    [[nodiscard]] bool historyInvalidated() const noexcept
+    {
+        return history_invalidation_flags != RenderFeatureHistoryInvalidationFlags::None;
+    }
+
+    [[nodiscard]] bool hasHistoryInvalidation(RenderFeatureHistoryInvalidationFlags reason) const noexcept
+    {
+        return history_invalidation_flags & reason;
+    }
+};
+
+} // namespace luna::render_flow
+
 
 
 

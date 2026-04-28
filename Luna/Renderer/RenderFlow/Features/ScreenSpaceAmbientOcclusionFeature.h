@@ -35,7 +35,9 @@ public:
     bool registerPasses(RenderFlowBuilder& builder) override;
     void prepareFrame(const RenderWorld& world,
                       const SceneRenderContext& scene_context,
+                      const RenderFeatureFrameContext& frame_context,
                       RenderPassBlackboard& blackboard) override;
+    void releasePersistentResources() override;
     void shutdown() override;
 
 private:

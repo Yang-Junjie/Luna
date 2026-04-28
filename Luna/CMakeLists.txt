@@ -34,6 +34,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/RenderFlowBuilder.cpp
     Renderer/RenderFlow/RenderFlowTypes.h
     Renderer/RenderFlow/RenderFeature.h
+    Renderer/RenderFlow/RenderFeatureResources.h
+    Renderer/RenderFlow/RenderFeatureResources.cpp
     Renderer/RenderFlow/RenderFeatureRegistry.h
     Renderer/RenderFlow/RenderFeatureRegistry.cpp
     Renderer/RenderFlow/RenderResourceKey.h

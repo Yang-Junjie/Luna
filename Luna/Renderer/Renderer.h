@@ -93,6 +93,7 @@ public:
 
     void requestResize();
     bool isResizeRequested() const;
+    void notifyCameraCut();
 
     void setImGuiEnabled(bool enabled);
 
@@ -183,6 +184,7 @@ private:
         PickDebugMarker debug_pick_marker{};
         std::optional<PickRequest> queued_pick_request;
         std::optional<uint32_t> completed_pick_id;
+        uint64_t generation{0};
     };
 
     struct FrameResources {
@@ -222,9 +224,40 @@ private:
         bool render_graph_profiling_enabled{false};
     };
 
+    struct RenderFeatureHistoryState {
+        bool has_previous_frame{false};
+        luna::RHI::Device* device{nullptr};
+        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
+        SceneOutputMode scene_output_mode{SceneOutputMode::Swapchain};
+        uint32_t framebuffer_width{0};
+        uint32_t framebuffer_height{0};
+        uint64_t scene_output_generation{0};
+        render_flow::RenderFeatureHistoryInvalidationFlags pending_flags{
+            render_flow::RenderFeatureHistoryInvalidationFlags::None};
+        bool has_pending_frame{false};
+        luna::RHI::Device* pending_device{nullptr};
+        luna::RHI::BackendType pending_backend_type{luna::RHI::BackendType::Auto};
+        SceneOutputMode pending_scene_output_mode{SceneOutputMode::Swapchain};
+        uint32_t pending_framebuffer_width{0};
+        uint32_t pending_framebuffer_height{0};
+        uint64_t pending_scene_output_generation{0};
+    };
+
     void createSwapchain(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
+    void invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
+    [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(
+        luna::RHI::BackendType backend_type,
+        SceneOutputMode scene_output_mode,
+        uint64_t frame_index,
+        uint32_t framebuffer_width,
+        uint32_t framebuffer_height) const;
+    void stageRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
+                                        SceneOutputMode scene_output_mode,
+                                        uint32_t framebuffer_width,
+                                        uint32_t framebuffer_height) noexcept;
+    void commitStagedRenderFeatureFrameContext() noexcept;
     bool hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const;
     void releaseFrameCommandBuffers();
     void ensureScenePickReadbackBuffers();
@@ -242,6 +275,7 @@ private:
     SceneOutputState m_scene_output{};
     FrameResources m_frame_resources{};
     RuntimeState m_runtime{};
+    RenderFeatureHistoryState m_render_feature_history{};
     RenderWorld m_render_world{};
     std::unique_ptr<IRenderFlow> m_render_flow;
     RenderGraphProfileSnapshot m_last_render_graph_profile{};

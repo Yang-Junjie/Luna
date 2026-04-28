@@ -96,9 +96,11 @@ bool Feature::registerPasses(RenderFlowBuilder& builder)
 
 void Feature::prepareFrame(const RenderWorld& world,
                            const SceneRenderContext& scene_context,
+                           const RenderFeatureFrameContext& frame_context,
                            RenderPassBlackboard& blackboard)
 {
     namespace blackboard_names = luna::render_flow::blackboard;
+    (void) frame_context;
 
     prepareResources(scene_context);
 

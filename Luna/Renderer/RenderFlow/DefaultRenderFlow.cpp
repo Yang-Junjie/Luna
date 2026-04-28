@@ -25,8 +25,10 @@ DefaultRenderFlow::~DefaultRenderFlow()
 
 void DefaultRenderFlow::shutdown()
 {
+    m_frame_ready_to_commit = false;
     m_builder.clear();
     for (const auto& feature : m_features) {
+        feature->releasePersistentResources();
         feature->shutdown();
     }
     m_features.clear();
@@ -224,6 +226,8 @@ const render_flow::RenderFlowBuilder& DefaultRenderFlow::builder() const noexcep
 
 void DefaultRenderFlow::render(RenderFlowContext& context)
 {
+    m_frame_ready_to_commit = false;
+
     const RenderWorld& world = context.world();
     const SceneRenderContext& scene_context = context.sceneContext();
 
@@ -253,7 +257,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
 
     m_blackboard.clear();
     for (const auto& feature : m_features) {
-        feature->prepareFrame(world, scene_context, m_blackboard);
+        feature->prepareFrame(world, scene_context, context.featureFrameContext(), m_blackboard);
     }
 
     render_flow::RenderPassContext pass_context(context.graph(), world, scene_context, m_blackboard);
@@ -268,6 +272,23 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
             entry.pass->setup(pass_context);
         }
     }
+
+    m_frame_ready_to_commit = true;
+}
+
+bool DefaultRenderFlow::commitFrame()
+{
+    if (!m_frame_ready_to_commit) {
+        return false;
+    }
+
+    m_frame_ready_to_commit = false;
+    for (const auto& feature : m_features) {
+        if (feature) {
+            feature->commitFrame();
+        }
+    }
+    return true;
 }
 
 } // namespace luna

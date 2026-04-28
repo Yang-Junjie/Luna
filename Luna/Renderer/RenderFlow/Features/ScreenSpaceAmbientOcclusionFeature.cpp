@@ -4,6 +4,7 @@
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
+#include "Renderer/RenderFlow/RenderFeatureResources.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
@@ -142,6 +143,36 @@ bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
     return handle.has_value() && handle->isValid();
 }
 
+RenderGraphTextureDesc makeAmbientOcclusionGraphDesc(const SceneRenderContext& scene_context)
+{
+    return RenderGraphTextureDesc{
+        .Name = "ScreenSpaceAmbientOcclusion",
+        .Type = luna::RHI::TextureType::Texture2D,
+        .Width = scene_context.framebuffer_width,
+        .Height = scene_context.framebuffer_height,
+        .Depth = 1,
+        .ArrayLayers = 1,
+        .MipLevels = 1,
+        .Format = kAmbientOcclusionFormat,
+        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+        .InitialState = luna::RHI::ResourceState::Undefined,
+        .SampleCount = luna::RHI::SampleCount::Count1,
+    };
+}
+
+PersistentTexture2DDesc makeAmbientOcclusionPersistentDesc(const SceneRenderContext& scene_context)
+{
+    return PersistentTexture2DDesc{
+        .width = scene_context.framebuffer_width,
+        .height = scene_context.framebuffer_height,
+        .format = kAmbientOcclusionFormat,
+        .usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+        .initial_state = luna::RHI::ResourceState::Undefined,
+        .sample_count = luna::RHI::SampleCount::Count1,
+        .name = "ScreenSpaceAmbientOcclusion",
+    };
+}
+
 void clearAmbientOcclusion(RenderGraphRasterPassContext& pass_context)
 {
     pass_context.beginRendering();
@@ -175,7 +206,13 @@ class ScreenSpaceAmbientOcclusionFeature::Resources final {
 public:
     void shutdown()
     {
+        releasePersistentResources();
         m_state = {};
+    }
+
+    void releasePersistentResources()
+    {
+        m_ambient_occlusion.reset();
     }
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
@@ -236,6 +273,21 @@ public:
                            static_cast<bool>(m_state.params_buffer),
                            static_cast<bool>(m_state.descriptor_set));
         return false;
+    }
+
+    [[nodiscard]] bool ensureAmbientOcclusion(const SceneRenderContext& context)
+    {
+        return m_ambient_occlusion.ensure(context.device, makeAmbientOcclusionPersistentDesc(context));
+    }
+
+    [[nodiscard]] RenderGraphTextureHandle importAmbientOcclusion(RenderGraphBuilder& graph)
+    {
+        return importPersistentTexture2D(graph,
+                                         m_ambient_occlusion,
+                                         RenderFeatureTextureImportOptions{
+                                             .name = "ScreenSpaceAmbientOcclusion",
+                                             .final_state = luna::RHI::ResourceState::ShaderRead,
+                                         });
     }
 
     [[nodiscard]] bool isComplete() const noexcept
@@ -348,6 +400,7 @@ private:
     };
 
     State m_state{};
+    PersistentTexture2D m_ambient_occlusion;
 };
 
 namespace {
@@ -382,19 +435,13 @@ public:
                                isValidTextureHandle(world_position_roughness));
         }
 
-        RenderGraphTextureHandle ambient_occlusion = context.graph().CreateTexture(RenderGraphTextureDesc{
-            .Name = "ScreenSpaceAmbientOcclusion",
-            .Type = luna::RHI::TextureType::Texture2D,
-            .Width = scene_context.framebuffer_width,
-            .Height = scene_context.framebuffer_height,
-            .Depth = 1,
-            .ArrayLayers = 1,
-            .MipLevels = 1,
-            .Format = kAmbientOcclusionFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
-        });
+        RenderGraphTextureHandle ambient_occlusion;
+        if (m_resources != nullptr && m_resources->ensureAmbientOcclusion(scene_context)) {
+            ambient_occlusion = m_resources->importAmbientOcclusion(context.graph());
+        }
+        if (!ambient_occlusion.isValid()) {
+            ambient_occlusion = context.graph().CreateTexture(makeAmbientOcclusionGraphDesc(scene_context));
+        }
         if (!ambient_occlusion.isValid()) {
             return;
         }
@@ -569,11 +616,20 @@ bool ScreenSpaceAmbientOcclusionFeature::registerPasses(RenderFlowBuilder& build
 
 void ScreenSpaceAmbientOcclusionFeature::prepareFrame(const RenderWorld& world,
                                                       const SceneRenderContext& scene_context,
+                                                      const RenderFeatureFrameContext& frame_context,
                                                       RenderPassBlackboard& blackboard)
 {
     (void) world;
     (void) scene_context;
+    (void) frame_context;
     (void) blackboard;
+}
+
+void ScreenSpaceAmbientOcclusionFeature::releasePersistentResources()
+{
+    if (m_resources) {
+        m_resources->releasePersistentResources();
+    }
 }
 
 void ScreenSpaceAmbientOcclusionFeature::shutdown()

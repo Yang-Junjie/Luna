@@ -97,10 +97,12 @@ bool FeatureProbe::registerPasses(RenderFlowBuilder& builder)
 
 void FeatureProbe::prepareFrame(const RenderWorld& world,
                                 const SceneRenderContext& scene_context,
+                                const RenderFeatureFrameContext& frame_context,
                                 RenderPassBlackboard& blackboard)
 {
     (void) world;
     (void) scene_context;
+    (void) frame_context;
     (void) blackboard;
 }
 
