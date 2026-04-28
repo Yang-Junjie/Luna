@@ -132,11 +132,13 @@ bool Renderer::init(Window& window, InitializationOptions options)
         LUNA_RENDERER_DEBUG("Created RHI instance for backend '{}'",
                             renderer_detail::backendTypeToString(device_context.instance->GetType()));
         LUNA_RENDERER_DEBUG("RHI capabilities: default_flow={} imgui={} scene_pick_readback={} gpu_timestamp={} "
+                            "gpu_timestamp_disjoint={} "
                             "projection_y_flip={} imgui_uv_y_flip={} pick_y_matches_display={}",
                             device_context.capabilities.supports_default_render_flow,
                             device_context.capabilities.supports_imgui,
                             device_context.capabilities.supports_scene_pick_readback,
                             device_context.capabilities.supports_gpu_timestamp,
+                            device_context.capabilities.gpu_timestamp_uses_disjoint_query,
                             device_context.capabilities.conventions.requires_projection_y_flip,
                             device_context.capabilities.conventions.imgui_render_target_requires_uv_y_flip,
                             device_context.capabilities.conventions.scene_pick_y_matches_display_y);
@@ -1468,8 +1470,7 @@ void Renderer::ensureGpuTimingResources()
 
     const double timestamp_period_ns = m_device_context.graphics_queue->GetTimestampPeriodNs();
     const bool use_disjoint_timestamps =
-        timestamp_period_ns <= 0.0 && m_device_context.instance &&
-        m_device_context.instance->GetType() == luna::RHI::BackendType::DirectX11;
+        timestamp_period_ns <= 0.0 && m_device_context.capabilities.gpu_timestamp_uses_disjoint_query;
     if (timestamp_period_ns <= 0.0 && !use_disjoint_timestamps) {
         frame_resources.gpu_timing_slots.clear();
         LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on this RHI backend");

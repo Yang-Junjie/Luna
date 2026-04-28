@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AssetLoadingPanel.h"
+#include "BackendCapabilitiesPanel.h"
 #include "BuiltinMaterialsPanel.h"
 #include "ContentBrowserPanel.h"
 #include "Core/Layer.h"
@@ -109,6 +110,7 @@ private:
     bool m_show_render_debug_panel{false};
     bool m_show_render_features_panel{false};
     bool m_show_render_profiler_panel{false};
+    bool m_show_backend_capabilities_panel{false};
     bool m_runtime_viewport_enabled{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
@@ -121,6 +123,7 @@ private:
     RenderDebugPanel m_render_debug_panel;
     RenderFeaturesPanel m_render_features_panel;
     RenderProfilerPanel m_render_profiler_panel;
+    BackendCapabilitiesPanel m_backend_capabilities_panel;
 };
 
 } // namespace luna

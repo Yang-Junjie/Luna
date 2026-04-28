@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <Capabilities.h>
 
 namespace luna::renderer_detail {
 
@@ -123,8 +124,7 @@ const char* formatToString(luna::RHI::Format format)
 
 bool supportsDefaultRenderFlow(luna::RHI::BackendType type)
 {
-    return type == luna::RHI::BackendType::Vulkan || type == luna::RHI::BackendType::DirectX11 ||
-           type == luna::RHI::BackendType::DirectX12;
+    return luna::RHI::makeCapabilitiesForBackend(type).supports_default_render_flow;
 }
 
 bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)

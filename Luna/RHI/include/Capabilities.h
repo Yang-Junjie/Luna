@@ -18,6 +18,7 @@ struct RHICapabilities {
     bool supports_imgui{false};
     bool supports_scene_pick_readback{false};
     bool supports_gpu_timestamp{false};
+    bool gpu_timestamp_uses_disjoint_query{false};
     RHIConventions conventions{};
 };
 
@@ -32,6 +33,7 @@ struct RHICapabilities {
             capabilities.supports_imgui = true;
             capabilities.supports_scene_pick_readback = true;
             capabilities.supports_gpu_timestamp = true;
+            capabilities.gpu_timestamp_uses_disjoint_query = false;
             capabilities.conventions.requires_projection_y_flip = true;
             capabilities.conventions.imgui_clip_top_y_is_negative_one = true;
             capabilities.conventions.imgui_render_target_requires_uv_y_flip = false;
@@ -42,6 +44,7 @@ struct RHICapabilities {
             capabilities.supports_imgui = true;
             capabilities.supports_scene_pick_readback = true;
             capabilities.supports_gpu_timestamp = true;
+            capabilities.gpu_timestamp_uses_disjoint_query = false;
             capabilities.conventions.requires_projection_y_flip = false;
             capabilities.conventions.imgui_clip_top_y_is_negative_one = true;
             capabilities.conventions.imgui_render_target_requires_uv_y_flip = true;
@@ -52,6 +55,7 @@ struct RHICapabilities {
             capabilities.supports_imgui = true;
             capabilities.supports_scene_pick_readback = true;
             capabilities.supports_gpu_timestamp = true;
+            capabilities.gpu_timestamp_uses_disjoint_query = true;
             capabilities.conventions.requires_projection_y_flip = false;
             capabilities.conventions.imgui_clip_top_y_is_negative_one = false;
             capabilities.conventions.imgui_render_target_requires_uv_y_flip = true;

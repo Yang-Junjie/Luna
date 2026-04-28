@@ -291,6 +291,7 @@ void LunaEditorLayer::onImGuiRender()
                                           [&renderer](bool enabled) {
                                               renderer.setRenderGraphProfilingEnabled(enabled);
                                           });
+    m_backend_capabilities_panel.onImGuiRender(m_show_backend_capabilities_panel, renderer);
     drawViewport();
 }
 
@@ -370,6 +371,7 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
         ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
         ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
+        ImGui::MenuItem("Backend Capabilities", nullptr, &m_show_backend_capabilities_panel);
         ImGui::EndMenu();
     }
 }
