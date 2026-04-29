@@ -12,12 +12,15 @@
 namespace luna::render_flow::default_scene {
 namespace {
 
-constexpr std::array<RenderPassResourceUsage, 4> kSkyPassResources{{
+constexpr std::array<RenderPassResourceUsage, 5> kSkyPassResources{{
+    {.name = blackboard::SceneLitColor.value(),
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::GBufferBaseColor.value(), .access = RenderPassResourceAccess::Read},
     {.name = blackboard::GBufferNormalMetallic.value(), .access = RenderPassResourceAccess::Read},
     {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::Read},
-    {.name = blackboard::SceneColor.value(),
-     .access = RenderPassResourceAccess::ReadWrite,
+    {.name = blackboard::SceneSkyCompositedColor.value(),
+     .access = RenderPassResourceAccess::Write,
      .flags = RenderFeatureGraphResourceFlags::External},
 }};
 
@@ -38,6 +41,8 @@ std::span<const RenderPassResourceUsage> SkyPass::resourceUsages() const noexcep
 void SkyPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
+    blackboard::publishSceneColorStage(
+        context.blackboard(), blackboard::SceneColorStage::SkyComposited, scene_context.color_target);
     const RenderGraphTextureHandle base_color =
         readBlackboardTexture(context.blackboard(), blackboard::GBufferBaseColor, name());
     const RenderGraphTextureHandle normal_metallic =

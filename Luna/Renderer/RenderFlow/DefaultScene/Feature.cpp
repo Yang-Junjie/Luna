@@ -25,9 +25,18 @@ namespace luna::render_flow::default_scene {
 namespace {
 
 inline constexpr std::string_view kFeatureName = "DefaultScene";
+constexpr RenderFeatureGraphResourceFlags kOptionalExternalGraphResourceFlags =
+    static_cast<RenderFeatureGraphResourceFlags>(
+        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::Optional) |
+        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
 
-constexpr std::array<RenderFeatureGraphResource, 9> kGraphOutputs{{
+constexpr std::array<RenderFeatureGraphResource, 14> kGraphOutputs{{
     {.name = blackboard::SceneColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneLitColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneSkyCompositedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTransparentCompositedColor.value(),
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneFinalColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Depth.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {blackboard::Pick.value()},
     {blackboard::GBufferBaseColor.value()},
@@ -38,7 +47,10 @@ constexpr std::array<RenderFeatureGraphResource, 9> kGraphOutputs{{
     {blackboard::ShadowMap.value()},
 }};
 
-constexpr std::array<RenderFeatureGraphResource, 11> kGraphInputs{{
+constexpr std::array<RenderFeatureGraphResource, 14> kGraphInputs{{
+    {blackboard::SceneLitColor.value()},
+    {blackboard::SceneSkyCompositedColor.value()},
+    {.name = blackboard::SceneTemporalResolvedColor.value(), .flags = kOptionalExternalGraphResourceFlags},
     {blackboard::Pick.value()},
     {blackboard::GBufferBaseColor.value()},
     {blackboard::GBufferNormalMetallic.value()},
@@ -174,7 +186,7 @@ void Feature::prepareFrame(const RenderWorld& world,
 
     prepareResources(scene_context);
 
-    blackboard.set(blackboard_names::SceneColor, scene_context.color_target);
+    blackboard_names::initializeSceneColorStageAliases(blackboard, scene_context.color_target);
     blackboard.set(blackboard_names::Depth, scene_context.depth_target);
     blackboard.set(blackboard_names::Pick, scene_context.pick_target);
 

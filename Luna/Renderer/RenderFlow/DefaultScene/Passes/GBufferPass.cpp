@@ -100,7 +100,7 @@ void GeometryPass::setup(RenderPassContext& context)
     context.blackboard().set(blackboard::GBufferWorldPositionRoughness, gbuffer.world_position_roughness);
     context.blackboard().set(blackboard::GBufferEmissiveAo, gbuffer.emissive_ao);
     context.blackboard().set(blackboard::Velocity, gbuffer.velocity);
-    context.blackboard().set(blackboard::SceneColor, scene_context.color_target);
+    blackboard::initializeSceneColorStageAliases(context.blackboard(), scene_context.color_target);
     context.blackboard().set(blackboard::Depth, scene_context.depth_target);
     context.blackboard().set(blackboard::Pick, scene_context.pick_target);
 

@@ -64,7 +64,7 @@ constexpr RenderFeatureGraphResourceFlags kOptionalExternalGraphResourceFlags =
         static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
 
 constexpr std::array<RenderFeatureGraphResource, 4> kGraphInputs{{
-    {blackboard::SceneColor.value()},
+    {blackboard::SceneSkyCompositedColor.value()},
     {blackboard::Depth.value()},
     {blackboard::Velocity.value()},
     {.name = kHistoryReadName, .flags = kOptionalExternalGraphResourceFlags},
@@ -73,12 +73,12 @@ constexpr std::array<RenderFeatureGraphResource, 4> kGraphInputs{{
 constexpr std::array<RenderFeatureGraphResource, 3> kGraphOutputs{{
     {.name = kTemporalColorName, .flags = RenderFeatureGraphResourceFlags::External},
     {.name = kHistoryWriteName, .flags = RenderFeatureGraphResourceFlags::External},
-    {.name = blackboard::SceneColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTemporalResolvedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
 }};
 
-constexpr std::array<RenderPassResourceUsage, 6> kPassResources{{
-    {.name = blackboard::SceneColor.value(),
-     .access = RenderPassResourceAccess::ReadWrite,
+constexpr std::array<RenderPassResourceUsage, 7> kPassResources{{
+    {.name = blackboard::SceneSkyCompositedColor.value(),
+     .access = RenderPassResourceAccess::Read,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Depth.value(), .access = RenderPassResourceAccess::Read},
     {.name = blackboard::Velocity.value(), .access = RenderPassResourceAccess::Read},
@@ -86,6 +86,9 @@ constexpr std::array<RenderPassResourceUsage, 6> kPassResources{{
      .access = RenderPassResourceAccess::Read,
      .flags = kOptionalExternalGraphResourceFlags},
     {.name = kTemporalColorName,
+     .access = RenderPassResourceAccess::Write,
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTemporalResolvedColor.value(),
      .access = RenderPassResourceAccess::Write,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = kHistoryWriteName,
@@ -661,7 +664,9 @@ public:
     void setup(RenderPassContext& context) override
     {
         const SceneRenderContext& scene_context = context.sceneContext();
-        const auto scene_color = context.blackboard().get(blackboard::SceneColor);
+        blackboard::publishSceneColorStage(
+            context.blackboard(), blackboard::SceneColorStage::TemporalResolved, scene_context.color_target);
+        const auto scene_color = context.blackboard().get(blackboard::SceneSkyCompositedColor);
         const auto depth = context.blackboard().get(blackboard::Depth);
         const auto velocity = context.blackboard().get(blackboard::Velocity);
         if (!isValidTextureHandle(scene_color) || !isValidTextureHandle(velocity)) {

@@ -33,7 +33,7 @@ constexpr std::array<RenderPassResourceUsage, 12> kLightingPassResources{{
     {.name = lighting_extension_keys::IndirectSpecular,
      .access = RenderPassResourceAccess::Read,
      .flags = RenderFeatureGraphResourceFlags::Optional},
-    {.name = blackboard::SceneColor.value(),
+    {.name = blackboard::SceneLitColor.value(),
      .access = RenderPassResourceAccess::Write,
      .flags = RenderFeatureGraphResourceFlags::External},
 }};
@@ -55,6 +55,8 @@ std::span<const RenderPassResourceUsage> LightingPass::resourceUsages() const no
 void LightingPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
+    blackboard::publishSceneColorStage(
+        context.blackboard(), blackboard::SceneColorStage::Lit, scene_context.color_target);
     const GBufferTextures gbuffer{
         .base_color = readBlackboardTexture(context.blackboard(), blackboard::GBufferBaseColor, name()),
         .normal_metallic = readBlackboardTexture(context.blackboard(), blackboard::GBufferNormalMetallic, name()),

@@ -14,9 +14,18 @@
 namespace luna::render_flow::default_scene {
 namespace {
 
-constexpr std::array<RenderPassResourceUsage, 3> kTransparentPassResources{{
-    {.name = blackboard::SceneColor.value(),
-     .access = RenderPassResourceAccess::ReadWrite,
+constexpr std::array<RenderPassResourceUsage, 6> kTransparentPassResources{{
+    {.name = blackboard::SceneSkyCompositedColor.value(),
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTemporalResolvedColor.value(),
+     .access = RenderPassResourceAccess::Read,
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTransparentCompositedColor.value(),
+     .access = RenderPassResourceAccess::Write,
+     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneFinalColor.value(),
+     .access = RenderPassResourceAccess::Write,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::ReadWrite},
     {.name = blackboard::Depth.value(),
@@ -41,6 +50,10 @@ std::span<const RenderPassResourceUsage> TransparentPass::resourceUsages() const
 void TransparentPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
+    blackboard::publishSceneColorStage(
+        context.blackboard(), blackboard::SceneColorStage::TransparentComposited, scene_context.color_target);
+    blackboard::publishSceneColorStage(
+        context.blackboard(), blackboard::SceneColorStage::Final, scene_context.color_target);
     if (m_state->drawQueue().drawCommands(luna::RenderPhase::Transparent).empty()) {
         return;
     }

@@ -60,6 +60,7 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h
     Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.cpp
     Renderer/RenderFlow/RenderBlackboardKeys.h
+    Renderer/RenderFlow/RenderBlackboardKeys.cpp
     Renderer/RenderFlow/RenderSlots.h
     Renderer/RenderFlow/RenderSlotPass.h
     Renderer/RenderFlow/RenderSlotPass.cpp
