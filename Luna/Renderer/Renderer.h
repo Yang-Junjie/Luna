@@ -4,25 +4,25 @@
 // Owns device-facing frame state, scene output targets, and the public frame loop,
 // while delegating scene-specific drawing to RenderFlow.
 
-#include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/RenderFlow/RenderFeature.h"
+#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderViewState.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 #include <cstdint>
-#include <functional>
 
 #include <Barrier.h>
 #include <Capabilities.h>
 #include <Core.h>
+#include <functional>
 #include <glm/vec4.hpp>
 #include <Instance.h>
 #include <memory>
 #include <optional>
-#include <Surface.h>
 #include <string_view>
+#include <Surface.h>
 #include <vector>
 
 struct GLFWwindow;
@@ -262,12 +262,12 @@ private:
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
     void invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
-    [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(
-        luna::RHI::BackendType backend_type,
-        SceneOutputMode scene_output_mode,
-        uint64_t frame_index,
-        uint32_t framebuffer_width,
-        uint32_t framebuffer_height) const;
+    [[nodiscard]] render_flow::RenderFeatureFrameContext
+        makeRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
+                                      SceneOutputMode scene_output_mode,
+                                      uint64_t frame_index,
+                                      uint32_t framebuffer_width,
+                                      uint32_t framebuffer_height) const;
     void stageRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
                                         SceneOutputMode scene_output_mode,
                                         uint32_t framebuffer_width,
@@ -298,7 +298,3 @@ private:
 };
 
 } // namespace luna
-
-
-
-

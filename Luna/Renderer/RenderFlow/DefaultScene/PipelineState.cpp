@@ -147,14 +147,13 @@ glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::
     return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
-RenderViewMatrices buildViewMatrices(const Camera& camera,
-                                     float aspect_ratio,
-                                     const luna::RHI::RHICapabilities& capabilities)
+RenderViewMatrices
+    buildViewMatrices(const Camera& camera, float aspect_ratio, const luna::RHI::RHICapabilities& capabilities)
 {
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
-                                                         capabilities.conventions);
+    matrices.projection =
+        adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio), capabilities.conventions);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);
     matrices.inverse_projection = glm::inverse(matrices.projection);
@@ -442,7 +441,8 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
 
     if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
         !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
-        !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.transparent_fragment_shader) {
+        !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader ||
+        !m_state.transparent_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -458,13 +458,13 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
 
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_vertex_path,
-                                 "sceneGeometryVertexMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_vertex_path,
+                                                    "sceneGeometryVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_fragment_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneGeometryFragmentMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneGeometryFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_vertex_shader,
                                                     transparent_contract,
                                                     shader_paths.geometry_vertex_path,
@@ -474,21 +474,21 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_fragment_shader, shadow_contract, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_vertex_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_vertex_path,
-                                 "sceneLightingVertexMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_vertex_path,
+                                                    "sceneLightingVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneLightingFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneLightingFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.debug_view_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneDebugFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneDebugFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_fragment_shader,
-                                 transparent_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneTransparentFragmentMain");
+                                                    transparent_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneTransparentFragmentMain");
 
     m_state.material_layout = createMaterialLayout(m_state.device);
     m_state.gbuffer_layout = createGBufferLayout(m_state.device);
@@ -699,10 +699,10 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
         params.light_color_exposure = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
-    const uint32_t point_light_count = (std::min) (static_cast<uint32_t>(lights.point_lights.size()),
-                                                   render_flow::default_scene_detail::kMaxPointLights);
-    const uint32_t spot_light_count = (std::min) (static_cast<uint32_t>(lights.spot_lights.size()),
-                                                  render_flow::default_scene_detail::kMaxSpotLights);
+    const uint32_t point_light_count = (std::min)(static_cast<uint32_t>(lights.point_lights.size()),
+                                                  render_flow::default_scene_detail::kMaxPointLights);
+    const uint32_t spot_light_count =
+        (std::min)(static_cast<uint32_t>(lights.spot_lights.size()), render_flow::default_scene_detail::kMaxSpotLights);
     params.light_counts =
         glm::vec4(static_cast<float>(point_light_count), static_cast<float>(spot_light_count), 0.0f, 0.0f);
 

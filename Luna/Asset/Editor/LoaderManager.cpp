@@ -1,5 +1,4 @@
 #include "LoaderManager.h"
-
 #include "MaterialLoader.h"
 #include "MeshLoader.h"
 #include "ModelLoader.h"

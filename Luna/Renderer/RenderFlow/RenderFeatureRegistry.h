@@ -61,36 +61,30 @@ private:
 } // namespace luna::render_flow
 
 #define LUNA_RENDER_FEATURE_JOIN_IMPL(lhs, rhs) lhs##rhs
-#define LUNA_RENDER_FEATURE_JOIN(lhs, rhs) LUNA_RENDER_FEATURE_JOIN_IMPL(lhs, rhs)
+#define LUNA_RENDER_FEATURE_JOIN(lhs, rhs)      LUNA_RENDER_FEATURE_JOIN_IMPL(lhs, rhs)
 
-#define LUNA_REGISTER_RENDER_FEATURE_EX(FeatureType, FeatureName, DisplayName, Category, TargetFlow, AutoInstall,     \
-                                        EnabledByDefault, Order)                                                     \
-    namespace {                                                                                                      \
-    [[maybe_unused]] const ::luna::render_flow::RenderFeatureRegistration                                             \
-        LUNA_RENDER_FEATURE_JOIN(g_luna_render_feature_registration_, __LINE__){                                      \
-            ::luna::render_flow::RenderFeatureRegistrationDesc{                                                       \
-                .descriptor =                                                                                        \
-                    ::luna::render_flow::RenderFeatureDescriptor{                                                     \
-                        .name = ::std::string(FeatureName),                                                          \
-                        .display_name = ::std::string(DisplayName),                                                  \
-                        .category = ::std::string(Category),                                                         \
-                        .target_flow = ::std::string(TargetFlow),                                                    \
-                        .auto_install = AutoInstall,                                                                 \
-                        .enabled_by_default = EnabledByDefault,                                                       \
-                        .order = Order,                                                                              \
-                    },                                                                                               \
-                .factory = []() -> std::unique_ptr<::luna::render_flow::IRenderFeature> {                            \
-                    return std::make_unique<FeatureType>();                                                          \
-                },                                                                                                   \
-            }};                                                                                                      \
+#define LUNA_REGISTER_RENDER_FEATURE_EX(                                                               \
+    FeatureType, FeatureName, DisplayName, Category, TargetFlow, AutoInstall, EnabledByDefault, Order) \
+    namespace {                                                                                        \
+    [[maybe_unused]] const ::luna::render_flow::RenderFeatureRegistration                              \
+        LUNA_RENDER_FEATURE_JOIN(g_luna_render_feature_registration_,                                  \
+                                 __LINE__){::luna::render_flow::RenderFeatureRegistrationDesc{         \
+            .descriptor =                                                                              \
+                ::luna::render_flow::RenderFeatureDescriptor{                                          \
+                    .name = ::std::string(FeatureName),                                                \
+                    .display_name = ::std::string(DisplayName),                                        \
+                    .category = ::std::string(Category),                                               \
+                    .target_flow = ::std::string(TargetFlow),                                          \
+                    .auto_install = AutoInstall,                                                       \
+                    .enabled_by_default = EnabledByDefault,                                            \
+                    .order = Order,                                                                    \
+                },                                                                                     \
+            .factory = []() -> std::unique_ptr<::luna::render_flow::IRenderFeature> {                  \
+                return std::make_unique<FeatureType>();                                                \
+            },                                                                                         \
+        }};                                                                                            \
     }
 
-#define LUNA_REGISTER_RENDER_FEATURE(FeatureType, FeatureName, DisplayName, Category)                                \
-    LUNA_REGISTER_RENDER_FEATURE_EX(FeatureType,                                                                     \
-                                    FeatureName,                                                                     \
-                                    DisplayName,                                                                     \
-                                    Category,                                                                        \
-                                    ::luna::render_flow::kDefaultRenderFlowName,                                     \
-                                    true,                                                                            \
-                                    true,                                                                            \
-                                    0)
+#define LUNA_REGISTER_RENDER_FEATURE(FeatureType, FeatureName, DisplayName, Category) \
+    LUNA_REGISTER_RENDER_FEATURE_EX(                                                  \
+        FeatureType, FeatureName, DisplayName, Category, ::luna::render_flow::kDefaultRenderFlowName, true, true, 0)

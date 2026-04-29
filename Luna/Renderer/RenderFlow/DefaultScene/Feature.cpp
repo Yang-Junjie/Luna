@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/DefaultScene/Feature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
@@ -13,7 +13,6 @@
 #include "Renderer/RenderFlow/RenderSlotPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 #include <memory>
@@ -56,9 +55,8 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
     namespace pass_slots = luna::render_flow::slots::passes;
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
-    return builder.addFeaturePass(kFeatureName,
-                                  std::string(pass_slots::Environment),
-                                  std::make_unique<EnvironmentPass>(state)) &&
+    return builder.addFeaturePass(
+               kFeatureName, std::string(pass_slots::Environment), std::make_unique<EnvironmentPass>(state)) &&
            builder.insertFeaturePassAfter(kFeatureName,
                                           pass_slots::Environment,
                                           std::string(pass_slots::ShadowDepth),
@@ -131,17 +129,18 @@ RenderFeatureContract Feature::contract() const noexcept
         .display_name = "Default Scene",
         .category = "Scene",
         .runtime_toggleable = false,
-        .requirements = RenderFeatureRequirements{
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
-                         RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = true,
-            .uses_history_resources = true,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
+                             RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = true,
+                .uses_history_resources = true,
+            },
     };
 }
 
@@ -170,7 +169,6 @@ void Feature::prepareFrame(const RenderWorld& world,
     m_scene_state.setWorld(world);
     m_scene_state.setFrameContext(frame_context);
     m_scene_state.setShadowParams({});
-
 }
 
 void Feature::prepareResources(const SceneRenderContext& scene_context)

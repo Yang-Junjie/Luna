@@ -730,7 +730,7 @@ void ContentBrowserPanel::drawDirectoryContents()
     const float available_width = ImGui::GetContentRegionAvail().x;
     const float tile_width = 104.0f;
     const float tile_height = 88.0f;
-    const int column_count = (std::max) (1, static_cast<int>(available_width / tile_width));
+    const int column_count = (std::max)(1, static_cast<int>(available_width / tile_width));
 
     if (!ImGui::BeginTable(
             "##ContentBrowserGrid", column_count, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {

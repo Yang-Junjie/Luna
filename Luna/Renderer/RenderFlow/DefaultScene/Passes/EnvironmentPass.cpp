@@ -1,12 +1,13 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
-
 #include "Renderer/RenderFlow/DefaultScene/Environment.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderGraphBuilder.h"
 
 namespace luna::render_flow::default_scene {
 
-EnvironmentPass::EnvironmentPass(PassSharedState& state) : m_state(&state) {}
+EnvironmentPass::EnvironmentPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* EnvironmentPass::name() const noexcept
 {

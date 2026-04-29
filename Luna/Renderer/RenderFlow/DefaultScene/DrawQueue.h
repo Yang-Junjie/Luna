@@ -47,8 +47,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

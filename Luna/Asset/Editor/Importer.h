@@ -4,11 +4,11 @@
 #include "Core/FileTool.h"
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
-
 #include "yaml-cpp/yaml.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -36,8 +36,8 @@ inline AssetMetadata makeAssetMetadata(const std::filesystem::path& asset_path, 
         metadata.Handle = UUID(1);
     }
     metadata.Type = type;
-    metadata.FilePath =
-        luna::tools::makeRelative(asset_path, ProjectManager::instance().getProjectRootPath().value_or(asset_path.root_path()));
+    metadata.FilePath = luna::tools::makeRelative(
+        asset_path, ProjectManager::instance().getProjectRootPath().value_or(asset_path.root_path()));
     return metadata;
 }
 
@@ -86,9 +86,8 @@ inline bool writeMetadataFile(const YAML::Emitter& out, const std::filesystem::p
         std::error_code ec;
         std::filesystem::create_directories(meta_path.parent_path(), ec);
         if (ec) {
-            LUNA_CORE_ERROR("Failed to create metadata directory '{}': {}",
-                            meta_path.parent_path().string(),
-                            ec.message());
+            LUNA_CORE_ERROR(
+                "Failed to create metadata directory '{}': {}", meta_path.parent_path().string(), ec.message());
             return false;
         }
     }
@@ -158,10 +157,12 @@ inline bool serializeMetadataWithConfig(const AssetMetadata& metadata, DefaultCo
     YAML::Emitter out;
     beginMetadataFile(out);
     writeCommonMetadata(out, metadata);
-    out << YAML::Key << "Config" << YAML::Value << resolveConfig(metadata, std::forward<DefaultConfigFactory>(make_default_config));
+    out << YAML::Key << "Config" << YAML::Value
+        << resolveConfig(metadata, std::forward<DefaultConfigFactory>(make_default_config));
     endMetadataFile(out);
     if (!out.good()) {
-        LUNA_CORE_ERROR("Failed to emit metadata YAML for '{}': {}", metadata.FilePath.generic_string(), out.GetLastError());
+        LUNA_CORE_ERROR(
+            "Failed to emit metadata YAML for '{}': {}", metadata.FilePath.generic_string(), out.GetLastError());
         return false;
     }
 

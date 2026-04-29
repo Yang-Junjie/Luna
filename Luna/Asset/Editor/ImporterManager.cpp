@@ -121,7 +121,8 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
 uint32_t computeParallelMinRange(const luna::TaskSystem& task_system, size_t work_item_count)
 {
     const uint32_t worker_count = (std::max)(task_system.getWorkerThreadCount(), 1u);
-    const uint32_t task_count = static_cast<uint32_t>((std::min)(work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+    const uint32_t task_count =
+        static_cast<uint32_t>((std::min)(work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
     const uint32_t target_chunk_count = (std::max)(worker_count * 4u, 1u);
     return (std::max)(1u, (task_count + target_chunk_count - 1u) / target_chunk_count);
 }
@@ -199,8 +200,8 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     if (task_system != nullptr && supported_assets.size() > 1 && task_system->getWorkerThreadCount() > 1) {
         TaskSubmitDesc submit_desc{};
         submit_desc.priority = enki::TASK_PRIORITY_MED;
-        submit_desc.set_size =
-            static_cast<uint32_t>((std::min)(supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+        submit_desc.set_size = static_cast<uint32_t>(
+            (std::min)(supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
         submit_desc.min_range = computeParallelMinRange(*task_system, supported_assets.size());
 
         TaskHandle task = task_system->submitParallel(

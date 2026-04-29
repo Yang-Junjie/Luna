@@ -5,16 +5,16 @@
 #include "Loader.h"
 #include "Project/ProjectManager.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
+
+#include <algorithm>
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <glm/vec3.hpp>
 #include <yaml-cpp/yaml.h>
 
 namespace luna::model_loader_detail {
@@ -75,8 +75,8 @@ inline std::vector<AssetHandle> readMaterialBindings(const YAML::Node& node)
             continue;
         }
 
-        const uint32_t material_index =
-            item["SourceMaterialIndex"] ? item["SourceMaterialIndex"].as<uint32_t>() : static_cast<uint32_t>(materials.size());
+        const uint32_t material_index = item["SourceMaterialIndex"] ? item["SourceMaterialIndex"].as<uint32_t>()
+                                                                    : static_cast<uint32_t>(materials.size());
         if (materials.size() <= material_index) {
             materials.resize(static_cast<size_t>(material_index) + 1, AssetHandle(0));
         }

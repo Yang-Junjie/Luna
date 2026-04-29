@@ -1,9 +1,7 @@
-#include "Asset/Editor/MaterialFactory.h"
-
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/MaterialFactory.h"
 #include "Asset/Editor/MaterialImporter.h"
 #include "Core/Log.h"
-
 #include "yaml-cpp/yaml.h"
 
 #include <fstream>
@@ -87,8 +85,7 @@ bool writeMaterialFile(const std::filesystem::path& path, const MaterialAssetDes
     YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << "Material" << YAML::Value << YAML::BeginMap;
-    out << YAML::Key << "Name" << YAML::Value
-        << (descriptor.Name.empty() ? path.stem().string() : descriptor.Name);
+    out << YAML::Key << "Name" << YAML::Value << (descriptor.Name.empty() ? path.stem().string() : descriptor.Name);
     emitTextureHandles(out, descriptor.Textures);
     emitSurface(out, descriptor.Surface);
     out << YAML::EndMap;

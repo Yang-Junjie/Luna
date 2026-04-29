@@ -1,8 +1,8 @@
-#include "Impls/Vulkan/VKCommandBufferEncoder.h"
+#include "Device.h"
 #include "Impls/Vulkan/VKAdapter.h"
+#include "Impls/Vulkan/VKCommandBufferEncoder.h"
 #include "Impls/Vulkan/VKQueue.h"
 #include "Impls/Vulkan/VKSynchronization.h"
-#include "Device.h"
 
 #include <mutex>
 

@@ -1,6 +1,6 @@
 ﻿#include "Core/Log.h"
-#include "Renderer/RenderGraph.h"
 #include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderGraph.h"
 
 #include <algorithm>
 #include <chrono>
@@ -15,8 +15,7 @@ const luna::RHI::Ref<luna::RHI::Texture>& emptyTextureRef()
     return empty_ref;
 }
 
-double elapsedMilliseconds(std::chrono::steady_clock::time_point begin,
-                           std::chrono::steady_clock::time_point end)
+double elapsedMilliseconds(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
 {
     return std::chrono::duration<double, std::milli>(end - begin).count();
 }
@@ -135,7 +134,8 @@ void RenderGraph::execute() const
     }
 
     const uint32_t requested_timestamp_queries = static_cast<uint32_t>(m_compiled_passes.size() * 2);
-    const bool gpu_timing_enabled = profiling_enabled && m_frame_context.timestamp_query_pool && requested_timestamp_queries > 0 &&
+    const bool gpu_timing_enabled = profiling_enabled && m_frame_context.timestamp_query_pool &&
+                                    requested_timestamp_queries > 0 &&
                                     requested_timestamp_queries <= m_frame_context.timestamp_query_capacity;
     m_profile.GpuTimingSupported = gpu_timing_enabled;
     m_profile.GpuTimingPending = gpu_timing_enabled;
@@ -147,11 +147,11 @@ void RenderGraph::execute() const
     const size_t compute_pass_count = m_compiled_passes.size() - raster_pass_count;
     LUNA_RENDERER_FRAME_DEBUG(
         "Executing render graph with {} pass(es) (raster={}, compute={}), {} texture(s), {} final barrier(s)",
-                              m_compiled_passes.size(),
-                              raster_pass_count,
-                              compute_pass_count,
-                              m_textures.size(),
-                              m_final_texture_barriers.size());
+        m_compiled_passes.size(),
+        raster_pass_count,
+        compute_pass_count,
+        m_textures.size(),
+        m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
     if (gpu_timing_enabled) {
         command_buffer.ResetQueryPool(m_frame_context.timestamp_query_pool, 0, requested_timestamp_queries);
@@ -202,12 +202,13 @@ void RenderGraph::execute() const
         }
 
         if (pass.Pass.Type == RenderGraphPassType::Raster) {
-            LUNA_RENDERER_FRAME_TRACE("Executing raster render graph pass '{}' ({}x{}, color_attachments={}, has_depth={})",
-                                      pass.Pass.Name,
-                                      pass.FramebufferWidth,
-                                      pass.FramebufferHeight,
-                                      pass.RenderingInfo.ColorAttachments.size(),
-                                      static_cast<bool>(pass.RenderingInfo.DepthAttachment));
+            LUNA_RENDERER_FRAME_TRACE(
+                "Executing raster render graph pass '{}' ({}x{}, color_attachments={}, has_depth={})",
+                pass.Pass.Name,
+                pass.FramebufferWidth,
+                pass.FramebufferHeight,
+                pass.RenderingInfo.ColorAttachments.size(),
+                static_cast<bool>(pass.RenderingInfo.DepthAttachment));
         } else {
             LUNA_RENDERER_FRAME_TRACE("Executing compute render graph pass '{}'", pass.Pass.Name);
         }
@@ -267,7 +268,3 @@ const RenderGraphProfileSnapshot& RenderGraph::profile() const
 }
 
 } // namespace luna
-
-
-
-

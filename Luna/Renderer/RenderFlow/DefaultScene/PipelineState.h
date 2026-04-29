@@ -4,11 +4,11 @@
 // Owns pipelines, descriptor layouts, descriptor sets, samplers, and scene-wide buffers.
 // Rebuild policy and shader path defaults stay in PipelineResources.
 
-#include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/PassResources.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
+#include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/Resources/TextureUpload.h"
 
 #include <array>
@@ -17,7 +17,7 @@
 namespace luna {
 class Camera;
 class RenderWorld;
-}
+} // namespace luna
 
 namespace luna::RHI {
 class Buffer;
@@ -128,9 +128,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-
-

@@ -3,8 +3,8 @@
 #include "Core/Application.h"
 #include "Scene/Scene.h"
 
-#include <Instance.h>
 #include <filesystem>
+#include <Instance.h>
 #include <string>
 
 namespace luna {

@@ -88,7 +88,7 @@ UINT8 ToD3D12ColorWriteMask(luna::RHI::ColorComponentFlags mask)
     }
     return result;
 }
-}
+} // namespace
 
 namespace luna::RHI {
 D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const GraphicsPipelineCreateInfo& info)
@@ -248,7 +248,8 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
                         continue;
                     }
 
-                    if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) && message->pDescription != nullptr) {
+                    if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) &&
+                        message->pDescription != nullptr) {
                         error << (appendedMessage ? " | " : " [");
                         error << message->pDescription;
                         appendedMessage = true;

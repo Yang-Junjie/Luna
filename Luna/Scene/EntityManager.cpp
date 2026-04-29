@@ -1,7 +1,6 @@
-#include "EntityManager.h"
-
 #include "Core/Log.h"
 #include "Entity.h"
+#include "EntityManager.h"
 
 #include <algorithm>
 #include <glm/matrix.hpp>

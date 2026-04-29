@@ -4,7 +4,9 @@
 
 namespace luna::render_flow {
 
-RenderSlotPass::RenderSlotPass(std::string name) : m_name(std::move(name)) {}
+RenderSlotPass::RenderSlotPass(std::string name)
+    : m_name(std::move(name))
+{}
 
 const char* RenderSlotPass::name() const noexcept
 {

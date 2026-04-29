@@ -28,12 +28,12 @@ public:
     virtual void Reset(uint32_t firstQuery, uint32_t count) = 0;
     virtual bool
         GetResults(uint32_t firstQuery, uint32_t queryCount, std::vector<uint64_t>& outResults, bool wait = true) = 0;
-    virtual bool GetTimestampDisjointResult(uint32_t queryIndex,
-                                            TimestampDisjointResult& outResult,
-                                            bool wait = true)
+
+    virtual bool GetTimestampDisjointResult(uint32_t queryIndex, TimestampDisjointResult& outResult, bool wait = true)
     {
         return false;
     }
+
     virtual QueryType GetType() const = 0;
     virtual uint32_t GetCount() const = 0;
 };

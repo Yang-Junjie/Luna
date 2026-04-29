@@ -2,11 +2,12 @@
 
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <string_view>
+
+#include <array>
 #include <Core.h>
+#include <string_view>
 
 namespace luna {
 class RenderGraphRasterPassBuilder;
@@ -58,8 +59,8 @@ void setLightingExtensionInput(RenderPassBlackboard& blackboard,
 [[nodiscard]] LightingExtensionInputSet getLightingExtensionInputs(const RenderPassBlackboard& blackboard);
 void readLightingExtensionInputTextures(RenderGraphRasterPassBuilder& pass_builder,
                                         const LightingExtensionInputSet& inputs);
-[[nodiscard]] LightingExtensionTextureRefs resolveLightingExtensionInputTextures(
-    RenderGraphRasterPassContext& pass_context,
-    const LightingExtensionInputSet& inputs);
+[[nodiscard]] LightingExtensionTextureRefs
+    resolveLightingExtensionInputTextures(RenderGraphRasterPassContext& pass_context,
+                                          const LightingExtensionInputSet& inputs);
 
 } // namespace luna::render_flow

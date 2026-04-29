@@ -1,9 +1,9 @@
 ﻿#pragma once
 
+#include <cstdint>
+
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
-
-#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -73,7 +73,3 @@ struct RenderSpotLight {
 };
 
 } // namespace luna
-
-
-
-

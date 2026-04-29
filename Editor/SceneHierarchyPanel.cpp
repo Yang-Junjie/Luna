@@ -1,5 +1,5 @@
-#include "EditorAssetDragDrop.h"
 #include "Asset/BuiltinAssets.h"
+#include "EditorAssetDragDrop.h"
 #include "LunaEditorLayer.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
@@ -30,8 +30,8 @@ bool isDescendantOf(luna::Entity entity, luna::Entity potential_ancestor)
 luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
 {
     auto& entity_manager = editor_layer.getScene().entityManager();
-    luna::Entity entity = parent ? entity_manager.createChildEntity(parent, "Empty Entity")
-                                 : entity_manager.createEntity("Empty Entity");
+    luna::Entity entity =
+        parent ? entity_manager.createChildEntity(parent, "Empty Entity") : entity_manager.createEntity("Empty Entity");
     if (entity) {
         editor_layer.setSelectedEntity(entity);
     }
@@ -110,12 +110,13 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         return;
     }
 
-    const char* label = entity.hasComponent<luna::TagComponent>() ? entity.getComponent<luna::TagComponent>().tag.c_str()
-                                                                  : "Unnamed Entity";
+    const char* label = entity.hasComponent<luna::TagComponent>()
+                            ? entity.getComponent<luna::TagComponent>().tag.c_str()
+                            : "Unnamed Entity";
     const bool has_children = entity.hasChildren();
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (!has_children) {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
     }
@@ -123,10 +124,8 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    const bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint64_t>(entity.getUUID()))),
-                                          flags,
-                                          "%s",
-                                          label);
+    const bool opened = ImGui::TreeNodeEx(
+        reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint64_t>(entity.getUUID()))), flags, "%s", label);
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         editor_layer.setSelectedEntity(entity);
@@ -181,7 +180,8 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         const std::vector<luna::UUID> children = entity.getChildren();
         for (const luna::UUID child_uuid : children) {
             if (luna::Entity child = entity_manager.findEntityByUUID(child_uuid); child) {
-                drawEntityNode(editor_layer, entity_manager, child, editor_layer.getSelectedEntity(), rendered_entities);
+                drawEntityNode(
+                    editor_layer, entity_manager, child, editor_layer.getSelectedEntity(), rendered_entities);
             }
         }
         ImGui::TreePop();
@@ -189,7 +189,8 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
 
     if (delete_entity) {
         const luna::Entity current_selection = editor_layer.getSelectedEntity();
-        const bool clear_selection = current_selection && (current_selection == entity || isDescendantOf(current_selection, entity));
+        const bool clear_selection =
+            current_selection && (current_selection == entity || isDescendantOf(current_selection, entity));
         entity_manager.destroyEntity(entity);
         if (clear_selection) {
             editor_layer.setSelectedEntity({});
@@ -242,11 +243,8 @@ void SceneHierarchyPanel::onImGuiRender()
         for (const auto entity_handle : view) {
             Entity entity(entity_handle, &entity_manager);
             if (!owned_entities.contains(entity.getUUID())) {
-                drawEntityNode(*m_editor_layer,
-                               entity_manager,
-                               entity,
-                               m_editor_layer->getSelectedEntity(),
-                               rendered_entities);
+                drawEntityNode(
+                    *m_editor_layer, entity_manager, entity, m_editor_layer->getSelectedEntity(), rendered_entities);
             }
         }
     }
@@ -274,7 +272,8 @@ void SceneHierarchyPanel::onImGuiRender()
             }
 
             luna::editor::AssetDragDropData asset_payload{};
-            if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh, luna::AssetType::Model})) {
+            if (luna::editor::acceptAssetDragDropPayload(asset_payload,
+                                                         {luna::AssetType::Mesh, luna::AssetType::Model})) {
                 if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Mesh) {
                     m_editor_layer->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
                 } else if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Model) {

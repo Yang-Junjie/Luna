@@ -46,9 +46,11 @@ struct TransformComponent {
     glm::vec3 scale{1.0f, 1.0f, 1.0f};
 
     TransformComponent() = default;
+
     explicit TransformComponent(const glm::vec3& translation)
         : translation(translation)
     {}
+
     TransformComponent(const TransformComponent&) = default;
 
     void setTransform(const glm::mat4& transform)
@@ -59,12 +61,7 @@ struct TransformComponent {
         glm::vec3 decomposed_scale{};
         glm::vec3 decomposed_translation{};
 
-        if (!glm::decompose(transform,
-                            decomposed_scale,
-                            orientation,
-                            decomposed_translation,
-                            skew,
-                            perspective)) {
+        if (!glm::decompose(transform, decomposed_scale, orientation, decomposed_translation, skew, perspective)) {
             return;
         }
 
@@ -146,6 +143,7 @@ struct RelationshipComponent {
 
     RelationshipComponent() = default;
     RelationshipComponent(const RelationshipComponent&) = default;
+
     explicit RelationshipComponent(UUID parent)
         : parentHandle(parent)
     {}

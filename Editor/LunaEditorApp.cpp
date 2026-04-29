@@ -2,10 +2,10 @@
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 
-#include <Capabilities.h>
-
 #include <cctype>
+
 #include <algorithm>
+#include <Capabilities.h>
 #include <memory>
 #include <optional>
 #include <string_view>

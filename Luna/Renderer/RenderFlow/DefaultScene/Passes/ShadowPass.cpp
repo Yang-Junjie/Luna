@@ -1,24 +1,22 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
-
 #include "Core/Log.h"
 #include "Math/Math.h"
 #include "Renderer/Material.h"
-#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
 
+#include <array>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
-
-#include <array>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -64,14 +62,13 @@ glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
     return length_squared > 1.0e-6f ? glm::normalize(value) : fallback;
 }
 
-render_flow::default_scene_detail::ShadowRenderParams
-    buildDirectionalShadowParams(const RenderWorld* world, const SceneRenderContext& context, const DrawQueue& draw_queue)
+render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowParams(const RenderWorld* world,
+                                                                                   const SceneRenderContext& context,
+                                                                                   const DrawQueue& draw_queue)
 {
     render_flow::default_scene_detail::ShadowRenderParams params{};
-    params.params = glm::vec4(0.0f,
-                              0.0018f,
-                              0.0f,
-                              1.0f / static_cast<float>(render_flow::default_scene_detail::kShadowMapSize));
+    params.params =
+        glm::vec4(0.0f, 0.0018f, 0.0f, 1.0f / static_cast<float>(render_flow::default_scene_detail::kShadowMapSize));
     if (!world || world->directionalLights().empty() ||
         draw_queue.drawCommands(luna::RenderPhase::ShadowCaster).empty()) {
         return params;
@@ -105,7 +102,9 @@ render_flow::default_scene_detail::ShadowRenderParams
 
 } // namespace
 
-ShadowDepthPass::ShadowDepthPass(PassSharedState& state) : m_state(&state) {}
+ShadowDepthPass::ShadowDepthPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* ShadowDepthPass::name() const noexcept
 {
@@ -161,20 +160,22 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
     }
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, shadow_draw_commands, default_material, AssetCache::Bindings{
-        .device = pipelines.device(),
-        .descriptor_pool = pipelines.descriptorPool(),
-        .material_layout = pipelines.materialLayout(),
-    });
+    assets.prepareDraws(commands,
+                        shadow_draw_commands,
+                        default_material,
+                        AssetCache::Bindings{
+                            .device = pipelines.device(),
+                            .descriptor_pool = pipelines.descriptorPool(),
+                            .material_layout = pipelines.materialLayout(),
+                        });
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
     const size_t recorded_draw_count =
         recordShadowDrawCommands(commands, pass_resources, shadow_draw_commands, assets, default_material);
-    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} draw command(s)",
-                              recorded_draw_count,
-                              shadow_draw_commands.size());
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Scene shadow pass recorded {}/{} draw command(s)", recorded_draw_count, shadow_draw_commands.size());
     pass_context.endRendering();
 }
 

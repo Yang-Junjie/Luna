@@ -5,16 +5,16 @@
 #include "Project/ProjectManager.h"
 #include "Renderer/Material.h"
 #include "TextureLoader.h"
+#include "yaml-cpp/yaml.h"
+
+#include <cctype>
 
 #include <algorithm>
 #include <charconv>
-#include <cctype>
 #include <fstream>
 #include <map>
 #include <memory>
 #include <string>
-
-#include "yaml-cpp/yaml.h"
 
 #if defined(_MSC_VER)
 #define TINYOBJLOADER_DISABLE_FAST_FLOAT
@@ -57,9 +57,9 @@ inline glm::vec4 readVec4(const YAML::Node& node, const glm::vec4& default_value
 }
 
 inline std::shared_ptr<Texture> loadTextureRelative(const std::filesystem::path& base_dir,
-                                                         const YAML::Node& textures_node,
-                                                         const char* key,
-                                                         const std::string& debug_name)
+                                                    const YAML::Node& textures_node,
+                                                    const char* key,
+                                                    const std::string& debug_name)
 {
     if (!textures_node || !textures_node[key]) {
         return {};
@@ -106,26 +106,23 @@ inline std::shared_ptr<Material> loadFromYaml(const std::filesystem::path& path,
     }
 
     Material::TextureSet textures;
-    textures.BaseColor =
-        loadTextureRelative(path.parent_path(), textures_node, "BaseColor", asset_name + "_BaseColor");
+    textures.BaseColor = loadTextureRelative(path.parent_path(), textures_node, "BaseColor", asset_name + "_BaseColor");
     textures.Normal = loadTextureRelative(path.parent_path(), textures_node, "Normal", asset_name + "_Normal");
     textures.MetallicRoughness =
         loadTextureRelative(path.parent_path(), textures_node, "MetallicRoughness", asset_name + "_MetallicRoughness");
-    textures.Emissive =
-        loadTextureRelative(path.parent_path(), textures_node, "Emissive", asset_name + "_Emissive");
-    textures.Occlusion =
-        loadTextureRelative(path.parent_path(), textures_node, "Occlusion", asset_name + "_Occlusion");
+    textures.Emissive = loadTextureRelative(path.parent_path(), textures_node, "Emissive", asset_name + "_Emissive");
+    textures.Occlusion = loadTextureRelative(path.parent_path(), textures_node, "Occlusion", asset_name + "_Occlusion");
 
     Material::SurfaceProperties surface;
     surface.BaseColorFactor = readVec4(surface_node["BaseColorFactor"], surface.BaseColorFactor);
     surface.EmissiveFactor = readVec3(surface_node["EmissiveFactor"], surface.EmissiveFactor);
-    surface.MetallicFactor = surface_node["MetallicFactor"] ? surface_node["MetallicFactor"].as<float>()
-                                                            : surface.MetallicFactor;
-    surface.RoughnessFactor = surface_node["RoughnessFactor"] ? surface_node["RoughnessFactor"].as<float>()
-                                                              : surface.RoughnessFactor;
+    surface.MetallicFactor =
+        surface_node["MetallicFactor"] ? surface_node["MetallicFactor"].as<float>() : surface.MetallicFactor;
+    surface.RoughnessFactor =
+        surface_node["RoughnessFactor"] ? surface_node["RoughnessFactor"].as<float>() : surface.RoughnessFactor;
     surface.NormalScale = surface_node["NormalScale"] ? surface_node["NormalScale"].as<float>() : surface.NormalScale;
-    surface.OcclusionStrength = surface_node["OcclusionStrength"] ? surface_node["OcclusionStrength"].as<float>()
-                                                                  : surface.OcclusionStrength;
+    surface.OcclusionStrength =
+        surface_node["OcclusionStrength"] ? surface_node["OcclusionStrength"].as<float>() : surface.OcclusionStrength;
     surface.AlphaCutoff = surface_node["AlphaCutoff"] ? surface_node["AlphaCutoff"].as<float>() : surface.AlphaCutoff;
     surface.DoubleSided = surface_node["DoubleSided"] ? surface_node["DoubleSided"].as<bool>() : surface.DoubleSided;
     surface.Unlit = surface_node["Unlit"] ? surface_node["Unlit"].as<bool>() : surface.Unlit;
@@ -175,16 +172,17 @@ inline std::shared_ptr<Material> loadFromMtl(const std::filesystem::path& path, 
             return {};
         }
 
-        return TextureLoader::loadFromFile((path.parent_path() / relative_path).lexically_normal(), asset_name + suffix);
+        return TextureLoader::loadFromFile((path.parent_path() / relative_path).lexically_normal(),
+                                           asset_name + suffix);
     };
 
     Material::TextureSet textures;
     textures.BaseColor = load_texture(selected_material->diffuse_texname, "_BaseColor");
     textures.Normal = load_texture(selected_material->normal_texname, "_Normal");
-    textures.MetallicRoughness = load_texture(
-        !selected_material->roughness_texname.empty() ? selected_material->roughness_texname
-                                                      : selected_material->metallic_texname,
-        "_MetallicRoughness");
+    textures.MetallicRoughness =
+        load_texture(!selected_material->roughness_texname.empty() ? selected_material->roughness_texname
+                                                                   : selected_material->metallic_texname,
+                     "_MetallicRoughness");
     textures.Emissive = load_texture(selected_material->emissive_texname, "_Emissive");
     textures.Occlusion = load_texture(selected_material->ambient_texname, "_Occlusion");
 
@@ -193,9 +191,8 @@ inline std::shared_ptr<Material> loadFromMtl(const std::filesystem::path& path, 
                                         selected_material->diffuse[1],
                                         selected_material->diffuse[2],
                                         selected_material->dissolve);
-    surface.EmissiveFactor = glm::vec3(selected_material->emission[0],
-                                       selected_material->emission[1],
-                                       selected_material->emission[2]);
+    surface.EmissiveFactor =
+        glm::vec3(selected_material->emission[0], selected_material->emission[1], selected_material->emission[2]);
     surface.MetallicFactor = selected_material->metallic;
     surface.RoughnessFactor = selected_material->roughness > 0.0f ? selected_material->roughness : 1.0f;
     surface.BlendModeValue =

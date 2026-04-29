@@ -1,5 +1,4 @@
 #include "BackendCapabilitiesPanel.h"
-
 #include "Renderer/RendererUtilities.h"
 
 #include <imgui.h>
@@ -68,7 +67,8 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     }
 
     ImGui::Spacing();
-    if (ImGui::BeginTable("BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
+    if (ImGui::BeginTable(
+            "BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 170.0f);
         ImGui::TableHeadersRow();

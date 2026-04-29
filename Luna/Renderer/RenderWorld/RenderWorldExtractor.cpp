@@ -1,9 +1,8 @@
-﻿#include "Renderer/RenderWorld/RenderWorldExtractor.h"
-
-#include "Asset/AssetManager.h"
+﻿#include "Asset/AssetManager.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
+#include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene/Entity.h"
 
 #include <algorithm>
@@ -14,11 +13,10 @@ namespace luna {
 
 namespace {
 
-std::vector<std::shared_ptr<Material>>
-    resolveSubmeshMaterials(const MeshComponent& mesh_component,
-                            const Mesh& mesh,
-                            AssetManager& asset_manager,
-                            Scene::AssetLoadBehavior asset_load_behavior)
+std::vector<std::shared_ptr<Material>> resolveSubmeshMaterials(const MeshComponent& mesh_component,
+                                                               const Mesh& mesh,
+                                                               AssetManager& asset_manager,
+                                                               Scene::AssetLoadBehavior asset_load_behavior)
 {
     const auto& sub_meshes = mesh.getSubMeshes();
     std::vector<std::shared_ptr<Material>> submesh_materials(sub_meshes.size());
@@ -166,7 +164,3 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
 }
 
 } // namespace luna
-
-
-
-

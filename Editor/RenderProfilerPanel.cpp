@@ -1,11 +1,9 @@
+#include "Renderer/RenderProfileExporter.h"
 #include "RenderProfilerPanel.h"
 
-#include "Renderer/RenderProfileExporter.h"
-
 #include <algorithm>
-#include <string_view>
-
 #include <imgui.h>
+#include <string_view>
 
 namespace luna {
 namespace {
@@ -38,7 +36,7 @@ void appendHistory(std::vector<RenderGraphProfileSnapshot>& history, const Rende
 
 size_t averageBeginIndex(size_t history_size, int average_frames)
 {
-    const size_t frame_count = static_cast<size_t>((std::max) (average_frames, 1));
+    const size_t frame_count = static_cast<size_t>((std::max)(average_frames, 1));
     return history_size > frame_count ? history_size - frame_count : 0;
 }
 
@@ -94,9 +92,10 @@ double averagePassCpuMs(std::string_view pass_name,
     const size_t begin_index = averageBeginIndex(history.size(), average_frames);
     for (size_t snapshot_index = begin_index; snapshot_index < history.size(); ++snapshot_index) {
         const auto& snapshot = history[snapshot_index];
-        const auto pass_it = std::find_if(snapshot.Passes.begin(), snapshot.Passes.end(), [pass_name](const auto& pass) {
-            return pass.Name == pass_name;
-        });
+        const auto pass_it =
+            std::find_if(snapshot.Passes.begin(), snapshot.Passes.end(), [pass_name](const auto& pass) {
+                return pass.Name == pass_name;
+            });
         if (pass_it == snapshot.Passes.end()) {
             continue;
         }
@@ -121,9 +120,10 @@ double averagePassGpuMs(std::string_view pass_name,
     const size_t begin_index = averageBeginIndex(history.size(), average_frames);
     for (size_t snapshot_index = begin_index; snapshot_index < history.size(); ++snapshot_index) {
         const auto& snapshot = history[snapshot_index];
-        const auto pass_it = std::find_if(snapshot.Passes.begin(), snapshot.Passes.end(), [pass_name](const auto& pass) {
-            return pass.Name == pass_name;
-        });
+        const auto pass_it =
+            std::find_if(snapshot.Passes.begin(), snapshot.Passes.end(), [pass_name](const auto& pass) {
+                return pass.Name == pass_name;
+            });
         if (pass_it == snapshot.Passes.end() || !pass_it->HasGpuTime) {
             continue;
         }
@@ -274,8 +274,8 @@ void RenderProfilerPanel::onImGuiRender(bool& open,
         });
     }
 
-    constexpr ImGuiTableFlags table_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                                            ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
+    constexpr ImGuiTableFlags table_flags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
     if (ImGui::BeginTable("##RenderGraphPassProfile", 13, table_flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 0.35f);
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 72.0f);
@@ -299,8 +299,7 @@ void RenderProfilerPanel::onImGuiRender(bool& open,
             const float pass_percent = passCpuPercent(pass.CpuTimeMs, profile.TotalCpuTimeMs);
             const double pass_average_gpu_ms =
                 !m_history.empty() ? averagePassGpuMs(pass.Name, m_history, m_average_frames) : pass.GpuTimeMs;
-            const float gpu_percent =
-                pass.HasGpuTime ? passGpuPercent(pass.GpuTimeMs, profile.TotalGpuTimeMs) : 0.0f;
+            const float gpu_percent = pass.HasGpuTime ? passGpuPercent(pass.GpuTimeMs, profile.TotalGpuTimeMs) : 0.0f;
 
             ImGui::TableNextRow();
             const float hot_percent = pass.HasGpuTime ? gpu_percent : pass_percent;

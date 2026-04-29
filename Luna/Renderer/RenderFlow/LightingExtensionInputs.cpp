@@ -1,5 +1,4 @@
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
-
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderResourceKey.h"
 #include "Renderer/RenderGraphBuilder.h"
@@ -39,8 +38,8 @@ constexpr RenderResourceKey<RenderGraphTextureHandle> inputKey(LightingExtension
     return {"Scene.LightingExtension.Invalid"};
 }
 
-[[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>&
-    optionalTexture(RenderGraphRasterPassContext& pass_context, RenderGraphTextureHandle handle)
+[[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& optionalTexture(RenderGraphRasterPassContext& pass_context,
+                                                                        RenderGraphTextureHandle handle)
 {
     return handle.isValid() ? pass_context.getTexture(handle) : pass_context.getTexture(RenderGraphTextureHandle{});
 }

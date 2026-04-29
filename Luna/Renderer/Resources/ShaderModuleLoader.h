@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Core.h>
-
 #include <filesystem>
 #include <string_view>
 

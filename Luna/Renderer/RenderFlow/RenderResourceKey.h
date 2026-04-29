@@ -4,8 +4,7 @@
 
 namespace luna::render_flow {
 
-template <typename ResourceT>
-struct RenderResourceKey {
+template <typename ResourceT> struct RenderResourceKey {
     using ValueType = ResourceT;
 
     std::string_view name;

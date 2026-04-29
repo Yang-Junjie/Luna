@@ -19,6 +19,7 @@ public:
                         uint32_t frameIndex) = 0;
     virtual void Submit(const Ref<CommandBufferEncoder>& cmd) = 0;
     virtual void WaitIdle() = 0;
+
     virtual double GetTimestampPeriodNs() const
     {
         return 0.0;

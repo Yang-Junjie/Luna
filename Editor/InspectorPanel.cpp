@@ -1,17 +1,17 @@
-#include "InspectorPanel.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "EditorAssetDragDrop.h"
+#include "InspectorPanel.h"
 #include "LunaEditorLayer.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 
+#include <cstring>
+
 #include <algorithm>
 #include <array>
-#include <cstring>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <string>
@@ -113,8 +113,8 @@ std::string getAssetDisplayLabel(luna::AssetHandle handle)
 }
 
 bool drawAssetHandleEditor(const char* label,
-                          luna::AssetHandle& handle,
-                          std::initializer_list<luna::AssetType> accepted_types = {})
+                           luna::AssetHandle& handle,
+                           std::initializer_list<luna::AssetType> accepted_types = {})
 {
     bool changed = false;
     unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
@@ -262,7 +262,9 @@ void InspectorPanel::onImGuiRender()
     ImGui::Separator();
 
     drawComponentSection<TransformComponent>(
-        "Transform", selected_entity, [&](TransformComponent& transform) {
+        "Transform",
+        selected_entity,
+        [&](TransformComponent& transform) {
             drawVec3Control("Translation", transform.translation, 0.0f);
 
             glm::vec3 rotation_degrees = glm::degrees(transform.rotation);
@@ -275,7 +277,9 @@ void InspectorPanel::onImGuiRender()
         false);
 
     drawComponentSection<RelationshipComponent>(
-        "Relationship", selected_entity, [&](RelationshipComponent&) {
+        "Relationship",
+        selected_entity,
+        [&](RelationshipComponent&) {
             Entity parent = selected_entity.getParent();
             if (parent) {
                 if (ImGui::Button(parent.getName().c_str(), ImVec2(-1.0f, 0.0f))) {
@@ -310,7 +314,9 @@ void InspectorPanel::onImGuiRender()
         false);
 
     drawComponentSection<CameraComponent>(
-        "Camera", selected_entity, [&](CameraComponent& camera_component) {
+        "Camera",
+        selected_entity,
+        [&](CameraComponent& camera_component) {
             ImGui::Checkbox("Primary", &camera_component.primary);
             ImGui::Checkbox("Fixed Aspect Ratio", &camera_component.fixedAspectRatio);
 
@@ -345,7 +351,9 @@ void InspectorPanel::onImGuiRender()
         true);
 
     drawComponentSection<LightComponent>(
-        "Light", selected_entity, [](LightComponent& light_component) {
+        "Light",
+        selected_entity,
+        [](LightComponent& light_component) {
             ImGui::Checkbox("Enabled", &light_component.enabled);
 
             const char* type_label = "Directional";
@@ -369,12 +377,13 @@ void InspectorPanel::onImGuiRender()
 
             ImGui::ColorEdit3("Color", &light_component.color.x);
             ImGui::DragFloat("Intensity", &light_component.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
-            if (light_component.type == LightComponent::Type::Point || light_component.type == LightComponent::Type::Spot) {
+            if (light_component.type == LightComponent::Type::Point ||
+                light_component.type == LightComponent::Type::Spot) {
                 ImGui::DragFloat("Range", &light_component.range, 0.1f, 0.001f, 1000.0f, "%.2f");
             }
             if (light_component.type == LightComponent::Type::Spot) {
-                glm::vec2 cone_angles = glm::degrees(glm::vec2(light_component.innerConeAngleRadians,
-                                                               light_component.outerConeAngleRadians));
+                glm::vec2 cone_angles = glm::degrees(
+                    glm::vec2(light_component.innerConeAngleRadians, light_component.outerConeAngleRadians));
                 if (ImGui::DragFloat2("Cone Angles", &cone_angles.x, 0.5f, 0.1f, 89.0f, "%.1f")) {
                     cone_angles.x = (std::clamp)(cone_angles.x, 0.1f, 89.0f);
                     cone_angles.y = (std::clamp)(cone_angles.y, cone_angles.x, 89.0f);
@@ -393,11 +402,13 @@ void InspectorPanel::onImGuiRender()
         true);
 
     drawComponentSection<MeshComponent>(
-        "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
+        "Mesh",
+        selected_entity,
+        [&](MeshComponent& mesh_component) {
             const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
             const std::string current_builtin_label = BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle)
-                                                        ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
-                                                        : "None";
+                                                          ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
+                                                          : "None";
             if (ImGui::BeginCombo("Primitive", current_builtin_label.c_str())) {
                 if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle))) {
                     mesh_component.meshHandle = AssetHandle(0);
@@ -435,7 +446,8 @@ void InspectorPanel::onImGuiRender()
                     mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
                 }
             } else {
-                if (mesh_component.meshHandle.isValid() && AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
+                if (mesh_component.meshHandle.isValid() &&
+                    AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
                     ImGui::TextDisabled("Mesh asset is loading...");
                 }
                 int slot_count = static_cast<int>(mesh_component.getSubmeshMaterialCount());
@@ -456,9 +468,10 @@ void InspectorPanel::onImGuiRender()
                     ImGui::Text("Submesh %u", submesh_index);
 
                     AssetHandle material_handle = mesh_component.getSubmeshMaterial(submesh_index);
-                    const std::string current_builtin_material_label = BuiltinAssets::isBuiltinMaterial(material_handle)
-                                                                     ? BuiltinAssets::getDisplayName(material_handle)
-                                                                     : "None";
+                    const std::string current_builtin_material_label =
+                        BuiltinAssets::isBuiltinMaterial(material_handle)
+                            ? BuiltinAssets::getDisplayName(material_handle)
+                            : "None";
                     if (ImGui::BeginCombo("Builtin Material", current_builtin_material_label.c_str())) {
                         if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMaterial(material_handle))) {
                             material_handle = AssetHandle(0);

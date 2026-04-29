@@ -1,15 +1,15 @@
-#include "LunaRuntime.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "LunaRuntime.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <filesystem>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
@@ -269,9 +269,8 @@ bool LunaRuntimeApplication::loadStartupScene()
     }
 
     m_scene_file_path = start_scene_path;
-    LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
-                      m_scene_file_path.string(),
-                      m_scene.entityManager().entityCount());
+    LUNA_RUNTIME_INFO(
+        "Loaded StartScene '{}' with {} entities", m_scene_file_path.string(), m_scene.entityManager().entityCount());
     return true;
 }
 

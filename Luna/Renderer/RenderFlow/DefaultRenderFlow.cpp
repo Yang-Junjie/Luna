@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/DefaultRenderFlow.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/DefaultRenderFlow.h"
 #include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderFlow/Features/RenderFeatureModules.h"
 #include "Renderer/RenderFlow/RenderFeatureGraphContract.h"
@@ -8,7 +8,6 @@
 #include "Renderer/RenderFlow/RenderFeatureSupport.h"
 #include "Renderer/RenderFlow/RenderPassGraphContract.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
 #include <span>
@@ -77,9 +76,8 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
     }
 
     if (!feature->registerPasses(m_builder)) {
-        LUNA_RENDERER_ERROR("Default render flow feature '{}' registration failed: {}",
-                            contract.name,
-                            m_builder.lastError());
+        LUNA_RENDERER_ERROR(
+            "Default render flow feature '{}' registration failed: {}", contract.name, m_builder.lastError());
         return false;
     }
 
@@ -98,8 +96,9 @@ bool DefaultRenderFlow::addFeature(std::unique_ptr<render_flow::IRenderFeature> 
     runtime_state.pass_contract_valid = true;
     runtime_state.pass_contract_summary = "not evaluated";
     if (runtime_state.owned_passes.empty()) {
-        LUNA_RENDERER_WARN("Default render flow feature '{}' registered no owned passes; use RenderFlowBuilder feature pass APIs",
-                           contract.name);
+        LUNA_RENDERER_WARN(
+            "Default render flow feature '{}' registered no owned passes; use RenderFlowBuilder feature pass APIs",
+            contract.name);
     }
 
     LUNA_RENDERER_INFO("Registered default render flow feature '{}'", contract.name);
@@ -149,8 +148,7 @@ DefaultRenderFlow::FeatureRuntimeState* DefaultRenderFlow::findFeatureRuntimeSta
     return state != m_feature_runtime_states.end() ? &state->second : nullptr;
 }
 
-const DefaultRenderFlow::FeatureRuntimeState*
-    DefaultRenderFlow::findFeatureRuntimeState(std::string_view name) const
+const DefaultRenderFlow::FeatureRuntimeState* DefaultRenderFlow::findFeatureRuntimeState(std::string_view name) const
 {
     const auto state = m_feature_runtime_states.find(std::string(name));
     return state != m_feature_runtime_states.end() ? &state->second : nullptr;
@@ -333,9 +331,10 @@ bool DefaultRenderFlow::setFeatureParameter(std::string_view feature_name,
         }
 
         const auto parameters = feature->parameters();
-        const auto parameter_it = std::find_if(parameters.begin(), parameters.end(), [parameter_name](const auto& parameter) {
-            return parameter.name == parameter_name;
-        });
+        const auto parameter_it =
+            std::find_if(parameters.begin(), parameters.end(), [parameter_name](const auto& parameter) {
+                return parameter.name == parameter_name;
+            });
         if (parameter_it == parameters.end()) {
             LUNA_RENDERER_WARN("Render feature '{}' has no parameter '{}'", feature_name, parameter_name);
             return false;
@@ -345,9 +344,8 @@ bool DefaultRenderFlow::setFeatureParameter(std::string_view feature_name,
             return false;
         }
         if (parameter_it->type != value.type) {
-            LUNA_RENDERER_WARN("Render feature parameter '{}.{}' received a mismatched value type",
-                               feature_name,
-                               parameter_name);
+            LUNA_RENDERER_WARN(
+                "Render feature parameter '{}.{}' received a mismatched value type", feature_name, parameter_name);
             return false;
         }
 
@@ -399,14 +397,13 @@ void DefaultRenderFlow::validateFeatureGraphContracts()
             continue;
         }
 
-        const bool had_previous = state->graph_contract_summary != "not evaluated" &&
-                                  state->graph_contract_summary != "inactive";
+        const bool had_previous =
+            state->graph_contract_summary != "not evaluated" && state->graph_contract_summary != "inactive";
         state->graph_contract_valid = result.valid;
         state->graph_contract_summary = result.summary;
         if (!result.valid) {
-            LUNA_RENDERER_WARN("Render feature '{}' graph contract diagnostics: {}",
-                               result.feature_name,
-                               result.summary);
+            LUNA_RENDERER_WARN(
+                "Render feature '{}' graph contract diagnostics: {}", result.feature_name, result.summary);
         } else if (had_previous) {
             LUNA_RENDERER_INFO("Render feature '{}' graph contract diagnostics are clear", result.feature_name);
         }
@@ -462,14 +459,13 @@ void DefaultRenderFlow::validatePassGraphContracts()
             continue;
         }
 
-        const bool had_previous = state->pass_contract_summary != "not evaluated" &&
-                                  state->pass_contract_summary != "inactive";
+        const bool had_previous =
+            state->pass_contract_summary != "not evaluated" && state->pass_contract_summary != "inactive";
         state->pass_contract_valid = result.valid;
         state->pass_contract_summary = result.summary;
         if (!result.valid) {
-            LUNA_RENDERER_WARN("Render feature '{}' pass contract diagnostics: {}",
-                               result.feature_name,
-                               result.summary);
+            LUNA_RENDERER_WARN(
+                "Render feature '{}' pass contract diagnostics: {}", result.feature_name, result.summary);
         } else if (had_previous) {
             LUNA_RENDERER_INFO("Render feature '{}' pass contract diagnostics are clear", result.feature_name);
         }
@@ -488,12 +484,13 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
     }
 
     if (!scene_context.isValid()) {
-        LUNA_RENDERER_WARN("Scene render graph build skipped because context is invalid: device={} color={} depth={} size={}x{}",
-                           static_cast<bool>(scene_context.device),
-                           scene_context.color_target.isValid(),
-                           scene_context.depth_target.isValid(),
-                           scene_context.framebuffer_width,
-                           scene_context.framebuffer_height);
+        LUNA_RENDERER_WARN(
+            "Scene render graph build skipped because context is invalid: device={} color={} depth={} size={}x{}",
+            static_cast<bool>(scene_context.device),
+            scene_context.color_target.isValid(),
+            scene_context.depth_target.isValid(),
+            scene_context.framebuffer_width,
+            scene_context.framebuffer_height);
         return;
     }
 

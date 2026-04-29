@@ -1,10 +1,8 @@
-#include "AssetLoadingPanel.h"
-
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
+#include "AssetLoadingPanel.h"
 
 #include <algorithm>
-
 #include <imgui.h>
 
 namespace luna {
@@ -49,7 +47,8 @@ void AssetLoadingPanel::onImGuiRender()
             ImGui::TextUnformatted(name);
 
             ImGui::TableNextColumn();
-            const std::string display_path = info.FilePath.empty() ? std::string("Unknown Path") : info.FilePath.generic_string();
+            const std::string display_path =
+                info.FilePath.empty() ? std::string("Unknown Path") : info.FilePath.generic_string();
             ImGui::TextUnformatted(display_path.c_str());
 
             ImGui::TableNextColumn();

@@ -52,6 +52,7 @@ public:
     }
 
     [[nodiscard]] float prefilteredMaxMipLevel() const noexcept;
+
     [[nodiscard]] bool hasPrecomputedIbl() const noexcept
     {
         return m_precomputed;
@@ -103,8 +104,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

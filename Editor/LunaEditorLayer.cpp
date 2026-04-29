@@ -20,8 +20,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <glm/gtc/type_ptr.hpp>
-#include <ImGuizmo.h>
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -238,7 +238,7 @@ void LunaEditorLayer::onImGuiRender()
     auto& application = *m_application;
     auto& renderer = application.getRenderer();
     const float delta_seconds = Application::get().getTimestep().getSeconds();
-    const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
+    const float fps = 1.0f / (std::max)(delta_seconds, 0.0001f);
 
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene");
@@ -254,7 +254,9 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Viewport Mode: %s", m_runtime_viewport_enabled ? "Runtime" : "Editor");
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
-    ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
+    ImGui::Text("Gizmo: %s / %s",
+                gizmoOperationToString(m_gizmo_operation),
+                m_gizmo_mode == GizmoMode::World ? "World" : "Local");
     ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();
@@ -271,20 +273,20 @@ void LunaEditorLayer::onImGuiRender()
     m_content_browser_panel.onImGuiRender();
     m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer);
     if (m_show_render_features_panel) {
-        m_render_features_panel.onImGuiRender(m_show_render_features_panel,
-                                              renderer.getDefaultRenderFeatureInfos(),
-                                              [&renderer](std::string_view feature_name) {
-                                                  return renderer.getDefaultRenderFeatureParameters(feature_name);
-                                              },
-                                              [&renderer](std::string_view feature_name, bool enabled) {
-                                                  return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
-                                              },
-                                              [&renderer](std::string_view feature_name,
-                                                          std::string_view parameter_name,
-                                                          const render_flow::RenderFeatureParameterValue& value) {
-                                                  return renderer.setDefaultRenderFeatureParameter(
-                                                      feature_name, parameter_name, value);
-                                              });
+        m_render_features_panel.onImGuiRender(
+            m_show_render_features_panel,
+            renderer.getDefaultRenderFeatureInfos(),
+            [&renderer](std::string_view feature_name) {
+                return renderer.getDefaultRenderFeatureParameters(feature_name);
+            },
+            [&renderer](std::string_view feature_name, bool enabled) {
+                return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
+            },
+            [&renderer](std::string_view feature_name,
+                        std::string_view parameter_name,
+                        const render_flow::RenderFeatureParameterValue& value) {
+                return renderer.setDefaultRenderFeatureParameter(feature_name, parameter_name, value);
+            });
     }
     m_render_profiler_panel.onImGuiRender(m_show_render_profiler_panel,
                                           renderer.getLastRenderGraphProfile(),
@@ -395,8 +397,8 @@ void LunaEditorLayer::drawViewport()
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const float dpi_scale = ImGui::GetWindowViewport() != nullptr ? ImGui::GetWindowViewport()->DpiScale : 1.0f;
-    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * dpi_scale, 0.0f));
-    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * dpi_scale, 0.0f));
+    const uint32_t viewport_width = static_cast<uint32_t>((std::max)(available.x * dpi_scale, 0.0f));
+    const uint32_t viewport_height = static_cast<uint32_t>((std::max)(available.y * dpi_scale, 0.0f));
     renderer.setSceneOutputSize(viewport_width, viewport_height);
     m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
 
@@ -413,13 +415,13 @@ void LunaEditorLayer::drawViewport()
         const bool gizmo_active = !m_runtime_viewport_enabled && drawViewportGizmo(viewport_min, viewport_size);
         if (!gizmo_active) {
             if (!m_runtime_viewport_enabled) {
-                requestViewportPick(
-                    ImGui::GetItemRectMin(),
-                    ImGui::GetItemRectMax(),
-                    uv0,
-                    uv1,
-                    scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
-                                  : luna::RHI::Extent2D{0, 0});
+                requestViewportPick(ImGui::GetItemRectMin(),
+                                    ImGui::GetItemRectMax(),
+                                    uv0,
+                                    uv1,
+                                    scene_texture
+                                        ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
+                                        : luna::RHI::Extent2D{0, 0});
             }
         }
     } else if (available.x > 0.0f && available.y > 0.0f) {
@@ -433,8 +435,8 @@ void LunaEditorLayer::drawViewport()
 
 void LunaEditorLayer::updateGizmoShortcuts()
 {
-    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput || !m_selected_entity ||
-        !m_selected_entity.isValid()) {
+    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput ||
+        !m_selected_entity || !m_selected_entity.isValid()) {
         return;
     }
 
@@ -473,9 +475,10 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(viewport_min.x, viewport_min.y, viewport_size.x, viewport_size.y);
-    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7fffffff));
+    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7f'ff'ff'ff));
 
-    const ImGuizmo::MODE mode = m_gizmo_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_gizmo_mode);
+    const ImGuizmo::MODE mode =
+        m_gizmo_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_gizmo_mode);
     ImGuizmo::Manipulate(glm::value_ptr(view),
                          glm::value_ptr(projection),
                          toImGuizmoOperation(m_gizmo_operation),
@@ -557,7 +560,7 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const float texture_v = std::clamp(uv0.y + (uv1.y - uv0.y) * local_y, 0.0f, 0.999999f);
 
     const uint32_t pixel_x = static_cast<uint32_t>(texture_u * static_cast<float>(texture_extent.width));
-    const uint32_t color_pixel_y = (std::min) (
+    const uint32_t color_pixel_y = (std::min)(
         static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
 
     // The final scene color is produced by a fullscreen lighting pass before ImGui samples it.
@@ -567,7 +570,7 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const uint32_t pick_pixel_y =
         pick_y_matches_display_y ? color_pixel_y : (texture_extent.height - 1) - color_pixel_y;
 
-    m_application->getRenderer().requestScenePick((std::min) (pixel_x, texture_extent.width - 1), pick_pixel_y);
+    m_application->getRenderer().requestScenePick((std::min)(pixel_x, texture_extent.width - 1), pick_pixel_y);
 }
 
 const std::string& LunaEditorLayer::getAssetLabel() const
@@ -753,8 +756,8 @@ Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 {
     auto& entity_manager = m_scene.entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Point Light")
-                           : entity_manager.createEntity("Point Light");
+    Entity entity =
+        parent ? entity_manager.createChildEntity(parent, "Point Light") : entity_manager.createEntity("Point Light");
     if (!entity) {
         return {};
     }
@@ -775,8 +778,8 @@ Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
 {
     auto& entity_manager = m_scene.entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Spot Light")
-                           : entity_manager.createEntity("Spot Light");
+    Entity entity =
+        parent ? entity_manager.createChildEntity(parent, "Spot Light") : entity_manager.createEntity("Spot Light");
     if (!entity) {
         return {};
     }

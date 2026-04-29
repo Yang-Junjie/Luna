@@ -1,7 +1,6 @@
-#include "Renderer/RenderViewState.h"
-
 #include "Math/Math.h"
 #include "Renderer/Camera.h"
+#include "Renderer/RenderViewState.h"
 
 #include <glm/matrix.hpp>
 
@@ -69,8 +68,8 @@ RenderViewMatrices buildViewMatrices(const Camera& camera,
 
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
-                                                         capabilities.conventions);
+    matrices.projection =
+        adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio), capabilities.conventions);
     matrices.projection = applyProjectionJitter(matrices.projection, jitter_ndc);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);

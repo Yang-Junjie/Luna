@@ -289,8 +289,7 @@ public:
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision =
-            m_resource_set.prepareGpuResourceBuild(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision = m_resource_set.prepareGpuResourceBuild(context, isComplete());
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -337,20 +336,18 @@ public:
     [[nodiscard]] bool ensureAmbientOcclusion(const SceneRenderContext& context)
     {
         m_ambient_occlusion_evaluated = true;
-        return m_resource_set.ensurePersistentTexture2D(m_ambient_occlusion,
-                                                        context,
-                                                        makeAmbientOcclusionPersistentDesc(context));
+        return m_resource_set.ensurePersistentTexture2D(
+            m_ambient_occlusion, context, makeAmbientOcclusionPersistentDesc(context));
     }
 
     [[nodiscard]] RenderGraphTextureHandle importAmbientOcclusion(RenderGraphBuilder& graph)
     {
-        return m_resource_set.importPersistentTexture2D(
-            graph,
-            m_ambient_occlusion,
-            RenderFeatureTextureImportOptions{
-                .name = "ScreenSpaceAmbientOcclusion",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
-            });
+        return m_resource_set.importPersistentTexture2D(graph,
+                                                        m_ambient_occlusion,
+                                                        RenderFeatureTextureImportOptions{
+                                                            .name = "ScreenSpaceAmbientOcclusion",
+                                                            .final_state = luna::RHI::ResourceState::ShaderRead,
+                                                        });
     }
 
     [[nodiscard]] bool isComplete() const noexcept
@@ -634,21 +631,22 @@ RenderFeatureContract ScreenSpaceAmbientOcclusionFeature::contract() const noexc
         .display_name = "Screen Space Ambient Occlusion",
         .category = "Lighting",
         .runtime_toggleable = true,
-        .requirements = RenderFeatureRequirements{
-            .scene_inputs = RenderFeatureSceneInputFlags::Depth |
-                            RenderFeatureSceneInputFlags::GBufferNormalMetallic |
-                            RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
-                         RenderFeatureResourceFlags::Sampler,
-            .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = true,
-            .uses_history_resources = false,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .scene_inputs = RenderFeatureSceneInputFlags::Depth |
+                                RenderFeatureSceneInputFlags::GBufferNormalMetallic |
+                                RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                             RenderFeatureResourceFlags::Sampler,
+                .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = true,
+                .uses_history_resources = false,
+            },
     };
 }
 

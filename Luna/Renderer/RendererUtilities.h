@@ -6,9 +6,8 @@
 
 #include <Adapter.h>
 #include <Instance.h>
-#include <Surface.h>
-
 #include <string>
+#include <Surface.h>
 #include <vector>
 
 namespace luna::renderer_detail {
@@ -34,7 +33,3 @@ luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMod
 #define LUNA_RENDERER_FRAME_TRACE(...) ((void) 0)
 #define LUNA_RENDERER_FRAME_DEBUG(...) ((void) 0)
 #endif
-
-
-
-

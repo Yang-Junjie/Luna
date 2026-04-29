@@ -1,7 +1,6 @@
-#include "AssetManager.h"
-
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/LoaderManager.h"
+#include "AssetManager.h"
 #include "Core/Log.h"
 
 #include <vector>

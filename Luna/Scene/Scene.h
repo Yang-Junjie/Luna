@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Renderer/Camera.h"
 #include "EntityManager.h"
+#include "Renderer/Camera.h"
 
 #include <string>
 
