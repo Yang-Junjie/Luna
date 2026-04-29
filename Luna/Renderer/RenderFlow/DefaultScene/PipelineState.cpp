@@ -399,6 +399,11 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                                        shader_paths.geometry_vertex_path,
                                                                        "sceneGeometryVertexMain",
                                                                        luna::RHI::ShaderStage::Vertex);
+    m_state.transparent_vertex_shader = renderer_detail::loadShaderModule(m_state.device,
+                                                                          context.compiler,
+                                                                          shader_paths.geometry_vertex_path,
+                                                                          "sceneTransparentVertexMain",
+                                                                          luna::RHI::ShaderStage::Vertex);
     m_state.geometry_fragment_shader = renderer_detail::loadShaderModule(m_state.device,
                                                                          context.compiler,
                                                                          shader_paths.geometry_fragment_path,
@@ -435,9 +440,9 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                                             "sceneTransparentFragmentMain",
                                                                             luna::RHI::ShaderStage::Fragment);
 
-    if (!m_state.geometry_vertex_shader || !m_state.geometry_fragment_shader || !m_state.shadow_vertex_shader ||
-        !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader || !m_state.lighting_fragment_shader ||
-        !m_state.debug_view_fragment_shader || !m_state.transparent_fragment_shader) {
+    if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
+        !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
+        !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.transparent_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -460,6 +465,10 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                  geometry_contract,
                                  shader_paths.geometry_fragment_path,
                                  "sceneGeometryFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_vertex_shader,
+                                                    transparent_contract,
+                                                    shader_paths.geometry_vertex_path,
+                                                    "sceneTransparentVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_vertex_shader, shadow_contract, shader_paths.shadow_vertex_path, "sceneShadowVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(
@@ -548,7 +557,7 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     m_state.transparent_pipeline = createTransparentPipeline(m_state.device,
                                                              m_state.transparent_pipeline_layout,
                                                              context.color_format,
-                                                             m_state.geometry_vertex_shader,
+                                                             m_state.transparent_vertex_shader,
                                                              m_state.transparent_fragment_shader);
     m_state.surface_format = context.color_format;
 
@@ -679,7 +688,7 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
     params.view_flags = glm::uvec4(view_state.history_valid ? 1u : 0u,
                                    view_state.jitter_sample_index,
                                    view_state.previous_jitter_sample_index,
-                                   0u);
+                                   context.temporal_jitter_enabled ? 1u : 0u);
     if (lights.directional_light && lights.directional_light->intensity > 0.0f) {
         const auto& directional_light = *lights.directional_light;
         params.light_direction_intensity =

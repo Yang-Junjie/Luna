@@ -32,6 +32,7 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE m_samplerGpu = {};
     D3D12_CPU_DESCRIPTOR_HANDLE m_samplerCpu = {};
     uint32_t m_stagedSamplerFrameIndex = (std::numeric_limits<uint32_t>::max)();
+    uint64_t m_stagedSamplerGeneration = 0;
     uint64_t m_samplerVersion = 1;
     uint64_t m_stagedSamplerVersion = 0;
 

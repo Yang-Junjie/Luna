@@ -15,6 +15,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <string>
 
 namespace luna::RHI {
 static inline UINT CalcSubresource(UINT mipSlice, UINT arraySlice, UINT planeSlice, UINT mipLevels, UINT arraySize)
@@ -36,6 +37,61 @@ static void AssignDescriptorHeap(ID3D12DescriptorHeap*& target, ID3D12Descriptor
     }
 
     target = candidate;
+}
+
+static void BindDescriptorSetTables(ID3D12GraphicsCommandList* commandList,
+                                    const D3D12PipelineLayout& layout,
+                                    uint32_t firstSet,
+                                    std::span<const Ref<DescriptorSet>> descriptorSets,
+                                    bool graphics)
+{
+    for (size_t i = 0; i < descriptorSets.size(); i++) {
+        auto d3dSet = std::dynamic_pointer_cast<D3D12DescriptorSet>(descriptorSets[i]);
+        if (!d3dSet) {
+            continue;
+        }
+
+        const uint32_t setIndex = firstSet + static_cast<uint32_t>(i);
+        const auto* rootParameters = layout.GetDescriptorSetRootParameters(setIndex);
+        if (rootParameters == nullptr) {
+            throw std::runtime_error("D3D12 descriptor set " + std::to_string(setIndex) +
+                                     " is not present in the pipeline layout");
+        }
+
+        if (d3dSet->HasCBVSRVUAV()) {
+            if (rootParameters->cbvSrvUavRootIndex == D3D12PipelineLayout::InvalidRootParameterIndex) {
+                throw std::runtime_error("D3D12 descriptor set " + std::to_string(setIndex) +
+                                         " has CBV/SRV/UAV descriptors but the pipeline layout has no matching root "
+                                         "descriptor table");
+            }
+            if (graphics) {
+                commandList->SetGraphicsRootDescriptorTable(rootParameters->cbvSrvUavRootIndex,
+                                                            d3dSet->GetCBVSRVUAVGPUHandle());
+            } else {
+                commandList->SetComputeRootDescriptorTable(rootParameters->cbvSrvUavRootIndex,
+                                                           d3dSet->GetCBVSRVUAVGPUHandle());
+            }
+        }
+
+        if (d3dSet->HasSamplers()) {
+            if (rootParameters->samplerRootIndex == D3D12PipelineLayout::InvalidRootParameterIndex) {
+                throw std::runtime_error("D3D12 descriptor set " + std::to_string(setIndex) +
+                                         " has sampler descriptors but the pipeline layout has no matching root "
+                                         "descriptor table");
+            }
+            if (d3dSet->GetSamplerGPUHandle().ptr == 0) {
+                throw std::runtime_error("D3D12 descriptor set " + std::to_string(setIndex) +
+                                         " has sampler descriptors but no shader-visible sampler table was prepared");
+            }
+            if (graphics) {
+                commandList->SetGraphicsRootDescriptorTable(rootParameters->samplerRootIndex,
+                                                            d3dSet->GetSamplerGPUHandle());
+            } else {
+                commandList->SetComputeRootDescriptorTable(rootParameters->samplerRootIndex,
+                                                           d3dSet->GetSamplerGPUHandle());
+            }
+        }
+    }
 }
 
 D3D12CommandBufferEncoder::D3D12CommandBufferEncoder(const Ref<Device>& device,
@@ -209,13 +265,13 @@ void D3D12CommandBufferEncoder::BindDescriptorSets(const Ref<GraphicsPipeline>& 
     }
 
     auto d3dPipeline = std::dynamic_pointer_cast<D3D12GraphicsPipeline>(pipeline);
-    bool hasPushConstants = false;
-    if (auto layout = d3dPipeline->GetLayout()) {
-        if (auto d3dLayout = std::dynamic_pointer_cast<D3D12PipelineLayout>(layout)) {
-            hasPushConstants = !d3dLayout->GetCreateInfo().PushConstantRanges.empty();
-        }
+    if (!d3dPipeline) {
+        throw std::runtime_error("D3D12 BindDescriptorSets received a non-D3D12 graphics pipeline");
     }
-    uint32_t rootParamBase = hasPushConstants ? 1 : 0;
+    auto d3dLayout = std::dynamic_pointer_cast<D3D12PipelineLayout>(d3dPipeline->GetLayout());
+    if (!d3dLayout) {
+        throw std::runtime_error("D3D12 BindDescriptorSets received a graphics pipeline without a D3D12 layout");
+    }
     auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
 
     ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
@@ -226,7 +282,7 @@ void D3D12CommandBufferEncoder::BindDescriptorSets(const Ref<GraphicsPipeline>& 
             continue;
         }
 
-        if (d3dSet->GetCBVSRVUAVHeap()) {
+        if (d3dSet->HasCBVSRVUAV() && d3dSet->GetCBVSRVUAVHeap()) {
             AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
 
@@ -247,22 +303,7 @@ void D3D12CommandBufferEncoder::BindDescriptorSets(const Ref<GraphicsPipeline>& 
         m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
-    uint32_t rootIdx = rootParamBase;
-    for (size_t i = 0; i < descriptorSets.size(); i++) {
-        auto d3dSet = std::dynamic_pointer_cast<D3D12DescriptorSet>(descriptorSets[i]);
-        if (!d3dSet) {
-            continue;
-        }
-
-        if (d3dSet->HasCBVSRVUAV()) {
-            m_commandList->SetGraphicsRootDescriptorTable(rootIdx, d3dSet->GetCBVSRVUAVGPUHandle());
-            rootIdx++;
-        }
-        if (d3dSet->HasSamplers()) {
-            m_commandList->SetGraphicsRootDescriptorTable(rootIdx, d3dSet->GetSamplerGPUHandle());
-            rootIdx++;
-        }
-    }
+    BindDescriptorSetTables(m_commandList.Get(), *d3dLayout, firstSet, descriptorSets, true);
 }
 
 void D3D12CommandBufferEncoder::PushConstants(
@@ -299,20 +340,23 @@ void D3D12CommandBufferEncoder::BindComputeDescriptorSets(const Ref<ComputePipel
     }
 
     auto d3dPipeline = std::dynamic_pointer_cast<D3D12ComputePipeline>(pipeline);
-    bool hasPushConstants = false;
-    if (auto layout = d3dPipeline->GetLayout()) {
-        if (auto d3dLayout = std::dynamic_pointer_cast<D3D12PipelineLayout>(layout)) {
-            hasPushConstants = !d3dLayout->GetCreateInfo().PushConstantRanges.empty();
-        }
+    if (!d3dPipeline) {
+        throw std::runtime_error("D3D12 BindComputeDescriptorSets received a non-D3D12 compute pipeline");
     }
-    uint32_t rootParamBase = hasPushConstants ? 1 : 0;
+    auto d3dLayout = std::dynamic_pointer_cast<D3D12PipelineLayout>(d3dPipeline->GetLayout());
+    if (!d3dLayout) {
+        throw std::runtime_error("D3D12 BindComputeDescriptorSets received a compute pipeline without a D3D12 layout");
+    }
     auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
 
     ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
     ID3D12DescriptorHeap* samplerHeap = nullptr;
     for (auto& ds : descriptorSets) {
-        auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
-        if (d3dSet->HasCBVSRVUAV()) {
+        auto d3dSet = std::dynamic_pointer_cast<D3D12DescriptorSet>(ds);
+        if (!d3dSet) {
+            continue;
+        }
+        if (d3dSet->HasCBVSRVUAV() && d3dSet->GetCBVSRVUAVHeap()) {
             AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
         if (d3dSet->HasSamplers() && d3dDevice && d3dSet->PrepareSamplerTable(*d3dDevice)) {
@@ -332,18 +376,7 @@ void D3D12CommandBufferEncoder::BindComputeDescriptorSets(const Ref<ComputePipel
         m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
-    uint32_t rootIdx = rootParamBase;
-    for (auto& ds : descriptorSets) {
-        auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
-        if (d3dSet->HasCBVSRVUAV()) {
-            m_commandList->SetComputeRootDescriptorTable(rootIdx, d3dSet->GetCBVSRVUAVGPUHandle());
-            rootIdx++;
-        }
-        if (d3dSet->HasSamplers()) {
-            m_commandList->SetComputeRootDescriptorTable(rootIdx, d3dSet->GetSamplerGPUHandle());
-            rootIdx++;
-        }
-    }
+    BindDescriptorSetTables(m_commandList.Get(), *d3dLayout, firstSet, descriptorSets, false);
 }
 
 void D3D12CommandBufferEncoder::ComputePushConstants(
@@ -811,12 +844,25 @@ void D3D12CommandBufferEncoder::BindRayTracingDescriptorSets(const Ref<RayTracin
                                                              uint32_t firstSet,
                                                              std::span<const Ref<DescriptorSet>> descriptorSets)
 {
+    if (descriptorSets.empty()) {
+        return;
+    }
+
+    auto d3dLayout = std::dynamic_pointer_cast<D3D12PipelineLayout>(pipeline ? pipeline->GetLayout() : nullptr);
+    if (!d3dLayout) {
+        throw std::runtime_error(
+            "D3D12 BindRayTracingDescriptorSets received a ray tracing pipeline without a D3D12 layout");
+    }
+
     auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(m_device);
     ID3D12DescriptorHeap* cbvSrvUavHeap = nullptr;
     ID3D12DescriptorHeap* samplerHeap = nullptr;
     for (auto& ds : descriptorSets) {
-        auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
-        if (d3dSet->GetCBVSRVUAVHeap()) {
+        auto d3dSet = std::dynamic_pointer_cast<D3D12DescriptorSet>(ds);
+        if (!d3dSet) {
+            continue;
+        }
+        if (d3dSet->HasCBVSRVUAV() && d3dSet->GetCBVSRVUAVHeap()) {
             AssignDescriptorHeap(cbvSrvUavHeap, d3dSet->GetCBVSRVUAVHeap(), "CBV/SRV/UAV");
         }
         if (d3dSet->HasSamplers() && d3dDevice && d3dSet->PrepareSamplerTable(*d3dDevice)) {
@@ -836,18 +882,7 @@ void D3D12CommandBufferEncoder::BindRayTracingDescriptorSets(const Ref<RayTracin
         m_commandList->SetDescriptorHeaps(heapCount, heaps.data());
     }
 
-    uint32_t rootIdx = firstSet;
-    for (auto& ds : descriptorSets) {
-        auto* d3dSet = static_cast<D3D12DescriptorSet*>(ds.get());
-        if (d3dSet->HasCBVSRVUAV()) {
-            m_commandList->SetComputeRootDescriptorTable(rootIdx, d3dSet->GetCBVSRVUAVGPUHandle());
-            rootIdx++;
-        }
-        if (d3dSet->HasSamplers()) {
-            m_commandList->SetComputeRootDescriptorTable(rootIdx, d3dSet->GetSamplerGPUHandle());
-            rootIdx++;
-        }
-    }
+    BindDescriptorSetTables(m_commandList.Get(), *d3dLayout, firstSet, descriptorSets, false);
 }
 
 void D3D12CommandBufferEncoder::MemoryBarrierFast(MemoryTransition transition)

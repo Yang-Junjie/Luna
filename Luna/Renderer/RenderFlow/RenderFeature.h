@@ -241,6 +241,7 @@ struct RenderFeatureRequirements {
     bool requires_framebuffer_size{false};
     bool uses_persistent_resources{false};
     bool uses_history_resources{false};
+    bool uses_temporal_jitter{false};
 };
 
 struct RenderFeatureContract {

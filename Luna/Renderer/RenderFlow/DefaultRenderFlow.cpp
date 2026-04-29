@@ -481,7 +481,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
     m_frame_ready_to_commit = false;
 
     const RenderWorld& world = context.world();
-    const SceneRenderContext& scene_context = context.sceneContext();
+    SceneRenderContext scene_context = context.sceneContext();
 
     if (!world.hasCamera()) {
         return;
@@ -507,6 +507,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         world.drawPackets().size(),
         scene_context.show_pick_debug_visualization);
 
+    bool temporal_jitter_enabled = false;
     for (const auto& feature : m_features) {
         if (!feature) {
             continue;
@@ -533,7 +534,12 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         if (was_active && !state->active_this_frame) {
             feature->releasePersistentResources();
         }
+
+        if (state->active_this_frame && feature->requirements().uses_temporal_jitter) {
+            temporal_jitter_enabled = true;
+        }
     }
+    scene_context.temporal_jitter_enabled = temporal_jitter_enabled;
 
     if (m_contract_diagnostics_dirty) {
         validateFeatureGraphContracts();

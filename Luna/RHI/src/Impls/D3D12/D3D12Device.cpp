@@ -122,6 +122,7 @@ void D3D12Device::InitializeDeferredDescriptorRecycling(uint32_t maxFramesInFlig
     m_deferredSamplerRangeFrees.resize(maxFramesInFlight);
     m_orphanedSamplerRangeFrees.clear();
     m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
+    m_currentDeferredDescriptorGeneration = 0;
 }
 
 void D3D12Device::PrepareDeferredDescriptorFrame(uint32_t frameIndex)
@@ -137,6 +138,7 @@ void D3D12Device::PrepareDeferredDescriptorFrame(uint32_t frameIndex)
         }
 
         m_currentDeferredDescriptorFrame = frameIndex;
+        ++m_currentDeferredDescriptorGeneration;
         readyToFree.swap(m_deferredDescriptorFrees[frameIndex]);
         if (frameIndex < m_deferredSamplerRangeFrees.size()) {
             readySamplerRanges.swap(m_deferredSamplerRangeFrees[frameIndex]);

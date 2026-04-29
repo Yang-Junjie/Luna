@@ -161,7 +161,7 @@ void addConsumerCompatibilityIssues(const RenderFeatureGraphResource& output,
 
     const std::string resource_name(output.name);
     const auto producer_it = producers.find(resource_name);
-    if (producer_it != producers.end() && producer_it->second.size() > 1) {
+    if (producer_it != producers.end() && producer_it->second.size() > 1 && !isExternal(output)) {
         issues.push_back("graph output '" + resource_name +
                          "' has multiple active producers: " + joinFeatureNames(producer_it->second));
     }

@@ -111,6 +111,7 @@ private:
         bool shadow_bindings_valid{false};
 
         luna::RHI::Ref<luna::RHI::ShaderModule> geometry_vertex_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> transparent_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> shadow_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> shadow_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> geometry_fragment_shader;

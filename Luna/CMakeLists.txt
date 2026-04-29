@@ -57,6 +57,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/Features/RenderFeatureModules.cpp
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.cpp
+    Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h
+    Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.cpp
     Renderer/RenderFlow/RenderBlackboardKeys.h
     Renderer/RenderFlow/RenderSlots.h
     Renderer/RenderFlow/RenderSlotPass.h
@@ -114,6 +116,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/SceneLighting.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang
+    Renderer/Shaders/TemporalAntiAliasing.slang
     Renderer/Renderer.h
     Renderer/Renderer.cpp
 

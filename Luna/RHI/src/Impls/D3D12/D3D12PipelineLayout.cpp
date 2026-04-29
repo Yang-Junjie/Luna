@@ -16,6 +16,7 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
     auto d3dDevice = std::dynamic_pointer_cast<D3D12Device>(device);
 
     std::vector<D3D12_ROOT_PARAMETER> rootParams;
+    m_setRootParameters.assign(info.SetLayouts.size(), DescriptorSetRootParameters{});
 
     if (!info.PushConstantRanges.empty()) {
         D3D12_ROOT_PARAMETER pushParam = {};
@@ -78,6 +79,7 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
             tableParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
             tableParam.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(srvCbvUavRanges[i].size());
             tableParam.DescriptorTable.pDescriptorRanges = srvCbvUavRanges[i].data();
+            m_setRootParameters[i].cbvSrvUavRootIndex = static_cast<uint32_t>(rootParams.size());
             rootParams.push_back(tableParam);
         }
         if (!samplerRanges[i].empty()) {
@@ -86,6 +88,7 @@ D3D12PipelineLayout::D3D12PipelineLayout(const Ref<Device>& device, const Pipeli
             tableParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
             tableParam.DescriptorTable.NumDescriptorRanges = static_cast<UINT>(samplerRanges[i].size());
             tableParam.DescriptorTable.pDescriptorRanges = samplerRanges[i].data();
+            m_setRootParameters[i].samplerRootIndex = static_cast<uint32_t>(rootParams.size());
             rootParams.push_back(tableParam);
         }
 

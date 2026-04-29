@@ -182,6 +182,46 @@ float2 screenUvFromPosition(float4 position)
     return position.xy * gSceneParams.viewportSize.zw;
 }
 
+bool temporalJitterEnabled()
+{
+    return gSceneParams.viewFlags.w != 0u;
+}
+
+float4 currentClipPosition(float4 worldPosition)
+{
+    if (temporalJitterEnabled())
+    {
+        return mul(gSceneParams.jitteredViewProjection, worldPosition);
+    }
+    return mul(gSceneParams.viewProjection, worldPosition);
+}
+
+float4 previousClipPosition(float4 worldPosition)
+{
+    if (temporalJitterEnabled())
+    {
+        return mul(gSceneParams.previousJitteredViewProjection, worldPosition);
+    }
+    return mul(gSceneParams.previousViewProjection, worldPosition);
+}
+
+SceneVertexOutput buildSceneVertexOutput(SceneVertexInput input, bool allowTemporalJitter)
+{
+    SceneVertexOutput output;
+    const float4 worldPosition = mul(gPushConstants.model, float4(input.position, 1.0));
+    const float3x3 normalMatrix = (float3x3)gPushConstants.model;
+
+    output.position = allowTemporalJitter ? currentClipPosition(worldPosition)
+                                          : mul(gSceneParams.viewProjection, worldPosition);
+    output.worldPosition = worldPosition.xyz;
+    output.uv = input.uv;
+    output.worldNormal = mul(normalMatrix, input.normal);
+    output.worldTangent = mul(normalMatrix, input.tangent);
+    output.worldBitangent = mul(normalMatrix, input.bitangent);
+    output.pickingId = gPushConstants.pickingId;
+    return output;
+}
+
 float2 screenUvFromClip(float4 clipPosition)
 {
     const float invW = abs(clipPosition.w) > 1e-6 ? 1.0 / clipPosition.w : 0.0;
@@ -203,7 +243,7 @@ float2 computeVelocity(float4 position, float3 worldPosition)
     }
 
     const float2 currentUv = screenUvFromPosition(position);
-    const float4 previousClip = mul(gSceneParams.previousViewProjection, float4(worldPosition, 1.0));
+    const float4 previousClip = previousClipPosition(float4(worldPosition, 1.0));
     if (previousClip.w <= 1e-6)
     {
         return float2(0.0, 0.0);
@@ -458,18 +498,13 @@ SampledMaterial sampleMaterial(SceneVertexOutput input)
 [shader("vertex")]
 SceneVertexOutput sceneGeometryVertexMain(SceneVertexInput input)
 {
-    SceneVertexOutput output;
-    const float4 worldPosition = mul(gPushConstants.model, float4(input.position, 1.0));
-    const float3x3 normalMatrix = (float3x3)gPushConstants.model;
+    return buildSceneVertexOutput(input, true);
+}
 
-    output.position = mul(gSceneParams.viewProjection, worldPosition);
-    output.worldPosition = worldPosition.xyz;
-    output.uv = input.uv;
-    output.worldNormal = mul(normalMatrix, input.normal);
-    output.worldTangent = mul(normalMatrix, input.tangent);
-    output.worldBitangent = mul(normalMatrix, input.bitangent);
-    output.pickingId = gPushConstants.pickingId;
-    return output;
+[shader("vertex")]
+SceneVertexOutput sceneTransparentVertexMain(SceneVertexInput input)
+{
+    return buildSceneVertexOutput(input, false);
 }
 
 [shader("fragment")]

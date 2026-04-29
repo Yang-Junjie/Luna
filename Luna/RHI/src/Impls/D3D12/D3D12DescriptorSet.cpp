@@ -5,8 +5,16 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12Sampler.h"
 #include "Impls/D3D12/D3D12Texture.h"
+#include "Logging.h"
+
+#include <atomic>
 
 namespace luna::RHI {
+namespace {
+std::atomic<uint32_t> g_samplerGenerationInvalidationLogCount{0};
+constexpr uint32_t kMaxSamplerGenerationInvalidationLogs = 16;
+} // namespace
+
 D3D12DescriptorSet::D3D12DescriptorSet(const Ref<Device>& device,
                                        D3D12_GPU_DESCRIPTOR_HANDLE cbvGpu,
                                        D3D12_CPU_DESCRIPTOR_HANDLE cbvCpu,
@@ -110,11 +118,9 @@ void D3D12DescriptorSet::WriteTexture(const TextureWriteInfo& info)
         return;
     }
 
-    uint64_t resHash = srcHandle.ptr;
-    if (m_bindingHashes[info.Binding] == resHash) {
-        return;
-    }
-    m_bindingHashes[info.Binding] = resHash;
+    // Texture view descriptor handles are recycled by the device descriptor pool.
+    // A reused CPU handle can point at a different resource, so the descriptor copy
+    // must not be skipped based on handle address alone.
     m_dirty = true;
 
     D3D12_CPU_DESCRIPTOR_HANDLE dest = m_cbvSrvUavCpu;
@@ -191,9 +197,19 @@ bool D3D12DescriptorSet::PrepareSamplerTable(D3D12Device& device)
     }
 
     const uint32_t currentFrameIndex = device.GetCurrentDeferredDescriptorFrameIndex();
-    if (m_stagedSamplerFrameIndex == currentFrameIndex && m_stagedSamplerVersion == m_samplerVersion &&
-        m_samplerHeap != nullptr && m_samplerGpu.ptr != 0) {
+    const uint64_t currentGeneration = device.GetCurrentDeferredDescriptorGeneration();
+    if (m_stagedSamplerFrameIndex == currentFrameIndex && m_stagedSamplerGeneration == currentGeneration &&
+        m_stagedSamplerVersion == m_samplerVersion && m_samplerHeap != nullptr && m_samplerGpu.ptr != 0) {
         return true;
+    }
+
+    if (m_stagedSamplerFrameIndex == currentFrameIndex && m_stagedSamplerGeneration != currentGeneration &&
+        m_stagedSamplerVersion == m_samplerVersion && m_samplerHeap != nullptr && m_samplerGpu.ptr != 0) {
+        const uint32_t logIndex = g_samplerGenerationInvalidationLogCount.fetch_add(1, std::memory_order_relaxed);
+        if (logIndex < kMaxSamplerGenerationInvalidationLogs) {
+            LogMessage(LogLevel::Debug,
+                       "D3D12 descriptor sampler table restaged after deferred descriptor generation advanced");
+        }
     }
 
     const auto allocation = device.AllocateTransientSamplerTable(m_samplerCount);
@@ -215,6 +231,7 @@ bool D3D12DescriptorSet::PrepareSamplerTable(D3D12Device& device)
     m_samplerGpu = allocation.gpu;
     m_samplerHeap = allocation.heap;
     m_stagedSamplerFrameIndex = currentFrameIndex;
+    m_stagedSamplerGeneration = currentGeneration;
     m_stagedSamplerVersion = m_samplerVersion;
     return true;
 }

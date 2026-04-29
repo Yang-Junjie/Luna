@@ -238,6 +238,7 @@ private:
     std::vector<std::vector<DescriptorRange>> m_deferredSamplerRangeFrees;
     std::vector<DescriptorRange> m_orphanedSamplerRangeFrees;
     uint32_t m_currentDeferredDescriptorFrame = kInvalidDeferredDescriptorFrame;
+    uint64_t m_currentDeferredDescriptorGeneration = 0;
     void InitPipelineLibrary();
     void SavePipelineLibrary();
     void InitializeDeferredDescriptorRecycling(uint32_t maxFramesInFlight);
@@ -342,6 +343,11 @@ public:
     uint32_t GetCurrentDeferredDescriptorFrameIndex() const
     {
         return m_currentDeferredDescriptorFrame;
+    }
+
+    uint64_t GetCurrentDeferredDescriptorGeneration() const
+    {
+        return m_currentDeferredDescriptorGeneration;
     }
 
     ID3D12DescriptorHeap* GetShaderVisibleSamplerHeap() const

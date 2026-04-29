@@ -79,10 +79,8 @@ Ref<DescriptorSet> D3D12DescriptorPool::AllocateDescriptorSet(const Ref<Descript
             cbvSrvUavCount += b.Count;
         }
     }
-    if (cbvSrvUavCount == 0) {
-        cbvSrvUavCount = 1;
-    }
-    if (m_cbvSrvUavOffset + cbvSrvUavCount > m_cbvSrvUavCapacity || !m_cbvSrvUavHeap) {
+    const uint32_t allocatedCbvSrvUavCount = cbvSrvUavCount == 0 ? 1 : cbvSrvUavCount;
+    if (m_cbvSrvUavOffset + allocatedCbvSrvUavCount > m_cbvSrvUavCapacity || !m_cbvSrvUavHeap) {
         throw std::runtime_error("D3D12 descriptor pool exhausted CBV/SRV/UAV heap capacity");
     }
 
@@ -90,7 +88,7 @@ Ref<DescriptorSet> D3D12DescriptorPool::AllocateDescriptorSet(const Ref<Descript
     auto cbvGpu = GetGPUHandleForCBVSRVUAV(cbvHeapOffset);
     auto cbvCpu = m_cbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart();
     cbvCpu.ptr += cbvHeapOffset * m_cbvSrvUavDescriptorSize;
-    m_cbvSrvUavOffset += cbvSrvUavCount;
+    m_cbvSrvUavOffset += allocatedCbvSrvUavCount;
 
     if (samplerCount > 0) {
         if (m_samplerOffset + samplerCount > m_samplerCapacity) {

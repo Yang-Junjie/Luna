@@ -55,6 +55,7 @@ struct SceneRenderContext {
     luna::RHI::Format debug_format{luna::RHI::Format::UNDEFINED};
     luna::RenderDebugViewMode debug_view_mode{luna::RenderDebugViewMode::None};
     float debug_velocity_scale{20.0f};
+    bool temporal_jitter_enabled{false};
     uint32_t framebuffer_width{0};
     uint32_t framebuffer_height{0};
 
