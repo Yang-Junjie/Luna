@@ -67,6 +67,7 @@ public:
     [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
     [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
+    [[nodiscard]] SkyPassResources skyPassResources() const noexcept;
 
 private:
     struct State {
@@ -78,6 +79,7 @@ private:
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> shadow_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> lighting_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> debug_view_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> sky_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> transparent_pipeline;
 
         luna::RHI::Ref<luna::RHI::PipelineLayout> geometry_pipeline_layout;
@@ -118,6 +120,7 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderModule> lighting_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> lighting_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> debug_view_fragment_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> sky_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> transparent_fragment_shader;
     };
 

@@ -69,6 +69,7 @@ public:
     [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
     [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
+    [[nodiscard]] SkyPassResources skyPassResources() const noexcept;
 
 private:
     PipelineState m_pipeline_state{};

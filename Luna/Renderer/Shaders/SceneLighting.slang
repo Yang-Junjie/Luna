@@ -515,6 +515,11 @@ SceneLightingVertexOutput sceneLightingVertexMain(uint vertexID : SV_VertexID)
     return output;
 }
 
+bool isGBufferSurface(float4 baseColorAlpha, float4 normalMetallic)
+{
+    return dot(normalMetallic.xyz, normalMetallic.xyz) >= 1e-6 && baseColorAlpha.a > 0.001;
+}
+
 [shader("fragment")]
 float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
 {
@@ -524,13 +529,9 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
     const float4 worldPositionRoughness = gGBufferWorldPositionRoughness.Sample(gGBufferSampler, input.uv);
     const float4 emissiveAo = gGBufferEmissiveAo.Sample(gGBufferSampler, input.uv);
 
-    if (dot(normalMetallic.xyz, normalMetallic.xyz) < 1e-6 || baseColorAlpha.a <= 0.001)
+    if (!isGBufferSurface(baseColorAlpha, normalMetallic))
     {
-        const float3 skyDirection = reconstructViewDirection(input.uv);
-        float3 skyColor = sampleEnvironmentSky(skyDirection, 0.0);
-        skyColor *= gSceneParams.lightColorExposure.a;
-        const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(skyColor)), pickingId, input.uv);
-        return float4(finalColor, 1.0);
+        return float4(0.0, 0.0, 0.0, 1.0);
     }
 
     const float3 baseColor = baseColorAlpha.rgb;
@@ -558,6 +559,25 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
     color *= gSceneParams.lightColorExposure.a;
     const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(color)), pickingId, input.uv);
     return float4(finalColor, baseColorAlpha.a);
+}
+
+[shader("fragment")]
+float4 sceneSkyFragmentMain(SceneLightingVertexOutput input) : SV_Target
+{
+    const float4 baseColorAlpha = gGBufferBaseColor.Sample(gGBufferSampler, input.uv);
+    const float4 normalMetallic = gGBufferNormalMetallic.Sample(gGBufferSampler, input.uv);
+    if (isGBufferSurface(baseColorAlpha, normalMetallic))
+    {
+        discard;
+        return float4(0.0, 0.0, 0.0, 0.0);
+    }
+
+    const uint pickingId = loadPickingId(input.uv);
+    const float3 skyDirection = reconstructViewDirection(input.uv);
+    float3 skyColor = sampleEnvironmentSky(skyDirection, 0.0);
+    skyColor *= gSceneParams.lightColorExposure.a;
+    const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(skyColor)), pickingId, input.uv);
+    return float4(finalColor, 1.0);
 }
 
 [shader("fragment")]

@@ -366,7 +366,8 @@ bool PipelineState::hasCompleteState(const SceneRenderContext& context) const no
 {
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
-           m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.transparent_pipeline &&
+           m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.sky_pipeline &&
+           m_state.transparent_pipeline &&
            m_state.material_layout && m_state.descriptor_pool && m_state.gbuffer_descriptor_set &&
            m_state.scene_descriptor_set && m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
            m_state.gbuffer_sampler && m_state.environment_source_sampler && m_state.shadow_sampler;
@@ -434,6 +435,11 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                                            shader_paths.lighting_fragment_path,
                                                                            "sceneDebugFragmentMain",
                                                                            luna::RHI::ShaderStage::Fragment);
+    m_state.sky_fragment_shader = renderer_detail::loadShaderModule(m_state.device,
+                                                                    context.compiler,
+                                                                    shader_paths.lighting_fragment_path,
+                                                                    "sceneSkyFragmentMain",
+                                                                    luna::RHI::ShaderStage::Fragment);
     m_state.transparent_fragment_shader = renderer_detail::loadShaderModule(m_state.device,
                                                                             context.compiler,
                                                                             shader_paths.geometry_fragment_path,
@@ -442,7 +448,8 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
 
     if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
         !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
-        !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.transparent_fragment_shader) {
+        !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.sky_fragment_shader ||
+        !m_state.transparent_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -485,6 +492,10 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                  lighting_contract,
                                  shader_paths.lighting_fragment_path,
                                  "sceneDebugFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.sky_fragment_shader,
+                                 lighting_contract,
+                                 shader_paths.lighting_fragment_path,
+                                 "sceneSkyFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_fragment_shader,
                                  transparent_contract,
                                  shader_paths.geometry_fragment_path,
@@ -554,6 +565,11 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                          context.color_format,
                                                          m_state.lighting_vertex_shader,
                                                          m_state.debug_view_fragment_shader);
+    m_state.sky_pipeline = createLightingPipeline(m_state.device,
+                                                  m_state.lighting_pipeline_layout,
+                                                  context.color_format,
+                                                  m_state.lighting_vertex_shader,
+                                                  m_state.sky_fragment_shader);
     m_state.transparent_pipeline = createTransparentPipeline(m_state.device,
                                                              m_state.transparent_pipeline_layout,
                                                              context.color_format,
@@ -965,6 +981,16 @@ DebugViewPassResources PipelineState::debugViewPassResources() const noexcept
 {
     return DebugViewPassResources{
         .pipeline = m_state.debug_view_pipeline,
+        .gbuffer_descriptor_set = m_state.gbuffer_descriptor_set,
+        .scene_descriptor_set = m_state.lighting_scene_descriptor_set,
+        .gbuffer_sampler = m_state.gbuffer_sampler,
+    };
+}
+
+SkyPassResources PipelineState::skyPassResources() const noexcept
+{
+    return SkyPassResources{
+        .pipeline = m_state.sky_pipeline,
         .gbuffer_descriptor_set = m_state.gbuffer_descriptor_set,
         .scene_descriptor_set = m_state.lighting_scene_descriptor_set,
         .gbuffer_sampler = m_state.gbuffer_sampler,

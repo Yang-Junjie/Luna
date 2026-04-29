@@ -5,6 +5,7 @@
 #include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/SkyPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
@@ -89,6 +90,20 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
            builder.insertFeaturePassAfter(
                kFeatureName,
                extension_slots::AfterLighting,
+               std::string(extension_slots::BeforeSky),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeSky))) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          extension_slots::BeforeSky,
+                                          std::string(pass_slots::Sky),
+                                          std::make_unique<SkyPass>(state)) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               pass_slots::Sky,
+               std::string(extension_slots::AfterSky),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterSky))) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               extension_slots::AfterSky,
                std::string(extension_slots::BeforeTransparent),
                std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeTransparent))) &&
            builder.insertFeaturePassAfter(kFeatureName,

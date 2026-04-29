@@ -143,4 +143,9 @@ DebugViewPassResources PipelineResources::debugViewPassResources() const noexcep
     return m_pipeline_state.debugViewPassResources();
 }
 
+SkyPassResources PipelineResources::skyPassResources() const noexcept
+{
+    return m_pipeline_state.skyPassResources();
+}
+
 } // namespace luna::render_flow::default_scene

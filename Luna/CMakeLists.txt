@@ -96,6 +96,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h
     Renderer/RenderFlow/DefaultScene/Passes/LightingPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/SkyPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/SkyPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.cpp
     Renderer/RenderWorld/RenderWorld.h

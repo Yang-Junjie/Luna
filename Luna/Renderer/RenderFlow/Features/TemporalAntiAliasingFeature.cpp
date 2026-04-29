@@ -567,9 +567,9 @@ private:
             return;
         }
 
-        constexpr float kHistoryBlend = 0.97f;
-        constexpr float kVarianceClipGamma = 2.00f;
-        constexpr float kMotionRejectScale = 0.04f;
+        constexpr float kHistoryBlend = 0.95f;
+        constexpr float kVarianceClipGamma = 1.50f;
+        constexpr float kMotionRejectScale = 0.05f;
         const TaaGpuParams params{
             .framebuffer = glm::vec4(1.0f / static_cast<float>(width),
                                      1.0f / static_cast<float>(height),
@@ -855,13 +855,13 @@ bool TemporalAntiAliasingFeature::registerPasses(RenderFlowBuilder& builder)
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered = builder.insertFeaturePassBetween(kFeatureName,
-                                                            extension_slots::AfterLighting,
+                                                            extension_slots::AfterSky,
                                                             extension_slots::BeforeTransparent,
                                                             "TemporalAntiAliasing",
                                                             std::make_unique<TemporalAntiAliasingPass>(*m_resources));
     if (registered) {
         LUNA_RENDERER_INFO("Registered TemporalAntiAliasing between '{}' and '{}'",
-                           extension_slots::AfterLighting,
+                           extension_slots::AfterSky,
                            extension_slots::BeforeTransparent);
     }
     return registered;
