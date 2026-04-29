@@ -271,10 +271,14 @@ public:
     void shutdown()
     {
         releasePersistentResources();
-        m_state = {};
+        releasePipelineResources();
         m_resource_set.resetGpuContext();
-        m_binding_contract_valid = true;
-        m_binding_contract_summary = "not evaluated";
+        m_resource_set.resetBindingContractDiagnostics();
+    }
+
+    void releasePipelineResources() noexcept
+    {
+        m_state = {};
     }
 
     void releasePersistentResources()
@@ -285,7 +289,8 @@ public:
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision = m_resource_set.evaluateGpuResources(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision =
+            m_resource_set.prepareGpuResourceBuild(context, isComplete());
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -293,8 +298,7 @@ public:
             return true;
         }
 
-        shutdown();
-        m_resource_set.bindGpuContext(context);
+        releasePipelineResources();
         const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
@@ -304,21 +308,11 @@ public:
             device, context.compiler, path, "ssaoFragmentMain", luna::RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeSsaoShaderBindingContract();
-        const bool vertex_bindings_valid =
-            m_state.vertex_shader &&
-            validateAndLogRenderFeatureShaderModuleBindings(m_state.vertex_shader, contract, path, "ssaoVertexMain");
-        const bool fragment_bindings_valid =
-            m_state.fragment_shader &&
-            validateAndLogRenderFeatureShaderModuleBindings(
-                m_state.fragment_shader, contract, path, "ssaoFragmentMain");
-        m_binding_contract_valid = vertex_bindings_valid && fragment_bindings_valid;
-        if (!m_state.vertex_shader || !m_state.fragment_shader) {
-            m_binding_contract_summary = "shader module missing";
-        } else if (!m_binding_contract_valid) {
-            m_binding_contract_summary = "shader reflection mismatch; see renderer log";
-        } else {
-            m_binding_contract_summary = "ok";
-        }
+        const std::array<RenderFeatureShaderBindingCheck, 2> binding_checks{{
+            {.shader = m_state.vertex_shader, .entry_point = "ssaoVertexMain"},
+            {.shader = m_state.fragment_shader, .entry_point = "ssaoFragmentMain"},
+        }};
+        m_resource_set.validateShaderBindingContract(binding_checks, contract, path);
 
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
@@ -437,30 +431,10 @@ public:
     [[nodiscard]] RenderFeatureDiagnostics diagnostics() const
     {
         RenderFeatureDiagnostics result;
-        result.binding_contract_valid = m_binding_contract_valid;
-        result.binding_contract_summary = m_binding_contract_summary;
-
-        const RenderFeatureResourceReport gpu_report =
-            m_resource_set.gpuResourceReport(isComplete(), resourceStatus());
-        result.pipeline_resources_valid = gpu_report.valid;
-        result.pipeline_resources_summary = gpu_report.summary;
-        for (const RenderFeatureResourceReportEntry& resource : gpu_report.resources) {
-            result.pipeline_resources.push_back(RenderFeatureStatusEntry{
-                .name = resource.name,
-                .ready = resource.ready,
-            });
-        }
-
-        const RenderFeatureResourceReport persistent_report =
-            m_resource_set.resourceReport(m_ambient_occlusion_evaluated, persistentResourceStatus());
-        result.persistent_resources_valid = persistent_report.valid;
-        result.persistent_resources_summary = persistent_report.summary;
-        for (const RenderFeatureResourceReportEntry& resource : persistent_report.resources) {
-            result.persistent_resources.push_back(RenderFeatureStatusEntry{
-                .name = resource.name,
-                .ready = resource.ready,
-            });
-        }
+        m_resource_set.writeBindingContractDiagnostics(result);
+        m_resource_set.writePipelineResourceDiagnostics(result, isComplete(), resourceStatus());
+        m_resource_set.writePersistentResourceDiagnostics(
+            result, m_ambient_occlusion_evaluated, persistentResourceStatus());
         return result;
     }
 
@@ -520,8 +494,6 @@ private:
 
     State m_state{};
     RenderFeatureResourceSet m_resource_set{std::string(kFeatureName)};
-    bool m_binding_contract_valid{true};
-    std::string m_binding_contract_summary{"not evaluated"};
     PersistentTexture2D m_ambient_occlusion;
     bool m_ambient_occlusion_evaluated{false};
 };

@@ -289,8 +289,7 @@ public:
         releasePersistentResources();
         releasePipelineResources();
         m_resource_set.resetGpuContext();
-        m_binding_contract_valid = true;
-        m_binding_contract_summary = "not evaluated";
+        m_resource_set.resetBindingContractDiagnostics();
     }
 
     void releasePipelineResources()
@@ -306,7 +305,8 @@ public:
 
     [[nodiscard]] bool ensurePipeline(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision = m_resource_set.evaluateGpuResources(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision =
+            m_resource_set.prepareGpuResourceBuild(context, isComplete());
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -315,7 +315,6 @@ public:
         }
 
         releasePipelineResources();
-        m_resource_set.bindGpuContext(context);
         const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
@@ -327,24 +326,12 @@ public:
             device, context.compiler, path, "taaCopyFragmentMain", luna::RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeTaaShaderBindingContract();
-        const bool vertex_bindings_valid =
-            m_state.vertex_shader &&
-            validateAndLogRenderFeatureShaderModuleBindings(m_state.vertex_shader, contract, path, "taaVertexMain");
-        const bool fragment_bindings_valid =
-            m_state.fragment_shader &&
-            validateAndLogRenderFeatureShaderModuleBindings(m_state.fragment_shader, contract, path, "taaFragmentMain");
-        const bool copy_fragment_bindings_valid =
-            m_state.copy_fragment_shader &&
-            validateAndLogRenderFeatureShaderModuleBindings(
-                m_state.copy_fragment_shader, contract, path, "taaCopyFragmentMain");
-        m_binding_contract_valid = vertex_bindings_valid && fragment_bindings_valid && copy_fragment_bindings_valid;
-        if (!m_state.vertex_shader || !m_state.fragment_shader || !m_state.copy_fragment_shader) {
-            m_binding_contract_summary = "shader module missing";
-        } else if (!m_binding_contract_valid) {
-            m_binding_contract_summary = "shader reflection mismatch; see renderer log";
-        } else {
-            m_binding_contract_summary = "ok";
-        }
+        const std::array<RenderFeatureShaderBindingCheck, 3> binding_checks{{
+            {.shader = m_state.vertex_shader, .entry_point = "taaVertexMain"},
+            {.shader = m_state.fragment_shader, .entry_point = "taaFragmentMain"},
+            {.shader = m_state.copy_fragment_shader, .entry_point = "taaCopyFragmentMain"},
+        }};
+        m_resource_set.validateShaderBindingContract(binding_checks, contract, path);
 
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
@@ -387,13 +374,12 @@ public:
             return false;
         }
 
-        m_resource_set.bindGpuContext(context);
         return m_resource_set.ensureHistoryTexture2D(m_history, context, makeTemporalHistoryDesc(context));
     }
 
     [[nodiscard]] RenderGraphTextureHandle importHistoryRead(RenderGraphBuilder& graph)
     {
-        return importHistoryReadTexture2D(
+        return m_resource_set.importHistoryReadTexture2D(
             graph,
             m_history,
             RenderFeatureTextureImportOptions{
@@ -405,7 +391,7 @@ public:
 
     [[nodiscard]] RenderGraphTextureHandle importHistoryWrite(RenderGraphBuilder& graph)
     {
-        return importHistoryWriteTexture2D(
+        return m_resource_set.importHistoryWriteTexture2D(
             graph,
             m_history,
             RenderFeatureTextureImportOptions{
@@ -565,34 +551,9 @@ public:
     [[nodiscard]] RenderFeatureDiagnostics diagnostics() const
     {
         RenderFeatureDiagnostics result;
-        result.binding_contract_valid = m_binding_contract_valid;
-        result.binding_contract_summary = m_binding_contract_summary;
-
-        const RenderFeatureResourceReport gpu_report =
-            m_resource_set.gpuResourceReport(isComplete(), resourceStatus());
-        result.pipeline_resources_valid = gpu_report.valid;
-        result.pipeline_resources_summary = gpu_report.summary;
-        for (const RenderFeatureResourceReportEntry& resource : gpu_report.resources) {
-            result.pipeline_resources.push_back(RenderFeatureStatusEntry{
-                .name = resource.name,
-                .ready = resource.ready,
-            });
-        }
-
-        result.history_resources_valid = !m_history_evaluated || m_history.isValid();
-        if (!m_history_evaluated) {
-            result.history_resources_summary = "not evaluated";
-            return result;
-        }
-
-        result.history_resources_summary =
-            m_history.isValid() ? (m_history.hasReadableHistory() ? "ok" : "warming up") : "incomplete";
-        for (const RenderFeatureResourceStatus& resource : historyResourceStatus()) {
-            result.history_resources.push_back(RenderFeatureStatusEntry{
-                .name = std::string(resource.name),
-                .ready = resource.ready,
-            });
-        }
+        m_resource_set.writeBindingContractDiagnostics(result);
+        m_resource_set.writePipelineResourceDiagnostics(result, isComplete(), resourceStatus());
+        m_resource_set.writeHistoryResourceDiagnostics(result, m_history_evaluated, m_history, historyResourceStatus());
         return result;
     }
 
@@ -674,8 +635,6 @@ private:
 
     State m_state{};
     RenderFeatureResourceSet m_resource_set{std::string(kFeatureName)};
-    bool m_binding_contract_valid{true};
-    std::string m_binding_contract_summary{"not evaluated"};
     HistoryTexture2D m_history;
     RenderFeatureFrameContext m_frame_context{};
     bool m_history_evaluated{false};

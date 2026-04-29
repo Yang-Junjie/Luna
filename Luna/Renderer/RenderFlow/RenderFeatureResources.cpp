@@ -1,6 +1,8 @@
 #include "Renderer/RenderFlow/RenderFeatureResources.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/RenderFeature.h"
+#include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -52,6 +54,19 @@ RenderFeatureResourceReport makeResourceReport(bool evaluated,
     report.valid = !evaluated || complete;
     report.summary = evaluated ? (complete ? "ok" : "incomplete") : "not evaluated";
     return report;
+}
+
+void copyResourceReportEntries(const RenderFeatureResourceReport& report,
+                               std::vector<RenderFeatureStatusEntry>& target)
+{
+    target.clear();
+    target.reserve(report.resources.size());
+    for (const RenderFeatureResourceReportEntry& resource : report.resources) {
+        target.push_back(RenderFeatureStatusEntry{
+            .name = resource.name,
+            .ready = resource.ready,
+        });
+    }
 }
 
 } // namespace
@@ -400,6 +415,17 @@ RenderFeatureGpuResourceDecision RenderFeatureResourceSet::evaluateGpuResources(
     return m_gpu_resources.evaluate(context, resources_complete);
 }
 
+RenderFeatureGpuResourceDecision RenderFeatureResourceSet::prepareGpuResourceBuild(
+    const SceneRenderContext& context,
+    bool resources_complete) noexcept
+{
+    const RenderFeatureGpuResourceDecision decision = evaluateGpuResources(context, resources_complete);
+    if (decision.action == RenderFeatureGpuResourceAction::Rebuild) {
+        bindGpuContext(context);
+    }
+    return decision;
+}
+
 void RenderFeatureResourceSet::bindGpuContext(const SceneRenderContext& context) noexcept
 {
     m_gpu_resources.bindContext(context);
@@ -431,6 +457,49 @@ bool RenderFeatureResourceSet::logGpuResourceBuildResult(
     return logRenderFeatureGpuResourceBuildResult(m_gpu_resources, resources);
 }
 
+void RenderFeatureResourceSet::resetBindingContractDiagnostics() noexcept
+{
+    m_binding_contract_valid = true;
+    m_binding_contract_summary = "not evaluated";
+}
+
+bool RenderFeatureResourceSet::validateShaderBindingContract(
+    std::span<const RenderFeatureShaderBindingCheck> shaders,
+    const ShaderBindingContract& contract,
+    const std::filesystem::path& shader_file)
+{
+    bool complete = true;
+    bool missing_shader = false;
+    for (const RenderFeatureShaderBindingCheck& shader : shaders) {
+        if (!shader.shader) {
+            complete = false;
+            missing_shader = true;
+            continue;
+        }
+
+        complete = luna::render_flow::validateAndLogRenderFeatureShaderModuleBindings(
+                       shader.shader, contract, shader_file, shader.entry_point) &&
+                   complete;
+    }
+
+    m_binding_contract_valid = complete;
+    if (missing_shader) {
+        m_binding_contract_summary = "shader module missing";
+    } else if (!complete) {
+        m_binding_contract_summary = "shader reflection mismatch; see renderer log";
+    } else {
+        m_binding_contract_summary = "ok";
+    }
+
+    return m_binding_contract_valid;
+}
+
+void RenderFeatureResourceSet::writeBindingContractDiagnostics(RenderFeatureDiagnostics& diagnostics) const
+{
+    diagnostics.binding_contract_valid = m_binding_contract_valid;
+    diagnostics.binding_contract_summary = m_binding_contract_summary;
+}
+
 RenderFeatureResourceReport RenderFeatureResourceSet::gpuResourceReport(
     bool resources_complete,
     std::span<const RenderFeatureResourceStatus> resources) const
@@ -443,6 +512,59 @@ RenderFeatureResourceReport RenderFeatureResourceSet::resourceReport(
     std::span<const RenderFeatureResourceStatus> resources) const
 {
     return makeResourceReport(evaluated, true, resources);
+}
+
+RenderFeatureResourceReport RenderFeatureResourceSet::historyResourceReport(
+    bool evaluated,
+    const HistoryTexture2D& history,
+    std::span<const RenderFeatureResourceStatus> resources) const
+{
+    RenderFeatureResourceReport report = resourceReport(evaluated, resources);
+    if (!evaluated) {
+        return report;
+    }
+
+    report.valid = report.valid && history.isValid();
+    if (!history.isValid()) {
+        report.summary = "incomplete";
+    } else {
+        report.summary = history.hasReadableHistory() ? "ok" : "warming up";
+    }
+    return report;
+}
+
+void RenderFeatureResourceSet::writePipelineResourceDiagnostics(
+    RenderFeatureDiagnostics& diagnostics,
+    bool resources_complete,
+    std::span<const RenderFeatureResourceStatus> resources) const
+{
+    const RenderFeatureResourceReport report = gpuResourceReport(resources_complete, resources);
+    diagnostics.pipeline_resources_valid = report.valid;
+    diagnostics.pipeline_resources_summary = report.summary;
+    copyResourceReportEntries(report, diagnostics.pipeline_resources);
+}
+
+void RenderFeatureResourceSet::writePersistentResourceDiagnostics(
+    RenderFeatureDiagnostics& diagnostics,
+    bool evaluated,
+    std::span<const RenderFeatureResourceStatus> resources) const
+{
+    const RenderFeatureResourceReport report = resourceReport(evaluated, resources);
+    diagnostics.persistent_resources_valid = report.valid;
+    diagnostics.persistent_resources_summary = report.summary;
+    copyResourceReportEntries(report, diagnostics.persistent_resources);
+}
+
+void RenderFeatureResourceSet::writeHistoryResourceDiagnostics(
+    RenderFeatureDiagnostics& diagnostics,
+    bool evaluated,
+    const HistoryTexture2D& history,
+    std::span<const RenderFeatureResourceStatus> resources) const
+{
+    const RenderFeatureResourceReport report = historyResourceReport(evaluated, history, resources);
+    diagnostics.history_resources_valid = report.valid;
+    diagnostics.history_resources_summary = report.summary;
+    copyResourceReportEntries(report, diagnostics.history_resources);
 }
 
 bool RenderFeatureResourceSet::ensurePersistentTexture2D(PersistentTexture2D& texture,
@@ -469,13 +591,33 @@ bool RenderFeatureResourceSet::ensureHistoryTexture2D(HistoryTexture2D& history,
                                                       const SceneRenderContext& context,
                                                       const PersistentTexture2DDesc& desc) const
 {
+    if (!context.device) {
+        history.reset();
+        return false;
+    }
+
     return history.ensure(context.device, desc);
+}
+
+bool RenderFeatureResourceSet::hasReadableHistoryTexture2D(const HistoryTexture2D& history) const noexcept
+{
+    return history.hasReadableHistory();
+}
+
+bool RenderFeatureResourceSet::wasHistoryTexture2DWritten(const HistoryTexture2D& history) const noexcept
+{
+    return history.wasFrameWritten();
 }
 
 void RenderFeatureResourceSet::beginHistoryFrame(HistoryTexture2D& history,
                                                  const RenderFeatureFrameContext& frame_context) const noexcept
 {
     history.beginFrame(frame_context);
+}
+
+void RenderFeatureResourceSet::invalidateHistoryTexture2D(HistoryTexture2D& history) const noexcept
+{
+    history.invalidateHistory();
 }
 
 void RenderFeatureResourceSet::commitHistoryTexture2D(HistoryTexture2D& history) const noexcept
@@ -486,6 +628,22 @@ void RenderFeatureResourceSet::commitHistoryTexture2D(HistoryTexture2D& history)
 void RenderFeatureResourceSet::resetHistoryTexture2D(HistoryTexture2D& history) const noexcept
 {
     history.reset();
+}
+
+RenderGraphTextureHandle RenderFeatureResourceSet::importHistoryReadTexture2D(
+    luna::RenderGraphBuilder& graph,
+    HistoryTexture2D& history,
+    const RenderFeatureTextureImportOptions& options) const
+{
+    return luna::render_flow::importHistoryReadTexture2D(graph, history, options);
+}
+
+RenderGraphTextureHandle RenderFeatureResourceSet::importHistoryWriteTexture2D(
+    luna::RenderGraphBuilder& graph,
+    HistoryTexture2D& history,
+    const RenderFeatureTextureImportOptions& options) const
+{
+    return luna::render_flow::importHistoryWriteTexture2D(graph, history, options);
 }
 
 RenderGraphTextureHandle importPersistentTexture2D(luna::RenderGraphBuilder& graph,
