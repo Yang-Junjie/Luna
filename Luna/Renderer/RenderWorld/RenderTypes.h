@@ -76,6 +76,7 @@ struct RenderSpotLight {
 
 struct RenderEnvironment {
     bool enabled{true};
+    bool ibl_enabled{true};
     AssetHandle environment_map_handle{AssetHandle(0)};
     float intensity{1.0f};
     float sky_intensity{1.0f};

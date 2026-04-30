@@ -736,14 +736,18 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
         params.spot_light_color_cones[light_index] = glm::vec4(light.color, 0.0f);
         params.spot_light_cone_params[light_index] = glm::vec4(light.innerConeCos, light.outerConeCos, 0.0f, 0.0f);
     }
+    const bool ibl_enabled = environment == nullptr || environment->ibl_enabled;
     const float environment_intensity = environment != nullptr ? (std::max)(environment->intensity, 0.0f) : 1.0f;
+    const float ibl_environment_intensity = ibl_enabled ? environment_intensity : 0.0f;
     const float diffuse_intensity =
-        environment != nullptr ? (std::max)(environment->diffuse_intensity, 0.0f) : 1.0f;
+        ibl_enabled && environment != nullptr ? (std::max)(environment->diffuse_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
     const float specular_intensity =
-        environment != nullptr ? (std::max)(environment->specular_intensity, 0.0f) : 1.0f;
+        ibl_enabled && environment != nullptr ? (std::max)(environment->specular_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
     const float sky_intensity = environment != nullptr ? (std::max)(environment->sky_intensity, 0.0f) : 1.0f;
-    params.ibl_factors =
-        glm::vec4(diffuse_intensity, specular_intensity, environment_intensity, sky_intensity * environment_intensity);
+    params.ibl_factors = glm::vec4(diffuse_intensity,
+                                   specular_intensity,
+                                   ibl_environment_intensity,
+                                   sky_intensity * environment_intensity);
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f,
                                             0.65f,
                                             static_cast<float>(context.debug_view_mode),

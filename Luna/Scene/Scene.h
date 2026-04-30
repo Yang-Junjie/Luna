@@ -13,6 +13,7 @@ namespace luna {
 
 struct SceneEnvironmentSettings {
     bool enabled = true;
+    bool iblEnabled = true;
     AssetHandle environmentMapHandle = AssetHandle(0);
     float intensity = 1.0f;
     float skyIntensity = 1.0f;
@@ -47,6 +48,8 @@ public:
 
     void setName(std::string name);
     const std::string& getName() const;
+    void setIblEnabled(bool enabled);
+    bool isIblEnabled() const;
     SceneEnvironmentSettings& environmentSettings();
     const SceneEnvironmentSettings& environmentSettings() const;
 

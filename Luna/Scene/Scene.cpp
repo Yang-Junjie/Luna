@@ -147,6 +147,16 @@ const std::string& Scene::getName() const
     return m_name;
 }
 
+void Scene::setIblEnabled(bool enabled)
+{
+    m_environment_settings.iblEnabled = enabled;
+}
+
+bool Scene::isIblEnabled() const
+{
+    return m_environment_settings.iblEnabled;
+}
+
 SceneEnvironmentSettings& Scene::environmentSettings()
 {
     return m_environment_settings;

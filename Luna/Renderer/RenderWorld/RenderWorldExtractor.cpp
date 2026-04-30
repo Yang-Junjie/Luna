@@ -77,9 +77,10 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
     auto& registry = entity_manager.registry();
 
     const SceneEnvironmentSettings& environment_settings = scene.environmentSettings();
-    if (environment_settings.enabled) {
+    if (environment_settings.enabled || !environment_settings.iblEnabled) {
         render_world.setEnvironment(RenderEnvironment{
             .enabled = environment_settings.enabled,
+            .ibl_enabled = environment_settings.iblEnabled,
             .environment_map_handle = environment_settings.environmentMapHandle,
             .intensity = (std::max)(environment_settings.intensity, 0.0f),
             .sky_intensity = (std::max)(environment_settings.skyIntensity, 0.0f),

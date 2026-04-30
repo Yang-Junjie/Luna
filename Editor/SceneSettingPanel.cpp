@@ -136,7 +136,8 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
 
 bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const luna::SceneEnvironmentSettings& rhs)
 {
-    return lhs.enabled == rhs.enabled && lhs.environmentMapHandle == rhs.environmentMapHandle &&
+    return lhs.enabled == rhs.enabled && lhs.iblEnabled == rhs.iblEnabled &&
+           lhs.environmentMapHandle == rhs.environmentMapHandle &&
            lhs.intensity == rhs.intensity && lhs.skyIntensity == rhs.skyIntensity &&
            lhs.diffuseIntensity == rhs.diffuseIntensity && lhs.specularIntensity == rhs.specularIntensity &&
            sameVec3(lhs.proceduralSunDirection, rhs.proceduralSunDirection) &&
@@ -186,6 +187,7 @@ void SceneSettingPanel::onImGuiRender()
 
     if (ImGui::CollapsingHeader("Environment", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Checkbox("Enabled", &environment.enabled);
+        ImGui::Checkbox("IBL Enabled", &environment.iblEnabled);
 
         drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
         ImGui::TextDisabled("Environment Asset: %s", getAssetDisplayLabel(environment.environmentMapHandle).c_str());

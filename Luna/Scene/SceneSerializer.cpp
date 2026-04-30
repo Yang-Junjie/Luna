@@ -47,6 +47,7 @@ void emitSceneEnvironment(YAML::Emitter& out, const luna::SceneEnvironmentSettin
 {
     out << YAML::Key << "Environment" << YAML::Value << YAML::BeginMap;
     out << YAML::Key << "Enabled" << YAML::Value << environment.enabled;
+    out << YAML::Key << "IblEnabled" << YAML::Value << environment.iblEnabled;
     out << YAML::Key << "EnvironmentMapHandle" << YAML::Value
         << static_cast<uint64_t>(environment.environmentMapHandle);
     out << YAML::Key << "Intensity" << YAML::Value << environment.intensity;
@@ -75,6 +76,9 @@ void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings
 
     if (node["Enabled"]) {
         environment.enabled = node["Enabled"].as<bool>();
+    }
+    if (node["IblEnabled"]) {
+        environment.iblEnabled = node["IblEnabled"].as<bool>();
     }
     if (node["EnvironmentMapHandle"]) {
         environment.environmentMapHandle = luna::AssetHandle(node["EnvironmentMapHandle"].as<uint64_t>());
