@@ -20,6 +20,7 @@ enum class RenderDebugViewMode : uint8_t {
     None,
     Velocity,
     HistoryValidity,
+    ShadowCascades,
 };
 
 struct SceneShaderPaths {

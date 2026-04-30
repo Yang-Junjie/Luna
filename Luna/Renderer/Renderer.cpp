@@ -57,6 +57,8 @@ const char* renderDebugViewModeToString(RenderDebugViewMode mode)
             return "Velocity";
         case RenderDebugViewMode::HistoryValidity:
             return "HistoryValidity";
+        case RenderDebugViewMode::ShadowCascades:
+            return "ShadowCascades";
         default:
             return "Unknown";
     }

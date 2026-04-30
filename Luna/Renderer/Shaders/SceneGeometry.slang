@@ -2,6 +2,7 @@ static const float kPi = 3.14159265359;
 static const float kMinRoughness = 0.045;
 static const uint kMaxPointLights = 32;
 static const uint kMaxSpotLights = 32;
+static const uint kShadowCascadeCount = 4;
 
 struct SceneVertexInput
 {
@@ -43,7 +44,8 @@ struct MeshPushConstants
 {
     float4x4 model;
     uint pickingId;
-    uint3 padding;
+    uint shadowCascadeIndex;
+    uint2 padding;
 };
 
 struct MaterialParams
@@ -80,8 +82,10 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
-    float4x4 shadowViewProjection;
+    float4x4 shadowViewProjections[kShadowCascadeCount];
     float4 shadowParams;
+    float4 shadowCascadeSplits;
+    float4 shadowAtlasParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
     float4 pointLightColorRange[kMaxPointLights];

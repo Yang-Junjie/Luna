@@ -11,7 +11,12 @@ inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::R
 inline constexpr luna::RHI::Format kVelocityFormat = luna::RHI::Format::RG16_FLOAT;
 inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_UINT;
 inline constexpr luna::RHI::Format kShadowMapFormat = luna::RHI::Format::R32_FLOAT;
-inline constexpr uint32_t kShadowMapSize = 2048;
+inline constexpr uint32_t kShadowCascadeCount = 4;
+inline constexpr uint32_t kShadowCascadeAtlasColumns = 2;
+inline constexpr uint32_t kShadowCascadeAtlasRows = 2;
+inline constexpr uint32_t kShadowCascadeTileSize = 2048;
+inline constexpr uint32_t kShadowCascadeAtlasSize = kShadowCascadeTileSize * kShadowCascadeAtlasColumns;
+inline constexpr uint32_t kShadowMapSize = kShadowCascadeTileSize;
 
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
 inline constexpr luna::RHI::Format kEnvironmentIblFormat = luna::RHI::Format::RGBA16_FLOAT;

@@ -32,7 +32,8 @@ void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint
                                               const DrawPassResources& pass_resources,
                                               const std::vector<DrawCommand>& draw_commands,
                                               const AssetCache& assets,
-                                              const Material& default_material);
+                                              const Material& default_material,
+                                              uint32_t cascade_index = 0);
 
 void updateSceneParameters(PassSharedState& state, const SceneRenderContext& context);
 void updateEnvironmentBindings(PassSharedState& state);

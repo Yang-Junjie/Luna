@@ -14,10 +14,11 @@ struct DebugModeItem {
     const char* label;
 };
 
-constexpr std::array<DebugModeItem, 3> kDebugModes{{
+constexpr std::array<DebugModeItem, 4> kDebugModes{{
     {RenderDebugViewMode::None, "None"},
     {RenderDebugViewMode::Velocity, "Velocity"},
     {RenderDebugViewMode::HistoryValidity, "History Validity"},
+    {RenderDebugViewMode::ShadowCascades, "Shadow Cascades"},
 }};
 
 int modeIndex(RenderDebugViewMode mode)

@@ -757,8 +757,10 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
                   static_cast<float>(context.debug_pick_pixel_y),
                   (context.show_pick_debug_visualization && context.show_pick_debug_marker) ? 1.0f : 0.0f,
                   1.0f);
-    params.shadow_view_projection = shadow_params.view_projection;
+    params.shadow_view_projections = shadow_params.view_projections;
     params.shadow_params = shadow_params.params;
+    params.shadow_cascade_splits = shadow_params.cascade_splits;
+    params.shadow_atlas_params = shadow_params.atlas_params;
     params.irradiance_sh = irradiance_sh;
 
     if (void* mapped = scene_params_buffer->Map()) {

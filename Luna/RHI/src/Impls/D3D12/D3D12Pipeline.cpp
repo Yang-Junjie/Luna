@@ -88,6 +88,32 @@ UINT8 ToD3D12ColorWriteMask(luna::RHI::ColorComponentFlags mask)
     }
     return result;
 }
+
+D3D12_COMPARISON_FUNC ToD3D12ComparisonFunc(luna::RHI::CompareOp op)
+{
+    using namespace luna::RHI;
+
+    switch (op) {
+        case CompareOp::Never:
+            return D3D12_COMPARISON_FUNC_NEVER;
+        case CompareOp::Less:
+            return D3D12_COMPARISON_FUNC_LESS;
+        case CompareOp::Equal:
+            return D3D12_COMPARISON_FUNC_EQUAL;
+        case CompareOp::LessOrEqual:
+            return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        case CompareOp::Greater:
+            return D3D12_COMPARISON_FUNC_GREATER;
+        case CompareOp::NotEqual:
+            return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+        case CompareOp::GreaterOrEqual:
+            return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+        case CompareOp::Always:
+            return D3D12_COMPARISON_FUNC_ALWAYS;
+        default:
+            return D3D12_COMPARISON_FUNC_LESS;
+    }
+}
 }
 
 namespace luna::RHI {
@@ -169,13 +195,18 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     }
     psoDesc.RasterizerState.FrontCounterClockwise =
         (info.Rasterizer.FrontFace == FrontFace::CounterClockwise) ? TRUE : FALSE;
-    psoDesc.RasterizerState.DepthClipEnable = TRUE;
+    psoDesc.RasterizerState.DepthBias = static_cast<INT>(info.Rasterizer.DepthBiasConstantFactor);
+    psoDesc.RasterizerState.DepthBiasClamp = info.Rasterizer.DepthBiasClamp;
+    psoDesc.RasterizerState.SlopeScaledDepthBias = info.Rasterizer.DepthBiasSlopeFactor;
+    psoDesc.RasterizerState.DepthClipEnable = info.Rasterizer.DepthClampEnable ? FALSE : TRUE;
+    psoDesc.RasterizerState.MultisampleEnable = info.Multisample.RasterizationSamples > 1 ? TRUE : FALSE;
+    psoDesc.RasterizerState.AntialiasedLineEnable = FALSE;
 
     // Depth-Stencil
     psoDesc.DepthStencilState.DepthEnable = info.DepthStencil.DepthTestEnable ? TRUE : FALSE;
     psoDesc.DepthStencilState.DepthWriteMask =
         info.DepthStencil.DepthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
-    psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    psoDesc.DepthStencilState.DepthFunc = ToD3D12ComparisonFunc(info.DepthStencil.DepthCompareOp);
 
     // Blend
     psoDesc.BlendState.AlphaToCoverageEnable = info.Multisample.AlphaToCoverageEnable ? TRUE : FALSE;

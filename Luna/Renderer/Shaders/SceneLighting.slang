@@ -2,6 +2,7 @@ static const float kPi = 3.14159265359;
 static const float kMinRoughness = 0.045;
 static const uint kMaxPointLights = 32;
 static const uint kMaxSpotLights = 32;
+static const uint kShadowCascadeCount = 4;
 
 struct SceneLightingVertexOutput
 {
@@ -35,8 +36,10 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
-    float4x4 shadowViewProjection;
+    float4x4 shadowViewProjections[kShadowCascadeCount];
     float4 shadowParams;
+    float4 shadowCascadeSplits;
+    float4 shadowAtlasParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
     float4 pointLightColorRange[kMaxPointLights];
@@ -263,6 +266,72 @@ float2 shadowUvFromClip(float2 clipXY)
     return uv;
 }
 
+float2 shadowAtlasUv(float2 cascadeUv, uint cascadeIndex)
+{
+    const uint atlasColumns = max((uint)(gSceneParams.shadowAtlasParams.x + 0.5), 1u);
+    const uint tileX = cascadeIndex % atlasColumns;
+    const uint tileY = cascadeIndex / atlasColumns;
+    const float2 tileOffset = float2((float)tileX, (float)tileY) * gSceneParams.shadowAtlasParams.zw;
+    return tileOffset + cascadeUv * gSceneParams.shadowAtlasParams.zw;
+}
+
+uint shadowCascadeCount()
+{
+    return min(max((uint)(gSceneParams.shadowParams.z + 0.5), 1u), kShadowCascadeCount);
+}
+
+float shadowSplit(uint cascadeIndex)
+{
+    if (cascadeIndex == 0u)
+    {
+        return gSceneParams.shadowCascadeSplits.x;
+    }
+    if (cascadeIndex == 1u)
+    {
+        return gSceneParams.shadowCascadeSplits.y;
+    }
+    if (cascadeIndex == 2u)
+    {
+        return gSceneParams.shadowCascadeSplits.z;
+    }
+    return gSceneParams.shadowCascadeSplits.w;
+}
+
+uint selectShadowCascade(float viewDepth)
+{
+    const uint cascadeCount = shadowCascadeCount();
+    if (viewDepth <= shadowSplit(0u) || cascadeCount <= 1u)
+    {
+        return 0u;
+    }
+    if (cascadeCount > 1u && viewDepth <= shadowSplit(1u))
+    {
+        return 1u;
+    }
+    if (cascadeCount > 2u && viewDepth <= shadowSplit(2u))
+    {
+        return 2u;
+    }
+    return min(cascadeCount - 1u, kShadowCascadeCount - 1u);
+}
+
+float shadowCascadeDepthSpan(uint cascadeIndex)
+{
+    const float splitEnd = shadowSplit(cascadeIndex);
+    if (cascadeIndex == 0u)
+    {
+        return max(splitEnd, 0.001);
+    }
+    return max(splitEnd - shadowSplit(cascadeIndex - 1u), 0.001);
+}
+
+float shadowCascadeBiasScale(uint cascadeIndex)
+{
+    const float firstCascadeSpan = shadowCascadeDepthSpan(0u);
+    const float cascadeSpan = shadowCascadeDepthSpan(cascadeIndex);
+    return sqrt(max(cascadeSpan / firstCascadeSpan, 1.0));
+}
+
 float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 lightDirection)
 {
     if (gSceneParams.shadowParams.x <= 0.5)
@@ -270,7 +339,15 @@ float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 li
         return 1.0;
     }
 
-    const float4 shadowClip = mul(gSceneParams.shadowViewProjection, float4(worldPosition, 1.0));
+    const float3 viewPosition = mul(gSceneParams.view, float4(worldPosition, 1.0)).xyz;
+    const float viewDepth = -viewPosition.z;
+    if (viewDepth <= 0.0 || viewDepth > shadowSplit(shadowCascadeCount() - 1u))
+    {
+        return 1.0;
+    }
+
+    const uint cascadeIndex = selectShadowCascade(viewDepth);
+    const float4 shadowClip = mul(gSceneParams.shadowViewProjections[cascadeIndex], float4(worldPosition, 1.0));
     if (abs(shadowClip.w) <= 1e-6)
     {
         return 1.0;
@@ -286,23 +363,35 @@ float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 li
 
     const float normalLightFactor = 1.0 - saturate(dot(safeNormalize(normalWS, float3(0.0, 0.0, 1.0)),
                                                        safeNormalize(lightDirection, float3(0.0, 1.0, 0.0))));
-    const float bias = max(gSceneParams.shadowParams.y * normalLightFactor, gSceneParams.shadowParams.y * 0.25);
-    const float texelSize = gSceneParams.shadowParams.w;
+    const float cascadeBiasScale = shadowCascadeBiasScale(cascadeIndex);
+    const float bias =
+        max(gSceneParams.shadowParams.y * normalLightFactor, gSceneParams.shadowParams.y * 0.25) * cascadeBiasScale;
+    const float2 atlasUv = shadowAtlasUv(shadowUv, cascadeIndex);
+    const float2 atlasTexelSize = gSceneParams.shadowParams.w * gSceneParams.shadowAtlasParams.zw;
+    const uint atlasColumns = max((uint)(gSceneParams.shadowAtlasParams.x + 0.5), 1u);
+    const uint tileX = cascadeIndex % atlasColumns;
+    const uint tileY = cascadeIndex / atlasColumns;
+    const float2 tileMinUv = float2((float)tileX, (float)tileY) * gSceneParams.shadowAtlasParams.zw;
+    const float2 tileMaxUv = tileMinUv + gSceneParams.shadowAtlasParams.zw;
+    static const int kShadowPcfRadius = 3;
+    static const float kShadowPcfSampleCount = 49.0;
     float visibility = 0.0;
 
     [unroll]
-    for (int y = -1; y <= 1; ++y)
+    for (int y = -kShadowPcfRadius; y <= kShadowPcfRadius; ++y)
     {
         [unroll]
-        for (int x = -1; x <= 1; ++x)
+        for (int x = -kShadowPcfRadius; x <= kShadowPcfRadius; ++x)
         {
+            const float2 sampleUv =
+                clamp(atlasUv + float2(x, y) * atlasTexelSize, tileMinUv + atlasTexelSize, tileMaxUv - atlasTexelSize);
             const float sampledDepth =
-                gShadowMap.SampleLevel(gShadowSampler, shadowUv + float2(x, y) * texelSize, 0.0);
+                gShadowMap.SampleLevel(gShadowSampler, sampleUv, 0.0);
             visibility += (shadowNdc.z - bias) <= sampledDepth ? 1.0 : 0.0;
         }
     }
 
-    return visibility / 9.0;
+    return visibility / kShadowPcfSampleCount;
 }
 
 float3 reconstructViewDirection(float2 uv)
@@ -520,6 +609,54 @@ bool isGBufferSurface(float4 baseColorAlpha, float4 normalMetallic)
     return dot(normalMetallic.xyz, normalMetallic.xyz) >= 1e-6 && baseColorAlpha.a > 0.001;
 }
 
+float3 shadowCascadeDebugColor(uint cascadeIndex)
+{
+    if (cascadeIndex == 0u)
+    {
+        return float3(0.95, 0.18, 0.16);
+    }
+    if (cascadeIndex == 1u)
+    {
+        return float3(0.16, 0.78, 0.25);
+    }
+    if (cascadeIndex == 2u)
+    {
+        return float3(0.16, 0.38, 0.95);
+    }
+    return float3(0.95, 0.82, 0.16);
+}
+
+float4 debugShadowCascades(float2 uv)
+{
+    if (gSceneParams.shadowParams.x <= 0.5)
+    {
+        return float4(0.08, 0.08, 0.08, 1.0);
+    }
+
+    const float4 baseColorAlpha = gGBufferBaseColor.Sample(gGBufferSampler, uv);
+    const float4 normalMetallic = gGBufferNormalMetallic.Sample(gGBufferSampler, uv);
+    if (!isGBufferSurface(baseColorAlpha, normalMetallic))
+    {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    const float3 worldPosition = gGBufferWorldPositionRoughness.Sample(gGBufferSampler, uv).xyz;
+    const float3 viewPosition = mul(gSceneParams.view, float4(worldPosition, 1.0)).xyz;
+    const float viewDepth = -viewPosition.z;
+    const float maxShadowDepth = shadowSplit(shadowCascadeCount() - 1u);
+    if (viewDepth <= 0.0 || viewDepth > maxShadowDepth)
+    {
+        return float4(0.12, 0.12, 0.12, 1.0);
+    }
+
+    const uint cascadeIndex = selectShadowCascade(viewDepth);
+    const float splitStart = cascadeIndex == 0u ? 0.0 : shadowSplit(cascadeIndex - 1u);
+    const float splitEnd = shadowSplit(cascadeIndex);
+    const float splitT = saturate((viewDepth - splitStart) / max(splitEnd - splitStart, 0.001));
+    const float3 cascadeColor = shadowCascadeDebugColor(cascadeIndex);
+    return float4(lerp(cascadeColor * 0.55, cascadeColor, 1.0 - splitT * 0.35), 1.0);
+}
+
 [shader("fragment")]
 float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
 {
@@ -599,6 +736,11 @@ float4 sceneDebugFragmentMain(SceneLightingVertexOutput input) : SV_Target
     {
         return gSceneParams.viewFlags.x != 0u ? float4(0.05, 0.85, 0.25, 1.0)
                                               : float4(0.90, 0.10, 0.08, 1.0);
+    }
+
+    if (mode == 3u)
+    {
+        return debugShadowCascades(input.uv);
     }
 
     return float4(0.0, 0.0, 0.0, 1.0);

@@ -12,7 +12,8 @@ namespace luna::render_flow::default_scene_detail {
 struct MeshPushConstants {
     glm::mat4 model{1.0f};
     uint32_t picking_id{0};
-    uint32_t padding[3]{0, 0, 0};
+    uint32_t shadow_cascade_index{0};
+    uint32_t padding[2]{0, 0};
 };
 
 struct SceneGpuParams {
@@ -40,8 +41,15 @@ struct SceneGpuParams {
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
     glm::vec4 debug_overlay_params{0.0f, 0.65f, 0.0f, 0.0f};
     glm::vec4 debug_pick_marker{0.0f, 0.0f, 0.0f, 1.0f};
-    glm::mat4 shadow_view_projection{1.0f};
-    glm::vec4 shadow_params{0.0f, 0.0015f, 0.0f, 1.0f / static_cast<float>(kShadowMapSize)};
+    std::array<glm::mat4, kShadowCascadeCount> shadow_view_projections{
+        glm::mat4{1.0f}, glm::mat4{1.0f}, glm::mat4{1.0f}, glm::mat4{1.0f}};
+    glm::vec4 shadow_params{
+        0.0f, 0.0015f, static_cast<float>(kShadowCascadeCount), 1.0f / static_cast<float>(kShadowCascadeTileSize)};
+    glm::vec4 shadow_cascade_splits{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 shadow_atlas_params{static_cast<float>(kShadowCascadeAtlasColumns),
+                                  static_cast<float>(kShadowCascadeAtlasRows),
+                                  1.0f / static_cast<float>(kShadowCascadeAtlasColumns),
+                                  1.0f / static_cast<float>(kShadowCascadeAtlasRows)};
     glm::vec4 light_counts{0.0f, 0.0f, 0.0f, 0.0f};
     std::array<glm::vec4, kMaxPointLights> point_light_position_intensity{};
     std::array<glm::vec4, kMaxPointLights> point_light_color_range{};
@@ -62,8 +70,15 @@ struct MaterialGpuParams {
 };
 
 struct ShadowRenderParams {
-    glm::mat4 view_projection{1.0f};
-    glm::vec4 params{0.0f, 0.0015f, 0.0f, 1.0f / static_cast<float>(kShadowMapSize)};
+    std::array<glm::mat4, kShadowCascadeCount> view_projections{
+        glm::mat4{1.0f}, glm::mat4{1.0f}, glm::mat4{1.0f}, glm::mat4{1.0f}};
+    glm::vec4 params{
+        0.0f, 0.0015f, static_cast<float>(kShadowCascadeCount), 1.0f / static_cast<float>(kShadowCascadeTileSize)};
+    glm::vec4 cascade_splits{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 atlas_params{static_cast<float>(kShadowCascadeAtlasColumns),
+                           static_cast<float>(kShadowCascadeAtlasRows),
+                           1.0f / static_cast<float>(kShadowCascadeAtlasColumns),
+                           1.0f / static_cast<float>(kShadowCascadeAtlasRows)};
 };
 
 } // namespace luna::render_flow::default_scene_detail

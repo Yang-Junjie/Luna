@@ -65,7 +65,8 @@ size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
                                 const DrawPassResources& pass_resources,
                                 const std::vector<DrawCommand>& draw_commands,
                                 const AssetCache& assets,
-                                const Material& default_material)
+                                const Material& default_material,
+                                uint32_t cascade_index)
 {
     size_t recorded_count = 0;
     for (const auto& draw_command : draw_commands) {
@@ -81,6 +82,7 @@ size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
         render_flow::default_scene_detail::MeshPushConstants push_constants{
             .model = draw_command.transform,
             .picking_id = draw_command.picking_id,
+            .shadow_cascade_index = cascade_index,
         };
         const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
             pass_resources.scene_descriptor_set,

@@ -18,7 +18,10 @@
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <limits>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -26,10 +29,14 @@ namespace {
 constexpr std::array<RenderPassResourceUsage, 1> kShadowPassResources{{
     {.name = blackboard::ShadowMap.value(), .access = RenderPassResourceAccess::Write},
 }};
+constexpr float kCascadeShadowDistance = 120.0f;
+constexpr float kCascadeSplitLambda = 0.55f;
+constexpr float kCascadeLightDepthPadding = 40.0f;
+constexpr float kCascadeBoundsPaddingScale = 1.08f;
 
 ShadowResources createShadowResources(RenderGraphBuilder& graph)
 {
-    const uint32_t shadow_map_size = render_flow::default_scene_detail::kShadowMapSize;
+    const uint32_t shadow_map_size = render_flow::default_scene_detail::kShadowCascadeAtlasSize;
     return ShadowResources{
         .shadow_map = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = "SceneShadowMap",
@@ -64,14 +71,176 @@ glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
     return length_squared > 1.0e-6f ? glm::normalize(value) : fallback;
 }
 
+void configureCascadeViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t cascade_index)
+{
+    const uint32_t tile_size = render_flow::default_scene_detail::kShadowCascadeTileSize;
+    const uint32_t atlas_columns = render_flow::default_scene_detail::kShadowCascadeAtlasColumns;
+    const uint32_t tile_x = cascade_index % atlas_columns;
+    const uint32_t tile_y = cascade_index / atlas_columns;
+    const uint32_t offset_x = tile_x * tile_size;
+    const uint32_t offset_y = tile_y * tile_size;
+
+    commands.SetViewport({static_cast<float>(offset_x),
+                          static_cast<float>(offset_y),
+                          static_cast<float>(tile_size),
+                          static_cast<float>(tile_size),
+                          0.0f,
+                          1.0f});
+    commands.SetScissor({static_cast<int32_t>(offset_x), static_cast<int32_t>(offset_y), tile_size, tile_size});
+}
+
+float viewportAspectRatio(const SceneRenderContext& context)
+{
+    if (context.framebuffer_height == 0) {
+        return 1.0f;
+    }
+
+    return (std::max)(static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height),
+                      0.001f);
+}
+
+std::array<float, render_flow::default_scene_detail::kShadowCascadeCount>
+    calculateCascadeSplits(float near_clip, float far_clip)
+{
+    std::array<float, render_flow::default_scene_detail::kShadowCascadeCount> splits{};
+    const float clamped_near = (std::max)(near_clip, 0.001f);
+    const float clamped_far = (std::max)(far_clip, clamped_near + 0.001f);
+
+    for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
+         ++cascade_index) {
+        const float split_ratio =
+            static_cast<float>(cascade_index + 1u) /
+            static_cast<float>(render_flow::default_scene_detail::kShadowCascadeCount);
+        const float linear_split = clamped_near + (clamped_far - clamped_near) * split_ratio;
+        const float logarithmic_split = clamped_near * std::pow(clamped_far / clamped_near, split_ratio);
+        splits[cascade_index] =
+            kCascadeSplitLambda * logarithmic_split + (1.0f - kCascadeSplitLambda) * linear_split;
+    }
+
+    splits.back() = clamped_far;
+    return splits;
+}
+
+std::array<glm::vec3, 8>
+    perspectiveFrustumCorners(const Camera& camera, float aspect_ratio, float near_distance, float far_distance)
+{
+    std::array<glm::vec3, 8> corners{};
+    const auto& perspective = camera.getPerspectiveSettings();
+    const glm::vec3 position = camera.getPosition();
+    const glm::vec3 forward = camera.getForwardDirection();
+    const glm::vec3 right = camera.getRightDirection();
+    const glm::vec3 up = camera.getUpDirection();
+
+    const float tan_half_fov = std::tan(perspective.vertical_fov_radians * 0.5f);
+    const float near_half_height = tan_half_fov * near_distance;
+    const float near_half_width = near_half_height * aspect_ratio;
+    const float far_half_height = tan_half_fov * far_distance;
+    const float far_half_width = far_half_height * aspect_ratio;
+
+    const glm::vec3 near_center = position + forward * near_distance;
+    const glm::vec3 far_center = position + forward * far_distance;
+
+    corners[0] = near_center - right * near_half_width - up * near_half_height;
+    corners[1] = near_center + right * near_half_width - up * near_half_height;
+    corners[2] = near_center + right * near_half_width + up * near_half_height;
+    corners[3] = near_center - right * near_half_width + up * near_half_height;
+    corners[4] = far_center - right * far_half_width - up * far_half_height;
+    corners[5] = far_center + right * far_half_width - up * far_half_height;
+    corners[6] = far_center + right * far_half_width + up * far_half_height;
+    corners[7] = far_center - right * far_half_width + up * far_half_height;
+    return corners;
+}
+
+std::array<glm::vec3, 8> orthographicFrustumCorners(const Camera& camera, float aspect_ratio)
+{
+    std::array<glm::vec3, 8> corners{};
+    const auto& orthographic = camera.getOrthographicSettings();
+    const glm::vec3 position = camera.getPosition();
+    const glm::vec3 forward = camera.getForwardDirection();
+    const glm::vec3 right = camera.getRightDirection();
+    const glm::vec3 up = camera.getUpDirection();
+    const float half_height = orthographic.vertical_size * 0.5f;
+    const float half_width = half_height * aspect_ratio;
+    const float near_distance = orthographic.near_clip;
+    const float far_distance = orthographic.far_clip;
+    const glm::vec3 near_center = position + forward * near_distance;
+    const glm::vec3 far_center = position + forward * far_distance;
+
+    corners[0] = near_center - right * half_width - up * half_height;
+    corners[1] = near_center + right * half_width - up * half_height;
+    corners[2] = near_center + right * half_width + up * half_height;
+    corners[3] = near_center - right * half_width + up * half_height;
+    corners[4] = far_center - right * half_width - up * half_height;
+    corners[5] = far_center + right * half_width - up * half_height;
+    corners[6] = far_center + right * half_width + up * half_height;
+    corners[7] = far_center - right * half_width + up * half_height;
+    return corners;
+}
+
+glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
+                                     const glm::vec3& light_direction,
+                                     const luna::RHI::RHIConventions& conventions)
+{
+    glm::vec3 center{0.0f};
+    for (const glm::vec3& corner : corners) {
+        center += corner;
+    }
+    center /= static_cast<float>(corners.size());
+
+    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    if (glm::length2(glm::cross(-light_direction, up)) <= 1.0e-6f) {
+        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    const glm::mat4 view = glm::lookAtRH(center + light_direction, center, up);
+    glm::vec3 min_bounds{std::numeric_limits<float>::max()};
+    glm::vec3 max_bounds{std::numeric_limits<float>::lowest()};
+    for (const glm::vec3& corner : corners) {
+        const glm::vec3 light_space_corner = glm::vec3(view * glm::vec4(corner, 1.0f));
+        min_bounds = glm::min(min_bounds, light_space_corner);
+        max_bounds = glm::max(max_bounds, light_space_corner);
+    }
+
+    const glm::vec2 bounds_center = (glm::vec2(min_bounds) + glm::vec2(max_bounds)) * 0.5f;
+    const glm::vec2 half_extent = (glm::vec2(max_bounds) - glm::vec2(min_bounds)) * (0.5f * kCascadeBoundsPaddingScale);
+    min_bounds.x = bounds_center.x - half_extent.x;
+    max_bounds.x = bounds_center.x + half_extent.x;
+    min_bounds.y = bounds_center.y - half_extent.y;
+    max_bounds.y = bounds_center.y + half_extent.y;
+
+    const float cascade_width = max_bounds.x - min_bounds.x;
+    const float cascade_height = max_bounds.y - min_bounds.y;
+    const float texel_size_x =
+        cascade_width / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize);
+    const float texel_size_y =
+        cascade_height / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize);
+    if (texel_size_x > 0.0f && texel_size_y > 0.0f) {
+        const glm::vec2 snapped_center{
+            std::floor(bounds_center.x / texel_size_x) * texel_size_x,
+            std::floor(bounds_center.y / texel_size_y) * texel_size_y,
+        };
+        min_bounds.x = snapped_center.x - half_extent.x;
+        max_bounds.x = snapped_center.x + half_extent.x;
+        min_bounds.y = snapped_center.y - half_extent.y;
+        max_bounds.y = snapped_center.y + half_extent.y;
+    }
+
+    min_bounds.z -= kCascadeLightDepthPadding;
+    max_bounds.z += kCascadeLightDepthPadding;
+
+    const glm::mat4 projection =
+        glm::orthoRH_ZO(min_bounds.x, max_bounds.x, min_bounds.y, max_bounds.y, -max_bounds.z, -min_bounds.z);
+    return adjustProjectionForConventions(projection, conventions) * view;
+}
+
 render_flow::default_scene_detail::ShadowRenderParams
     buildDirectionalShadowParams(const RenderWorld* world, const SceneRenderContext& context, const DrawQueue& draw_queue)
 {
     render_flow::default_scene_detail::ShadowRenderParams params{};
     params.params = glm::vec4(0.0f,
                               0.0018f,
-                              0.0f,
-                              1.0f / static_cast<float>(render_flow::default_scene_detail::kShadowMapSize));
+                              static_cast<float>(render_flow::default_scene_detail::kShadowCascadeCount),
+                              1.0f / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize));
     if (!world || world->directionalLights().empty() ||
         draw_queue.drawCommands(luna::RenderPhase::ShadowCaster).empty()) {
         return params;
@@ -82,23 +251,37 @@ render_flow::default_scene_detail::ShadowRenderParams
         return params;
     }
 
-    constexpr float kShadowHalfExtent = 40.0f;
-    constexpr float kShadowCameraDistance = 70.0f;
-    constexpr float kShadowDepthRange = 160.0f;
     const glm::vec3 light_direction = safeNormalize(light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::vec3 camera_position = world->camera().getPosition();
-    const glm::vec3 shadow_center = camera_position + world->camera().getForwardDirection() * 20.0f;
-    const glm::vec3 shadow_eye = shadow_center + light_direction * kShadowCameraDistance;
+    const Camera& camera = world->camera();
+    const float aspect_ratio = viewportAspectRatio(context);
 
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    if (glm::length2(glm::cross(-light_direction, up)) <= 1.0e-6f) {
-        up = glm::vec3(0.0f, 0.0f, 1.0f);
+    if (camera.getProjectionType() == Camera::ProjectionType::Perspective) {
+        const auto& perspective = camera.getPerspectiveSettings();
+        const float near_clip = (std::max)(perspective.near_clip, 0.001f);
+        const float far_clip = (std::min)(perspective.far_clip, kCascadeShadowDistance);
+        const auto splits = calculateCascadeSplits(near_clip, far_clip);
+
+        float cascade_near = near_clip;
+        for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
+             ++cascade_index) {
+            const float cascade_far = splits[cascade_index];
+            const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, cascade_near, cascade_far);
+            params.view_projections[cascade_index] =
+                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions);
+            params.cascade_splits[cascade_index] = cascade_far;
+            cascade_near = cascade_far;
+        }
+    } else {
+        const auto corners = orthographicFrustumCorners(camera, aspect_ratio);
+        const glm::mat4 view_projection =
+            buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions);
+        for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
+             ++cascade_index) {
+            params.view_projections[cascade_index] = view_projection;
+            params.cascade_splits[cascade_index] = static_cast<float>(cascade_index + 1u);
+        }
     }
 
-    const glm::mat4 view = glm::lookAtRH(shadow_eye, shadow_center, up);
-    const glm::mat4 projection = glm::orthoRH_ZO(
-        -kShadowHalfExtent, kShadowHalfExtent, -kShadowHalfExtent, kShadowHalfExtent, 0.0f, kShadowDepthRange);
-    params.view_projection = adjustProjectionForConventions(projection, context.capabilities.conventions) * view;
     params.params.x = 1.0f;
     return params;
 }
@@ -169,12 +352,17 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
-    configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const size_t recorded_draw_count =
-        recordShadowDrawCommands(commands, pass_resources, shadow_draw_commands, assets, default_material);
-    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} draw command(s)",
+    size_t recorded_draw_count = 0;
+    for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
+         ++cascade_index) {
+        configureCascadeViewportAndScissor(commands, cascade_index);
+        recorded_draw_count +=
+            recordShadowDrawCommands(commands, pass_resources, shadow_draw_commands, assets, default_material, cascade_index);
+    }
+    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} draw command(s) across {} cascade(s)",
                               recorded_draw_count,
-                              shadow_draw_commands.size());
+                              shadow_draw_commands.size() * render_flow::default_scene_detail::kShadowCascadeCount,
+                              render_flow::default_scene_detail::kShadowCascadeCount);
     pass_context.endRendering();
 }
 

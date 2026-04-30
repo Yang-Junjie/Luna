@@ -1,5 +1,6 @@
 static const uint kMaxPointLights = 32;
 static const uint kMaxSpotLights = 32;
+static const uint kShadowCascadeCount = 4;
 
 struct ShadowVertexInput
 {
@@ -20,7 +21,8 @@ struct MeshPushConstants
 {
     float4x4 model;
     uint pickingId;
-    uint3 padding;
+    uint shadowCascadeIndex;
+    uint2 padding;
 };
 
 struct SceneParams
@@ -49,8 +51,10 @@ struct SceneParams
     float4 iblFactors;
     float4 debugOverlayParams;
     float4 debugPickMarker;
-    float4x4 shadowViewProjection;
+    float4x4 shadowViewProjections[kShadowCascadeCount];
     float4 shadowParams;
+    float4 shadowCascadeSplits;
+    float4 shadowAtlasParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
     float4 pointLightColorRange[kMaxPointLights];
@@ -89,7 +93,8 @@ ShadowVertexOutput sceneShadowVertexMain(ShadowVertexInput input)
 {
     ShadowVertexOutput output;
     const float4 worldPosition = mul(gPushConstants.model, float4(input.position, 1.0));
-    output.position = mul(gSceneParams.shadowViewProjection, worldPosition);
+    const uint cascadeIndex = min(gPushConstants.shadowCascadeIndex, kShadowCascadeCount - 1);
+    output.position = mul(gSceneParams.shadowViewProjections[cascadeIndex], worldPosition);
     return output;
 }
 
