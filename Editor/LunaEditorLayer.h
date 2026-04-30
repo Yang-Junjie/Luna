@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 
 struct ImVec2;
@@ -81,6 +82,10 @@ private:
     void updateGizmoShortcuts();
     bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size);
     void resetEditorState();
+    void setRuntimeViewportEnabled(bool enabled);
+    void beginRuntimeViewport();
+    void endRuntimeViewport();
+    Scene& activeRenderScene();
 
     bool syncProjectAssets();
     bool openProject(const std::filesystem::path& project_file_path);
@@ -100,7 +105,8 @@ private:
 private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
-    Scene m_scene;
+    std::unique_ptr<Scene> m_scene;
+    std::unique_ptr<Scene> m_runtime_scene;
     Entity m_selected_entity;
     std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
@@ -116,19 +122,20 @@ private:
     bool m_show_scene_setting_panel{true};
     bool m_show_backend_capabilities_panel{false};
     bool m_runtime_viewport_enabled{false};
+    bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
 
-    SceneHierarchyPanel m_scene_hierarchy_panel;
-    InspectorPanel m_inspector_panel;
-    AssetLoadingPanel m_asset_loading_panel;
-    BuiltinMaterialsPanel m_builtin_materials_panel;
-    ContentBrowserPanel m_content_browser_panel;
-    RenderDebugPanel m_render_debug_panel;
-    RenderFeaturesPanel m_render_features_panel;
-    RenderProfilerPanel m_render_profiler_panel;
-    SceneSettingPanel m_scene_setting_panel;
-    BackendCapabilitiesPanel m_backend_capabilities_panel;
+    std::unique_ptr<SceneHierarchyPanel> m_scene_hierarchy_panel;
+    std::unique_ptr<InspectorPanel> m_inspector_panel;
+    std::unique_ptr<AssetLoadingPanel> m_asset_loading_panel;
+    std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
+    std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
+    std::unique_ptr<RenderDebugPanel> m_render_debug_panel;
+    std::unique_ptr<RenderFeaturesPanel> m_render_features_panel;
+    std::unique_ptr<RenderProfilerPanel> m_render_profiler_panel;
+    std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
+    std::unique_ptr<BackendCapabilitiesPanel> m_backend_capabilities_panel;
 };
 
 } // namespace luna

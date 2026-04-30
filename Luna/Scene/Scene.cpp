@@ -4,6 +4,8 @@
 #include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene.h"
 
+#include <memory>
+#include <vector>
 #include <utility>
 
 namespace luna {
@@ -11,6 +13,72 @@ namespace luna {
 Scene::Scene()
     : m_entity_manager(this)
 {}
+
+std::unique_ptr<Scene> Scene::clone() const
+{
+    auto cloned_scene = std::make_unique<Scene>();
+    cloned_scene->m_name = m_name;
+    cloned_scene->m_asset_load_behavior = m_asset_load_behavior;
+    cloned_scene->m_environment_settings = m_environment_settings;
+
+    auto& cloned_entity_manager = cloned_scene->entityManager();
+    const auto& registry = m_entity_manager.registry();
+
+    std::vector<UUID> serialized_entity_ids;
+    serialized_entity_ids.reserve(m_entity_manager.entityCount());
+
+    auto view = registry.view<const IDComponent>();
+    for (const auto entity_handle : view) {
+        const auto& id_component = registry.get<const IDComponent>(entity_handle);
+        serialized_entity_ids.push_back(id_component.id);
+
+        std::string tag = "Entity";
+        if (registry.all_of<TagComponent>(entity_handle)) {
+            tag = registry.get<const TagComponent>(entity_handle).tag;
+        }
+
+        Entity cloned_entity = cloned_entity_manager.createEntityWithUUID(id_component.id, tag);
+        if (!cloned_entity) {
+            continue;
+        }
+
+        if (registry.all_of<TransformComponent>(entity_handle)) {
+            cloned_entity.getComponent<TransformComponent>() = registry.get<const TransformComponent>(entity_handle);
+        }
+
+        if (registry.all_of<CameraComponent>(entity_handle)) {
+            cloned_entity.addComponent<CameraComponent>(registry.get<const CameraComponent>(entity_handle));
+        }
+
+        if (registry.all_of<LightComponent>(entity_handle)) {
+            cloned_entity.addComponent<LightComponent>(registry.get<const LightComponent>(entity_handle));
+        }
+
+        if (registry.all_of<MeshComponent>(entity_handle)) {
+            cloned_entity.addComponent<MeshComponent>(registry.get<const MeshComponent>(entity_handle));
+        }
+    }
+
+    for (const UUID entity_id : serialized_entity_ids) {
+        Entity source_entity = m_entity_manager.findEntityByUUID(entity_id);
+        Entity cloned_entity = cloned_entity_manager.findEntityByUUID(entity_id);
+        if (!source_entity || !cloned_entity) {
+            continue;
+        }
+
+        const UUID parent_id = source_entity.getParentUUID();
+        if (!parent_id.isValid()) {
+            continue;
+        }
+
+        Entity cloned_parent = cloned_entity_manager.findEntityByUUID(parent_id);
+        if (cloned_parent) {
+            cloned_entity_manager.setParent(cloned_entity, cloned_parent, false);
+        }
+    }
+
+    return cloned_scene;
+}
 
 void Scene::onUpdateRuntime()
 {

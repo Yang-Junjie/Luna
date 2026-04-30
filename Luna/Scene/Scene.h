@@ -6,6 +6,7 @@
 
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
+#include <memory>
 #include <string>
 
 namespace luna {
@@ -36,6 +37,8 @@ public:
 
     Scene();
     ~Scene() = default;
+
+    [[nodiscard]] std::unique_ptr<Scene> clone() const;
 
     void onUpdateRuntime();
     void onUpdateEditor(const Camera& camera);

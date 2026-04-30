@@ -152,10 +152,17 @@ namespace luna {
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application),
-      m_scene_hierarchy_panel(*this),
-      m_inspector_panel(*this),
-      m_scene_setting_panel(*this),
-      m_content_browser_panel(*this)
+      m_scene(std::make_unique<Scene>()),
+      m_scene_hierarchy_panel(std::make_unique<SceneHierarchyPanel>(*this)),
+      m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
+      m_asset_loading_panel(std::make_unique<AssetLoadingPanel>()),
+      m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
+      m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
+      m_render_debug_panel(std::make_unique<RenderDebugPanel>()),
+      m_render_features_panel(std::make_unique<RenderFeaturesPanel>()),
+      m_render_profiler_panel(std::make_unique<RenderProfilerPanel>()),
+      m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
+      m_backend_capabilities_panel(std::make_unique<BackendCapabilitiesPanel>())
 {}
 
 void LunaEditorLayer::onAttach()
@@ -164,7 +171,7 @@ void LunaEditorLayer::onAttach()
         return;
     }
 
-    m_scene.setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
+    m_scene->setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
@@ -190,6 +197,7 @@ void LunaEditorLayer::onDetach()
 
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
+    endRuntimeViewport();
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
     m_application->getRenderer().setRenderDebugViewMode(RenderDebugViewMode::None);
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
@@ -203,6 +211,7 @@ void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
     consumePendingScenePick();
+    setRuntimeViewportEnabled(m_runtime_viewport_requested);
 
     const bool allow_editor_camera = !m_runtime_viewport_enabled &&
                                      (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
@@ -210,10 +219,10 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     m_editor_camera.setInputEnabled(allow_editor_camera);
     if (!m_runtime_viewport_enabled) {
         m_editor_camera.onUpdate(dt);
-        m_scene.onUpdateEditor(m_editor_camera.getCamera());
+        activeRenderScene().onUpdateEditor(m_editor_camera.getCamera());
     } else {
         m_editor_camera.releaseMouseCapture();
-        m_scene.onUpdateRuntime();
+        activeRenderScene().onUpdateRuntime();
     }
 }
 
@@ -247,12 +256,15 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
     ImGui::Separator();
     ImGui::Text("Scene File: %s", m_asset_label.c_str());
-    ImGui::Text("Entities: %zu", m_scene.entityManager().entityCount());
+    ImGui::Text("Entities: %zu", m_scene->entityManager().entityCount());
     ImGui::Separator();
 
     const auto viewport_extent = renderer.getSceneOutputSize();
     ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
     ImGui::Text("Viewport Mode: %s", m_runtime_viewport_enabled ? "Runtime" : "Editor");
+    if (m_runtime_viewport_enabled && m_runtime_scene) {
+        ImGui::Text("Runtime Entities: %zu", m_runtime_scene->entityManager().entityCount());
+    }
     const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
     ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
     ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
@@ -265,39 +277,39 @@ void LunaEditorLayer::onImGuiRender()
         "Scene rendering now targets a persistent offscreen texture and is presented in the Viewport panel.");
     ImGui::End();
 
-    m_scene_hierarchy_panel.onImGuiRender();
-    m_inspector_panel.onImGuiRender();
+    m_scene_hierarchy_panel->onImGuiRender();
+    m_inspector_panel->onImGuiRender();
     if (m_show_scene_setting_panel) {
-        m_scene_setting_panel.onImGuiRender();
+        m_scene_setting_panel->onImGuiRender();
     }
-    m_asset_loading_panel.onImGuiRender();
-    m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
-    m_content_browser_panel.onImGuiRender();
-    m_render_debug_panel.onImGuiRender(m_show_render_debug_panel, renderer);
+    m_asset_loading_panel->onImGuiRender();
+    m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
+    m_content_browser_panel->onImGuiRender();
+    m_render_debug_panel->onImGuiRender(m_show_render_debug_panel, renderer);
     if (m_show_render_features_panel) {
-        m_render_features_panel.onImGuiRender(m_show_render_features_panel,
-                                              renderer.getDefaultRenderFeatureInfos(),
-                                              [&renderer](std::string_view feature_name) {
-                                                  return renderer.getDefaultRenderFeatureParameters(feature_name);
-                                              },
-                                              [&renderer](std::string_view feature_name, bool enabled) {
-                                                  return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
-                                              },
-                                              [&renderer](std::string_view feature_name,
-                                                          std::string_view parameter_name,
-                                                          const render_flow::RenderFeatureParameterValue& value) {
-                                                  return renderer.setDefaultRenderFeatureParameter(
-                                                      feature_name, parameter_name, value);
-                                              });
+        m_render_features_panel->onImGuiRender(m_show_render_features_panel,
+                                               renderer.getDefaultRenderFeatureInfos(),
+                                               [&renderer](std::string_view feature_name) {
+                                                   return renderer.getDefaultRenderFeatureParameters(feature_name);
+                                               },
+                                               [&renderer](std::string_view feature_name, bool enabled) {
+                                                   return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
+                                               },
+                                               [&renderer](std::string_view feature_name,
+                                                           std::string_view parameter_name,
+                                                           const render_flow::RenderFeatureParameterValue& value) {
+                                                   return renderer.setDefaultRenderFeatureParameter(
+                                                       feature_name, parameter_name, value);
+                                               });
     }
-    m_render_profiler_panel.onImGuiRender(m_show_render_profiler_panel,
-                                          renderer.getLastRenderGraphProfile(),
-                                          backendTypeToString(application.getBackend()),
-                                          renderer.isRenderGraphProfilingEnabled(),
-                                          [&renderer](bool enabled) {
-                                              renderer.setRenderGraphProfilingEnabled(enabled);
-                                          });
-    m_backend_capabilities_panel.onImGuiRender(m_show_backend_capabilities_panel, renderer);
+    m_render_profiler_panel->onImGuiRender(m_show_render_profiler_panel,
+                                           renderer.getLastRenderGraphProfile(),
+                                           backendTypeToString(application.getBackend()),
+                                           renderer.isRenderGraphProfilingEnabled(),
+                                           [&renderer](bool enabled) {
+                                               renderer.setRenderGraphProfilingEnabled(enabled);
+                                           });
+    m_backend_capabilities_panel->onImGuiRender(m_show_backend_capabilities_panel, renderer);
     drawViewport();
 }
 
@@ -368,7 +380,7 @@ void LunaEditorLayer::onImGuiMenuBar()
     }
 
     if (ImGui::BeginMenu("Viewport")) {
-        ImGui::MenuItem("Runtime Viewport", nullptr, &m_runtime_viewport_enabled);
+        ImGui::MenuItem("Runtime Viewport", nullptr, &m_runtime_viewport_requested);
         ImGui::EndMenu();
     }
 
@@ -473,7 +485,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     glm::mat4 view = camera.getViewMatrix();
     glm::mat4 projection = camera.getProjectionMatrix(aspect_ratio);
     projection[1][1] *= -1.0f;
-    glm::mat4 transform = m_scene.entityManager().getWorldSpaceTransformMatrix(selected_entity);
+    glm::mat4 transform = m_scene->entityManager().getWorldSpaceTransformMatrix(selected_entity);
 
     ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
     ImGuizmo::SetDrawlist();
@@ -488,7 +500,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
                          glm::value_ptr(transform));
 
     if (ImGuizmo::IsUsing()) {
-        m_scene.entityManager().setWorldSpaceTransform(selected_entity, transform);
+        m_scene->entityManager().setWorldSpaceTransform(selected_entity, transform);
     }
 
     const bool gizmo_active = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
@@ -512,7 +524,7 @@ void LunaEditorLayer::consumePendingScenePick()
         return;
     }
 
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     const entt::entity entity_handle = static_cast<entt::entity>(*picked_id - 1u);
     if (!entity_manager.registry().valid(entity_handle)) {
         setSelectedEntity({});
@@ -582,7 +594,7 @@ const std::string& LunaEditorLayer::getAssetLabel() const
 
 Scene& LunaEditorLayer::getScene()
 {
-    return m_scene;
+    return *m_scene;
 }
 
 Entity LunaEditorLayer::getSelectedEntity() const
@@ -632,7 +644,7 @@ Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Ent
             : (!metadata.Name.empty() ? metadata.Name
                                       : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Model"));
 
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     Entity root = parent ? entity_manager.createChildEntity(parent, root_name) : entity_manager.createEntity(root_name);
     if (!root) {
         return {};
@@ -708,8 +720,8 @@ Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entit
         !metadata.Name.empty() ? metadata.Name
                                : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Mesh Entity");
 
-    Entity entity = parent ? m_scene.entityManager().createChildEntity(parent, entity_name)
-                           : m_scene.entityManager().createEntity(entity_name);
+    Entity entity = parent ? m_scene->entityManager().createChildEntity(parent, entity_name)
+                           : m_scene->entityManager().createEntity(entity_name);
     if (!entity) {
         return {};
     }
@@ -730,7 +742,7 @@ Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity pa
 
 Entity LunaEditorLayer::createCameraEntity(Entity parent)
 {
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     Entity entity = parent ? entity_manager.createChildEntity(parent, "Camera") : entity_manager.createEntity("Camera");
     if (!entity) {
         return {};
@@ -746,7 +758,7 @@ Entity LunaEditorLayer::createCameraEntity(Entity parent)
 
 Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     Entity entity = parent ? entity_manager.createChildEntity(parent, "Directional Light")
                            : entity_manager.createEntity("Directional Light");
     if (!entity) {
@@ -767,7 +779,7 @@ Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 
 Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     Entity entity = parent ? entity_manager.createChildEntity(parent, "Point Light")
                            : entity_manager.createEntity("Point Light");
     if (!entity) {
@@ -789,7 +801,7 @@ Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 
 Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene.entityManager();
+    auto& entity_manager = m_scene->entityManager();
     Entity entity = parent ? entity_manager.createChildEntity(parent, "Spot Light")
                            : entity_manager.createEntity("Spot Light");
     if (!entity) {
@@ -848,23 +860,71 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
 {
     if (material_handle.isValid()) {
-        m_builtin_materials_panel.focusMaterial(material_handle);
+        m_builtin_materials_panel->focusMaterial(material_handle);
     }
     m_show_builtin_materials_panel = true;
 }
 
 void LunaEditorLayer::resetEditorState()
 {
-    m_scene.entityManager().clear();
-    m_scene.setName("Untitled");
-    m_scene.environmentSettings() = {};
-    m_scene_setting_panel.syncFromScene();
+    endRuntimeViewport();
+    m_runtime_viewport_requested = false;
+    m_scene->entityManager().clear();
+    m_scene->setName("Untitled");
+    m_scene->environmentSettings() = {};
+    m_scene_setting_panel->syncFromScene();
     m_selected_entity = {};
     m_scene_file_path.clear();
     m_asset_label = "No scene loaded";
     m_scene_dirty = false;
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
+}
+
+void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
+{
+    if (enabled == m_runtime_viewport_enabled) {
+        return;
+    }
+
+    if (enabled) {
+        beginRuntimeViewport();
+    } else {
+        endRuntimeViewport();
+    }
+}
+
+void LunaEditorLayer::beginRuntimeViewport()
+{
+    m_runtime_scene = m_scene->clone();
+    if (!m_runtime_scene) {
+        LUNA_EDITOR_WARN("Failed to create runtime scene for runtime viewport");
+        m_runtime_viewport_enabled = false;
+        m_runtime_viewport_requested = false;
+        return;
+    }
+
+    m_runtime_scene->setAssetLoadBehavior(m_scene->getAssetLoadBehavior());
+    m_runtime_viewport_enabled = true;
+    m_editor_camera.releaseMouseCapture();
+    m_editor_camera.setInputEnabled(false);
+    LUNA_EDITOR_INFO("Runtime viewport started with {} entities", m_runtime_scene->entityManager().entityCount());
+}
+
+void LunaEditorLayer::endRuntimeViewport()
+{
+    if (!m_runtime_viewport_enabled && !m_runtime_scene) {
+        return;
+    }
+
+    m_runtime_scene.reset();
+    m_runtime_viewport_enabled = false;
+    LUNA_EDITOR_INFO("Runtime viewport stopped");
+}
+
+Scene& LunaEditorLayer::activeRenderScene()
+{
+    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : *m_scene;
 }
 
 void LunaEditorLayer::createScene()
@@ -886,7 +946,7 @@ bool LunaEditorLayer::syncProjectAssets()
 
     const ImporterManager::ImportStats stats = ImporterManager::syncProjectAssets();
     logEditorAssetSyncStats(stats);
-    m_content_browser_panel.requestRefresh();
+    m_content_browser_panel->requestRefresh();
     return stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0;
 }
 
@@ -936,8 +996,8 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
 
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
-                     m_scene.entityManager().entityCount());
-    m_content_browser_panel.requestRefresh();
+                     m_scene->entityManager().entityCount());
+    m_content_browser_panel->requestRefresh();
     return true;
 }
 
@@ -959,7 +1019,10 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
         return false;
     }
 
-    if (!SceneSerializer::deserialize(m_scene, normalized_scene_path)) {
+    endRuntimeViewport();
+    m_runtime_viewport_requested = false;
+
+    if (!SceneSerializer::deserialize(*m_scene, normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to open scene '{}'", normalized_scene_path.string());
         return false;
     }
@@ -967,7 +1030,7 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     m_scene_file_path = normalized_scene_path;
     m_selected_entity = {};
     m_scene_dirty = false;
-    m_scene_setting_panel.syncFromScene();
+    m_scene_setting_panel->syncFromScene();
     updateSceneLabel();
 
     if (update_project_start_scene) {
@@ -975,7 +1038,7 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     }
 
     LUNA_EDITOR_INFO(
-        "Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene.entityManager().entityCount());
+        "Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene->entityManager().entityCount());
     return true;
 }
 
@@ -1006,11 +1069,11 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
         return false;
     }
 
-    if (m_scene.getName().empty() || m_scene.getName() == "Untitled") {
-        m_scene.setName(normalized_scene_path.stem().string());
+    if (m_scene->getName().empty() || m_scene->getName() == "Untitled") {
+        m_scene->setName(normalized_scene_path.stem().string());
     }
 
-    if (!SceneSerializer::serialize(m_scene, normalized_scene_path)) {
+    if (!SceneSerializer::serialize(*m_scene, normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to save scene '{}'", normalized_scene_path.string());
         return false;
     }
@@ -1019,9 +1082,9 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
     m_scene_dirty = false;
     updateSceneLabel();
     syncProjectStartScene(normalized_scene_path);
-    m_content_browser_panel.requestRefresh();
+    m_content_browser_panel->requestRefresh();
 
-    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene.getName(), normalized_scene_path.string());
+    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene->getName(), normalized_scene_path.string());
     return true;
 }
 
@@ -1067,7 +1130,7 @@ void LunaEditorLayer::updateSceneLabel()
         return;
     }
 
-    const std::string scene_name = m_scene.getName().empty() ? "Untitled" : m_scene.getName();
+    const std::string scene_name = m_scene->getName().empty() ? "Untitled" : m_scene->getName();
     m_asset_label = scene_name + SceneSerializer::FileExtension + std::string(" (unsaved)");
 }
 
