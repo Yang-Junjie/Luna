@@ -129,6 +129,13 @@ set(RENDERER_SOURCE
 
 set(SCENE_SOURCE
     Scene/Components.h
+    Scene/Components/CameraComponent.h
+    Scene/Components/IDComponent.h
+    Scene/Components/LightComponent.h
+    Scene/Components/MeshComponent.h
+    Scene/Components/RelationshipComponent.h
+    Scene/Components/TagComponent.h
+    Scene/Components/TransformComponent.h
     Scene/Entity.h
     Scene/Entity.cpp
     Scene/EntityManager.h
@@ -137,6 +144,14 @@ set(SCENE_SOURCE
     Scene/Scene.cpp
     Scene/SceneSerializer.h
     Scene/SceneSerializer.cpp)
+
+set(SCRIPT_SOURCE
+    Script/ScriptComponent.h
+    Script/ScriptRuntime.h
+    Script/ScriptSystem.h
+    Script/ScriptSystem.cpp
+    Script/LuaScriptRuntime.h
+    Script/LuaScriptRuntime.cpp)
 
 set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiContext.cpp
@@ -241,6 +256,7 @@ add_library(
     ${ASSET_SOURCE}
 
     ${SCENE_SOURCE}
+    ${SCRIPT_SOURCE}
     ${RENDERER_SOURCE}
     ${RHI_RUNTIME_SOURCE}
     ${IMGUI_SOURCE}
@@ -255,6 +271,8 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/entt/src
+        ${THIRD_PARTY_DIR}/lua
+        ${THIRD_PARTY_DIR}/sol2/include
         ${EXTERNAL_DIR}/yaml-cpp/include
         ${PROJECT_SOURCE_DIR}
 )
@@ -269,6 +287,7 @@ target_link_libraries(LunaCore
         Vulkan::Vulkan
         glfw
         enkiTS
+        lua
         # spirv-cross-core
         stb::stb
         yaml-cpp::yaml-cpp
@@ -280,4 +299,5 @@ target_compile_definitions(
         LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
+        SOL_NO_LUA_HPP=1
 )

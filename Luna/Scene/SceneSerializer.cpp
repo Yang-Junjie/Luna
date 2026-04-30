@@ -26,6 +26,8 @@ struct SerializedEntityData {
     luna::LightComponent light;
     bool has_mesh_component = false;
     luna::MeshComponent mesh;
+    bool has_script_component = false;
+    luna::ScriptComponent script;
 };
 
 void emitVec3(YAML::Emitter& out, const glm::vec3& value)
@@ -41,6 +43,136 @@ glm::vec3 readVec3(const YAML::Node& node, const glm::vec3& fallback)
     }
 
     return {node[0].as<float>(), node[1].as<float>(), node[2].as<float>()};
+}
+
+const char* scriptPropertyTypeToString(luna::ScriptPropertyType type)
+{
+    switch (type) {
+        case luna::ScriptPropertyType::Bool:
+            return "Bool";
+        case luna::ScriptPropertyType::Int:
+            return "Int";
+        case luna::ScriptPropertyType::Float:
+            return "Float";
+        case luna::ScriptPropertyType::String:
+            return "String";
+        case luna::ScriptPropertyType::Vec3:
+            return "Vec3";
+        case luna::ScriptPropertyType::Entity:
+            return "Entity";
+        case luna::ScriptPropertyType::Asset:
+            return "Asset";
+    }
+
+    return "Float";
+}
+
+luna::ScriptPropertyType readScriptPropertyType(const YAML::Node& node, luna::ScriptPropertyType fallback)
+{
+    if (!node) {
+        return fallback;
+    }
+
+    const std::string type = node.as<std::string>();
+    if (type == "Bool") {
+        return luna::ScriptPropertyType::Bool;
+    }
+    if (type == "Int") {
+        return luna::ScriptPropertyType::Int;
+    }
+    if (type == "Float") {
+        return luna::ScriptPropertyType::Float;
+    }
+    if (type == "String") {
+        return luna::ScriptPropertyType::String;
+    }
+    if (type == "Vec3") {
+        return luna::ScriptPropertyType::Vec3;
+    }
+    if (type == "Entity") {
+        return luna::ScriptPropertyType::Entity;
+    }
+    if (type == "Asset") {
+        return luna::ScriptPropertyType::Asset;
+    }
+
+    return fallback;
+}
+
+void emitScriptProperty(YAML::Emitter& out, const luna::ScriptProperty& property)
+{
+    out << YAML::BeginMap;
+    out << YAML::Key << "Name" << YAML::Value << property.name;
+    out << YAML::Key << "Type" << YAML::Value << scriptPropertyTypeToString(property.type);
+    out << YAML::Key << "Value" << YAML::Value;
+    switch (property.type) {
+        case luna::ScriptPropertyType::Bool:
+            out << property.boolValue;
+            break;
+        case luna::ScriptPropertyType::Int:
+            out << property.intValue;
+            break;
+        case luna::ScriptPropertyType::Float:
+            out << property.floatValue;
+            break;
+        case luna::ScriptPropertyType::String:
+            out << property.stringValue;
+            break;
+        case luna::ScriptPropertyType::Vec3:
+            emitVec3(out, property.vec3Value);
+            break;
+        case luna::ScriptPropertyType::Entity:
+            out << static_cast<uint64_t>(property.entityValue);
+            break;
+        case luna::ScriptPropertyType::Asset:
+            out << static_cast<uint64_t>(property.assetValue);
+            break;
+    }
+    out << YAML::EndMap;
+}
+
+luna::ScriptProperty readScriptProperty(const YAML::Node& node)
+{
+    luna::ScriptProperty property{};
+    if (!node) {
+        return property;
+    }
+
+    if (node["Name"]) {
+        property.name = node["Name"].as<std::string>();
+    }
+    property.type = readScriptPropertyType(node["Type"], property.type);
+
+    const YAML::Node value_node = node["Value"];
+    if (!value_node) {
+        return property;
+    }
+
+    switch (property.type) {
+        case luna::ScriptPropertyType::Bool:
+            property.boolValue = value_node.as<bool>();
+            break;
+        case luna::ScriptPropertyType::Int:
+            property.intValue = value_node.as<int>();
+            break;
+        case luna::ScriptPropertyType::Float:
+            property.floatValue = value_node.as<float>();
+            break;
+        case luna::ScriptPropertyType::String:
+            property.stringValue = value_node.as<std::string>();
+            break;
+        case luna::ScriptPropertyType::Vec3:
+            property.vec3Value = readVec3(value_node, property.vec3Value);
+            break;
+        case luna::ScriptPropertyType::Entity:
+            property.entityValue = luna::UUID(value_node.as<uint64_t>());
+            break;
+        case luna::ScriptPropertyType::Asset:
+            property.assetValue = luna::AssetHandle(value_node.as<uint64_t>());
+            break;
+    }
+
+    return property;
 }
 
 void emitSceneEnvironment(YAML::Emitter& out, const luna::SceneEnvironmentSettings& environment)
@@ -277,6 +409,29 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             out << YAML::EndMap;
         }
 
+        if (registry.all_of<ScriptComponent>(entity_handle)) {
+            const auto& script_component = registry.get<const ScriptComponent>(entity_handle);
+            out << YAML::Key << "ScriptComponent" << YAML::Value << YAML::BeginMap;
+            out << YAML::Key << "Enabled" << YAML::Value << script_component.enabled;
+            out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
+            for (const auto& script : script_component.scripts) {
+                out << YAML::BeginMap;
+                out << YAML::Key << "ID" << YAML::Value << static_cast<uint64_t>(script.id);
+                out << YAML::Key << "Enabled" << YAML::Value << script.enabled;
+                out << YAML::Key << "ScriptAsset" << YAML::Value << static_cast<uint64_t>(script.scriptAsset);
+                out << YAML::Key << "TypeName" << YAML::Value << script.typeName;
+                out << YAML::Key << "ExecutionOrder" << YAML::Value << script.executionOrder;
+                out << YAML::Key << "Properties" << YAML::Value << YAML::BeginSeq;
+                for (const auto& property : script.properties) {
+                    emitScriptProperty(out, property);
+                }
+                out << YAML::EndSeq;
+                out << YAML::EndMap;
+            }
+            out << YAML::EndSeq;
+            out << YAML::EndMap;
+        }
+
         out << YAML::EndMap;
     }
 
@@ -455,6 +610,46 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                     }
                 }
 
+                if (const YAML::Node script_component = entity_node["ScriptComponent"]; script_component) {
+                    entity_data.has_script_component = true;
+                    if (script_component["Enabled"]) {
+                        entity_data.script.enabled = script_component["Enabled"].as<bool>();
+                    }
+
+                    if (const YAML::Node scripts_node = script_component["Scripts"];
+                        scripts_node && scripts_node.IsSequence()) {
+                        entity_data.script.scripts.reserve(scripts_node.size());
+                        for (const auto& script_node : scripts_node) {
+                            ScriptEntry script{};
+                            if (script_node["ID"]) {
+                                script.id = UUID(script_node["ID"].as<uint64_t>());
+                            }
+                            if (script_node["Enabled"]) {
+                                script.enabled = script_node["Enabled"].as<bool>();
+                            }
+                            if (script_node["ScriptAsset"]) {
+                                script.scriptAsset = AssetHandle(script_node["ScriptAsset"].as<uint64_t>());
+                            }
+                            if (script_node["TypeName"]) {
+                                script.typeName = script_node["TypeName"].as<std::string>();
+                            }
+                            if (script_node["ExecutionOrder"]) {
+                                script.executionOrder = script_node["ExecutionOrder"].as<int>();
+                            }
+
+                            if (const YAML::Node properties_node = script_node["Properties"];
+                                properties_node && properties_node.IsSequence()) {
+                                script.properties.reserve(properties_node.size());
+                                for (const auto& property_node : properties_node) {
+                                    script.properties.push_back(readScriptProperty(property_node));
+                                }
+                            }
+
+                            entity_data.script.scripts.push_back(std::move(script));
+                        }
+                    }
+                }
+
                 entities.push_back(std::move(entity_data));
             }
         }
@@ -488,6 +683,11 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
         if (entity_data.has_mesh_component) {
             auto& mesh_component = entity.addComponent<MeshComponent>();
             mesh_component = entity_data.mesh;
+        }
+
+        if (entity_data.has_script_component) {
+            auto& script_component = entity.addComponent<ScriptComponent>();
+            script_component = entity_data.script;
         }
     }
 

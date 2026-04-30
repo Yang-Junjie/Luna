@@ -2,6 +2,7 @@
 
 #include "Core/Application.h"
 #include "Scene/Scene.h"
+#include "Script/ScriptSystem.h"
 
 #include <Instance.h>
 #include <filesystem>
@@ -17,12 +18,14 @@ protected:
     Renderer::InitializationOptions getRendererInitializationOptions() override;
     void onInit() override;
     void onUpdate(Timestep timestep) override;
+    void onShutdown() override;
 
 private:
     bool loadStartupScene();
 
 private:
     Scene m_scene;
+    ScriptSystem m_script_system;
     std::filesystem::path m_project_file_path;
     std::filesystem::path m_scene_file_path;
     luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};

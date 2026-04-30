@@ -57,6 +57,10 @@ std::unique_ptr<Scene> Scene::clone() const
         if (registry.all_of<MeshComponent>(entity_handle)) {
             cloned_entity.addComponent<MeshComponent>(registry.get<const MeshComponent>(entity_handle));
         }
+
+        if (registry.all_of<ScriptComponent>(entity_handle)) {
+            cloned_entity.addComponent<ScriptComponent>(registry.get<const ScriptComponent>(entity_handle));
+        }
     }
 
     for (const UUID entity_id : serialized_entity_ids) {

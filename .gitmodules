@@ -41,3 +41,10 @@
 [submodule "third_party/ufbx"]
 	path = third_party/ufbx
 	url = https://github.com/ufbx/ufbx.git
+[submodule "third_party/sol2"]
+	path = third_party/sol2
+	url = https://github.com/ThePhD/sol2.git
+[submodule "third_party/lua"]
+	path = third_party/lua
+	url = https://github.com/lua/lua.git
+	branch = v5.4

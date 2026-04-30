@@ -7,6 +7,7 @@
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
+#include "Script/LuaScriptRuntime.h"
 
 #include <algorithm>
 #include <cctype>
@@ -215,15 +216,24 @@ void LunaRuntimeApplication::onInit()
     renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
     renderer.getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
     m_scene.setName("Untitled");
+    m_script_system.setRuntime(std::make_unique<LuaScriptRuntime>());
+    m_script_system.initialize();
 
     if (!loadStartupScene()) {
         LUNA_RUNTIME_WARN("Runtime started without a loaded scene. Pass '--project <path-to-.lunaproj>' to load one.");
     }
 }
 
-void LunaRuntimeApplication::onUpdate(Timestep)
+void LunaRuntimeApplication::onUpdate(Timestep timestep)
 {
+    m_script_system.onUpdate(m_scene, timestep);
     m_scene.onUpdateRuntime();
+}
+
+void LunaRuntimeApplication::onShutdown()
+{
+    m_script_system.onRuntimeStop(m_scene);
+    m_script_system.shutdown();
 }
 
 bool LunaRuntimeApplication::loadStartupScene()
@@ -269,6 +279,7 @@ bool LunaRuntimeApplication::loadStartupScene()
     }
 
     m_scene_file_path = start_scene_path;
+    m_script_system.onRuntimeStart(m_scene);
     LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
                       m_scene_file_path.string(),
                       m_scene.entityManager().entityCount());
