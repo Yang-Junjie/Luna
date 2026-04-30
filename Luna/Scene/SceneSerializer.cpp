@@ -43,6 +43,72 @@ glm::vec3 readVec3(const YAML::Node& node, const glm::vec3& fallback)
     return {node[0].as<float>(), node[1].as<float>(), node[2].as<float>()};
 }
 
+void emitSceneEnvironment(YAML::Emitter& out, const luna::SceneEnvironmentSettings& environment)
+{
+    out << YAML::Key << "Environment" << YAML::Value << YAML::BeginMap;
+    out << YAML::Key << "Enabled" << YAML::Value << environment.enabled;
+    out << YAML::Key << "EnvironmentMapHandle" << YAML::Value
+        << static_cast<uint64_t>(environment.environmentMapHandle);
+    out << YAML::Key << "Intensity" << YAML::Value << environment.intensity;
+    out << YAML::Key << "SkyIntensity" << YAML::Value << environment.skyIntensity;
+    out << YAML::Key << "DiffuseIntensity" << YAML::Value << environment.diffuseIntensity;
+    out << YAML::Key << "SpecularIntensity" << YAML::Value << environment.specularIntensity;
+    out << YAML::Key << "ProceduralSunDirection" << YAML::Value;
+    emitVec3(out, environment.proceduralSunDirection);
+    out << YAML::Key << "ProceduralSunIntensity" << YAML::Value << environment.proceduralSunIntensity;
+    out << YAML::Key << "ProceduralSunAngularRadius" << YAML::Value << environment.proceduralSunAngularRadius;
+    out << YAML::Key << "ProceduralSkyColorZenith" << YAML::Value;
+    emitVec3(out, environment.proceduralSkyColorZenith);
+    out << YAML::Key << "ProceduralSkyColorHorizon" << YAML::Value;
+    emitVec3(out, environment.proceduralSkyColorHorizon);
+    out << YAML::Key << "ProceduralGroundColor" << YAML::Value;
+    emitVec3(out, environment.proceduralGroundColor);
+    out << YAML::Key << "ProceduralSkyExposure" << YAML::Value << environment.proceduralSkyExposure;
+    out << YAML::EndMap;
+}
+
+void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings& environment)
+{
+    if (!node) {
+        return;
+    }
+
+    if (node["Enabled"]) {
+        environment.enabled = node["Enabled"].as<bool>();
+    }
+    if (node["EnvironmentMapHandle"]) {
+        environment.environmentMapHandle = luna::AssetHandle(node["EnvironmentMapHandle"].as<uint64_t>());
+    }
+    if (node["Intensity"]) {
+        environment.intensity = node["Intensity"].as<float>();
+    }
+    if (node["SkyIntensity"]) {
+        environment.skyIntensity = node["SkyIntensity"].as<float>();
+    }
+    if (node["DiffuseIntensity"]) {
+        environment.diffuseIntensity = node["DiffuseIntensity"].as<float>();
+    }
+    if (node["SpecularIntensity"]) {
+        environment.specularIntensity = node["SpecularIntensity"].as<float>();
+    }
+    environment.proceduralSunDirection =
+        readVec3(node["ProceduralSunDirection"], environment.proceduralSunDirection);
+    if (node["ProceduralSunIntensity"]) {
+        environment.proceduralSunIntensity = node["ProceduralSunIntensity"].as<float>();
+    }
+    if (node["ProceduralSunAngularRadius"]) {
+        environment.proceduralSunAngularRadius = node["ProceduralSunAngularRadius"].as<float>();
+    }
+    environment.proceduralSkyColorZenith =
+        readVec3(node["ProceduralSkyColorZenith"], environment.proceduralSkyColorZenith);
+    environment.proceduralSkyColorHorizon =
+        readVec3(node["ProceduralSkyColorHorizon"], environment.proceduralSkyColorHorizon);
+    environment.proceduralGroundColor = readVec3(node["ProceduralGroundColor"], environment.proceduralGroundColor);
+    if (node["ProceduralSkyExposure"]) {
+        environment.proceduralSkyExposure = node["ProceduralSkyExposure"].as<float>();
+    }
+}
+
 const char* lightTypeToString(luna::LightComponent::Type type)
 {
     switch (type) {
@@ -117,6 +183,7 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
     YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << "Scene" << YAML::Value << scene.getName();
+    emitSceneEnvironment(out, scene.environmentSettings());
     out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
     const auto& registry = scene.entityManager().registry();
@@ -263,7 +330,12 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
     }
 
     std::vector<SerializedEntityData> entities;
+    SceneEnvironmentSettings environment_settings{};
     try {
+        if (const YAML::Node environment_node = data["Environment"]; environment_node) {
+            readSceneEnvironment(environment_node, environment_settings);
+        }
+
         const YAML::Node entities_node = data["Entities"];
         if (entities_node && !entities_node.IsSequence()) {
             LUNA_CORE_ERROR("Scene file '{}' has an invalid 'Entities' node", normalized_path.string());
@@ -389,6 +461,7 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
 
     scene.entityManager().clear();
     scene.setName(scene_name);
+    scene.environmentSettings() = environment_settings;
 
     auto& entity_manager = scene.entityManager();
     for (const auto& entity_data : entities) {

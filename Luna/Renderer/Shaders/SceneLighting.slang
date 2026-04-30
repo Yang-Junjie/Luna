@@ -575,7 +575,7 @@ float4 sceneSkyFragmentMain(SceneLightingVertexOutput input) : SV_Target
     const uint pickingId = loadPickingId(input.uv);
     const float3 skyDirection = reconstructViewDirection(input.uv);
     float3 skyColor = sampleEnvironmentSky(skyDirection, 0.0);
-    skyColor *= gSceneParams.lightColorExposure.a;
+    skyColor *= gSceneParams.lightColorExposure.a * max(gSceneParams.iblFactors.w, 0.0);
     const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(skyColor)), pickingId, input.uv);
     return float4(finalColor, 1.0);
 }

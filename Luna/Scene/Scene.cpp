@@ -79,6 +79,16 @@ const std::string& Scene::getName() const
     return m_name;
 }
 
+SceneEnvironmentSettings& Scene::environmentSettings()
+{
+    return m_environment_settings;
+}
+
+const SceneEnvironmentSettings& Scene::environmentSettings() const
+{
+    return m_environment_settings;
+}
+
 EntityManager& Scene::entityManager()
 {
     return m_entity_manager;

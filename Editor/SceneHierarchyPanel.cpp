@@ -60,6 +60,7 @@ void drawCreateEntityMenu(luna::LunaEditorLayer& editor_layer, luna::Entity pare
     if (ImGui::MenuItem(parent ? "Create Child Spot Light" : "Create Spot Light")) {
         editor_layer.createSpotLightEntity(parent);
     }
+
 }
 
 void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})

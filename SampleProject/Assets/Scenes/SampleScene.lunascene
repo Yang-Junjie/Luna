@@ -1,4 +1,18 @@
 Scene: SampleScene
+Environment:
+  Enabled: true
+  EnvironmentMapHandle: 4220633622516789126
+  Intensity: 1
+  SkyIntensity: 1
+  DiffuseIntensity: 1
+  SpecularIntensity: 1
+  ProceduralSunDirection: [0.51214755, 0.7682213, 0.38411066]
+  ProceduralSunIntensity: 20
+  ProceduralSunAngularRadius: 0.02
+  ProceduralSkyColorZenith: [0.15, 0.3, 0.6]
+  ProceduralSkyColorHorizon: [0.6, 0.5, 0.4]
+  ProceduralGroundColor: [0.1, 0.08, 0.06]
+  ProceduralSkyExposure: 1.5
 Entities:
   - IDComponent:
       ID: 14702620125449447707

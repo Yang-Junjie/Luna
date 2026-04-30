@@ -7,6 +7,7 @@
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/Resources/TextureUpload.h"
+#include "Renderer/RenderWorld/RenderTypes.h"
 
 #include <array>
 
@@ -26,8 +27,27 @@ namespace luna::render_flow::default_scene {
 
 class EnvironmentResources final {
 public:
+    enum class SourceKind : uint8_t {
+        DefaultSky,
+        TextureAsset,
+    };
+
+    struct SourceSignature {
+        SourceKind kind{SourceKind::DefaultSky};
+        AssetHandle texture_handle{AssetHandle(0)};
+        glm::vec3 procedural_sun_direction{0.51214755f, 0.76822126f, 0.38411063f};
+        float procedural_sun_intensity{20.0f};
+        float procedural_sun_angular_radius{0.02f};
+        glm::vec3 procedural_sky_color_zenith{0.15f, 0.30f, 0.60f};
+        glm::vec3 procedural_sky_color_horizon{0.60f, 0.50f, 0.40f};
+        glm::vec3 procedural_ground_color{0.10f, 0.08f, 0.06f};
+        float procedural_sky_exposure{1.5f};
+    };
+
     void reset();
-    void ensure(const SceneRenderContext& context);
+    void ensure(const SceneRenderContext& context,
+                const RenderEnvironment* environment,
+                const SceneShaderPaths& shader_paths);
     void uploadIfNeeded(luna::RHI::CommandBufferEncoder& commands);
     void precomputeIfNeeded(luna::RHI::CommandBufferEncoder& commands);
 
@@ -60,6 +80,10 @@ public:
 private:
     luna::RHI::Ref<luna::RHI::Device> m_device;
     luna::RHI::BackendType m_backend_type{luna::RHI::BackendType::Auto};
+    SourceSignature m_source_signature{};
+    bool m_has_source_signature{false};
+    bool m_source_is_gpu_generated{false};
+    bool m_procedural_source_generated{false};
     renderer_detail::PendingTextureUpload m_source_texture;
     std::array<glm::vec4, 9> m_irradiance_sh{};
 
@@ -68,6 +92,7 @@ private:
     luna::RHI::Ref<luna::RHI::Texture> m_prefiltered_texture;
     luna::RHI::Ref<luna::RHI::Texture> m_brdf_lut_texture;
 
+    luna::RHI::Ref<luna::RHI::TextureView> m_procedural_source_uav;
     luna::RHI::Ref<luna::RHI::TextureView> m_environment_cube_uav;
     luna::RHI::Ref<luna::RHI::TextureView> m_irradiance_uav;
     std::array<luna::RHI::Ref<luna::RHI::TextureView>,
@@ -75,13 +100,16 @@ private:
         m_prefiltered_uavs{};
     luna::RHI::Ref<luna::RHI::TextureView> m_brdf_lut_uav;
 
+    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_procedural_sky_layout;
     luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_equirect_to_cube_layout;
     luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_cube_filter_layout;
     luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_brdf_lut_layout;
+    luna::RHI::Ref<luna::RHI::PipelineLayout> m_procedural_sky_pipeline_layout;
     luna::RHI::Ref<luna::RHI::PipelineLayout> m_equirect_to_cube_pipeline_layout;
     luna::RHI::Ref<luna::RHI::PipelineLayout> m_cube_filter_pipeline_layout;
     luna::RHI::Ref<luna::RHI::PipelineLayout> m_brdf_lut_pipeline_layout;
     luna::RHI::Ref<luna::RHI::DescriptorPool> m_descriptor_pool;
+    luna::RHI::Ref<luna::RHI::DescriptorSet> m_procedural_sky_descriptor_set;
     luna::RHI::Ref<luna::RHI::DescriptorSet> m_equirect_to_cube_descriptor_set;
     luna::RHI::Ref<luna::RHI::DescriptorSet> m_irradiance_descriptor_set;
     std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>,
@@ -90,10 +118,12 @@ private:
     luna::RHI::Ref<luna::RHI::DescriptorSet> m_brdf_lut_descriptor_set;
     luna::RHI::Ref<luna::RHI::Sampler> m_sampler;
 
+    luna::RHI::Ref<luna::RHI::ShaderModule> m_procedural_sky_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_equirect_to_cube_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_irradiance_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_prefilter_shader;
     luna::RHI::Ref<luna::RHI::ShaderModule> m_brdf_lut_shader;
+    luna::RHI::Ref<luna::RHI::ComputePipeline> m_procedural_sky_pipeline;
     luna::RHI::Ref<luna::RHI::ComputePipeline> m_equirect_to_cube_pipeline;
     luna::RHI::Ref<luna::RHI::ComputePipeline> m_irradiance_pipeline;
     luna::RHI::Ref<luna::RHI::ComputePipeline> m_prefilter_pipeline;

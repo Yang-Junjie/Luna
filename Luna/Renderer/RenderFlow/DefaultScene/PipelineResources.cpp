@@ -13,6 +13,8 @@ SceneShaderPaths defaultShaderPaths()
     const std::filesystem::path geometry_shader_path = shader_root / "SceneGeometry.slang";
     const std::filesystem::path shadow_shader_path = shader_root / "ShadowMapping.slang";
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
+    const std::filesystem::path environment_ibl_shader_path = shader_root / "EnvironmentIBL.slang";
+    const std::filesystem::path procedural_sky_shader_path = shader_root / "ProceduralSky.slang";
     return SceneShaderPaths{
         .geometry_vertex_path = geometry_shader_path,
         .geometry_fragment_path = geometry_shader_path,
@@ -20,6 +22,8 @@ SceneShaderPaths defaultShaderPaths()
         .shadow_fragment_path = shadow_shader_path,
         .lighting_vertex_path = lighting_shader_path,
         .lighting_fragment_path = lighting_shader_path,
+        .environment_ibl_path = environment_ibl_shader_path,
+        .procedural_sky_path = procedural_sky_shader_path,
     };
 }
 
@@ -28,6 +32,7 @@ SceneShaderPaths defaultShaderPaths()
 void PipelineResources::shutdown()
 {
     m_pipeline_state.shutdown();
+    m_shader_paths = {};
 }
 
 bool PipelineResources::hasAnyState() const noexcept
@@ -54,7 +59,8 @@ PipelineResources::Invalidation PipelineResources::invalidationFor(const SceneRe
 
 void PipelineResources::rebuild(const SceneRenderContext& context)
 {
-    m_pipeline_state.rebuild(context, defaultShaderPaths());
+    m_shader_paths = defaultShaderPaths();
+    m_pipeline_state.rebuild(context, m_shader_paths);
 }
 
 void PipelineResources::updateSceneBindings(
@@ -146,6 +152,11 @@ DebugViewPassResources PipelineResources::debugViewPassResources() const noexcep
 SkyPassResources PipelineResources::skyPassResources() const noexcept
 {
     return m_pipeline_state.skyPassResources();
+}
+
+const SceneShaderPaths& PipelineResources::shaderPaths() const noexcept
+{
+    return m_shader_paths;
 }
 
 } // namespace luna::render_flow::default_scene

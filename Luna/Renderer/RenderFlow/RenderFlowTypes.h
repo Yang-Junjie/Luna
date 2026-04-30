@@ -29,11 +29,14 @@ struct SceneShaderPaths {
     std::filesystem::path shadow_fragment_path;
     std::filesystem::path lighting_vertex_path;
     std::filesystem::path lighting_fragment_path;
+    std::filesystem::path environment_ibl_path;
+    std::filesystem::path procedural_sky_path;
 
     [[nodiscard]] bool isComplete() const
     {
         return !geometry_vertex_path.empty() && !geometry_fragment_path.empty() && !shadow_vertex_path.empty() &&
-               !shadow_fragment_path.empty() && !lighting_vertex_path.empty() && !lighting_fragment_path.empty();
+               !shadow_fragment_path.empty() && !lighting_vertex_path.empty() && !lighting_fragment_path.empty() &&
+               !environment_ibl_path.empty() && !procedural_sky_path.empty();
     }
 };
 

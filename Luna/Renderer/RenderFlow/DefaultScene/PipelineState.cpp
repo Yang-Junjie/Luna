@@ -664,6 +664,7 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
                                 const Camera& camera,
                                 const RenderFeatureFrameContext& frame_context,
                                 const SceneLightView& lights,
+                                const RenderEnvironment* environment,
                                 float environment_mip_count,
                                 const std::array<glm::vec4, 9>& irradiance_sh,
                                 const render_flow::default_scene_detail::ShadowRenderParams& shadow_params,
@@ -735,7 +736,14 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
         params.spot_light_color_cones[light_index] = glm::vec4(light.color, 0.0f);
         params.spot_light_cone_params[light_index] = glm::vec4(light.innerConeCos, light.outerConeCos, 0.0f, 0.0f);
     }
-    params.ibl_factors = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+    const float environment_intensity = environment != nullptr ? (std::max)(environment->intensity, 0.0f) : 1.0f;
+    const float diffuse_intensity =
+        environment != nullptr ? (std::max)(environment->diffuse_intensity, 0.0f) : 1.0f;
+    const float specular_intensity =
+        environment != nullptr ? (std::max)(environment->specular_intensity, 0.0f) : 1.0f;
+    const float sky_intensity = environment != nullptr ? (std::max)(environment->sky_intensity, 0.0f) : 1.0f;
+    params.ibl_factors =
+        glm::vec4(diffuse_intensity, specular_intensity, environment_intensity, sky_intensity * environment_intensity);
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f,
                                             0.65f,
                                             static_cast<float>(context.debug_view_mode),
@@ -777,6 +785,7 @@ void PipelineState::updateSceneParameters(const SceneRenderContext& context,
                                    .point_lights = world.pointLights(),
                                    .spot_lights = world.spotLights(),
                                },
+                               world.hasEnvironment() ? &world.environment() : nullptr,
                                environment_mip_count,
                                irradiance_sh,
                                shadow_params,

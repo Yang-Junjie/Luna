@@ -24,6 +24,8 @@ add_executable(
     RenderFeaturesPanel.cpp
     RenderProfilerPanel.h
     RenderProfilerPanel.cpp
+    SceneSettingPanel.h
+    SceneSettingPanel.cpp
     SceneHierarchyPanel.h
     SceneHierarchyPanel.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp

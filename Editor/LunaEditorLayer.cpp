@@ -154,6 +154,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_application(&application),
       m_scene_hierarchy_panel(*this),
       m_inspector_panel(*this),
+      m_scene_setting_panel(*this),
       m_content_browser_panel(*this)
 {}
 
@@ -266,6 +267,9 @@ void LunaEditorLayer::onImGuiRender()
 
     m_scene_hierarchy_panel.onImGuiRender();
     m_inspector_panel.onImGuiRender();
+    if (m_show_scene_setting_panel) {
+        m_scene_setting_panel.onImGuiRender();
+    }
     m_asset_loading_panel.onImGuiRender();
     m_builtin_materials_panel.onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel.onImGuiRender();
@@ -373,6 +377,7 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
         ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
         ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
+        ImGui::MenuItem("Scene Settings", nullptr, &m_show_scene_setting_panel);
         ImGui::MenuItem("Backend Capabilities", nullptr, &m_show_backend_capabilities_panel);
         ImGui::EndMenu();
     }
@@ -588,6 +593,16 @@ Entity LunaEditorLayer::getSelectedEntity() const
 void LunaEditorLayer::setSelectedEntity(Entity entity)
 {
     m_selected_entity = entity;
+}
+
+void LunaEditorLayer::markSceneDirty()
+{
+    if (m_scene_dirty) {
+        return;
+    }
+
+    m_scene_dirty = true;
+    updateSceneLabel();
 }
 
 bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
@@ -842,9 +857,12 @@ void LunaEditorLayer::resetEditorState()
 {
     m_scene.entityManager().clear();
     m_scene.setName("Untitled");
+    m_scene.environmentSettings() = {};
+    m_scene_setting_panel.syncFromScene();
     m_selected_entity = {};
     m_scene_file_path.clear();
     m_asset_label = "No scene loaded";
+    m_scene_dirty = false;
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
 }
@@ -854,6 +872,7 @@ void LunaEditorLayer::createScene()
     resetEditorState();
     createCameraEntity();
     createDirectionalLightEntity();
+    m_scene_dirty = false;
     updateSceneLabel();
     LUNA_EDITOR_INFO("Created a new scene with a primary camera and directional light");
 }
@@ -947,6 +966,8 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
 
     m_scene_file_path = normalized_scene_path;
     m_selected_entity = {};
+    m_scene_dirty = false;
+    m_scene_setting_panel.syncFromScene();
     updateSceneLabel();
 
     if (update_project_start_scene) {
@@ -995,6 +1016,7 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
     }
 
     m_scene_file_path = normalized_scene_path;
+    m_scene_dirty = false;
     updateSceneLabel();
     syncProjectStartScene(normalized_scene_path);
     m_content_browser_panel.requestRefresh();
@@ -1034,13 +1056,14 @@ std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
 
 void LunaEditorLayer::updateSceneLabel()
 {
+    const char* dirty_suffix = m_scene_dirty ? " *" : "";
     if (!m_scene_file_path.empty()) {
         if (const auto relative_path = makeScenePathRelativeToProject(m_scene_file_path)) {
-            m_asset_label = relative_path->generic_string();
+            m_asset_label = relative_path->generic_string() + dirty_suffix;
             return;
         }
 
-        m_asset_label = m_scene_file_path.lexically_normal().string();
+        m_asset_label = m_scene_file_path.lexically_normal().string() + dirty_suffix;
         return;
     }
 

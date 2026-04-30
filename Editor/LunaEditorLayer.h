@@ -14,6 +14,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "SceneHierarchyPanel.h"
+#include "SceneSettingPanel.h"
 
 #include <cstdint>
 
@@ -55,6 +56,7 @@ public:
     Scene& getScene();
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
+    void markSceneDirty();
     bool openSceneFile(const std::filesystem::path& scene_file_path);
     Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
@@ -102,6 +104,7 @@ private:
     Entity m_selected_entity;
     std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
+    bool m_scene_dirty{false};
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
@@ -110,6 +113,7 @@ private:
     bool m_show_render_debug_panel{false};
     bool m_show_render_features_panel{false};
     bool m_show_render_profiler_panel{false};
+    bool m_show_scene_setting_panel{true};
     bool m_show_backend_capabilities_panel{false};
     bool m_runtime_viewport_enabled{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
@@ -123,6 +127,7 @@ private:
     RenderDebugPanel m_render_debug_panel;
     RenderFeaturesPanel m_render_features_panel;
     RenderProfilerPanel m_render_profiler_panel;
+    SceneSettingPanel m_scene_setting_panel;
     BackendCapabilitiesPanel m_backend_capabilities_panel;
 };
 

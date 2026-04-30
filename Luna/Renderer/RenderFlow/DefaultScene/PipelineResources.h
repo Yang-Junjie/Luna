@@ -70,8 +70,10 @@ public:
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
     [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
     [[nodiscard]] SkyPassResources skyPassResources() const noexcept;
+    [[nodiscard]] const SceneShaderPaths& shaderPaths() const noexcept;
 
 private:
+    SceneShaderPaths m_shader_paths{};
     PipelineState m_pipeline_state{};
 };
 

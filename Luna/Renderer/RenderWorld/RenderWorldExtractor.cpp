@@ -76,6 +76,27 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
     render_world.begin(camera);
     auto& registry = entity_manager.registry();
 
+    const SceneEnvironmentSettings& environment_settings = scene.environmentSettings();
+    if (environment_settings.enabled) {
+        render_world.setEnvironment(RenderEnvironment{
+            .enabled = environment_settings.enabled,
+            .environment_map_handle = environment_settings.environmentMapHandle,
+            .intensity = (std::max)(environment_settings.intensity, 0.0f),
+            .sky_intensity = (std::max)(environment_settings.skyIntensity, 0.0f),
+            .diffuse_intensity = (std::max)(environment_settings.diffuseIntensity, 0.0f),
+            .specular_intensity = (std::max)(environment_settings.specularIntensity, 0.0f),
+            .allow_async_load = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking,
+            .procedural_sun_direction = safeNormalize(environment_settings.proceduralSunDirection,
+                                                       glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
+            .procedural_sun_intensity = (std::max)(environment_settings.proceduralSunIntensity, 0.0f),
+            .procedural_sun_angular_radius = (std::max)(environment_settings.proceduralSunAngularRadius, 0.0f),
+            .procedural_sky_color_zenith = environment_settings.proceduralSkyColorZenith,
+            .procedural_sky_color_horizon = environment_settings.proceduralSkyColorHorizon,
+            .procedural_ground_color = environment_settings.proceduralGroundColor,
+            .procedural_sky_exposure = (std::max)(environment_settings.proceduralSkyExposure, 0.0f),
+        });
+    }
+
     bool has_directional_light = false;
     auto light_view = registry.view<TransformComponent, LightComponent>();
     for (const auto entity_handle : light_view) {

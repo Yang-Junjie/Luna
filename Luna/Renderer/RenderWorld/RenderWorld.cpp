@@ -17,6 +17,8 @@ void RenderWorld::clear()
     m_directional_lights.clear();
     m_point_lights.clear();
     m_spot_lights.clear();
+    m_has_environment = false;
+    m_environment = {};
     m_mesh_instances.clear();
     m_draw_packets.clear();
 }
@@ -46,6 +48,12 @@ void RenderWorld::addSpotLight(const RenderSpotLight& light)
     m_spot_lights.push_back(light);
 }
 
+void RenderWorld::setEnvironment(const RenderEnvironment& environment)
+{
+    m_environment = environment;
+    m_has_environment = true;
+}
+
 void RenderWorld::addMeshInstance(RenderMeshInstance instance)
 {
     m_mesh_instances.push_back(std::move(instance));
@@ -69,6 +77,16 @@ const std::vector<RenderPointLight>& RenderWorld::pointLights() const
 const std::vector<RenderSpotLight>& RenderWorld::spotLights() const
 {
     return m_spot_lights;
+}
+
+bool RenderWorld::hasEnvironment() const
+{
+    return m_has_environment;
+}
+
+const RenderEnvironment& RenderWorld::environment() const
+{
+    return m_environment;
 }
 
 const std::vector<RenderMeshInstance>& RenderWorld::meshInstances() const
