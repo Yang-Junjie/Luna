@@ -15,6 +15,30 @@ enum {
     LUNA_SCRIPT_RUNTIME_API_VERSION = 1u,
 };
 
+typedef struct LunaScriptSchemaRequest {
+    const char* asset_name;
+    const char* type_name;
+    const char* language;
+    const char* source;
+} LunaScriptSchemaRequest;
+
+typedef struct LunaScriptPropertySchemaDesc {
+    const char* name;
+    const char* display_name;
+    const char* description;
+    LunaScriptPropertyType type;
+    int32_t default_bool_value;
+    int32_t default_int_value;
+    float default_float_value;
+    const char* default_string_value;
+    LunaScriptVec3 default_vec3_value;
+    uint64_t default_entity_value;
+    uint64_t default_asset_value;
+} LunaScriptPropertySchemaDesc;
+
+typedef int (*LunaScriptEnumeratePropertySchemaFn)(void* user_data,
+                                                   const LunaScriptPropertySchemaDesc* property_schema);
+
 typedef struct LunaScriptRuntimeApi {
     uint32_t struct_size;
     uint32_t api_version;
@@ -37,6 +61,10 @@ typedef struct LunaScriptBackendApi {
     size_t supported_extension_count;
     void* backend_user_data;
     int (*create_runtime)(void* backend_user_data, LunaScriptRuntimeApi* out_runtime_api);
+    int (*enumerate_property_schema)(void* backend_user_data,
+                                     const LunaScriptSchemaRequest* request,
+                                     void* user_data,
+                                     LunaScriptEnumeratePropertySchemaFn enumerate_fn);
 } LunaScriptBackendApi;
 
 typedef struct LunaScriptPluginApi {

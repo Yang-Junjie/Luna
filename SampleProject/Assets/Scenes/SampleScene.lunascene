@@ -16,31 +16,163 @@ Environment:
   ProceduralSkyExposure: 1.5
 Entities:
   - IDComponent:
-      ID: 6296757327198945537
+      ID: 14702620125449447707
     TagComponent:
       Tag: Cube
     TransformComponent:
-      Translation: [-3.052795, -0.80931854, -0.15800995]
-      Rotation: [0, -0, 0.68598604]
+      Translation: [-6.6599393, 0.16055065, -7.32053]
+      Rotation: [0, -0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
     MeshComponent:
-      MeshHandle: 1002
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 15137094438280049332
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-7.2446747, 0.30549136, -6.7512374]
+      Rotation: [0, -0, 0]
+      Scale: [0.2671559, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 1575925757346616929
+    TagComponent:
+      Tag: Plane
+    TransformComponent:
+      Translation: [0.004538013, 0.59949076, 0]
+      Rotation: [0, -0, 3.1387298]
+      Scale: [16.081938, 16.081938, 16.082]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1003
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 16951615904058710475
+    TagComponent:
+      Tag: Directional Light
+    TransformComponent:
+      Translation: [-0.6801461, -0.61538255, 3.585527]
+      Rotation: [0.4096293, 0.31345832, 0.13309059]
+      Scale: [1, 1, 1.0000001]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    LightComponent:
+      Type: Directional
+      Enabled: true
+      Color: [1, 1, 1]
+      Intensity: 3.25
+      Range: 10
+      InnerConeAngle: 20
+      OuterConeAngle: 35
+  - IDComponent:
+      ID: 6422384645588011490
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [-2.3475351, -1.3175536, 0.77447546]
+      Rotation: [-1.748029, 0.040767383, -0.010694907]
+      Scale: [1.0000588, 0.999993, 1.0000048]
+    RelationshipComponent:
+      ParentHandle: 6652629833754950424
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 5963794263514486561
       SubmeshMaterials:
         - 2003
     ScriptComponent:
       Enabled: true
       Scripts:
-        - ID: 10612220443214595304
+        - ID: 12560270270496314802
           Enabled: true
-          ScriptAsset: 5171177704692656994
+          ScriptAsset: 3036130797873598393
           TypeName: ""
           ExecutionOrder: 0
           Properties:
-            []
+            - Name: enabled
+              Type: Bool
+              Value: true
+            - Name: amplitude
+              Type: Float
+              Value: 1.75
+            - Name: label
+              Type: String
+              Value: SchemaDrivenMover
+            - Name: speed
+              Type: Float
+              Value: 1
+            - Name: preview_asset
+              Type: Asset
+              Value: 0
+            - Name: offset
+              Type: Vec3
+              Value: [0, 0, 0]
+            - Name: target
+              Type: Entity
+              Value: 0
+            - Name: rotation_speed
+              Type: Float
+              Value: 45
+            - Name: frequency
+              Type: Float
+              Value: 1.5
+  - IDComponent:
+      ID: 8795389863366798160
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Translation: [-0.541266, 0, 6.217166]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    CameraComponent:
+      Primary: true
+      FixedAspectRatio: false
+      ProjectionType: Perspective
+      PerspectiveFOV: 50
+      PerspectiveNear: 0.05
+      PerspectiveFar: 500
+      OrthographicSize: 10
+      OrthographicNear: -100
+      OrthographicFar: 100
+  - IDComponent:
+      ID: 6652629833754950424
+    TagComponent:
+      Tag: Empty Entity
+    TransformComponent:
+      Translation: [-0.98545384, -0.5444564, 0.1510384]
+      Rotation: [1.7735412, 0.2715993, -3.1398218]
+      Scale: [1.0000209, 0.99999946, 1.0000008]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        - 6422384645588011490
+    MeshComponent:
+      MeshHandle: 17196472838577284151
+      SubmeshMaterials:
+        - 8706604916645388531
   - IDComponent:
       ID: 4597209426252840243
     TagComponent:
@@ -68,124 +200,28 @@ Entities:
           Properties:
             []
   - IDComponent:
-      ID: 6652629833754950424
+      ID: 6296757327198945537
     TagComponent:
-      Tag: Empty Entity
+      Tag: Cube
     TransformComponent:
-      Translation: [-0.98545384, -0.5444564, 0.1510384]
-      Rotation: [1.7735412, 0.2715993, -3.1398218]
-      Scale: [1.0000209, 0.99999946, 1.0000008]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        - 6422384645588011490
-    MeshComponent:
-      MeshHandle: 17196472838577284151
-      SubmeshMaterials:
-        - 8706604916645388531
-  - IDComponent:
-      ID: 8795389863366798160
-    TagComponent:
-      Tag: Camera
-    TransformComponent:
-      Translation: [-0.541266, 0, 6.217166]
-      Rotation: [0, -0, 0]
+      Translation: [-3.052795, -0.80931854, -0.15800995]
+      Rotation: [0, -0, 0.68598604]
       Scale: [1, 1, 1]
     RelationshipComponent:
       ParentHandle: 0
       Children:
         []
-    CameraComponent:
-      Primary: true
-      FixedAspectRatio: false
-      ProjectionType: Perspective
-      PerspectiveFOV: 50
-      PerspectiveNear: 0.05
-      PerspectiveFar: 500
-      OrthographicSize: 10
-      OrthographicNear: -100
-      OrthographicFar: 100
-  - IDComponent:
-      ID: 6422384645588011490
-    TagComponent:
-      Tag: Empty Entity
-    TransformComponent:
-      Translation: [-2.3475351, -1.3175536, 0.77447546]
-      Rotation: [-1.748029, 0.040767383, -0.010694907]
-      Scale: [1.0000588, 0.999993, 1.0000048]
-    RelationshipComponent:
-      ParentHandle: 6652629833754950424
-      Children:
-        []
     MeshComponent:
-      MeshHandle: 5963794263514486561
+      MeshHandle: 1002
       SubmeshMaterials:
         - 2003
-  - IDComponent:
-      ID: 16951615904058710475
-    TagComponent:
-      Tag: Directional Light
-    TransformComponent:
-      Translation: [-0.6801461, -0.61538255, 3.585527]
-      Rotation: [0.4096293, 0.31345832, 0.13309059]
-      Scale: [1, 1, 1.0000001]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    LightComponent:
-      Type: Directional
+    ScriptComponent:
       Enabled: true
-      Color: [1, 1, 1]
-      Intensity: 3.25
-      Range: 10
-      InnerConeAngle: 20
-      OuterConeAngle: 35
-  - IDComponent:
-      ID: 1575925757346616929
-    TagComponent:
-      Tag: Plane
-    TransformComponent:
-      Translation: [0.004538013, 0.59949076, 0]
-      Rotation: [0, -0, 3.1387298]
-      Scale: [16.081938, 16.081938, 16.082]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1003
-      SubmeshMaterials:
-        - 2001
-  - IDComponent:
-      ID: 15137094438280049332
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [-7.2446747, 0.30549136, -6.7512374]
-      Rotation: [0, -0, 0]
-      Scale: [0.2671559, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1001
-      SubmeshMaterials:
-        - 2001
-  - IDComponent:
-      ID: 14702620125449447707
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [-6.6599393, 0.16055065, -7.32053]
-      Rotation: [0, -0, 0]
-      Scale: [1, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1001
-      SubmeshMaterials:
-        - 2001
+      Scripts:
+        - ID: 10612220443214595304
+          Enabled: true
+          ScriptAsset: 5171177704692656994
+          TypeName: ""
+          ExecutionOrder: 0
+          Properties:
+            []

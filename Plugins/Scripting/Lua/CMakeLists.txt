@@ -3,6 +3,8 @@ add_library(
     SHARED
     Source/LuaPluginRuntime.h
     Source/LuaPluginRuntime.cpp
+    Source/LuaPropertySchema.h
+    Source/LuaPropertySchema.cpp
     Source/Bindings/LuaCoreBindings.h
     Source/Bindings/LuaCoreBindings.cpp
     Source/Bindings/LuaInputBindings.h

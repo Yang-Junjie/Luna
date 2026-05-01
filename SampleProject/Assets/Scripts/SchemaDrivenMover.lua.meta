@@ -1,0 +1,7 @@
+Asset:
+  Name: SchemaDrivenMover
+  Handle: 3036130797873598393
+  Type: Script
+  FilePath: Assets/Scripts/SchemaDrivenMover.lua
+  Config:
+    Language: Lua

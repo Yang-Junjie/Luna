@@ -1,9 +1,14 @@
 #include "ScriptComponentInspector.h"
 
 #include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
 #include "EditorAssetDragDrop.h"
+#include "Project/ProjectManager.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Entity.h"
+#include "Script/ScriptAsset.h"
+#include "Script/ScriptPluginManager.h"
+#include "Script/ScriptPropertySchema.h"
 
 #include <imgui.h>
 
@@ -11,9 +16,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -133,6 +140,71 @@ bool normalizeScriptPropertyNames(luna::ScriptEntry& script)
     return changed;
 }
 
+void copyScriptPropertyValue(luna::ScriptProperty& destination, const luna::ScriptProperty& source)
+{
+    destination.boolValue = source.boolValue;
+    destination.intValue = source.intValue;
+    destination.floatValue = source.floatValue;
+    destination.stringValue = source.stringValue;
+    destination.vec3Value = source.vec3Value;
+    destination.entityValue = source.entityValue;
+    destination.assetValue = source.assetValue;
+}
+
+const luna::ScriptProperty* findMatchingProperty(const luna::ScriptEntry& script,
+                                                 const std::string& name,
+                                                 luna::ScriptPropertyType type)
+{
+    for (const luna::ScriptProperty& property : script.properties) {
+        if (property.type == type && equalsIgnoreCase(property.name, name)) {
+            return &property;
+        }
+    }
+
+    return nullptr;
+}
+
+bool applyScriptPropertySchema(luna::ScriptEntry& script, const std::vector<luna::ScriptPropertySchema>& schemas)
+{
+    std::vector<luna::ScriptProperty> synced_properties;
+    synced_properties.reserve(schemas.size());
+
+    for (const luna::ScriptPropertySchema& schema : schemas) {
+        if (schema.name.empty()) {
+            continue;
+        }
+
+        luna::ScriptProperty property = schema.defaultValue;
+        property.name = schema.name;
+        property.type = schema.type;
+
+        if (const luna::ScriptProperty* existing = findMatchingProperty(script, schema.name, schema.type)) {
+            copyScriptPropertyValue(property, *existing);
+        }
+
+        synced_properties.push_back(std::move(property));
+    }
+
+    const bool changed = script.properties.size() != synced_properties.size() ||
+                         !std::equal(script.properties.begin(),
+                                     script.properties.end(),
+                                     synced_properties.begin(),
+                                     synced_properties.end(),
+                                     [](const luna::ScriptProperty& lhs, const luna::ScriptProperty& rhs) {
+                                         return equalsIgnoreCase(lhs.name, rhs.name) && lhs.type == rhs.type &&
+                                                lhs.boolValue == rhs.boolValue && lhs.intValue == rhs.intValue &&
+                                                lhs.floatValue == rhs.floatValue && lhs.stringValue == rhs.stringValue &&
+                                                lhs.vec3Value == rhs.vec3Value && lhs.entityValue == rhs.entityValue &&
+                                                lhs.assetValue == rhs.assetValue;
+                                     });
+
+    if (changed) {
+        script.properties = std::move(synced_properties);
+    }
+
+    return changed;
+}
+
 std::string getAssetDisplayLabel(luna::AssetHandle handle)
 {
     if (!handle.isValid()) {
@@ -197,6 +269,54 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
     ImGui::TextDisabled("Script Type: %s", luna::AssetUtils::AssetTypeToString(metadata.Type));
     if (metadata.Type != luna::AssetType::Script) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Selected asset is not a Script asset.");
+    }
+
+    return changed;
+}
+
+std::vector<luna::ScriptPropertySchema> loadScriptPropertySchema(const luna::ScriptEntry& script)
+{
+    if (!script.scriptAsset.isValid() || !luna::AssetDatabase::exists(script.scriptAsset)) {
+        return {};
+    }
+
+    const luna::AssetMetadata& metadata = luna::AssetDatabase::getAssetMetadata(script.scriptAsset);
+    if (metadata.Type != luna::AssetType::Script) {
+        return {};
+    }
+
+    const std::shared_ptr<luna::ScriptAsset> script_asset =
+        luna::AssetManager::get().loadAssetAs<luna::ScriptAsset>(script.scriptAsset);
+    if (!script_asset) {
+        return {};
+    }
+
+    luna::ScriptSchemaRequest request{};
+    request.assetName = !metadata.Name.empty() ? metadata.Name : metadata.FilePath.filename().string();
+    request.typeName = script.typeName;
+    request.language = script_asset->language;
+    request.source = script_asset->source;
+
+    const auto& project_info = luna::ProjectManager::instance().getProjectInfo();
+    return luna::ScriptPluginManager::instance().getPropertySchemaForProject(
+        project_info ? &*project_info : nullptr, request);
+}
+
+bool drawSchemaSyncControls(luna::ScriptEntry& script)
+{
+    bool changed = false;
+    if (ImGui::Button("Sync Properties From Script", ImVec2(-1.0f, 0.0f))) {
+        const std::vector<luna::ScriptPropertySchema> schemas = loadScriptPropertySchema(script);
+        if (schemas.empty()) {
+            ImGui::OpenPopup("NoScriptSchemaPopup");
+        } else {
+            changed |= applyScriptPropertySchema(script, schemas);
+        }
+    }
+
+    if (ImGui::BeginPopup("NoScriptSchemaPopup")) {
+        ImGui::TextUnformatted("The selected script did not expose a Properties schema.");
+        ImGui::EndPopup();
     }
 
     return changed;
@@ -424,7 +544,7 @@ bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_c
         changed |= ImGui::InputInt("Execution Order", &script.executionOrder);
 
         ImGui::SeparatorText("Properties");
-        changed |= normalizeScriptPropertyNames(script);
+        changed |= drawSchemaSyncControls(script);
         ImGui::TextDisabled("Property Count: %zu", script.properties.size());
         if (ImGui::Button("Add Property", ImVec2(-1.0f, 0.0f))) {
             ScriptProperty property{};
@@ -432,6 +552,7 @@ bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_c
             script.properties.push_back(std::move(property));
             changed = true;
         }
+        changed |= normalizeScriptPropertyNames(script);
 
         if (script.properties.empty()) {
             ImGui::TextDisabled("No properties.");

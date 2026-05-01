@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ScriptRuntime.h"
+#include "ScriptPropertySchema.h"
 
 #include <filesystem>
 #include <memory>
@@ -24,6 +25,7 @@ public:
 
     virtual const ScriptBackendDescriptor& descriptor() const noexcept = 0;
     virtual std::unique_ptr<IScriptRuntime> createRuntime() const = 0;
+    virtual std::vector<ScriptPropertySchema> getPropertySchema(const ScriptSchemaRequest& request) const = 0;
 };
 
 } // namespace luna

@@ -1,4 +1,5 @@
 #include "LuaPluginRuntime.h"
+#include "LuaPropertySchema.h"
 
 namespace {
 
@@ -14,6 +15,19 @@ int createLuaRuntime(void* backend_user_data, LunaScriptRuntimeApi* out_runtime_
 
     const auto* backend_state = static_cast<const LuaPluginBackendState*>(backend_user_data);
     return lua_plugin::createLuaRuntimeApi(backend_state->host_api, out_runtime_api);
+}
+
+int enumerateLuaPropertySchema(void* backend_user_data,
+                               const LunaScriptSchemaRequest* request,
+                               void* user_data,
+                               LunaScriptEnumeratePropertySchemaFn enumerate_fn)
+{
+    if (backend_user_data == nullptr) {
+        return 0;
+    }
+
+    const auto* backend_state = static_cast<const LuaPluginBackendState*>(backend_user_data);
+    return lua_plugin::enumerateLuaPropertySchema(backend_state->host_api, request, user_data, enumerate_fn);
 }
 
 } // namespace
@@ -46,6 +60,7 @@ int LunaCreateScriptPlugin(uint32_t host_api_version,
     backend_api.supported_extension_count = 1;
     backend_api.backend_user_data = &backend_state;
     backend_api.create_runtime = &createLuaRuntime;
+    backend_api.enumerate_property_schema = &enumerateLuaPropertySchema;
 
     out_plugin_api->struct_size = sizeof(LunaScriptPluginApi);
     out_plugin_api->api_version = LUNA_SCRIPT_PLUGIN_API_VERSION;

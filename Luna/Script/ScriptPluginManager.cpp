@@ -66,6 +66,18 @@ std::unique_ptr<luna::IScriptRuntime> createRuntimeFromMap(const BackendMap& bac
     return it->second->createRuntime();
 }
 
+std::vector<luna::ScriptPropertySchema> getPropertySchemaFromMap(const BackendMap& backends,
+                                                                 std::string_view backend_name,
+                                                                 const luna::ScriptSchemaRequest& request)
+{
+    const auto it = backends.find(normalizeBackendKey(backend_name));
+    if (it == backends.end()) {
+        return {};
+    }
+
+    return it->second->getPropertySchema(request);
+}
+
 void logHostMessage(void*, LunaScriptHostLogLevel level, const char* message)
 {
     const char* text = message != nullptr ? message : "";
@@ -375,7 +387,102 @@ public:
         return std::make_unique<PluginScriptRuntime>(m_descriptor.name, runtime_api, m_plugin_library);
     }
 
+    std::vector<luna::ScriptPropertySchema> getPropertySchema(const luna::ScriptSchemaRequest& request) const override
+    {
+        if (m_backend_api.enumerate_property_schema == nullptr) {
+            return {};
+        }
+
+        LunaScriptSchemaRequest api_request{};
+        api_request.asset_name = request.assetName.c_str();
+        api_request.type_name = request.typeName.c_str();
+        api_request.language = request.language.c_str();
+        api_request.source = request.source.c_str();
+
+        std::vector<luna::ScriptPropertySchema> schemas;
+        if (m_backend_api.enumerate_property_schema(
+                m_backend_api.backend_user_data, &api_request, &schemas, &enumeratePropertySchema) == 0) {
+            LUNA_CORE_WARN("Script backend '{}' failed to enumerate property schema for '{}'",
+                           m_descriptor.name,
+                           request.assetName);
+            return {};
+        }
+
+        return schemas;
+    }
+
 private:
+    static int enumeratePropertySchema(void* user_data, const LunaScriptPropertySchemaDesc* property_schema)
+    {
+        if (user_data == nullptr || property_schema == nullptr || property_schema->name == nullptr ||
+            property_schema->name[0] == '\0') {
+            return 1;
+        }
+
+        auto& schemas = *static_cast<std::vector<luna::ScriptPropertySchema>*>(user_data);
+        luna::ScriptPropertySchema schema{};
+        schema.name = property_schema->name;
+        schema.displayName = property_schema->display_name != nullptr ? property_schema->display_name : schema.name;
+        schema.description = property_schema->description != nullptr ? property_schema->description : std::string{};
+        schema.type = toPropertyType(property_schema->type);
+        schema.defaultValue.name = schema.name;
+        schema.defaultValue.type = schema.type;
+        applyDefaultValue(schema.defaultValue, *property_schema);
+        schemas.push_back(std::move(schema));
+        return 1;
+    }
+
+    static luna::ScriptPropertyType toPropertyType(LunaScriptPropertyType type)
+    {
+        switch (type) {
+            case LunaScriptPropertyType_Bool:
+                return luna::ScriptPropertyType::Bool;
+            case LunaScriptPropertyType_Int:
+                return luna::ScriptPropertyType::Int;
+            case LunaScriptPropertyType_Float:
+                return luna::ScriptPropertyType::Float;
+            case LunaScriptPropertyType_String:
+                return luna::ScriptPropertyType::String;
+            case LunaScriptPropertyType_Vec3:
+                return luna::ScriptPropertyType::Vec3;
+            case LunaScriptPropertyType_Entity:
+                return luna::ScriptPropertyType::Entity;
+            case LunaScriptPropertyType_Asset:
+                return luna::ScriptPropertyType::Asset;
+            default:
+                return luna::ScriptPropertyType::Float;
+        }
+    }
+
+    static void applyDefaultValue(luna::ScriptProperty& property, const LunaScriptPropertySchemaDesc& schema)
+    {
+        switch (property.type) {
+            case luna::ScriptPropertyType::Bool:
+                property.boolValue = schema.default_bool_value != 0;
+                break;
+            case luna::ScriptPropertyType::Int:
+                property.intValue = schema.default_int_value;
+                break;
+            case luna::ScriptPropertyType::Float:
+                property.floatValue = schema.default_float_value;
+                break;
+            case luna::ScriptPropertyType::String:
+                property.stringValue = schema.default_string_value != nullptr ? schema.default_string_value : "";
+                break;
+            case luna::ScriptPropertyType::Vec3:
+                property.vec3Value = {schema.default_vec3_value.x,
+                                      schema.default_vec3_value.y,
+                                      schema.default_vec3_value.z};
+                break;
+            case luna::ScriptPropertyType::Entity:
+                property.entityValue = luna::UUID(schema.default_entity_value);
+                break;
+            case luna::ScriptPropertyType::Asset:
+                property.assetValue = luna::AssetHandle(schema.default_asset_value);
+                break;
+        }
+    }
+
     luna::ScriptPluginCandidate m_candidate;
     luna::ScriptBackendDescriptor m_descriptor;
     LunaScriptBackendApi m_backend_api{};
@@ -470,6 +577,63 @@ const ScriptPluginCandidate* ScriptPluginManager::findDiscoveredPlugin(std::stri
 std::string ScriptPluginManager::defaultBackendName() const
 {
     return "Lua";
+}
+
+std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchema(std::string_view backend_name,
+                                                                          const ScriptSchemaRequest& request) const
+{
+    if (std::vector<ScriptPropertySchema> schemas = getPropertySchemaFromMap(m_plugin_backends, backend_name, request);
+        !schemas.empty()) {
+        return schemas;
+    }
+
+    return getPropertySchemaFromMap(m_builtin_backends, backend_name, request);
+}
+
+std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchemaForProject(
+    const ProjectInfo* project_info,
+    const ScriptSchemaRequest& request) const
+{
+    const auto project_root_path = ProjectManager::instance().getProjectRootPath();
+    const_cast<ScriptPluginManager*>(this)->refreshDiscoveredPlugins(project_root_path);
+
+    const std::string configured_plugin_id =
+        project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
+    const std::string configured_backend_name =
+        project_info != nullptr ? project_info->Scripting.SelectedBackendName : std::string{};
+
+    const ScriptPluginCandidate* candidate = nullptr;
+    if (!configured_plugin_id.empty()) {
+        candidate = findDiscoveredPlugin(configured_plugin_id);
+    }
+    if (candidate == nullptr && !configured_backend_name.empty()) {
+        candidate = findUniqueCandidateByBackend(m_discovered_plugins, configured_backend_name);
+    }
+    if (candidate == nullptr && m_discovered_plugins.size() == 1) {
+        candidate = &m_discovered_plugins.front();
+    }
+
+    std::string backend_name = configured_backend_name;
+    if (candidate != nullptr) {
+        if (candidate->Manifest.HostApiVersion != LUNA_SCRIPT_HOST_API_VERSION) {
+            LUNA_CORE_ERROR("Script plugin '{}' requires host API version {} but the engine provides {}",
+                            candidate->Manifest.PluginId,
+                            candidate->Manifest.HostApiVersion,
+                            static_cast<uint32_t>(LUNA_SCRIPT_HOST_API_VERSION));
+            return {};
+        }
+
+        if (!const_cast<ScriptPluginManager*>(this)->ensurePluginLoaded(candidate)) {
+            return {};
+        }
+        backend_name = candidate->Manifest.BackendName;
+    }
+
+    if (backend_name.empty()) {
+        backend_name = defaultBackendName();
+    }
+
+    return getPropertySchema(backend_name, request);
 }
 
 std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntime(std::string_view backend_name) const

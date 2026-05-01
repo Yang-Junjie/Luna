@@ -151,6 +151,7 @@ set(SCENE_SOURCE
 set(SCRIPT_SOURCE
     Script/ScriptAsset.h
     Script/ScriptBackend.h
+    Script/ScriptPropertySchema.h
     Script/ScriptPluginManifest.h
     Script/ScriptPluginDiscovery.h
     Script/ScriptPluginDiscovery.cpp
