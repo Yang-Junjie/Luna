@@ -2,8 +2,9 @@
 
 namespace luna {
 
+class Entity;
 struct ScriptComponent;
 
-void drawScriptComponentInspector(ScriptComponent& script_component);
+bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_component);
 
 } // namespace luna

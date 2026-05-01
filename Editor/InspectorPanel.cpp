@@ -508,8 +508,10 @@ void InspectorPanel::onImGuiRender()
         true);
 
     drawComponentSection<ScriptComponent>(
-        "Script", selected_entity, [](ScriptComponent& script_component) {
-            drawScriptComponentInspector(script_component);
+        "Script", selected_entity, [this, selected_entity](ScriptComponent& script_component) {
+            if (drawScriptComponentInspector(selected_entity, script_component)) {
+                m_editor_layer->markSceneDirty();
+            }
         },
         true);
 
