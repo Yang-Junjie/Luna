@@ -1,6 +1,14 @@
 add_library(
     LunaScriptLuaPlugin
     SHARED
+    Source/LuaPluginRuntime.h
+    Source/LuaPluginRuntime.cpp
+    Source/Bindings/LuaCoreBindings.h
+    Source/Bindings/LuaCoreBindings.cpp
+    Source/Bindings/LuaInputBindings.h
+    Source/Bindings/LuaInputBindings.cpp
+    Source/Bindings/LuaSceneBindings.h
+    Source/Bindings/LuaSceneBindings.cpp
     Source/LuaScriptPlugin.cpp
 )
 

@@ -8,6 +8,8 @@ extern "C" {
 #endif
 
 enum {
+    // Script host ABI v1.
+    // Stable modules in this version: Core(Log), Scene, Entity/Transform, Input.
     LUNA_SCRIPT_HOST_API_VERSION = 1u,
 };
 
@@ -66,7 +68,11 @@ typedef struct LunaScriptHostApi {
     uint32_t struct_size;
     uint32_t api_version;
     void* user_data;
+
+    // Core
     LunaScriptHostLogFn log;
+
+    // Scene
     const char* (*scene_get_name)(void* scene_context);
     int (*scene_enumerate_script_instances)(void* scene_context,
                                             void* user_data,
@@ -76,6 +82,8 @@ typedef struct LunaScriptHostApi {
                                              uint64_t script_id,
                                              void* user_data,
                                              LunaScriptEnumeratePropertiesFn enumerate_fn);
+
+    // Entity / Transform
     int (*entity_is_valid)(void* scene_context, uint64_t entity_id);
     const char* (*entity_get_name)(void* scene_context, uint64_t entity_id);
     int (*entity_get_translation)(void* scene_context, uint64_t entity_id, LunaScriptVec3* out_value);
@@ -84,6 +92,8 @@ typedef struct LunaScriptHostApi {
     int (*entity_set_rotation)(void* scene_context, uint64_t entity_id, const LunaScriptVec3* value);
     int (*entity_get_scale)(void* scene_context, uint64_t entity_id, LunaScriptVec3* out_value);
     int (*entity_set_scale)(void* scene_context, uint64_t entity_id, const LunaScriptVec3* value);
+
+    // Input
     int (*input_is_key_pressed)(int32_t key_code);
     int (*input_is_mouse_button_pressed)(int32_t button_code);
     float (*input_get_mouse_x)();

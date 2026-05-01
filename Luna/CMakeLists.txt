@@ -156,7 +156,11 @@ set(SCRIPT_SOURCE
     Script/ScriptPluginDiscovery.cpp
     Script/ScriptHostApi.h
     Script/ScriptHostBridge.h
+    Script/ScriptHostBridgeInternal.h
     Script/ScriptHostBridge.cpp
+    Script/ScriptHostBridgeScene.cpp
+    Script/ScriptHostBridgeEntity.cpp
+    Script/ScriptHostBridgeInput.cpp
     Script/ScriptPluginApi.h
     Script/ScriptPluginManager.h
     Script/ScriptPluginManager.cpp
