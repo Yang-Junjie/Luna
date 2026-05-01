@@ -112,33 +112,7 @@ int enumerateScriptProperty(void* user_data, const LunaScriptPropertyDesc* scrip
         return 1;
     }
 
-    switch (script_property->type) {
-        case LunaScriptPropertyType_Bool:
-            instance_table[script_property->name] = script_property->bool_value != 0;
-            break;
-        case LunaScriptPropertyType_Int:
-            instance_table[script_property->name] = script_property->int_value;
-            break;
-        case LunaScriptPropertyType_Float:
-            instance_table[script_property->name] = script_property->float_value;
-            break;
-        case LunaScriptPropertyType_String:
-            instance_table[script_property->name] =
-                script_property->string_value != nullptr ? script_property->string_value : "";
-            break;
-        case LunaScriptPropertyType_Vec3:
-            instance_table[script_property->name] =
-                glm::vec3(script_property->vec3_value.x, script_property->vec3_value.y, script_property->vec3_value.z);
-            break;
-        case LunaScriptPropertyType_Entity:
-            instance_table[script_property->name] = makeLuaEntity(runtime, script_property->entity_value);
-            break;
-        case LunaScriptPropertyType_Asset:
-            instance_table[script_property->name] = script_property->asset_value;
-            break;
-        default:
-            break;
-    }
+    lua_plugin::assignLuaScriptProperty(runtime, instance_table, *script_property);
 
     return 1;
 }
@@ -172,6 +146,43 @@ void bindLuaSceneApi(LuaPluginRuntime& runtime)
                                       sol::property(&LuaEntity::getRotation, &LuaEntity::setRotation),
                                       "scale",
                                       sol::property(&LuaEntity::getScale, &LuaEntity::setScale));
+}
+
+void assignLuaScriptProperty(LuaPluginRuntime& runtime,
+                             sol::table& instance_table,
+                             const LunaScriptPropertyDesc& script_property)
+{
+    if (script_property.name == nullptr || script_property.name[0] == '\0') {
+        return;
+    }
+
+    switch (script_property.type) {
+        case LunaScriptPropertyType_Bool:
+            instance_table[script_property.name] = script_property.bool_value != 0;
+            break;
+        case LunaScriptPropertyType_Int:
+            instance_table[script_property.name] = script_property.int_value;
+            break;
+        case LunaScriptPropertyType_Float:
+            instance_table[script_property.name] = script_property.float_value;
+            break;
+        case LunaScriptPropertyType_String:
+            instance_table[script_property.name] =
+                script_property.string_value != nullptr ? script_property.string_value : "";
+            break;
+        case LunaScriptPropertyType_Vec3:
+            instance_table[script_property.name] =
+                glm::vec3(script_property.vec3_value.x, script_property.vec3_value.y, script_property.vec3_value.z);
+            break;
+        case LunaScriptPropertyType_Entity:
+            instance_table[script_property.name] = makeLuaEntity(runtime, script_property.entity_value);
+            break;
+        case LunaScriptPropertyType_Asset:
+            instance_table[script_property.name] = script_property.asset_value;
+            break;
+        default:
+            break;
+    }
 }
 
 void initializeLuaScriptInstanceTable(LuaPluginRuntime& runtime,

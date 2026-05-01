@@ -83,6 +83,18 @@ void SceneRuntime::update(Timestep timestep)
     m_scene->renderFromRuntimeCamera();
 }
 
+void SceneRuntime::setScriptProperty(UUID entity_id,
+                                     UUID script_id,
+                                     const ScriptProperty& property,
+                                     size_t property_index)
+{
+    if (!m_running) {
+        return;
+    }
+
+    m_script_system.setScriptProperty(*m_scene, entity_id, script_id, property, property_index);
+}
+
 bool SceneRuntime::isRunning() const noexcept
 {
     return m_running;

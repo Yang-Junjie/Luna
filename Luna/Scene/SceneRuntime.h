@@ -2,12 +2,14 @@
 
 #include "Script/ScriptSystem.h"
 
+#include <cstddef>
 #include <memory>
 
 namespace luna {
 
 class IScriptRuntime;
 class Scene;
+struct ScriptProperty;
 
 class SceneRuntime {
 public:
@@ -26,6 +28,7 @@ public:
     bool start();
     void stop();
     void update(Timestep timestep);
+    void setScriptProperty(UUID entity_id, UUID script_id, const ScriptProperty& property, size_t property_index);
     [[nodiscard]] bool isRunning() const noexcept;
 
 private:

@@ -62,6 +62,8 @@ public:
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
     void markSceneDirty();
+    void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index);
+    void syncRuntimeScriptComponent(UUID entity_id);
     bool openSceneFile(const std::filesystem::path& scene_file_path);
     Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});

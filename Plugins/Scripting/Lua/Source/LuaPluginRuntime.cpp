@@ -27,6 +27,8 @@ std::string toLower(std::string value)
 namespace lua_plugin {
 
 struct LuaPluginRuntime::LuaScriptInstance {
+    uint64_t entity_id{0};
+    uint64_t script_id{0};
     int execution_order{0};
     size_t creation_index{0};
     std::string debug_name;
@@ -171,6 +173,37 @@ void LuaPluginRuntime::onUpdate(void* scene_context, float delta_time_seconds)
     }
 }
 
+void LuaPluginRuntime::setScriptProperty(void* scene_context,
+                                         uint64_t entity_id,
+                                         uint64_t script_id,
+                                         const LunaScriptPropertyValueDesc& property)
+{
+    if (!m_lua_state || property.name == nullptr || property.name[0] == '\0') {
+        return;
+    }
+
+    m_active_scene_context = scene_context;
+
+    auto instance_it = std::find_if(m_script_instances.begin(), m_script_instances.end(), [&](const auto& instance) {
+        return instance && instance->entity_id == entity_id && instance->script_id == script_id;
+    });
+    if (instance_it == m_script_instances.end()) {
+        return;
+    }
+
+    LunaScriptPropertyDesc desc{};
+    desc.name = property.name;
+    desc.type = property.type;
+    desc.bool_value = property.bool_value;
+    desc.int_value = property.int_value;
+    desc.float_value = property.float_value;
+    desc.string_value = property.string_value;
+    desc.vec3_value = property.vec3_value;
+    desc.entity_value = property.entity_value;
+    desc.asset_value = property.asset_value;
+    assignLuaScriptProperty(*this, (*instance_it)->self, desc);
+}
+
 const LunaScriptHostApi* LuaPluginRuntime::hostApi() const noexcept
 {
     return m_host_api;
@@ -273,6 +306,8 @@ void LuaPluginRuntime::handleScriptInstance(const LunaScriptInstanceDesc& script
     instance_table[sol::metatable_key] = metatable;
 
     auto instance = std::make_unique<LuaScriptInstance>();
+    instance->entity_id = script_instance.entity_id;
+    instance->script_id = script_instance.script_id;
     instance->execution_order = script_instance.execution_order;
     instance->creation_index = m_creation_index++;
     instance->debug_name = getScriptDebugName(script_instance);
@@ -365,6 +400,17 @@ void onLuaRuntimeUpdate(void* runtime_user_data, void* scene_context, float delt
     }
 }
 
+void setLuaRuntimeScriptProperty(void* runtime_user_data,
+                                 void* scene_context,
+                                 uint64_t entity_id,
+                                 uint64_t script_id,
+                                 const LunaScriptPropertyValueDesc* property)
+{
+    if (runtime_user_data != nullptr && property != nullptr) {
+        static_cast<LuaPluginRuntime*>(runtime_user_data)->setScriptProperty(scene_context, entity_id, script_id, *property);
+    }
+}
+
 } // namespace
 
 int createLuaRuntimeApi(const LunaScriptHostApi* host_api, LunaScriptRuntimeApi* out_runtime_api)
@@ -385,6 +431,7 @@ int createLuaRuntimeApi(const LunaScriptHostApi* host_api, LunaScriptRuntimeApi*
     out_runtime_api->on_runtime_start = &onLuaRuntimeStart;
     out_runtime_api->on_runtime_stop = &onLuaRuntimeStop;
     out_runtime_api->on_update = &onLuaRuntimeUpdate;
+    out_runtime_api->set_script_property = &setLuaRuntimeScriptProperty;
     return 1;
 }
 

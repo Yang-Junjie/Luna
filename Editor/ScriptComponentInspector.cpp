@@ -513,46 +513,67 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
 
 namespace luna {
 
-bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_component)
+ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_component)
 {
-    bool changed = false;
+    ScriptComponentInspectorChange change{};
 
-    changed |= ImGui::Checkbox("Enabled", &script_component.enabled);
+    if (ImGui::Checkbox("Enabled", &script_component.enabled)) {
+        change.changed = true;
+        change.script_structure_changed = true;
+    }
     ImGui::Text("Scripts: %zu", script_component.scripts.size());
 
     if (ImGui::Button("Add Script", ImVec2(-1.0f, 0.0f))) {
         ScriptEntry entry{};
         entry.id = UUID{};
         script_component.scripts.push_back(std::move(entry));
-        changed = true;
+        change.changed = true;
+        change.script_structure_changed = true;
     }
 
     for (size_t script_index = 0; script_index < script_component.scripts.size(); ++script_index) {
         auto& script = script_component.scripts[script_index];
         ImGui::PushID(static_cast<int>(script_index));
         ImGui::Separator();
-        changed |= ImGui::Checkbox("Script Enabled", &script.enabled);
+        if (ImGui::Checkbox("Script Enabled", &script.enabled)) {
+            change.changed = true;
+            change.script_structure_changed = true;
+        }
 
         char type_buffer[256] = {};
         strncpy_s(type_buffer, script.typeName.c_str(), _TRUNCATE);
         if (ImGui::InputText("Type Name", type_buffer, sizeof(type_buffer))) {
             script.typeName = type_buffer;
-            changed = true;
+            change.changed = true;
+            change.script_structure_changed = true;
         }
 
-        changed |= drawScriptAssetEditor(script);
-        changed |= ImGui::InputInt("Execution Order", &script.executionOrder);
+        if (drawScriptAssetEditor(script)) {
+            change.changed = true;
+            change.script_structure_changed = true;
+        }
+        if (ImGui::InputInt("Execution Order", &script.executionOrder)) {
+            change.changed = true;
+            change.script_structure_changed = true;
+        }
 
         ImGui::SeparatorText("Properties");
-        changed |= drawSchemaSyncControls(script);
+        if (drawSchemaSyncControls(script)) {
+            change.changed = true;
+            change.script_structure_changed = true;
+        }
         ImGui::TextDisabled("Property Count: %zu", script.properties.size());
         if (ImGui::Button("Add Property", ImVec2(-1.0f, 0.0f))) {
             ScriptProperty property{};
             property.name = makeUniquePropertyName(script, script.properties.size(), "Property");
             script.properties.push_back(std::move(property));
-            changed = true;
+            change.changed = true;
+            change.script_structure_changed = true;
         }
-        changed |= normalizeScriptPropertyNames(script);
+        if (normalizeScriptPropertyNames(script)) {
+            change.changed = true;
+            change.script_structure_changed = true;
+        }
 
         if (script.properties.empty()) {
             ImGui::TextDisabled("No properties.");
@@ -560,7 +581,16 @@ bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_c
             for (size_t property_index = 0; property_index < script.properties.size(); ++property_index) {
                 ImGui::PushID(static_cast<int>(property_index));
                 bool removed_property = false;
-                changed |= drawScriptPropertyEditor(owner_entity, script, property_index, removed_property);
+                if (drawScriptPropertyEditor(owner_entity, script, property_index, removed_property)) {
+                    change.changed = true;
+                    if (removed_property) {
+                        change.script_structure_changed = true;
+                    } else if (!change.script_structure_changed) {
+                        change.property_value_changed = true;
+                        change.script_index = script_index;
+                        change.property_index = property_index;
+                    }
+                }
                 ImGui::PopID();
 
                 if (removed_property) {
@@ -571,7 +601,8 @@ bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_c
 
         if (ImGui::Button("Remove Script", ImVec2(-1.0f, 0.0f))) {
             script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
-            changed = true;
+            change.changed = true;
+            change.script_structure_changed = true;
             ImGui::PopID();
             break;
         }
@@ -579,7 +610,7 @@ bool drawScriptComponentInspector(Entity owner_entity, ScriptComponent& script_c
         ImGui::PopID();
     }
 
-    return changed;
+    return change;
 }
 
 } // namespace luna

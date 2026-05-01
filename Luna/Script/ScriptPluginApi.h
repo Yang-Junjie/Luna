@@ -36,6 +36,19 @@ typedef struct LunaScriptPropertySchemaDesc {
     uint64_t default_asset_value;
 } LunaScriptPropertySchemaDesc;
 
+typedef struct LunaScriptPropertyValueDesc {
+    const char* name;
+    LunaScriptPropertyType type;
+    int32_t bool_value;
+    int32_t int_value;
+    float float_value;
+    const char* string_value;
+    LunaScriptVec3 vec3_value;
+    uint64_t entity_value;
+    uint64_t asset_value;
+    size_t property_index;
+} LunaScriptPropertyValueDesc;
+
 typedef int (*LunaScriptEnumeratePropertySchemaFn)(void* user_data,
                                                    const LunaScriptPropertySchemaDesc* property_schema);
 
@@ -49,6 +62,11 @@ typedef struct LunaScriptRuntimeApi {
     void (*on_runtime_start)(void* runtime_user_data, void* scene_context);
     void (*on_runtime_stop)(void* runtime_user_data, void* scene_context);
     void (*on_update)(void* runtime_user_data, void* scene_context, float delta_time_seconds);
+    void (*set_script_property)(void* runtime_user_data,
+                                void* scene_context,
+                                uint64_t entity_id,
+                                uint64_t script_id,
+                                const LunaScriptPropertyValueDesc* property);
 } LunaScriptRuntimeApi;
 
 typedef struct LunaScriptBackendApi {

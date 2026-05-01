@@ -102,4 +102,17 @@ void ScriptSystem::onUpdate(Scene& scene, Timestep timestep)
     m_runtime->onUpdate(scene, timestep);
 }
 
+void ScriptSystem::setScriptProperty(Scene& scene,
+                                     UUID entity_id,
+                                     UUID script_id,
+                                     const ScriptProperty& property,
+                                     size_t property_index)
+{
+    if (!m_runtime || !m_runtime_started) {
+        return;
+    }
+
+    m_runtime->setScriptProperty(scene, entity_id, script_id, property, property_index);
+}
+
 } // namespace luna

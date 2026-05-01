@@ -654,6 +654,67 @@ void LunaEditorLayer::markSceneDirty()
     updateSceneLabel();
 }
 
+void LunaEditorLayer::patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index)
+{
+    if (!m_runtime_viewport_enabled || !m_runtime_scene || !m_runtime_scene_runtime ||
+        !m_runtime_scene_runtime->isRunning()) {
+        return;
+    }
+
+    Entity editor_entity = m_scene->entityManager().findEntityByUUID(entity_id);
+    Entity runtime_entity = m_runtime_scene->entityManager().findEntityByUUID(entity_id);
+    if (!editor_entity || !runtime_entity || !editor_entity.hasComponent<ScriptComponent>()) {
+        return;
+    }
+
+    const ScriptComponent& editor_script_component = editor_entity.getComponent<ScriptComponent>();
+    if (script_index >= editor_script_component.scripts.size()) {
+        return;
+    }
+
+    const ScriptEntry& editor_script = editor_script_component.scripts[script_index];
+    if (property_index >= editor_script.properties.size()) {
+        return;
+    }
+
+    if (!runtime_entity.hasComponent<ScriptComponent>()) {
+        runtime_entity.addComponent<ScriptComponent>();
+    }
+
+    ScriptComponent& runtime_script_component = runtime_entity.getComponent<ScriptComponent>();
+    runtime_script_component = editor_script_component;
+
+    const ScriptEntry& runtime_script = runtime_script_component.scripts[script_index];
+    const ScriptProperty& runtime_property = runtime_script.properties[property_index];
+    m_runtime_scene_runtime->setScriptProperty(entity_id, runtime_script.id, runtime_property, property_index);
+}
+
+void LunaEditorLayer::syncRuntimeScriptComponent(UUID entity_id)
+{
+    if (!m_runtime_viewport_enabled || !m_runtime_scene) {
+        return;
+    }
+
+    Entity editor_entity = m_scene->entityManager().findEntityByUUID(entity_id);
+    Entity runtime_entity = m_runtime_scene->entityManager().findEntityByUUID(entity_id);
+    if (!editor_entity || !runtime_entity) {
+        return;
+    }
+
+    if (!editor_entity.hasComponent<ScriptComponent>()) {
+        if (runtime_entity.hasComponent<ScriptComponent>()) {
+            runtime_entity.removeComponent<ScriptComponent>();
+        }
+        return;
+    }
+
+    if (!runtime_entity.hasComponent<ScriptComponent>()) {
+        runtime_entity.addComponent<ScriptComponent>();
+    }
+
+    runtime_entity.getComponent<ScriptComponent>() = editor_entity.getComponent<ScriptComponent>();
+}
+
 bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
 {
     return openScene(scene_file_path, true);

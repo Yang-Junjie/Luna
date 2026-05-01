@@ -2,6 +2,7 @@
 
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
+#include "Scene/Components/ScriptComponent.h"
 #include "ScriptHostBridge.h"
 #include "ScriptPluginApi.h"
 #include "ScriptPluginDiscovery.h"
@@ -76,6 +77,49 @@ std::vector<luna::ScriptPropertySchema> getPropertySchemaFromMap(const BackendMa
     }
 
     return it->second->getPropertySchema(request);
+}
+
+LunaScriptPropertyType toApiPropertyType(luna::ScriptPropertyType type)
+{
+    switch (type) {
+        case luna::ScriptPropertyType::Bool:
+            return LunaScriptPropertyType_Bool;
+        case luna::ScriptPropertyType::Int:
+            return LunaScriptPropertyType_Int;
+        case luna::ScriptPropertyType::Float:
+            return LunaScriptPropertyType_Float;
+        case luna::ScriptPropertyType::String:
+            return LunaScriptPropertyType_String;
+        case luna::ScriptPropertyType::Vec3:
+            return LunaScriptPropertyType_Vec3;
+        case luna::ScriptPropertyType::Entity:
+            return LunaScriptPropertyType_Entity;
+        case luna::ScriptPropertyType::Asset:
+            return LunaScriptPropertyType_Asset;
+        default:
+            return LunaScriptPropertyType_Float;
+    }
+}
+
+LunaScriptVec3 toApiVec3(const glm::vec3& value)
+{
+    return LunaScriptVec3{value.x, value.y, value.z};
+}
+
+LunaScriptPropertyValueDesc toApiPropertyValueDesc(const luna::ScriptProperty& property, size_t property_index)
+{
+    LunaScriptPropertyValueDesc desc{};
+    desc.name = property.name.c_str();
+    desc.type = toApiPropertyType(property.type);
+    desc.bool_value = property.boolValue ? 1 : 0;
+    desc.int_value = property.intValue;
+    desc.float_value = property.floatValue;
+    desc.string_value = property.stringValue.c_str();
+    desc.vec3_value = toApiVec3(property.vec3Value);
+    desc.entity_value = static_cast<uint64_t>(property.entityValue);
+    desc.asset_value = static_cast<uint64_t>(property.assetValue);
+    desc.property_index = property_index;
+    return desc;
 }
 
 void logHostMessage(void*, LunaScriptHostLogLevel level, const char* message)
@@ -312,6 +356,24 @@ public:
         if (m_runtime_api.on_update != nullptr) {
             m_runtime_api.on_update(m_runtime_api.runtime_user_data, &scene, timestep.getSeconds());
         }
+    }
+
+    void setScriptProperty(luna::Scene& scene,
+                           luna::UUID entity_id,
+                           luna::UUID script_id,
+                           const luna::ScriptProperty& property,
+                           size_t property_index) override
+    {
+        if (m_runtime_api.set_script_property == nullptr) {
+            return;
+        }
+
+        const LunaScriptPropertyValueDesc desc = toApiPropertyValueDesc(property, property_index);
+        m_runtime_api.set_script_property(m_runtime_api.runtime_user_data,
+                                          &scene,
+                                          static_cast<uint64_t>(entity_id),
+                                          static_cast<uint64_t>(script_id),
+                                          &desc);
     }
 
 private:

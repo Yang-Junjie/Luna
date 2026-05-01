@@ -509,8 +509,16 @@ void InspectorPanel::onImGuiRender()
 
     drawComponentSection<ScriptComponent>(
         "Script", selected_entity, [this, selected_entity](ScriptComponent& script_component) {
-            if (drawScriptComponentInspector(selected_entity, script_component)) {
+            const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
+            if (change.changed) {
                 m_editor_layer->markSceneDirty();
+                if (change.property_value_changed) {
+                    m_editor_layer->patchRuntimeScriptProperty(selected_entity.getUUID(),
+                                                               change.script_index,
+                                                               change.property_index);
+                } else if (change.script_structure_changed) {
+                    m_editor_layer->syncRuntimeScriptComponent(selected_entity.getUUID());
+                }
             }
         },
         true);

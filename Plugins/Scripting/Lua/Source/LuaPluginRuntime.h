@@ -25,6 +25,10 @@ public:
     void onRuntimeStart(void* scene_context);
     void onRuntimeStop(void* scene_context);
     void onUpdate(void* scene_context, float delta_time_seconds);
+    void setScriptProperty(void* scene_context,
+                           uint64_t entity_id,
+                           uint64_t script_id,
+                           const LunaScriptPropertyValueDesc& property);
 
     [[nodiscard]] const LunaScriptHostApi* hostApi() const noexcept;
     [[nodiscard]] sol::state& luaState() noexcept;
