@@ -13,14 +13,18 @@
 #include "RenderProfilerPanel.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
+#include "Scene/SceneRuntime.h"
 #include "SceneHierarchyPanel.h"
 #include "SceneSettingPanel.h"
+#include "ScriptPluginsPanel.h"
+#include "Script/ScriptPluginManifest.h"
 
 #include <cstdint>
 
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <vector>
 
 struct ImVec2;
 
@@ -68,6 +72,12 @@ public:
     Entity createSpotLightEntity(Entity parent = {});
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0));
+    bool hasProjectLoaded() const;
+    void refreshProjectScriptPlugins();
+    const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const;
+    const std::string& getScriptPluginStatus() const;
+    const ScriptPluginCandidate* getSelectedScriptPluginCandidate() const;
+    bool selectScriptPlugin(const ScriptPluginCandidate* candidate);
 
 private:
     void consumePendingScenePick();
@@ -100,13 +110,16 @@ private:
     std::filesystem::path sceneDialogDefaultPath() const;
     void updateSceneLabel();
     void syncProjectStartScene(const std::filesystem::path& scene_file_path);
-    bool hasProjectLoaded() const;
+    void refreshScriptPluginCandidates();
+    void resolveProjectScriptPluginSelection(bool persist_changes);
+    bool setProjectScriptPluginSelection(const ScriptPluginCandidate* candidate, bool log_changes = true);
 
 private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
     std::unique_ptr<Scene> m_scene;
     std::unique_ptr<Scene> m_runtime_scene;
+    std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
     Entity m_selected_entity;
     std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
@@ -120,11 +133,14 @@ private:
     bool m_show_render_features_panel{false};
     bool m_show_render_profiler_panel{false};
     bool m_show_scene_setting_panel{true};
+    bool m_show_script_plugins_panel{true};
     bool m_show_backend_capabilities_panel{false};
     bool m_runtime_viewport_enabled{false};
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
+    std::vector<ScriptPluginCandidate> m_script_plugin_candidates;
+    std::string m_script_plugin_status;
 
     std::unique_ptr<SceneHierarchyPanel> m_scene_hierarchy_panel;
     std::unique_ptr<InspectorPanel> m_inspector_panel;
@@ -135,6 +151,7 @@ private:
     std::unique_ptr<RenderFeaturesPanel> m_render_features_panel;
     std::unique_ptr<RenderProfilerPanel> m_render_profiler_panel;
     std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
+    std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
     std::unique_ptr<BackendCapabilitiesPanel> m_backend_capabilities_panel;
 };
 

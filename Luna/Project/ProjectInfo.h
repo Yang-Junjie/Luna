@@ -3,6 +3,12 @@
 #include <string>
 
 namespace luna {
+
+struct ScriptProjectSettings {
+    std::string SelectedPluginId;
+    std::string SelectedBackendName;
+};
+
 struct ProjectInfo {
     std::string Name{"Unknown"};
     std::string Version{"0.1.0"};
@@ -12,5 +18,6 @@ struct ProjectInfo {
     // relative to project root
     std::filesystem::path StartScene;
     std::filesystem::path AssetsPath;
+    ScriptProjectSettings Scripting{};
 };
 } // namespace luna

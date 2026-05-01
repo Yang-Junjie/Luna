@@ -1,0 +1,7 @@
+Asset:
+  Name: SpinAndBob
+  Handle: 5171177704692656994
+  Type: Script
+  FilePath: Assets/Scripts/SpinAndBob.lua
+  Config:
+    Language: Lua

@@ -41,8 +41,8 @@ public:
 
     [[nodiscard]] std::unique_ptr<Scene> clone() const;
 
-    void onUpdateRuntime();
-    void onUpdateEditor(const Camera& camera);
+    void renderFromRuntimeCamera();
+    void renderFromEditorCamera(const Camera& camera);
     void setAssetLoadBehavior(AssetLoadBehavior behavior);
     AssetLoadBehavior getAssetLoadBehavior() const;
 

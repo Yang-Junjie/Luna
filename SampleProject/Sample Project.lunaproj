@@ -5,3 +5,6 @@ Project:
   Description: A simple Luna project.
   StartScene: ./Assets/Scenes/SampleScene.lunascene
   Assets: ./Assets/
+  Scripting:
+    SelectedPluginId: luna.official.lua
+    SelectedBackendName: Lua

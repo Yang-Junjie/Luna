@@ -13,3 +13,5 @@ shader_cache/
 imgui.ini
 .codex/
 devdocs/
+Plugins/**/Binaries/
+Plugins/**/Intermediate/

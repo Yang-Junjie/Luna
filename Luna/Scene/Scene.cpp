@@ -84,7 +84,7 @@ std::unique_ptr<Scene> Scene::clone() const
     return cloned_scene;
 }
 
-void Scene::onUpdateRuntime()
+void Scene::renderFromRuntimeCamera()
 {
     Camera runtime_camera;
     if (!findPrimaryRuntimeCamera(runtime_camera)) {
@@ -94,7 +94,7 @@ void Scene::onUpdateRuntime()
     submitScene(runtime_camera);
 }
 
-void Scene::onUpdateEditor(const Camera& camera)
+void Scene::renderFromEditorCamera(const Camera& camera)
 {
     submitScene(camera);
 }

@@ -7,6 +7,7 @@
 #include "MaterialImporter.h"
 #include "MeshImporter.h"
 #include "ModelImporter.h"
+#include "ScriptImporter.h"
 #include "Project/ProjectManager.h"
 #include "TextureImporter.h"
 
@@ -145,6 +146,7 @@ void ImporterManager::init()
     register_importer(std::make_unique<MeshImporter>());
     register_importer(std::make_unique<MaterialImporter>());
     register_importer(std::make_unique<ModelImporter>());
+    register_importer(std::make_unique<ScriptImporter>());
     register_importer(std::make_unique<TextureImporter>());
 }
 

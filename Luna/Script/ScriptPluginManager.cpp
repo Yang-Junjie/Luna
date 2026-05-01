@@ -1,0 +1,750 @@
+#include "ScriptPluginManager.h"
+
+#include "Core/Log.h"
+#include "Project/ProjectManager.h"
+#include "ScriptHostBridge.h"
+#include "ScriptPluginApi.h"
+#include "ScriptPluginDiscovery.h"
+
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+
+#if defined(_WIN32)
+#    if !defined(WIN32_LEAN_AND_MEAN)
+#        define WIN32_LEAN_AND_MEAN
+#    endif
+#    if !defined(NOMINMAX)
+#        define NOMINMAX
+#    endif
+#    include <Windows.h>
+#endif
+
+namespace {
+
+using BackendMap = std::unordered_map<std::string, std::unique_ptr<luna::IScriptBackend>>;
+
+std::string normalizeBackendKey(std::string_view value)
+{
+    std::string normalized(value);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return normalized;
+}
+
+const char* scopeToString(luna::ScriptPluginScope scope)
+{
+    switch (scope) {
+        case luna::ScriptPluginScope::Engine:
+            return "engine";
+        case luna::ScriptPluginScope::Project:
+            return "project";
+        default:
+            return "unknown";
+    }
+}
+
+const luna::ScriptBackendDescriptor* findBackendInMap(const BackendMap& backends, std::string_view backend_name)
+{
+    const auto it = backends.find(normalizeBackendKey(backend_name));
+    return it != backends.end() ? &it->second->descriptor() : nullptr;
+}
+
+std::unique_ptr<luna::IScriptRuntime> createRuntimeFromMap(const BackendMap& backends, std::string_view backend_name)
+{
+    const auto it = backends.find(normalizeBackendKey(backend_name));
+    if (it == backends.end()) {
+        return {};
+    }
+
+    return it->second->createRuntime();
+}
+
+void logHostMessage(void*, LunaScriptHostLogLevel level, const char* message)
+{
+    const char* text = message != nullptr ? message : "";
+
+    switch (level) {
+        case LunaScriptHostLogLevel_Trace:
+            LUNA_CORE_TRACE("[ScriptHost] {}", text);
+            break;
+        case LunaScriptHostLogLevel_Info:
+            LUNA_CORE_INFO("[ScriptHost] {}", text);
+            break;
+        case LunaScriptHostLogLevel_Warn:
+            LUNA_CORE_WARN("[ScriptHost] {}", text);
+            break;
+        case LunaScriptHostLogLevel_Error:
+            LUNA_CORE_ERROR("[ScriptHost] {}", text);
+            break;
+        default:
+            LUNA_CORE_INFO("[ScriptHost] {}", text);
+            break;
+    }
+}
+
+struct ResolvedScriptSelection {
+    const luna::ScriptPluginCandidate* candidate{nullptr};
+    std::string backend_name;
+    bool explicit_selection{false};
+    bool ambiguous{false};
+};
+
+const luna::ScriptPluginCandidate* findUniqueCandidateByBackend(
+    const std::vector<luna::ScriptPluginCandidate>& candidates, std::string_view backend_name)
+{
+    const std::string normalized_backend = normalizeBackendKey(backend_name);
+    const luna::ScriptPluginCandidate* resolved = nullptr;
+
+    for (const auto& candidate : candidates) {
+        if (normalizeBackendKey(candidate.Manifest.BackendName) != normalized_backend) {
+            continue;
+        }
+
+        if (resolved != nullptr) {
+            return nullptr;
+        }
+
+        resolved = &candidate;
+    }
+
+    return resolved;
+}
+
+bool registerBackendIntoMap(BackendMap& backends, std::unique_ptr<luna::IScriptBackend> backend)
+{
+    if (!backend) {
+        return false;
+    }
+
+    const luna::ScriptBackendDescriptor& descriptor = backend->descriptor();
+    if (descriptor.name.empty()) {
+        LUNA_CORE_WARN("Rejected script backend registration because the backend name is empty");
+        return false;
+    }
+
+    const std::string key = normalizeBackendKey(descriptor.name);
+    if (backends.contains(key)) {
+        LUNA_CORE_WARN("Rejected duplicate script backend registration for '{}'", descriptor.name);
+        return false;
+    }
+
+    LUNA_CORE_INFO("Registered script backend '{}' ({})",
+                   descriptor.name,
+                   descriptor.built_in ? "built-in" : "plugin");
+    backends.emplace(key, std::move(backend));
+    return true;
+}
+
+#if defined(_WIN32)
+std::string formatWindowsError(DWORD error)
+{
+    LPSTR buffer = nullptr;
+    const DWORD length = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                                            FORMAT_MESSAGE_IGNORE_INSERTS,
+                                        nullptr,
+                                        error,
+                                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                                        reinterpret_cast<LPSTR>(&buffer),
+                                        0,
+                                        nullptr);
+
+    std::string message = (length > 0 && buffer != nullptr) ? std::string(buffer, length) : "unknown error";
+    if (buffer != nullptr) {
+        LocalFree(buffer);
+    }
+
+    while (!message.empty() &&
+           (message.back() == '\r' || message.back() == '\n' || message.back() == ' ' || message.back() == '.')) {
+        message.pop_back();
+    }
+
+    return message;
+}
+
+class DynamicLibraryHandle {
+public:
+    static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
+    {
+        const HMODULE module = ::LoadLibraryW(path.c_str());
+        if (module == nullptr) {
+            const DWORD error = ::GetLastError();
+            LUNA_CORE_ERROR("Failed to load script plugin library '{}': {}", path.string(), formatWindowsError(error));
+            return {};
+        }
+
+        return std::shared_ptr<DynamicLibraryHandle>(new DynamicLibraryHandle(module, path));
+    }
+
+    ~DynamicLibraryHandle()
+    {
+        if (m_module != nullptr) {
+            ::FreeLibrary(m_module);
+        }
+    }
+
+    [[nodiscard]] void* findSymbol(const char* name) const
+    {
+        if (m_module == nullptr || name == nullptr) {
+            return nullptr;
+        }
+
+        return reinterpret_cast<void*>(::GetProcAddress(m_module, name));
+    }
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept
+    {
+        return m_path;
+    }
+
+private:
+    DynamicLibraryHandle(HMODULE module, std::filesystem::path path)
+        : m_module(module),
+          m_path(std::move(path))
+    {}
+
+private:
+    HMODULE m_module{nullptr};
+    std::filesystem::path m_path;
+};
+#else
+class DynamicLibraryHandle {
+public:
+    static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
+    {
+        LUNA_CORE_ERROR("Script plugin loading is not implemented on this platform. Requested '{}'",
+                        path.string());
+        return {};
+    }
+
+    [[nodiscard]] void* findSymbol(const char*) const
+    {
+        return nullptr;
+    }
+};
+#endif
+
+class PluginScriptRuntime final : public luna::IScriptRuntime {
+public:
+    PluginScriptRuntime(std::string runtime_name,
+                        LunaScriptRuntimeApi runtime_api,
+                        std::shared_ptr<DynamicLibraryHandle> plugin_library)
+        : m_runtime_name(std::move(runtime_name)),
+          m_runtime_api(runtime_api),
+          m_plugin_library(std::move(plugin_library))
+    {}
+
+    ~PluginScriptRuntime() override
+    {
+        shutdown();
+        if (m_runtime_api.destroy_runtime != nullptr && m_runtime_api.runtime_user_data != nullptr) {
+            m_runtime_api.destroy_runtime(m_runtime_api.runtime_user_data);
+            m_runtime_api.runtime_user_data = nullptr;
+        }
+    }
+
+    const char* name() const noexcept override
+    {
+        return m_runtime_name.c_str();
+    }
+
+    bool initialize() override
+    {
+        if (m_initialized) {
+            return true;
+        }
+
+        if (m_runtime_api.initialize != nullptr && m_runtime_api.initialize(m_runtime_api.runtime_user_data) == 0) {
+            return false;
+        }
+
+        m_initialized = true;
+        return true;
+    }
+
+    void shutdown() override
+    {
+        if (!m_initialized) {
+            return;
+        }
+
+        if (m_runtime_api.shutdown != nullptr) {
+            m_runtime_api.shutdown(m_runtime_api.runtime_user_data);
+        }
+
+        m_initialized = false;
+    }
+
+    void onRuntimeStart(luna::Scene& scene) override
+    {
+        if (m_runtime_api.on_runtime_start != nullptr) {
+            m_runtime_api.on_runtime_start(m_runtime_api.runtime_user_data, &scene);
+        }
+    }
+
+    void onRuntimeStop(luna::Scene& scene) override
+    {
+        if (m_runtime_api.on_runtime_stop != nullptr) {
+            m_runtime_api.on_runtime_stop(m_runtime_api.runtime_user_data, &scene);
+        }
+    }
+
+    void onUpdate(luna::Scene& scene, luna::Timestep timestep) override
+    {
+        if (m_runtime_api.on_update != nullptr) {
+            m_runtime_api.on_update(m_runtime_api.runtime_user_data, &scene, timestep.getSeconds());
+        }
+    }
+
+private:
+    std::string m_runtime_name;
+    LunaScriptRuntimeApi m_runtime_api{};
+    std::shared_ptr<DynamicLibraryHandle> m_plugin_library;
+    bool m_initialized{false};
+};
+
+class PluginScriptBackend final : public luna::IScriptBackend {
+public:
+    PluginScriptBackend(luna::ScriptPluginCandidate candidate,
+                        LunaScriptBackendApi backend_api,
+                        std::shared_ptr<DynamicLibraryHandle> plugin_library)
+        : m_candidate(std::move(candidate)),
+          m_backend_api(backend_api),
+          m_plugin_library(std::move(plugin_library))
+    {
+        m_descriptor.name = m_backend_api.backend_name != nullptr ? m_backend_api.backend_name
+                                                                  : m_candidate.Manifest.BackendName;
+        m_descriptor.display_name =
+            m_backend_api.display_name != nullptr ? m_backend_api.display_name : m_candidate.Manifest.DisplayName;
+        m_descriptor.language =
+            m_backend_api.language_name != nullptr ? m_backend_api.language_name : m_candidate.Manifest.Language;
+        m_descriptor.built_in = false;
+        m_descriptor.plugin_path = m_candidate.PluginRootPath;
+
+        if (m_backend_api.supported_extensions != nullptr) {
+            m_descriptor.supported_extensions.reserve(m_backend_api.supported_extension_count);
+            for (size_t extension_index = 0; extension_index < m_backend_api.supported_extension_count;
+                 ++extension_index) {
+                const char* extension = m_backend_api.supported_extensions[extension_index];
+                if (extension != nullptr && extension[0] != '\0') {
+                    m_descriptor.supported_extensions.emplace_back(extension);
+                }
+            }
+        }
+    }
+
+    const luna::ScriptBackendDescriptor& descriptor() const noexcept override
+    {
+        return m_descriptor;
+    }
+
+    std::unique_ptr<luna::IScriptRuntime> createRuntime() const override
+    {
+        if (m_backend_api.create_runtime == nullptr) {
+            LUNA_CORE_ERROR("Script backend '{}' does not expose a runtime factory", m_descriptor.name);
+            return {};
+        }
+
+        LunaScriptRuntimeApi runtime_api{};
+        runtime_api.struct_size = sizeof(LunaScriptRuntimeApi);
+        runtime_api.api_version = LUNA_SCRIPT_RUNTIME_API_VERSION;
+        if (m_backend_api.create_runtime(m_backend_api.backend_user_data, &runtime_api) == 0) {
+            LUNA_CORE_ERROR("Script backend '{}' failed to create a runtime instance", m_descriptor.name);
+            return {};
+        }
+
+        if (runtime_api.api_version != LUNA_SCRIPT_RUNTIME_API_VERSION) {
+            LUNA_CORE_ERROR("Script backend '{}' returned runtime API version {} but the engine expects {}",
+                            m_descriptor.name,
+                            runtime_api.api_version,
+                            static_cast<uint32_t>(LUNA_SCRIPT_RUNTIME_API_VERSION));
+            return {};
+        }
+
+        if (runtime_api.destroy_runtime == nullptr) {
+            LUNA_CORE_ERROR("Script backend '{}' returned a runtime without destroy_runtime", m_descriptor.name);
+            return {};
+        }
+
+        return std::make_unique<PluginScriptRuntime>(m_descriptor.name, runtime_api, m_plugin_library);
+    }
+
+private:
+    luna::ScriptPluginCandidate m_candidate;
+    luna::ScriptBackendDescriptor m_descriptor;
+    LunaScriptBackendApi m_backend_api{};
+    std::shared_ptr<DynamicLibraryHandle> m_plugin_library;
+};
+
+} // namespace
+
+namespace luna {
+
+ScriptPluginManager& ScriptPluginManager::instance()
+{
+    static ScriptPluginManager manager;
+    return manager;
+}
+
+ScriptPluginManager::ScriptPluginManager()
+{
+    m_host_api.struct_size = sizeof(LunaScriptHostApi);
+    m_host_api.api_version = LUNA_SCRIPT_HOST_API_VERSION;
+    m_host_api.user_data = nullptr;
+    m_host_api.log = &logHostMessage;
+    initializeScriptHostApiBridge(m_host_api);
+
+    registerBuiltinBackends();
+    refreshDiscoveredPlugins();
+}
+
+const ScriptBackendDescriptor* ScriptPluginManager::findBackend(std::string_view backend_name) const
+{
+    if (const ScriptBackendDescriptor* plugin_backend = findBackendInMap(m_plugin_backends, backend_name);
+        plugin_backend != nullptr) {
+        return plugin_backend;
+    }
+
+    return findBackendInMap(m_builtin_backends, backend_name);
+}
+
+std::vector<ScriptBackendDescriptor> ScriptPluginManager::getBackends() const
+{
+    std::vector<ScriptBackendDescriptor> backends;
+    backends.reserve(m_builtin_backends.size() + m_plugin_backends.size());
+
+    for (const auto& [key, backend] : m_plugin_backends) {
+        (void) key;
+        backends.push_back(backend->descriptor());
+    }
+
+    for (const auto& [key, backend] : m_builtin_backends) {
+        if (m_plugin_backends.contains(key)) {
+            continue;
+        }
+
+        backends.push_back(backend->descriptor());
+    }
+
+    std::sort(backends.begin(), backends.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.name < rhs.name;
+    });
+    return backends;
+}
+
+void ScriptPluginManager::refreshDiscoveredPlugins(std::optional<std::filesystem::path> project_root_path)
+{
+    ScriptPluginDiscovery discovery;
+    ScriptPluginDiscovery::Options options{};
+    options.EnginePluginsRoot = std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins";
+    if (project_root_path.has_value()) {
+        options.ProjectPluginsRoot = project_root_path.value() / "Plugins";
+    }
+
+    m_discovered_plugins = discovery.discover(options);
+}
+
+const std::vector<ScriptPluginCandidate>& ScriptPluginManager::getDiscoveredPlugins() const noexcept
+{
+    return m_discovered_plugins;
+}
+
+const ScriptPluginCandidate* ScriptPluginManager::findDiscoveredPlugin(std::string_view plugin_id) const
+{
+    const std::string normalized_plugin_id = normalizeBackendKey(plugin_id);
+    for (const ScriptPluginCandidate& candidate : m_discovered_plugins) {
+        if (normalizeBackendKey(candidate.Manifest.PluginId) == normalized_plugin_id) {
+            return &candidate;
+        }
+    }
+
+    return nullptr;
+}
+
+std::string ScriptPluginManager::defaultBackendName() const
+{
+    return "Lua";
+}
+
+std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntime(std::string_view backend_name) const
+{
+    if (std::unique_ptr<IScriptRuntime> runtime = createRuntimeFromMap(m_plugin_backends, backend_name)) {
+        return runtime;
+    }
+
+    return createRuntimeFromMap(m_builtin_backends, backend_name);
+}
+
+std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(const ProjectInfo* project_info) const
+{
+    const auto project_root_path = ProjectManager::instance().getProjectRootPath();
+    const_cast<ScriptPluginManager*>(this)->refreshDiscoveredPlugins(project_root_path);
+
+    const std::string configured_plugin_id =
+        project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
+    const std::string configured_backend_name =
+        project_info != nullptr ? project_info->Scripting.SelectedBackendName : std::string{};
+
+    ResolvedScriptSelection selection{};
+    selection.explicit_selection = !configured_plugin_id.empty() || !configured_backend_name.empty();
+
+    if (!configured_plugin_id.empty()) {
+        selection.candidate = findDiscoveredPlugin(configured_plugin_id);
+        if (selection.candidate == nullptr) {
+            LUNA_CORE_WARN("Configured script plugin '{}' was not discovered in the current plugin directories",
+                           configured_plugin_id);
+        }
+    }
+
+    if (selection.candidate == nullptr && !configured_backend_name.empty()) {
+        selection.candidate = findUniqueCandidateByBackend(m_discovered_plugins, configured_backend_name);
+        if (selection.candidate != nullptr) {
+            LUNA_CORE_INFO("Resolved script backend '{}' to plugin '{}'",
+                           configured_backend_name,
+                           selection.candidate->Manifest.PluginId);
+        }
+    }
+
+    if (selection.candidate == nullptr) {
+        if (m_discovered_plugins.size() == 1) {
+            selection.candidate = &m_discovered_plugins.front();
+        } else if (m_discovered_plugins.size() > 1) {
+            selection.ambiguous = true;
+        }
+    }
+
+    if (selection.candidate != nullptr) {
+        selection.backend_name = selection.candidate->Manifest.BackendName;
+
+        if (selection.candidate->Manifest.HostApiVersion != LUNA_SCRIPT_HOST_API_VERSION) {
+            LUNA_CORE_ERROR("Script plugin '{}' requires host API version {} but the engine provides {}",
+                            selection.candidate->Manifest.PluginId,
+                            selection.candidate->Manifest.HostApiVersion,
+                            static_cast<uint32_t>(LUNA_SCRIPT_HOST_API_VERSION));
+            return {};
+        }
+    } else if (!configured_backend_name.empty()) {
+        selection.backend_name = configured_backend_name;
+    } else if (!selection.ambiguous) {
+        selection.backend_name = defaultBackendName();
+    }
+
+    if (selection.ambiguous) {
+        LUNA_CORE_ERROR("Multiple script plugins were discovered, but the project does not specify "
+                        "'Scripting.SelectedPluginId'. Script runtime creation was skipped.");
+        for (const auto& candidate : m_discovered_plugins) {
+            LUNA_CORE_ERROR("  candidate: '{}' backend='{}' scope='{}'",
+                            candidate.Manifest.PluginId,
+                            candidate.Manifest.BackendName,
+                            scopeToString(candidate.Scope));
+        }
+        return {};
+    }
+
+    if (selection.candidate != nullptr) {
+        if (!const_cast<ScriptPluginManager*>(this)->ensurePluginLoaded(selection.candidate)) {
+            return {};
+        }
+    } else {
+        const_cast<ScriptPluginManager*>(this)->unloadActivePlugin();
+    }
+
+    if (selection.backend_name.empty()) {
+        selection.backend_name = defaultBackendName();
+    }
+
+    if (std::unique_ptr<IScriptRuntime> runtime = createRuntime(selection.backend_name)) {
+        return runtime;
+    }
+
+    if (selection.candidate != nullptr) {
+        LUNA_CORE_ERROR("Script plugin '{}' resolved to backend '{}', but that backend is not registered",
+                        selection.candidate->Manifest.PluginId,
+                        selection.backend_name);
+        return {};
+    }
+
+    if (selection.explicit_selection) {
+        LUNA_CORE_ERROR("Configured script backend '{}' is unavailable", selection.backend_name);
+        return {};
+    }
+
+    if (selection.backend_name != defaultBackendName()) {
+        LUNA_CORE_WARN("Script backend '{}' is unavailable; falling back to '{}'",
+                       selection.backend_name,
+                       defaultBackendName());
+    }
+
+    return createRuntime(defaultBackendName());
+}
+
+bool ScriptPluginManager::registerBackend(std::unique_ptr<IScriptBackend> backend)
+{
+    if (!backend) {
+        return false;
+    }
+
+    BackendMap& target_backends = backend->descriptor().built_in ? m_builtin_backends : m_plugin_backends;
+    return registerBackendIntoMap(target_backends, std::move(backend));
+}
+
+const LunaScriptHostApi& ScriptPluginManager::hostApi() const noexcept
+{
+    return m_host_api;
+}
+
+bool ScriptPluginManager::ensurePluginLoaded(const ScriptPluginCandidate* candidate)
+{
+    if (candidate == nullptr) {
+        unloadActivePlugin();
+        return true;
+    }
+
+    const std::string normalized_plugin_id = normalizeBackendKey(candidate->Manifest.PluginId);
+    if (m_active_plugin_id == normalized_plugin_id && !m_plugin_backends.empty()) {
+        return true;
+    }
+
+    unloadActivePlugin();
+
+    const ScriptBackendDescriptor* builtin_backend = findBackendInMap(m_builtin_backends, candidate->Manifest.BackendName);
+    if (candidate->Manifest.Entry.empty()) {
+        if (builtin_backend != nullptr) {
+            LUNA_CORE_WARN("Script plugin '{}' does not define an entry library yet; using built-in backend '{}'",
+                           candidate->Manifest.PluginId,
+                           candidate->Manifest.BackendName);
+            return true;
+        }
+
+        LUNA_CORE_ERROR("Script plugin '{}' does not define 'Plugin.Entry'", candidate->Manifest.PluginId);
+        return false;
+    }
+
+    if (!candidate->EntryExists) {
+        if (builtin_backend != nullptr) {
+            LUNA_CORE_WARN("Script plugin '{}' entry '{}' does not exist yet; using built-in backend '{}'",
+                           candidate->Manifest.PluginId,
+                           candidate->ResolvedEntryPath.string(),
+                           candidate->Manifest.BackendName);
+            return true;
+        }
+
+        LUNA_CORE_ERROR("Script plugin '{}' entry '{}' does not exist",
+                        candidate->Manifest.PluginId,
+                        candidate->ResolvedEntryPath.string());
+        return false;
+    }
+
+    std::shared_ptr<DynamicLibraryHandle> plugin_library = DynamicLibraryHandle::load(candidate->ResolvedEntryPath);
+    if (!plugin_library) {
+        return false;
+    }
+
+    auto* create_plugin_fn =
+        reinterpret_cast<LunaCreateScriptPluginFn>(plugin_library->findSymbol("LunaCreateScriptPlugin"));
+    if (create_plugin_fn == nullptr) {
+        LUNA_CORE_ERROR("Script plugin '{}' does not export LunaCreateScriptPlugin",
+                        candidate->ResolvedEntryPath.string());
+        return false;
+    }
+
+    LunaScriptPluginApi plugin_api{};
+    plugin_api.struct_size = sizeof(LunaScriptPluginApi);
+    plugin_api.api_version = LUNA_SCRIPT_PLUGIN_API_VERSION;
+    if (create_plugin_fn(LUNA_SCRIPT_HOST_API_VERSION, &m_host_api, &plugin_api) == 0) {
+        LUNA_CORE_ERROR("Script plugin '{}' failed to initialize its plugin API", candidate->Manifest.PluginId);
+        return false;
+    }
+
+    if (plugin_api.api_version != LUNA_SCRIPT_PLUGIN_API_VERSION) {
+        LUNA_CORE_ERROR("Script plugin '{}' returned plugin API version {} but the engine expects {}",
+                        candidate->Manifest.PluginId,
+                        plugin_api.api_version,
+                        static_cast<uint32_t>(LUNA_SCRIPT_PLUGIN_API_VERSION));
+        return false;
+    }
+
+    if (plugin_api.backends == nullptr || plugin_api.backend_count == 0) {
+        LUNA_CORE_ERROR("Script plugin '{}' did not expose any script backends", candidate->Manifest.PluginId);
+        return false;
+    }
+
+    BackendMap loaded_backends;
+    loaded_backends.reserve(plugin_api.backend_count);
+
+    for (size_t backend_index = 0; backend_index < plugin_api.backend_count; ++backend_index) {
+        const LunaScriptBackendApi& backend_api = plugin_api.backends[backend_index];
+        if (backend_api.api_version != LUNA_SCRIPT_BACKEND_API_VERSION) {
+            LUNA_CORE_ERROR("Script plugin '{}' returned backend API version {} for backend #{} but the engine expects {}",
+                            candidate->Manifest.PluginId,
+                            backend_api.api_version,
+                            backend_index,
+                            static_cast<uint32_t>(LUNA_SCRIPT_BACKEND_API_VERSION));
+            return false;
+        }
+
+        if (backend_api.backend_name == nullptr || backend_api.backend_name[0] == '\0') {
+            LUNA_CORE_ERROR("Script plugin '{}' returned backend #{} with an empty backend_name",
+                            candidate->Manifest.PluginId,
+                            backend_index);
+            return false;
+        }
+
+        if (backend_api.create_runtime == nullptr) {
+            LUNA_CORE_ERROR("Script plugin '{}' returned backend '{}' without create_runtime",
+                            candidate->Manifest.PluginId,
+                            backend_api.backend_name);
+            return false;
+        }
+
+        if (!registerBackendIntoMap(loaded_backends,
+                                    std::make_unique<PluginScriptBackend>(*candidate, backend_api, plugin_library))) {
+            LUNA_CORE_ERROR("Script plugin '{}' failed to register backend '{}'",
+                            candidate->Manifest.PluginId,
+                            backend_api.backend_name);
+            return false;
+        }
+    }
+
+    if (!loaded_backends.contains(normalizeBackendKey(candidate->Manifest.BackendName))) {
+        LUNA_CORE_ERROR("Script plugin '{}' was loaded, but it does not expose the manifest backend '{}'",
+                        candidate->Manifest.PluginId,
+                        candidate->Manifest.BackendName);
+        return false;
+    }
+
+    m_plugin_backends = std::move(loaded_backends);
+    m_active_plugin_id = normalized_plugin_id;
+
+    LUNA_CORE_INFO("Loaded script plugin '{}' from '{}'",
+                   candidate->Manifest.PluginId,
+                   candidate->ResolvedEntryPath.string());
+    return true;
+}
+
+void ScriptPluginManager::unloadActivePlugin()
+{
+    if (m_active_plugin_id.empty() && m_plugin_backends.empty()) {
+        return;
+    }
+
+    if (!m_active_plugin_id.empty()) {
+        LUNA_CORE_INFO("Unloaded script plugin '{}'", m_active_plugin_id);
+    }
+
+    m_plugin_backends.clear();
+    m_active_plugin_id.clear();
+}
+
+void ScriptPluginManager::registerBuiltinBackends()
+{
+    // Intentionally empty. Script languages are expected to be provided by plugins.
+}
+
+} // namespace luna

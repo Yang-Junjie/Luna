@@ -134,6 +134,7 @@ set(SCENE_SOURCE
     Scene/Components/LightComponent.h
     Scene/Components/MeshComponent.h
     Scene/Components/RelationshipComponent.h
+    Scene/Components/ScriptComponent.h
     Scene/Components/TagComponent.h
     Scene/Components/TransformComponent.h
     Scene/Entity.h
@@ -142,16 +143,26 @@ set(SCENE_SOURCE
     Scene/EntityManager.cpp
     Scene/Scene.h
     Scene/Scene.cpp
+    Scene/SceneRuntime.h
+    Scene/SceneRuntime.cpp
     Scene/SceneSerializer.h
     Scene/SceneSerializer.cpp)
 
 set(SCRIPT_SOURCE
-    Script/ScriptComponent.h
+    Script/ScriptAsset.h
+    Script/ScriptBackend.h
+    Script/ScriptPluginManifest.h
+    Script/ScriptPluginDiscovery.h
+    Script/ScriptPluginDiscovery.cpp
+    Script/ScriptHostApi.h
+    Script/ScriptHostBridge.h
+    Script/ScriptHostBridge.cpp
+    Script/ScriptPluginApi.h
+    Script/ScriptPluginManager.h
+    Script/ScriptPluginManager.cpp
     Script/ScriptRuntime.h
     Script/ScriptSystem.h
-    Script/ScriptSystem.cpp
-    Script/LuaScriptRuntime.h
-    Script/LuaScriptRuntime.cpp)
+    Script/ScriptSystem.cpp)
 
 set(RHI_RUNTIME_SOURCE
     Imgui/ImGuiContext.cpp
@@ -201,6 +212,8 @@ set(ASSET_SOURCE
     Asset/Editor/MeshLoader.cpp
     Asset/Editor/ModelImporter.h
     Asset/Editor/ModelLoader.h
+    Asset/Editor/ScriptImporter.h
+    Asset/Editor/ScriptLoader.h
     Asset/Editor/TextureImporter.h
     Asset/Editor/TextureLoader.h
     Asset/Editor/TextureLoader.cpp
@@ -271,8 +284,6 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/entt/src
-        ${THIRD_PARTY_DIR}/lua
-        ${THIRD_PARTY_DIR}/sol2/include
         ${EXTERNAL_DIR}/yaml-cpp/include
         ${PROJECT_SOURCE_DIR}
 )
@@ -287,7 +298,6 @@ target_link_libraries(LunaCore
         Vulkan::Vulkan
         glfw
         enkiTS
-        lua
         # spirv-cross-core
         stb::stb
         yaml-cpp::yaml-cpp
@@ -299,5 +309,4 @@ target_compile_definitions(
         LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
-        SOL_NO_LUA_HPP=1
 )

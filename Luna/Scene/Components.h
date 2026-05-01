@@ -5,6 +5,6 @@
 #include "Scene/Components/LightComponent.h"
 #include "Scene/Components/MeshComponent.h"
 #include "Scene/Components/RelationshipComponent.h"
+#include "Scene/Components/ScriptComponent.h"
 #include "Scene/Components/TagComponent.h"
 #include "Scene/Components/TransformComponent.h"
-#include "Script/ScriptComponent.h"

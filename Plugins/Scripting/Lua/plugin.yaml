@@ -1,0 +1,9 @@
+Plugin:
+  Id: luna.official.lua
+  DisplayName: Luna Lua
+  Type: Script
+  Language: Lua
+  Backend: Lua
+  Version: 0.1.0
+  HostApiVersion: 1
+  Entry: Binaries/Win64/LunaScriptLua.dll

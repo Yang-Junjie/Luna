@@ -7,7 +7,7 @@
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
-#include "Script/LuaScriptRuntime.h"
+#include "Script/ScriptPluginManager.h"
 
 #include <algorithm>
 #include <cctype>
@@ -216,8 +216,6 @@ void LunaRuntimeApplication::onInit()
     renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
     renderer.getClearColor() = glm::vec4(0.08f, 0.09f, 0.11f, 1.0f);
     m_scene.setName("Untitled");
-    m_script_system.setRuntime(std::make_unique<LuaScriptRuntime>());
-    m_script_system.initialize();
 
     if (!loadStartupScene()) {
         LUNA_RUNTIME_WARN("Runtime started without a loaded scene. Pass '--project <path-to-.lunaproj>' to load one.");
@@ -226,18 +224,28 @@ void LunaRuntimeApplication::onInit()
 
 void LunaRuntimeApplication::onUpdate(Timestep timestep)
 {
-    m_script_system.onUpdate(m_scene, timestep);
-    m_scene.onUpdateRuntime();
+    if (m_scene_runtime) {
+        m_scene_runtime->update(timestep);
+    }
 }
 
 void LunaRuntimeApplication::onShutdown()
 {
-    m_script_system.onRuntimeStop(m_scene);
-    m_script_system.shutdown();
+    if (!m_scene_runtime) {
+        return;
+    }
+
+    m_scene_runtime->stop();
+    m_scene_runtime.reset();
 }
 
 bool LunaRuntimeApplication::loadStartupScene()
 {
+    if (m_scene_runtime) {
+        m_scene_runtime->stop();
+        m_scene_runtime.reset();
+    }
+
     if (m_project_file_path.empty()) {
         return false;
     }
@@ -279,7 +287,14 @@ bool LunaRuntimeApplication::loadStartupScene()
     }
 
     m_scene_file_path = start_scene_path;
-    m_script_system.onRuntimeStart(m_scene);
+    m_scene_runtime = std::make_unique<SceneRuntime>(m_scene);
+    m_scene_runtime->setScriptRuntime(ScriptPluginManager::instance().createRuntimeForProject(&*project_info));
+    if (!m_scene_runtime->start()) {
+        LUNA_RUNTIME_WARN("Failed to start runtime scene '{}'", m_scene_file_path.string());
+        m_scene_runtime.reset();
+        return false;
+    }
+
     LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
                       m_scene_file_path.string(),
                       m_scene.entityManager().entityCount());

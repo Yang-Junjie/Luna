@@ -2,10 +2,11 @@
 
 #include "Core/Application.h"
 #include "Scene/Scene.h"
-#include "Script/ScriptSystem.h"
+#include "Scene/SceneRuntime.h"
 
 #include <Instance.h>
 #include <filesystem>
+#include <memory>
 #include <string>
 
 namespace luna {
@@ -25,7 +26,7 @@ private:
 
 private:
     Scene m_scene;
-    ScriptSystem m_script_system;
+    std::unique_ptr<SceneRuntime> m_scene_runtime;
     std::filesystem::path m_project_file_path;
     std::filesystem::path m_scene_file_path;
     luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};

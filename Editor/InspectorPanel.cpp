@@ -8,6 +8,7 @@
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
+#include "ScriptComponentInspector.h"
 
 #include <algorithm>
 #include <array>
@@ -508,38 +509,7 @@ void InspectorPanel::onImGuiRender()
 
     drawComponentSection<ScriptComponent>(
         "Script", selected_entity, [](ScriptComponent& script_component) {
-            ImGui::Checkbox("Enabled", &script_component.enabled);
-            ImGui::Text("Scripts: %zu", script_component.scripts.size());
-
-            if (ImGui::Button("Add Script", ImVec2(-1.0f, 0.0f))) {
-                ScriptEntry entry{};
-                entry.id = UUID{};
-                script_component.scripts.push_back(std::move(entry));
-            }
-
-            for (size_t script_index = 0; script_index < script_component.scripts.size(); ++script_index) {
-                auto& script = script_component.scripts[script_index];
-                ImGui::PushID(static_cast<int>(script_index));
-                ImGui::Separator();
-                ImGui::Checkbox("Script Enabled", &script.enabled);
-
-                char type_buffer[256] = {};
-                strncpy_s(type_buffer, script.typeName.c_str(), _TRUNCATE);
-                if (ImGui::InputText("Type Name", type_buffer, sizeof(type_buffer))) {
-                    script.typeName = type_buffer;
-                }
-
-                drawAssetHandleEditor("Script Asset", script.scriptAsset);
-                ImGui::InputInt("Execution Order", &script.executionOrder);
-                ImGui::TextDisabled("Properties: %zu", script.properties.size());
-
-                if (ImGui::Button("Remove Script", ImVec2(-1.0f, 0.0f))) {
-                    script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
-                    ImGui::PopID();
-                    break;
-                }
-                ImGui::PopID();
-            }
+            drawScriptComponentInspector(script_component);
         },
         true);
 

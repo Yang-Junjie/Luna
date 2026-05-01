@@ -70,6 +70,13 @@ bool ProjectManager::serializeProject()
         out << YAML::Key << "Description" << YAML::Value << project_info.Description;
         out << YAML::Key << "StartScene" << YAML::Value << project_info.StartScene.generic_string();
         out << YAML::Key << "Assets" << YAML::Value << project_info.AssetsPath.generic_string();
+        out << YAML::Key << "Scripting" << YAML::Value;
+        {
+            out << YAML::BeginMap;
+            out << YAML::Key << "SelectedPluginId" << YAML::Value << project_info.Scripting.SelectedPluginId;
+            out << YAML::Key << "SelectedBackendName" << YAML::Value << project_info.Scripting.SelectedBackendName;
+            out << YAML::EndMap;
+        }
     }
     out << YAML::EndMap;
 
@@ -121,6 +128,16 @@ bool ProjectManager::deserializeProject()
         }
         if (project["Assets"]) {
             info.AssetsPath = project["Assets"].as<std::string>();
+        }
+        if (const YAML::Node scripting = project["Scripting"]) {
+            if (scripting["SelectedPluginId"]) {
+                info.Scripting.SelectedPluginId = scripting["SelectedPluginId"].as<std::string>();
+            }
+            if (scripting["SelectedBackendName"]) {
+                info.Scripting.SelectedBackendName = scripting["SelectedBackendName"].as<std::string>();
+            } else if (scripting["Backend"]) {
+                info.Scripting.SelectedBackendName = scripting["Backend"].as<std::string>();
+            }
         }
         m_project_info = std::move(info);
         return true;

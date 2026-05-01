@@ -1,0 +1,43 @@
+add_library(
+    LunaScriptLuaPlugin
+    SHARED
+    Source/LuaScriptPlugin.cpp
+)
+
+target_include_directories(
+    LunaScriptLuaPlugin
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/Luna
+        ${PROJECT_SOURCE_DIR}/third_party/lua
+        ${PROJECT_SOURCE_DIR}/third_party/sol2/include
+        ${PROJECT_SOURCE_DIR}/third_party/glm
+)
+
+target_link_libraries(
+    LunaScriptLuaPlugin
+    PRIVATE
+        lua
+)
+
+target_compile_definitions(
+    LunaScriptLuaPlugin
+    PRIVATE
+        SOL_NO_LUA_HPP=1
+)
+
+set_target_properties(
+    LunaScriptLuaPlugin
+    PROPERTIES
+        OUTPUT_NAME "LunaScriptLua"
+        PREFIX ""
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+        LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_CURRENT_SOURCE_DIR}/Binaries/Win64"
+)
