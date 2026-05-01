@@ -990,9 +990,18 @@ void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
 
 void LunaEditorLayer::beginRuntimeViewport()
 {
-    m_runtime_scene = m_scene->clone();
-    if (!m_runtime_scene) {
-        LUNA_EDITOR_WARN("Failed to create runtime scene for runtime viewport");
+    const std::string runtime_scene_snapshot = SceneSerializer::serializeToString(*m_scene);
+    if (runtime_scene_snapshot.empty()) {
+        LUNA_EDITOR_WARN("Failed to serialize current editor scene for runtime viewport");
+        m_runtime_viewport_enabled = false;
+        m_runtime_viewport_requested = false;
+        return;
+    }
+
+    m_runtime_scene = std::make_unique<Scene>();
+    if (!SceneSerializer::deserializeFromString(*m_runtime_scene, runtime_scene_snapshot, "runtime viewport snapshot")) {
+        LUNA_EDITOR_WARN("Failed to create runtime scene snapshot for runtime viewport");
+        m_runtime_scene.reset();
         m_runtime_viewport_enabled = false;
         m_runtime_viewport_requested = false;
         return;

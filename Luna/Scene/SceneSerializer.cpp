@@ -8,6 +8,7 @@
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 #include <yaml-cpp/yaml.h>
@@ -279,53 +280,17 @@ luna::LightComponent::Type readLightType(const YAML::Node& node, luna::LightComp
     return fallback;
 }
 
-} // namespace
-
-namespace luna {
-
-std::filesystem::path SceneSerializer::normalizeScenePath(const std::filesystem::path& scene_path)
+bool emitSceneYaml(const luna::Scene& scene, YAML::Emitter& out, std::string_view source_name)
 {
-    if (scene_path.empty()) {
-        return {};
-    }
-
-    std::filesystem::path normalized_path = scene_path.lexically_normal();
-    if (normalized_path.extension() != FileExtension) {
-        normalized_path.replace_extension(FileExtension);
-    }
-
-    return normalized_path;
-}
-
-bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path& scene_path)
-{
-    const std::filesystem::path normalized_path = normalizeScenePath(scene_path);
-    if (normalized_path.empty()) {
-        LUNA_CORE_ERROR("Cannot serialize scene because the target path is empty");
-        return false;
-    }
-
-    std::error_code ec;
-    if (!normalized_path.parent_path().empty()) {
-        std::filesystem::create_directories(normalized_path.parent_path(), ec);
-        if (ec) {
-            LUNA_CORE_ERROR("Failed to create scene directory '{}': {}",
-                            normalized_path.parent_path().string(),
-                            ec.message());
-            return false;
-        }
-    }
-
-    YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << "Scene" << YAML::Value << scene.getName();
     emitSceneEnvironment(out, scene.environmentSettings());
     out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
     const auto& registry = scene.entityManager().registry();
-    auto view = registry.view<const IDComponent>();
+    auto view = registry.view<const luna::IDComponent>();
     for (const auto entity_handle : view) {
-        const auto& id_component = registry.get<const IDComponent>(entity_handle);
+        const auto& id_component = registry.get<const luna::IDComponent>(entity_handle);
 
         out << YAML::BeginMap;
 
@@ -333,15 +298,15 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
         out << YAML::Key << "ID" << YAML::Value << static_cast<uint64_t>(id_component.id);
         out << YAML::EndMap;
 
-        if (registry.all_of<TagComponent>(entity_handle)) {
-            const auto& tag_component = registry.get<const TagComponent>(entity_handle);
+        if (registry.all_of<luna::TagComponent>(entity_handle)) {
+            const auto& tag_component = registry.get<const luna::TagComponent>(entity_handle);
             out << YAML::Key << "TagComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "Tag" << YAML::Value << tag_component.tag;
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<TransformComponent>(entity_handle)) {
-            const auto& transform_component = registry.get<const TransformComponent>(entity_handle);
+        if (registry.all_of<luna::TransformComponent>(entity_handle)) {
+            const auto& transform_component = registry.get<const luna::TransformComponent>(entity_handle);
             out << YAML::Key << "TransformComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "Translation" << YAML::Value;
             emitVec3(out, transform_component.translation);
@@ -352,27 +317,27 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<RelationshipComponent>(entity_handle)) {
-            const auto& relationship_component = registry.get<const RelationshipComponent>(entity_handle);
+        if (registry.all_of<luna::RelationshipComponent>(entity_handle)) {
+            const auto& relationship_component = registry.get<const luna::RelationshipComponent>(entity_handle);
             out << YAML::Key << "RelationshipComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "ParentHandle" << YAML::Value
                 << static_cast<uint64_t>(relationship_component.parentHandle);
             out << YAML::Key << "Children" << YAML::Value << YAML::BeginSeq;
-            for (const UUID child_uuid : relationship_component.children) {
+            for (const luna::UUID child_uuid : relationship_component.children) {
                 out << static_cast<uint64_t>(child_uuid);
             }
             out << YAML::EndSeq;
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<CameraComponent>(entity_handle)) {
-            const auto& camera_component = registry.get<const CameraComponent>(entity_handle);
+        if (registry.all_of<luna::CameraComponent>(entity_handle)) {
+            const auto& camera_component = registry.get<const luna::CameraComponent>(entity_handle);
             out << YAML::Key << "CameraComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "Primary" << YAML::Value << camera_component.primary;
             out << YAML::Key << "FixedAspectRatio" << YAML::Value << camera_component.fixedAspectRatio;
             out << YAML::Key << "ProjectionType" << YAML::Value
-                << (camera_component.projectionType == Camera::ProjectionType::Orthographic ? "Orthographic"
-                                                                                             : "Perspective");
+                << (camera_component.projectionType == luna::Camera::ProjectionType::Orthographic ? "Orthographic"
+                                                                                                   : "Perspective");
             out << YAML::Key << "PerspectiveFOV" << YAML::Value
                 << glm::degrees(camera_component.perspectiveVerticalFovRadians);
             out << YAML::Key << "PerspectiveNear" << YAML::Value << camera_component.perspectiveNear;
@@ -383,8 +348,8 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<LightComponent>(entity_handle)) {
-            const auto& light_component = registry.get<const LightComponent>(entity_handle);
+        if (registry.all_of<luna::LightComponent>(entity_handle)) {
+            const auto& light_component = registry.get<const luna::LightComponent>(entity_handle);
             out << YAML::Key << "LightComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "Type" << YAML::Value << lightTypeToString(light_component.type);
             out << YAML::Key << "Enabled" << YAML::Value << light_component.enabled;
@@ -397,20 +362,20 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<MeshComponent>(entity_handle)) {
-            const auto& mesh_component = registry.get<const MeshComponent>(entity_handle);
+        if (registry.all_of<luna::MeshComponent>(entity_handle)) {
+            const auto& mesh_component = registry.get<const luna::MeshComponent>(entity_handle);
             out << YAML::Key << "MeshComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "MeshHandle" << YAML::Value << static_cast<uint64_t>(mesh_component.meshHandle);
             out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::BeginSeq;
-            for (const AssetHandle material_handle : mesh_component.submeshMaterials) {
+            for (const luna::AssetHandle material_handle : mesh_component.submeshMaterials) {
                 out << static_cast<uint64_t>(material_handle);
             }
             out << YAML::EndSeq;
             out << YAML::EndMap;
         }
 
-        if (registry.all_of<ScriptComponent>(entity_handle)) {
-            const auto& script_component = registry.get<const ScriptComponent>(entity_handle);
+        if (registry.all_of<luna::ScriptComponent>(entity_handle)) {
+            const auto& script_component = registry.get<const luna::ScriptComponent>(entity_handle);
             out << YAML::Key << "ScriptComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "Enabled" << YAML::Value << script_component.enabled;
             out << YAML::Key << "Scripts" << YAML::Value << YAML::BeginSeq;
@@ -439,51 +404,21 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
     out << YAML::EndMap;
 
     if (!out.good()) {
-        LUNA_CORE_ERROR("Failed to emit scene YAML for '{}': {}", normalized_path.string(), out.GetLastError());
+        LUNA_CORE_ERROR("Failed to emit scene YAML for '{}': {}", source_name, out.GetLastError());
         return false;
     }
 
-    std::ofstream output_stream(normalized_path);
-    if (!output_stream.is_open()) {
-        LUNA_CORE_ERROR("Failed to open scene file for writing: {}", normalized_path.string());
-        return false;
-    }
-
-    output_stream << out.c_str();
-    if (!output_stream.good()) {
-        LUNA_CORE_ERROR("Failed to write scene file: {}", normalized_path.string());
-        return false;
-    }
-
-    LUNA_CORE_INFO("Serialized scene '{}' with {} entities to '{}'",
-                   scene.getName(),
-                   scene.entityManager().entityCount(),
-                   normalized_path.string());
     return true;
 }
 
-bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& scene_path)
+} // namespace
+
+namespace luna {
+
+namespace {
+
+bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string scene_name, std::string_view source_name)
 {
-    const std::filesystem::path normalized_path = normalizeScenePath(scene_path);
-    if (normalized_path.empty()) {
-        LUNA_CORE_ERROR("Cannot deserialize scene because the source path is empty");
-        return false;
-    }
-
-    if (!std::filesystem::exists(normalized_path)) {
-        LUNA_CORE_ERROR("Scene file does not exist: {}", normalized_path.string());
-        return false;
-    }
-
-    YAML::Node data;
-    try {
-        data = YAML::LoadFile(normalized_path.string());
-    } catch (const YAML::Exception& error) {
-        LUNA_CORE_ERROR("Failed to parse scene file '{}': {}", normalized_path.string(), error.what());
-        return false;
-    }
-
-    std::string scene_name = normalized_path.stem().string();
     if (data["Scene"]) {
         scene_name = data["Scene"].as<std::string>();
     }
@@ -497,7 +432,7 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
 
         const YAML::Node entities_node = data["Entities"];
         if (entities_node && !entities_node.IsSequence()) {
-            LUNA_CORE_ERROR("Scene file '{}' has an invalid 'Entities' node", normalized_path.string());
+            LUNA_CORE_ERROR("Scene data '{}' has an invalid 'Entities' node", source_name);
             return false;
         }
 
@@ -547,8 +482,8 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                     if (camera_component["ProjectionType"]) {
                         const std::string projection_type = camera_component["ProjectionType"].as<std::string>();
                         entity_data.camera.projectionType = projection_type == "Orthographic"
-                                                             ? Camera::ProjectionType::Orthographic
-                                                             : Camera::ProjectionType::Perspective;
+                                                              ? Camera::ProjectionType::Orthographic
+                                                              : Camera::ProjectionType::Perspective;
                     }
                     if (camera_component["PerspectiveFOV"]) {
                         entity_data.camera.perspectiveVerticalFovRadians =
@@ -654,7 +589,7 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
             }
         }
     } catch (const YAML::Exception& error) {
-        LUNA_CORE_ERROR("Failed to deserialize scene data from '{}': {}", normalized_path.string(), error.what());
+        LUNA_CORE_ERROR("Failed to deserialize scene data from '{}': {}", source_name, error.what());
         return false;
     }
 
@@ -717,6 +652,130 @@ bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& sce
                            entity.getUUID().toString(),
                            parent_uuid.toString());
         }
+    }
+
+    return true;
+}
+
+} // namespace
+
+std::filesystem::path SceneSerializer::normalizeScenePath(const std::filesystem::path& scene_path)
+{
+    if (scene_path.empty()) {
+        return {};
+    }
+
+    std::filesystem::path normalized_path = scene_path.lexically_normal();
+    if (normalized_path.extension() != FileExtension) {
+        normalized_path.replace_extension(FileExtension);
+    }
+
+    return normalized_path;
+}
+
+std::string SceneSerializer::serializeToString(const Scene& scene)
+{
+    YAML::Emitter out;
+    if (!emitSceneYaml(scene, out, "memory scene snapshot")) {
+        return {};
+    }
+
+    return out.c_str();
+}
+
+bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path& scene_path)
+{
+    const std::filesystem::path normalized_path = normalizeScenePath(scene_path);
+    if (normalized_path.empty()) {
+        LUNA_CORE_ERROR("Cannot serialize scene because the target path is empty");
+        return false;
+    }
+
+    std::error_code ec;
+    if (!normalized_path.parent_path().empty()) {
+        std::filesystem::create_directories(normalized_path.parent_path(), ec);
+        if (ec) {
+            LUNA_CORE_ERROR("Failed to create scene directory '{}': {}",
+                            normalized_path.parent_path().string(),
+                            ec.message());
+            return false;
+        }
+    }
+
+    YAML::Emitter out;
+    if (!emitSceneYaml(scene, out, normalized_path.string())) {
+        return false;
+    }
+
+    std::ofstream output_stream(normalized_path);
+    if (!output_stream.is_open()) {
+        LUNA_CORE_ERROR("Failed to open scene file for writing: {}", normalized_path.string());
+        return false;
+    }
+
+    output_stream << out.c_str();
+    if (!output_stream.good()) {
+        LUNA_CORE_ERROR("Failed to write scene file: {}", normalized_path.string());
+        return false;
+    }
+
+    LUNA_CORE_INFO("Serialized scene '{}' with {} entities to '{}'",
+                   scene.getName(),
+                   scene.entityManager().entityCount(),
+                   normalized_path.string());
+    return true;
+}
+
+bool SceneSerializer::deserializeFromString(Scene& scene, std::string_view scene_data, std::string_view source_name)
+{
+    if (scene_data.empty()) {
+        LUNA_CORE_ERROR("Cannot deserialize scene because the source data is empty");
+        return false;
+    }
+
+    const std::string source_label = source_name.empty() ? "memory scene snapshot" : std::string(source_name);
+    YAML::Node data;
+    try {
+        data = YAML::Load(std::string(scene_data));
+    } catch (const YAML::Exception& error) {
+        LUNA_CORE_ERROR("Failed to parse scene data '{}': {}", source_label, error.what());
+        return false;
+    }
+
+    if (!deserializeSceneFromNode(scene, data, scene.getName(), source_label)) {
+        return false;
+    }
+
+    LUNA_CORE_INFO("Deserialized scene '{}' with {} entities from '{}'",
+                   scene.getName(),
+                   scene.entityManager().entityCount(),
+                   source_label);
+    return true;
+}
+
+bool SceneSerializer::deserialize(Scene& scene, const std::filesystem::path& scene_path)
+{
+    const std::filesystem::path normalized_path = normalizeScenePath(scene_path);
+    if (normalized_path.empty()) {
+        LUNA_CORE_ERROR("Cannot deserialize scene because the source path is empty");
+        return false;
+    }
+
+    if (!std::filesystem::exists(normalized_path)) {
+        LUNA_CORE_ERROR("Scene file does not exist: {}", normalized_path.string());
+        return false;
+    }
+
+    YAML::Node data;
+    try {
+        data = YAML::LoadFile(normalized_path.string());
+    } catch (const YAML::Exception& error) {
+        LUNA_CORE_ERROR("Failed to parse scene file '{}': {}", normalized_path.string(), error.what());
+        return false;
+    }
+
+    if (!deserializeSceneFromNode(scene, data, normalized_path.stem().string(), normalized_path.string())) {
+        return false;
     }
 
     LUNA_CORE_INFO("Deserialized scene '{}' with {} entities from '{}'",
