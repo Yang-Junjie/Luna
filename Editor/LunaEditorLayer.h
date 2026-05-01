@@ -59,11 +59,15 @@ public:
 
     const std::string& getAssetLabel() const;
     Scene& getScene();
+    Scene& getInspectionScene();
+    const Scene& getInspectionScene() const;
+    bool isRuntimeViewportEnabled() const noexcept;
+    UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() const;
     void setSelectedEntity(Entity entity);
+    void setSelectedEntityId(UUID entity_id);
     void markSceneDirty();
     void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index);
-    void syncRuntimeScriptComponent(UUID entity_id);
     bool openSceneFile(const std::filesystem::path& scene_file_path);
     Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
@@ -122,7 +126,7 @@ private:
     std::unique_ptr<Scene> m_scene;
     std::unique_ptr<Scene> m_runtime_scene;
     std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
-    Entity m_selected_entity;
+    UUID m_selected_entity_id{0};
     std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
     bool m_scene_dirty{false};

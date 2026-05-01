@@ -487,8 +487,8 @@ void LunaEditorLayer::drawViewport()
 
 void LunaEditorLayer::updateGizmoShortcuts()
 {
-    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput || !m_selected_entity ||
-        !m_selected_entity.isValid()) {
+    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput ||
+        !m_selected_entity_id.isValid()) {
         return;
     }
 
@@ -561,7 +561,7 @@ void LunaEditorLayer::consumePendingScenePick()
         return;
     }
 
-    auto& entity_manager = m_scene->entityManager();
+    auto& entity_manager = activeRenderScene().entityManager();
     const entt::entity entity_handle = static_cast<entt::entity>(*picked_id - 1u);
     if (!entity_manager.registry().valid(entity_handle)) {
         setSelectedEntity({});
@@ -634,14 +634,43 @@ Scene& LunaEditorLayer::getScene()
     return *m_scene;
 }
 
+Scene& LunaEditorLayer::getInspectionScene()
+{
+    return activeRenderScene();
+}
+
+const Scene& LunaEditorLayer::getInspectionScene() const
+{
+    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : *m_scene;
+}
+
+bool LunaEditorLayer::isRuntimeViewportEnabled() const noexcept
+{
+    return m_runtime_viewport_enabled;
+}
+
+UUID LunaEditorLayer::getSelectedEntityId() const noexcept
+{
+    return m_selected_entity_id;
+}
+
 Entity LunaEditorLayer::getSelectedEntity() const
 {
-    return m_selected_entity;
+    if (!m_selected_entity_id.isValid()) {
+        return {};
+    }
+
+    return const_cast<Scene&>(getInspectionScene()).entityManager().findEntityByUUID(m_selected_entity_id);
 }
 
 void LunaEditorLayer::setSelectedEntity(Entity entity)
 {
-    m_selected_entity = entity;
+    m_selected_entity_id = entity ? entity.getUUID() : UUID(0);
+}
+
+void LunaEditorLayer::setSelectedEntityId(UUID entity_id)
+{
+    m_selected_entity_id = entity_id;
 }
 
 void LunaEditorLayer::markSceneDirty()
@@ -661,58 +690,23 @@ void LunaEditorLayer::patchRuntimeScriptProperty(UUID entity_id, size_t script_i
         return;
     }
 
-    Entity editor_entity = m_scene->entityManager().findEntityByUUID(entity_id);
     Entity runtime_entity = m_runtime_scene->entityManager().findEntityByUUID(entity_id);
-    if (!editor_entity || !runtime_entity || !editor_entity.hasComponent<ScriptComponent>()) {
+    if (!runtime_entity || !runtime_entity.hasComponent<ScriptComponent>()) {
         return;
     }
 
-    const ScriptComponent& editor_script_component = editor_entity.getComponent<ScriptComponent>();
-    if (script_index >= editor_script_component.scripts.size()) {
+    const ScriptComponent& runtime_script_component = runtime_entity.getComponent<ScriptComponent>();
+    if (script_index >= runtime_script_component.scripts.size()) {
         return;
     }
-
-    const ScriptEntry& editor_script = editor_script_component.scripts[script_index];
-    if (property_index >= editor_script.properties.size()) {
-        return;
-    }
-
-    if (!runtime_entity.hasComponent<ScriptComponent>()) {
-        runtime_entity.addComponent<ScriptComponent>();
-    }
-
-    ScriptComponent& runtime_script_component = runtime_entity.getComponent<ScriptComponent>();
-    runtime_script_component = editor_script_component;
 
     const ScriptEntry& runtime_script = runtime_script_component.scripts[script_index];
+    if (property_index >= runtime_script.properties.size()) {
+        return;
+    }
+
     const ScriptProperty& runtime_property = runtime_script.properties[property_index];
     m_runtime_scene_runtime->setScriptProperty(entity_id, runtime_script.id, runtime_property, property_index);
-}
-
-void LunaEditorLayer::syncRuntimeScriptComponent(UUID entity_id)
-{
-    if (!m_runtime_viewport_enabled || !m_runtime_scene) {
-        return;
-    }
-
-    Entity editor_entity = m_scene->entityManager().findEntityByUUID(entity_id);
-    Entity runtime_entity = m_runtime_scene->entityManager().findEntityByUUID(entity_id);
-    if (!editor_entity || !runtime_entity) {
-        return;
-    }
-
-    if (!editor_entity.hasComponent<ScriptComponent>()) {
-        if (runtime_entity.hasComponent<ScriptComponent>()) {
-            runtime_entity.removeComponent<ScriptComponent>();
-        }
-        return;
-    }
-
-    if (!runtime_entity.hasComponent<ScriptComponent>()) {
-        runtime_entity.addComponent<ScriptComponent>();
-    }
-
-    runtime_entity.getComponent<ScriptComponent>() = editor_entity.getComponent<ScriptComponent>();
 }
 
 bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
@@ -1028,7 +1022,7 @@ void LunaEditorLayer::resetEditorState()
     m_scene->setName("Untitled");
     m_scene->environmentSettings() = {};
     m_scene_setting_panel->syncFromScene();
-    m_selected_entity = {};
+    m_selected_entity_id = UUID(0);
     m_scene_file_path.clear();
     m_asset_label = "No scene loaded";
     m_scene_dirty = false;
@@ -1211,7 +1205,7 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     }
 
     m_scene_file_path = normalized_scene_path;
-    m_selected_entity = {};
+    m_selected_entity_id = UUID(0);
     m_scene_dirty = false;
     m_scene_setting_panel->syncFromScene();
     updateSceneLabel();

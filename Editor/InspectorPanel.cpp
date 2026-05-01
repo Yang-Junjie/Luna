@@ -215,6 +215,8 @@ void InspectorPanel::onImGuiRender()
     ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
 
+    const bool editing_runtime_scene = m_editor_layer->isRuntimeViewportEnabled();
+
     Entity selected_entity = m_editor_layer->getSelectedEntity();
     if (selected_entity && !selected_entity.isValid()) {
         m_editor_layer->setSelectedEntity({});
@@ -233,6 +235,9 @@ void InspectorPanel::onImGuiRender()
 
     if (ImGui::InputText("##Tag", tag_buffer, sizeof(tag_buffer))) {
         tag_component.tag = tag_buffer;
+        if (!editing_runtime_scene) {
+            m_editor_layer->markSceneDirty();
+        }
     }
 
     ImGui::SameLine();
@@ -243,21 +248,33 @@ void InspectorPanel::onImGuiRender()
     if (ImGui::BeginPopup("AddComponentPopup")) {
         if (!selected_entity.hasComponent<MeshComponent>() && ImGui::MenuItem("Mesh")) {
             selected_entity.addComponent<MeshComponent>();
+            if (!editing_runtime_scene) {
+                m_editor_layer->markSceneDirty();
+            }
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<CameraComponent>() && ImGui::MenuItem("Camera")) {
             selected_entity.addComponent<CameraComponent>();
+            if (!editing_runtime_scene) {
+                m_editor_layer->markSceneDirty();
+            }
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<LightComponent>() && ImGui::MenuItem("Light")) {
             selected_entity.addComponent<LightComponent>();
+            if (!editing_runtime_scene) {
+                m_editor_layer->markSceneDirty();
+            }
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<ScriptComponent>() && ImGui::MenuItem("Script")) {
             selected_entity.addComponent<ScriptComponent>();
+            if (!editing_runtime_scene) {
+                m_editor_layer->markSceneDirty();
+            }
             ImGui::CloseCurrentPopup();
         }
 
@@ -291,6 +308,9 @@ void InspectorPanel::onImGuiRender()
 
                 if (ImGui::Button("Detach From Parent", ImVec2(-1.0f, 0.0f))) {
                     selected_entity.clearParent(true);
+                    if (!editing_runtime_scene) {
+                        m_editor_layer->markSceneDirty();
+                    }
                 }
             } else {
                 ImGui::TextUnformatted("Parent: None");
@@ -508,16 +528,15 @@ void InspectorPanel::onImGuiRender()
         true);
 
     drawComponentSection<ScriptComponent>(
-        "Script", selected_entity, [this, selected_entity](ScriptComponent& script_component) {
+        "Script", selected_entity, [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
             const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
             if (change.changed) {
-                m_editor_layer->markSceneDirty();
-                if (change.property_value_changed) {
+                if (!editing_runtime_scene) {
+                    m_editor_layer->markSceneDirty();
+                } else if (change.property_value_changed) {
                     m_editor_layer->patchRuntimeScriptProperty(selected_entity.getUUID(),
                                                                change.script_index,
                                                                change.property_index);
-                } else if (change.script_structure_changed) {
-                    m_editor_layer->syncRuntimeScriptComponent(selected_entity.getUUID());
                 }
             }
         },
