@@ -60,7 +60,7 @@ public:
 
     struct InitializationOptions {
         InitializationOptions()
-            : backend(luna::RHI::BackendType::Vulkan),
+            : backend(luna::RHI::BackendType::Auto),
               present_mode(luna::RHI::PresentMode::Fifo)
         {}
 

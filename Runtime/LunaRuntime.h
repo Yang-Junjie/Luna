@@ -29,7 +29,7 @@ private:
     std::unique_ptr<SceneRuntime> m_scene_runtime;
     std::filesystem::path m_project_file_path;
     std::filesystem::path m_scene_file_path;
-    luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};
+    luna::RHI::BackendType m_backend{luna::RHI::BackendType::Auto};
 };
 
 Application* createApplication(int argc, char** argv);

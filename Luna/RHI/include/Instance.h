@@ -83,6 +83,9 @@ class LUNA_RHI_API Instance : public std::enable_shared_from_this<Instance> {
 public:
     virtual ~Instance() = default;
     static Ref<Instance> Create(const InstanceCreateInfo& createInfo);
+    [[nodiscard]] static std::vector<BackendType> GetCompiledBackends();
+    [[nodiscard]] static bool IsBackendCompiled(BackendType backend);
+    [[nodiscard]] static BackendType GetDefaultBackend();
     [[nodiscard]] virtual BackendType GetType() const = 0;
     virtual bool Initialize(const InstanceCreateInfo& createInfo) = 0;
     virtual std::vector<Ref<Adapter>> EnumerateAdapters() = 0;

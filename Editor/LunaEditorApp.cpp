@@ -61,6 +61,9 @@ std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
         return static_cast<char>(std::tolower(c));
     });
 
+    if (normalized == "auto") {
+        return luna::RHI::BackendType::Auto;
+    }
     if (normalized == "vulkan" || normalized == "vk") {
         return luna::RHI::BackendType::Vulkan;
     }
@@ -70,13 +73,25 @@ std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
     if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
         return luna::RHI::BackendType::DirectX11;
     }
+    if (normalized == "metal" || normalized == "mtl") {
+        return luna::RHI::BackendType::Metal;
+    }
+    if (normalized == "opengl" || normalized == "gl") {
+        return luna::RHI::BackendType::OpenGL;
+    }
+    if (normalized == "opengles" || normalized == "gles") {
+        return luna::RHI::BackendType::OpenGLES;
+    }
+    if (normalized == "webgpu" || normalized == "wgpu") {
+        return luna::RHI::BackendType::WebGPU;
+    }
 
     return std::nullopt;
 }
 
 luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
 {
-    luna::RHI::BackendType selected_backend = luna::RHI::BackendType::Vulkan;
+    luna::RHI::BackendType selected_backend = luna::RHI::BackendType::Auto;
 
     for (int i = 1; i < argc; ++i) {
         const std::string_view argument = argv[i] != nullptr ? std::string_view(argv[i]) : std::string_view{};
@@ -109,6 +124,20 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
     return selected_backend;
 }
 
+luna::RHI::BackendType resolveCapabilitiesBackend(luna::RHI::BackendType backend)
+{
+    if (backend != luna::RHI::BackendType::Auto) {
+        return backend;
+    }
+
+    try {
+        return luna::RHI::Instance::GetDefaultBackend();
+    } catch (const std::exception& error) {
+        LUNA_EDITOR_WARN("Failed to resolve default RHI backend for editor capabilities: {}", error.what());
+        return luna::RHI::BackendType::Auto;
+    }
+}
+
 } // namespace
 
 namespace luna {
@@ -119,7 +148,7 @@ LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend)
           .m_window_width = 1'600,
           .m_window_height = 900,
           .m_maximized = false,
-          .m_enable_imgui = luna::RHI::makeCapabilitiesForBackend(backend).supports_imgui,
+          .m_enable_imgui = luna::RHI::makeCapabilitiesForBackend(resolveCapabilitiesBackend(backend)).supports_imgui,
           .m_enable_multi_viewport = false,
       }),
       m_backend(backend)

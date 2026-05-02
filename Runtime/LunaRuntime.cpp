@@ -25,7 +25,7 @@ namespace {
 constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
 
 struct RuntimeStartupOptions {
-    luna::RHI::BackendType backend = luna::RHI::BackendType::Vulkan;
+    luna::RHI::BackendType backend = luna::RHI::BackendType::Auto;
     std::filesystem::path project_file_path;
 };
 
@@ -90,6 +90,9 @@ std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
         return static_cast<char>(std::tolower(c));
     });
 
+    if (normalized == "auto") {
+        return luna::RHI::BackendType::Auto;
+    }
     if (normalized == "vulkan" || normalized == "vk") {
         return luna::RHI::BackendType::Vulkan;
     }
@@ -98,6 +101,18 @@ std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
     }
     if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
         return luna::RHI::BackendType::DirectX11;
+    }
+    if (normalized == "metal" || normalized == "mtl") {
+        return luna::RHI::BackendType::Metal;
+    }
+    if (normalized == "opengl" || normalized == "gl") {
+        return luna::RHI::BackendType::OpenGL;
+    }
+    if (normalized == "opengles" || normalized == "gles") {
+        return luna::RHI::BackendType::OpenGLES;
+    }
+    if (normalized == "webgpu" || normalized == "wgpu") {
+        return luna::RHI::BackendType::WebGPU;
     }
 
     return std::nullopt;

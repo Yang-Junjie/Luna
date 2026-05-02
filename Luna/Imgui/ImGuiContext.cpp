@@ -84,7 +84,7 @@ luna::RHI::Format g_pipeline_color_format = luna::RHI::Format::UNDEFINED;
 std::unordered_map<ImGuiTextureKey, std::shared_ptr<ImGuiTextureBinding>, ImGuiTextureKeyHash> g_texture_bindings;
 std::vector<FrameResources> g_frame_resources;
 ImTextureID g_font_texture_id = 0;
-luna::RHI::BackendType g_backend_type = luna::RHI::BackendType::Vulkan;
+luna::RHI::BackendType g_backend_type = luna::RHI::BackendType::Auto;
 bool g_initialized = false;
 
 float imguiTopClipY(luna::RHI::BackendType backend_type)
@@ -501,7 +501,7 @@ void clearState()
 {
     g_initialized = false;
     g_font_texture_id = 0;
-    g_backend_type = luna::RHI::BackendType::Vulkan;
+    g_backend_type = luna::RHI::BackendType::Auto;
     g_texture_bindings.clear();
     g_frame_resources.clear();
     g_pipeline.reset();
@@ -530,7 +530,7 @@ bool ImGuiRhiContext::Init(luna::Renderer& renderer)
         g_device = renderer.getDevice();
         g_graphics_queue = renderer.getGraphicsQueue();
         g_shader_compiler = renderer.getShaderCompiler();
-        g_backend_type = renderer.getInstance() ? renderer.getInstance()->GetType() : luna::RHI::BackendType::Vulkan;
+        g_backend_type = renderer.getInstance() ? renderer.getInstance()->GetType() : luna::RHI::BackendType::Auto;
         if (!g_device || !g_graphics_queue || !g_shader_compiler || renderer.getNativeWindow() == nullptr) {
             LUNA_IMGUI_ERROR("Cannot initialize ImGui because renderer state is incomplete");
             clearState();

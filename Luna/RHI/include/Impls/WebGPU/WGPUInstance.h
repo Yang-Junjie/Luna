@@ -12,7 +12,7 @@ private:
     ::WGPUInstance m_instance = nullptr;
 
     friend class WGPUAdapter;
-    friend class WGPUSurface;
+    friend class WGPUSurfaceImpl;
 
 public:
     ~WGPUInstance() override;

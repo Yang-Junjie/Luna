@@ -317,7 +317,6 @@ target_link_libraries(LunaCore
         fastgltf::fastgltf
         ufbx
         # add_subdirectory(third_party/VMA)
-        Vulkan::Vulkan
         glfw
         enkiTS
         $<$<NOT:$<PLATFORM_ID:Windows>>:${CMAKE_DL_LIBS}>

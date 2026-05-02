@@ -17,7 +17,7 @@ protected:
     void onInit() override;
 
 private:
-    luna::RHI::BackendType m_backend{luna::RHI::BackendType::Vulkan};
+    luna::RHI::BackendType m_backend{luna::RHI::BackendType::Auto};
 };
 
 Application* createApplication(int argc, char** argv);

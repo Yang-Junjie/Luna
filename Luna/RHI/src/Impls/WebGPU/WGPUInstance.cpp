@@ -83,7 +83,7 @@ Ref<Surface> WGPUInstance::CreateSurface(const NativeWindowHandle& windowHandle)
         throw std::runtime_error("Invalid NativeWindowHandle for WebGPU surface");
     }
 
-    return std::make_shared<WGPUSurface>(windowHandle);
+    return std::make_shared<WGPUSurfaceImpl>(windowHandle);
 }
 
 Ref<ShaderCompiler> WGPUInstance::CreateShaderCompiler()

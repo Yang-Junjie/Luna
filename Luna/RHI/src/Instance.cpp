@@ -1,5 +1,10 @@
 #include <Instance.h>
 
+#include <algorithm>
+#include <sstream>
+#include <stdexcept>
+#include <string_view>
+
 #ifdef LUNA_RHI_BACKEND_VULKAN
 #include "Impls/Vulkan/VKInstance.h"
 #endif
@@ -12,100 +17,212 @@
 #include "Impls/D3D11/D3D11Instance.h"
 #endif
 
+#ifdef LUNA_RHI_BACKEND_METAL
+#include "Impls/Metal/MTLInstance.h"
+#endif
+
 #if defined(LUNA_RHI_BACKEND_OPENGL) || defined(LUNA_RHI_BACKEND_OPENGLES)
 #include "Impls/OpenGL/GLInstance.h"
 #endif
 
-namespace luna::RHI {
-static BackendType SelectBestBackend()
-{
-#if defined(_WIN32)
-#ifdef LUNA_RHI_BACKEND_D3D12
-    return BackendType::DirectX12;
-#elif defined(LUNA_RHI_BACKEND_VULKAN)
-    return BackendType::Vulkan;
-#elif defined(LUNA_RHI_BACKEND_D3D11)
-    return BackendType::DirectX11;
-#elif defined(LUNA_RHI_BACKEND_OPENGL)
-    return BackendType::OpenGL;
-#endif
-#elif defined(__APPLE__)
-#ifdef LUNA_RHI_BACKEND_METAL
-    return BackendType::Metal;
-#elif defined(LUNA_RHI_BACKEND_VULKAN)
-    return BackendType::Vulkan;
-#endif
-#elif defined(__ANDROID__)
-#ifdef LUNA_RHI_BACKEND_VULKAN
-    return BackendType::Vulkan;
-#elif defined(LUNA_RHI_BACKEND_OPENGLES)
-    return BackendType::OpenGLES;
-#endif
-#elif defined(__linux__)
-#ifdef LUNA_RHI_BACKEND_VULKAN
-    return BackendType::Vulkan;
-#elif defined(LUNA_RHI_BACKEND_OPENGL)
-    return BackendType::OpenGL;
-#endif
-#elif defined(__EMSCRIPTEN__)
 #ifdef LUNA_RHI_BACKEND_WEBGPU
-    return BackendType::WebGPU;
+#include "Impls/WebGPU/WGPUInstance.h"
 #endif
+
+namespace luna::RHI {
+namespace {
+
+std::string backendTypeName(BackendType type)
+{
+    switch (type) {
+        case BackendType::Auto:
+            return "Auto";
+        case BackendType::Vulkan:
+            return "Vulkan";
+        case BackendType::DirectX12:
+            return "DirectX12";
+        case BackendType::DirectX11:
+            return "DirectX11";
+        case BackendType::Metal:
+            return "Metal";
+        case BackendType::OpenGL:
+            return "OpenGL";
+        case BackendType::OpenGLES:
+            return "OpenGLES";
+        case BackendType::WebGPU:
+            return "WebGPU";
+        default:
+            return "Unknown";
+    }
+}
+
+std::string compiledBackendListString()
+{
+    const std::vector<BackendType> backends = Instance::GetCompiledBackends();
+    if (backends.empty()) {
+        return "none";
+    }
+
+    std::ostringstream stream;
+    for (size_t index = 0; index < backends.size(); ++index) {
+        if (index != 0) {
+            stream << ", ";
+        }
+        stream << backendTypeName(backends[index]);
+    }
+    return stream.str();
+}
+
+std::vector<BackendType> backendPreferenceOrder()
+{
+    std::vector<BackendType> order;
+#if defined(_WIN32)
+    order = {
+        BackendType::DirectX12,
+        BackendType::Vulkan,
+        BackendType::DirectX11,
+        BackendType::OpenGL,
+        BackendType::WebGPU,
+    };
+#elif defined(__APPLE__)
+    order = {
+        BackendType::Metal,
+        BackendType::Vulkan,
+        BackendType::WebGPU,
+        BackendType::OpenGL,
+    };
+#elif defined(__ANDROID__)
+    order = {
+        BackendType::Vulkan,
+        BackendType::OpenGLES,
+    };
+#elif defined(__linux__)
+    order = {
+        BackendType::Vulkan,
+        BackendType::OpenGL,
+        BackendType::WebGPU,
+    };
+#elif defined(__EMSCRIPTEN__)
+    order = {
+        BackendType::WebGPU,
+        BackendType::OpenGLES,
+    };
+#else
+    order = Instance::GetCompiledBackends();
 #endif
-    throw std::runtime_error("No suitable backend available for this platform");
+    return order;
+}
+
+template <typename InstanceType>
+Ref<Instance> createInitializedInstance(const InstanceCreateInfo& createInfo, std::string_view backend_name)
+{
+    auto instance = CreateRef<InstanceType>();
+    if (!instance->Initialize(createInfo)) {
+        throw std::runtime_error("Failed to initialize " + std::string(backend_name) + " instance");
+    }
+    return instance;
+}
+
+} // namespace
+
+std::vector<BackendType> Instance::GetCompiledBackends()
+{
+    std::vector<BackendType> backends;
+#ifdef LUNA_RHI_BACKEND_VULKAN
+    backends.push_back(BackendType::Vulkan);
+#endif
+#ifdef LUNA_RHI_BACKEND_D3D12
+    backends.push_back(BackendType::DirectX12);
+#endif
+#ifdef LUNA_RHI_BACKEND_D3D11
+    backends.push_back(BackendType::DirectX11);
+#endif
+#ifdef LUNA_RHI_BACKEND_METAL
+    backends.push_back(BackendType::Metal);
+#endif
+#ifdef LUNA_RHI_BACKEND_OPENGL
+    backends.push_back(BackendType::OpenGL);
+#endif
+#ifdef LUNA_RHI_BACKEND_OPENGLES
+    backends.push_back(BackendType::OpenGLES);
+#endif
+#ifdef LUNA_RHI_BACKEND_WEBGPU
+    backends.push_back(BackendType::WebGPU);
+#endif
+    return backends;
+}
+
+bool Instance::IsBackendCompiled(BackendType backend)
+{
+    if (backend == BackendType::Auto) {
+        return !GetCompiledBackends().empty();
+    }
+
+    const std::vector<BackendType> backends = GetCompiledBackends();
+    return std::find(backends.begin(), backends.end(), backend) != backends.end();
+}
+
+BackendType Instance::GetDefaultBackend()
+{
+    const std::vector<BackendType> compiled_backends = GetCompiledBackends();
+    for (const BackendType backend : backendPreferenceOrder()) {
+        if (std::find(compiled_backends.begin(), compiled_backends.end(), backend) != compiled_backends.end()) {
+            return backend;
+        }
+    }
+
+    throw std::runtime_error("No RHI backend was compiled");
 }
 
 Ref<Instance> Instance::Create(const InstanceCreateInfo& createInfo)
 {
     InstanceCreateInfo resolved = createInfo;
     if (resolved.type == BackendType::Auto) {
-        resolved.type = SelectBestBackend();
+        resolved.type = GetDefaultBackend();
+    }
+
+    if (!IsBackendCompiled(resolved.type)) {
+        throw std::runtime_error("Requested RHI backend '" + backendTypeName(resolved.type) +
+                                 "' is not compiled into this build. Compiled backends: " +
+                                 compiledBackendListString());
     }
 
     switch (resolved.type) {
 #ifdef LUNA_RHI_BACKEND_VULKAN
-        case BackendType::Vulkan: {
-            auto inst = luna::RHI::CreateRef<VKInstance>();
-            if (!inst->Initialize(resolved)) {
-                throw std::runtime_error("Failed to initialize Vulkan instance");
-            }
-            return inst;
-        }
+        case BackendType::Vulkan:
+            return createInitializedInstance<VKInstance>(resolved, "Vulkan");
 #endif
 
 #ifdef LUNA_RHI_BACKEND_D3D12
-        case BackendType::DirectX12: {
-            auto inst = luna::RHI::CreateRef<D3D12Instance>();
-            if (!inst->Initialize(resolved)) {
-                throw std::runtime_error("Failed to initialize D3D12 instance");
-            }
-            return inst;
-        }
+        case BackendType::DirectX12:
+            return createInitializedInstance<D3D12Instance>(resolved, "D3D12");
 #endif
 
 #ifdef LUNA_RHI_BACKEND_D3D11
-        case BackendType::DirectX11: {
-            auto inst = luna::RHI::CreateRef<D3D11Instance>();
-            if (!inst->Initialize(resolved)) {
-                throw std::runtime_error("Failed to initialize D3D11 instance");
-            }
-            return inst;
-        }
+        case BackendType::DirectX11:
+            return createInitializedInstance<D3D11Instance>(resolved, "D3D11");
+#endif
+
+#ifdef LUNA_RHI_BACKEND_METAL
+        case BackendType::Metal:
+            return createInitializedInstance<MTLInstance>(resolved, "Metal");
 #endif
 
 #if defined(LUNA_RHI_BACKEND_OPENGL) || defined(LUNA_RHI_BACKEND_OPENGLES)
         case BackendType::OpenGL:
-        case BackendType::OpenGLES: {
-            auto inst = luna::RHI::CreateRef<GLInstance>();
-            if (!inst->Initialize(resolved)) {
-                throw std::runtime_error("Failed to initialize OpenGL instance");
-            }
-            return inst;
-        }
+        case BackendType::OpenGLES:
+            return createInitializedInstance<GLInstance>(resolved, "OpenGL");
 #endif
 
+#ifdef LUNA_RHI_BACKEND_WEBGPU
+        case BackendType::WebGPU:
+            return createInitializedInstance<WGPUInstance>(resolved, "WebGPU");
+#endif
+
+        case BackendType::Auto:
         default:
-            throw std::runtime_error("Unsupported backend type: " + std::to_string(static_cast<int>(resolved.type)));
+            throw std::runtime_error("Unsupported RHI backend type: " +
+                                     std::to_string(static_cast<int>(resolved.type)));
     }
 }
 } // namespace luna::RHI
