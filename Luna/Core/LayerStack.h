@@ -1,4 +1,6 @@
 ﻿#pragma once
+#include <cstddef>
+
 #include <memory>
 #include <vector>
 
@@ -14,6 +16,7 @@ public:
     void pushOverlay(std::unique_ptr<Layer> overlay);
     void popLayer(Layer* layer);
     void popOverlay(Layer* overlay);
+    void detachAll();
 
     std::vector<std::unique_ptr<Layer>>::iterator begin()
     {
@@ -57,6 +60,6 @@ public:
 
 private:
     std::vector<std::unique_ptr<Layer>> m_layers;
-    unsigned int m_layer_insert_index = 0;
+    size_t m_layer_insert_index = 0;
 };
 } // namespace luna

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Asset.h"
 #include "yaml-cpp/yaml.h"
 
@@ -6,8 +6,8 @@
 
 namespace luna {
 struct AssetMetadata {
-    AssetHandle Handle;
-    AssetType Type;
+    AssetHandle Handle{0};
+    AssetType Type{AssetType::None};
     std::string Name;
 
     // relative project root path
@@ -19,8 +19,11 @@ struct AssetMetadata {
 
     template <typename T> T GetConfig(const std::string& key, T defaultValue = T()) const
     {
-        if (SpecializedConfig[key]) {
-            return SpecializedConfig[key].as<T>();
+        try {
+            if (SpecializedConfig && SpecializedConfig[key]) {
+                return SpecializedConfig[key].as<T>();
+            }
+        } catch (const YAML::Exception&) {
         }
         return defaultValue;
     }

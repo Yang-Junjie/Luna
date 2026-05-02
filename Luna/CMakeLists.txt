@@ -282,14 +282,19 @@ add_library(
 
 target_include_directories(
     LunaCore
-    SYSTEM PUBLIC
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_include_directories(
+    LunaCore
+    SYSTEM PUBLIC
         ${THIRD_PARTY_DIR}/imgui
         ${THIRD_PARTY_DIR}/spdlog/include
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
         ${THIRD_PARTY_DIR}/entt/src
-        ${EXTERNAL_DIR}/yaml-cpp/include
+        ${THIRD_PARTY_DIR}/yaml-cpp/include
         ${PROJECT_SOURCE_DIR}
 )
 

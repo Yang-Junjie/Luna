@@ -1,6 +1,6 @@
-#include "application.h"
+#include "Application.h"
 #include "Core/Log.h"
-#include "window.h"
+#include "Window.h"
 
 #include <chrono>
 #include <GLFW/glfw3.h>
@@ -23,11 +23,15 @@ Application::Application(const ApplicationSpecification& spec)
 
 Application::~Application()
 {
+    m_renderer.waitForGpuIdle();
+
     if (m_imgui_layer != nullptr) {
         m_imgui_layer->onDetach();
         m_imgui_layer.reset();
         m_imgui_layer_raw = nullptr;
     }
+
+    m_layer_stack.detachAll();
 
     m_task_system.shutdown();
     m_renderer.shutdown();
@@ -198,6 +202,11 @@ void Application::renderFrame()
 
 void Application::pushLayer(std::unique_ptr<Layer> layer)
 {
+    if (layer == nullptr) {
+        LUNA_CORE_WARN("Ignoring null application layer");
+        return;
+    }
+
     Layer* raw_layer = layer.get();
     m_layer_stack.pushLayer(std::move(layer));
     raw_layer->onAttach();
@@ -205,6 +214,11 @@ void Application::pushLayer(std::unique_ptr<Layer> layer)
 
 void Application::pushOverlay(std::unique_ptr<Layer> overlay)
 {
+    if (overlay == nullptr) {
+        LUNA_CORE_WARN("Ignoring null application overlay");
+        return;
+    }
+
     Layer* raw_overlay = overlay.get();
     m_layer_stack.pushOverlay(std::move(overlay));
     raw_overlay->onAttach();

@@ -2,36 +2,37 @@
 
 #include "Asset/Asset.h"
 
-#include <array>
 #include <cstddef>
+
+#include <array>
 
 namespace luna {
 
 namespace BuiltinMeshes {
-inline const AssetHandle Cube{1001};
-inline const AssetHandle Sphere{1002};
-inline const AssetHandle Plane{1003};
-inline const AssetHandle Cylinder{1004};
-inline const AssetHandle Cone{1005};
+inline const AssetHandle Cube{1'001};
+inline const AssetHandle Sphere{1'002};
+inline const AssetHandle Plane{1'003};
+inline const AssetHandle Cylinder{1'004};
+inline const AssetHandle Cone{1'005};
 } // namespace BuiltinMeshes
 
 namespace BuiltinMaterials {
-inline const AssetHandle DefaultLit{2001};
-inline const AssetHandle DefaultUnlit{2002};
-inline const AssetHandle DebugRed{2003};
-inline const AssetHandle DebugGreen{2004};
-inline const AssetHandle DebugBlue{2005};
-inline const AssetHandle Transparent{2006};
+inline const AssetHandle DefaultLit{2'001};
+inline const AssetHandle DefaultUnlit{2'002};
+inline const AssetHandle DebugRed{2'003};
+inline const AssetHandle DebugGreen{2'004};
+inline const AssetHandle DebugBlue{2'005};
+inline const AssetHandle Transparent{2'006};
 } // namespace BuiltinMaterials
 
 struct BuiltinMeshDescriptor {
-    AssetHandle Handle;
-    const char* Name;
+    AssetHandle Handle{0};
+    const char* Name = "";
 };
 
 struct BuiltinMaterialDescriptor {
-    AssetHandle Handle;
-    const char* Name;
+    AssetHandle Handle{0};
+    const char* Name = "";
 };
 
 class BuiltinAssets final {

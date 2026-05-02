@@ -3,11 +3,11 @@
 #include "Events/Event.h"
 #include "Imgui/ImGuiLayer.hpp"
 #include "JobSystem/TaskSystem.h"
-#include "layer.h"
+#include "Layer.h"
 #include "LayerStack.h"
 #include "Renderer/Renderer.h"
 #include "Timestep.h"
-#include "window.h"
+#include "Window.h"
 
 #include <memory>
 #include <string>

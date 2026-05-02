@@ -30,11 +30,10 @@ public:
     [[nodiscard]] std::string defaultBackendName() const;
     [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchema(std::string_view backend_name,
                                                                        const ScriptSchemaRequest& request) const;
-    [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchemaForProject(
-        const ProjectInfo* project_info,
-        const ScriptSchemaRequest& request) const;
+    [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchemaForProject(const ProjectInfo* project_info,
+                                                                                 const ScriptSchemaRequest& request);
     [[nodiscard]] std::unique_ptr<IScriptRuntime> createRuntime(std::string_view backend_name) const;
-    [[nodiscard]] std::unique_ptr<IScriptRuntime> createRuntimeForProject(const ProjectInfo* project_info) const;
+    [[nodiscard]] std::unique_ptr<IScriptRuntime> createRuntimeForProject(const ProjectInfo* project_info);
     bool registerBackend(std::unique_ptr<IScriptBackend> backend);
     [[nodiscard]] const LunaScriptHostApi& hostApi() const noexcept;
 

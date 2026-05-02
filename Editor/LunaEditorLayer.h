@@ -60,10 +60,9 @@ public:
     const std::string& getAssetLabel() const;
     Scene& getScene();
     Scene& getInspectionScene();
-    const Scene& getInspectionScene() const;
     bool isRuntimeViewportEnabled() const noexcept;
     UUID getSelectedEntityId() const noexcept;
-    Entity getSelectedEntity() const;
+    Entity getSelectedEntity();
     void setSelectedEntity(Entity entity);
     void setSelectedEntityId(UUID entity_id);
     void markSceneDirty();

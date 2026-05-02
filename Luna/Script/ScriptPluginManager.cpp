@@ -654,10 +654,10 @@ std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchema(std::st
 
 std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchemaForProject(
     const ProjectInfo* project_info,
-    const ScriptSchemaRequest& request) const
+    const ScriptSchemaRequest& request)
 {
     const auto project_root_path = ProjectManager::instance().getProjectRootPath();
-    const_cast<ScriptPluginManager*>(this)->refreshDiscoveredPlugins(project_root_path);
+    refreshDiscoveredPlugins(project_root_path);
 
     const std::string configured_plugin_id =
         project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
@@ -685,7 +685,7 @@ std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchemaForProje
             return {};
         }
 
-        if (!const_cast<ScriptPluginManager*>(this)->ensurePluginLoaded(candidate)) {
+        if (!ensurePluginLoaded(candidate)) {
             return {};
         }
         backend_name = candidate->Manifest.BackendName;
@@ -707,10 +707,10 @@ std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntime(std::string_v
     return createRuntimeFromMap(m_builtin_backends, backend_name);
 }
 
-std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(const ProjectInfo* project_info) const
+std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(const ProjectInfo* project_info)
 {
     const auto project_root_path = ProjectManager::instance().getProjectRootPath();
-    const_cast<ScriptPluginManager*>(this)->refreshDiscoveredPlugins(project_root_path);
+    refreshDiscoveredPlugins(project_root_path);
 
     const std::string configured_plugin_id =
         project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
@@ -774,11 +774,11 @@ std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(con
     }
 
     if (selection.candidate != nullptr) {
-        if (!const_cast<ScriptPluginManager*>(this)->ensurePluginLoaded(selection.candidate)) {
+        if (!ensurePluginLoaded(selection.candidate)) {
             return {};
         }
     } else {
-        const_cast<ScriptPluginManager*>(this)->unloadActivePlugin();
+        unloadActivePlugin();
     }
 
     if (selection.backend_name.empty()) {

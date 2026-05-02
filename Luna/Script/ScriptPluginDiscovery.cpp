@@ -1,10 +1,10 @@
-#include "ScriptPluginDiscovery.h"
-
 #include "Core/Log.h"
+#include "ScriptPluginDiscovery.h"
 #include "yaml-cpp/yaml.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -135,6 +135,10 @@ void appendDiscoveredPlugins(std::vector<luna::ScriptPluginCandidate>& candidate
 
     std::error_code exists_ec;
     if (!std::filesystem::exists(plugins_root, exists_ec) || exists_ec) {
+        if (exists_ec) {
+            LUNA_CORE_WARN(
+                "Failed to check script plugin directory '{}': {}", plugins_root.string(), exists_ec.message());
+        }
         return;
     }
 
@@ -146,8 +150,17 @@ void appendDiscoveredPlugins(std::vector<luna::ScriptPluginCandidate>& candidate
         return;
     }
 
-    for (const auto& entry : iterator) {
-        if (!entry.is_regular_file()) {
+    for (const std::filesystem::recursive_directory_iterator end; iterator != end; iterator.increment(iterator_ec)) {
+        if (iterator_ec) {
+            LUNA_CORE_WARN(
+                "Failed to advance script plugin scan under '{}': {}", plugins_root.string(), iterator_ec.message());
+            iterator_ec.clear();
+            continue;
+        }
+
+        const auto& entry = *iterator;
+        std::error_code entry_ec;
+        if (!entry.is_regular_file(entry_ec) || entry_ec) {
             continue;
         }
 

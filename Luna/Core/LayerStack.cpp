@@ -1,4 +1,4 @@
-#include "layer.h"
+#include "Layer.h"
 #include "LayerStack.h"
 
 #include <algorithm>
@@ -6,9 +6,7 @@
 namespace luna {
 LayerStack::~LayerStack()
 {
-    for (auto& layer : m_layers) {
-        layer->onDetach();
-    }
+    detachAll();
 }
 
 void LayerStack::pushLayer(std::unique_ptr<Layer> layer)
@@ -45,5 +43,17 @@ void LayerStack::popOverlay(Layer* overlay)
         (*it)->onDetach();
         m_layers.erase(it);
     }
+}
+
+void LayerStack::detachAll()
+{
+    for (auto it = m_layers.rbegin(); it != m_layers.rend(); ++it) {
+        if (*it) {
+            (*it)->onDetach();
+        }
+    }
+
+    m_layers.clear();
+    m_layer_insert_index = 0;
 }
 } // namespace luna

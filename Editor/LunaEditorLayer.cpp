@@ -639,11 +639,6 @@ Scene& LunaEditorLayer::getInspectionScene()
     return activeRenderScene();
 }
 
-const Scene& LunaEditorLayer::getInspectionScene() const
-{
-    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : *m_scene;
-}
-
 bool LunaEditorLayer::isRuntimeViewportEnabled() const noexcept
 {
     return m_runtime_viewport_enabled;
@@ -654,13 +649,13 @@ UUID LunaEditorLayer::getSelectedEntityId() const noexcept
     return m_selected_entity_id;
 }
 
-Entity LunaEditorLayer::getSelectedEntity() const
+Entity LunaEditorLayer::getSelectedEntity()
 {
     if (!m_selected_entity_id.isValid()) {
         return {};
     }
 
-    return const_cast<Scene&>(getInspectionScene()).entityManager().findEntityByUUID(m_selected_entity_id);
+    return getInspectionScene().entityManager().findEntityByUUID(m_selected_entity_id);
 }
 
 void LunaEditorLayer::setSelectedEntity(Entity entity)
@@ -794,6 +789,7 @@ Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Ent
     }
 
     setSelectedEntity(root);
+    markSceneDirty();
     return root;
 }
 
@@ -820,6 +816,7 @@ Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entit
 
     applyMeshAssetToEntity(entity, mesh_handle);
     setSelectedEntity(entity);
+    markSceneDirty();
     return entity;
 }
 
@@ -845,6 +842,7 @@ Entity LunaEditorLayer::createCameraEntity(Entity parent)
     transform.translation = {0.0f, 1.0f, 6.0f};
     transform.rotation = {0.0f, 0.0f, 0.0f};
     setSelectedEntity(entity);
+    markSceneDirty();
     return entity;
 }
 
@@ -866,6 +864,7 @@ Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
     auto& transform = entity.transform();
     transform.rotation = glm::radians(glm::vec3{-45.0f, 35.0f, 0.0f});
     setSelectedEntity(entity);
+    markSceneDirty();
     return entity;
 }
 
@@ -888,6 +887,7 @@ Entity LunaEditorLayer::createPointLightEntity(Entity parent)
     auto& transform = entity.transform();
     transform.translation = {0.0f, 2.0f, 0.0f};
     setSelectedEntity(entity);
+    markSceneDirty();
     return entity;
 }
 
@@ -913,6 +913,7 @@ Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
     transform.translation = {0.0f, 3.0f, 3.0f};
     transform.rotation = glm::radians(glm::vec3{-35.0f, 0.0f, 0.0f});
     setSelectedEntity(entity);
+    markSceneDirty();
     return entity;
 }
 
@@ -927,8 +928,10 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
         return;
     }
 
+    bool changed = false;
     if (!entity.hasComponent<MeshComponent>()) {
         entity.addComponent<MeshComponent>();
+        changed = true;
     }
 
     auto& mesh_component = entity.getComponent<MeshComponent>();
@@ -936,16 +939,24 @@ void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_han
     mesh_component.meshHandle = mesh_handle;
     if (changed_mesh) {
         mesh_component.clearAllSubmeshMaterials();
+        changed = true;
     }
 
     const auto mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
     if (mesh && mesh->isValid()) {
+        const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
         mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+        changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
         for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
             if (!mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
                 mesh_component.setSubmeshMaterial(submesh_index, BuiltinMaterials::DefaultLit);
+                changed = true;
             }
         }
+    }
+
+    if (changed) {
+        markSceneDirty();
     }
 }
 

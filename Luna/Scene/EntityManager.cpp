@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <glm/matrix.hpp>
+#include <optional>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -103,9 +104,18 @@ Entity EntityManager::findEntityByUUID(UUID uuid)
     return Entity(it->second, this);
 }
 
-Entity EntityManager::findEntityByUUID(UUID uuid) const
+std::optional<entt::entity> EntityManager::findEntityHandleByUUID(UUID uuid) const
 {
-    return const_cast<EntityManager*>(this)->findEntityByUUID(uuid);
+    if (!uuid.isValid()) {
+        return std::nullopt;
+    }
+
+    const auto it = m_entity_map.find(uuid);
+    if (it == m_entity_map.end() || !m_registry.valid(it->second)) {
+        return std::nullopt;
+    }
+
+    return it->second;
 }
 
 bool EntityManager::containsEntity(UUID uuid) const
@@ -234,23 +244,57 @@ glm::mat4 EntityManager::getWorldSpaceTransformMatrix(Entity entity) const
         return glm::mat4(1.0f);
     }
 
-    std::vector<Entity> hierarchy_chain;
+    return getWorldSpaceTransformMatrix(static_cast<entt::entity>(entity));
+}
+
+glm::mat4 EntityManager::getWorldSpaceTransformMatrix(entt::entity entity_handle) const
+{
+    if (!m_registry.valid(entity_handle) || !m_registry.all_of<TransformComponent>(entity_handle)) {
+        return glm::mat4(1.0f);
+    }
+
+    std::vector<entt::entity> hierarchy_chain;
     std::unordered_set<UUID> visited;
     hierarchy_chain.reserve(8);
 
-    for (Entity current = entity; current; current = current.getParent()) {
-        if (!visited.insert(current.getUUID()).second) {
+    for (entt::entity current = entity_handle; current != entt::null;) {
+        if (!m_registry.valid(current) || !m_registry.all_of<TransformComponent>(current)) {
+            break;
+        }
+
+        UUID current_uuid(0);
+        if (m_registry.all_of<IDComponent>(current)) {
+            current_uuid = m_registry.get<IDComponent>(current).id;
+        }
+
+        if (current_uuid.isValid() && !visited.insert(current_uuid).second) {
             LUNA_CORE_WARN("Cycle detected while computing world transform for entity '{}'",
-                           entity.getUUID().toString());
+                           current_uuid.toString());
             break;
         }
 
         hierarchy_chain.push_back(current);
+
+        UUID parent_uuid(0);
+        if (m_registry.all_of<RelationshipComponent>(current)) {
+            parent_uuid = m_registry.get<RelationshipComponent>(current).parentHandle;
+        }
+
+        if (!parent_uuid.isValid()) {
+            break;
+        }
+
+        const std::optional<entt::entity> parent_handle = findEntityHandleByUUID(parent_uuid);
+        if (!parent_handle.has_value()) {
+            break;
+        }
+
+        current = parent_handle.value();
     }
 
     glm::mat4 world_transform(1.0f);
     for (auto it = hierarchy_chain.rbegin(); it != hierarchy_chain.rend(); ++it) {
-        world_transform *= it->transform().getTransform();
+        world_transform *= m_registry.get<TransformComponent>(*it).getTransform();
     }
 
     return world_transform;
@@ -260,6 +304,13 @@ TransformComponent EntityManager::getWorldSpaceTransform(Entity entity) const
 {
     TransformComponent world_transform;
     world_transform.setTransform(getWorldSpaceTransformMatrix(entity));
+    return world_transform;
+}
+
+TransformComponent EntityManager::getWorldSpaceTransform(entt::entity entity_handle) const
+{
+    TransformComponent world_transform;
+    world_transform.setTransform(getWorldSpaceTransformMatrix(entity_handle));
     return world_transform;
 }
 

@@ -236,6 +236,8 @@ VKTexture::VKTexture(const Ref<Device>& device, const VmaAllocator& allocator, c
 
 VKTexture::~VKTexture()
 {
+    m_view.reset();
+
     if (m_allocator && m_allocation && m_image) {
         vmaDestroyImage(m_allocator, m_image, m_allocation);
         m_image = VK_NULL_HANDLE;

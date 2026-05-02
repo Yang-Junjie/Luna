@@ -86,6 +86,7 @@ public:
 
     bool init(Window& window, InitializationOptions options = {});
     void shutdown();
+    void waitForGpuIdle() noexcept;
     void startFrame();
     void renderFrame();
     void endFrame();
@@ -282,7 +283,6 @@ private:
     bool storePendingGpuTimingProfile(uint32_t frame_index, const RenderGraphProfileSnapshot& profile);
     void ensureSceneOutputTargets(uint32_t width, uint32_t height);
     void releaseSceneOutputTargets();
-    void waitForGpuIdle() noexcept;
 
 private:
     WindowContext m_window_context{};

@@ -7,8 +7,8 @@
 #include "MaterialImporter.h"
 #include "MeshImporter.h"
 #include "ModelImporter.h"
-#include "ScriptImporter.h"
 #include "Project/ProjectManager.h"
+#include "ScriptImporter.h"
 #include "TextureImporter.h"
 
 #include <cctype>
@@ -65,6 +65,18 @@ std::filesystem::path getMetadataPathForAsset(const std::filesystem::path& asset
     return std::filesystem::path(asset_path.string() + ".meta");
 }
 
+bool pathExistsNoThrow(const std::filesystem::path& path)
+{
+    std::error_code ec;
+    const bool exists = std::filesystem::exists(path, ec);
+    if (ec) {
+        LUNA_CORE_WARN("Failed to check path '{}': {}", path.string(), ec.message());
+        return false;
+    }
+
+    return exists;
+}
+
 std::string toDisplayPath(const std::filesystem::path& path, const std::filesystem::path& project_root)
 {
     const std::filesystem::path relative_path = luna::tools::makeRelative(path, project_root);
@@ -87,7 +99,7 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
 
     bool should_serialize_metadata = false;
 
-    if (std::filesystem::exists(work_item.metaPath)) {
+    if (pathExistsNoThrow(work_item.metaPath)) {
         result.metadata = work_item.importer->deserializeMetadata(work_item.metaPath);
         if (shouldRebuildMetadata(result.metadata, work_item.assetPath, project_root)) {
             result.metadata = work_item.importer->import(work_item.assetPath);
@@ -108,7 +120,7 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
         work_item.importer->serializeMetadata(result.metadata);
     }
 
-    if (!std::filesystem::exists(work_item.metaPath)) {
+    if (!pathExistsNoThrow(work_item.metaPath)) {
         result.failed = true;
         LUNA_CORE_WARN("Failed to synchronize asset '{}': metadata file was not written",
                        toDisplayPath(work_item.assetPath, project_root));
@@ -121,10 +133,11 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
 
 uint32_t computeParallelMinRange(const luna::TaskSystem& task_system, size_t work_item_count)
 {
-    const uint32_t worker_count = (std::max)(task_system.getWorkerThreadCount(), 1u);
-    const uint32_t task_count = static_cast<uint32_t>((std::min)(work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
-    const uint32_t target_chunk_count = (std::max)(worker_count * 4u, 1u);
-    return (std::max)(1u, (task_count + target_chunk_count - 1u) / target_chunk_count);
+    const uint32_t worker_count = (std::max) (task_system.getWorkerThreadCount(), 1u);
+    const uint32_t task_count =
+        static_cast<uint32_t>((std::min) (work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+    const uint32_t target_chunk_count = (std::max) (worker_count * 4u, 1u);
+    return (std::max) (1u, (task_count + target_chunk_count - 1u) / target_chunk_count);
 }
 
 } // namespace
@@ -167,16 +180,34 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     }
 
     const auto root = (*project_root / project_info->AssetsPath).lexically_normal();
-    if (!std::filesystem::exists(root)) {
+    if (!pathExistsNoThrow(root)) {
         return stats;
     }
 
     std::vector<SupportedAssetWorkItem> supported_assets;
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+    std::error_code iterate_ec;
+    std::filesystem::recursive_directory_iterator directory_it(
+        root, std::filesystem::directory_options::skip_permission_denied, iterate_ec);
+    if (iterate_ec) {
+        LUNA_CORE_WARN("Failed to scan project assets directory '{}': {}", root.string(), iterate_ec.message());
+        return stats;
+    }
+
+    for (const std::filesystem::recursive_directory_iterator directory_end; directory_it != directory_end;
+         directory_it.increment(iterate_ec)) {
+        if (iterate_ec) {
+            LUNA_CORE_WARN(
+                "Failed to advance asset directory scan under '{}': {}", root.string(), iterate_ec.message());
+            iterate_ec.clear();
+            continue;
+        }
+
+        const auto& entry = *directory_it;
         const auto& path = entry.path();
 
-        if (!entry.is_regular_file() || path.extension() == ".meta") {
+        std::error_code entry_ec;
+        if (!entry.is_regular_file(entry_ec) || entry_ec || path.extension() == ".meta") {
             continue;
         }
 
@@ -201,8 +232,8 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     if (task_system != nullptr && supported_assets.size() > 1 && task_system->getWorkerThreadCount() > 1) {
         TaskSubmitDesc submit_desc{};
         submit_desc.priority = enki::TASK_PRIORITY_MED;
-        submit_desc.set_size =
-            static_cast<uint32_t>((std::min)(supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+        submit_desc.set_size = static_cast<uint32_t>(
+            (std::min) (supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
         submit_desc.min_range = computeParallelMinRange(*task_system, supported_assets.size());
 
         TaskHandle task = task_system->submitParallel(
@@ -303,7 +334,7 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     }
 
     for (const SupportedAssetWorkItem& supported_asset : supported_assets) {
-        if (!std::filesystem::exists(supported_asset.metaPath)) {
+        if (!pathExistsNoThrow(supported_asset.metaPath)) {
             ++stats.missingMetadataAfterSync;
             LUNA_CORE_ERROR("Supported asset is still missing metadata after sync: '{}'",
                             toDisplayPath(supported_asset.assetPath, *project_root));

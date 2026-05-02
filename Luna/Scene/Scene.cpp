@@ -64,13 +64,16 @@ std::unique_ptr<Scene> Scene::clone() const
     }
 
     for (const UUID entity_id : serialized_entity_ids) {
-        Entity source_entity = m_entity_manager.findEntityByUUID(entity_id);
+        const auto source_entity_handle = m_entity_manager.findEntityHandleByUUID(entity_id);
         Entity cloned_entity = cloned_entity_manager.findEntityByUUID(entity_id);
-        if (!source_entity || !cloned_entity) {
+        if (!source_entity_handle.has_value() || !cloned_entity) {
             continue;
         }
 
-        const UUID parent_id = source_entity.getParentUUID();
+        UUID parent_id(0);
+        if (registry.all_of<RelationshipComponent>(source_entity_handle.value())) {
+            parent_id = registry.get<const RelationshipComponent>(source_entity_handle.value()).parentHandle;
+        }
         if (!parent_id.isValid()) {
             continue;
         }
@@ -119,8 +122,7 @@ bool Scene::findPrimaryRuntimeCamera(Camera& camera) const
             continue;
         }
 
-        Entity camera_entity(entity_handle, const_cast<EntityManager*>(&m_entity_manager));
-        const TransformComponent world_transform = m_entity_manager.getWorldSpaceTransform(camera_entity);
+        const TransformComponent world_transform = m_entity_manager.getWorldSpaceTransform(entity_handle);
         camera = camera_component.createCamera();
         camera.setPosition(world_transform.translation);
         camera.setOrientationEuler(world_transform.rotation);

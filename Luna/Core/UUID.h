@@ -44,7 +44,7 @@ template <typename T> struct hash;
 template <> struct hash<luna::UUID> {
     std::size_t operator()(const luna::UUID& uuid) const
     {
-        return (uint64_t) uuid;
+        return static_cast<uint64_t>(uuid);
     }
 };
 

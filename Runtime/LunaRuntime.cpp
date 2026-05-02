@@ -1,16 +1,16 @@
-#include "LunaRuntime.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "LunaRuntime.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <filesystem>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
@@ -111,12 +111,20 @@ std::filesystem::path resolveProjectFilePath(const std::filesystem::path& input_
 
     std::error_code ec;
     if (std::filesystem::is_directory(input_path, ec) && !ec) {
-        for (const auto& entry : std::filesystem::directory_iterator(input_path, ec)) {
+        std::filesystem::directory_iterator directory_it(input_path, ec);
+        if (ec) {
+            return {};
+        }
+
+        for (const std::filesystem::directory_iterator directory_end; directory_it != directory_end;
+             directory_it.increment(ec)) {
             if (ec) {
                 return {};
             }
 
-            if (entry.is_regular_file() && entry.path().extension() == ".lunaproj") {
+            const auto& entry = *directory_it;
+            std::error_code entry_ec;
+            if (entry.is_regular_file(entry_ec) && !entry_ec && entry.path().extension() == ".lunaproj") {
                 return entry.path().lexically_normal();
             }
         }
@@ -276,7 +284,9 @@ bool LunaRuntimeApplication::loadStartupScene()
 
     const std::filesystem::path start_scene_path =
         SceneSerializer::normalizeScenePath((*project_root / project_info->StartScene).lexically_normal());
-    if (!std::filesystem::exists(start_scene_path)) {
+    std::error_code scene_exists_ec;
+    const bool start_scene_exists = std::filesystem::exists(start_scene_path, scene_exists_ec);
+    if (scene_exists_ec || !start_scene_exists) {
         LUNA_RUNTIME_WARN("Configured StartScene '{}' does not exist", start_scene_path.string());
         return false;
     }
@@ -295,9 +305,8 @@ bool LunaRuntimeApplication::loadStartupScene()
         return false;
     }
 
-    LUNA_RUNTIME_INFO("Loaded StartScene '{}' with {} entities",
-                      m_scene_file_path.string(),
-                      m_scene.entityManager().entityCount());
+    LUNA_RUNTIME_INFO(
+        "Loaded StartScene '{}' with {} entities", m_scene_file_path.string(), m_scene.entityManager().entityCount());
     return true;
 }
 

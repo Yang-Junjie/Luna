@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <entt/entity/registry.hpp>
 #include <glm/mat4x4.hpp>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -21,14 +22,16 @@ public:
     Entity createEntityWithUUID(UUID uuid, const std::string& name = std::string{});
     Entity createChildEntity(Entity parent, const std::string& name = std::string{});
     Entity findEntityByUUID(UUID uuid);
-    Entity findEntityByUUID(UUID uuid) const;
+    std::optional<entt::entity> findEntityHandleByUUID(UUID uuid) const;
     bool containsEntity(UUID uuid) const;
     bool setParent(Entity child, Entity parent, bool preserve_world_transform = true);
     void destroyEntity(Entity entity);
     void clear();
     size_t entityCount() const;
     glm::mat4 getWorldSpaceTransformMatrix(Entity entity) const;
+    glm::mat4 getWorldSpaceTransformMatrix(entt::entity entity_handle) const;
     TransformComponent getWorldSpaceTransform(Entity entity) const;
+    TransformComponent getWorldSpaceTransform(entt::entity entity_handle) const;
     void setWorldSpaceTransform(Entity entity, const glm::mat4& world_transform);
     void setWorldSpaceTransform(Entity entity, const TransformComponent& world_transform);
     bool convertToWorldSpace(Entity entity);

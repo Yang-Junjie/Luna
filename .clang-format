@@ -3,6 +3,7 @@
 # =========================================================
 BasedOnStyle: LLVM
 Standard: Latest
+LineEnding: LF
 IndentWidth: 4
 TabWidth: 4
 UseTab: Never

@@ -7,7 +7,7 @@ using AssetHandle = UUID;
 
 class Asset {
 public:
-    AssetHandle handle;
+    AssetHandle handle{0};
 
     virtual ~Asset() = default;
 

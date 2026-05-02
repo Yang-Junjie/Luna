@@ -13,7 +13,9 @@ static std::mutex s_EngineMutex;
 UUID::UUID()
 {
     std::lock_guard<std::mutex> lock(s_EngineMutex);
-    m_UUID = s_UniformDistribution(s_Engine);
+    do {
+        m_UUID = s_UniformDistribution(s_Engine);
+    } while (m_UUID == 0);
 }
 
 UUID::UUID(uint64_t uuid)

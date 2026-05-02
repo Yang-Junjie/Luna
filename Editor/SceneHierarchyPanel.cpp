@@ -38,6 +38,7 @@ luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity
                                  : entity_manager.createEntity("Empty Entity");
     if (entity) {
         editor_layer.setSelectedEntity(entity);
+        editor_layer.markSceneDirty();
     }
 
     return entity;
@@ -173,7 +174,9 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
                 luna::Entity dropped_entity = entity_manager.findEntityByUUID(luna::UUID(dropped_id));
 
                 if (dropped_entity && dropped_entity != entity && !isDescendantOf(entity, dropped_entity)) {
-                    entity_manager.setParent(dropped_entity, entity, true);
+                    if (entity_manager.setParent(dropped_entity, entity, true)) {
+                        editor_layer.markSceneDirty();
+                    }
                 }
             }
 
@@ -201,7 +204,9 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         }
 
         if (entity.hasParent() && ImGui::MenuItem("Detach From Parent")) {
-            entity.clearParent(true);
+            if (entity.clearParent(true)) {
+                editor_layer.markSceneDirty();
+            }
         }
 
         if (ImGui::MenuItem("Delete Entity")) {
@@ -229,6 +234,7 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         const luna::Entity current_selection = editor_layer.getSelectedEntity();
         const bool clear_selection = current_selection && (current_selection == entity || isDescendantOf(current_selection, entity));
         entity_manager.destroyEntity(entity);
+        editor_layer.markSceneDirty();
         if (clear_selection) {
             editor_layer.setSelectedEntity({});
         }
@@ -308,7 +314,9 @@ void SceneHierarchyPanel::onImGuiRender()
                 const uint64_t dropped_id = *static_cast<const uint64_t*>(payload->Data);
                 if (!m_editor_layer->isRuntimeViewportEnabled()) {
                     if (Entity dropped_entity = entity_manager.findEntityByUUID(UUID(dropped_id)); dropped_entity) {
-                        dropped_entity.clearParent(true);
+                        if (dropped_entity.clearParent(true)) {
+                            m_editor_layer->markSceneDirty();
+                        }
                     }
                 }
             }

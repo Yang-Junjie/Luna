@@ -2,19 +2,20 @@
 
 #include "Asset/AssetManager.h"
 #include "Asset/Model.h"
+#include "Core/Log.h"
 #include "Loader.h"
 #include "Project/ProjectManager.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
+
+#include <algorithm>
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <glm/vec3.hpp>
 #include <yaml-cpp/yaml.h>
 
 namespace luna::model_loader_detail {
@@ -75,8 +76,8 @@ inline std::vector<AssetHandle> readMaterialBindings(const YAML::Node& node)
             continue;
         }
 
-        const uint32_t material_index =
-            item["SourceMaterialIndex"] ? item["SourceMaterialIndex"].as<uint32_t>() : static_cast<uint32_t>(materials.size());
+        const uint32_t material_index = item["SourceMaterialIndex"] ? item["SourceMaterialIndex"].as<uint32_t>()
+                                                                    : static_cast<uint32_t>(materials.size());
         if (materials.size() <= material_index) {
             materials.resize(static_cast<size_t>(material_index) + 1, AssetHandle(0));
         }
@@ -140,49 +141,56 @@ inline void normalizeHierarchy(std::vector<ModelNode>& nodes)
 
 inline std::shared_ptr<Model> loadFromYaml(const std::filesystem::path& path, std::string asset_name)
 {
-    YAML::Node data = YAML::LoadFile(path.string());
-    YAML::Node model_node = data["Model"] ? data["Model"] : data;
-    if (!model_node) {
+    try {
+        YAML::Node data = YAML::LoadFile(path.string());
+        YAML::Node model_node = data["Model"] ? data["Model"] : data;
+        if (!model_node) {
+            return {};
+        }
+
+        if (asset_name.empty()) {
+            asset_name = model_node["Name"] ? model_node["Name"].as<std::string>() : path.stem().string();
+        }
+
+        const std::filesystem::path source_path = model_node["Source"]
+                                                      ? std::filesystem::path(model_node["Source"].as<std::string>())
+                                                      : std::filesystem::path{};
+
+        std::vector<ModelNode> nodes;
+        if (const YAML::Node nodes_node = model_node["Nodes"]; nodes_node && nodes_node.IsSequence()) {
+            nodes.reserve(nodes_node.size());
+            for (size_t node_index = 0; node_index < nodes_node.size(); ++node_index) {
+                nodes.push_back(readNode(nodes_node[node_index], asset_name + "_Node_" + std::to_string(node_index)));
+            }
+        }
+
+        if (nodes.empty()) {
+            AssetHandle source_mesh(0);
+            if (model_node["SourceMesh"]) {
+                source_mesh = readHandle(model_node["SourceMesh"]);
+            } else if (model_node["Mesh"]) {
+                source_mesh = readHandle(model_node["Mesh"]);
+            }
+
+            if (source_mesh.isValid()) {
+                ModelNode fallback_node;
+                fallback_node.Name = asset_name;
+                fallback_node.MeshHandle = source_mesh;
+                fallback_node.SubmeshMaterials = readMaterialBindings(model_node["Materials"]);
+                if (fallback_node.SubmeshMaterials.empty()) {
+                    fallback_node.SubmeshMaterials = readHandleSequence(model_node["SubmeshMaterials"]);
+                }
+                nodes.push_back(std::move(fallback_node));
+            }
+        }
+
+        normalizeHierarchy(nodes);
+        return Model::create(std::move(asset_name), source_path, std::move(nodes));
+    } catch (const YAML::Exception& error) {
+        const char* message = error.what();
+        LUNA_CORE_WARN("{}", message);
         return {};
     }
-
-    if (asset_name.empty()) {
-        asset_name = model_node["Name"] ? model_node["Name"].as<std::string>() : path.stem().string();
-    }
-
-    const std::filesystem::path source_path =
-        model_node["Source"] ? std::filesystem::path(model_node["Source"].as<std::string>()) : std::filesystem::path{};
-
-    std::vector<ModelNode> nodes;
-    if (const YAML::Node nodes_node = model_node["Nodes"]; nodes_node && nodes_node.IsSequence()) {
-        nodes.reserve(nodes_node.size());
-        for (size_t node_index = 0; node_index < nodes_node.size(); ++node_index) {
-            nodes.push_back(readNode(nodes_node[node_index], asset_name + "_Node_" + std::to_string(node_index)));
-        }
-    }
-
-    if (nodes.empty()) {
-        AssetHandle source_mesh(0);
-        if (model_node["SourceMesh"]) {
-            source_mesh = readHandle(model_node["SourceMesh"]);
-        } else if (model_node["Mesh"]) {
-            source_mesh = readHandle(model_node["Mesh"]);
-        }
-
-        if (source_mesh.isValid()) {
-            ModelNode fallback_node;
-            fallback_node.Name = asset_name;
-            fallback_node.MeshHandle = source_mesh;
-            fallback_node.SubmeshMaterials = readMaterialBindings(model_node["Materials"]);
-            if (fallback_node.SubmeshMaterials.empty()) {
-                fallback_node.SubmeshMaterials = readHandleSequence(model_node["SubmeshMaterials"]);
-            }
-            nodes.push_back(std::move(fallback_node));
-        }
-    }
-
-    normalizeHierarchy(nodes);
-    return Model::create(std::move(asset_name), source_path, std::move(nodes));
 }
 
 } // namespace luna::model_loader_detail

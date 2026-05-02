@@ -4,11 +4,11 @@
 #include "Core/FileTool.h"
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
-
 #include "yaml-cpp/yaml.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -36,8 +36,8 @@ inline AssetMetadata makeAssetMetadata(const std::filesystem::path& asset_path, 
         metadata.Handle = UUID(1);
     }
     metadata.Type = type;
-    metadata.FilePath =
-        luna::tools::makeRelative(asset_path, ProjectManager::instance().getProjectRootPath().value_or(asset_path.root_path()));
+    metadata.FilePath = luna::tools::makeRelative(
+        asset_path, ProjectManager::instance().getProjectRootPath().value_or(asset_path.root_path()));
     return metadata;
 }
 
@@ -86,9 +86,8 @@ inline bool writeMetadataFile(const YAML::Emitter& out, const std::filesystem::p
         std::error_code ec;
         std::filesystem::create_directories(meta_path.parent_path(), ec);
         if (ec) {
-            LUNA_CORE_ERROR("Failed to create metadata directory '{}': {}",
-                            meta_path.parent_path().string(),
-                            ec.message());
+            LUNA_CORE_ERROR(
+                "Failed to create metadata directory '{}': {}", meta_path.parent_path().string(), ec.message());
             return false;
         }
     }
@@ -116,8 +115,14 @@ inline bool writeMetadataFile(const YAML::Emitter& out, const std::filesystem::p
 
 inline YAML::Node loadMetadataNode(const std::filesystem::path& meta_path)
 {
-    const YAML::Node data = YAML::LoadFile(meta_path.string());
-    return data["Asset"];
+    try {
+        const YAML::Node data = YAML::LoadFile(meta_path.string());
+        return data["Asset"];
+    } catch (const YAML::Exception& error) {
+        const char* message = error.what();
+        LUNA_CORE_WARN("{}", message);
+        return {};
+    }
 }
 
 inline void readCommonMetadata(const YAML::Node& asset_node, AssetMetadata& metadata)
@@ -158,10 +163,12 @@ inline bool serializeMetadataWithConfig(const AssetMetadata& metadata, DefaultCo
     YAML::Emitter out;
     beginMetadataFile(out);
     writeCommonMetadata(out, metadata);
-    out << YAML::Key << "Config" << YAML::Value << resolveConfig(metadata, std::forward<DefaultConfigFactory>(make_default_config));
+    out << YAML::Key << "Config" << YAML::Value
+        << resolveConfig(metadata, std::forward<DefaultConfigFactory>(make_default_config));
     endMetadataFile(out);
     if (!out.good()) {
-        LUNA_CORE_ERROR("Failed to emit metadata YAML for '{}': {}", metadata.FilePath.generic_string(), out.GetLastError());
+        LUNA_CORE_ERROR(
+            "Failed to emit metadata YAML for '{}': {}", metadata.FilePath.generic_string(), out.GetLastError());
         return false;
     }
 
@@ -173,10 +180,16 @@ inline AssetMetadata deserializeMetadataWithConfig(const std::filesystem::path& 
                                                    DefaultConfigFactory&& make_default_config)
 {
     AssetMetadata metadata;
-    const YAML::Node asset_node = loadMetadataNode(meta_path);
-    readCommonMetadata(asset_node, metadata);
-    metadata.SpecializedConfig =
-        asset_node && asset_node["Config"] ? asset_node["Config"] : make_default_config(metadata);
+    try {
+        const YAML::Node asset_node = loadMetadataNode(meta_path);
+        readCommonMetadata(asset_node, metadata);
+        metadata.SpecializedConfig =
+            asset_node && asset_node["Config"] ? asset_node["Config"] : make_default_config(metadata);
+    } catch (const YAML::Exception& error) {
+        const char* message = error.what();
+        LUNA_CORE_WARN("{}", message);
+        return {};
+    }
     return metadata;
 }
 
