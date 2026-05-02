@@ -236,6 +236,9 @@ set(ASSET_SOURCE
 if(WIN32)
     list(APPEND PLATFORM_SOURCE
         Platform/Windows/WinFileDialogs.cpp)
+else()
+    list(APPEND PLATFORM_SOURCE
+        Platform/Common/FileDialogs.cpp)
 endif()
 
 add_library(
