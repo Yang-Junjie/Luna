@@ -1,37 +1,37 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    AssetLoadingPanel.h
-    AssetLoadingPanel.cpp
-    BackendCapabilitiesPanel.h
-    BackendCapabilitiesPanel.cpp
-    BuiltinMaterialsPanel.h
-    BuiltinMaterialsPanel.cpp
-    ContentBrowserPanel.h
-    ContentBrowserPanel.cpp
+    Panels/AssetLoadingPanel.h
+    Panels/AssetLoadingPanel.cpp
+    Panels/BackendCapabilitiesPanel.h
+    Panels/BackendCapabilitiesPanel.cpp
+    Panels/BuiltinMaterialsPanel.h
+    Panels/BuiltinMaterialsPanel.cpp
+    Panels/ContentBrowserPanel.h
+    Panels/ContentBrowserPanel.cpp
     EditorCamera.h
     EditorCamera.cpp
     EditorAssetDragDrop.h
-    InspectorPanel.h
-    InspectorPanel.cpp
+    Panels/InspectorPanel.h
+    Panels/InspectorPanel.cpp
     LunaEditorApp.h
     LunaEditorApp.cpp
     LunaEditorLayer.h
     LunaEditorLayer.cpp
-    RenderDebugPanel.h
-    RenderDebugPanel.cpp
-    RenderFeaturesPanel.h
-    RenderFeaturesPanel.cpp
-    RenderProfilerPanel.h
-    RenderProfilerPanel.cpp
+    Panels/RenderDebugPanel.h
+    Panels/RenderDebugPanel.cpp
+    Panels/RenderFeaturesPanel.h
+    Panels/RenderFeaturesPanel.cpp
+    Panels/RenderProfilerPanel.h
+    Panels/RenderProfilerPanel.cpp
     ScriptComponentInspector.h
     ScriptComponentInspector.cpp
-    SceneSettingPanel.h
-    SceneSettingPanel.cpp
-    ScriptPluginsPanel.h
-    ScriptPluginsPanel.cpp
-    SceneHierarchyPanel.h
-    SceneHierarchyPanel.cpp
+    Panels/SceneSettingPanel.h
+    Panels/SceneSettingPanel.cpp
+    Panels/ScriptPluginsPanel.h
+    Panels/ScriptPluginsPanel.cpp
+    Panels/SceneHierarchyPanel.h
+    Panels/SceneHierarchyPanel.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
 )
 
