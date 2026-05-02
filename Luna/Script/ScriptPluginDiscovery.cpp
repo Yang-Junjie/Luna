@@ -10,6 +10,7 @@
 #include <string_view>
 #include <system_error>
 #include <unordered_map>
+#include <utility>
 
 namespace {
 
@@ -38,6 +39,59 @@ const char* scopeToString(luna::ScriptPluginScope scope)
         default:
             return "unknown";
     }
+}
+
+bool platformKeyMatchesCurrentPlatform(std::string_view key)
+{
+    const std::string normalized_key = toLower(key);
+#if defined(_WIN32)
+    return normalized_key == "windows" || normalized_key == "win32" || normalized_key == "win64";
+#elif defined(__APPLE__)
+    return normalized_key == "macos" || normalized_key == "mac" || normalized_key == "darwin";
+#elif defined(__ANDROID__)
+    return normalized_key == "android";
+#elif defined(__linux__)
+    return normalized_key == "linux";
+#else
+    return normalized_key == "default";
+#endif
+}
+
+std::optional<std::filesystem::path> readEntryPathForCurrentPlatform(const YAML::Node& entry_node,
+                                                                     const std::filesystem::path& manifest_path)
+{
+    if (!entry_node) {
+        return std::nullopt;
+    }
+
+    if (entry_node.IsScalar()) {
+        return std::filesystem::path(entry_node.as<std::string>());
+    }
+
+    if (!entry_node.IsMap()) {
+        LUNA_CORE_WARN("Skipped 'Plugin.Entry' in '{}' because it must be a string or platform map",
+                       manifest_path.string());
+        return std::nullopt;
+    }
+
+    std::optional<std::filesystem::path> default_entry;
+    for (const auto& entry : entry_node) {
+        const std::string key = entry.first.as<std::string>();
+        if (!entry.second.IsScalar()) {
+            LUNA_CORE_WARN("Skipped non-scalar 'Plugin.Entry.{}' in '{}'", key, manifest_path.string());
+            continue;
+        }
+
+        const std::filesystem::path value = entry.second.as<std::string>();
+        if (platformKeyMatchesCurrentPlatform(key)) {
+            return value;
+        }
+        if (toLower(key) == "default") {
+            default_entry = value;
+        }
+    }
+
+    return default_entry;
 }
 
 std::optional<luna::ScriptPluginCandidate> loadManifest(const std::filesystem::path& manifest_path,
@@ -79,7 +133,10 @@ std::optional<luna::ScriptPluginCandidate> loadManifest(const std::filesystem::p
             candidate.Manifest.HostApiVersion = plugin["HostApiVersion"].as<uint32_t>();
         }
         if (plugin["Entry"]) {
-            candidate.Manifest.Entry = plugin["Entry"].as<std::string>();
+            if (std::optional<std::filesystem::path> entry =
+                    readEntryPathForCurrentPlatform(plugin["Entry"], manifest_path)) {
+                candidate.Manifest.Entry = std::move(*entry);
+            }
         }
 
         if (!candidate.Manifest.Type.empty() && toLower(candidate.Manifest.Type) != "script") {

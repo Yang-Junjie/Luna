@@ -24,6 +24,8 @@
 #        define NOMINMAX
 #    endif
 #    include <Windows.h>
+#else
+#    include <dlfcn.h>
 #endif
 
 namespace {
@@ -226,6 +228,11 @@ std::string formatWindowsError(DWORD error)
 
 class DynamicLibraryHandle {
 public:
+    DynamicLibraryHandle(const DynamicLibraryHandle&) = delete;
+    DynamicLibraryHandle& operator=(const DynamicLibraryHandle&) = delete;
+    DynamicLibraryHandle(DynamicLibraryHandle&&) = delete;
+    DynamicLibraryHandle& operator=(DynamicLibraryHandle&&) = delete;
+
     static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
     {
         const HMODULE module = ::LoadLibraryW(path.c_str());
@@ -272,17 +279,59 @@ private:
 #else
 class DynamicLibraryHandle {
 public:
+    DynamicLibraryHandle(const DynamicLibraryHandle&) = delete;
+    DynamicLibraryHandle& operator=(const DynamicLibraryHandle&) = delete;
+    DynamicLibraryHandle(DynamicLibraryHandle&&) = delete;
+    DynamicLibraryHandle& operator=(DynamicLibraryHandle&&) = delete;
+
     static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
     {
-        LUNA_CORE_ERROR("Script plugin loading is not implemented on this platform. Requested '{}'",
-                        path.string());
-        return {};
+        dlerror();
+        void* module = ::dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
+        if (module == nullptr) {
+            const char* error = dlerror();
+            LUNA_CORE_ERROR("Failed to load script plugin library '{}': {}",
+                            path.string(),
+                            error != nullptr ? error : "unknown error");
+            return {};
+        }
+
+        return std::shared_ptr<DynamicLibraryHandle>(new DynamicLibraryHandle(module, path));
     }
 
-    [[nodiscard]] void* findSymbol(const char*) const
+    ~DynamicLibraryHandle()
     {
-        return nullptr;
+        if (m_module != nullptr) {
+            ::dlclose(m_module);
+        }
     }
+
+    [[nodiscard]] void* findSymbol(const char* name) const
+    {
+        if (m_module == nullptr || name == nullptr) {
+            return nullptr;
+        }
+
+        dlerror();
+        void* symbol = ::dlsym(m_module, name);
+        const char* error = dlerror();
+        return error == nullptr ? symbol : nullptr;
+    }
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept
+    {
+        return m_path;
+    }
+
+private:
+    DynamicLibraryHandle(void* module, std::filesystem::path path)
+        : m_module(module),
+          m_path(std::move(path))
+    {}
+
+private:
+    void* m_module{nullptr};
+    std::filesystem::path m_path;
 };
 #endif
 

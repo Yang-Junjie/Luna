@@ -1,6 +1,14 @@
 #include "LuaPluginRuntime.h"
 #include "LuaPropertySchema.h"
 
+#if defined(_WIN32)
+#    define LUNA_SCRIPT_PLUGIN_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
+#    define LUNA_SCRIPT_PLUGIN_EXPORT __attribute__((visibility("default")))
+#else
+#    define LUNA_SCRIPT_PLUGIN_EXPORT
+#endif
+
 namespace {
 
 struct LuaPluginBackendState {
@@ -34,9 +42,7 @@ int enumerateLuaPropertySchema(void* backend_user_data,
 
 extern "C" {
 
-#if defined(_WIN32)
-__declspec(dllexport)
-#endif
+LUNA_SCRIPT_PLUGIN_EXPORT
 int LunaCreateScriptPlugin(uint32_t host_api_version,
                            const LunaScriptHostApi* host_api,
                            LunaScriptPluginApi* out_plugin_api)

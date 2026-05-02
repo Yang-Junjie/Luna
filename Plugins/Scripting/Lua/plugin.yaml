@@ -6,4 +6,7 @@ Plugin:
   Backend: Lua
   Version: 0.1.0
   HostApiVersion: 1
-  Entry: Binaries/Win64/LunaScriptLua.dll
+  Entry:
+    Windows: Binaries/Win64/LunaScriptLua.dll
+    Linux: Binaries/Linux/libLunaScriptLua.so
+    macOS: Binaries/macOS/libLunaScriptLua.dylib

@@ -182,7 +182,16 @@ set(PROJECT_SOURCE
     Project/ProjectManager.cpp)
 
 set(PLATFORM_SOURCE
-    Platform/Common/FileDialogs.h)
+    Platform/Common/FileDialogs.h
+    Platform/Common/NativeWindowHandle.h)
+
+if(APPLE)
+    list(APPEND PLATFORM_SOURCE
+        Platform/MacOS/GLFWNativeWindowHandle.mm)
+else()
+    list(APPEND PLATFORM_SOURCE
+        Platform/GLFWNativeWindowHandle.cpp)
+endif()
 
 set(ASSET_SOURCE
     Asset/BuiltinAssets.h
@@ -308,6 +317,7 @@ target_link_libraries(LunaCore
         Vulkan::Vulkan
         glfw
         enkiTS
+        $<$<NOT:$<PLATFORM_ID:Windows>>:${CMAKE_DL_LIBS}>
         # spirv-cross-core
         stb::stb
         yaml-cpp::yaml-cpp
@@ -319,4 +329,5 @@ target_compile_definitions(
         LUNA_PROJECT_ROOT="${PROJECT_SOURCE_DIR}"
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE
         GLM_ENABLE_EXPERIMENTAL
+        ${LUNA_PLATFORM_WINDOW_SYSTEM_DEFINITIONS}
 )

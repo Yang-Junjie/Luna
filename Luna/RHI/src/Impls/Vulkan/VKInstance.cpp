@@ -260,15 +260,21 @@ Ref<Surface> VKInstance::CreateSurface(const NativeWindowHandle& windowHandle)
 #elif defined(__linux__)
 #if defined(USE_WAYLAND)
         vk::WaylandSurfaceCreateInfoKHR createInfo =
-            vk::WaylandSurfaceCreateInfoKHR().setDisplay(windowHandle.wlDisplay).setSurface(windowHandle.wlSurface);
+            vk::WaylandSurfaceCreateInfoKHR()
+                .setDisplay(static_cast<wl_display*>(windowHandle.wlDisplay))
+                .setSurface(static_cast<wl_surface*>(windowHandle.wlSurface));
         surface = m_instance.createWaylandSurfaceKHR(createInfo);
 #elif defined(USE_XCB)
         vk::XcbSurfaceCreateInfoKHR createInfo =
-            vk::XcbSurfaceCreateInfoKHR().setConnection(windowHandle.xcbConnection).setWindow(windowHandle.xcbWindow);
+            vk::XcbSurfaceCreateInfoKHR()
+                .setConnection(static_cast<xcb_connection_t*>(windowHandle.xcbConnection))
+                .setWindow(static_cast<xcb_window_t>(windowHandle.xcbWindow));
         surface = m_instance.createXcbSurfaceKHR(createInfo);
 #elif defined(USE_XLIB)
         vk::XlibSurfaceCreateInfoKHR createInfo =
-            vk::XlibSurfaceCreateInfoKHR().setDpy(windowHandle.x11Display).setWindow(windowHandle.x11Window);
+            vk::XlibSurfaceCreateInfoKHR()
+                .setDpy(static_cast<Display*>(windowHandle.x11Display))
+                .setWindow(static_cast<Window>(windowHandle.x11Window));
         surface = m_instance.createXlibSurfaceKHR(createInfo);
 #else
         throw std::runtime_error("未定义的 Linux 显示后端 (需定义 USE_WAYLAND, USE_XCB 或 USE_XLIB)。");

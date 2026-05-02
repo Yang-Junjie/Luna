@@ -19,19 +19,15 @@ struct NativeWindowHandle {
     void* hInst = nullptr;
 #elif defined(__APPLE__)
     void* metalLayer = nullptr;
-#elif defined(__linux__) && !defined(__ANDROID__)
-#if defined(USE_WAYLAND)
-    wl_display* wlDisplay = nullptr;
-    wl_surface* wlSurface = nullptr;
-#elif defined(USE_XCB)
-    xcb_connection_t* xcbConnection = nullptr;
-    xcb_window_t xcbWindow = 0;
-#elif defined(USE_XLIB)
-    Display* x11Display = nullptr;
-    Window x11Window = 0;
-#endif
 #elif defined(__ANDROID__)
     void* aNativeWindow = nullptr;
+#elif defined(__linux__)
+    void* wlDisplay = nullptr;
+    void* wlSurface = nullptr;
+    void* xcbConnection = nullptr;
+    std::uintptr_t xcbWindow = 0;
+    void* x11Display = nullptr;
+    std::uintptr_t x11Window = 0;
 #else
     void* placeholder = nullptr;
 #endif
@@ -41,16 +37,18 @@ struct NativeWindowHandle {
         return hWnd != nullptr && hInst != nullptr;
 #elif defined(__APPLE__)
         return metalLayer != nullptr;
-#elif defined(__linux__) && !defined(__ANDROID__)
+#elif defined(__ANDROID__)
+        return aNativeWindow != nullptr;
+#elif defined(__linux__)
 #if defined(USE_WAYLAND)
         return wlDisplay != nullptr && wlSurface != nullptr;
 #elif defined(USE_XCB)
         return xcbConnection != nullptr && xcbWindow != 0;
 #elif defined(USE_XLIB)
         return x11Display != nullptr && x11Window != 0;
+#else
+        return false;
 #endif
-#elif defined(__ANDROID__)
-        return aNativeWindow != nullptr;
 #else
         return placeholder != nullptr;
 #endif

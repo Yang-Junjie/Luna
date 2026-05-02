@@ -1,6 +1,7 @@
 ﻿#include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
+#include "Platform/Common/NativeWindowHandle.h"
 #include "Renderer/RenderFlow/DefaultRenderFlow.h"
 #include "Renderer/RenderFlow/RenderFlow.h"
 #include "Renderer/Renderer.h"
@@ -15,16 +16,11 @@
 #include <Swapchain.h>
 #include <Synchronization.h>
 
-#define GLFW_EXPOSE_NATIVE_WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <cstring>
 
 #include <algorithm>
 #include <array>
 #include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
 #include <stdexcept>
@@ -109,12 +105,10 @@ bool Renderer::init(Window& window, InitializationOptions options)
         return false;
     }
 
-    // TODO : corss platform support
-    luna::RHI::NativeWindowHandle window_handle;
-    window_handle.hWnd = glfwGetWin32Window(m_window_context.native_window);
-    window_handle.hInst = GetModuleHandleW(nullptr);
+    const luna::RHI::NativeWindowHandle window_handle = createNativeWindowHandle(window);
     if (!window_handle.IsValid()) {
-        LUNA_RENDERER_WARN("Native Win32 window handle is incomplete; surface creation may fail");
+        LUNA_RENDERER_WARN("Native {} window handle is incomplete; surface creation may fail",
+                           nativeWindowPlatformName());
     }
 
     auto& device_context = m_device_context;
