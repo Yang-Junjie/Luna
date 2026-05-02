@@ -8,17 +8,17 @@
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
 
-#include <cctype>
+#include <Backend.h>
 
-#include <algorithm>
+#include <exception>
 #include <filesystem>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -45,30 +45,6 @@ const char* presentModeToString(luna::RHI::PresentMode mode)
     }
 }
 
-const char* backendTypeToString(luna::RHI::BackendType type)
-{
-    switch (type) {
-        case luna::RHI::BackendType::Auto:
-            return "Auto";
-        case luna::RHI::BackendType::Vulkan:
-            return "Vulkan";
-        case luna::RHI::BackendType::DirectX12:
-            return "DirectX12";
-        case luna::RHI::BackendType::DirectX11:
-            return "DirectX11";
-        case luna::RHI::BackendType::Metal:
-            return "Metal";
-        case luna::RHI::BackendType::OpenGL:
-            return "OpenGL";
-        case luna::RHI::BackendType::OpenGLES:
-            return "OpenGLES";
-        case luna::RHI::BackendType::WebGPU:
-            return "WebGPU";
-        default:
-            return "Unknown";
-    }
-}
-
 void logRuntimeAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
 {
     LUNA_RUNTIME_INFO(
@@ -81,41 +57,6 @@ void logRuntimeAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
         stats.unsupportedFilesSkipped,
         stats.failedAssets,
         stats.missingMetadataAfterSync);
-}
-
-std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
-{
-    std::string normalized(value);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-
-    if (normalized == "auto") {
-        return luna::RHI::BackendType::Auto;
-    }
-    if (normalized == "vulkan" || normalized == "vk") {
-        return luna::RHI::BackendType::Vulkan;
-    }
-    if (normalized == "d3d12" || normalized == "dx12" || normalized == "directx12") {
-        return luna::RHI::BackendType::DirectX12;
-    }
-    if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
-        return luna::RHI::BackendType::DirectX11;
-    }
-    if (normalized == "metal" || normalized == "mtl") {
-        return luna::RHI::BackendType::Metal;
-    }
-    if (normalized == "opengl" || normalized == "gl") {
-        return luna::RHI::BackendType::OpenGL;
-    }
-    if (normalized == "opengles" || normalized == "gles") {
-        return luna::RHI::BackendType::OpenGLES;
-    }
-    if (normalized == "webgpu" || normalized == "wgpu") {
-        return luna::RHI::BackendType::WebGPU;
-    }
-
-    return std::nullopt;
 }
 
 std::filesystem::path resolveProjectFilePath(const std::filesystem::path& input_path)
@@ -161,29 +102,29 @@ RuntimeStartupOptions parseStartupOptions(int argc, char** argv)
         if (argument == "--backend") {
             if (i + 1 >= argc || argv[i + 1] == nullptr) {
                 LUNA_RUNTIME_WARN("Missing value after '--backend'; defaulting to '{}'",
-                                  backendTypeToString(options.backend));
+                                  luna::RHI::BackendTypeToString(options.backend));
                 continue;
             }
 
             option_value = std::string_view(argv[++i]);
-            if (const auto parsed_backend = parseBackendValue(option_value)) {
+            if (const auto parsed_backend = luna::RHI::ParseBackendType(option_value)) {
                 options.backend = *parsed_backend;
             } else {
                 LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
                                   std::string(option_value),
-                                  backendTypeToString(options.backend));
+                                  luna::RHI::BackendTypeToString(options.backend));
             }
             continue;
         }
 
         if (argument.starts_with("--backend=")) {
             option_value = argument.substr(std::string_view("--backend=").size());
-            if (const auto parsed_backend = parseBackendValue(option_value)) {
+            if (const auto parsed_backend = luna::RHI::ParseBackendType(option_value)) {
                 options.backend = *parsed_backend;
             } else {
                 LUNA_RUNTIME_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
                                   std::string(option_value),
-                                  backendTypeToString(options.backend));
+                                  luna::RHI::BackendTypeToString(options.backend));
             }
             continue;
         }
@@ -208,6 +149,32 @@ RuntimeStartupOptions parseStartupOptions(int argc, char** argv)
     return options;
 }
 
+void logBackendStartupSelection(luna::RHI::BackendType requested_backend)
+{
+    const std::vector<luna::RHI::BackendType> compiled_backends = luna::RHI::Instance::GetCompiledBackends();
+    const std::string compiled_backend_names = luna::RHI::DescribeBackendTypes(compiled_backends);
+
+    LUNA_RUNTIME_INFO("Compiled RHI backends: {}", compiled_backend_names);
+    if (requested_backend == luna::RHI::BackendType::Auto) {
+        try {
+            const luna::RHI::BackendType default_backend = luna::RHI::Instance::GetDefaultBackend();
+            LUNA_RUNTIME_INFO("Auto RHI backend will resolve to '{}'",
+                              luna::RHI::BackendTypeToString(default_backend));
+        } catch (const std::exception& error) {
+            LUNA_RUNTIME_WARN("Failed to resolve default RHI backend: {}", error.what());
+        }
+        return;
+    }
+
+    if (!luna::RHI::Instance::IsBackendCompiled(requested_backend)) {
+        LUNA_RUNTIME_WARN(
+            "Requested RHI backend '{}' is not compiled into this build; renderer initialization will fail. "
+            "Compiled backends: {}",
+            luna::RHI::BackendTypeToString(requested_backend),
+            compiled_backend_names);
+    }
+}
+
 } // namespace
 
 namespace luna {
@@ -228,7 +195,7 @@ LunaRuntimeApplication::LunaRuntimeApplication(luna::RHI::BackendType backend, s
 Renderer::InitializationOptions LunaRuntimeApplication::getRendererInitializationOptions()
 {
     LUNA_RUNTIME_INFO("LunaRuntime requested backend '{}' and present mode '{}' via code",
-                      backendTypeToString(m_backend),
+                      luna::RHI::BackendTypeToString(m_backend),
                       presentModeToString(kRequestedPresentMode));
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
@@ -328,7 +295,9 @@ bool LunaRuntimeApplication::loadStartupScene()
 Application* createApplication(int argc, char** argv)
 {
     const RuntimeStartupOptions options = parseStartupOptions(argc, argv);
-    LUNA_RUNTIME_INFO("Starting LunaRuntime with backend '{}'", backendTypeToString(options.backend));
+    LUNA_RUNTIME_INFO("Starting LunaRuntime with requested backend '{}'",
+                      luna::RHI::BackendTypeToString(options.backend));
+    logBackendStartupSelection(options.backend);
 
     if (!options.project_file_path.empty()) {
         LUNA_RUNTIME_INFO("Runtime project path: '{}'", options.project_file_path.string());

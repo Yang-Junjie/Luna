@@ -1,8 +1,13 @@
 #include "BackendCapabilitiesPanel.h"
 
-#include "Renderer/RendererUtilities.h"
-
+#include <Backend.h>
+#include <Instance.h>
 #include <imgui.h>
+
+#include <exception>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace luna {
 namespace {
@@ -30,6 +35,32 @@ void textRow(const char* name, const char* value)
     ImGui::TextUnformatted(value);
 }
 
+std::optional<luna::RHI::BackendType> tryGetDefaultBackend()
+{
+    try {
+        return luna::RHI::Instance::GetDefaultBackend();
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+std::string backendStatusText(luna::RHI::BackendType backend,
+                              luna::RHI::BackendType current_backend,
+                              std::optional<luna::RHI::BackendType> default_backend)
+{
+    std::string status;
+    if (backend == current_backend) {
+        status = "Current";
+    }
+    if (default_backend && backend == *default_backend) {
+        if (!status.empty()) {
+            status += ", ";
+        }
+        status += "Default";
+    }
+    return status.empty() ? "Available" : status;
+}
+
 } // namespace
 
 void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& renderer)
@@ -47,8 +78,28 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     const auto& capabilities = renderer.getCapabilities();
     const auto& conventions = capabilities.conventions;
 
-    ImGui::Text("Backend: %s", renderer_detail::backendTypeToString(capabilities.backend_type));
+    ImGui::Text("Backend: %s", luna::RHI::BackendTypeToString(capabilities.backend_type));
     ImGui::Separator();
+
+    const std::vector<luna::RHI::BackendType> compiled_backends = luna::RHI::Instance::GetCompiledBackends();
+    const std::optional<luna::RHI::BackendType> default_backend = tryGetDefaultBackend();
+    const std::string compiled_backend_names = luna::RHI::DescribeBackendTypes(compiled_backends);
+
+    ImGui::Text("Compiled: %s", compiled_backend_names.c_str());
+    if (ImGui::BeginTable("CompiledRHIBackendsTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableHeadersRow();
+
+        for (const luna::RHI::BackendType backend : compiled_backends) {
+            const std::string status = backendStatusText(backend, capabilities.backend_type, default_backend);
+            textRow(luna::RHI::BackendTypeToString(backend), status.c_str());
+        }
+
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
 
     if (ImGui::BeginTable("BackendCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Capability", ImGuiTableColumnFlags_WidthStretch);

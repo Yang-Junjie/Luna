@@ -98,7 +98,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
     m_window_context.native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
     m_runtime.initialization_options = std::move(options);
     LUNA_RENDERER_INFO("Initializing renderer with requested backend '{}' and present mode '{}'",
-                       renderer_detail::backendTypeToString(m_runtime.initialization_options.backend),
+                       luna::RHI::BackendTypeToString(m_runtime.initialization_options.backend),
                        renderer_detail::presentModeToString(m_runtime.initialization_options.present_mode));
     if (m_window_context.native_window == nullptr) {
         LUNA_RENDERER_ERROR("Cannot initialize renderer without a GLFW window");
@@ -126,7 +126,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         device_context.instance = luna::RHI::Instance::Create(instance_info);
         device_context.capabilities = luna::RHI::makeCapabilitiesForBackend(device_context.instance->GetType());
         LUNA_RENDERER_DEBUG("Created RHI instance for backend '{}'",
-                            renderer_detail::backendTypeToString(device_context.instance->GetType()));
+                            luna::RHI::BackendTypeToString(device_context.instance->GetType()));
         LUNA_RENDERER_DEBUG("RHI capabilities: default_flow={} imgui={} scene_pick_readback={} gpu_timestamp={} "
                             "gpu_timestamp_disjoint={} "
                             "projection_y_flip={} imgui_uv_y_flip={} pick_y_matches_display={}",
@@ -143,7 +143,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         if (!device_context.surface) {
             throw std::runtime_error(
                 "Failed to create surface for backend '" +
-                std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
+                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
         }
 
         const auto adapters = device_context.instance->EnumerateAdapters();
@@ -167,7 +167,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         if (!device_context.adapter) {
             throw std::runtime_error(
                 "No compatible adapter available for backend '" +
-                std::string(renderer_detail::backendTypeToString(device_context.instance->GetType())) + "'");
+                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
         }
         const auto selected_adapter_properties = device_context.adapter->GetProperties();
         LUNA_RENDERER_INFO("Selected renderer adapter '{}' ({}, {} MiB dedicated VRAM)",
@@ -198,7 +198,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
         LUNA_RENDERER_INFO("Initialized renderer backend '{}' with {} frame(s) in flight",
-                           renderer_detail::backendTypeToString(device_context.instance->GetType()),
+                           luna::RHI::BackendTypeToString(device_context.instance->GetType()),
                            m_frame_resources.frames_in_flight);
         m_render_flow = std::make_unique<DefaultRenderFlow>();
     } catch (const std::exception& error) {
@@ -352,7 +352,7 @@ void Renderer::renderFrame()
         frame_resources.frame_index,
         extent.width,
         extent.height,
-        renderer_detail::backendTypeToString(backend_type),
+        luna::RHI::BackendTypeToString(backend_type),
         offscreen_scene_output ? "OffscreenTexture" : "Swapchain",
         runtime.imgui_enabled);
 
@@ -623,7 +623,7 @@ void Renderer::renderFrame()
     if (render_scene_to_offscreen && scene_output_valid && scene_output.queued_pick_request.has_value() &&
         !pick_readback_supported) {
         LUNA_RENDERER_WARN("Scene pick readback is not supported on backend '{}'; dropping pick request",
-                           renderer_detail::backendTypeToString(backend_type));
+                           luna::RHI::BackendTypeToString(backend_type));
         scene_output.queued_pick_request.reset();
     }
 
@@ -1460,7 +1460,7 @@ void Renderer::ensureGpuTimingResources()
     if (!m_device_context.capabilities.supports_gpu_timestamp) {
         frame_resources.gpu_timing_slots.clear();
         LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on backend '{}'",
-                           renderer_detail::backendTypeToString(m_device_context.capabilities.backend_type));
+                           luna::RHI::BackendTypeToString(m_device_context.capabilities.backend_type));
         return;
     }
 

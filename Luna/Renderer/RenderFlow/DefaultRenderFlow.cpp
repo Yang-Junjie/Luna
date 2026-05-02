@@ -10,6 +10,8 @@
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <Backend.h>
+
 #include <algorithm>
 #include <span>
 #include <string>
@@ -501,7 +503,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         "Building default render flow: size={}x{} backend={} color_format={} ({}) draw_packets={} pick_debug={}",
         scene_context.framebuffer_width,
         scene_context.framebuffer_height,
-        renderer_detail::backendTypeToString(scene_context.backend_type),
+        luna::RHI::BackendTypeToString(scene_context.backend_type),
         renderer_detail::formatToString(scene_context.color_format),
         static_cast<int>(scene_context.color_format),
         world.drawPackets().size(),

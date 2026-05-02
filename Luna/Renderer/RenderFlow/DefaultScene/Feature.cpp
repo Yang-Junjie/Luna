@@ -16,6 +16,8 @@
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <Backend.h>
+
 #include <array>
 #include <memory>
 #include <string>
@@ -212,10 +214,10 @@ void Feature::prepareResources(const SceneRenderContext& scene_context)
     const PipelineResources::Invalidation invalidation = m_pipelines.invalidationFor(scene_context);
     if (invalidation == PipelineResources::Invalidation::All) {
         LUNA_RENDERER_INFO("Scene render flow device changed; rebuilding GPU resources for backend '{}'",
-                           renderer_detail::backendTypeToString(scene_context.backend_type));
+                           luna::RHI::BackendTypeToString(scene_context.backend_type));
     } else if (invalidation == PipelineResources::Invalidation::MaterialsAndTextures) {
         LUNA_RENDERER_INFO("Rebuilding scene render flow pipeline state for backend '{}' and color format {} ({})",
-                           renderer_detail::backendTypeToString(scene_context.backend_type),
+                           luna::RHI::BackendTypeToString(scene_context.backend_type),
                            renderer_detail::formatToString(scene_context.color_format),
                            static_cast<int>(scene_context.color_format));
     }

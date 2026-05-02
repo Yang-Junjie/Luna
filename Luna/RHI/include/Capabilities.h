@@ -1,7 +1,7 @@
 #ifndef LUNA_RHI_CAPABILITIES_H
 #define LUNA_RHI_CAPABILITIES_H
 
-#include <Instance.h>
+#include <Backend.h>
 
 namespace luna::RHI {
 

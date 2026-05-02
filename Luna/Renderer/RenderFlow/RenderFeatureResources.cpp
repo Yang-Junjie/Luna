@@ -6,6 +6,7 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
+#include <Backend.h>
 #include <Builders.h>
 #include <Device.h>
 
@@ -153,9 +154,9 @@ bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState&
     const std::string_view feature_name = state.featureName().empty() ? std::string_view("RenderFeature")
                                                                       : std::string_view(state.featureName());
     if (complete) {
-        LUNA_RENDERER_INFO("Created {} GPU resources for backend '{}'",
+        LUNA_RENDERER_INFO("Created GPU resources for feature '{}' on backend '{}'",
                            feature_name,
-                           renderer_detail::backendTypeToString(state.backendType()));
+                           luna::RHI::BackendTypeToString(state.backendType()));
         return true;
     }
 

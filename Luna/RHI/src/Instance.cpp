@@ -1,7 +1,6 @@
 #include <Instance.h>
 
 #include <algorithm>
-#include <sstream>
 #include <stdexcept>
 #include <string_view>
 
@@ -32,45 +31,10 @@
 namespace luna::RHI {
 namespace {
 
-std::string backendTypeName(BackendType type)
-{
-    switch (type) {
-        case BackendType::Auto:
-            return "Auto";
-        case BackendType::Vulkan:
-            return "Vulkan";
-        case BackendType::DirectX12:
-            return "DirectX12";
-        case BackendType::DirectX11:
-            return "DirectX11";
-        case BackendType::Metal:
-            return "Metal";
-        case BackendType::OpenGL:
-            return "OpenGL";
-        case BackendType::OpenGLES:
-            return "OpenGLES";
-        case BackendType::WebGPU:
-            return "WebGPU";
-        default:
-            return "Unknown";
-    }
-}
-
 std::string compiledBackendListString()
 {
     const std::vector<BackendType> backends = Instance::GetCompiledBackends();
-    if (backends.empty()) {
-        return "none";
-    }
-
-    std::ostringstream stream;
-    for (size_t index = 0; index < backends.size(); ++index) {
-        if (index != 0) {
-            stream << ", ";
-        }
-        stream << backendTypeName(backends[index]);
-    }
-    return stream.str();
+    return DescribeBackendTypes(backends);
 }
 
 std::vector<BackendType> backendPreferenceOrder()
@@ -182,7 +146,7 @@ Ref<Instance> Instance::Create(const InstanceCreateInfo& createInfo)
     }
 
     if (!IsBackendCompiled(resolved.type)) {
-        throw std::runtime_error("Requested RHI backend '" + backendTypeName(resolved.type) +
+        throw std::runtime_error("Requested RHI backend '" + std::string(BackendTypeToString(resolved.type)) +
                                  "' is not compiled into this build. Compiled backends: " +
                                  compiledBackendListString());
     }

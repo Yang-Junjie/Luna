@@ -17,7 +17,6 @@ luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Re
 luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats);
 const char* presentModeToString(luna::RHI::PresentMode mode);
 const char* adapterTypeToString(luna::RHI::AdapterType type);
-const char* backendTypeToString(luna::RHI::BackendType type);
 const char* formatToString(luna::RHI::Format format);
 bool supportsDefaultRenderFlow(luna::RHI::BackendType type);
 bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode);

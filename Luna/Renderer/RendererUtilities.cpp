@@ -72,30 +72,6 @@ const char* adapterTypeToString(luna::RHI::AdapterType type)
     }
 }
 
-const char* backendTypeToString(luna::RHI::BackendType type)
-{
-    switch (type) {
-        case luna::RHI::BackendType::Auto:
-            return "Auto";
-        case luna::RHI::BackendType::Vulkan:
-            return "Vulkan";
-        case luna::RHI::BackendType::DirectX12:
-            return "DirectX12";
-        case luna::RHI::BackendType::DirectX11:
-            return "DirectX11";
-        case luna::RHI::BackendType::Metal:
-            return "Metal";
-        case luna::RHI::BackendType::OpenGL:
-            return "OpenGL";
-        case luna::RHI::BackendType::OpenGLES:
-            return "OpenGLES";
-        case luna::RHI::BackendType::WebGPU:
-            return "WebGPU";
-        default:
-            return "Unknown";
-    }
-}
-
 const char* formatToString(luna::RHI::Format format)
 {
     switch (format) {

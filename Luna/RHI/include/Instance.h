@@ -1,5 +1,6 @@
 #ifndef LUNA_RHI_INSTANCE_H
 #define LUNA_RHI_INSTANCE_H
+#include "Backend.h"
 #include "Core.h"
 
 namespace luna::RHI {
@@ -54,16 +55,6 @@ struct NativeWindowHandle {
 #endif
     }
 };
-enum class BackendType {
-    Auto,
-    Vulkan,
-    DirectX12,
-    DirectX11,
-    Metal,
-    OpenGL,
-    OpenGLES,
-    WebGPU,
-};
 enum class InstanceFeature {
     ValidationLayer = 0x00'00'00'01,
     Surface = 0x00'00'00'02,
@@ -94,34 +85,8 @@ public:
     virtual Ref<ShaderCompiler> CreateShaderCompiler() = 0;
 };
 
-template <> struct to_string<BackendType> {
-    static std::string convert(BackendType type)
-    {
-        switch (type) {
-            case BackendType::Auto:
-                return "Auto";
-            case BackendType::Vulkan:
-                return "Vulkan";
-            case BackendType::DirectX12:
-                return "DirectX12";
-            case BackendType::DirectX11:
-                return "DirectX11";
-            case BackendType::Metal:
-                return "Metal";
-            case BackendType::OpenGL:
-                return "OpenGL";
-            case BackendType::OpenGLES:
-                return "OpenGLES";
-            case BackendType::WebGPU:
-                return "WebGPU";
-            default:
-                return "Unknown";
-        }
-    }
-};
-
 template <> struct to_string<InstanceFeature> {
-    static std::string convert(InstanceFeature feature)
+    static std::string Convert(InstanceFeature feature)
     {
         switch (feature) {
             case InstanceFeature::ValidationLayer:

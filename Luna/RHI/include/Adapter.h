@@ -103,7 +103,7 @@ public:
 };
 
 template <> struct to_string<AdapterType> {
-    static std::string convert(AdapterType type)
+    static std::string Convert(AdapterType type)
     {
         switch (type) {
             case AdapterType::Discrete:

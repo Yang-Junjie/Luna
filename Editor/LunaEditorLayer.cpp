@@ -18,6 +18,8 @@
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
 
+#include <Backend.h>
+
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
@@ -35,30 +37,6 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
-
-const char* backendTypeToString(luna::RHI::BackendType type)
-{
-    switch (type) {
-        case luna::RHI::BackendType::Auto:
-            return "Auto";
-        case luna::RHI::BackendType::Vulkan:
-            return "Vulkan";
-        case luna::RHI::BackendType::DirectX12:
-            return "DirectX12";
-        case luna::RHI::BackendType::DirectX11:
-            return "DirectX11";
-        case luna::RHI::BackendType::Metal:
-            return "Metal";
-        case luna::RHI::BackendType::OpenGL:
-            return "OpenGL";
-        case luna::RHI::BackendType::OpenGLES:
-            return "OpenGLES";
-        case luna::RHI::BackendType::WebGPU:
-            return "WebGPU";
-        default:
-            return "Unknown";
-    }
-}
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
 {
@@ -208,7 +186,9 @@ void LunaEditorLayer::onAttach()
         syncPickDebugVisualizationState();
     } else {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
-        LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'", backendTypeToString(m_application->getBackend()));
+        LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'",
+                         luna::RHI::BackendTypeToString(
+                             m_application->getRenderer().getCapabilities().backend_type));
     }
 
     if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
@@ -279,12 +259,13 @@ void LunaEditorLayer::onImGuiRender()
 
     auto& application = *m_application;
     auto& renderer = application.getRenderer();
+    const luna::RHI::BackendType active_backend = renderer.getCapabilities().backend_type;
     const float delta_seconds = Application::get().getTimestep().getSeconds();
     const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
 
     ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene");
-    ImGui::Text("Backend: Luna RHI / %s", backendTypeToString(application.getBackend()));
+    ImGui::Text("Backend: Luna RHI / %s", luna::RHI::BackendTypeToString(active_backend));
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
     ImGui::Separator();
     ImGui::Text("Scene File: %s", m_asset_label.c_str());
@@ -336,7 +317,7 @@ void LunaEditorLayer::onImGuiRender()
     }
     m_render_profiler_panel->onImGuiRender(m_show_render_profiler_panel,
                                            renderer.getLastRenderGraphProfile(),
-                                           backendTypeToString(application.getBackend()),
+                                           luna::RHI::BackendTypeToString(active_backend),
                                            renderer.isRenderGraphProfilingEnabled(),
                                            [&renderer](bool enabled) {
                                                renderer.setRenderGraphProfilingEnabled(enabled);

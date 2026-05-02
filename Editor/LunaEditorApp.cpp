@@ -2,13 +2,14 @@
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 
+#include <Backend.h>
 #include <Capabilities.h>
 
-#include <cctype>
-#include <algorithm>
+#include <exception>
 #include <memory>
-#include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -30,65 +31,6 @@ const char* presentModeToString(luna::RHI::PresentMode mode)
     }
 }
 
-const char* backendTypeToString(luna::RHI::BackendType type)
-{
-    switch (type) {
-        case luna::RHI::BackendType::Auto:
-            return "Auto";
-        case luna::RHI::BackendType::Vulkan:
-            return "Vulkan";
-        case luna::RHI::BackendType::DirectX12:
-            return "DirectX12";
-        case luna::RHI::BackendType::DirectX11:
-            return "DirectX11";
-        case luna::RHI::BackendType::Metal:
-            return "Metal";
-        case luna::RHI::BackendType::OpenGL:
-            return "OpenGL";
-        case luna::RHI::BackendType::OpenGLES:
-            return "OpenGLES";
-        case luna::RHI::BackendType::WebGPU:
-            return "WebGPU";
-        default:
-            return "Unknown";
-    }
-}
-
-std::optional<luna::RHI::BackendType> parseBackendValue(std::string_view value)
-{
-    std::string normalized(value);
-    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-
-    if (normalized == "auto") {
-        return luna::RHI::BackendType::Auto;
-    }
-    if (normalized == "vulkan" || normalized == "vk") {
-        return luna::RHI::BackendType::Vulkan;
-    }
-    if (normalized == "d3d12" || normalized == "dx12" || normalized == "directx12") {
-        return luna::RHI::BackendType::DirectX12;
-    }
-    if (normalized == "d3d11" || normalized == "dx11" || normalized == "directx11") {
-        return luna::RHI::BackendType::DirectX11;
-    }
-    if (normalized == "metal" || normalized == "mtl") {
-        return luna::RHI::BackendType::Metal;
-    }
-    if (normalized == "opengl" || normalized == "gl") {
-        return luna::RHI::BackendType::OpenGL;
-    }
-    if (normalized == "opengles" || normalized == "gles") {
-        return luna::RHI::BackendType::OpenGLES;
-    }
-    if (normalized == "webgpu" || normalized == "wgpu") {
-        return luna::RHI::BackendType::WebGPU;
-    }
-
-    return std::nullopt;
-}
-
 luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
 {
     luna::RHI::BackendType selected_backend = luna::RHI::BackendType::Auto;
@@ -100,7 +42,7 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
         if (argument == "--backend") {
             if (i + 1 >= argc || argv[i + 1] == nullptr) {
                 LUNA_EDITOR_WARN("Missing value after '--backend'; defaulting to '{}'",
-                                 backendTypeToString(selected_backend));
+                                 luna::RHI::BackendTypeToString(selected_backend));
                 continue;
             }
 
@@ -111,17 +53,42 @@ luna::RHI::BackendType parseBackendFromArgs(int argc, char** argv)
             continue;
         }
 
-        if (const auto parsed = parseBackendValue(backend_value)) {
+        if (const auto parsed = luna::RHI::ParseBackendType(backend_value)) {
             selected_backend = *parsed;
             continue;
         }
 
         LUNA_EDITOR_WARN("Unsupported backend '{}' requested via command line; defaulting to '{}'",
                          std::string(backend_value),
-                         backendTypeToString(selected_backend));
+                         luna::RHI::BackendTypeToString(selected_backend));
     }
 
     return selected_backend;
+}
+
+void logBackendStartupSelection(luna::RHI::BackendType requested_backend)
+{
+    const std::vector<luna::RHI::BackendType> compiled_backends = luna::RHI::Instance::GetCompiledBackends();
+    const std::string compiled_backend_names = luna::RHI::DescribeBackendTypes(compiled_backends);
+
+    LUNA_EDITOR_INFO("Compiled RHI backends: {}", compiled_backend_names);
+    if (requested_backend == luna::RHI::BackendType::Auto) {
+        try {
+            const luna::RHI::BackendType default_backend = luna::RHI::Instance::GetDefaultBackend();
+            LUNA_EDITOR_INFO("Auto RHI backend will resolve to '{}'",
+                             luna::RHI::BackendTypeToString(default_backend));
+        } catch (const std::exception& error) {
+            LUNA_EDITOR_WARN("Failed to resolve default RHI backend: {}", error.what());
+        }
+        return;
+    }
+
+    if (!luna::RHI::Instance::IsBackendCompiled(requested_backend)) {
+        LUNA_EDITOR_WARN("Requested RHI backend '{}' is not compiled into this build; renderer initialization will fail. "
+                         "Compiled backends: {}",
+                         luna::RHI::BackendTypeToString(requested_backend),
+                         compiled_backend_names);
+    }
 }
 
 luna::RHI::BackendType resolveCapabilitiesBackend(luna::RHI::BackendType backend)
@@ -162,7 +129,7 @@ luna::RHI::BackendType LunaEditorApplication::getBackend() const
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()
 {
     LUNA_EDITOR_INFO("LunaEditor requested backend '{}' and present mode '{}' via code",
-                     backendTypeToString(m_backend),
+                     luna::RHI::BackendTypeToString(m_backend),
                      presentModeToString(kRequestedPresentMode));
     return Renderer::InitializationOptions{m_backend, kRequestedPresentMode};
 }
@@ -175,7 +142,8 @@ void LunaEditorApplication::onInit()
 Application* createApplication(int argc, char** argv)
 {
     const auto backend = parseBackendFromArgs(argc, argv);
-    LUNA_EDITOR_INFO("Starting LunaEditor with backend '{}'", backendTypeToString(backend));
+    LUNA_EDITOR_INFO("Starting LunaEditor with requested backend '{}'", luna::RHI::BackendTypeToString(backend));
+    logBackendStartupSelection(backend);
     return new LunaEditorApplication(backend);
 }
 
