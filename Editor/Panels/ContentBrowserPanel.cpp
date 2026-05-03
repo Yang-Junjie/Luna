@@ -4,8 +4,8 @@
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "EditorAssetDragDrop.h"
+#include "EditorContext.h"
 #include "Imgui/ImGuiContext.h"
-#include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
 
 #include <cctype>
@@ -510,8 +510,8 @@ ImTextureID entryIconTextureId(const luna::ContentBrowserPanelState& state, Brow
 
 namespace luna {
 
-ContentBrowserPanel::ContentBrowserPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer),
+ContentBrowserPanel::ContentBrowserPanel(EditorContext& editor_context)
+    : m_editor_context(&editor_context),
       m_state(std::make_unique<ContentBrowserPanelState>())
 {}
 
@@ -773,8 +773,8 @@ void ContentBrowserPanel::drawDirectoryContents()
                 if (tile_result.DoubleClicked) {
                     if (entry.Kind == BrowserEntryKind::Directory) {
                         navigateTo(entry.Path);
-                    } else if (entry.Kind == BrowserEntryKind::SceneFile && m_editor_layer != nullptr) {
-                        m_editor_layer->openSceneFile(entry.Path);
+                    } else if (entry.Kind == BrowserEntryKind::SceneFile && m_editor_context != nullptr) {
+                        m_editor_context->openSceneFile(entry.Path);
                     }
                 }
 

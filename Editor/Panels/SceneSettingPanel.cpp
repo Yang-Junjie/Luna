@@ -2,7 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "EditorAssetDragDrop.h"
-#include "LunaEditorLayer.h"
+#include "EditorContext.h"
 
 #include <algorithm>
 #include <cmath>
@@ -153,24 +153,24 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const lu
 
 namespace luna {
 
-SceneSettingPanel::SceneSettingPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer)
+SceneSettingPanel::SceneSettingPanel(EditorContext& editor_context)
+    : m_editor_context(&editor_context)
 {}
 
 void SceneSettingPanel::syncFromScene()
 {
-    if (m_editor_layer == nullptr) {
+    if (m_editor_context == nullptr) {
         return;
     }
 
-    m_environment_draft = m_editor_layer->getScene().environmentSettings();
+    m_environment_draft = m_editor_context->getScene().environmentSettings();
     m_environment_draft_dirty = false;
     m_has_environment_draft = true;
 }
 
 void SceneSettingPanel::onImGuiRender()
 {
-    if (m_editor_layer == nullptr) {
+    if (m_editor_context == nullptr) {
         return;
     }
 
@@ -181,7 +181,7 @@ void SceneSettingPanel::onImGuiRender()
     ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene Settings");
 
-    const SceneEnvironmentSettings& scene_environment = m_editor_layer->getScene().environmentSettings();
+    const SceneEnvironmentSettings& scene_environment = m_editor_context->getScene().environmentSettings();
     SceneEnvironmentSettings& environment = m_environment_draft;
     m_environment_draft_dirty = !sameEnvironmentSettings(environment, scene_environment);
 
@@ -220,9 +220,9 @@ void SceneSettingPanel::onImGuiRender()
             ImGui::BeginDisabled();
         }
         if (ImGui::Button("Apply", ImVec2(120.0f, 0.0f))) {
-            m_editor_layer->getScene().environmentSettings() = m_environment_draft;
+            m_editor_context->getScene().environmentSettings() = m_environment_draft;
             m_environment_draft_dirty = false;
-            m_editor_layer->markSceneDirty();
+            m_editor_context->markSceneDirty();
         }
         ImGui::SameLine();
         if (ImGui::Button("Revert", ImVec2(120.0f, 0.0f))) {

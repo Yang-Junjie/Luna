@@ -2,16 +2,16 @@
 
 namespace luna {
 
-class LunaEditorLayer;
+class EditorContext;
 
 class ScriptPluginsPanel {
 public:
-    explicit ScriptPluginsPanel(LunaEditorLayer& editor_layer);
+    explicit ScriptPluginsPanel(EditorContext& editor_context);
 
     void onImGuiRender(bool& open);
 
 private:
-    LunaEditorLayer* m_editor_layer{nullptr};
+    EditorContext* m_editor_context{nullptr};
 };
 
 } // namespace luna

@@ -4,17 +4,17 @@
 
 namespace luna {
 
-class LunaEditorLayer;
+class EditorContext;
 
 class SceneSettingPanel {
 public:
-    explicit SceneSettingPanel(LunaEditorLayer& editor_layer);
+    explicit SceneSettingPanel(EditorContext& editor_context);
 
     void onImGuiRender();
     void syncFromScene();
 
 private:
-    LunaEditorLayer* m_editor_layer{nullptr};
+    EditorContext* m_editor_context{nullptr};
     SceneEnvironmentSettings m_environment_draft{};
     bool m_environment_draft_dirty{false};
     bool m_has_environment_draft{false};

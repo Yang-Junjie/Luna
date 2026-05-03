@@ -432,6 +432,40 @@ private:
     bool m_initialized{false};
 };
 
+class RuntimeApiOwner final {
+public:
+    explicit RuntimeApiOwner(LunaScriptRuntimeApi runtime_api) noexcept
+        : m_runtime_api(runtime_api)
+    {}
+
+    RuntimeApiOwner(const RuntimeApiOwner&) = delete;
+    RuntimeApiOwner& operator=(const RuntimeApiOwner&) = delete;
+
+    ~RuntimeApiOwner()
+    {
+        reset();
+    }
+
+    [[nodiscard]] LunaScriptRuntimeApi release() noexcept
+    {
+        LunaScriptRuntimeApi runtime_api = m_runtime_api;
+        m_runtime_api = {};
+        return runtime_api;
+    }
+
+private:
+    void reset() noexcept
+    {
+        if (m_runtime_api.destroy_runtime != nullptr && m_runtime_api.runtime_user_data != nullptr) {
+            m_runtime_api.destroy_runtime(m_runtime_api.runtime_user_data);
+            m_runtime_api.runtime_user_data = nullptr;
+        }
+    }
+
+private:
+    LunaScriptRuntimeApi m_runtime_api{};
+};
+
 class PluginScriptBackend final : public luna::IScriptBackend {
 public:
     PluginScriptBackend(luna::ScriptPluginCandidate candidate,
@@ -477,7 +511,10 @@ public:
         LunaScriptRuntimeApi runtime_api{};
         runtime_api.struct_size = sizeof(LunaScriptRuntimeApi);
         runtime_api.api_version = LUNA_SCRIPT_RUNTIME_API_VERSION;
-        if (m_backend_api.create_runtime(m_backend_api.backend_user_data, &runtime_api) == 0) {
+        const int create_result = m_backend_api.create_runtime(m_backend_api.backend_user_data, &runtime_api);
+        RuntimeApiOwner runtime_api_owner(runtime_api);
+
+        if (create_result == 0) {
             LUNA_CORE_ERROR("Script backend '{}' failed to create a runtime instance", m_descriptor.name);
             return {};
         }
@@ -495,7 +532,7 @@ public:
             return {};
         }
 
-        return std::make_unique<PluginScriptRuntime>(m_descriptor.name, runtime_api, m_plugin_library);
+        return std::make_unique<PluginScriptRuntime>(m_descriptor.name, runtime_api_owner.release(), m_plugin_library);
     }
 
     std::vector<luna::ScriptPropertySchema> getPropertySchema(const luna::ScriptSchemaRequest& request) const override

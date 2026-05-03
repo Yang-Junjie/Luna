@@ -1,6 +1,6 @@
 #include "ScriptPluginsPanel.h"
 
-#include "LunaEditorLayer.h"
+#include "EditorContext.h"
 
 #include <imgui.h>
 
@@ -22,13 +22,13 @@ const char* scriptPluginScopeToString(luna::ScriptPluginScope scope)
 
 namespace luna {
 
-ScriptPluginsPanel::ScriptPluginsPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer)
+ScriptPluginsPanel::ScriptPluginsPanel(EditorContext& editor_context)
+    : m_editor_context(&editor_context)
 {}
 
 void ScriptPluginsPanel::onImGuiRender(bool& open)
 {
-    if (!open || m_editor_layer == nullptr) {
+    if (!open || m_editor_context == nullptr) {
         return;
     }
 
@@ -38,17 +38,17 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
         return;
     }
 
-    if (!m_editor_layer->hasProjectLoaded()) {
+    if (!m_editor_context->hasProjectLoaded()) {
         ImGui::TextUnformatted("Open a project to configure script plugins.");
         ImGui::End();
         return;
     }
 
     if (ImGui::Button("Refresh")) {
-        m_editor_layer->refreshProjectScriptPlugins();
+        m_editor_context->refreshProjectScriptPlugins();
     }
 
-    const ScriptPluginCandidate* selected_candidate = m_editor_layer->getSelectedScriptPluginCandidate();
+    const ScriptPluginCandidate* selected_candidate = m_editor_context->getSelectedScriptPluginCandidate();
 
     ImGui::SameLine();
     if (selected_candidate != nullptr) {
@@ -57,7 +57,7 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
         ImGui::TextUnformatted("Selected: <none>");
     }
 
-    const std::string& status = m_editor_layer->getScriptPluginStatus();
+    const std::string& status = m_editor_context->getScriptPluginStatus();
     if (!status.empty()) {
         ImGui::Spacing();
         ImGui::TextWrapped("%s", status.c_str());
@@ -65,7 +65,7 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
 
     ImGui::Separator();
 
-    const auto& candidates = m_editor_layer->getDiscoveredScriptPlugins();
+    const auto& candidates = m_editor_context->getDiscoveredScriptPlugins();
     if (candidates.empty()) {
         ImGui::TextUnformatted("No script plugin candidates were discovered.");
         ImGui::End();
@@ -78,7 +78,7 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
 
         ImGui::PushID(candidate.Manifest.PluginId.c_str());
         if (ImGui::RadioButton("##selected", is_selected)) {
-            m_editor_layer->selectScriptPlugin(&candidate);
+            m_editor_context->selectScriptPlugin(&candidate);
         }
         ImGui::SameLine();
         ImGui::BeginGroup();

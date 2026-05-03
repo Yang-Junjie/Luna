@@ -1,6 +1,6 @@
-#include "EditorAssetDragDrop.h"
 #include "Asset/BuiltinAssets.h"
-#include "LunaEditorLayer.h"
+#include "EditorAssetDragDrop.h"
+#include "EditorContext.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
 
@@ -27,48 +27,48 @@ bool isDescendantOf(luna::Entity entity, luna::Entity potential_ancestor)
     return false;
 }
 
-luna::Entity createEmptyEntity(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
+luna::Entity createEmptyEntity(luna::EditorContext& editor_context, luna::Entity parent = {})
 {
-    if (editor_layer.isRuntimeViewportEnabled()) {
+    if (editor_context.isRuntimeViewportEnabled()) {
         return {};
     }
 
-    auto& entity_manager = editor_layer.getScene().entityManager();
+    auto& entity_manager = editor_context.getScene().entityManager();
     luna::Entity entity = parent ? entity_manager.createChildEntity(parent, "Empty Entity")
                                  : entity_manager.createEntity("Empty Entity");
     if (entity) {
-        editor_layer.setSelectedEntity(entity);
-        editor_layer.markSceneDirty();
+        editor_context.setSelectedEntity(entity);
+        editor_context.markSceneDirty();
     }
 
     return entity;
 }
 
-void drawCreateEntityMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
+void drawCreateEntityMenu(luna::EditorContext& editor_context, luna::Entity parent = {})
 {
-    const bool disabled = editor_layer.isRuntimeViewportEnabled();
+    const bool disabled = editor_context.isRuntimeViewportEnabled();
     if (disabled) {
         ImGui::BeginDisabled();
     }
 
     if (ImGui::MenuItem(parent ? "Create Child" : "Create Empty Entity")) {
-        createEmptyEntity(editor_layer, parent);
+        createEmptyEntity(editor_context, parent);
     }
 
     if (ImGui::MenuItem(parent ? "Create Child Camera" : "Create Camera")) {
-        editor_layer.createCameraEntity(parent);
+        editor_context.createCameraEntity(parent);
     }
 
     if (ImGui::MenuItem(parent ? "Create Child Directional Light" : "Create Directional Light")) {
-        editor_layer.createDirectionalLightEntity(parent);
+        editor_context.createDirectionalLightEntity(parent);
     }
 
     if (ImGui::MenuItem(parent ? "Create Child Point Light" : "Create Point Light")) {
-        editor_layer.createPointLightEntity(parent);
+        editor_context.createPointLightEntity(parent);
     }
 
     if (ImGui::MenuItem(parent ? "Create Child Spot Light" : "Create Spot Light")) {
-        editor_layer.createSpotLightEntity(parent);
+        editor_context.createSpotLightEntity(parent);
     }
 
     if (disabled) {
@@ -77,20 +77,20 @@ void drawCreateEntityMenu(luna::LunaEditorLayer& editor_layer, luna::Entity pare
 
 }
 
-void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity parent = {})
+void drawCreatePrimitiveMenu(luna::EditorContext& editor_context, luna::Entity parent = {})
 {
     if (!ImGui::BeginMenu("3D Object")) {
         return;
     }
 
-    const bool disabled = editor_layer.isRuntimeViewportEnabled();
+    const bool disabled = editor_context.isRuntimeViewportEnabled();
     if (disabled) {
         ImGui::BeginDisabled();
     }
 
     for (const auto& mesh : luna::BuiltinAssets::getBuiltinMeshes()) {
         if (ImGui::MenuItem(mesh.Name)) {
-            editor_layer.createPrimitiveEntity(mesh.Handle, parent);
+            editor_context.createPrimitiveEntity(mesh.Handle, parent);
         }
     }
 
@@ -101,16 +101,16 @@ void drawCreatePrimitiveMenu(luna::LunaEditorLayer& editor_layer, luna::Entity p
     ImGui::EndMenu();
 }
 
-void applyMeshAssetToEntity(luna::LunaEditorLayer& editor_layer,
+void applyMeshAssetToEntity(luna::EditorContext& editor_context,
                             luna::Entity entity,
                             const luna::editor::AssetDragDropData& payload)
 {
-    if (editor_layer.isRuntimeViewportEnabled()) {
+    if (editor_context.isRuntimeViewportEnabled()) {
         return;
     }
 
-    editor_layer.applyMeshAssetToEntity(entity, luna::editor::getAssetHandle(payload));
-    editor_layer.setSelectedEntity(entity);
+    editor_context.applyMeshAssetToEntity(entity, luna::editor::getAssetHandle(payload));
+    editor_context.setSelectedEntity(entity);
 }
 
 void collectOwnedEntities(luna::EntityManager& entity_manager,
@@ -128,7 +128,7 @@ void collectOwnedEntities(luna::EntityManager& entity_manager,
     }
 }
 
-void drawEntityNode(luna::LunaEditorLayer& editor_layer,
+void drawEntityNode(luna::EditorContext& editor_context,
                     luna::EntityManager& entity_manager,
                     luna::Entity entity,
                     luna::Entity selected_entity,
@@ -157,7 +157,7 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
                                           label);
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-        editor_layer.setSelectedEntity(entity);
+        editor_context.setSelectedEntity(entity);
     }
 
     if (ImGui::BeginDragDropSource()) {
@@ -168,14 +168,14 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
     }
 
     if (ImGui::BeginDragDropTarget()) {
-        if (!editor_layer.isRuntimeViewportEnabled()) {
+        if (!editor_context.isRuntimeViewportEnabled()) {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kEntityDragPayload)) {
                 const uint64_t dropped_id = *static_cast<const uint64_t*>(payload->Data);
                 luna::Entity dropped_entity = entity_manager.findEntityByUUID(luna::UUID(dropped_id));
 
                 if (dropped_entity && dropped_entity != entity && !isDescendantOf(entity, dropped_entity)) {
                     if (entity_manager.setParent(dropped_entity, entity, true)) {
-                        editor_layer.markSceneDirty();
+                        editor_context.markSceneDirty();
                     }
                 }
             }
@@ -183,9 +183,9 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
             luna::editor::AssetDragDropData asset_payload{};
             if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh, luna::AssetType::Model})) {
                 if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Mesh) {
-                    applyMeshAssetToEntity(editor_layer, entity, asset_payload);
+                    applyMeshAssetToEntity(editor_context, entity, asset_payload);
                 } else if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Model) {
-                    editor_layer.createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload), entity);
+                    editor_context.createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload), entity);
                 }
             }
         }
@@ -194,18 +194,18 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
 
     bool delete_entity = false;
     if (ImGui::BeginPopupContextItem()) {
-        drawCreateEntityMenu(editor_layer, entity);
+        drawCreateEntityMenu(editor_context, entity);
 
-        drawCreatePrimitiveMenu(editor_layer, entity);
+        drawCreatePrimitiveMenu(editor_context, entity);
 
-        const bool edit_mode = !editor_layer.isRuntimeViewportEnabled();
+        const bool edit_mode = !editor_context.isRuntimeViewportEnabled();
         if (!edit_mode) {
             ImGui::BeginDisabled();
         }
 
         if (entity.hasParent() && ImGui::MenuItem("Detach From Parent")) {
             if (entity.clearParent(true)) {
-                editor_layer.markSceneDirty();
+                editor_context.markSceneDirty();
             }
         }
 
@@ -224,19 +224,19 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
         const std::vector<luna::UUID> children = entity.getChildren();
         for (const luna::UUID child_uuid : children) {
             if (luna::Entity child = entity_manager.findEntityByUUID(child_uuid); child) {
-                drawEntityNode(editor_layer, entity_manager, child, editor_layer.getSelectedEntity(), rendered_entities);
+                drawEntityNode(editor_context, entity_manager, child, editor_context.getSelectedEntity(), rendered_entities);
             }
         }
         ImGui::TreePop();
     }
 
     if (delete_entity) {
-        const luna::Entity current_selection = editor_layer.getSelectedEntity();
+        const luna::Entity current_selection = editor_context.getSelectedEntity();
         const bool clear_selection = current_selection && (current_selection == entity || isDescendantOf(current_selection, entity));
         entity_manager.destroyEntity(entity);
-        editor_layer.markSceneDirty();
+        editor_context.markSceneDirty();
         if (clear_selection) {
-            editor_layer.setSelectedEntity({});
+            editor_context.setSelectedEntity({});
         }
     }
 }
@@ -245,25 +245,25 @@ void drawEntityNode(luna::LunaEditorLayer& editor_layer,
 
 namespace luna {
 
-SceneHierarchyPanel::SceneHierarchyPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer)
+SceneHierarchyPanel::SceneHierarchyPanel(EditorContext& editor_context)
+    : m_editor_context(&editor_context)
 {}
 
 void SceneHierarchyPanel::onImGuiRender()
 {
-    if (m_editor_layer == nullptr) {
+    if (m_editor_context == nullptr) {
         return;
     }
 
     ImGui::SetNextWindowSize(ImVec2(300.0f, 360.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene Hierarchy");
 
-    auto& scene = m_editor_layer->getInspectionScene();
+    auto& scene = m_editor_context->getInspectionScene();
     auto& entity_manager = scene.entityManager();
 
-    Entity selected_entity = m_editor_layer->getSelectedEntity();
+    Entity selected_entity = m_editor_context->getSelectedEntity();
     if (selected_entity && !selected_entity.isValid()) {
-        m_editor_layer->setSelectedEntity({});
+        m_editor_context->setSelectedEntity({});
         selected_entity = {};
     }
 
@@ -279,17 +279,17 @@ void SceneHierarchyPanel::onImGuiRender()
             const UUID parent_uuid = entity.getParentUUID();
             if (!parent_uuid.isValid() || !entity_manager.containsEntity(parent_uuid)) {
                 collectOwnedEntities(entity_manager, entity, owned_entities);
-                drawEntityNode(*m_editor_layer, entity_manager, entity, selected_entity, rendered_entities);
+                drawEntityNode(*m_editor_context, entity_manager, entity, selected_entity, rendered_entities);
             }
         }
 
         for (const auto entity_handle : view) {
             Entity entity(entity_handle, &entity_manager);
             if (!owned_entities.contains(entity.getUUID())) {
-                drawEntityNode(*m_editor_layer,
+                drawEntityNode(*m_editor_context,
                                entity_manager,
                                entity,
-                               m_editor_layer->getSelectedEntity(),
+                               m_editor_context->getSelectedEntity(),
                                rendered_entities);
             }
         }
@@ -300,34 +300,34 @@ void SceneHierarchyPanel::onImGuiRender()
         ImGui::InvisibleButton("##HierarchyDropZone", ImVec2(-1.0f, drop_zone_height));
 
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            m_editor_layer->setSelectedEntity({});
+            m_editor_context->setSelectedEntity({});
         }
 
         if (ImGui::BeginPopupContextItem("HierarchyContext", ImGuiPopupFlags_MouseButtonRight)) {
-            drawCreateEntityMenu(*m_editor_layer);
-            drawCreatePrimitiveMenu(*m_editor_layer);
+            drawCreateEntityMenu(*m_editor_context);
+            drawCreatePrimitiveMenu(*m_editor_context);
             ImGui::EndPopup();
         }
 
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kEntityDragPayload)) {
                 const uint64_t dropped_id = *static_cast<const uint64_t*>(payload->Data);
-                if (!m_editor_layer->isRuntimeViewportEnabled()) {
+                if (!m_editor_context->isRuntimeViewportEnabled()) {
                     if (Entity dropped_entity = entity_manager.findEntityByUUID(UUID(dropped_id)); dropped_entity) {
                         if (dropped_entity.clearParent(true)) {
-                            m_editor_layer->markSceneDirty();
+                            m_editor_context->markSceneDirty();
                         }
                     }
                 }
             }
 
-            if (!m_editor_layer->isRuntimeViewportEnabled()) {
+            if (!m_editor_context->isRuntimeViewportEnabled()) {
                 luna::editor::AssetDragDropData asset_payload{};
                 if (luna::editor::acceptAssetDragDropPayload(asset_payload, {luna::AssetType::Mesh, luna::AssetType::Model})) {
                     if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Mesh) {
-                        m_editor_layer->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
+                        m_editor_context->createEntityFromMeshAsset(luna::editor::getAssetHandle(asset_payload));
                     } else if (luna::editor::getAssetType(asset_payload) == luna::AssetType::Model) {
-                        m_editor_layer->createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload));
+                        m_editor_context->createEntityFromModelAsset(luna::editor::getAssetHandle(asset_payload));
                     }
                 }
             } else {

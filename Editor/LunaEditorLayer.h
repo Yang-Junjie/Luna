@@ -2,18 +2,8 @@
 
 #include "Core/Layer.h"
 #include "EditorCamera.h"
+#include "EditorContext.h"
 #include "Events/Event.h"
-#include "Panels/AssetLoadingPanel.h"
-#include "Panels/BackendCapabilitiesPanel.h"
-#include "Panels/BuiltinMaterialsPanel.h"
-#include "Panels/ContentBrowserPanel.h"
-#include "Panels/InspectorPanel.h"
-#include "Panels/RenderDebugPanel.h"
-#include "Panels/RenderFeaturesPanel.h"
-#include "Panels/RenderProfilerPanel.h"
-#include "Panels/SceneHierarchyPanel.h"
-#include "Panels/SceneSettingPanel.h"
-#include "Panels/ScriptPluginsPanel.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneRuntime.h"
@@ -34,7 +24,18 @@ struct Extent2D;
 
 namespace luna {
 
+class AssetLoadingPanel;
+class BackendCapabilitiesPanel;
+class BuiltinMaterialsPanel;
+class ContentBrowserPanel;
+class InspectorPanel;
 class LunaEditorApplication;
+class RenderDebugPanel;
+class RenderFeaturesPanel;
+class RenderProfilerPanel;
+class SceneHierarchyPanel;
+class SceneSettingPanel;
+class ScriptPluginsPanel;
 
 enum class GizmoOperation : uint8_t {
     Translate,
@@ -47,9 +48,10 @@ enum class GizmoMode : uint8_t {
     World,
 };
 
-class LunaEditorLayer final : public Layer {
+class LunaEditorLayer final : public Layer, public EditorContext {
 public:
     explicit LunaEditorLayer(LunaEditorApplication& application);
+    ~LunaEditorLayer() override;
 
     void onAttach() override;
     void onDetach() override;
@@ -58,31 +60,31 @@ public:
     void onImGuiRender() override;
 
     const std::string& getAssetLabel() const;
-    Scene& getScene();
-    Scene& getInspectionScene();
-    bool isRuntimeViewportEnabled() const noexcept;
+    Scene& getScene() override;
+    Scene& getInspectionScene() override;
+    bool isRuntimeViewportEnabled() const noexcept override;
     UUID getSelectedEntityId() const noexcept;
-    Entity getSelectedEntity();
-    void setSelectedEntity(Entity entity);
+    Entity getSelectedEntity() override;
+    void setSelectedEntity(Entity entity) override;
     void setSelectedEntityId(UUID entity_id);
-    void markSceneDirty();
-    void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index);
-    bool openSceneFile(const std::filesystem::path& scene_file_path);
-    Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
-    Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
-    Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
-    Entity createCameraEntity(Entity parent = {});
-    Entity createDirectionalLightEntity(Entity parent = {});
-    Entity createPointLightEntity(Entity parent = {});
-    Entity createSpotLightEntity(Entity parent = {});
-    void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
-    void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0));
-    bool hasProjectLoaded() const;
-    void refreshProjectScriptPlugins();
-    const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const;
-    const std::string& getScriptPluginStatus() const;
-    const ScriptPluginCandidate* getSelectedScriptPluginCandidate() const;
-    bool selectScriptPlugin(const ScriptPluginCandidate* candidate);
+    void markSceneDirty() override;
+    void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index) override;
+    bool openSceneFile(const std::filesystem::path& scene_file_path) override;
+    Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {}) override;
+    Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {}) override;
+    Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {}) override;
+    Entity createCameraEntity(Entity parent = {}) override;
+    Entity createDirectionalLightEntity(Entity parent = {}) override;
+    Entity createPointLightEntity(Entity parent = {}) override;
+    Entity createSpotLightEntity(Entity parent = {}) override;
+    void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle) override;
+    void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) override;
+    bool hasProjectLoaded() const override;
+    void refreshProjectScriptPlugins() override;
+    const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const override;
+    const std::string& getScriptPluginStatus() const override;
+    const ScriptPluginCandidate* getSelectedScriptPluginCandidate() const override;
+    bool selectScriptPlugin(const ScriptPluginCandidate* candidate) override;
 
 private:
     void consumePendingScenePick();

@@ -108,6 +108,7 @@ add_library(lua STATIC
     third_party/lua/lzio.c
 )
 target_include_directories(lua PUBLIC third_party/lua)
+set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(Luna)
 

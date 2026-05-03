@@ -11,6 +11,7 @@ add_executable(
     Panels/ContentBrowserPanel.cpp
     EditorCamera.h
     EditorCamera.cpp
+    EditorContext.h
     EditorAssetDragDrop.h
     Panels/InspectorPanel.h
     Panels/InspectorPanel.cpp

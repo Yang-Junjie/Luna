@@ -9,6 +9,17 @@
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
+#include "Panels/AssetLoadingPanel.h"
+#include "Panels/BackendCapabilitiesPanel.h"
+#include "Panels/BuiltinMaterialsPanel.h"
+#include "Panels/ContentBrowserPanel.h"
+#include "Panels/InspectorPanel.h"
+#include "Panels/RenderDebugPanel.h"
+#include "Panels/RenderFeaturesPanel.h"
+#include "Panels/RenderProfilerPanel.h"
+#include "Panels/SceneHierarchyPanel.h"
+#include "Panels/SceneSettingPanel.h"
+#include "Panels/ScriptPluginsPanel.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
@@ -171,6 +182,8 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this)),
       m_backend_capabilities_panel(std::make_unique<BackendCapabilitiesPanel>())
 {}
+
+LunaEditorLayer::~LunaEditorLayer() = default;
 
 void LunaEditorLayer::onAttach()
 {

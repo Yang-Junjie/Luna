@@ -4,7 +4,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "EditorAssetDragDrop.h"
-#include "LunaEditorLayer.h"
+#include "EditorContext.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
@@ -205,25 +205,25 @@ void assignDefaultMaterialSlots(luna::MeshComponent& mesh_component)
 
 namespace luna {
 
-InspectorPanel::InspectorPanel(LunaEditorLayer& editor_layer)
-    : m_editor_layer(&editor_layer)
+InspectorPanel::InspectorPanel(EditorContext& editor_context)
+    : m_editor_context(&editor_context)
 {}
 
 void InspectorPanel::onImGuiRender()
 {
-    if (m_editor_layer == nullptr) {
+    if (m_editor_context == nullptr) {
         return;
     }
 
     ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
 
-    const bool editing_runtime_scene = m_editor_layer->isRuntimeViewportEnabled();
+    const bool editing_runtime_scene = m_editor_context->isRuntimeViewportEnabled();
     bool scene_changed = false;
 
-    Entity selected_entity = m_editor_layer->getSelectedEntity();
+    Entity selected_entity = m_editor_context->getSelectedEntity();
     if (selected_entity && !selected_entity.isValid()) {
-        m_editor_layer->setSelectedEntity({});
+        m_editor_context->setSelectedEntity({});
         selected_entity = {};
     }
 
@@ -300,7 +300,7 @@ void InspectorPanel::onImGuiRender()
             Entity parent = selected_entity.getParent();
             if (parent) {
                 if (ImGui::Button(parent.getName().c_str(), ImVec2(-1.0f, 0.0f))) {
-                    m_editor_layer->setSelectedEntity(parent);
+                    m_editor_context->setSelectedEntity(parent);
                 }
                 ImGui::TextDisabled("Parent UUID: %s", parent.getUUID().toString().c_str());
 
@@ -322,7 +322,7 @@ void InspectorPanel::onImGuiRender()
                     }
 
                     if (ImGui::Selectable(child.getName().c_str())) {
-                        m_editor_layer->setSelectedEntity(child);
+                        m_editor_context->setSelectedEntity(child);
                     }
                     ImGui::TextDisabled("UUID: %s", child.getUUID().toString().c_str());
                 }
@@ -542,7 +542,7 @@ void InspectorPanel::onImGuiRender()
                     if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
                         ImGui::TextDisabled("Global builtin material; edits affect all users.");
                         if (ImGui::Button("Edit Builtin Material", ImVec2(-1.0f, 0.0f))) {
-                            m_editor_layer->openBuiltinMaterialsPanel(material_handle);
+                            m_editor_context->openBuiltinMaterialsPanel(material_handle);
                         }
                     }
 
@@ -572,7 +572,7 @@ void InspectorPanel::onImGuiRender()
         "Script", selected_entity, [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
             const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
             if (editing_runtime_scene && change.property_value_changed) {
-                m_editor_layer->patchRuntimeScriptProperty(selected_entity.getUUID(),
+                m_editor_context->patchRuntimeScriptProperty(selected_entity.getUUID(),
                                                            change.script_index,
                                                            change.property_index);
             }
@@ -581,7 +581,7 @@ void InspectorPanel::onImGuiRender()
         true);
 
     if (scene_changed && !editing_runtime_scene) {
-        m_editor_layer->markSceneDirty();
+        m_editor_context->markSceneDirty();
     }
 
     ImGui::End();

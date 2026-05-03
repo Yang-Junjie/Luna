@@ -6,12 +6,12 @@
 
 namespace luna {
 
-class LunaEditorLayer;
+class EditorContext;
 struct ContentBrowserPanelState;
 
 class ContentBrowserPanel {
 public:
-    explicit ContentBrowserPanel(LunaEditorLayer& editor_layer);
+    explicit ContentBrowserPanel(EditorContext& editor_context);
     ~ContentBrowserPanel();
 
     void onImGuiRender();
@@ -26,7 +26,7 @@ private:
     bool isWithinAssetsRoot(const std::filesystem::path& directory) const;
 
 private:
-    LunaEditorLayer* m_editor_layer{nullptr};
+    EditorContext* m_editor_context{nullptr};
     std::filesystem::path m_assets_root;
     std::filesystem::path m_current_directory;
     std::array<char, 128> m_search_buffer{};

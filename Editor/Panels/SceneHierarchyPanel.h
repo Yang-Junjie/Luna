@@ -4,16 +4,16 @@
 
 namespace luna {
 
-class LunaEditorLayer;
+class EditorContext;
 
 class SceneHierarchyPanel {
 public:
-    explicit SceneHierarchyPanel(LunaEditorLayer& editor_layer);
+    explicit SceneHierarchyPanel(EditorContext& editor_context);
 
     void onImGuiRender();
 
 private:
-    LunaEditorLayer* m_editor_layer{nullptr};
+    EditorContext* m_editor_context{nullptr};
 };
 
 } // namespace luna
