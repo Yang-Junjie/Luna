@@ -1,5 +1,7 @@
 #include "BackendCapabilitiesPanel.h"
 
+#include "EditorUI.h"
+
 #include <Backend.h>
 #include <Instance.h>
 #include <imgui.h>
@@ -69,7 +71,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(430.0f, 520.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(430.0f, 520.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Backend Capabilities", &open)) {
         ImGui::End();
         return;
@@ -88,7 +90,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     ImGui::Text("Compiled: %s", compiled_backend_names.c_str());
     if (ImGui::BeginTable("CompiledRHIBackendsTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Backend", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(170.0f));
         ImGui::TableHeadersRow();
 
         for (const luna::RHI::BackendType backend : compiled_backends) {
@@ -103,7 +105,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
 
     if (ImGui::BeginTable("BackendCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Capability", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(170.0f));
         ImGui::TableHeadersRow();
 
         capabilityRow("Default Render Flow", capabilities.supports_default_render_flow);
@@ -121,7 +123,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     ImGui::Spacing();
     if (ImGui::BeginTable("BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(170.0f));
         ImGui::TableHeadersRow();
 
         capabilityRow("Graphics Pipeline", capabilities.supports_graphics_pipeline);
@@ -140,7 +142,7 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     ImGui::Spacing();
     if (ImGui::BeginTable("BackendConventionsTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Convention", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(170.0f));
         ImGui::TableHeadersRow();
 
         capabilityRow("Projection Y Flip", conventions.requires_projection_y_flip);

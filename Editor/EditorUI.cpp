@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <vector>
 
 namespace luna::editor::ui {
 namespace {
@@ -129,8 +130,8 @@ bool drawAssetPreview(const char* id,
 {
     const AssetDisplayInfo info = describeAsset(handle);
     const ImGuiStyle& style = ImGui::GetStyle();
-    const float width = (std::max)(ImGui::GetContentRegionAvail().x, 64.0f);
-    const float height = ImGui::GetTextLineHeight() * 2.0f + style.FramePadding.y * 2.0f + 6.0f;
+    const float width = (std::max)(ImGui::GetContentRegionAvail().x, scale(64.0f));
+    const float height = ImGui::GetTextLineHeight() * 2.0f + style.FramePadding.y * 2.0f + scale(6.0f);
     const ImVec2 position = ImGui::GetCursorScreenPos();
     const ImVec2 size{width, height};
 
@@ -153,16 +154,16 @@ bool drawAssetPreview(const char* id,
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
     draw_list->AddRect(min, max, ImGui::GetColorU32(border), style.FrameRounding);
-    draw_list->AddRectFilled(ImVec2{min.x + 6.0f, min.y + 7.0f},
-                             ImVec2{min.x + 9.0f, max.y - 7.0f},
+    draw_list->AddRectFilled(ImVec2{min.x + scale(6.0f), min.y + scale(7.0f)},
+                             ImVec2{min.x + scale(9.0f), max.y - scale(7.0f)},
                              ImGui::GetColorU32(accent),
-                             2.0f);
+                             scale(2.0f));
 
-    const ImVec2 text_min{min.x + 16.0f, min.y + style.FramePadding.y + 3.0f};
-    const ImVec2 text_max{max.x - 8.0f, max.y - style.FramePadding.y};
+    const ImVec2 text_min{min.x + scale(16.0f), min.y + style.FramePadding.y + scale(3.0f)};
+    const ImVec2 text_max{max.x - scale(8.0f), max.y - style.FramePadding.y};
     draw_list->PushClipRect(text_min, text_max, true);
     draw_list->AddText(text_min, label_color, info.label.c_str());
-    draw_list->AddText(ImVec2{text_min.x, text_min.y + ImGui::GetTextLineHeight() + 3.0f},
+    draw_list->AddText(ImVec2{text_min.x, text_min.y + ImGui::GetTextLineHeight() + scale(3.0f)},
                        detail_color,
                        info.detail.c_str());
     draw_list->PopClipRect();
@@ -184,7 +185,7 @@ bool drawAxisControl(const char* label,
     const ImVec4 color = axisColor(axis);
 
     ImGui::PushID(label);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{3.0f, 0.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(3.0f, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(color, 0.72f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, withAlpha(color, 0.95f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, withAlpha(color, 1.0f));
@@ -195,7 +196,7 @@ bool drawAxisControl(const char* label,
     ImGui::PopStyleColor(3);
 
     ImGui::SameLine();
-    ImGui::SetNextItemWidth((std::max)(width - button_size.x - 3.0f, 24.0f));
+    ImGui::SetNextItemWidth((std::max)(width - button_size.x - scale(3.0f), scale(24.0f)));
     changed |= ImGui::DragFloat("##value", &value, drag_speed, 0.0f, 0.0f, "%.2f");
     ImGui::PopStyleVar();
     ImGui::PopID();
@@ -204,6 +205,39 @@ bool drawAxisControl(const char* label,
         ImGui::SameLine();
     }
     return changed;
+}
+
+bool pushButtonVariant(ButtonVariant variant)
+{
+    switch (variant) {
+        case ButtonVariant::Primary:
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.15f, 0.31f, 0.35f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.18f, 0.40f, 0.45f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.11f, 0.26f, 0.30f, 1.0f});
+            return true;
+        case ButtonVariant::Danger:
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.32f, 0.16f, 0.17f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.46f, 0.20f, 0.22f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.26f, 0.12f, 0.14f, 1.0f});
+            return true;
+        case ButtonVariant::Subtle:
+            ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_Button), 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            return true;
+        case ButtonVariant::Default:
+            break;
+    }
+
+    return false;
+}
+
+std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffer_size)
+{
+    std::vector<char> buffer((std::max)(buffer_size, value.size() + 1), '\0');
+    const std::size_t copy_size = (std::min)(value.size(), buffer.size() - 1);
+    std::copy_n(value.data(), copy_size, buffer.data());
+    return buffer;
 }
 
 } // namespace
@@ -216,14 +250,14 @@ std::string assetDisplayLabel(AssetHandle handle)
 bool beginPropertyRow(const char* label, const PropertyLayout& layout)
 {
     ImGui::PushID(label);
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{0.0f, 3.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, scaled(0.0f, 3.0f));
     if (!ImGui::BeginTable("##PropertyRow", 2, ImGuiTableFlags_NoSavedSettings)) {
         ImGui::PopStyleVar();
         ImGui::PopID();
         return false;
     }
 
-    ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, layout.label_width);
+    ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, layout.scaledLabelWidth());
     ImGui::TableSetupColumn("##control", ImGuiTableColumnFlags_WidthStretch);
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
@@ -241,6 +275,159 @@ void endPropertyRow()
     ImGui::PopID();
 }
 
+bool drawBool(const char* label, bool& value, const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    const bool changed = ImGui::Checkbox("##value", &value);
+    endPropertyRow();
+    return changed;
+}
+
+bool drawInt(const char* label, int& value, int step, int step_fast, const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    const bool changed = ImGui::InputInt("##value", &value, step, step_fast);
+    endPropertyRow();
+    return changed;
+}
+
+bool drawFloat(const char* label,
+               float& value,
+               float drag_speed,
+               float min_value,
+               float max_value,
+               const char* format,
+               const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    const bool changed = ImGui::DragFloat("##value", &value, drag_speed, min_value, max_value, format);
+    endPropertyRow();
+    return changed;
+}
+
+bool drawColor3(const char* label, glm::vec3& value, const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    const bool changed = ImGui::ColorEdit3("##value", &value.x);
+    endPropertyRow();
+    return changed;
+}
+
+bool drawTextValue(const char* label, const std::string& value, const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    ImGui::TextDisabled("%s", value.c_str());
+    endPropertyRow();
+    return false;
+}
+
+bool drawTextInput(const char* label,
+                   std::string& value,
+                   std::size_t buffer_size,
+                   const PropertyLayout& layout,
+                   bool* deactivated_after_edit)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
+    const bool changed = ImGui::InputText("##value", buffer.data(), buffer.size());
+    if (changed) {
+        value = buffer.data();
+    }
+    if (deactivated_after_edit != nullptr) {
+        *deactivated_after_edit = ImGui::IsItemDeactivatedAfterEdit();
+    }
+
+    endPropertyRow();
+    return changed;
+}
+
+bool drawTextMultiline(const char* label,
+                       std::string& value,
+                       std::size_t buffer_size,
+                       float visible_lines,
+                       const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
+    const ImVec2 size{-1.0f, ImGui::GetTextLineHeight() * visible_lines};
+    const bool changed = ImGui::InputTextMultiline("##value", buffer.data(), buffer.size(), size);
+    if (changed) {
+        value = buffer.data();
+    }
+
+    endPropertyRow();
+    return changed;
+}
+
+bool drawCombo(const char* label,
+               const char* preview_value,
+               const std::function<bool()>& draw_options,
+               const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    bool changed = false;
+    if (ImGui::BeginCombo("##value", preview_value)) {
+        if (draw_options) {
+            changed |= draw_options();
+        }
+        ImGui::EndCombo();
+    }
+
+    endPropertyRow();
+    return changed;
+}
+
+bool drawButton(const char* label, ButtonVariant variant, const ImVec2& size)
+{
+    const bool pushed_colors = pushButtonVariant(variant);
+    const bool pressed = ImGui::Button(label, size);
+    if (pushed_colors) {
+        ImGui::PopStyleColor(3);
+    }
+    return pressed;
+}
+
+bool drawVec2Control(const char* label,
+                     glm::vec2& values,
+                     float drag_speed,
+                     float min_value,
+                     float max_value,
+                     const char* format,
+                     const PropertyLayout& layout)
+{
+    if (!beginPropertyRow(label, layout)) {
+        return false;
+    }
+
+    const bool changed = ImGui::DragFloat2("##value", &values.x, drag_speed, min_value, max_value, format);
+    endPropertyRow();
+    return changed;
+}
+
 bool drawVec3Control(const char* label,
                      glm::vec3& values,
                      float reset_value,
@@ -252,9 +439,9 @@ bool drawVec3Control(const char* label,
     }
 
     bool changed = false;
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{5.0f, 3.0f});
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(5.0f, 3.0f));
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    const float axis_width = (std::max)((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, 40.0f);
+    const float axis_width = (std::max)((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, scale(40.0f));
     changed |= drawAxisControl("X", 'X', values.x, reset_value, drag_speed, axis_width, false);
     changed |= drawAxisControl("Y", 'Y', values.y, reset_value, drag_speed, axis_width, false);
     changed |= drawAxisControl("Z", 'Z', values.z, reset_value, drag_speed, axis_width, true);
@@ -279,9 +466,10 @@ bool drawAssetHandleEditor(const char* label,
 
     changed |= drawAssetPreview("##assetPreview", handle, accepted_types, accepts_handle);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{6.0f, 3.0f});
-    const float clear_button_width = 70.0f;
-    ImGui::SetNextItemWidth((std::max)(ImGui::GetContentRegionAvail().x - clear_button_width - 6.0f, 64.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(6.0f, 3.0f));
+    const float clear_button_width = scale(70.0f);
+    ImGui::SetNextItemWidth(
+        (std::max)(ImGui::GetContentRegionAvail().x - clear_button_width - scale(6.0f), scale(64.0f)));
     if (ImGui::InputScalar("##handle", ImGuiDataType_U64, &raw_handle)) {
         const AssetHandle candidate_handle(static_cast<uint64_t>(raw_handle));
         if (!accepts_handle || accepts_handle(candidate_handle)) {

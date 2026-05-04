@@ -1,5 +1,7 @@
 #include "RenderFeaturesPanel.h"
 
+#include "EditorUI.h"
+
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
 #include <string>
@@ -313,7 +315,7 @@ void RenderFeaturesPanel::onImGuiRender(bool& open,
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(380.0f, 420.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(380.0f, 420.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Render Features", &open)) {
         ImGui::End();
         return;

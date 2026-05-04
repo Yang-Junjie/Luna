@@ -10,12 +10,13 @@
 #include "ScriptComponentInspector.h"
 
 #include <algorithm>
-#include <cstring>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <string>
 
 namespace {
+
+const luna::editor::ui::PropertyLayout kInspectorHeaderLayout{96.0f};
 
 void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
 {
@@ -40,6 +41,59 @@ void assignDefaultMaterialSlots(luna::MeshComponent& mesh_component)
     }
 }
 
+bool drawAddComponentPopup(luna::Entity selected_entity)
+{
+    bool changed = false;
+    if (ImGui::BeginPopup("AddComponentPopup")) {
+        if (!selected_entity.hasComponent<luna::MeshComponent>() && ImGui::MenuItem("Mesh")) {
+            selected_entity.addComponent<luna::MeshComponent>();
+            changed = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (!selected_entity.hasComponent<luna::CameraComponent>() && ImGui::MenuItem("Camera")) {
+            selected_entity.addComponent<luna::CameraComponent>();
+            changed = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (!selected_entity.hasComponent<luna::LightComponent>() && ImGui::MenuItem("Light")) {
+            selected_entity.addComponent<luna::LightComponent>();
+            changed = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (!selected_entity.hasComponent<luna::ScriptComponent>() && ImGui::MenuItem("Script")) {
+            selected_entity.addComponent<luna::ScriptComponent>();
+            changed = true;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
+    return changed;
+}
+
+bool drawEntityHeader(luna::Entity selected_entity)
+{
+    bool changed = false;
+
+    ImGui::TextDisabled("Entity");
+    auto& tag_component = selected_entity.getComponent<luna::TagComponent>();
+    changed |= luna::editor::ui::drawTextInput("Name", tag_component.tag, 256, kInspectorHeaderLayout);
+    luna::editor::ui::drawTextValue("UUID", selected_entity.getUUID().toString(), kInspectorHeaderLayout);
+
+    if (luna::editor::ui::drawButton("Add Component", luna::editor::ui::ButtonVariant::Subtle, ImVec2(-1.0f, 0.0f))) {
+        ImGui::OpenPopup("AddComponentPopup");
+    }
+
+    changed |= drawAddComponentPopup(selected_entity);
+    ImGui::Spacing();
+    ImGui::Separator();
+    return changed;
+}
+
 } // namespace
 
 namespace luna {
@@ -54,7 +108,7 @@ void InspectorPanel::onImGuiRender()
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
 
     const bool editing_runtime_scene = m_editor_context->isRuntimeViewportEnabled();
@@ -72,50 +126,7 @@ void InspectorPanel::onImGuiRender()
         return;
     }
 
-    auto& tag_component = selected_entity.getComponent<TagComponent>();
-    char tag_buffer[256] = {};
-    strncpy_s(tag_buffer, tag_component.tag.c_str(), _TRUNCATE);
-
-    if (ImGui::InputText("##Tag", tag_buffer, sizeof(tag_buffer))) {
-        tag_component.tag = tag_buffer;
-        scene_changed = true;
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Add Component")) {
-        ImGui::OpenPopup("AddComponentPopup");
-    }
-
-    if (ImGui::BeginPopup("AddComponentPopup")) {
-        if (!selected_entity.hasComponent<MeshComponent>() && ImGui::MenuItem("Mesh")) {
-            selected_entity.addComponent<MeshComponent>();
-            scene_changed = true;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (!selected_entity.hasComponent<CameraComponent>() && ImGui::MenuItem("Camera")) {
-            selected_entity.addComponent<CameraComponent>();
-            scene_changed = true;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (!selected_entity.hasComponent<LightComponent>() && ImGui::MenuItem("Light")) {
-            selected_entity.addComponent<LightComponent>();
-            scene_changed = true;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (!selected_entity.hasComponent<ScriptComponent>() && ImGui::MenuItem("Script")) {
-            selected_entity.addComponent<ScriptComponent>();
-            scene_changed = true;
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
-
-    ImGui::TextDisabled("UUID: %s", selected_entity.getUUID().toString().c_str());
-    ImGui::Separator();
+    scene_changed |= drawEntityHeader(selected_entity);
 
     scene_changed |= editor::ui::drawComponentSection<TransformComponent>(
         "Transform", selected_entity, [&](TransformComponent& transform) {
@@ -138,16 +149,20 @@ void InspectorPanel::onImGuiRender()
             bool changed = false;
             Entity parent = selected_entity.getParent();
             if (parent) {
-                if (ImGui::Button(parent.getName().c_str(), ImVec2(-1.0f, 0.0f))) {
+                if (editor::ui::drawButton(parent.getName().c_str(),
+                                           editor::ui::ButtonVariant::Subtle,
+                                           ImVec2(-1.0f, 0.0f))) {
                     m_editor_context->setSelectedEntity(parent);
                 }
-                ImGui::TextDisabled("Parent UUID: %s", parent.getUUID().toString().c_str());
+                editor::ui::drawTextValue("Parent UUID", parent.getUUID().toString(), kInspectorHeaderLayout);
 
-                if (ImGui::Button("Detach From Parent", ImVec2(-1.0f, 0.0f))) {
+                if (editor::ui::drawButton("Detach From Parent",
+                                           editor::ui::ButtonVariant::Danger,
+                                           ImVec2(-1.0f, 0.0f))) {
                     changed |= selected_entity.clearParent(true);
                 }
             } else {
-                ImGui::TextUnformatted("Parent: None");
+                editor::ui::drawTextValue("Parent", "None", kInspectorHeaderLayout);
             }
 
             ImGui::SeparatorText("Children");
@@ -155,7 +170,7 @@ void InspectorPanel::onImGuiRender()
                 ImGui::TextUnformatted("No child entities.");
             } else {
                 for (const UUID child_uuid : selected_entity.getChildren()) {
-                    Entity child = selected_entity.getEntityManager()->findEntityByUUID(child_uuid);
+                    luna::Entity child = selected_entity.getEntityManager()->findEntityByUUID(child_uuid);
                     if (!child) {
                         continue;
                     }
@@ -173,42 +188,45 @@ void InspectorPanel::onImGuiRender()
     scene_changed |= editor::ui::drawComponentSection<CameraComponent>(
         "Camera", selected_entity, [&](CameraComponent& camera_component) {
             bool changed = false;
-            changed |= ImGui::Checkbox("Primary", &camera_component.primary);
-            changed |= ImGui::Checkbox("Fixed Aspect Ratio", &camera_component.fixedAspectRatio);
+            changed |= editor::ui::drawBool("Primary", camera_component.primary);
+            changed |= editor::ui::drawBool("Fixed Aspect", camera_component.fixedAspectRatio);
 
             const char* projection_label = camera_component.projectionType == Camera::ProjectionType::Orthographic
                                                ? "Orthographic"
                                                : "Perspective";
-            if (ImGui::BeginCombo("Projection", projection_label)) {
+            changed |= editor::ui::drawCombo("Projection", projection_label, [&]() {
+                bool projection_changed = false;
                 if (ImGui::Selectable("Perspective",
                                       camera_component.projectionType == Camera::ProjectionType::Perspective)) {
                     if (camera_component.projectionType != Camera::ProjectionType::Perspective) {
                         camera_component.projectionType = Camera::ProjectionType::Perspective;
-                        changed = true;
+                        projection_changed = true;
                     }
                 }
                 if (ImGui::Selectable("Orthographic",
                                       camera_component.projectionType == Camera::ProjectionType::Orthographic)) {
                     if (camera_component.projectionType != Camera::ProjectionType::Orthographic) {
                         camera_component.projectionType = Camera::ProjectionType::Orthographic;
-                        changed = true;
+                        projection_changed = true;
                     }
                 }
-                ImGui::EndCombo();
-            }
+                return projection_changed;
+            });
 
             if (camera_component.projectionType == Camera::ProjectionType::Perspective) {
                 float fov_degrees = glm::degrees(camera_component.perspectiveVerticalFovRadians);
-                if (ImGui::DragFloat("Vertical FOV", &fov_degrees, 0.25f, 1.0f, 179.0f, "%.2f deg")) {
+                if (editor::ui::drawFloat("Vertical FOV", fov_degrees, 0.25f, 1.0f, 179.0f, "%.2f deg")) {
                     camera_component.perspectiveVerticalFovRadians = glm::radians(fov_degrees);
                     changed = true;
                 }
-                changed |= ImGui::DragFloat("Near", &camera_component.perspectiveNear, 0.01f, 0.001f, 1000.0f);
-                changed |= ImGui::DragFloat("Far", &camera_component.perspectiveFar, 1.0f, 0.001f, 10000.0f);
+                changed |= editor::ui::drawFloat("Near", camera_component.perspectiveNear, 0.01f, 0.001f, 1000.0f);
+                changed |= editor::ui::drawFloat("Far", camera_component.perspectiveFar, 1.0f, 0.001f, 10000.0f);
             } else {
-                changed |= ImGui::DragFloat("Size", &camera_component.orthographicSize, 0.1f, 0.001f, 10000.0f);
-                changed |= ImGui::DragFloat("Near", &camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
-                changed |= ImGui::DragFloat("Far", &camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
+                changed |= editor::ui::drawFloat("Size", camera_component.orthographicSize, 0.1f, 0.001f, 10000.0f);
+                changed |=
+                    editor::ui::drawFloat("Near", camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
+                changed |=
+                    editor::ui::drawFloat("Far", camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
             }
             return changed;
         },
@@ -217,7 +235,7 @@ void InspectorPanel::onImGuiRender()
     scene_changed |= editor::ui::drawComponentSection<LightComponent>(
         "Light", selected_entity, [](LightComponent& light_component) {
             bool changed = false;
-            changed |= ImGui::Checkbox("Enabled", &light_component.enabled);
+            changed |= editor::ui::drawBool("Enabled", light_component.enabled);
 
             const char* type_label = "Directional";
             if (light_component.type == LightComponent::Type::Point) {
@@ -225,37 +243,38 @@ void InspectorPanel::onImGuiRender()
             } else if (light_component.type == LightComponent::Type::Spot) {
                 type_label = "Spot";
             }
-            if (ImGui::BeginCombo("Type", type_label)) {
+            changed |= editor::ui::drawCombo("Type", type_label, [&]() {
+                bool type_changed = false;
                 if (ImGui::Selectable("Directional", light_component.type == LightComponent::Type::Directional)) {
                     if (light_component.type != LightComponent::Type::Directional) {
                         light_component.type = LightComponent::Type::Directional;
-                        changed = true;
+                        type_changed = true;
                     }
                 }
                 if (ImGui::Selectable("Point", light_component.type == LightComponent::Type::Point)) {
                     if (light_component.type != LightComponent::Type::Point) {
                         light_component.type = LightComponent::Type::Point;
-                        changed = true;
+                        type_changed = true;
                     }
                 }
                 if (ImGui::Selectable("Spot", light_component.type == LightComponent::Type::Spot)) {
                     if (light_component.type != LightComponent::Type::Spot) {
                         light_component.type = LightComponent::Type::Spot;
-                        changed = true;
+                        type_changed = true;
                     }
                 }
-                ImGui::EndCombo();
-            }
+                return type_changed;
+            });
 
-            changed |= ImGui::ColorEdit3("Color", &light_component.color.x);
-            changed |= ImGui::DragFloat("Intensity", &light_component.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
+            changed |= editor::ui::drawColor3("Color", light_component.color);
+            changed |= editor::ui::drawFloat("Intensity", light_component.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
             if (light_component.type == LightComponent::Type::Point || light_component.type == LightComponent::Type::Spot) {
-                changed |= ImGui::DragFloat("Range", &light_component.range, 0.1f, 0.001f, 1000.0f, "%.2f");
+                changed |= editor::ui::drawFloat("Range", light_component.range, 0.1f, 0.001f, 1000.0f, "%.2f");
             }
             if (light_component.type == LightComponent::Type::Spot) {
                 glm::vec2 cone_angles = glm::degrees(glm::vec2(light_component.innerConeAngleRadians,
                                                                light_component.outerConeAngleRadians));
-                if (ImGui::DragFloat2("Cone Angles", &cone_angles.x, 0.5f, 0.1f, 89.0f, "%.1f")) {
+                if (editor::ui::drawVec2Control("Cone Angles", cone_angles, 0.5f, 0.1f, 89.0f, "%.1f")) {
                     cone_angles.x = (std::clamp)(cone_angles.x, 0.1f, 89.0f);
                     cone_angles.y = (std::clamp)(cone_angles.y, cone_angles.x, 89.0f);
                     light_component.innerConeAngleRadians = glm::radians(cone_angles.x);
@@ -281,11 +300,12 @@ void InspectorPanel::onImGuiRender()
             const std::string current_builtin_label = BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle)
                                                         ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
                                                         : "None";
-            if (ImGui::BeginCombo("Primitive", current_builtin_label.c_str())) {
+            changed |= editor::ui::drawCombo("Primitive", current_builtin_label.c_str(), [&]() {
+                bool primitive_changed = false;
                 if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle))) {
                     if (mesh_component.meshHandle != AssetHandle(0)) {
                         mesh_component.meshHandle = AssetHandle(0);
-                        changed = true;
+                        primitive_changed = true;
                     }
                 }
 
@@ -294,15 +314,15 @@ void InspectorPanel::onImGuiRender()
                     if (ImGui::Selectable(mesh.Name, selected)) {
                         if (mesh_component.meshHandle != mesh.Handle) {
                             mesh_component.meshHandle = mesh.Handle;
-                            changed = true;
+                            primitive_changed = true;
                         }
                     }
                     if (selected) {
                         ImGui::SetItemDefaultFocus();
                     }
                 }
-                ImGui::EndCombo();
-            }
+                return primitive_changed;
+            });
 
             changed |= editor::ui::drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
 
@@ -319,8 +339,10 @@ void InspectorPanel::onImGuiRender()
             const bool mesh_loaded = mesh && mesh->isValid();
 
             if (mesh_loaded) {
-                ImGui::Text("Submeshes: %zu", mesh->getSubMeshes().size());
-                if (ImGui::Button("Sync Material Slots To Mesh", ImVec2(-1.0f, 0.0f))) {
+                editor::ui::drawTextValue("Submeshes", std::to_string(mesh->getSubMeshes().size()));
+                if (editor::ui::drawButton("Sync Material Slots To Mesh",
+                                           editor::ui::ButtonVariant::Primary,
+                                           ImVec2(-1.0f, 0.0f))) {
                     const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
                     mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
                     changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
@@ -330,7 +352,7 @@ void InspectorPanel::onImGuiRender()
                     ImGui::TextDisabled("Mesh asset is loading...");
                 }
                 int slot_count = static_cast<int>(mesh_component.getSubmeshMaterialCount());
-                if (ImGui::InputInt("Material Slot Count", &slot_count)) {
+                if (editor::ui::drawInt("Material Slots", slot_count)) {
                     slot_count = (std::max)(slot_count, 0);
                     const size_t requested_slot_count = static_cast<size_t>(slot_count);
                     if (mesh_component.getSubmeshMaterialCount() != requested_slot_count) {
@@ -354,22 +376,29 @@ void InspectorPanel::onImGuiRender()
                     const std::string current_builtin_material_label = BuiltinAssets::isBuiltinMaterial(material_handle)
                                                                      ? BuiltinAssets::getDisplayName(material_handle)
                                                                      : "None";
-                    if (ImGui::BeginCombo("Builtin Material", current_builtin_material_label.c_str())) {
+                    changed |= editor::ui::drawCombo("Builtin Material", current_builtin_material_label.c_str(), [&]() {
+                        bool material_changed = false;
                         if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMaterial(material_handle))) {
-                            material_handle = AssetHandle(0);
+                            if (material_handle != AssetHandle(0)) {
+                                material_handle = AssetHandle(0);
+                                material_changed = true;
+                            }
                         }
 
                         for (const auto& material : BuiltinAssets::getBuiltinMaterials()) {
                             const bool selected = material_handle == material.Handle;
                             if (ImGui::Selectable(material.Name, selected)) {
-                                material_handle = material.Handle;
+                                if (material_handle != material.Handle) {
+                                    material_handle = material.Handle;
+                                    material_changed = true;
+                                }
                             }
                             if (selected) {
                                 ImGui::SetItemDefaultFocus();
                             }
                         }
-                        ImGui::EndCombo();
-                    }
+                        return material_changed;
+                    });
 
                     changed |= editor::ui::drawAssetHandleEditor(
                         "Material Handle", material_handle, {AssetType::Material});
@@ -379,12 +408,16 @@ void InspectorPanel::onImGuiRender()
                     }
                     if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
                         ImGui::TextDisabled("Global builtin material; edits affect all users.");
-                        if (ImGui::Button("Edit Builtin Material", ImVec2(-1.0f, 0.0f))) {
+                        if (editor::ui::drawButton("Edit Builtin Material",
+                                                   editor::ui::ButtonVariant::Subtle,
+                                                   ImVec2(-1.0f, 0.0f))) {
                             m_editor_context->openBuiltinMaterialsPanel(material_handle);
                         }
                     }
 
-                    if (ImGui::Button("Clear Material", ImVec2(-1.0f, 0.0f))) {
+                    if (editor::ui::drawButton("Clear Material",
+                                               editor::ui::ButtonVariant::Danger,
+                                               ImVec2(-1.0f, 0.0f))) {
                         if (mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
                             mesh_component.clearSubmeshMaterial(submesh_index);
                             changed = true;
@@ -395,7 +428,9 @@ void InspectorPanel::onImGuiRender()
                     ImGui::PopID();
                 }
 
-                if (ImGui::Button("Clear All Materials", ImVec2(-1.0f, 0.0f))) {
+                if (editor::ui::drawButton("Clear All Materials",
+                                           editor::ui::ButtonVariant::Danger,
+                                           ImVec2(-1.0f, 0.0f))) {
                     if (mesh_component.getSubmeshMaterialCount() > 0) {
                         mesh_component.clearAllSubmeshMaterials();
                         changed = true;

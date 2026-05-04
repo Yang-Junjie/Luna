@@ -1,6 +1,7 @@
 #include "ScriptPluginsPanel.h"
 
 #include "EditorContext.h"
+#include "EditorUI.h"
 
 #include <imgui.h>
 
@@ -47,7 +48,7 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Script Plugins", &open)) {
         ImGui::End();
         return;

@@ -2,6 +2,7 @@
 
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
+#include "EditorUI.h"
 
 #include <algorithm>
 
@@ -11,7 +12,7 @@ namespace luna {
 
 void AssetLoadingPanel::onImGuiRender()
 {
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 220.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(420.0f, 220.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Asset Loading")) {
         ImGui::End();
         return;
@@ -32,7 +33,7 @@ void AssetLoadingPanel::onImGuiRender()
                           4,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp |
                               ImGuiTableFlags_ScrollY)) {
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(90.0f));
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.25f);
         ImGui::TableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch, 0.55f);
         ImGui::TableSetupColumn("Handle", ImGuiTableColumnFlags_WidthStretch, 0.20f);

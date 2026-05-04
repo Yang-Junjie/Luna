@@ -1,5 +1,6 @@
 #include "RenderProfilerPanel.h"
 
+#include "EditorUI.h"
 #include "Renderer/RenderProfileExporter.h"
 
 #include <algorithm>
@@ -168,7 +169,7 @@ void RenderProfilerPanel::onImGuiRender(bool& open,
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(1120.0f, 460.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(1120.0f, 460.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Render Profiler", &open)) {
         ImGui::End();
         if (!open && profiling_enabled && set_profiling_enabled) {
@@ -201,7 +202,7 @@ void RenderProfilerPanel::onImGuiRender(bool& open,
     ImGui::SameLine();
     ImGui::Checkbox("Sort by GPU", &m_sort_by_gpu);
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(160.0f);
+    ImGui::SetNextItemWidth(editor::ui::scale(160.0f));
     ImGui::SliderInt("Average Frames", &m_average_frames, 1, static_cast<int>(kMaxHistoryFrames));
     ImGui::SameLine();
     if (ImGui::Button("Clear History")) {
@@ -278,18 +279,18 @@ void RenderProfilerPanel::onImGuiRender(bool& open,
                                             ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
     if (ImGui::BeginTable("##RenderGraphPassProfile", 13, table_flags, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 0.35f);
-        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 72.0f);
-        ImGui::TableSetupColumn("CPU ms", ImGuiTableColumnFlags_WidthFixed, 76.0f);
-        ImGui::TableSetupColumn("CPU Avg", ImGuiTableColumnFlags_WidthFixed, 76.0f);
-        ImGui::TableSetupColumn("CPU %", ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("GPU ms", ImGuiTableColumnFlags_WidthFixed, 76.0f);
-        ImGui::TableSetupColumn("GPU Avg", ImGuiTableColumnFlags_WidthFixed, 76.0f);
-        ImGui::TableSetupColumn("GPU %", ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-        ImGui::TableSetupColumn("Reads", ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("Writes", ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("Colors", ImGuiTableColumnFlags_WidthFixed, 54.0f);
-        ImGui::TableSetupColumn("Barriers", ImGuiTableColumnFlags_WidthFixed, 62.0f);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(72.0f));
+        ImGui::TableSetupColumn("CPU ms", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(76.0f));
+        ImGui::TableSetupColumn("CPU Avg", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(76.0f));
+        ImGui::TableSetupColumn("CPU %", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(54.0f));
+        ImGui::TableSetupColumn("GPU ms", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(76.0f));
+        ImGui::TableSetupColumn("GPU Avg", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(76.0f));
+        ImGui::TableSetupColumn("GPU %", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(54.0f));
+        ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(90.0f));
+        ImGui::TableSetupColumn("Reads", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(54.0f));
+        ImGui::TableSetupColumn("Writes", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(54.0f));
+        ImGui::TableSetupColumn("Colors", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(54.0f));
+        ImGui::TableSetupColumn("Barriers", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(62.0f));
         ImGui::TableHeadersRow();
 
         for (const size_t pass_index : pass_indices) {

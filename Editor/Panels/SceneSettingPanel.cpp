@@ -47,8 +47,8 @@ const char* backgroundModeLabel(luna::SceneBackgroundMode mode)
 
 bool drawBackgroundModeCombo(luna::SceneBackgroundMode& mode)
 {
-    bool changed = false;
-    if (ImGui::BeginCombo("Background", backgroundModeLabel(mode))) {
+    return luna::editor::ui::drawCombo("Background", backgroundModeLabel(mode), [&]() {
+        bool changed = false;
         const luna::SceneBackgroundMode modes[] = {
             luna::SceneBackgroundMode::SolidColor,
             luna::SceneBackgroundMode::ProceduralSky,
@@ -65,10 +65,8 @@ bool drawBackgroundModeCombo(luna::SceneBackgroundMode& mode)
                 ImGui::SetItemDefaultFocus();
             }
         }
-        ImGui::EndCombo();
-    }
-
-    return changed;
+        return changed;
+    });
 }
 
 } // namespace
@@ -101,7 +99,7 @@ void SceneSettingPanel::onImGuiRender()
         syncFromScene();
     }
 
-    ImGui::SetNextWindowSize(ImVec2(380.0f, 520.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene Settings");
 
     const SceneEnvironmentSettings& scene_environment = m_editor_context->getScene().environmentSettings();
@@ -112,23 +110,25 @@ void SceneSettingPanel::onImGuiRender()
         environment.enabled = environment.backgroundMode != SceneBackgroundMode::SolidColor;
 
         if (environment.backgroundMode == SceneBackgroundMode::SolidColor) {
-            ImGui::ColorEdit3("Background Color", &environment.backgroundColor.x);
+            editor::ui::drawColor3("Background Color", environment.backgroundColor);
         }
 
-        ImGui::Checkbox("IBL Enabled", &environment.iblEnabled);
+        editor::ui::drawBool("IBL Enabled", environment.iblEnabled);
 
         if (environment.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
             environment.backgroundMode == SceneBackgroundMode::SolidColor) {
             editor::ui::drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
-            if (ImGui::Button("Clear Environment Map", ImVec2(-1.0f, 0.0f))) {
+            if (editor::ui::drawButton("Clear Environment Map",
+                                       editor::ui::ButtonVariant::Danger,
+                                       ImVec2(-1.0f, 0.0f))) {
                 environment.environmentMapHandle = AssetHandle(0);
             }
         }
 
-        ImGui::DragFloat("Intensity", &environment.intensity, 0.01f, 0.0f, 100.0f, "%.2f");
-        ImGui::DragFloat("Sky Intensity", &environment.skyIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
-        ImGui::DragFloat("Diffuse Intensity", &environment.diffuseIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
-        ImGui::DragFloat("Specular Intensity", &environment.specularIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
+        editor::ui::drawFloat("Intensity", environment.intensity, 0.01f, 0.0f, 100.0f, "%.2f");
+        editor::ui::drawFloat("Sky Intensity", environment.skyIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
+        editor::ui::drawFloat("Diffuse Intensity", environment.diffuseIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
+        editor::ui::drawFloat("Specular Intensity", environment.specularIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
 
         if (environment.backgroundMode == SceneBackgroundMode::ProceduralSky) {
             ImGui::SeparatorText("Default Sky");
@@ -137,17 +137,22 @@ void SceneSettingPanel::onImGuiRender()
                                          0.0f,
                                          0.01f,
                                          editor::ui::PropertyLayout{120.0f});
-            ImGui::DragFloat("Sun Intensity", &environment.proceduralSunIntensity, 0.05f, 0.0f, 1000.0f, "%.2f");
-            ImGui::DragFloat("Sun Angular Radius",
-                             &environment.proceduralSunAngularRadius,
-                             0.001f,
-                             0.0f,
-                             0.25f,
-                             "%.4f");
-            ImGui::ColorEdit3("Sky Zenith", &environment.proceduralSkyColorZenith.x);
-            ImGui::ColorEdit3("Sky Horizon", &environment.proceduralSkyColorHorizon.x);
-            ImGui::ColorEdit3("Ground", &environment.proceduralGroundColor.x);
-            ImGui::DragFloat("Sky Exposure", &environment.proceduralSkyExposure, 0.01f, 0.0f, 100.0f, "%.2f");
+            editor::ui::drawFloat("Sun Intensity",
+                                  environment.proceduralSunIntensity,
+                                  0.05f,
+                                  0.0f,
+                                  1000.0f,
+                                  "%.2f");
+            editor::ui::drawFloat("Sun Angular Radius",
+                                  environment.proceduralSunAngularRadius,
+                                  0.001f,
+                                  0.0f,
+                                  0.25f,
+                                  "%.4f");
+            editor::ui::drawColor3("Sky Zenith", environment.proceduralSkyColorZenith);
+            editor::ui::drawColor3("Sky Horizon", environment.proceduralSkyColorHorizon);
+            editor::ui::drawColor3("Ground", environment.proceduralGroundColor);
+            editor::ui::drawFloat("Sky Exposure", environment.proceduralSkyExposure, 0.01f, 0.0f, 100.0f, "%.2f");
         }
 
         m_environment_draft_dirty = !sameEnvironmentSettings(environment, scene_environment);
@@ -157,14 +162,14 @@ void SceneSettingPanel::onImGuiRender()
         if (disable_apply_controls) {
             ImGui::BeginDisabled();
         }
-        if (ImGui::Button("Apply", ImVec2(120.0f, 0.0f))) {
+        if (editor::ui::drawButton("Apply", editor::ui::ButtonVariant::Primary, editor::ui::scaled(120.0f, 0.0f))) {
             m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
             m_editor_context->getScene().environmentSettings() = m_environment_draft;
             m_environment_draft_dirty = false;
             m_editor_context->markSceneDirty();
         }
         ImGui::SameLine();
-        if (ImGui::Button("Revert", ImVec2(120.0f, 0.0f))) {
+        if (editor::ui::drawButton("Revert", editor::ui::ButtonVariant::Subtle, editor::ui::scaled(120.0f, 0.0f))) {
             syncFromScene();
         }
         if (disable_apply_controls) {

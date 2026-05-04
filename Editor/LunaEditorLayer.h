@@ -88,6 +88,7 @@ public:
 
 private:
     void consumePendingScenePick();
+    void syncEditorUiScale();
     void syncPickDebugVisualizationState() const;
     void requestViewportPick(const ImVec2& image_min,
                              const ImVec2& image_max,
@@ -136,6 +137,7 @@ private:
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     bool m_show_builtin_materials_panel{false};
+    float m_editor_ui_scale{0.0f};
 
     bool m_show_render_debug_panel{false};
     bool m_show_render_features_panel{false};

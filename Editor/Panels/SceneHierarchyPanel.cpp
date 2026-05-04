@@ -1,6 +1,7 @@
 #include "Asset/BuiltinAssets.h"
 #include "EditorAssetDragDrop.h"
 #include "EditorContext.h"
+#include "EditorUI.h"
 #include "Scene/Components.h"
 #include "SceneHierarchyPanel.h"
 
@@ -255,7 +256,7 @@ void SceneHierarchyPanel::onImGuiRender()
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(300.0f, 360.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(300.0f, 360.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene Hierarchy");
 
     auto& scene = m_editor_context->getInspectionScene();

@@ -1,9 +1,25 @@
 #include "EditorStyle.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <imgui.h>
 
 namespace luna::editor {
 namespace {
+
+constexpr float kMinUiScale = 0.85f;
+constexpr float kMaxUiScale = 2.5f;
+float g_editor_ui_scale = 1.0f;
+
+float sanitizeUiScale(float ui_scale) noexcept
+{
+    if (!std::isfinite(ui_scale) || ui_scale <= 0.0f) {
+        return 1.0f;
+    }
+
+    return std::clamp(ui_scale, kMinUiScale, kMaxUiScale);
+}
 
 ImVec4 color(float r, float g, float b, float a = 1.0f)
 {
@@ -12,9 +28,11 @@ ImVec4 color(float r, float g, float b, float a = 1.0f)
 
 void applyModernLightweightTheme()
 {
-    ImGui::StyleColorsDark();
+    ImGui::GetStyle() = ImGuiStyle{};
 
     ImGuiStyle& style = ImGui::GetStyle();
+    style.FontScaleMain = 1.0f;
+    style.FontScaleDpi = 1.0f;
     style.WindowPadding = ImVec2(10.0f, 10.0f);
     style.FramePadding = ImVec2(8.0f, 4.0f);
     style.CellPadding = ImVec2(6.0f, 4.0f);
@@ -104,13 +122,35 @@ void applyModernLightweightTheme()
 
 } // namespace
 
-void applyEditorTheme(EditorThemePreset preset)
+float getEditorUiScale() noexcept
 {
+    return g_editor_ui_scale;
+}
+
+float scaleEditorUi(float value) noexcept
+{
+    return value * g_editor_ui_scale;
+}
+
+ImVec2 scaleEditorUi(float x, float y) noexcept
+{
+    return ImVec2{x * g_editor_ui_scale, y * g_editor_ui_scale};
+}
+
+void applyEditorTheme(EditorThemePreset preset, float ui_scale)
+{
+    g_editor_ui_scale = sanitizeUiScale(ui_scale);
+
     switch (preset) {
         case EditorThemePreset::ModernLightweight:
             applyModernLightweightTheme();
             break;
     }
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(g_editor_ui_scale);
+    style.FontScaleMain = g_editor_ui_scale;
+    style.FontScaleDpi = 1.0f;
 }
 
 } // namespace luna::editor

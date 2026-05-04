@@ -6,6 +6,7 @@
 #include "Core/Log.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
+#include "EditorStyle.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
@@ -33,6 +34,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <glm/gtc/type_ptr.hpp>
 #include <ImGuizmo.h>
@@ -48,6 +50,7 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
+constexpr float kUiScaleChangeThreshold = 0.01f;
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
 {
@@ -235,6 +238,7 @@ void LunaEditorLayer::onImGuiRender()
         return;
     }
 
+    syncEditorUiScale();
     ImGuizmo::BeginFrame();
 
     drawDockSpace();
@@ -245,7 +249,7 @@ void LunaEditorLayer::onImGuiRender()
     const float delta_seconds = Application::get().getTimestep().getSeconds();
     const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
 
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 0.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::scaleEditorUi(420.0f, 0.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Scene");
     ImGui::Text("Backend: Luna RHI / %s", luna::RHI::BackendTypeToString(active_backend));
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
@@ -307,6 +311,23 @@ void LunaEditorLayer::onImGuiRender()
     m_backend_capabilities_panel->onImGuiRender(m_show_backend_capabilities_panel, renderer);
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
     drawViewport();
+}
+
+void LunaEditorLayer::syncEditorUiScale()
+{
+    const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+
+    float ui_scale = 1.0f;
+    if (main_viewport != nullptr && std::isfinite(main_viewport->DpiScale) && main_viewport->DpiScale > 0.0f) {
+        ui_scale = main_viewport->DpiScale;
+    }
+
+    if (std::abs(ui_scale - m_editor_ui_scale) <= kUiScaleChangeThreshold) {
+        return;
+    }
+
+    editor::applyEditorTheme(editor::EditorThemePreset::ModernLightweight, ui_scale);
+    m_editor_ui_scale = editor::getEditorUiScale();
 }
 
 void LunaEditorLayer::drawDockSpace()
@@ -431,7 +452,7 @@ void LunaEditorLayer::drawViewport()
 
     auto& renderer = m_application->getRenderer();
 
-    ImGui::SetNextWindowSize(ImVec2(960.0f, 640.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::scaleEditorUi(960.0f, 640.0f), ImGuiCond_FirstUseEver);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("Viewport");
     m_viewport_focused = ImGui::IsWindowFocused();
@@ -439,9 +460,15 @@ void LunaEditorLayer::drawViewport()
     updateGizmoShortcuts();
 
     const ImVec2 available = ImGui::GetContentRegionAvail();
-    const float dpi_scale = ImGui::GetWindowViewport() != nullptr ? ImGui::GetWindowViewport()->DpiScale : 1.0f;
-    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * dpi_scale, 0.0f));
-    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * dpi_scale, 0.0f));
+    const ImGuiViewport* viewport = ImGui::GetWindowViewport();
+    const ImVec2 framebuffer_scale =
+        viewport != nullptr ? viewport->FramebufferScale : ImGui::GetIO().DisplayFramebufferScale;
+    const float viewport_scale_x =
+        std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
+    const float viewport_scale_y =
+        std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
+    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * viewport_scale_x, 0.0f));
+    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * viewport_scale_y, 0.0f));
     renderer.setSceneOutputSize(viewport_width, viewport_height);
     m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
 
@@ -468,7 +495,7 @@ void LunaEditorLayer::drawViewport()
             }
         }
     } else if (available.x > 0.0f && available.y > 0.0f) {
-        ImGui::SetCursorPos(ImVec2(16.0f, 16.0f));
+        ImGui::SetCursorPos(editor::scaleEditorUi(16.0f, 16.0f));
         ImGui::TextUnformatted("Viewport texture will appear after the first rendered frame.");
     }
 

@@ -1,5 +1,6 @@
 #include "RenderDebugPanel.h"
 
+#include "EditorUI.h"
 #include "Imgui/ImGuiContext.h"
 
 #include <algorithm>
@@ -59,7 +60,7 @@ void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer)
         return;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(640.0f, 420.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(640.0f, 420.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Render Debug", &open)) {
         ImGui::End();
         if (!open) {
@@ -69,7 +70,7 @@ void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer)
     }
 
     int selected_mode = modeIndex(renderer.getRenderDebugViewMode());
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(editor::ui::scale(220.0f));
     if (ImGui::BeginCombo("View", kDebugModes[static_cast<size_t>(selected_mode)].label)) {
         for (int index = 0; index < static_cast<int>(kDebugModes.size()); ++index) {
             const bool selected = index == selected_mode;
@@ -86,7 +87,7 @@ void RenderDebugPanel::onImGuiRender(bool& open, Renderer& renderer)
 
     if (renderer.getRenderDebugViewMode() == RenderDebugViewMode::Velocity) {
         float velocity_scale = renderer.getRenderDebugVelocityScale();
-        ImGui::SetNextItemWidth(220.0f);
+        ImGui::SetNextItemWidth(editor::ui::scale(220.0f));
         if (ImGui::SliderFloat("Velocity Scale", &velocity_scale, 1.0f, 200.0f, "%.1f")) {
             renderer.setRenderDebugVelocityScale(velocity_scale);
         }

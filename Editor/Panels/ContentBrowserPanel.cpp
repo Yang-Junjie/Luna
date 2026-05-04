@@ -5,6 +5,7 @@
 #include "Core/Log.h"
 #include "EditorAssetDragDrop.h"
 #include "EditorContext.h"
+#include "EditorUI.h"
 #include "Imgui/ImGuiContext.h"
 #include "Project/ProjectManager.h"
 
@@ -526,7 +527,7 @@ void ContentBrowserPanel::onImGuiRender()
     ensureIconsLoaded(*m_state);
     syncProjectDirectories();
 
-    ImGui::SetNextWindowSize(ImVec2(880.0f, 540.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(880.0f, 540.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Content Browser")) {
         ImGui::End();
         return;
@@ -550,7 +551,7 @@ void ContentBrowserPanel::onImGuiRender()
                           2,
                           ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV |
                               ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings)) {
-        ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, 240.0f);
+        ImGui::TableSetupColumn("Folders", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(240.0f));
         ImGui::TableSetupColumn("Files", ImGuiTableColumnFlags_WidthStretch);
 
         ImGui::TableNextColumn();
@@ -662,7 +663,7 @@ void ContentBrowserPanel::drawHeader()
     }
 
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(220.0f);
+    ImGui::SetNextItemWidth(editor::ui::scale(220.0f));
     if (ImGui::InputTextWithHint(
             "##ContentBrowserSearch", "Search current folder", m_search_buffer.data(), m_search_buffer.size())) {
         m_state->SearchFilter = m_search_buffer.data();
@@ -728,8 +729,8 @@ void ContentBrowserPanel::drawDirectoryContents()
     }
 
     const float available_width = ImGui::GetContentRegionAvail().x;
-    const float tile_width = 104.0f;
-    const float tile_height = 88.0f;
+    const float tile_width = editor::ui::scale(104.0f);
+    const float tile_height = editor::ui::scale(88.0f);
     const int column_count = (std::max) (1, static_cast<int>(available_width / tile_width));
 
     if (!ImGui::BeginTable(
@@ -765,7 +766,8 @@ void ContentBrowserPanel::drawDirectoryContents()
                 const EntryTileResult tile_result = drawEntryTile(entry,
                                                                   entryIconTextureId(*m_state, entry.Kind),
                                                                   m_state->SelectedEntry == entry.Path,
-                                                                  ImVec2(tile_width - 8.0f, tile_height - 8.0f));
+                                                                  ImVec2(tile_width - editor::ui::scale(8.0f),
+                                                                         tile_height - editor::ui::scale(8.0f)));
                 if (tile_result.Clicked) {
                     m_state->SelectedEntry = entry.Path;
                 }

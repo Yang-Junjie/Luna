@@ -3,6 +3,7 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
+#include "EditorUI.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Renderer/Material.h"
 
@@ -54,7 +55,7 @@ void BuiltinMaterialsPanel::onImGuiRender(bool& open)
         m_selected_material = firstBuiltinMaterial().Handle;
     }
 
-    ImGui::SetNextWindowSize(ImVec2(420.0f, 520.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(editor::ui::scaled(420.0f, 520.0f), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Builtin Materials", &open)) {
         ImGui::End();
         return;

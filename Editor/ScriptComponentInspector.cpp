@@ -16,7 +16,6 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
@@ -381,7 +380,9 @@ std::vector<luna::ScriptPropertySchema> loadScriptPropertySchema(const luna::Scr
 bool drawSchemaSyncControls(luna::ScriptEntry& script)
 {
     bool changed = false;
-    if (ImGui::Button("Sync Properties From Script", ImVec2(-1.0f, 0.0f))) {
+    if (luna::editor::ui::drawButton("Sync Properties From Script",
+                                     luna::editor::ui::ButtonVariant::Primary,
+                                     ImVec2(-1.0f, 0.0f))) {
         const std::vector<luna::ScriptPropertySchema> schemas = loadScriptPropertySchema(script);
         if (schemas.empty()) {
             ImGui::OpenPopup("NoScriptSchemaPopup");
@@ -403,28 +404,32 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
     bool changed = false;
 
     unsigned long long raw_entity_id = static_cast<unsigned long long>(static_cast<uint64_t>(entity_value));
-    if (ImGui::InputScalar("Entity", ImGuiDataType_U64, &raw_entity_id)) {
-        entity_value = luna::UUID(static_cast<uint64_t>(raw_entity_id));
-        changed = true;
-    }
-
-    if (ImGui::BeginDragDropTarget()) {
-        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kEntityDragPayload);
-            payload != nullptr && payload->Data != nullptr && payload->DataSize == sizeof(uint64_t)) {
-            entity_value = luna::UUID(*static_cast<const uint64_t*>(payload->Data));
+    if (luna::editor::ui::beginPropertyRow("Entity")) {
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputScalar("##value", ImGuiDataType_U64, &raw_entity_id)) {
+            entity_value = luna::UUID(static_cast<uint64_t>(raw_entity_id));
             changed = true;
         }
-        ImGui::EndDragDropTarget();
+
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kEntityDragPayload);
+                payload != nullptr && payload->Data != nullptr && payload->DataSize == sizeof(uint64_t)) {
+                entity_value = luna::UUID(*static_cast<const uint64_t*>(payload->Data));
+                changed = true;
+            }
+            ImGui::EndDragDropTarget();
+        }
+        luna::editor::ui::endPropertyRow();
     }
 
     if (owner_entity) {
-        if (ImGui::Button("Use Self")) {
+        if (luna::editor::ui::drawButton("Use Self", luna::editor::ui::ButtonVariant::Subtle)) {
             entity_value = owner_entity.getUUID();
             changed = true;
         }
         ImGui::SameLine();
     }
-    if (ImGui::Button("Clear")) {
+    if (luna::editor::ui::drawButton("Clear", luna::editor::ui::ButtonVariant::Danger)) {
         entity_value = luna::UUID(0);
         changed = true;
     }
@@ -455,28 +460,19 @@ bool drawScriptPropertyValueEditor(luna::Entity owner_entity, luna::ScriptProper
 
     switch (property.type) {
         case luna::ScriptPropertyType::Bool:
-            changed |= ImGui::Checkbox("Value", &property.boolValue);
+            changed |= luna::editor::ui::drawBool("Value", property.boolValue);
             break;
         case luna::ScriptPropertyType::Int:
-            changed |= ImGui::InputInt("Value", &property.intValue);
+            changed |= luna::editor::ui::drawInt("Value", property.intValue);
             break;
         case luna::ScriptPropertyType::Float:
-            changed |= ImGui::DragFloat("Value", &property.floatValue, 0.05f);
+            changed |= luna::editor::ui::drawFloat("Value", property.floatValue, 0.05f);
             break;
-        case luna::ScriptPropertyType::String: {
-            char string_buffer[512] = {};
-            strncpy_s(string_buffer, property.stringValue.c_str(), _TRUNCATE);
-            if (ImGui::InputTextMultiline("Value",
-                                          string_buffer,
-                                          sizeof(string_buffer),
-                                          ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f))) {
-                property.stringValue = string_buffer;
-                changed = true;
-            }
+        case luna::ScriptPropertyType::String:
+            changed |= luna::editor::ui::drawTextMultiline("Value", property.stringValue);
             break;
-        }
         case luna::ScriptPropertyType::Vec3:
-            changed |= ImGui::DragFloat3("Value", &property.vec3Value.x, 0.05f);
+            changed |= luna::editor::ui::drawVec3Control("Value", property.vec3Value, 0.0f, 0.05f);
             break;
         case luna::ScriptPropertyType::Entity:
             changed |= drawEntityReferenceEditor(owner_entity, property.entityValue);
@@ -525,13 +521,11 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
     }
 
     if (open) {
-        char name_buffer[256] = {};
-        strncpy_s(name_buffer, property.name.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Name", name_buffer, sizeof(name_buffer))) {
-            property.name = name_buffer;
+        bool name_deactivated = false;
+        if (luna::editor::ui::drawTextInput("Name", property.name, 256, {}, &name_deactivated)) {
             changed = true;
         }
-        if (ImGui::IsItemDeactivatedAfterEdit()) {
+        if (name_deactivated) {
             const std::string normalized_name = makeUniquePropertyName(script, property_index, property.name);
             if (property.name != normalized_name) {
                 property.name = normalized_name;
@@ -540,7 +534,8 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
         }
 
         const char* current_type_label = scriptPropertyTypeToString(property.type);
-        if (ImGui::BeginCombo("Type", current_type_label)) {
+        changed |= luna::editor::ui::drawCombo("Type", current_type_label, [&]() {
+            bool type_changed = false;
             constexpr luna::ScriptPropertyType kPropertyTypes[] = {
                 luna::ScriptPropertyType::Bool,
                 luna::ScriptPropertyType::Int,
@@ -557,20 +552,21 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
                     if (property.type != type) {
                         property.type = type;
                         resetScriptPropertyValue(property);
-                        changed = true;
+                        type_changed = true;
                     }
                 }
                 if (selected) {
                     ImGui::SetItemDefaultFocus();
                 }
             }
-
-            ImGui::EndCombo();
-        }
+            return type_changed;
+        });
 
         changed |= drawScriptPropertyValueEditor(owner_entity, property);
 
-        if (ImGui::Button("Remove Property", ImVec2(-1.0f, 0.0f))) {
+        if (luna::editor::ui::drawButton("Remove Property",
+                                         luna::editor::ui::ButtonVariant::Danger,
+                                         ImVec2(-1.0f, 0.0f))) {
             remove_requested = true;
         }
 
@@ -594,13 +590,13 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
 {
     ScriptComponentInspectorChange change{};
 
-    if (ImGui::Checkbox("Enabled", &script_component.enabled)) {
+    if (editor::ui::drawBool("Enabled", script_component.enabled)) {
         change.changed = true;
         change.script_structure_changed = true;
     }
-    ImGui::Text("Scripts: %zu", script_component.scripts.size());
+    editor::ui::drawTextValue("Scripts", std::to_string(script_component.scripts.size()));
 
-    if (ImGui::Button("Add Script", ImVec2(-1.0f, 0.0f))) {
+    if (editor::ui::drawButton("Add Script", editor::ui::ButtonVariant::Primary, ImVec2(-1.0f, 0.0f))) {
         ScriptEntry entry{};
         entry.id = UUID{};
         script_component.scripts.push_back(std::move(entry));
@@ -612,15 +608,12 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
         auto& script = script_component.scripts[script_index];
         ImGui::PushID(static_cast<int>(script_index));
         ImGui::Separator();
-        if (ImGui::Checkbox("Script Enabled", &script.enabled)) {
+        if (editor::ui::drawBool("Script Enabled", script.enabled)) {
             change.changed = true;
             change.script_structure_changed = true;
         }
 
-        char type_buffer[256] = {};
-        strncpy_s(type_buffer, script.typeName.c_str(), _TRUNCATE);
-        if (ImGui::InputText("Type Name", type_buffer, sizeof(type_buffer))) {
-            script.typeName = type_buffer;
+        if (editor::ui::drawTextInput("Type Name", script.typeName)) {
             change.changed = true;
             change.script_structure_changed = true;
         }
@@ -629,7 +622,7 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
             change.changed = true;
             change.script_structure_changed = true;
         }
-        if (ImGui::InputInt("Execution Order", &script.executionOrder)) {
+        if (editor::ui::drawInt("Execution Order", script.executionOrder)) {
             change.changed = true;
             change.script_structure_changed = true;
         }
@@ -640,7 +633,7 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
             change.script_structure_changed = true;
         }
         ImGui::TextDisabled("Property Count: %zu", script.properties.size());
-        if (ImGui::Button("Add Property", ImVec2(-1.0f, 0.0f))) {
+        if (editor::ui::drawButton("Add Property", editor::ui::ButtonVariant::Primary, ImVec2(-1.0f, 0.0f))) {
             ScriptProperty property{};
             property.name = makeUniquePropertyName(script, script.properties.size(), "Property");
             script.properties.push_back(std::move(property));
@@ -676,7 +669,7 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
             }
         }
 
-        if (ImGui::Button("Remove Script", ImVec2(-1.0f, 0.0f))) {
+        if (editor::ui::drawButton("Remove Script", editor::ui::ButtonVariant::Danger, ImVec2(-1.0f, 0.0f))) {
             script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
             change.changed = true;
             change.script_structure_changed = true;
