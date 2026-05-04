@@ -380,17 +380,22 @@ std::vector<luna::ScriptPropertySchema> loadScriptPropertySchema(const luna::Scr
 bool drawSchemaSyncControls(luna::ScriptEntry& script)
 {
     bool changed = false;
-    if (luna::editor::ui::drawButton("Sync Properties From Script",
-                                     luna::editor::ui::ButtonVariant::Primary,
-                                     ImVec2(-1.0f, 0.0f))) {
-        const std::vector<luna::ScriptPropertySchema> schemas = loadScriptPropertySchema(script);
-        if (schemas.empty()) {
-            ImGui::OpenPopup("NoScriptSchemaPopup");
-        } else {
-            changed |= applyScriptPropertySchema(script, schemas);
+    bool open_no_schema_popup = false;
+    if (ImGui::BeginPopupContextItem("ScriptPropertiesContext")) {
+        if (ImGui::MenuItem("Sync Properties From Script")) {
+            const std::vector<luna::ScriptPropertySchema> schemas = loadScriptPropertySchema(script);
+            if (schemas.empty()) {
+                open_no_schema_popup = true;
+            } else {
+                changed |= applyScriptPropertySchema(script, schemas);
+            }
         }
+        ImGui::EndPopup();
     }
 
+    if (open_no_schema_popup) {
+        ImGui::OpenPopup("NoScriptSchemaPopup");
+    }
     if (ImGui::BeginPopup("NoScriptSchemaPopup")) {
         ImGui::TextUnformatted("The selected script did not expose a Properties schema.");
         ImGui::EndPopup();
@@ -404,11 +409,22 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
     bool changed = false;
 
     unsigned long long raw_entity_id = static_cast<unsigned long long>(static_cast<uint64_t>(entity_value));
+    bool use_self_requested = false;
+    bool clear_requested = false;
     if (luna::editor::ui::beginPropertyRow("Entity")) {
         ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::InputScalar("##value", ImGuiDataType_U64, &raw_entity_id)) {
             entity_value = luna::UUID(static_cast<uint64_t>(raw_entity_id));
             changed = true;
+        }
+        if (ImGui::BeginPopupContextItem("EntityReferenceContext")) {
+            if (ImGui::MenuItem("Use Self", nullptr, false, static_cast<bool>(owner_entity))) {
+                use_self_requested = true;
+            }
+            if (ImGui::MenuItem("Clear", nullptr, false, entity_value.isValid())) {
+                clear_requested = true;
+            }
+            ImGui::EndPopup();
         }
 
         if (ImGui::BeginDragDropTarget()) {
@@ -422,14 +438,11 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
         luna::editor::ui::endPropertyRow();
     }
 
-    if (owner_entity) {
-        if (luna::editor::ui::drawButton("Use Self", luna::editor::ui::ButtonVariant::Subtle)) {
-            entity_value = owner_entity.getUUID();
-            changed = true;
-        }
-        ImGui::SameLine();
+    if (use_self_requested && owner_entity) {
+        entity_value = owner_entity.getUUID();
+        changed = true;
     }
-    if (luna::editor::ui::drawButton("Clear", luna::editor::ui::ButtonVariant::Danger)) {
+    if (clear_requested) {
         entity_value = luna::UUID(0);
         changed = true;
     }
@@ -508,9 +521,7 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
     property_label += scriptPropertyTypeToString(property.type);
     property_label += ")";
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed |
-                               ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
-    const bool open = ImGui::TreeNodeEx("##Property", flags, "%s", property_label.c_str());
+    const bool open = luna::editor::ui::beginSection(property_label.c_str(), "##Property");
 
     bool remove_requested = false;
     if (ImGui::BeginPopupContextItem("PropertyContext")) {
@@ -564,13 +575,7 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
 
         changed |= drawScriptPropertyValueEditor(owner_entity, property);
 
-        if (luna::editor::ui::drawButton("Remove Property",
-                                         luna::editor::ui::ButtonVariant::Danger,
-                                         ImVec2(-1.0f, 0.0f))) {
-            remove_requested = true;
-        }
-
-        ImGui::TreePop();
+        luna::editor::ui::endSection();
     }
 
     if (remove_requested) {
@@ -607,69 +612,89 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
     for (size_t script_index = 0; script_index < script_component.scripts.size(); ++script_index) {
         auto& script = script_component.scripts[script_index];
         ImGui::PushID(static_cast<int>(script_index));
-        ImGui::Separator();
-        if (editor::ui::drawBool("Script Enabled", script.enabled)) {
-            change.changed = true;
-            change.script_structure_changed = true;
+        const std::string script_header = "Script " + std::to_string(script_index);
+        const bool script_open = editor::ui::beginSection(script_header.c_str(), "##ScriptEntry");
+        bool remove_script_requested = false;
+        if (ImGui::BeginPopupContextItem("ScriptEntryContext")) {
+            if (ImGui::MenuItem("Remove Script")) {
+                remove_script_requested = true;
+            }
+            ImGui::EndPopup();
         }
+        if (script_open) {
+            ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::ui::scale(10.0f));
+            if (editor::ui::drawBool("Script Enabled", script.enabled)) {
+                change.changed = true;
+                change.script_structure_changed = true;
+            }
 
-        if (editor::ui::drawTextInput("Type Name", script.typeName)) {
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
+            if (editor::ui::drawTextInput("Type Name", script.typeName)) {
+                change.changed = true;
+                change.script_structure_changed = true;
+            }
 
-        if (drawScriptAssetEditor(script)) {
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
-        if (editor::ui::drawInt("Execution Order", script.executionOrder)) {
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
+            if (drawScriptAssetEditor(script)) {
+                change.changed = true;
+                change.script_structure_changed = true;
+            }
+            if (editor::ui::drawInt("Execution Order", script.executionOrder)) {
+                change.changed = true;
+                change.script_structure_changed = true;
+            }
 
-        ImGui::SeparatorText("Properties");
-        if (drawSchemaSyncControls(script)) {
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
-        ImGui::TextDisabled("Property Count: %zu", script.properties.size());
-        if (editor::ui::drawButton("Add Property", editor::ui::ButtonVariant::Primary, ImVec2(-1.0f, 0.0f))) {
-            ScriptProperty property{};
-            property.name = makeUniquePropertyName(script, script.properties.size(), "Property");
-            script.properties.push_back(std::move(property));
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
-        if (normalizeScriptPropertyNames(script)) {
-            change.changed = true;
-            change.script_structure_changed = true;
-        }
-
-        if (script.properties.empty()) {
-            ImGui::TextDisabled("No properties.");
-        } else {
-            for (size_t property_index = 0; property_index < script.properties.size(); ++property_index) {
-                ImGui::PushID(static_cast<int>(property_index));
-                bool removed_property = false;
-                if (drawScriptPropertyEditor(owner_entity, script, property_index, removed_property)) {
+            const bool properties_open = editor::ui::beginSection("Properties", "##ScriptProperties");
+            if (drawSchemaSyncControls(script)) {
+                change.changed = true;
+                change.script_structure_changed = true;
+            }
+            if (properties_open) {
+                ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::ui::scale(10.0f));
+                editor::ui::drawTextValue("Property Count", std::to_string(script.properties.size()));
+                if (editor::ui::drawButton("Add Property", editor::ui::ButtonVariant::Primary, ImVec2(-1.0f, 0.0f))) {
+                    ScriptProperty property{};
+                    property.name = makeUniquePropertyName(script, script.properties.size(), "Property");
+                    script.properties.push_back(std::move(property));
                     change.changed = true;
-                    if (removed_property) {
-                        change.script_structure_changed = true;
-                    } else if (!change.script_structure_changed) {
-                        change.property_value_changed = true;
-                        change.script_index = script_index;
-                        change.property_index = property_index;
+                    change.script_structure_changed = true;
+                }
+                if (normalizeScriptPropertyNames(script)) {
+                    change.changed = true;
+                    change.script_structure_changed = true;
+                }
+
+                if (script.properties.empty()) {
+                    ImGui::TextDisabled("No properties.");
+                } else {
+                    for (size_t property_index = 0; property_index < script.properties.size(); ++property_index) {
+                        ImGui::PushID(static_cast<int>(property_index));
+                        bool removed_property = false;
+                        if (drawScriptPropertyEditor(owner_entity, script, property_index, removed_property)) {
+                            change.changed = true;
+                            if (removed_property) {
+                                change.script_structure_changed = true;
+                            } else if (!change.script_structure_changed) {
+                                change.property_value_changed = true;
+                                change.script_index = script_index;
+                                change.property_index = property_index;
+                            }
+                        }
+                        ImGui::PopID();
+
+                        if (removed_property) {
+                            break;
+                        }
                     }
                 }
-                ImGui::PopID();
 
-                if (removed_property) {
-                    break;
-                }
+                ImGui::PopStyleVar();
+                editor::ui::endSection();
             }
+
+            ImGui::PopStyleVar();
+            editor::ui::endSection();
         }
 
-        if (editor::ui::drawButton("Remove Script", editor::ui::ButtonVariant::Danger, ImVec2(-1.0f, 0.0f))) {
+        if (remove_script_requested) {
             script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
             change.changed = true;
             change.script_structure_changed = true;

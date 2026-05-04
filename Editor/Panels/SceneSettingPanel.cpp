@@ -118,11 +118,6 @@ void SceneSettingPanel::onImGuiRender()
         if (environment.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
             environment.backgroundMode == SceneBackgroundMode::SolidColor) {
             editor::ui::drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
-            if (editor::ui::drawButton("Clear Environment Map",
-                                       editor::ui::ButtonVariant::Danger,
-                                       ImVec2(-1.0f, 0.0f))) {
-                environment.environmentMapHandle = AssetHandle(0);
-            }
         }
 
         editor::ui::drawFloat("Intensity", environment.intensity, 0.01f, 0.0f, 100.0f, "%.2f");

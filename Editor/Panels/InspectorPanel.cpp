@@ -110,6 +110,7 @@ void InspectorPanel::onImGuiRender()
 
     ImGui::SetNextWindowSize(editor::ui::scaled(380.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("Inspector");
+    editor::ui::pushCompactInspectorStyle();
 
     const bool editing_runtime_scene = m_editor_context->isRuntimeViewportEnabled();
     bool scene_changed = false;
@@ -122,6 +123,7 @@ void InspectorPanel::onImGuiRender()
 
     if (!selected_entity) {
         ImGui::TextUnformatted("Select an entity to inspect.");
+        editor::ui::popCompactInspectorStyle();
         ImGui::End();
         return;
     }
@@ -154,13 +156,13 @@ void InspectorPanel::onImGuiRender()
                                            ImVec2(-1.0f, 0.0f))) {
                     m_editor_context->setSelectedEntity(parent);
                 }
-                editor::ui::drawTextValue("Parent UUID", parent.getUUID().toString(), kInspectorHeaderLayout);
-
-                if (editor::ui::drawButton("Detach From Parent",
-                                           editor::ui::ButtonVariant::Danger,
-                                           ImVec2(-1.0f, 0.0f))) {
-                    changed |= selected_entity.clearParent(true);
+                if (ImGui::BeginPopupContextItem("ParentContext")) {
+                    if (ImGui::MenuItem("Detach From Parent")) {
+                        changed |= selected_entity.clearParent(true);
+                    }
+                    ImGui::EndPopup();
                 }
+                editor::ui::drawTextValue("Parent UUID", parent.getUUID().toString(), kInspectorHeaderLayout);
             } else {
                 editor::ui::drawTextValue("Parent", "None", kInspectorHeaderLayout);
             }
@@ -340,13 +342,6 @@ void InspectorPanel::onImGuiRender()
 
             if (mesh_loaded) {
                 editor::ui::drawTextValue("Submeshes", std::to_string(mesh->getSubMeshes().size()));
-                if (editor::ui::drawButton("Sync Material Slots To Mesh",
-                                           editor::ui::ButtonVariant::Primary,
-                                           ImVec2(-1.0f, 0.0f))) {
-                    const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
-                    mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
-                    changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
-                }
             } else {
                 if (mesh_component.meshHandle.isValid() && AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
                     ImGui::TextDisabled("Mesh asset is loading...");
@@ -363,6 +358,22 @@ void InspectorPanel::onImGuiRender()
             }
 
             ImGui::SeparatorText("Submesh Materials");
+            bool sync_material_slots = false;
+            if (ImGui::BeginPopupContextItem("SubmeshMaterialsContext")) {
+                if (ImGui::MenuItem("Sync Material Slots To Mesh", nullptr, false, mesh_loaded)) {
+                    sync_material_slots = true;
+                }
+                if (ImGui::MenuItem("Clear All Materials", nullptr, false, mesh_component.getSubmeshMaterialCount() > 0)) {
+                    mesh_component.clearAllSubmeshMaterials();
+                    changed = true;
+                }
+                ImGui::EndPopup();
+            }
+            if (sync_material_slots && mesh_loaded) {
+                const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
+                mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+                changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
+            }
             if (mesh_component.getSubmeshMaterialCount() == 0) {
                 ImGui::TextUnformatted("No material slots.");
             } else {
@@ -373,6 +384,31 @@ void InspectorPanel::onImGuiRender()
                     ImGui::Text("Submesh %u", submesh_index);
 
                     AssetHandle material_handle = mesh_component.getSubmeshMaterial(submesh_index);
+                    bool clear_material = false;
+                    bool edit_builtin_material = false;
+                    if (ImGui::BeginPopupContextItem("SubmeshMaterialContext")) {
+                        if (ImGui::MenuItem("Edit Builtin Material",
+                                            nullptr,
+                                            false,
+                                            BuiltinAssets::isBuiltinMaterial(material_handle))) {
+                            edit_builtin_material = true;
+                        }
+                        if (ImGui::MenuItem("Clear Material", nullptr, false, material_handle.isValid())) {
+                            clear_material = true;
+                        }
+                        if (ImGui::MenuItem("Clear All Materials",
+                                            nullptr,
+                                            false,
+                                            mesh_component.getSubmeshMaterialCount() > 0)) {
+                            mesh_component.clearAllSubmeshMaterials();
+                            material_handle = AssetHandle(0);
+                            changed = true;
+                        }
+                        ImGui::EndPopup();
+                    }
+                    if (edit_builtin_material && BuiltinAssets::isBuiltinMaterial(material_handle)) {
+                        m_editor_context->openBuiltinMaterialsPanel(material_handle);
+                    }
                     const std::string current_builtin_material_label = BuiltinAssets::isBuiltinMaterial(material_handle)
                                                                      ? BuiltinAssets::getDisplayName(material_handle)
                                                                      : "None";
@@ -408,16 +444,9 @@ void InspectorPanel::onImGuiRender()
                     }
                     if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
                         ImGui::TextDisabled("Global builtin material; edits affect all users.");
-                        if (editor::ui::drawButton("Edit Builtin Material",
-                                                   editor::ui::ButtonVariant::Subtle,
-                                                   ImVec2(-1.0f, 0.0f))) {
-                            m_editor_context->openBuiltinMaterialsPanel(material_handle);
-                        }
                     }
 
-                    if (editor::ui::drawButton("Clear Material",
-                                               editor::ui::ButtonVariant::Danger,
-                                               ImVec2(-1.0f, 0.0f))) {
+                    if (clear_material) {
                         if (mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
                             mesh_component.clearSubmeshMaterial(submesh_index);
                             changed = true;
@@ -426,15 +455,6 @@ void InspectorPanel::onImGuiRender()
 
                     ImGui::Separator();
                     ImGui::PopID();
-                }
-
-                if (editor::ui::drawButton("Clear All Materials",
-                                           editor::ui::ButtonVariant::Danger,
-                                           ImVec2(-1.0f, 0.0f))) {
-                    if (mesh_component.getSubmeshMaterialCount() > 0) {
-                        mesh_component.clearAllSubmeshMaterials();
-                        changed = true;
-                    }
                 }
             }
             return changed;
@@ -457,6 +477,7 @@ void InspectorPanel::onImGuiRender()
         m_editor_context->markSceneDirty();
     }
 
+    editor::ui::popCompactInspectorStyle();
     ImGui::End();
 }
 

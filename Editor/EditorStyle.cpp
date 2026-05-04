@@ -8,8 +8,9 @@
 namespace luna::editor {
 namespace {
 
-constexpr float kMinUiScale = 0.85f;
+constexpr float kMinUiScale = 1.0f;
 constexpr float kMaxUiScale = 2.5f;
+constexpr float kEditorDensityScale = 0.88f;
 float g_editor_ui_scale = 1.0f;
 
 float sanitizeUiScale(float ui_scale) noexcept
@@ -18,7 +19,7 @@ float sanitizeUiScale(float ui_scale) noexcept
         return 1.0f;
     }
 
-    return std::clamp(ui_scale, kMinUiScale, kMaxUiScale);
+    return std::clamp(ui_scale * kEditorDensityScale, kMinUiScale, kMaxUiScale);
 }
 
 ImVec4 color(float r, float g, float b, float a = 1.0f)
@@ -33,15 +34,15 @@ void applyModernLightweightTheme()
     ImGuiStyle& style = ImGui::GetStyle();
     style.FontScaleMain = 1.0f;
     style.FontScaleDpi = 1.0f;
-    style.WindowPadding = ImVec2(10.0f, 10.0f);
-    style.FramePadding = ImVec2(8.0f, 4.0f);
-    style.CellPadding = ImVec2(6.0f, 4.0f);
-    style.ItemSpacing = ImVec2(8.0f, 5.0f);
-    style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
+    style.WindowPadding = ImVec2(8.0f, 8.0f);
+    style.FramePadding = ImVec2(7.0f, 3.0f);
+    style.CellPadding = ImVec2(5.0f, 3.0f);
+    style.ItemSpacing = ImVec2(7.0f, 4.0f);
+    style.ItemInnerSpacing = ImVec2(5.0f, 3.0f);
     style.TouchExtraPadding = ImVec2(0.0f, 0.0f);
-    style.IndentSpacing = 16.0f;
-    style.ScrollbarSize = 12.0f;
-    style.GrabMinSize = 10.0f;
+    style.IndentSpacing = 14.0f;
+    style.ScrollbarSize = 10.0f;
+    style.GrabMinSize = 9.0f;
 
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
@@ -49,13 +50,13 @@ void applyModernLightweightTheme()
     style.FrameBorderSize = 0.0f;
     style.TabBorderSize = 0.0f;
 
-    style.WindowRounding = 5.0f;
-    style.ChildRounding = 4.0f;
-    style.FrameRounding = 4.0f;
-    style.PopupRounding = 5.0f;
-    style.ScrollbarRounding = 5.0f;
-    style.GrabRounding = 4.0f;
-    style.TabRounding = 4.0f;
+    style.WindowRounding = 4.0f;
+    style.ChildRounding = 3.0f;
+    style.FrameRounding = 3.0f;
+    style.PopupRounding = 4.0f;
+    style.ScrollbarRounding = 4.0f;
+    style.GrabRounding = 3.0f;
+    style.TabRounding = 3.0f;
 
     style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
 
@@ -120,6 +121,18 @@ void applyModernLightweightTheme()
     colors[ImGuiCol_NavHighlight] = accent;
 }
 
+void clampScaledStyleMetrics(ImGuiStyle& style)
+{
+    style.WindowBorderSize = (std::max)(style.WindowBorderSize, 1.0f);
+    style.ChildBorderSize = (std::max)(style.ChildBorderSize, 1.0f);
+    style.PopupBorderSize = (std::max)(style.PopupBorderSize, 1.0f);
+    style.SeparatorSize = (std::max)(style.SeparatorSize, 1.0f);
+    style.SeparatorTextBorderSize = (std::max)(style.SeparatorTextBorderSize, 1.0f);
+    style.TreeLinesSize = (std::max)(style.TreeLinesSize, 1.0f);
+    style.DragDropTargetBorderSize = (std::max)(style.DragDropTargetBorderSize, 1.0f);
+    style.DockingSeparatorSize = (std::max)(style.DockingSeparatorSize, 1.0f);
+}
+
 } // namespace
 
 float getEditorUiScale() noexcept
@@ -149,6 +162,7 @@ void applyEditorTheme(EditorThemePreset preset, float ui_scale)
 
     ImGuiStyle& style = ImGui::GetStyle();
     style.ScaleAllSizes(g_editor_ui_scale);
+    clampScaledStyleMetrics(style);
     style.FontScaleMain = g_editor_ui_scale;
     style.FontScaleDpi = 1.0f;
 }

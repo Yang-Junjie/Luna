@@ -35,10 +35,19 @@ enum class ButtonVariant {
 
 struct PropertyLayout {
     float label_width = 112.0f;
+    float row_padding_y = -1.0f;
 
     [[nodiscard]] float scaledLabelWidth() const noexcept
     {
         return scale(label_width);
+    }
+
+    [[nodiscard]] float scaledRowPaddingY() const noexcept
+    {
+        if (row_padding_y < 0.0f) {
+            return ImGui::GetStyle().CellPadding.y;
+        }
+        return scale(row_padding_y);
     }
 };
 
@@ -74,6 +83,14 @@ bool drawCombo(const char* label,
                const PropertyLayout& layout = {});
 bool drawButton(const char* label, ButtonVariant variant = ButtonVariant::Default, const ImVec2& size = ImVec2{0.0f, 0.0f});
 
+void pushCompactInspectorStyle();
+void popCompactInspectorStyle();
+
+bool beginSection(const char* label,
+                  const char* id = "##Section",
+                  ImGuiTreeNodeFlags extra_flags = ImGuiTreeNodeFlags_None);
+void endSection();
+
 bool drawVec2Control(const char* label,
                      glm::vec2& values,
                      float drag_speed = 0.1f,
@@ -105,16 +122,7 @@ bool drawComponentSection(const char* label, Entity entity, UIFunction&& ui_func
     bool changed = false;
     ImGui::PushID(label);
 
-    const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
-                                     ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_AllowOverlap;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(2.0f, 5.0f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4{0.0f, 0.0f, 0.0f, 0.0f});
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive));
-    const bool open = ImGui::TreeNodeEx("##Section", flags, "%s", label);
-    ImGui::PopStyleColor(3);
-    ImGui::PopStyleVar();
+    const bool open = beginSection(label);
 
     bool remove_component = false;
     if (allow_remove) {
@@ -130,7 +138,7 @@ bool drawComponentSection(const char* label, Entity entity, UIFunction&& ui_func
         ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, scale(10.0f));
         changed |= ui_function(component);
         ImGui::PopStyleVar();
-        ImGui::TreePop();
+        endSection();
     }
 
     if (remove_component) {

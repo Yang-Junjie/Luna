@@ -123,6 +123,19 @@ bool acceptDroppedAsset(AssetHandle& handle,
     return changed;
 }
 
+bool drawAssetClearContextMenu(const char* id, AssetHandle& handle)
+{
+    bool changed = false;
+    if (ImGui::BeginPopupContextItem(id)) {
+        if (ImGui::MenuItem("Clear", nullptr, false, handle.isValid())) {
+            handle = AssetHandle(0);
+            changed = true;
+        }
+        ImGui::EndPopup();
+    }
+    return changed;
+}
+
 bool drawAssetPreview(const char* id,
                       AssetHandle& handle,
                       std::initializer_list<AssetType> accepted_types,
@@ -138,7 +151,8 @@ bool drawAssetPreview(const char* id,
     ImGui::InvisibleButton(id, size);
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
-    const bool changed = acceptDroppedAsset(handle, accepted_types, accepts_handle);
+    bool changed = acceptDroppedAsset(handle, accepted_types, accepts_handle);
+    changed |= drawAssetClearContextMenu("AssetPreviewContext", handle);
 
     const ImVec2 min = position;
     const ImVec2 max{position.x + size.x, position.y + size.y};
@@ -240,6 +254,12 @@ std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffe
     return buffer;
 }
 
+PropertyLayout compactVectorLayout(PropertyLayout layout)
+{
+    layout.row_padding_y = 1.0f;
+    return layout;
+}
+
 } // namespace
 
 std::string assetDisplayLabel(AssetHandle handle)
@@ -250,7 +270,7 @@ std::string assetDisplayLabel(AssetHandle handle)
 bool beginPropertyRow(const char* label, const PropertyLayout& layout)
 {
     ImGui::PushID(label);
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, scaled(0.0f, 3.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{0.0f, layout.scaledRowPaddingY()});
     if (!ImGui::BeginTable("##PropertyRow", 2, ImGuiTableFlags_NoSavedSettings)) {
         ImGui::PopStyleVar();
         ImGui::PopID();
@@ -411,6 +431,51 @@ bool drawButton(const char* label, ButtonVariant variant, const ImVec2& size)
     return pressed;
 }
 
+void pushCompactInspectorStyle()
+{
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(6.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, scaled(4.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(6.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, scaled(4.0f, 1.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, scale(10.0f));
+}
+
+void popCompactInspectorStyle()
+{
+    ImGui::PopStyleVar(5);
+}
+
+bool beginSection(const char* label, const char* id, ImGuiTreeNodeFlags extra_flags)
+{
+    const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
+                                     ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_AllowOverlap | extra_flags;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(2.0f, 2.0f));
+    ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive));
+    const bool open = ImGui::TreeNodeEx(id, flags, "%s", label);
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar();
+
+    const ImVec2 item_min = ImGui::GetItemRectMin();
+    const ImVec2 item_max = ImGui::GetItemRectMax();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float accent_width = scale(3.0f);
+    draw_list->AddRectFilled(item_min,
+                             ImVec2{item_min.x + accent_width, item_max.y},
+                             ImGui::GetColorU32(withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), 0.72f)));
+    draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
+                       ImVec2{item_max.x, item_max.y - 1.0f},
+                       ImGui::GetColorU32(ImGuiCol_Border));
+    return open;
+}
+
+void endSection()
+{
+    ImGui::TreePop();
+}
+
 bool drawVec2Control(const char* label,
                      glm::vec2& values,
                      float drag_speed,
@@ -419,11 +484,13 @@ bool drawVec2Control(const char* label,
                      const char* format,
                      const PropertyLayout& layout)
 {
-    if (!beginPropertyRow(label, layout)) {
+    if (!beginPropertyRow(label, compactVectorLayout(layout))) {
         return false;
     }
 
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(6.0f, 2.0f));
     const bool changed = ImGui::DragFloat2("##value", &values.x, drag_speed, min_value, max_value, format);
+    ImGui::PopStyleVar();
     endPropertyRow();
     return changed;
 }
@@ -434,12 +501,12 @@ bool drawVec3Control(const char* label,
                      float drag_speed,
                      const PropertyLayout& layout)
 {
-    if (!beginPropertyRow(label, layout)) {
+    if (!beginPropertyRow(label, compactVectorLayout(layout))) {
         return false;
     }
 
     bool changed = false;
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(5.0f, 3.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(5.0f, 2.0f));
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float axis_width = (std::max)((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, scale(40.0f));
     changed |= drawAxisControl("X", 'X', values.x, reset_value, drag_speed, axis_width, false);
@@ -467,9 +534,7 @@ bool drawAssetHandleEditor(const char* label,
     changed |= drawAssetPreview("##assetPreview", handle, accepted_types, accepts_handle);
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(6.0f, 3.0f));
-    const float clear_button_width = scale(70.0f);
-    ImGui::SetNextItemWidth(
-        (std::max)(ImGui::GetContentRegionAvail().x - clear_button_width - scale(6.0f), scale(64.0f)));
+    ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::InputScalar("##handle", ImGuiDataType_U64, &raw_handle)) {
         const AssetHandle candidate_handle(static_cast<uint64_t>(raw_handle));
         if (!accepts_handle || accepts_handle(candidate_handle)) {
@@ -479,20 +544,7 @@ bool drawAssetHandleEditor(const char* label,
     }
 
     changed |= acceptDroppedAsset(handle, accepted_types, accepts_handle);
-
-    ImGui::SameLine();
-    if (!handle.isValid()) {
-        ImGui::BeginDisabled();
-    }
-    if (ImGui::Button("Clear", ImVec2{clear_button_width, 0.0f})) {
-        if (handle.isValid()) {
-            handle = AssetHandle(0);
-            changed = true;
-        }
-    }
-    if (!handle.isValid()) {
-        ImGui::EndDisabled();
-    }
+    changed |= drawAssetClearContextMenu("AssetHandleInputContext", handle);
     ImGui::PopStyleVar();
 
     endPropertyRow();
