@@ -124,7 +124,9 @@ EnvironmentResources::SourceSignature defaultSkySignature(const RenderEnvironmen
 
 EnvironmentResources::SourceSignature requestedSourceSignature(const RenderEnvironment* environment)
 {
-    if (environment == nullptr || !environment->enabled || !environment->environment_map_handle.isValid()) {
+    if (environment == nullptr ||
+        environment->background_mode == RenderBackgroundMode::ProceduralSky ||
+        !environment->environment_map_handle.isValid()) {
         return defaultSkySignature(environment);
     }
 

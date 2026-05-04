@@ -1,9 +1,8 @@
 #pragma once
 
-#include "ScriptHostBridge.h"
-
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
+#include "ScriptHostBridge.h"
 
 #include <glm/vec3.hpp>
 

@@ -39,6 +39,7 @@ struct SceneGpuParams {
     glm::vec4 light_direction_intensity{0.0f, 1.0f, 0.0f, 0.0f};
     glm::vec4 light_color_exposure{1.0f, 1.0f, 1.0f, 1.0f};
     glm::vec4 ibl_factors{1.0f, 1.0f, 1.0f, 0.0f};
+    glm::vec4 background_color_mode{0.10f, 0.10f, 0.12f, 0.0f};
     glm::vec4 debug_overlay_params{0.0f, 0.65f, 0.0f, 0.0f};
     glm::vec4 debug_pick_marker{0.0f, 0.0f, 0.0f, 1.0f};
     std::array<glm::mat4, kShadowCascadeCount> shadow_view_projections{

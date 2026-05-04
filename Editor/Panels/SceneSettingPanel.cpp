@@ -136,7 +136,9 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
 
 bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const luna::SceneEnvironmentSettings& rhs)
 {
-    return lhs.enabled == rhs.enabled && lhs.iblEnabled == rhs.iblEnabled &&
+    return lhs.backgroundMode == rhs.backgroundMode &&
+           sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
+           lhs.iblEnabled == rhs.iblEnabled &&
            lhs.environmentMapHandle == rhs.environmentMapHandle &&
            lhs.intensity == rhs.intensity && lhs.skyIntensity == rhs.skyIntensity &&
            lhs.diffuseIntensity == rhs.diffuseIntensity && lhs.specularIntensity == rhs.specularIntensity &&
@@ -147,6 +149,46 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const lu
            sameVec3(lhs.proceduralSkyColorHorizon, rhs.proceduralSkyColorHorizon) &&
            sameVec3(lhs.proceduralGroundColor, rhs.proceduralGroundColor) &&
            lhs.proceduralSkyExposure == rhs.proceduralSkyExposure;
+}
+
+const char* backgroundModeLabel(luna::SceneBackgroundMode mode)
+{
+    switch (mode) {
+        case luna::SceneBackgroundMode::SolidColor:
+            return "Solid Color";
+        case luna::SceneBackgroundMode::ProceduralSky:
+            return "Default Sky";
+        case luna::SceneBackgroundMode::EnvironmentMap:
+            return "Environment Map";
+    }
+
+    return "Default Sky";
+}
+
+bool drawBackgroundModeCombo(luna::SceneBackgroundMode& mode)
+{
+    bool changed = false;
+    if (ImGui::BeginCombo("Background", backgroundModeLabel(mode))) {
+        const luna::SceneBackgroundMode modes[] = {
+            luna::SceneBackgroundMode::SolidColor,
+            luna::SceneBackgroundMode::ProceduralSky,
+            luna::SceneBackgroundMode::EnvironmentMap,
+        };
+
+        for (const luna::SceneBackgroundMode candidate : modes) {
+            const bool selected = mode == candidate;
+            if (ImGui::Selectable(backgroundModeLabel(candidate), selected)) {
+                mode = candidate;
+                changed = true;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    return changed;
 }
 
 } // namespace
@@ -164,6 +206,7 @@ void SceneSettingPanel::syncFromScene()
     }
 
     m_environment_draft = m_editor_context->getScene().environmentSettings();
+    m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
     m_environment_draft_dirty = false;
     m_has_environment_draft = true;
 }
@@ -183,16 +226,24 @@ void SceneSettingPanel::onImGuiRender()
 
     const SceneEnvironmentSettings& scene_environment = m_editor_context->getScene().environmentSettings();
     SceneEnvironmentSettings& environment = m_environment_draft;
-    m_environment_draft_dirty = !sameEnvironmentSettings(environment, scene_environment);
 
     if (ImGui::CollapsingHeader("Environment", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::Checkbox("Enabled", &environment.enabled);
+        drawBackgroundModeCombo(environment.backgroundMode);
+        environment.enabled = environment.backgroundMode != SceneBackgroundMode::SolidColor;
+
+        if (environment.backgroundMode == SceneBackgroundMode::SolidColor) {
+            ImGui::ColorEdit3("Background Color", &environment.backgroundColor.x);
+        }
+
         ImGui::Checkbox("IBL Enabled", &environment.iblEnabled);
 
-        drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
-        ImGui::TextDisabled("Environment Asset: %s", getAssetDisplayLabel(environment.environmentMapHandle).c_str());
-        if (ImGui::Button("Clear Environment Map", ImVec2(-1.0f, 0.0f))) {
-            environment.environmentMapHandle = AssetHandle(0);
+        if (environment.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
+            environment.backgroundMode == SceneBackgroundMode::SolidColor) {
+            drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
+            ImGui::TextDisabled("Environment Asset: %s", getAssetDisplayLabel(environment.environmentMapHandle).c_str());
+            if (ImGui::Button("Clear Environment Map", ImVec2(-1.0f, 0.0f))) {
+                environment.environmentMapHandle = AssetHandle(0);
+            }
         }
 
         ImGui::DragFloat("Intensity", &environment.intensity, 0.01f, 0.0f, 100.0f, "%.2f");
@@ -200,19 +251,23 @@ void SceneSettingPanel::onImGuiRender()
         ImGui::DragFloat("Diffuse Intensity", &environment.diffuseIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
         ImGui::DragFloat("Specular Intensity", &environment.specularIntensity, 0.01f, 0.0f, 100.0f, "%.2f");
 
-        ImGui::SeparatorText("Default Sky");
-        drawVec3Control("Sun Direction", environment.proceduralSunDirection, 0.0f, 120.0f, 0.01f);
-        ImGui::DragFloat("Sun Intensity", &environment.proceduralSunIntensity, 0.05f, 0.0f, 1000.0f, "%.2f");
-        ImGui::DragFloat("Sun Angular Radius",
-                         &environment.proceduralSunAngularRadius,
-                         0.001f,
-                         0.0f,
-                         0.25f,
-                         "%.4f");
-        ImGui::ColorEdit3("Sky Zenith", &environment.proceduralSkyColorZenith.x);
-        ImGui::ColorEdit3("Sky Horizon", &environment.proceduralSkyColorHorizon.x);
-        ImGui::ColorEdit3("Ground", &environment.proceduralGroundColor.x);
-        ImGui::DragFloat("Sky Exposure", &environment.proceduralSkyExposure, 0.01f, 0.0f, 100.0f, "%.2f");
+        if (environment.backgroundMode == SceneBackgroundMode::ProceduralSky) {
+            ImGui::SeparatorText("Default Sky");
+            drawVec3Control("Sun Direction", environment.proceduralSunDirection, 0.0f, 120.0f, 0.01f);
+            ImGui::DragFloat("Sun Intensity", &environment.proceduralSunIntensity, 0.05f, 0.0f, 1000.0f, "%.2f");
+            ImGui::DragFloat("Sun Angular Radius",
+                             &environment.proceduralSunAngularRadius,
+                             0.001f,
+                             0.0f,
+                             0.25f,
+                             "%.4f");
+            ImGui::ColorEdit3("Sky Zenith", &environment.proceduralSkyColorZenith.x);
+            ImGui::ColorEdit3("Sky Horizon", &environment.proceduralSkyColorHorizon.x);
+            ImGui::ColorEdit3("Ground", &environment.proceduralGroundColor.x);
+            ImGui::DragFloat("Sky Exposure", &environment.proceduralSkyExposure, 0.01f, 0.0f, 100.0f, "%.2f");
+        }
+
+        m_environment_draft_dirty = !sameEnvironmentSettings(environment, scene_environment);
 
         ImGui::Separator();
         const bool disable_apply_controls = !m_environment_draft_dirty;
@@ -220,6 +275,7 @@ void SceneSettingPanel::onImGuiRender()
             ImGui::BeginDisabled();
         }
         if (ImGui::Button("Apply", ImVec2(120.0f, 0.0f))) {
+            m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
             m_editor_context->getScene().environmentSettings() = m_environment_draft;
             m_environment_draft_dirty = false;
             m_editor_context->markSceneDirty();

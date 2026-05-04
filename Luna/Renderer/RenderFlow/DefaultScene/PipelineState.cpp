@@ -748,6 +748,13 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
                                    specular_intensity,
                                    ibl_environment_intensity,
                                    sky_intensity * environment_intensity);
+    const RenderBackgroundMode background_mode =
+        environment != nullptr ? environment->background_mode : RenderBackgroundMode::SolidColor;
+    const glm::vec3 background_color =
+        environment != nullptr ? environment->background_color
+                               : glm::vec3(context.clear_color.r, context.clear_color.g, context.clear_color.b);
+    params.background_color_mode = glm::vec4(background_color,
+                                             static_cast<float>(static_cast<uint32_t>(background_mode)));
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f,
                                             0.65f,
                                             static_cast<float>(context.debug_view_mode),

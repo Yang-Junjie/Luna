@@ -80,6 +80,7 @@ struct SceneParams
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
+    float4 backgroundColorMode;
     float4 debugOverlayParams;
     float4 debugPickMarker;
     float4x4 shadowViewProjections[kShadowCascadeCount];

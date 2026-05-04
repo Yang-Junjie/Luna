@@ -46,6 +46,45 @@ glm::vec3 readVec3(const YAML::Node& node, const glm::vec3& fallback)
     return {node[0].as<float>(), node[1].as<float>(), node[2].as<float>()};
 }
 
+const char* sceneBackgroundModeToString(luna::SceneBackgroundMode mode)
+{
+    switch (mode) {
+        case luna::SceneBackgroundMode::SolidColor:
+            return "SolidColor";
+        case luna::SceneBackgroundMode::ProceduralSky:
+            return "ProceduralSky";
+        case luna::SceneBackgroundMode::EnvironmentMap:
+            return "EnvironmentMap";
+    }
+
+    return "ProceduralSky";
+}
+
+luna::SceneBackgroundMode readSceneBackgroundMode(const YAML::Node& node, luna::SceneBackgroundMode fallback)
+{
+    if (!node) {
+        return fallback;
+    }
+
+    const std::string mode = node.as<std::string>();
+    if (mode == "SolidColor") {
+        return luna::SceneBackgroundMode::SolidColor;
+    }
+    if (mode == "ProceduralSky" || mode == "DefaultSky") {
+        return luna::SceneBackgroundMode::ProceduralSky;
+    }
+    if (mode == "EnvironmentMap") {
+        return luna::SceneBackgroundMode::EnvironmentMap;
+    }
+
+    return fallback;
+}
+
+bool sceneBackgroundModeHasVisibleSky(luna::SceneBackgroundMode mode)
+{
+    return mode != luna::SceneBackgroundMode::SolidColor;
+}
+
 const char* scriptPropertyTypeToString(luna::ScriptPropertyType type)
 {
     switch (type) {
@@ -179,7 +218,10 @@ luna::ScriptProperty readScriptProperty(const YAML::Node& node)
 void emitSceneEnvironment(YAML::Emitter& out, const luna::SceneEnvironmentSettings& environment)
 {
     out << YAML::Key << "Environment" << YAML::Value << YAML::BeginMap;
-    out << YAML::Key << "Enabled" << YAML::Value << environment.enabled;
+    out << YAML::Key << "Enabled" << YAML::Value << sceneBackgroundModeHasVisibleSky(environment.backgroundMode);
+    out << YAML::Key << "BackgroundMode" << YAML::Value << sceneBackgroundModeToString(environment.backgroundMode);
+    out << YAML::Key << "BackgroundColor" << YAML::Value;
+    emitVec3(out, environment.backgroundColor);
     out << YAML::Key << "IblEnabled" << YAML::Value << environment.iblEnabled;
     out << YAML::Key << "EnvironmentMapHandle" << YAML::Value
         << static_cast<uint64_t>(environment.environmentMapHandle);
@@ -207,8 +249,11 @@ void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings
         return;
     }
 
+    bool legacy_enabled = environment.enabled;
+    bool has_legacy_enabled = false;
     if (node["Enabled"]) {
-        environment.enabled = node["Enabled"].as<bool>();
+        legacy_enabled = node["Enabled"].as<bool>();
+        has_legacy_enabled = true;
     }
     if (node["IblEnabled"]) {
         environment.iblEnabled = node["IblEnabled"].as<bool>();
@@ -216,6 +261,17 @@ void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings
     if (node["EnvironmentMapHandle"]) {
         environment.environmentMapHandle = luna::AssetHandle(node["EnvironmentMapHandle"].as<uint64_t>());
     }
+    if (node["BackgroundMode"]) {
+        environment.backgroundMode = readSceneBackgroundMode(node["BackgroundMode"], environment.backgroundMode);
+    } else if (has_legacy_enabled && !legacy_enabled) {
+        environment.backgroundMode = luna::SceneBackgroundMode::SolidColor;
+    } else if (environment.environmentMapHandle.isValid()) {
+        environment.backgroundMode = luna::SceneBackgroundMode::EnvironmentMap;
+    } else {
+        environment.backgroundMode = luna::SceneBackgroundMode::ProceduralSky;
+    }
+    environment.backgroundColor = readVec3(node["BackgroundColor"], environment.backgroundColor);
+    environment.enabled = sceneBackgroundModeHasVisibleSky(environment.backgroundMode);
     if (node["Intensity"]) {
         environment.intensity = node["Intensity"].as<float>();
     }

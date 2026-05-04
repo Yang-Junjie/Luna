@@ -34,6 +34,7 @@ struct SceneParams
     float4 lightDirectionIntensity;
     float4 lightColorExposure;
     float4 iblFactors;
+    float4 backgroundColorMode;
     float4 debugOverlayParams;
     float4 debugPickMarker;
     float4x4 shadowViewProjections[kShadowCascadeCount];
@@ -234,6 +235,11 @@ float3 sampleEnvironment(float3 direction, float lod)
 float3 sampleEnvironmentSky(float3 direction, float lod)
 {
     return sampleEnvironment(direction, lod);
+}
+
+bool useSolidBackground()
+{
+    return ((uint)(gSceneParams.backgroundColorMode.w + 0.5)) == 0u;
 }
 
 float3 sampleEnvironmentIrradiance(float3 direction)
@@ -710,10 +716,16 @@ float4 sceneSkyFragmentMain(SceneLightingVertexOutput input) : SV_Target
     }
 
     const uint pickingId = loadPickingId(input.uv);
-    const float3 skyDirection = reconstructViewDirection(input.uv);
-    float3 skyColor = sampleEnvironmentSky(skyDirection, 0.0);
-    skyColor *= gSceneParams.lightColorExposure.a * max(gSceneParams.iblFactors.w, 0.0);
-    const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(skyColor)), pickingId, input.uv);
+    float3 backgroundColor = max(gSceneParams.backgroundColorMode.rgb, 0.0);
+    if (!useSolidBackground())
+    {
+        const float3 skyDirection = reconstructViewDirection(input.uv);
+        backgroundColor = sampleEnvironmentSky(skyDirection, 0.0);
+        backgroundColor *= gSceneParams.lightColorExposure.a * max(gSceneParams.iblFactors.w, 0.0);
+        backgroundColor = linearToSrgb(toneMapACES(backgroundColor));
+    }
+    const float3 finalColor =
+        applyPickDebugVisualization(backgroundColor, pickingId, input.uv);
     return float4(finalColor, 1.0);
 }
 

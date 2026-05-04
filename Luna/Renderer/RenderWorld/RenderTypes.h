@@ -23,6 +23,12 @@ enum class RenderPhase : uint8_t {
     Picking,
 };
 
+enum class RenderBackgroundMode : uint8_t {
+    SolidColor,
+    ProceduralSky,
+    EnvironmentMap,
+};
+
 using RenderPhaseMask = uint32_t;
 
 constexpr RenderPhaseMask renderPhaseBit(RenderPhase phase)
@@ -77,6 +83,8 @@ struct RenderSpotLight {
 struct RenderEnvironment {
     bool enabled{true};
     bool ibl_enabled{true};
+    RenderBackgroundMode background_mode{RenderBackgroundMode::ProceduralSky};
+    glm::vec3 background_color{0.10f, 0.10f, 0.12f};
     AssetHandle environment_map_handle{AssetHandle(0)};
     float intensity{1.0f};
     float sky_intensity{1.0f};

@@ -65,6 +65,20 @@ RenderPhaseMask phasesForMaterial(const std::shared_ptr<Material>& material)
     return phases;
 }
 
+RenderBackgroundMode resolveBackgroundMode(const SceneEnvironmentSettings& environment_settings)
+{
+    switch (environment_settings.backgroundMode) {
+        case SceneBackgroundMode::SolidColor:
+            return RenderBackgroundMode::SolidColor;
+        case SceneBackgroundMode::ProceduralSky:
+            return RenderBackgroundMode::ProceduralSky;
+        case SceneBackgroundMode::EnvironmentMap:
+            return RenderBackgroundMode::EnvironmentMap;
+    }
+
+    return RenderBackgroundMode::ProceduralSky;
+}
+
 } // namespace
 
 void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWorld& render_world) const
@@ -77,26 +91,26 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
     auto& registry = entity_manager.registry();
 
     const SceneEnvironmentSettings& environment_settings = scene.environmentSettings();
-    if (environment_settings.enabled || !environment_settings.iblEnabled) {
-        render_world.setEnvironment(RenderEnvironment{
-            .enabled = environment_settings.enabled,
-            .ibl_enabled = environment_settings.iblEnabled,
-            .environment_map_handle = environment_settings.environmentMapHandle,
-            .intensity = (std::max)(environment_settings.intensity, 0.0f),
-            .sky_intensity = (std::max)(environment_settings.skyIntensity, 0.0f),
-            .diffuse_intensity = (std::max)(environment_settings.diffuseIntensity, 0.0f),
-            .specular_intensity = (std::max)(environment_settings.specularIntensity, 0.0f),
-            .allow_async_load = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking,
-            .procedural_sun_direction = safeNormalize(environment_settings.proceduralSunDirection,
-                                                       glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
-            .procedural_sun_intensity = (std::max)(environment_settings.proceduralSunIntensity, 0.0f),
-            .procedural_sun_angular_radius = (std::max)(environment_settings.proceduralSunAngularRadius, 0.0f),
-            .procedural_sky_color_zenith = environment_settings.proceduralSkyColorZenith,
-            .procedural_sky_color_horizon = environment_settings.proceduralSkyColorHorizon,
-            .procedural_ground_color = environment_settings.proceduralGroundColor,
-            .procedural_sky_exposure = (std::max)(environment_settings.proceduralSkyExposure, 0.0f),
-        });
-    }
+    render_world.setEnvironment(RenderEnvironment{
+        .enabled = environment_settings.backgroundMode != SceneBackgroundMode::SolidColor,
+        .ibl_enabled = environment_settings.iblEnabled,
+        .background_mode = resolveBackgroundMode(environment_settings),
+        .background_color = environment_settings.backgroundColor,
+        .environment_map_handle = environment_settings.environmentMapHandle,
+        .intensity = (std::max)(environment_settings.intensity, 0.0f),
+        .sky_intensity = (std::max)(environment_settings.skyIntensity, 0.0f),
+        .diffuse_intensity = (std::max)(environment_settings.diffuseIntensity, 0.0f),
+        .specular_intensity = (std::max)(environment_settings.specularIntensity, 0.0f),
+        .allow_async_load = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking,
+        .procedural_sun_direction = safeNormalize(environment_settings.proceduralSunDirection,
+                                                   glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
+        .procedural_sun_intensity = (std::max)(environment_settings.proceduralSunIntensity, 0.0f),
+        .procedural_sun_angular_radius = (std::max)(environment_settings.proceduralSunAngularRadius, 0.0f),
+        .procedural_sky_color_zenith = environment_settings.proceduralSkyColorZenith,
+        .procedural_sky_color_horizon = environment_settings.proceduralSkyColorHorizon,
+        .procedural_ground_color = environment_settings.proceduralGroundColor,
+        .procedural_sky_exposure = (std::max)(environment_settings.proceduralSkyExposure, 0.0f),
+    });
 
     bool has_directional_light = false;
     auto light_view = registry.view<TransformComponent, LightComponent>();

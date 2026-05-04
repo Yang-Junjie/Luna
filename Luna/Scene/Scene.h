@@ -6,12 +6,22 @@
 
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
+#include <cstdint>
 #include <memory>
 #include <string>
 
 namespace luna {
 
+enum class SceneBackgroundMode : uint8_t {
+    SolidColor,
+    ProceduralSky,
+    EnvironmentMap,
+};
+
 struct SceneEnvironmentSettings {
+    SceneBackgroundMode backgroundMode = SceneBackgroundMode::ProceduralSky;
+    glm::vec3 backgroundColor{0.10f, 0.10f, 0.12f};
+    // Legacy serialized visibility flag. New code should use backgroundMode.
     bool enabled = true;
     bool iblEnabled = true;
     AssetHandle environmentMapHandle = AssetHandle(0);
