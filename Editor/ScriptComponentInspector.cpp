@@ -2,7 +2,7 @@
 
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
-#include "EditorAssetDragDrop.h"
+#include "EditorUI.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Entity.h"
@@ -12,11 +12,11 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -278,58 +278,6 @@ bool applyScriptPropertySchema(luna::ScriptEntry& script, const std::vector<luna
     return changed;
 }
 
-std::string getAssetDisplayLabel(luna::AssetHandle handle)
-{
-    if (!handle.isValid()) {
-        return "None";
-    }
-
-    if (!luna::AssetDatabase::exists(handle)) {
-        return "Unknown Asset";
-    }
-
-    const auto& metadata = luna::AssetDatabase::getAssetMetadata(handle);
-    if (!metadata.Name.empty()) {
-        return metadata.Name;
-    }
-
-    if (!metadata.FilePath.empty()) {
-        return metadata.FilePath.generic_string();
-    }
-
-    return "Unnamed Asset";
-}
-
-bool drawAssetHandleEditor(const char* label,
-                           luna::AssetHandle& handle,
-                           std::initializer_list<luna::AssetType> accepted_types = {},
-                           const std::function<bool(luna::AssetHandle)>& accepts_handle = {})
-{
-    bool changed = false;
-    unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
-    if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
-        const luna::AssetHandle candidate_handle(static_cast<uint64_t>(raw_handle));
-        if (!accepts_handle || accepts_handle(candidate_handle)) {
-            handle = candidate_handle;
-            changed = true;
-        }
-    }
-
-    if (ImGui::BeginDragDropTarget()) {
-        luna::editor::AssetDragDropData payload{};
-        if (luna::editor::acceptAssetDragDropPayload(payload, accepted_types)) {
-            const luna::AssetHandle candidate_handle = luna::editor::getAssetHandle(payload);
-            if (!accepts_handle || accepts_handle(candidate_handle)) {
-                handle = candidate_handle;
-                changed = true;
-            }
-        }
-        ImGui::EndDragDropTarget();
-    }
-
-    return changed;
-}
-
 bool drawScriptAssetEditor(luna::ScriptEntry& script)
 {
     const ProjectScriptLanguageState language_state = getProjectScriptLanguageState();
@@ -357,8 +305,8 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
         return true;
     };
 
-    bool changed =
-        drawAssetHandleEditor("Script Asset", script.scriptAsset, {luna::AssetType::Script}, accepts_script_handle);
+    bool changed = luna::editor::ui::drawAssetHandleEditor(
+        "Script Asset", script.scriptAsset, {luna::AssetType::Script}, accepts_script_handle);
     if (rejected_selection_message.has_value()) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", rejected_selection_message->c_str());
     }
@@ -377,7 +325,7 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
     }
 
     const auto& metadata = luna::AssetDatabase::getAssetMetadata(script.scriptAsset);
-    ImGui::TextDisabled("Script Asset: %s", getAssetDisplayLabel(script.scriptAsset).c_str());
+    ImGui::TextDisabled("Script Asset: %s", luna::editor::ui::assetDisplayLabel(script.scriptAsset).c_str());
     ImGui::TextDisabled("Script Type: %s", luna::AssetUtils::AssetTypeToString(metadata.Type));
     if (metadata.Type == luna::AssetType::Script) {
         const std::string metadata_language = getScriptAssetLanguage(metadata);
@@ -534,14 +482,15 @@ bool drawScriptPropertyValueEditor(luna::Entity owner_entity, luna::ScriptProper
             changed |= drawEntityReferenceEditor(owner_entity, property.entityValue);
             break;
         case luna::ScriptPropertyType::Asset:
-            changed |= drawAssetHandleEditor("Asset", property.assetValue);
+            changed |= luna::editor::ui::drawAssetHandleEditor("Asset", property.assetValue);
             if (!property.assetValue.isValid()) {
                 ImGui::TextDisabled("Resolved Asset: None");
             } else if (!luna::AssetDatabase::exists(property.assetValue)) {
                 ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Referenced asset does not exist.");
             } else {
                 const auto& metadata = luna::AssetDatabase::getAssetMetadata(property.assetValue);
-                ImGui::TextDisabled("Resolved Asset: %s", getAssetDisplayLabel(property.assetValue).c_str());
+                ImGui::TextDisabled("Resolved Asset: %s",
+                                    luna::editor::ui::assetDisplayLabel(property.assetValue).c_str());
                 ImGui::TextDisabled("Asset Type: %s", luna::AssetUtils::AssetTypeToString(metadata.Type));
             }
             break;

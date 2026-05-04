@@ -1,133 +1,13 @@
 #include "SceneSettingPanel.h"
 
-#include "Asset/AssetDatabase.h"
-#include "EditorAssetDragDrop.h"
 #include "EditorContext.h"
+#include "EditorUI.h"
 
-#include <algorithm>
 #include <cmath>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
-#include <string>
 
 namespace {
-
-bool drawVec3Control(const std::string& label,
-                     glm::vec3& values,
-                     float reset_value = 0.0f,
-                     float column_width = 120.0f,
-                     float drag_speed = 0.1f)
-{
-    bool changed = false;
-    ImGui::PushID(label.c_str());
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{0.0f, 1.0f});
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{4.0f, 1.0f});
-
-    if (ImGui::BeginTable("##Vec3Table", 2, ImGuiTableFlags_NoSavedSettings)) {
-        ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, column_width);
-        ImGui::TableSetupColumn("##controls", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFontSize() + 2.0f);
-
-        ImGui::TableNextColumn();
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(label.c_str());
-
-        ImGui::TableNextColumn();
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{4.0f, 0.0f});
-
-        const float line_height = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
-        const ImVec2 button_size{line_height + 3.0f, line_height};
-        const float item_spacing = ImGui::GetStyle().ItemSpacing.x;
-        const float item_width =
-            (std::max)((ImGui::GetContentRegionAvail().x - button_size.x * 3.0f - item_spacing * 2.0f) / 3.0f, 1.0f);
-
-        auto draw_axis_control =
-            [&](const char* axis_label, float& value, const ImVec4& color, const ImVec4& hovered_color, bool last) {
-                bool axis_changed = false;
-
-                ImGui::PushStyleColor(ImGuiCol_Button, color);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hovered_color);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-                if (ImGui::Button(axis_label, button_size)) {
-                    value = reset_value;
-                    axis_changed = true;
-                }
-                ImGui::PopStyleColor(3);
-
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(item_width);
-                if (ImGui::DragFloat(
-                        (std::string("##") + axis_label).c_str(), &value, drag_speed, 0.0f, 0.0f, "%.2f")) {
-                    axis_changed = true;
-                }
-
-                if (!last) {
-                    ImGui::SameLine();
-                }
-
-                return axis_changed;
-            };
-
-        changed |= draw_axis_control(
-            "X", values.x, ImVec4{0.80f, 0.10f, 0.15f, 1.0f}, ImVec4{0.90f, 0.20f, 0.20f, 1.0f}, false);
-        changed |= draw_axis_control(
-            "Y", values.y, ImVec4{0.20f, 0.70f, 0.20f, 1.0f}, ImVec4{0.30f, 0.80f, 0.30f, 1.0f}, false);
-        changed |= draw_axis_control(
-            "Z", values.z, ImVec4{0.10f, 0.25f, 0.80f, 1.0f}, ImVec4{0.20f, 0.35f, 0.90f, 1.0f}, true);
-
-        ImGui::PopStyleVar();
-        ImGui::EndTable();
-    }
-
-    ImGui::PopStyleVar(2);
-    ImGui::PopID();
-    return changed;
-}
-
-std::string getAssetDisplayLabel(luna::AssetHandle handle)
-{
-    if (!handle.isValid()) {
-        return "None";
-    }
-
-    if (!luna::AssetDatabase::exists(handle)) {
-        return "Unknown Asset";
-    }
-
-    const auto& metadata = luna::AssetDatabase::getAssetMetadata(handle);
-    if (!metadata.Name.empty()) {
-        return metadata.Name;
-    }
-
-    if (!metadata.FilePath.empty()) {
-        return metadata.FilePath.generic_string();
-    }
-
-    return "Unnamed Asset";
-}
-
-bool drawAssetHandleEditor(const char* label,
-                           luna::AssetHandle& handle,
-                           std::initializer_list<luna::AssetType> accepted_types = {})
-{
-    bool changed = false;
-    unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
-    if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
-        handle = luna::AssetHandle(static_cast<uint64_t>(raw_handle));
-        changed = true;
-    }
-
-    if (ImGui::BeginDragDropTarget()) {
-        luna::editor::AssetDragDropData payload{};
-        if (luna::editor::acceptAssetDragDropPayload(payload, accepted_types)) {
-            handle = luna::editor::getAssetHandle(payload);
-            changed = true;
-        }
-        ImGui::EndDragDropTarget();
-    }
-
-    return changed;
-}
 
 bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
 {
@@ -239,8 +119,7 @@ void SceneSettingPanel::onImGuiRender()
 
         if (environment.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
             environment.backgroundMode == SceneBackgroundMode::SolidColor) {
-            drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
-            ImGui::TextDisabled("Environment Asset: %s", getAssetDisplayLabel(environment.environmentMapHandle).c_str());
+            editor::ui::drawAssetHandleEditor("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
             if (ImGui::Button("Clear Environment Map", ImVec2(-1.0f, 0.0f))) {
                 environment.environmentMapHandle = AssetHandle(0);
             }
@@ -253,7 +132,11 @@ void SceneSettingPanel::onImGuiRender()
 
         if (environment.backgroundMode == SceneBackgroundMode::ProceduralSky) {
             ImGui::SeparatorText("Default Sky");
-            drawVec3Control("Sun Direction", environment.proceduralSunDirection, 0.0f, 120.0f, 0.01f);
+            editor::ui::drawVec3Control("Sun Direction",
+                                         environment.proceduralSunDirection,
+                                         0.0f,
+                                         0.01f,
+                                         editor::ui::PropertyLayout{120.0f});
             ImGui::DragFloat("Sun Intensity", &environment.proceduralSunIntensity, 0.05f, 0.0f, 1000.0f, "%.2f");
             ImGui::DragFloat("Sun Angular Radius",
                              &environment.proceduralSunAngularRadius,

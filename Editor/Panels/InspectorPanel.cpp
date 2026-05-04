@@ -1,182 +1,21 @@
 #include "InspectorPanel.h"
 
-#include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
-#include "EditorAssetDragDrop.h"
 #include "EditorContext.h"
+#include "EditorUI.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 #include "ScriptComponentInspector.h"
 
 #include <algorithm>
-#include <array>
 #include <cstring>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <string>
 
 namespace {
-
-bool drawVec3Control(const std::string& label,
-                     glm::vec3& values,
-                     float reset_value = 0.0f,
-                     float column_width = 100.0f,
-                     float drag_speed = 0.1f)
-{
-    bool changed = false;
-    ImGui::PushID(label.c_str());
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2{0.0f, 1.0f});
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{4.0f, 1.0f});
-
-    if (ImGui::BeginTable("##Vec3Table", 2, ImGuiTableFlags_NoSavedSettings)) {
-        ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, column_width);
-        ImGui::TableSetupColumn("##controls", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableNextRow(ImGuiTableRowFlags_None, ImGui::GetFontSize() + 2.0f);
-
-        ImGui::TableNextColumn();
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(label.c_str());
-
-        ImGui::TableNextColumn();
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{4.0f, 0.0f});
-
-        const float line_height = ImGui::GetFontSize() + ImGui::GetStyle().FramePadding.y * 2.0f;
-        const ImVec2 button_size{line_height + 3.0f, line_height};
-        const float item_spacing = ImGui::GetStyle().ItemSpacing.x;
-        const float item_width =
-            (std::max)((ImGui::GetContentRegionAvail().x - button_size.x * 3.0f - item_spacing * 2.0f) / 3.0f, 1.0f);
-
-        auto draw_axis_control =
-            [&](const char* axis_label, float& value, const ImVec4& color, const ImVec4& hovered_color, bool last) {
-                bool axis_changed = false;
-
-                ImGui::PushStyleColor(ImGuiCol_Button, color);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, hovered_color);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, color);
-                if (ImGui::Button(axis_label, button_size)) {
-                    value = reset_value;
-                    axis_changed = true;
-                }
-                ImGui::PopStyleColor(3);
-
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(item_width);
-                if (ImGui::DragFloat(
-                        (std::string("##") + axis_label).c_str(), &value, drag_speed, 0.0f, 0.0f, "%.2f")) {
-                    axis_changed = true;
-                }
-
-                if (!last) {
-                    ImGui::SameLine();
-                }
-
-                return axis_changed;
-            };
-
-        changed |= draw_axis_control(
-            "X", values.x, ImVec4{0.80f, 0.10f, 0.15f, 1.0f}, ImVec4{0.90f, 0.20f, 0.20f, 1.0f}, false);
-        changed |= draw_axis_control(
-            "Y", values.y, ImVec4{0.20f, 0.70f, 0.20f, 1.0f}, ImVec4{0.30f, 0.80f, 0.30f, 1.0f}, false);
-        changed |= draw_axis_control(
-            "Z", values.z, ImVec4{0.10f, 0.25f, 0.80f, 1.0f}, ImVec4{0.20f, 0.35f, 0.90f, 1.0f}, true);
-
-        ImGui::PopStyleVar();
-        ImGui::EndTable();
-    }
-
-    ImGui::PopStyleVar(2);
-    ImGui::PopID();
-    return changed;
-}
-
-std::string getAssetDisplayLabel(luna::AssetHandle handle)
-{
-    if (!handle.isValid()) {
-        return "None";
-    }
-
-    if (!luna::AssetDatabase::exists(handle)) {
-        return "Unknown Asset";
-    }
-
-    const auto& metadata = luna::AssetDatabase::getAssetMetadata(handle);
-    if (!metadata.Name.empty()) {
-        return metadata.Name;
-    }
-
-    if (!metadata.FilePath.empty()) {
-        return metadata.FilePath.generic_string();
-    }
-
-    return "Unnamed Asset";
-}
-
-bool drawAssetHandleEditor(const char* label,
-                          luna::AssetHandle& handle,
-                          std::initializer_list<luna::AssetType> accepted_types = {})
-{
-    bool changed = false;
-    unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
-    if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
-        handle = luna::AssetHandle(static_cast<uint64_t>(raw_handle));
-        changed = true;
-    }
-
-    if (ImGui::BeginDragDropTarget()) {
-        luna::editor::AssetDragDropData payload{};
-        if (luna::editor::acceptAssetDragDropPayload(payload, accepted_types)) {
-            handle = luna::editor::getAssetHandle(payload);
-            changed = true;
-        }
-        ImGui::EndDragDropTarget();
-    }
-
-    return changed;
-}
-
-template <typename T, typename UIFunction>
-bool drawComponentSection(const char* label, luna::Entity entity, UIFunction&& ui_function, bool allow_remove)
-{
-    if (!entity.hasComponent<T>()) {
-        return false;
-    }
-
-    auto& component = entity.getComponent<T>();
-    bool changed = false;
-    ImGui::PushID(label);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{6.0f, 4.0f});
-
-    const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed |
-                                     ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding |
-                                     ImGuiTreeNodeFlags_AllowOverlap;
-    const bool open = ImGui::TreeNodeEx("##Section", flags, "%s", label);
-    ImGui::PopStyleVar();
-
-    bool remove_component = false;
-    if (allow_remove) {
-        if (ImGui::BeginPopupContextItem("ComponentSettings")) {
-            if (ImGui::MenuItem("Remove Component")) {
-                remove_component = true;
-            }
-            ImGui::EndPopup();
-        }
-    }
-
-    if (open) {
-        changed |= ui_function(component);
-        ImGui::TreePop();
-    }
-
-    if (remove_component) {
-        entity.removeComponent<T>();
-        changed = true;
-    }
-
-    ImGui::PopID();
-    return changed;
-}
 
 void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
 {
@@ -278,23 +117,23 @@ void InspectorPanel::onImGuiRender()
     ImGui::TextDisabled("UUID: %s", selected_entity.getUUID().toString().c_str());
     ImGui::Separator();
 
-    scene_changed |= drawComponentSection<TransformComponent>(
+    scene_changed |= editor::ui::drawComponentSection<TransformComponent>(
         "Transform", selected_entity, [&](TransformComponent& transform) {
             bool changed = false;
-            changed |= drawVec3Control("Translation", transform.translation, 0.0f);
+            changed |= editor::ui::drawVec3Control("Translation", transform.translation, 0.0f);
 
             glm::vec3 rotation_degrees = glm::degrees(transform.rotation);
-            if (drawVec3Control("Rotation", rotation_degrees, 0.0f)) {
+            if (editor::ui::drawVec3Control("Rotation", rotation_degrees, 0.0f)) {
                 transform.setRotationEuler(glm::radians(rotation_degrees));
                 changed = true;
             }
 
-            changed |= drawVec3Control("Scale", transform.scale, 1.0f);
+            changed |= editor::ui::drawVec3Control("Scale", transform.scale, 1.0f);
             return changed;
         },
         false);
 
-    scene_changed |= drawComponentSection<RelationshipComponent>(
+    scene_changed |= editor::ui::drawComponentSection<RelationshipComponent>(
         "Relationship", selected_entity, [&](RelationshipComponent&) {
             bool changed = false;
             Entity parent = selected_entity.getParent();
@@ -331,7 +170,7 @@ void InspectorPanel::onImGuiRender()
         },
         false);
 
-    scene_changed |= drawComponentSection<CameraComponent>(
+    scene_changed |= editor::ui::drawComponentSection<CameraComponent>(
         "Camera", selected_entity, [&](CameraComponent& camera_component) {
             bool changed = false;
             changed |= ImGui::Checkbox("Primary", &camera_component.primary);
@@ -375,7 +214,7 @@ void InspectorPanel::onImGuiRender()
         },
         true);
 
-    scene_changed |= drawComponentSection<LightComponent>(
+    scene_changed |= editor::ui::drawComponentSection<LightComponent>(
         "Light", selected_entity, [](LightComponent& light_component) {
             bool changed = false;
             changed |= ImGui::Checkbox("Enabled", &light_component.enabled);
@@ -435,7 +274,7 @@ void InspectorPanel::onImGuiRender()
         },
         true);
 
-    scene_changed |= drawComponentSection<MeshComponent>(
+    scene_changed |= editor::ui::drawComponentSection<MeshComponent>(
         "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
             bool changed = false;
             const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
@@ -465,8 +304,7 @@ void InspectorPanel::onImGuiRender()
                 ImGui::EndCombo();
             }
 
-            changed |= drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
-            ImGui::TextDisabled("Mesh Asset: %s", getAssetDisplayLabel(mesh_component.meshHandle).c_str());
+            changed |= editor::ui::drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
 
             if (mesh_component.meshHandle != previous_mesh_handle) {
                 mesh_component.clearAllSubmeshMaterials();
@@ -533,12 +371,12 @@ void InspectorPanel::onImGuiRender()
                         ImGui::EndCombo();
                     }
 
-                    changed |= drawAssetHandleEditor("Material Handle", material_handle, {AssetType::Material});
+                    changed |= editor::ui::drawAssetHandleEditor(
+                        "Material Handle", material_handle, {AssetType::Material});
                     if (mesh_component.getSubmeshMaterial(submesh_index) != material_handle) {
                         mesh_component.setSubmeshMaterial(submesh_index, material_handle);
                         changed = true;
                     }
-                    ImGui::TextDisabled("Material Asset: %s", getAssetDisplayLabel(material_handle).c_str());
                     if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
                         ImGui::TextDisabled("Global builtin material; edits affect all users.");
                         if (ImGui::Button("Edit Builtin Material", ImVec2(-1.0f, 0.0f))) {
@@ -568,7 +406,7 @@ void InspectorPanel::onImGuiRender()
         },
         true);
 
-    scene_changed |= drawComponentSection<ScriptComponent>(
+    scene_changed |= editor::ui::drawComponentSection<ScriptComponent>(
         "Script", selected_entity, [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
             const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
             if (editing_runtime_scene && change.property_value_changed) {

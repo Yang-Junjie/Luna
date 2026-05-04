@@ -94,6 +94,7 @@ private:
                              const ImVec2& uv0,
                              const ImVec2& uv1,
                              const luna::RHI::Extent2D& texture_extent) const;
+    void drawDockSpace();
     void onImGuiMenuBar();
     void drawViewport();
     void updateGizmoShortcuts();

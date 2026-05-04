@@ -172,13 +172,11 @@ void Application::run()
 void Application::renderFrame()
 {
     if (m_imgui_layer != nullptr && m_imgui_layer->isInitialized()) {
-        m_imgui_layer->begin();
+        m_imgui_layer->startFrame();
 
         for (auto& layer : m_layer_stack) {
             layer->onImGuiRender();
         }
-
-        m_imgui_layer->end();
     }
 
     if (!m_renderer.isRenderingEnabled()) {

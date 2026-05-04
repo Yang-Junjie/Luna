@@ -13,6 +13,10 @@ add_executable(
     EditorCamera.cpp
     EditorContext.h
     EditorAssetDragDrop.h
+    EditorStyle.h
+    EditorStyle.cpp
+    EditorUI.h
+    EditorUI.cpp
     Panels/InspectorPanel.h
     Panels/InspectorPanel.cpp
     LunaEditorApp.h

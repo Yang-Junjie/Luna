@@ -180,12 +180,6 @@ void LunaEditorLayer::onAttach()
                          luna::RHI::BackendTypeToString(
                              m_application->getRenderer().getCapabilities().backend_type));
     }
-
-    if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
-        imgui_layer->setMenuBarCallback([this]() {
-            onImGuiMenuBar();
-        });
-    }
 }
 
 void LunaEditorLayer::onDetach()
@@ -200,10 +194,6 @@ void LunaEditorLayer::onDetach()
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
     m_application->getRenderer().setRenderDebugViewMode(RenderDebugViewMode::None);
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
-
-    if (auto* imgui_layer = m_application->getImGuiLayer(); imgui_layer != nullptr) {
-        imgui_layer->setMenuBarCallback({});
-    }
 }
 
 void LunaEditorLayer::onUpdate(Timestep dt)
@@ -246,6 +236,8 @@ void LunaEditorLayer::onImGuiRender()
     }
 
     ImGuizmo::BeginFrame();
+
+    drawDockSpace();
 
     auto& application = *m_application;
     auto& renderer = application.getRenderer();
@@ -315,6 +307,34 @@ void LunaEditorLayer::onImGuiRender()
     m_backend_capabilities_panel->onImGuiRender(m_show_backend_capabilities_panel, renderer);
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
     drawViewport();
+}
+
+void LunaEditorLayer::drawDockSpace()
+{
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos);
+    ImGui::SetNextWindowSize(ImGui::GetMainViewport()->Size);
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
+                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+    ImGui::Begin("##EditorDockSpace", nullptr, window_flags);
+    ImGui::PopStyleVar(3);
+
+    const ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
+    ImGui::DockSpace(ImGui::GetID("EditorDockSpace"), ImVec2(0.0f, 0.0f), dockspace_flags);
+
+    if (ImGui::BeginMainMenuBar()) {
+        onImGuiMenuBar();
+        ImGui::EndMainMenuBar();
+    }
+
+    ImGui::End();
 }
 
 void LunaEditorLayer::onImGuiMenuBar()

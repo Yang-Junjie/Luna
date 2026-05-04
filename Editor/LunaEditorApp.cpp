@@ -1,4 +1,5 @@
 #include "Core/Log.h"
+#include "EditorStyle.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 
@@ -136,6 +137,9 @@ Renderer::InitializationOptions LunaEditorApplication::getRendererInitialization
 
 void LunaEditorApplication::onInit()
 {
+    if (auto* imgui_layer = getImGuiLayer(); imgui_layer != nullptr && imgui_layer->isInitialized()) {
+        editor::applyEditorTheme();
+    }
     pushOverlay(std::make_unique<LunaEditorLayer>(*this));
 }
 
