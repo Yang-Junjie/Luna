@@ -5,7 +5,6 @@ bin/
 cmake-build-debug-mingw/
 Experimental/
 logs/
-Tests/
 /DesignTarget.md
 __pycache__/
 docs/
