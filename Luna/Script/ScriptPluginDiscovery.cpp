@@ -23,6 +23,20 @@ std::string toLower(std::string_view value)
     return normalized;
 }
 
+std::string normalizeExtension(std::string_view value)
+{
+    std::string extension(value);
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    if (!extension.empty() && extension.front() != '.') {
+        extension.insert(extension.begin(), '.');
+    }
+
+    return extension;
+}
+
 bool isManifestFile(const std::filesystem::path& path)
 {
     const std::string filename = toLower(path.filename().string());
@@ -139,13 +153,13 @@ std::optional<luna::ScriptPluginCandidate> loadManifest(const std::filesystem::p
 
                     const std::string extension = extension_node.as<std::string>();
                     if (!extension.empty()) {
-                        candidate.Manifest.SupportedExtensions.push_back(extension);
+                        candidate.Manifest.SupportedExtensions.push_back(normalizeExtension(extension));
                     }
                 }
             } else if (supported_extensions.IsScalar()) {
                 const std::string extension = supported_extensions.as<std::string>();
                 if (!extension.empty()) {
-                    candidate.Manifest.SupportedExtensions.push_back(extension);
+                    candidate.Manifest.SupportedExtensions.push_back(normalizeExtension(extension));
                 }
             } else {
                 LUNA_CORE_WARN("Skipped 'Plugin.SupportedExtensions' in '{}' because it must be a string or sequence",

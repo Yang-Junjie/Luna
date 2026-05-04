@@ -41,6 +41,20 @@ std::string normalizeBackendKey(std::string_view value)
     return normalized;
 }
 
+std::string normalizeScriptExtension(std::string_view value)
+{
+    std::string normalized(value);
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    if (!normalized.empty() && normalized.front() != '.') {
+        normalized.insert(normalized.begin(), '.');
+    }
+
+    return normalized;
+}
+
 const char* scopeToString(luna::ScriptPluginScope scope)
 {
     switch (scope) {
@@ -198,6 +212,89 @@ bool registerBackendIntoMap(BackendMap& backends, std::unique_ptr<luna::IScriptB
                    descriptor.name,
                    descriptor.built_in ? "built-in" : "plugin");
     backends.emplace(key, std::move(backend));
+    return true;
+}
+
+void normalizeScriptExtensions(std::vector<std::string>& extensions)
+{
+    for (std::string& extension : extensions) {
+        extension = normalizeScriptExtension(extension);
+    }
+
+    std::erase_if(extensions, [](const std::string& extension) {
+        return extension.empty();
+    });
+
+    std::sort(extensions.begin(), extensions.end());
+    extensions.erase(std::unique(extensions.begin(), extensions.end()), extensions.end());
+}
+
+std::string joinScriptExtensions(std::vector<std::string> extensions)
+{
+    normalizeScriptExtensions(extensions);
+
+    std::string joined_extensions;
+    for (const std::string& extension : extensions) {
+        if (!joined_extensions.empty()) {
+            joined_extensions += ", ";
+        }
+
+        joined_extensions += extension;
+    }
+
+    return joined_extensions.empty() ? std::string("<none>") : joined_extensions;
+}
+
+bool extensionSetsEqual(std::vector<std::string> lhs, std::vector<std::string> rhs)
+{
+    normalizeScriptExtensions(lhs);
+    normalizeScriptExtensions(rhs);
+    return lhs == rhs;
+}
+
+bool validateBackendAgainstManifest(const luna::ScriptPluginCandidate& candidate,
+                                    const luna::ScriptBackendDescriptor& descriptor)
+{
+    if (!equalsIgnoreCase(descriptor.name, candidate.Manifest.BackendName)) {
+        LUNA_CORE_ERROR("Script plugin '{}' manifest declares backend '{}' but DLL exported backend '{}'",
+                        candidate.Manifest.PluginId,
+                        candidate.Manifest.BackendName,
+                        descriptor.name);
+        return false;
+    }
+
+    if (!equalsIgnoreCase(descriptor.language, candidate.Manifest.Language)) {
+        LUNA_CORE_ERROR("Script plugin '{}' backend '{}' language '{}' does not match manifest language '{}'",
+                        candidate.Manifest.PluginId,
+                        descriptor.name,
+                        descriptor.language,
+                        candidate.Manifest.Language);
+        return false;
+    }
+
+    if (descriptor.supported_extensions.empty()) {
+        LUNA_CORE_ERROR("Script plugin '{}' backend '{}' did not export any supported script file extensions",
+                        candidate.Manifest.PluginId,
+                        descriptor.name);
+        return false;
+    }
+
+    if (candidate.Manifest.SupportedExtensions.empty()) {
+        LUNA_CORE_ERROR("Script plugin '{}' manifest does not declare 'Plugin.SupportedExtensions'",
+                        candidate.Manifest.PluginId);
+        return false;
+    }
+
+    if (!extensionSetsEqual(descriptor.supported_extensions, candidate.Manifest.SupportedExtensions)) {
+        LUNA_CORE_ERROR("Script plugin '{}' backend '{}' exported extensions do not match manifest "
+                        "'Plugin.SupportedExtensions' (manifest=[{}], dll=[{}])",
+                        candidate.Manifest.PluginId,
+                        descriptor.name,
+                        joinScriptExtensions(candidate.Manifest.SupportedExtensions),
+                        joinScriptExtensions(descriptor.supported_extensions));
+        return false;
+    }
+
     return true;
 }
 
@@ -1052,8 +1149,14 @@ bool ScriptPluginManager::ensurePluginLoaded(const ScriptPluginCandidate* candid
             return false;
         }
 
-        if (!registerBackendIntoMap(loaded_backends,
-                                    std::make_unique<PluginScriptBackend>(*candidate, backend_api, plugin_library))) {
+        auto backend = std::make_unique<PluginScriptBackend>(*candidate, backend_api, plugin_library);
+        const ScriptBackendDescriptor& descriptor = backend->descriptor();
+        const bool manifest_backend = equalsIgnoreCase(descriptor.name, candidate->Manifest.BackendName);
+        if (manifest_backend && !validateBackendAgainstManifest(*candidate, descriptor)) {
+            return false;
+        }
+
+        if (!registerBackendIntoMap(loaded_backends, std::move(backend))) {
             LUNA_CORE_ERROR("Script plugin '{}' failed to register backend '{}'",
                             candidate->Manifest.PluginId,
                             backend_api.backend_name);
