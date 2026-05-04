@@ -84,13 +84,16 @@ void logEditorAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
 {
     LUNA_EDITOR_INFO(
         "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
-        "failed={}, missing_after_sync={}, generated_models={}, generated_model_meta={}, generated_materials={}, "
-        "generated_material_meta={}, generated_texture_meta={}, generated_model_failures={}",
+        "script_skipped_no_plugin={}, script_skipped_unsupported_language={}, failed={}, missing_after_sync={}, "
+        "generated_models={}, generated_model_meta={}, generated_materials={}, generated_material_meta={}, "
+        "generated_texture_meta={}, generated_model_failures={}",
         stats.discoveredAssets,
         stats.importedMissingAssets,
         stats.loadedExistingMetadata,
         stats.rebuiltMetadata,
         stats.unsupportedFilesSkipped,
+        stats.scriptFilesSkippedNoPlugin,
+        stats.scriptFilesSkippedUnsupportedLanguage,
         stats.failedAssets,
         stats.missingMetadataAfterSync,
         stats.generatedModelFiles,
@@ -134,32 +137,6 @@ std::optional<std::filesystem::path> makeScenePathRelativeToProject(const std::f
     }
 
     return relative_path;
-}
-
-const luna::ScriptPluginCandidate* findUniqueCandidateByBackend(
-    const std::vector<luna::ScriptPluginCandidate>& candidates, std::string_view backend_name)
-{
-    const auto equals_ignore_case = [](std::string_view lhs, std::string_view rhs) {
-        return lhs.size() == rhs.size() &&
-               std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](char a, char b) {
-                   return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
-               });
-    };
-
-    const luna::ScriptPluginCandidate* resolved = nullptr;
-    for (const auto& candidate : candidates) {
-        if (!equals_ignore_case(candidate.Manifest.BackendName, backend_name)) {
-            continue;
-        }
-
-        if (resolved != nullptr) {
-            return nullptr;
-        }
-
-        resolved = &candidate;
-    }
-
-    return resolved;
 }
 
 } // namespace
@@ -971,7 +948,26 @@ bool LunaEditorLayer::hasProjectLoaded() const
 void LunaEditorLayer::refreshProjectScriptPlugins()
 {
     refreshScriptPluginCandidates();
-    resolveProjectScriptPluginSelection(true);
+
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    const ScriptPluginSelectionResult selection =
+        ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+
+    if (!selection.StatusMessage.empty()) {
+        m_script_plugin_status = selection.StatusMessage;
+    } else {
+        m_script_plugin_status.clear();
+    }
+
+    if (selection.isResolved() && selection.Candidate != nullptr) {
+        const ProjectInfo& current_project_info = *project_info;
+        const std::string selected_plugin_id = selection.Candidate->Manifest.PluginId;
+        const std::string selected_backend_name = selection.BackendName;
+        if (current_project_info.Scripting.SelectedPluginId != selected_plugin_id ||
+            current_project_info.Scripting.SelectedBackendName != selected_backend_name) {
+            setProjectScriptPluginSelection(selection.Candidate, false);
+        }
+    }
 }
 
 const std::vector<ScriptPluginCandidate>& LunaEditorLayer::getDiscoveredScriptPlugins() const
@@ -987,20 +983,13 @@ const std::string& LunaEditorLayer::getScriptPluginStatus() const
 const ScriptPluginCandidate* LunaEditorLayer::getSelectedScriptPluginCandidate() const
 {
     const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (!project_info || project_info->Scripting.SelectedPluginId.empty()) {
+    if (!project_info) {
         return nullptr;
     }
 
-    const auto it = std::find_if(m_script_plugin_candidates.begin(),
-                                 m_script_plugin_candidates.end(),
-                                 [&project_info](const ScriptPluginCandidate& candidate) {
-                                     return candidate.Manifest.PluginId == project_info->Scripting.SelectedPluginId;
-                                 });
-    if (it != m_script_plugin_candidates.end()) {
-        return &(*it);
-    }
-
-    return ScriptPluginManager::instance().findDiscoveredPlugin(project_info->Scripting.SelectedPluginId);
+    const ScriptPluginSelectionResult selection =
+        ScriptPluginManager::instance().resolveProjectSelection(&*project_info);
+    return selection.Candidate;
 }
 
 bool LunaEditorLayer::selectScriptPlugin(const ScriptPluginCandidate* candidate)
@@ -1009,12 +998,10 @@ bool LunaEditorLayer::selectScriptPlugin(const ScriptPluginCandidate* candidate)
         return false;
     }
 
-    if (candidate != nullptr) {
-        m_script_plugin_status = "Selected script plugin: " + candidate->Manifest.DisplayName + " (" +
-                                 candidate->Manifest.BackendName + ").";
-    } else {
-        m_script_plugin_status = "Cleared project script plugin selection.";
-    }
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    const ScriptPluginSelectionResult selection =
+        ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+    m_script_plugin_status = selection.StatusMessage;
 
     return true;
 }
@@ -1375,54 +1362,25 @@ void LunaEditorLayer::resolveProjectScriptPluginSelection(bool persist_changes)
         return;
     }
 
-    if (m_script_plugin_candidates.empty()) {
-        refreshScriptPluginCandidates();
-    }
-
     const auto project_info = ProjectManager::instance().getProjectInfo();
     if (!project_info) {
         return;
     }
 
-    const ScriptPluginCandidate* selected_candidate = nullptr;
-    if (!project_info->Scripting.SelectedPluginId.empty()) {
-        selected_candidate = ScriptPluginManager::instance().findDiscoveredPlugin(project_info->Scripting.SelectedPluginId);
-        if (selected_candidate == nullptr) {
-            m_script_plugin_status =
-                "Configured script plugin '" + project_info->Scripting.SelectedPluginId + "' was not discovered.";
+    const ScriptPluginSelectionResult selection =
+        ScriptPluginManager::instance().resolveProjectSelection(&*project_info);
+    if (!selection.StatusMessage.empty()) {
+        m_script_plugin_status = selection.StatusMessage;
+    } else {
+        m_script_plugin_status.clear();
+    }
+
+    if (persist_changes && selection.isResolved() && selection.Candidate != nullptr) {
+        if (project_info->Scripting.SelectedPluginId != selection.Candidate->Manifest.PluginId ||
+            project_info->Scripting.SelectedBackendName != selection.BackendName) {
+            setProjectScriptPluginSelection(selection.Candidate, false);
         }
     }
-
-    if (selected_candidate == nullptr && !project_info->Scripting.SelectedBackendName.empty()) {
-        selected_candidate =
-            findUniqueCandidateByBackend(m_script_plugin_candidates, project_info->Scripting.SelectedBackendName);
-        if (selected_candidate != nullptr && persist_changes) {
-            setProjectScriptPluginSelection(selected_candidate, false);
-        }
-    }
-
-    if (selected_candidate != nullptr) {
-        m_script_plugin_status = "Selected script plugin: " + selected_candidate->Manifest.DisplayName + " (" +
-                                 selected_candidate->Manifest.BackendName + ").";
-        return;
-    }
-
-    if (m_script_plugin_candidates.empty()) {
-        m_script_plugin_status = "No script plugins discovered.";
-        return;
-    }
-
-    if (m_script_plugin_candidates.size() == 1) {
-        if (persist_changes) {
-            setProjectScriptPluginSelection(&m_script_plugin_candidates.front(), false);
-        }
-        m_script_plugin_status = "Automatically selected the only discovered script plugin: " +
-                                 m_script_plugin_candidates.front().Manifest.DisplayName + ".";
-        return;
-    }
-
-    m_script_plugin_status =
-        "Multiple script plugins are available. Choose one before relying on runtime scripts.";
 }
 
 bool LunaEditorLayer::setProjectScriptPluginSelection(const ScriptPluginCandidate* candidate, bool log_changes)

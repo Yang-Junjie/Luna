@@ -15,6 +15,33 @@
 
 namespace luna {
 
+enum class ScriptPluginSelectionState {
+    Unresolved,
+    NoProject,
+    NoPluginsDiscovered,
+    MissingSelection,
+    PluginNotFound,
+    BackendNotFound,
+    BackendAmbiguous,
+    BackendMismatch,
+    HostApiMismatch,
+    Resolved,
+};
+
+struct ScriptPluginSelectionResult {
+    ScriptPluginSelectionState State{ScriptPluginSelectionState::Unresolved};
+    const ScriptPluginCandidate* Candidate{nullptr};
+    std::string BackendName;
+    std::string StatusMessage;
+    bool ExplicitSelection{false};
+    bool AutoSelected{false};
+
+    [[nodiscard]] bool isResolved() const noexcept
+    {
+        return State == ScriptPluginSelectionState::Resolved;
+    }
+};
+
 class ScriptPluginManager {
 public:
     static ScriptPluginManager& instance();
@@ -27,7 +54,8 @@ public:
     void refreshDiscoveredPlugins(std::optional<std::filesystem::path> project_root_path = std::nullopt);
     [[nodiscard]] const std::vector<ScriptPluginCandidate>& getDiscoveredPlugins() const noexcept;
     [[nodiscard]] const ScriptPluginCandidate* findDiscoveredPlugin(std::string_view plugin_id) const;
-    [[nodiscard]] std::string defaultBackendName() const;
+    [[nodiscard]] ScriptPluginSelectionResult resolveProjectSelection(const ProjectInfo* project_info) const;
+    [[nodiscard]] ScriptPluginSelectionResult resolveAndLoadProjectSelection(const ProjectInfo* project_info);
     [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchema(std::string_view backend_name,
                                                                        const ScriptSchemaRequest& request) const;
     [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchemaForProject(const ProjectInfo* project_info,

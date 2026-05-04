@@ -16,7 +16,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -151,6 +153,77 @@ void copyScriptPropertyValue(luna::ScriptProperty& destination, const luna::Scri
     destination.assetValue = source.assetValue;
 }
 
+struct ProjectScriptLanguageState {
+    bool available = false;
+    std::string language;
+    std::string statusMessage;
+};
+
+ProjectScriptLanguageState getProjectScriptLanguageState()
+{
+    ProjectScriptLanguageState state{};
+
+    const auto project_info = luna::ProjectManager::instance().getProjectInfo();
+    const luna::ScriptPluginSelectionResult selection =
+        luna::ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+    if (!selection.isResolved() || selection.Candidate == nullptr) {
+        state.statusMessage = selection.StatusMessage.empty() ? "No usable script plugin is selected for this project."
+                                                              : selection.StatusMessage;
+        return state;
+    }
+
+    state.language = selection.Candidate->Manifest.Language;
+    state.available = !state.language.empty();
+    if (!state.available) {
+        state.statusMessage = "Selected script plugin does not declare a script language.";
+    }
+    return state;
+}
+
+std::string getScriptAssetLanguage(const luna::AssetMetadata& metadata)
+{
+    return metadata.GetConfig<std::string>("Language", "");
+}
+
+bool isScriptAssetLanguageAccepted(const luna::AssetMetadata& metadata,
+                                   const ProjectScriptLanguageState& language_state,
+                                   std::string* rejection_message = nullptr)
+{
+    if (metadata.Type != luna::AssetType::Script) {
+        if (rejection_message != nullptr) {
+            *rejection_message = "Selected asset is not a Script asset.";
+        }
+        return false;
+    }
+
+    if (!language_state.available) {
+        if (rejection_message != nullptr) {
+            *rejection_message = language_state.statusMessage.empty()
+                                     ? "No usable script plugin is selected for this project."
+                                     : language_state.statusMessage;
+        }
+        return false;
+    }
+
+    const std::string metadata_language = getScriptAssetLanguage(metadata);
+    if (metadata_language.empty()) {
+        if (rejection_message != nullptr) {
+            *rejection_message = "Script asset metadata does not declare a script language.";
+        }
+        return false;
+    }
+
+    if (!equalsIgnoreCase(metadata_language, language_state.language)) {
+        if (rejection_message != nullptr) {
+            *rejection_message = "Script asset language '" + metadata_language +
+                                 "' does not match selected project script language '" + language_state.language + "'.";
+        }
+        return false;
+    }
+
+    return true;
+}
+
 const luna::ScriptProperty* findMatchingProperty(const luna::ScriptEntry& script,
                                                  const std::string& name,
                                                  luna::ScriptPropertyType type)
@@ -229,20 +302,27 @@ std::string getAssetDisplayLabel(luna::AssetHandle handle)
 
 bool drawAssetHandleEditor(const char* label,
                            luna::AssetHandle& handle,
-                           std::initializer_list<luna::AssetType> accepted_types = {})
+                           std::initializer_list<luna::AssetType> accepted_types = {},
+                           const std::function<bool(luna::AssetHandle)>& accepts_handle = {})
 {
     bool changed = false;
     unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
     if (ImGui::InputScalar(label, ImGuiDataType_U64, &raw_handle)) {
-        handle = luna::AssetHandle(static_cast<uint64_t>(raw_handle));
-        changed = true;
+        const luna::AssetHandle candidate_handle(static_cast<uint64_t>(raw_handle));
+        if (!accepts_handle || accepts_handle(candidate_handle)) {
+            handle = candidate_handle;
+            changed = true;
+        }
     }
 
     if (ImGui::BeginDragDropTarget()) {
         luna::editor::AssetDragDropData payload{};
         if (luna::editor::acceptAssetDragDropPayload(payload, accepted_types)) {
-            handle = luna::editor::getAssetHandle(payload);
-            changed = true;
+            const luna::AssetHandle candidate_handle = luna::editor::getAssetHandle(payload);
+            if (!accepts_handle || accepts_handle(candidate_handle)) {
+                handle = candidate_handle;
+                changed = true;
+            }
         }
         ImGui::EndDragDropTarget();
     }
@@ -252,10 +332,42 @@ bool drawAssetHandleEditor(const char* label,
 
 bool drawScriptAssetEditor(luna::ScriptEntry& script)
 {
-    bool changed = drawAssetHandleEditor("Script Asset", script.scriptAsset, {luna::AssetType::Script});
+    const ProjectScriptLanguageState language_state = getProjectScriptLanguageState();
+    std::optional<std::string> rejected_selection_message;
+
+    auto accepts_script_handle = [&](luna::AssetHandle handle) {
+        if (!handle.isValid()) {
+            rejected_selection_message.reset();
+            return true;
+        }
+
+        if (!luna::AssetDatabase::exists(handle)) {
+            rejected_selection_message = "Script asset handle does not exist.";
+            return false;
+        }
+
+        std::string rejection_message;
+        if (!isScriptAssetLanguageAccepted(
+                luna::AssetDatabase::getAssetMetadata(handle), language_state, &rejection_message)) {
+            rejected_selection_message = std::move(rejection_message);
+            return false;
+        }
+
+        rejected_selection_message.reset();
+        return true;
+    };
+
+    bool changed =
+        drawAssetHandleEditor("Script Asset", script.scriptAsset, {luna::AssetType::Script}, accepts_script_handle);
+    if (rejected_selection_message.has_value()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", rejected_selection_message->c_str());
+    }
 
     if (!script.scriptAsset.isValid()) {
         ImGui::TextDisabled("Script Asset: None");
+        if (!language_state.available && !language_state.statusMessage.empty()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", language_state.statusMessage.c_str());
+        }
         return changed;
     }
 
@@ -267,8 +379,18 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
     const auto& metadata = luna::AssetDatabase::getAssetMetadata(script.scriptAsset);
     ImGui::TextDisabled("Script Asset: %s", getAssetDisplayLabel(script.scriptAsset).c_str());
     ImGui::TextDisabled("Script Type: %s", luna::AssetUtils::AssetTypeToString(metadata.Type));
+    if (metadata.Type == luna::AssetType::Script) {
+        const std::string metadata_language = getScriptAssetLanguage(metadata);
+        ImGui::TextDisabled("Script Language: %s", metadata_language.empty() ? "<none>" : metadata_language.c_str());
+    }
     if (metadata.Type != luna::AssetType::Script) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Selected asset is not a Script asset.");
+        return changed;
+    }
+
+    std::string rejection_message;
+    if (!isScriptAssetLanguageAccepted(metadata, language_state, &rejection_message)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", rejection_message.c_str());
     }
 
     return changed;
@@ -282,6 +404,12 @@ std::vector<luna::ScriptPropertySchema> loadScriptPropertySchema(const luna::Scr
 
     const luna::AssetMetadata& metadata = luna::AssetDatabase::getAssetMetadata(script.scriptAsset);
     if (metadata.Type != luna::AssetType::Script) {
+        return {};
+    }
+
+    const ProjectScriptLanguageState language_state = getProjectScriptLanguageState();
+    std::string rejection_message;
+    if (!isScriptAssetLanguageAccepted(metadata, language_state, &rejection_message)) {
         return {};
     }
 

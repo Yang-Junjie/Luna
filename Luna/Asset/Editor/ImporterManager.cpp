@@ -9,6 +9,7 @@
 #include "ModelImporter.h"
 #include "Project/ProjectManager.h"
 #include "ScriptImporter.h"
+#include "Script/ScriptPluginManager.h"
 #include "TextureImporter.h"
 
 #include <cctype>
@@ -16,6 +17,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <limits>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -35,6 +38,137 @@ struct SupportedAssetResult {
     bool failed = false;
 };
 
+struct ResolvedScriptImportSupport {
+    std::string language;
+    std::string backend_name;
+    std::vector<std::string> extensions;
+    std::string status_message;
+    bool available = false;
+};
+
+bool pathExistsNoThrow(const std::filesystem::path& path);
+
+std::vector<std::string> normalizeExtensions(const std::vector<std::string>& extensions)
+{
+    std::vector<std::string> normalized_extensions;
+    std::unordered_set<std::string> seen_extensions;
+
+    for (const std::string& extension : extensions) {
+        const std::string normalized_extension = luna::importer_detail::normalizeExtension(extension);
+        if (normalized_extension.empty() || seen_extensions.contains(normalized_extension)) {
+            continue;
+        }
+
+        seen_extensions.insert(normalized_extension);
+        normalized_extensions.push_back(normalized_extension);
+    }
+
+    return normalized_extensions;
+}
+
+ResolvedScriptImportSupport resolveScriptImportSupport(bool log_failures)
+{
+    ResolvedScriptImportSupport support{};
+
+    const auto project_root = luna::ProjectManager::instance().getProjectRootPath();
+    luna::ScriptPluginManager::instance().refreshDiscoveredPlugins(project_root);
+
+    const auto project_info = luna::ProjectManager::instance().getProjectInfo();
+    const luna::ScriptPluginSelectionResult selection =
+        luna::ScriptPluginManager::instance().resolveAndLoadProjectSelection(project_info ? &*project_info : nullptr);
+    if (!selection.isResolved()) {
+        support.status_message = selection.StatusMessage;
+        if (log_failures && !support.status_message.empty()) {
+            LUNA_CORE_ERROR("Script importing is disabled: {}", support.status_message);
+        }
+        return support;
+    }
+
+    if (selection.Candidate == nullptr) {
+        support.status_message = "The resolved script selection does not reference a script plugin.";
+        if (log_failures) {
+            LUNA_CORE_ERROR("Script importing is disabled: {}", support.status_message);
+        }
+        return support;
+    }
+
+    support.language = selection.Candidate->Manifest.Language;
+    support.backend_name = selection.BackendName;
+
+    if (const luna::ScriptBackendDescriptor* backend =
+            luna::ScriptPluginManager::instance().findBackend(selection.BackendName);
+        backend != nullptr) {
+        support.extensions = backend->supported_extensions;
+    }
+
+    if (support.extensions.empty()) {
+        support.extensions = selection.Candidate->Manifest.SupportedExtensions;
+    }
+
+    support.extensions = normalizeExtensions(support.extensions);
+
+    if (support.language.empty()) {
+        support.status_message = "Selected script plugin '" + selection.Candidate->Manifest.PluginId +
+                                 "' does not declare a script language.";
+        if (log_failures) {
+            LUNA_CORE_ERROR("Script importing is disabled: {}", support.status_message);
+        }
+        return support;
+    }
+
+    if (support.extensions.empty()) {
+        support.status_message = "Selected script plugin '" + selection.Candidate->Manifest.PluginId +
+                                 "' does not declare any supported script file extensions.";
+        if (log_failures) {
+            LUNA_CORE_ERROR("Script importing is disabled: {}", support.status_message);
+        }
+        return support;
+    }
+
+    support.available = true;
+    return support;
+}
+
+std::unordered_set<std::string> collectManifestScriptExtensions()
+{
+    std::unordered_set<std::string> extensions;
+    for (const luna::ScriptPluginCandidate& candidate :
+         luna::ScriptPluginManager::instance().getDiscoveredPlugins()) {
+        for (const std::string& extension : candidate.Manifest.SupportedExtensions) {
+            const std::string normalized_extension = luna::importer_detail::normalizeExtension(extension);
+            if (!normalized_extension.empty()) {
+                extensions.insert(normalized_extension);
+            }
+        }
+    }
+
+    return extensions;
+}
+
+bool metadataDeclaresScriptAsset(const std::filesystem::path& meta_path)
+{
+    if (!pathExistsNoThrow(meta_path)) {
+        return false;
+    }
+
+    const YAML::Node asset_node = luna::importer_detail::loadMetadataNode(meta_path);
+    if (!asset_node) {
+        return false;
+    }
+
+    luna::AssetMetadata metadata;
+    luna::importer_detail::readCommonMetadata(asset_node, metadata);
+    return metadata.Type == luna::AssetType::Script;
+}
+
+bool isKnownScriptFile(const std::filesystem::path& asset_path,
+                       const std::filesystem::path& meta_path,
+                       const std::unordered_set<std::string>& known_script_extensions)
+{
+    const std::string extension = luna::importer_detail::normalizeExtension(asset_path);
+    return known_script_extensions.contains(extension) || metadataDeclaresScriptAsset(meta_path);
+}
+
 bool shouldRebuildMetadata(const luna::AssetMetadata& metadata,
                            const std::filesystem::path& asset_path,
                            const std::filesystem::path& project_root)
@@ -46,6 +180,15 @@ bool shouldRebuildMetadata(const luna::AssetMetadata& metadata,
     const std::filesystem::path expected_relative_path = luna::tools::makeRelative(asset_path, project_root);
     return metadata.FilePath.lexically_normal().generic_string() !=
            expected_relative_path.lexically_normal().generic_string();
+}
+
+bool shouldRebuildScriptMetadata(const luna::AssetMetadata& metadata, const std::string& expected_language)
+{
+    if (metadata.Type != luna::AssetType::Script) {
+        return false;
+    }
+
+    return metadata.GetConfig<std::string>("Language", "") != expected_language;
 }
 
 bool isGltfModelPath(const std::filesystem::path& path)
@@ -88,7 +231,8 @@ std::string toDisplayPath(const std::filesystem::path& path, const std::filesyst
 }
 
 SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_item,
-                                           const std::filesystem::path& project_root)
+                                           const std::filesystem::path& project_root,
+                                           const std::string& expected_script_language)
 {
     SupportedAssetResult result{};
 
@@ -101,7 +245,8 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
 
     if (pathExistsNoThrow(work_item.metaPath)) {
         result.metadata = work_item.importer->deserializeMetadata(work_item.metaPath);
-        if (shouldRebuildMetadata(result.metadata, work_item.assetPath, project_root)) {
+        if (shouldRebuildMetadata(result.metadata, work_item.assetPath, project_root) ||
+            shouldRebuildScriptMetadata(result.metadata, expected_script_language)) {
             result.metadata = work_item.importer->import(work_item.assetPath);
             should_serialize_metadata = true;
             result.rebuiltMetadata = true;
@@ -149,6 +294,8 @@ void ImporterManager::init()
     importers.clear();
     extensionToImporter.clear();
 
+    ResolvedScriptImportSupport script_support = resolveScriptImportSupport(true);
+
     auto register_importer = [](std::unique_ptr<Importer> importer) {
         for (const auto& ext : importer->getSupportedExtensions()) {
             extensionToImporter[importer_detail::normalizeExtension(ext)] = importer.get();
@@ -159,7 +306,10 @@ void ImporterManager::init()
     register_importer(std::make_unique<MeshImporter>());
     register_importer(std::make_unique<MaterialImporter>());
     register_importer(std::make_unique<ModelImporter>());
-    register_importer(std::make_unique<ScriptImporter>());
+    if (script_support.available) {
+        register_importer(
+            std::make_unique<ScriptImporter>(std::move(script_support.language), std::move(script_support.extensions)));
+    }
     register_importer(std::make_unique<TextureImporter>());
 }
 
@@ -177,6 +327,13 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     if (!project_info || !project_root) {
         return stats;
+    }
+
+    const ResolvedScriptImportSupport script_support = resolveScriptImportSupport(false);
+    const std::string expected_script_language = script_support.available ? script_support.language : std::string{};
+    std::unordered_set<std::string> known_script_extensions = collectManifestScriptExtensions();
+    for (const std::string& extension : script_support.extensions) {
+        known_script_extensions.insert(importer_detail::normalizeExtension(extension));
     }
 
     const auto root = (*project_root / project_info->AssetsPath).lexically_normal();
@@ -214,6 +371,26 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
         const std::string ext = importer_detail::normalizeExtension(path);
 
         if (!extensionToImporter.contains(ext)) {
+            if (isKnownScriptFile(path, getMetadataPathForAsset(path), known_script_extensions)) {
+                if (!script_support.available) {
+                    ++stats.scriptFilesSkippedNoPlugin;
+                    LUNA_CORE_ERROR("Skipped script file '{}' because the project has no usable script plugin: {}",
+                                    toDisplayPath(path, *project_root),
+                                    script_support.status_message.empty() ? "unknown script plugin error"
+                                                                          : script_support.status_message);
+                } else {
+                    ++stats.scriptFilesSkippedUnsupportedLanguage;
+                    LUNA_CORE_WARN(
+                        "Skipped script file '{}' because extension '{}' is not supported by the selected {} script "
+                        "plugin '{}'",
+                        toDisplayPath(path, *project_root),
+                        ext,
+                        script_support.language,
+                        script_support.backend_name);
+                }
+                continue;
+            }
+
             ++stats.unsupportedFilesSkipped;
             continue;
         }
@@ -239,7 +416,8 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
         TaskHandle task = task_system->submitParallel(
             [&](enki::TaskSetPartition range, uint32_t) {
                 for (uint32_t index = range.start; index < range.end; ++index) {
-                    results[index] = processSupportedAsset(supported_assets[index], *project_root);
+                    results[index] = processSupportedAsset(supported_assets[index], *project_root,
+                                                           expected_script_language);
                 }
             },
             submit_desc);
@@ -252,7 +430,7 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
 
     if (!used_parallel_sync) {
         for (size_t index = 0; index < supported_assets.size(); ++index) {
-            results[index] = processSupportedAsset(supported_assets[index], *project_root);
+            results[index] = processSupportedAsset(supported_assets[index], *project_root, expected_script_language);
         }
     }
 
@@ -343,13 +521,16 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
 
     LUNA_CORE_INFO(
         "Asset sync completed. discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
-        "failed={}, missing_after_sync={}, generated_models={}, generated_model_meta={}, generated_materials={}, "
-        "generated_material_meta={}, generated_texture_meta={}, generated_model_failures={}",
+        "script_skipped_no_plugin={}, script_skipped_unsupported_language={}, failed={}, missing_after_sync={}, "
+        "generated_models={}, generated_model_meta={}, generated_materials={}, generated_material_meta={}, "
+        "generated_texture_meta={}, generated_model_failures={}",
         stats.discoveredAssets,
         stats.importedMissingAssets,
         stats.loadedExistingMetadata,
         stats.rebuiltMetadata,
         stats.unsupportedFilesSkipped,
+        stats.scriptFilesSkippedNoPlugin,
+        stats.scriptFilesSkippedUnsupportedLanguage,
         stats.failedAssets,
         stats.missingMetadataAfterSync,
         stats.generatedModelFiles,

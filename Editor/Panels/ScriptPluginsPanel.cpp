@@ -4,6 +4,9 @@
 
 #include <imgui.h>
 
+#include <string>
+#include <vector>
+
 namespace {
 
 const char* scriptPluginScopeToString(luna::ScriptPluginScope scope)
@@ -16,6 +19,18 @@ const char* scriptPluginScopeToString(luna::ScriptPluginScope scope)
         default:
             return "Unknown";
     }
+}
+
+std::string joinScriptExtensions(const std::vector<std::string>& extensions)
+{
+    std::string joined_extensions;
+    for (const std::string& extension : extensions) {
+        if (!joined_extensions.empty()) {
+            joined_extensions += ", ";
+        }
+        joined_extensions += extension;
+    }
+    return joined_extensions;
 }
 
 } // namespace
@@ -87,6 +102,10 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
                             candidate.Manifest.Language.c_str(),
                             candidate.Manifest.BackendName.c_str(),
                             scriptPluginScopeToString(candidate.Scope));
+        if (!candidate.Manifest.SupportedExtensions.empty()) {
+            const std::string extensions = joinScriptExtensions(candidate.Manifest.SupportedExtensions);
+            ImGui::TextDisabled("Extensions: %s", extensions.c_str());
+        }
         ImGui::TextWrapped("Id: %s", candidate.Manifest.PluginId.c_str());
         if (!candidate.Manifest.Version.empty()) {
             ImGui::TextWrapped("Version: %s", candidate.Manifest.Version.c_str());

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace luna {
 
@@ -20,6 +21,7 @@ struct ScriptPluginManifest {
     std::string Language;
     std::string BackendName;
     std::string Version;
+    std::vector<std::string> SupportedExtensions;
     uint32_t HostApiVersion{LUNA_SCRIPT_HOST_API_VERSION};
     std::filesystem::path Entry;
 };

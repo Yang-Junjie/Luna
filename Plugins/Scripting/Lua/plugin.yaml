@@ -4,6 +4,8 @@ Plugin:
   Type: Script
   Language: Lua
   Backend: Lua
+  SupportedExtensions:
+    - .lua
   Version: 0.1.0
   HostApiVersion: 1
   Entry:

@@ -129,6 +129,29 @@ std::optional<luna::ScriptPluginCandidate> loadManifest(const std::filesystem::p
         if (plugin["Version"]) {
             candidate.Manifest.Version = plugin["Version"].as<std::string>();
         }
+        if (plugin["SupportedExtensions"]) {
+            const YAML::Node supported_extensions = plugin["SupportedExtensions"];
+            if (supported_extensions.IsSequence()) {
+                for (const YAML::Node& extension_node : supported_extensions) {
+                    if (!extension_node || !extension_node.IsScalar()) {
+                        continue;
+                    }
+
+                    const std::string extension = extension_node.as<std::string>();
+                    if (!extension.empty()) {
+                        candidate.Manifest.SupportedExtensions.push_back(extension);
+                    }
+                }
+            } else if (supported_extensions.IsScalar()) {
+                const std::string extension = supported_extensions.as<std::string>();
+                if (!extension.empty()) {
+                    candidate.Manifest.SupportedExtensions.push_back(extension);
+                }
+            } else {
+                LUNA_CORE_WARN("Skipped 'Plugin.SupportedExtensions' in '{}' because it must be a string or sequence",
+                               manifest_path.string());
+            }
+        }
         if (plugin["HostApiVersion"]) {
             candidate.Manifest.HostApiVersion = plugin["HostApiVersion"].as<uint32_t>();
         }

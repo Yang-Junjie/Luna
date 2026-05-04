@@ -147,12 +147,13 @@ void logHostMessage(void*, LunaScriptHostLogLevel level, const char* message)
     }
 }
 
-struct ResolvedScriptSelection {
-    const luna::ScriptPluginCandidate* candidate{nullptr};
-    std::string backend_name;
-    bool explicit_selection{false};
-    bool ambiguous{false};
-};
+bool equalsIgnoreCase(std::string_view lhs, std::string_view rhs)
+{
+    return lhs.size() == rhs.size() &&
+           std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](char a, char b) {
+               return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+           });
+}
 
 const luna::ScriptPluginCandidate* findUniqueCandidateByBackend(
     const std::vector<luna::ScriptPluginCandidate>& candidates, std::string_view backend_name)
@@ -722,11 +723,6 @@ const ScriptPluginCandidate* ScriptPluginManager::findDiscoveredPlugin(std::stri
     return nullptr;
 }
 
-std::string ScriptPluginManager::defaultBackendName() const
-{
-    return "Lua";
-}
-
 std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchema(std::string_view backend_name,
                                                                           const ScriptSchemaRequest& request) const
 {
@@ -745,43 +741,19 @@ std::vector<ScriptPropertySchema> ScriptPluginManager::getPropertySchemaForProje
     const auto project_root_path = ProjectManager::instance().getProjectRootPath();
     refreshDiscoveredPlugins(project_root_path);
 
-    const std::string configured_plugin_id =
-        project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
-    const std::string configured_backend_name =
-        project_info != nullptr ? project_info->Scripting.SelectedBackendName : std::string{};
-
-    const ScriptPluginCandidate* candidate = nullptr;
-    if (!configured_plugin_id.empty()) {
-        candidate = findDiscoveredPlugin(configured_plugin_id);
-    }
-    if (candidate == nullptr && !configured_backend_name.empty()) {
-        candidate = findUniqueCandidateByBackend(m_discovered_plugins, configured_backend_name);
-    }
-    if (candidate == nullptr && m_discovered_plugins.size() == 1) {
-        candidate = &m_discovered_plugins.front();
-    }
-
-    std::string backend_name = configured_backend_name;
-    if (candidate != nullptr) {
-        if (candidate->Manifest.HostApiVersion != LUNA_SCRIPT_HOST_API_VERSION) {
-            LUNA_CORE_ERROR("Script plugin '{}' requires host API version {} but the engine provides {}",
-                            candidate->Manifest.PluginId,
-                            candidate->Manifest.HostApiVersion,
-                            static_cast<uint32_t>(LUNA_SCRIPT_HOST_API_VERSION));
-            return {};
+    const ScriptPluginSelectionResult selection = resolveProjectSelection(project_info);
+    if (!selection.isResolved()) {
+        if (!selection.StatusMessage.empty()) {
+            LUNA_CORE_ERROR("{}", selection.StatusMessage);
         }
-
-        if (!ensurePluginLoaded(candidate)) {
-            return {};
-        }
-        backend_name = candidate->Manifest.BackendName;
+        return {};
     }
 
-    if (backend_name.empty()) {
-        backend_name = defaultBackendName();
+    if (selection.Candidate != nullptr && !ensurePluginLoaded(selection.Candidate)) {
+        return {};
     }
 
-    return getPropertySchema(backend_name, request);
+    return getPropertySchema(selection.BackendName, request);
 }
 
 std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntime(std::string_view backend_name) const
@@ -798,58 +770,9 @@ std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(con
     const auto project_root_path = ProjectManager::instance().getProjectRootPath();
     refreshDiscoveredPlugins(project_root_path);
 
-    const std::string configured_plugin_id =
-        project_info != nullptr ? project_info->Scripting.SelectedPluginId : std::string{};
-    const std::string configured_backend_name =
-        project_info != nullptr ? project_info->Scripting.SelectedBackendName : std::string{};
-
-    ResolvedScriptSelection selection{};
-    selection.explicit_selection = !configured_plugin_id.empty() || !configured_backend_name.empty();
-
-    if (!configured_plugin_id.empty()) {
-        selection.candidate = findDiscoveredPlugin(configured_plugin_id);
-        if (selection.candidate == nullptr) {
-            LUNA_CORE_WARN("Configured script plugin '{}' was not discovered in the current plugin directories",
-                           configured_plugin_id);
-        }
-    }
-
-    if (selection.candidate == nullptr && !configured_backend_name.empty()) {
-        selection.candidate = findUniqueCandidateByBackend(m_discovered_plugins, configured_backend_name);
-        if (selection.candidate != nullptr) {
-            LUNA_CORE_INFO("Resolved script backend '{}' to plugin '{}'",
-                           configured_backend_name,
-                           selection.candidate->Manifest.PluginId);
-        }
-    }
-
-    if (selection.candidate == nullptr) {
-        if (m_discovered_plugins.size() == 1) {
-            selection.candidate = &m_discovered_plugins.front();
-        } else if (m_discovered_plugins.size() > 1) {
-            selection.ambiguous = true;
-        }
-    }
-
-    if (selection.candidate != nullptr) {
-        selection.backend_name = selection.candidate->Manifest.BackendName;
-
-        if (selection.candidate->Manifest.HostApiVersion != LUNA_SCRIPT_HOST_API_VERSION) {
-            LUNA_CORE_ERROR("Script plugin '{}' requires host API version {} but the engine provides {}",
-                            selection.candidate->Manifest.PluginId,
-                            selection.candidate->Manifest.HostApiVersion,
-                            static_cast<uint32_t>(LUNA_SCRIPT_HOST_API_VERSION));
-            return {};
-        }
-    } else if (!configured_backend_name.empty()) {
-        selection.backend_name = configured_backend_name;
-    } else if (!selection.ambiguous) {
-        selection.backend_name = defaultBackendName();
-    }
-
-    if (selection.ambiguous) {
-        LUNA_CORE_ERROR("Multiple script plugins were discovered, but the project does not specify "
-                        "'Scripting.SelectedPluginId'. Script runtime creation was skipped.");
+    const ScriptPluginSelectionResult selection = resolveAndLoadProjectSelection(project_info);
+    if (selection.State == ScriptPluginSelectionState::BackendAmbiguous) {
+        LUNA_CORE_ERROR("{}", selection.StatusMessage);
         for (const auto& candidate : m_discovered_plugins) {
             LUNA_CORE_ERROR("  candidate: '{}' backend='{}' scope='{}'",
                             candidate.Manifest.PluginId,
@@ -859,41 +782,155 @@ std::unique_ptr<IScriptRuntime> ScriptPluginManager::createRuntimeForProject(con
         return {};
     }
 
-    if (selection.candidate != nullptr) {
-        if (!ensurePluginLoaded(selection.candidate)) {
-            return {};
+    if (!selection.isResolved()) {
+        if (!selection.StatusMessage.empty()) {
+            LUNA_CORE_ERROR("{}", selection.StatusMessage);
         }
-    } else {
-        unloadActivePlugin();
+        return {};
     }
 
-    if (selection.backend_name.empty()) {
-        selection.backend_name = defaultBackendName();
-    }
-
-    if (std::unique_ptr<IScriptRuntime> runtime = createRuntime(selection.backend_name)) {
+    if (std::unique_ptr<IScriptRuntime> runtime = createRuntime(selection.BackendName)) {
         return runtime;
     }
 
-    if (selection.candidate != nullptr) {
+    if (selection.Candidate != nullptr) {
         LUNA_CORE_ERROR("Script plugin '{}' resolved to backend '{}', but that backend is not registered",
-                        selection.candidate->Manifest.PluginId,
-                        selection.backend_name);
+                        selection.Candidate->Manifest.PluginId,
+                        selection.BackendName);
         return {};
     }
 
-    if (selection.explicit_selection) {
-        LUNA_CORE_ERROR("Configured script backend '{}' is unavailable", selection.backend_name);
-        return {};
+    LUNA_CORE_ERROR("Configured script backend '{}' is unavailable", selection.BackendName);
+    return {};
+}
+
+ScriptPluginSelectionResult ScriptPluginManager::resolveAndLoadProjectSelection(const ProjectInfo* project_info)
+{
+    ScriptPluginSelectionResult selection = resolveProjectSelection(project_info);
+    if (!selection.isResolved()) {
+        return selection;
     }
 
-    if (selection.backend_name != defaultBackendName()) {
-        LUNA_CORE_WARN("Script backend '{}' is unavailable; falling back to '{}'",
-                       selection.backend_name,
-                       defaultBackendName());
+    if (selection.Candidate != nullptr && !ensurePluginLoaded(selection.Candidate)) {
+        selection.State = ScriptPluginSelectionState::BackendNotFound;
+        selection.StatusMessage = "Script plugin '" + selection.Candidate->Manifest.PluginId +
+                                  "' failed to load its backend '" + selection.BackendName + "'.";
+        return selection;
     }
 
-    return createRuntime(defaultBackendName());
+    if (selection.Candidate == nullptr) {
+        unloadActivePlugin();
+    }
+
+    return selection;
+}
+
+ScriptPluginSelectionResult ScriptPluginManager::resolveProjectSelection(const ProjectInfo* project_info) const
+{
+    ScriptPluginSelectionResult selection{};
+    selection.ExplicitSelection = project_info != nullptr &&
+                                  (!project_info->Scripting.SelectedPluginId.empty() ||
+                                   !project_info->Scripting.SelectedBackendName.empty());
+
+    if (project_info == nullptr) {
+        selection.State = ScriptPluginSelectionState::NoProject;
+        selection.StatusMessage = "No project is loaded.";
+        return selection;
+    }
+
+    if (m_discovered_plugins.empty()) {
+        selection.State = ScriptPluginSelectionState::NoPluginsDiscovered;
+        selection.StatusMessage = "No script plugins were discovered.";
+        return selection;
+    }
+
+    const std::string& configured_plugin_id = project_info->Scripting.SelectedPluginId;
+    const std::string& configured_backend_name = project_info->Scripting.SelectedBackendName;
+
+    if (configured_plugin_id.empty() && configured_backend_name.empty()) {
+        selection.State = ScriptPluginSelectionState::MissingSelection;
+        selection.StatusMessage =
+            "No script plugin is selected for this project. Set 'Scripting.SelectedPluginId' before importing or "
+            "running scripts.";
+        return selection;
+    }
+
+    if (!configured_plugin_id.empty()) {
+        selection.Candidate = findDiscoveredPlugin(configured_plugin_id);
+        if (selection.Candidate == nullptr) {
+            selection.State = ScriptPluginSelectionState::PluginNotFound;
+            selection.StatusMessage = "Configured script plugin '" + configured_plugin_id +
+                                     "' was not discovered in the current plugin directories.";
+            return selection;
+        }
+    }
+
+    if (selection.Candidate == nullptr && !configured_backend_name.empty()) {
+        selection.Candidate = findUniqueCandidateByBackend(m_discovered_plugins, configured_backend_name);
+        if (selection.Candidate != nullptr) {
+            selection.AutoSelected = true;
+        } else {
+            const bool backend_exists = std::any_of(m_discovered_plugins.begin(),
+                                                    m_discovered_plugins.end(),
+                                                    [&](const ScriptPluginCandidate& candidate) {
+                                                        return equalsIgnoreCase(candidate.Manifest.BackendName,
+                                                                                configured_backend_name);
+                                                    });
+            selection.State = backend_exists ? ScriptPluginSelectionState::BackendAmbiguous
+                                             : ScriptPluginSelectionState::BackendNotFound;
+            selection.StatusMessage = backend_exists
+                                          ? "Configured script backend '" + configured_backend_name +
+                                                "' is provided by multiple plugins. Use SelectedPluginId instead."
+                                          : "Configured script backend '" + configured_backend_name +
+                                                "' was not discovered in the current plugin directories.";
+            return selection;
+        }
+    }
+
+    if (selection.Candidate == nullptr) {
+        selection.State = ScriptPluginSelectionState::MissingSelection;
+        selection.StatusMessage =
+            "No script plugin is selected for this project. Set 'Scripting.SelectedPluginId' before importing or "
+            "running scripts.";
+        return selection;
+    }
+
+    if (selection.Candidate->Manifest.HostApiVersion != LUNA_SCRIPT_HOST_API_VERSION) {
+        selection.State = ScriptPluginSelectionState::HostApiMismatch;
+        selection.StatusMessage = "Script plugin '" + selection.Candidate->Manifest.PluginId +
+                                  "' requires host API version " +
+                                  std::to_string(selection.Candidate->Manifest.HostApiVersion) +
+                                  " but the engine provides " +
+                                  std::to_string(LUNA_SCRIPT_HOST_API_VERSION) + ".";
+        return selection;
+    }
+
+    if (!configured_plugin_id.empty() && !configured_backend_name.empty() &&
+        !equalsIgnoreCase(selection.Candidate->Manifest.BackendName, configured_backend_name)) {
+        selection.State = ScriptPluginSelectionState::BackendMismatch;
+        selection.StatusMessage = "Configured script plugin '" + configured_plugin_id +
+                                  "' resolves to backend '" + selection.Candidate->Manifest.BackendName +
+                                  "' but the project configuration declares backend '" + configured_backend_name +
+                                  "'.";
+        return selection;
+    }
+
+    selection.BackendName = selection.Candidate->Manifest.BackendName;
+    selection.State = ScriptPluginSelectionState::Resolved;
+
+    if (selection.AutoSelected) {
+        if (!configured_backend_name.empty() && configured_plugin_id.empty()) {
+            selection.StatusMessage = "Resolved script backend '" + configured_backend_name +
+                                      "' to plugin '" + selection.Candidate->Manifest.PluginId + "'.";
+        } else {
+            selection.StatusMessage = "Automatically selected script plugin '" +
+                                      selection.Candidate->Manifest.DisplayName + "'.";
+        }
+    } else {
+        selection.StatusMessage = "Selected script plugin '" + selection.Candidate->Manifest.DisplayName + "'.";
+    }
+
+    return selection;
 }
 
 bool ScriptPluginManager::registerBackend(std::unique_ptr<IScriptBackend> backend)
