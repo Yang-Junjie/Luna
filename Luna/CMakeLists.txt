@@ -55,6 +55,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/Features/FeatureProbe.cpp
     Renderer/RenderFlow/Features/RenderFeatureModules.h
     Renderer/RenderFlow/Features/RenderFeatureModules.cpp
+    Renderer/RenderFlow/Features/EditorInfiniteGridFeature.h
+    Renderer/RenderFlow/Features/EditorInfiniteGridFeature.cpp
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.cpp
     Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h
@@ -118,6 +120,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/ProceduralSky.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang
+    Renderer/Shaders/EditorInfiniteGrid.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang
     Renderer/Shaders/TemporalAntiAliasing.slang

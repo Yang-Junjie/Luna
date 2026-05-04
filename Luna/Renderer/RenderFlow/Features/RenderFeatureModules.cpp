@@ -3,11 +3,13 @@
 namespace luna::render_flow {
 
 void linkScreenSpaceAmbientOcclusionFeature();
+void linkEditorInfiniteGridFeature();
 void linkTemporalAntiAliasingFeature();
 
 void linkBuiltInRenderFeatureModules()
 {
     linkScreenSpaceAmbientOcclusionFeature();
+    linkEditorInfiniteGridFeature();
     linkTemporalAntiAliasingFeature();
 }
 

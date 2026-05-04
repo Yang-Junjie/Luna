@@ -50,6 +50,8 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
+constexpr const char* kEditorGridFeatureName = "EditorInfiniteGrid";
+constexpr const char* kEditorGridToggleLabel = "Show Editor Grid";
 constexpr float kUiScaleChangeThreshold = 0.01f;
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
@@ -176,9 +178,11 @@ void LunaEditorLayer::onAttach()
 
     if (m_application->getImGuiLayer() != nullptr) {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::OffscreenTexture);
+        syncEditorGridFeatureState();
         syncPickDebugVisualizationState();
     } else {
         m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
+        syncEditorGridFeatureState();
         LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'",
                          luna::RHI::BackendTypeToString(
                              m_application->getRenderer().getCapabilities().backend_type));
@@ -197,6 +201,7 @@ void LunaEditorLayer::onDetach()
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
     m_application->getRenderer().setRenderDebugViewMode(RenderDebugViewMode::None);
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
+    m_application->getRenderer().setDefaultRenderFeatureEnabled(kEditorGridFeatureName, false);
 }
 
 void LunaEditorLayer::onUpdate(Timestep dt)
@@ -270,6 +275,9 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
     if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
         syncPickDebugVisualizationState();
+    }
+    if (ImGui::Checkbox(kEditorGridToggleLabel, &m_show_editor_grid)) {
+        syncEditorGridFeatureState();
     }
     ImGui::TextUnformatted("Highlights pickable pixels and shows the requested pick marker.");
     ImGui::TextUnformatted(
@@ -596,6 +604,19 @@ void LunaEditorLayer::syncPickDebugVisualizationState() const
     }
 
     m_application->getRenderer().setScenePickDebugVisualizationEnabled(m_show_pick_debug_visualization);
+}
+
+void LunaEditorLayer::syncEditorGridFeatureState() const
+{
+    if (m_application == nullptr) {
+        return;
+    }
+
+    auto& renderer = m_application->getRenderer();
+    const bool editor_grid_enabled =
+        m_show_editor_grid && !m_runtime_viewport_enabled &&
+        renderer.getSceneOutputMode() == Renderer::SceneOutputMode::OffscreenTexture;
+    renderer.setDefaultRenderFeatureEnabled(kEditorGridFeatureName, editor_grid_enabled);
 }
 
 void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
@@ -1067,6 +1088,7 @@ void LunaEditorLayer::resetEditorState()
     m_scene_dirty = false;
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
+    syncEditorGridFeatureState();
 }
 
 void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
@@ -1080,6 +1102,7 @@ void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
     } else {
         endRuntimeViewport();
     }
+    syncEditorGridFeatureState();
 }
 
 void LunaEditorLayer::beginRuntimeViewport()

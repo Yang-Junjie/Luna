@@ -90,6 +90,7 @@ private:
     void consumePendingScenePick();
     void syncEditorUiScale();
     void syncPickDebugVisualizationState() const;
+    void syncEditorGridFeatureState() const;
     void requestViewportPick(const ImVec2& image_min,
                              const ImVec2& image_max,
                              const ImVec2& uv0,
@@ -136,6 +137,7 @@ private:
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
+    bool m_show_editor_grid{true};
     bool m_show_builtin_materials_panel{false};
     float m_editor_ui_scale{0.0f};
 
