@@ -82,4 +82,9 @@ struct ShadowRenderParams {
                            1.0f / static_cast<float>(kShadowCascadeAtlasRows)};
 };
 
+namespace transparent_composite_binding {
+inline constexpr uint32_t ColorTexture = 0;
+inline constexpr uint32_t ColorSampler = 1;
+} // namespace transparent_composite_binding
+
 } // namespace luna::render_flow::default_scene_detail

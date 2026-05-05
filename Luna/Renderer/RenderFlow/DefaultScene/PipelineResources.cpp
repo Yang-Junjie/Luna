@@ -13,6 +13,7 @@ SceneShaderPaths defaultShaderPaths()
     const std::filesystem::path geometry_shader_path = shader_root / "SceneGeometry.slang";
     const std::filesystem::path shadow_shader_path = shader_root / "ShadowMapping.slang";
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
+    const std::filesystem::path transparent_composite_shader_path = shader_root / "TransparentComposite.slang";
     const std::filesystem::path environment_ibl_shader_path = shader_root / "EnvironmentIBL.slang";
     const std::filesystem::path procedural_sky_shader_path = shader_root / "ProceduralSky.slang";
     return SceneShaderPaths{
@@ -22,6 +23,7 @@ SceneShaderPaths defaultShaderPaths()
         .shadow_fragment_path = shadow_shader_path,
         .lighting_vertex_path = lighting_shader_path,
         .lighting_fragment_path = lighting_shader_path,
+        .transparent_composite_path = transparent_composite_shader_path,
         .environment_ibl_path = environment_ibl_shader_path,
         .procedural_sky_path = procedural_sky_shader_path,
     };
@@ -109,6 +111,12 @@ void PipelineResources::updateShadowResources(const luna::RHI::Ref<luna::RHI::Te
     m_pipeline_state.updateShadowResources(shadow_map);
 }
 
+void PipelineResources::updateTransparentCompositeResources(
+    const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
+{
+    m_pipeline_state.updateTransparentCompositeResources(transparent_color);
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& PipelineResources::device() const noexcept
 {
     return m_pipeline_state.device();
@@ -137,6 +145,11 @@ DrawPassResources PipelineResources::shadowPassResources() const noexcept
 DrawPassResources PipelineResources::transparentPassResources() const noexcept
 {
     return m_pipeline_state.transparentPassResources();
+}
+
+TransparentCompositePassResources PipelineResources::transparentCompositePassResources() const noexcept
+{
+    return m_pipeline_state.transparentCompositePassResources();
 }
 
 LightingPassResources PipelineResources::lightingPassResources() const noexcept

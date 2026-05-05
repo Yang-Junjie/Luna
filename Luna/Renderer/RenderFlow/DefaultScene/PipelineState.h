@@ -58,6 +58,7 @@ public:
                                  const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
                                  const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
+    void updateTransparentCompositeResources(const luna::RHI::Ref<luna::RHI::Texture>& transparent_color);
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
@@ -65,6 +66,7 @@ public:
     [[nodiscard]] DrawPassResources geometryPassResources() const noexcept;
     [[nodiscard]] DrawPassResources shadowPassResources() const noexcept;
     [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;
+    [[nodiscard]] TransparentCompositePassResources transparentCompositePassResources() const noexcept;
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
     [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
     [[nodiscard]] SkyPassResources skyPassResources() const noexcept;
@@ -81,22 +83,27 @@ private:
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> debug_view_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> sky_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> transparent_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> transparent_composite_pipeline;
 
         luna::RHI::Ref<luna::RHI::PipelineLayout> geometry_pipeline_layout;
         luna::RHI::Ref<luna::RHI::PipelineLayout> shadow_pipeline_layout;
         luna::RHI::Ref<luna::RHI::PipelineLayout> lighting_pipeline_layout;
         luna::RHI::Ref<luna::RHI::PipelineLayout> transparent_pipeline_layout;
+        luna::RHI::Ref<luna::RHI::PipelineLayout> transparent_composite_pipeline_layout;
 
         luna::RHI::Ref<luna::RHI::DescriptorSetLayout> material_layout;
         luna::RHI::Ref<luna::RHI::DescriptorSetLayout> gbuffer_layout;
         luna::RHI::Ref<luna::RHI::DescriptorSetLayout> scene_layout;
+        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> transparent_composite_layout;
         luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
 
         luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+        luna::RHI::Ref<luna::RHI::Sampler> transparent_composite_sampler;
         luna::RHI::Ref<luna::RHI::Sampler> environment_source_sampler;
         luna::RHI::Ref<luna::RHI::Sampler> shadow_sampler;
 
         luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
+        luna::RHI::Ref<luna::RHI::DescriptorSet> transparent_composite_descriptor_set;
         luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
         luna::RHI::Ref<luna::RHI::DescriptorSet> lighting_scene_descriptor_set;
         luna::RHI::Ref<luna::RHI::Buffer> scene_params_buffer;
@@ -105,12 +112,14 @@ private:
         luna::RHI::Ref<luna::RHI::Texture> bound_prefiltered_environment_texture;
         luna::RHI::Ref<luna::RHI::Texture> bound_brdf_lut_texture;
         luna::RHI::Ref<luna::RHI::Texture> bound_shadow_map_texture;
+        luna::RHI::Ref<luna::RHI::Texture> bound_transparent_color_texture;
         renderer_detail::PendingTextureUpload default_ambient_occlusion_texture;
         renderer_detail::PendingTextureUpload default_reflection_texture;
         renderer_detail::PendingTextureUpload default_indirect_diffuse_texture;
         renderer_detail::PendingTextureUpload default_indirect_specular_texture;
         bool scene_bindings_valid{false};
         bool shadow_bindings_valid{false};
+        bool transparent_composite_bindings_valid{false};
 
         luna::RHI::Ref<luna::RHI::ShaderModule> geometry_vertex_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> transparent_vertex_shader;
@@ -122,6 +131,8 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderModule> debug_view_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> sky_fragment_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> transparent_fragment_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> transparent_composite_vertex_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> transparent_composite_fragment_shader;
     };
 
     void reset() noexcept;

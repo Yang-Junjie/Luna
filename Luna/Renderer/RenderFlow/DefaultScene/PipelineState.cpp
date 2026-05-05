@@ -49,6 +49,26 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createSceneLayout(const luna::RHI
     return createDescriptorSetLayoutFromSchema(device, sceneDescriptorSetSchema());
 }
 
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
+    createTransparentCompositeLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+{
+    if (!device) {
+        return {};
+    }
+
+    return device->CreateDescriptorSetLayout(
+        luna::RHI::DescriptorSetLayoutBuilder()
+            .AddBinding(default_scene_detail::transparent_composite_binding::ColorTexture,
+                        luna::RHI::DescriptorType::SampledImage,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .AddBinding(default_scene_detail::transparent_composite_binding::ColorSampler,
+                        luna::RHI::DescriptorType::Sampler,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .Build());
+}
+
 ShaderBindingAddressMode bindingAddressModeForBackend(luna::RHI::BackendType backend_type)
 {
     switch (backend_type) {
@@ -58,6 +78,36 @@ ShaderBindingAddressMode bindingAddressModeForBackend(luna::RHI::BackendType bac
         default:
             return ShaderBindingAddressMode::LogicalSetBinding;
     }
+}
+
+ShaderBindingContract makeTransparentCompositeShaderBindingContract()
+{
+    ShaderBindingContract contract = makeShaderBindingContract("TransparentComposite");
+    contract.bindings.push_back(ShaderBindingRequirement{
+        .name = "ColorTexture",
+        .shader_name = "gTransparentColorTexture",
+        .set_name = "TransparentComposite",
+        .logical_set = 0,
+        .logical_binding = default_scene_detail::transparent_composite_binding::ColorTexture,
+        .set = 0,
+        .binding = default_scene_detail::transparent_composite_binding::ColorTexture,
+        .type = luna::RHI::DescriptorType::SampledImage,
+        .count = 1,
+        .stages = luna::RHI::ShaderStage::Fragment,
+    });
+    contract.bindings.push_back(ShaderBindingRequirement{
+        .name = "ColorSampler",
+        .shader_name = "gTransparentColorSampler",
+        .set_name = "TransparentComposite",
+        .logical_set = 0,
+        .logical_binding = default_scene_detail::transparent_composite_binding::ColorSampler,
+        .set = 0,
+        .binding = default_scene_detail::transparent_composite_binding::ColorSampler,
+        .type = luna::RHI::DescriptorType::Sampler,
+        .count = 1,
+        .stages = luna::RHI::ShaderStage::Fragment,
+    });
+    return contract;
 }
 
 luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
@@ -86,6 +136,21 @@ luna::RHI::Ref<luna::RHI::Sampler> createGBufferSampler(const luna::RHI::Ref<lun
                                      .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
                                      .SetAnisotropy(false)
                                      .SetName("SceneGBufferSampler")
+                                     .Build());
+}
+
+luna::RHI::Ref<luna::RHI::Sampler> createTransparentCompositeSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+{
+    if (!device) {
+        return {};
+    }
+
+    return device->CreateSampler(luna::RHI::SamplerBuilder()
+                                     .SetFilter(luna::RHI::Filter::Nearest, luna::RHI::Filter::Nearest)
+                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
+                                     .SetAnisotropy(false)
+                                     .SetName("SceneTransparentCompositeSampler")
                                      .Build());
 }
 
@@ -225,6 +290,20 @@ luna::RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
     return blend_attachment;
 }
 
+luna::RHI::ColorBlendAttachmentState makePremultipliedAlphaBlendAttachment()
+{
+    luna::RHI::ColorBlendAttachmentState blend_attachment{};
+    blend_attachment.BlendEnable = true;
+    blend_attachment.SrcColorBlendFactor = luna::RHI::BlendFactor::One;
+    blend_attachment.DstColorBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.ColorBlendOp = luna::RHI::BlendOp::Add;
+    blend_attachment.SrcAlphaBlendFactor = luna::RHI::BlendFactor::One;
+    blend_attachment.DstAlphaBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.AlphaBlendOp = luna::RHI::BlendOp::Add;
+    blend_attachment.ColorWriteMask = luna::RHI::ColorComponentFlags::All;
+    return blend_attachment;
+}
+
 void addStaticMeshVertexLayout(luna::RHI::GraphicsPipelineBuilder& builder)
 {
     builder.AddVertexBinding(0, sizeof(StaticMeshVertex), luna::RHI::VertexInputRate::Vertex)
@@ -350,6 +429,29 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     return device->CreateGraphicsPipeline(builder.Build());
 }
 
+luna::RHI::Ref<luna::RHI::GraphicsPipeline>
+    createTransparentCompositePipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
+                                       const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
+                                       luna::RHI::Format color_format,
+                                       const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
+                                       const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader)
+{
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED) {
+        return {};
+    }
+
+    return device->CreateGraphicsPipeline(luna::RHI::GraphicsPipelineBuilder()
+                                              .SetShaders({vertex_shader, fragment_shader})
+                                              .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
+                                              .SetCullMode(luna::RHI::CullMode::None)
+                                              .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
+                                              .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+                                              .AddColorAttachment(makePremultipliedAlphaBlendAttachment())
+                                              .AddColorFormat(color_format)
+                                              .SetLayout(layout)
+                                              .Build());
+}
+
 } // namespace
 
 void PipelineState::shutdown()
@@ -367,10 +469,12 @@ bool PipelineState::hasCompleteState(const SceneRenderContext& context) const no
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
            m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.sky_pipeline &&
-           m_state.transparent_pipeline &&
+           m_state.transparent_pipeline && m_state.transparent_composite_pipeline &&
            m_state.material_layout && m_state.descriptor_pool && m_state.gbuffer_descriptor_set &&
-           m_state.scene_descriptor_set && m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
-           m_state.gbuffer_sampler && m_state.environment_source_sampler && m_state.shadow_sampler;
+           m_state.transparent_composite_descriptor_set && m_state.scene_descriptor_set &&
+           m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
+           m_state.gbuffer_sampler && m_state.transparent_composite_sampler && m_state.environment_source_sampler &&
+           m_state.shadow_sampler;
 }
 
 void PipelineState::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
@@ -445,11 +549,24 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                                             shader_paths.geometry_fragment_path,
                                                                             "sceneTransparentFragmentMain",
                                                                             luna::RHI::ShaderStage::Fragment);
+    m_state.transparent_composite_vertex_shader =
+        renderer_detail::loadShaderModule(m_state.device,
+                                          context.compiler,
+                                          shader_paths.transparent_composite_path,
+                                          "transparentCompositeVertexMain",
+                                          luna::RHI::ShaderStage::Vertex);
+    m_state.transparent_composite_fragment_shader =
+        renderer_detail::loadShaderModule(m_state.device,
+                                          context.compiler,
+                                          shader_paths.transparent_composite_path,
+                                          "transparentCompositeFragmentMain",
+                                          luna::RHI::ShaderStage::Fragment);
 
     if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
         !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
         !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.sky_fragment_shader ||
-        !m_state.transparent_fragment_shader) {
+        !m_state.transparent_fragment_shader || !m_state.transparent_composite_vertex_shader ||
+        !m_state.transparent_composite_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -463,6 +580,8 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         makePipelineShaderBindingContract(lightingPipelineLayoutSchema(), binding_address_mode);
     const ShaderBindingContract transparent_contract =
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
+    const ShaderBindingContract transparent_composite_contract =
+        makeTransparentCompositeShaderBindingContract();
 
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
                                  geometry_contract,
@@ -500,12 +619,22 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                  transparent_contract,
                                  shader_paths.geometry_fragment_path,
                                  "sceneTransparentFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_composite_vertex_shader,
+                                                    transparent_composite_contract,
+                                                    shader_paths.transparent_composite_path,
+                                                    "transparentCompositeVertexMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_composite_fragment_shader,
+                                                    transparent_composite_contract,
+                                                    shader_paths.transparent_composite_path,
+                                                    "transparentCompositeFragmentMain");
 
     m_state.material_layout = createMaterialLayout(m_state.device);
     m_state.gbuffer_layout = createGBufferLayout(m_state.device);
     m_state.scene_layout = createSceneLayout(m_state.device);
+    m_state.transparent_composite_layout = createTransparentCompositeLayout(m_state.device);
     m_state.descriptor_pool = createDescriptorPool(m_state.device);
     m_state.gbuffer_sampler = createGBufferSampler(m_state.device);
+    m_state.transparent_composite_sampler = createTransparentCompositeSampler(m_state.device);
     m_state.environment_source_sampler = createEnvironmentSampler(m_state.device);
     m_state.shadow_sampler = createShadowSampler(m_state.device);
     m_state.default_ambient_occlusion_texture =
@@ -519,6 +648,10 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
 
     if (m_state.descriptor_pool && m_state.gbuffer_layout) {
         m_state.gbuffer_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.gbuffer_layout);
+    }
+    if (m_state.descriptor_pool && m_state.transparent_composite_layout) {
+        m_state.transparent_composite_descriptor_set =
+            m_state.descriptor_pool->AllocateDescriptorSet(m_state.transparent_composite_layout);
     }
     if (m_state.descriptor_pool && m_state.scene_layout) {
         m_state.scene_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.scene_layout);
@@ -548,6 +681,11 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         createPipelineLayoutFromSchema(m_state.device, lightingPipelineLayoutSchema(), descriptor_set_layouts);
     m_state.transparent_pipeline_layout =
         createPipelineLayoutFromSchema(m_state.device, transparentPipelineLayoutSchema(), descriptor_set_layouts);
+    m_state.transparent_composite_pipeline_layout =
+        m_state.device && m_state.transparent_composite_layout
+            ? m_state.device->CreatePipelineLayout(
+                  luna::RHI::PipelineLayoutBuilder().AddSetLayout(m_state.transparent_composite_layout).Build())
+            : nullptr;
 
     m_state.geometry_pipeline = createGeometryPipeline(m_state.device,
                                                        m_state.geometry_pipeline_layout,
@@ -575,6 +713,12 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                              context.color_format,
                                                              m_state.transparent_vertex_shader,
                                                              m_state.transparent_fragment_shader);
+    m_state.transparent_composite_pipeline =
+        createTransparentCompositePipeline(m_state.device,
+                                           m_state.transparent_composite_pipeline_layout,
+                                           context.color_format,
+                                           m_state.transparent_composite_vertex_shader,
+                                           m_state.transparent_composite_fragment_shader);
     m_state.surface_format = context.color_format;
 
     LUNA_RENDERER_INFO("Created scene render flow graphics pipelines for color format {} ({})",
@@ -950,6 +1094,39 @@ void PipelineState::updateShadowResources(const luna::RHI::Ref<luna::RHI::Textur
     m_state.shadow_bindings_valid = true;
 }
 
+void PipelineState::updateTransparentCompositeResources(
+    const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
+{
+    if (!m_state.transparent_composite_descriptor_set || !m_state.transparent_composite_sampler ||
+        !transparent_color) {
+        LUNA_RENDERER_WARN("Cannot update transparent composite resources: descriptor_set={} sampler={} color={}",
+                           static_cast<bool>(m_state.transparent_composite_descriptor_set),
+                           static_cast<bool>(m_state.transparent_composite_sampler),
+                           static_cast<bool>(transparent_color));
+        return;
+    }
+
+    if (m_state.transparent_composite_bindings_valid &&
+        m_state.bound_transparent_color_texture == transparent_color) {
+        return;
+    }
+
+    m_state.transparent_composite_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = default_scene_detail::transparent_composite_binding::ColorTexture,
+        .TextureView = transparent_color->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.transparent_composite_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        .Binding = default_scene_detail::transparent_composite_binding::ColorSampler,
+        .Sampler = m_state.transparent_composite_sampler,
+    });
+    m_state.transparent_composite_descriptor_set->Update();
+
+    m_state.bound_transparent_color_texture = transparent_color;
+    m_state.transparent_composite_bindings_valid = true;
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& PipelineState::device() const noexcept
 {
     return m_state.device;
@@ -986,6 +1163,15 @@ DrawPassResources PipelineState::transparentPassResources() const noexcept
     return DrawPassResources{
         .pipeline = m_state.transparent_pipeline,
         .scene_descriptor_set = m_state.scene_descriptor_set,
+    };
+}
+
+TransparentCompositePassResources PipelineState::transparentCompositePassResources() const noexcept
+{
+    return TransparentCompositePassResources{
+        .pipeline = m_state.transparent_composite_pipeline,
+        .descriptor_set = m_state.transparent_composite_descriptor_set,
+        .sampler = m_state.transparent_composite_sampler,
     };
 }
 

@@ -120,6 +120,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/ProceduralSky.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang
+    Renderer/Shaders/TransparentComposite.slang
     Renderer/Shaders/EditorInfiniteGrid.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang

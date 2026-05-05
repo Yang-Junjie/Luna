@@ -15,6 +15,7 @@ public:
 
 private:
     void execute(RenderGraphRasterPassContext& pass_context, const SceneRenderContext& context);
+    void composite(RenderGraphRasterPassContext& pass_context, RenderGraphTextureHandle transparent_color);
 
 private:
     PassSharedState* m_state{nullptr};
