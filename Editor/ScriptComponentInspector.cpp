@@ -289,7 +289,7 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
         }
 
         if (!luna::AssetDatabase::exists(handle)) {
-            rejected_selection_message = "Script asset handle does not exist.";
+            rejected_selection_message = "Script asset does not exist.";
             return false;
         }
 
@@ -304,7 +304,7 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
         return true;
     };
 
-    bool changed = luna::editor::ui::drawAssetHandleEditor(
+    bool changed = luna::editor::ui::drawAssetHandleSelector(
         "Script Asset", script.scriptAsset, {luna::AssetType::Script}, accepts_script_handle);
     if (rejected_selection_message.has_value()) {
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", rejected_selection_message->c_str());
@@ -319,7 +319,7 @@ bool drawScriptAssetEditor(luna::ScriptEntry& script)
     }
 
     if (!luna::AssetDatabase::exists(script.scriptAsset)) {
-        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Script asset handle does not exist.");
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Script asset does not exist.");
         return changed;
     }
 
@@ -491,7 +491,7 @@ bool drawScriptPropertyValueEditor(luna::Entity owner_entity, luna::ScriptProper
             changed |= drawEntityReferenceEditor(owner_entity, property.entityValue);
             break;
         case luna::ScriptPropertyType::Asset:
-            changed |= luna::editor::ui::drawAssetHandleEditor("Asset", property.assetValue);
+            changed |= luna::editor::ui::drawAssetHandleSelector("Asset", property.assetValue);
             if (!property.assetValue.isValid()) {
                 ImGui::TextDisabled("Resolved Asset: None");
             } else if (!luna::AssetDatabase::exists(property.assetValue)) {

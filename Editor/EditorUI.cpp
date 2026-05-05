@@ -70,11 +70,6 @@ struct AssetDisplayInfo {
     bool missing = false;
 };
 
-std::string assetHandleText(AssetHandle handle)
-{
-    return std::to_string(static_cast<uint64_t>(handle));
-}
-
 AssetDisplayInfo describeAsset(AssetHandle handle)
 {
     AssetDisplayInfo info{};
@@ -86,7 +81,7 @@ AssetDisplayInfo describeAsset(AssetHandle handle)
 
     if (!AssetDatabase::exists(handle)) {
         info.label = "Missing asset";
-        info.detail = "#" + assetHandleText(handle);
+        info.detail = "Referenced asset is not in the database";
         info.missing = true;
         return info;
     }
@@ -100,7 +95,7 @@ AssetDisplayInfo describeAsset(AssetHandle handle)
     } else {
         info.label = "Unnamed Asset";
     }
-    info.detail = std::string(AssetUtils::AssetTypeToString(metadata.Type)) + " #" + assetHandleText(handle);
+    info.detail = AssetUtils::AssetTypeToString(metadata.Type);
     return info;
 }
 
@@ -518,35 +513,18 @@ bool drawVec3Control(const char* label,
     return changed;
 }
 
-bool drawAssetHandleEditor(const char* label,
-                           AssetHandle& handle,
-                           std::initializer_list<AssetType> accepted_types,
-                           const std::function<bool(AssetHandle)>& accepts_handle,
-                           const PropertyLayout& layout)
+bool drawAssetHandleSelector(const char* label,
+                             AssetHandle& handle,
+                             std::initializer_list<AssetType> accepted_types,
+                             const std::function<bool(AssetHandle)>& accepts_handle,
+                             const PropertyLayout& layout)
 {
     if (!beginPropertyRow(label, layout)) {
         return false;
     }
 
     bool changed = false;
-    unsigned long long raw_handle = static_cast<unsigned long long>(static_cast<uint64_t>(handle));
-
     changed |= drawAssetPreview("##assetPreview", handle, accepted_types, accepts_handle);
-
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(6.0f, 3.0f));
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputScalar("##handle", ImGuiDataType_U64, &raw_handle)) {
-        const AssetHandle candidate_handle(static_cast<uint64_t>(raw_handle));
-        if (!accepts_handle || accepts_handle(candidate_handle)) {
-            handle = candidate_handle;
-            changed = true;
-        }
-    }
-
-    changed |= acceptDroppedAsset(handle, accepted_types, accepts_handle);
-    changed |= drawAssetClearContextMenu("AssetHandleInputContext", handle);
-    ImGui::PopStyleVar();
-
     endPropertyRow();
     return changed;
 }

@@ -326,7 +326,7 @@ void InspectorPanel::onImGuiRender()
                 return primitive_changed;
             });
 
-            changed |= editor::ui::drawAssetHandleEditor("Mesh Handle", mesh_component.meshHandle, {AssetType::Mesh});
+            changed |= editor::ui::drawAssetHandleSelector("Mesh Asset", mesh_component.meshHandle, {AssetType::Mesh});
 
             if (mesh_component.meshHandle != previous_mesh_handle) {
                 mesh_component.clearAllSubmeshMaterials();
@@ -436,8 +436,8 @@ void InspectorPanel::onImGuiRender()
                         return material_changed;
                     });
 
-                    changed |= editor::ui::drawAssetHandleEditor(
-                        "Material Handle", material_handle, {AssetType::Material});
+                    changed |= editor::ui::drawAssetHandleSelector(
+                        "Material Asset", material_handle, {AssetType::Material});
                     if (mesh_component.getSubmeshMaterial(submesh_index) != material_handle) {
                         mesh_component.setSubmeshMaterial(submesh_index, material_handle);
                         changed = true;

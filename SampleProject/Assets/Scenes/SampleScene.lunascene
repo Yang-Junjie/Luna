@@ -16,6 +16,11 @@ Environment:
   ProceduralSkyColorHorizon: [0.6, 0.5, 0.4]
   ProceduralGroundColor: [0.1, 0.08, 0.06]
   ProceduralSkyExposure: 1.5
+Shadows:
+  Mode: CascadedShadowMaps
+  PcfShadowDistance: 40
+  PcfMapSize: 4096
+  CsmCascadeSize: 2048
 Entities:
   - IDComponent:
       ID: 6296757327198945537
@@ -90,7 +95,7 @@ Entities:
     TagComponent:
       Tag: Camera
     TransformComponent:
-      Translation: [-0.541266, 0, 6.217166]
+      Translation: [-0.541266, -3.940267, 6.217166]
       Rotation: [0, -0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:

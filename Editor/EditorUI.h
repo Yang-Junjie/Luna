@@ -105,11 +105,11 @@ bool drawVec3Control(const char* label,
                      float drag_speed = 0.1f,
                      const PropertyLayout& layout = {});
 
-bool drawAssetHandleEditor(const char* label,
-                           AssetHandle& handle,
-                           std::initializer_list<AssetType> accepted_types = {},
-                           const std::function<bool(AssetHandle)>& accepts_handle = {},
-                           const PropertyLayout& layout = {});
+bool drawAssetHandleSelector(const char* label,
+                             AssetHandle& handle,
+                             std::initializer_list<AssetType> accepted_types = {},
+                             const std::function<bool(AssetHandle)>& accepts_handle = {},
+                             const PropertyLayout& layout = {});
 
 template <typename T, typename UIFunction>
 bool drawComponentSection(const char* label, Entity entity, UIFunction&& ui_function, bool allow_remove)
