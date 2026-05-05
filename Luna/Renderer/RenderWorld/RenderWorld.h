@@ -19,6 +19,7 @@ public:
     void addPointLight(const RenderPointLight& light);
     void addSpotLight(const RenderSpotLight& light);
     void setEnvironment(const RenderEnvironment& environment);
+    void setShadowSettings(const RenderShadowSettings& shadow_settings);
     void addMeshInstance(RenderMeshInstance instance);
     void addDrawPacket(RenderDrawPacket packet);
 
@@ -27,6 +28,7 @@ public:
     const std::vector<RenderSpotLight>& spotLights() const;
     bool hasEnvironment() const;
     const RenderEnvironment& environment() const;
+    const RenderShadowSettings& shadowSettings() const;
     const std::vector<RenderMeshInstance>& meshInstances() const;
     const std::vector<RenderDrawPacket>& drawPackets() const;
     std::vector<RenderDrawPacket> drawPackets(RenderPhase phase) const;
@@ -39,6 +41,7 @@ private:
     std::vector<RenderSpotLight> m_spot_lights;
     bool m_has_environment{false};
     RenderEnvironment m_environment{};
+    RenderShadowSettings m_shadow_settings{};
     std::vector<RenderMeshInstance> m_mesh_instances;
     std::vector<RenderDrawPacket> m_draw_packets;
 };

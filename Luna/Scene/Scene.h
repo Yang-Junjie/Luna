@@ -39,6 +39,19 @@ struct SceneEnvironmentSettings {
     float proceduralSkyExposure = 1.5f;
 };
 
+enum class SceneShadowMode : uint8_t {
+    None,
+    PcfShadowMap,
+    CascadedShadowMaps,
+};
+
+struct SceneShadowSettings {
+    SceneShadowMode mode{SceneShadowMode::CascadedShadowMaps};
+    float pcfShadowDistance{40.0f};
+    uint32_t pcfMapSize{4096};
+    uint32_t csmCascadeSize{2048};
+};
+
 class Scene {
 public:
     enum class AssetLoadBehavior {
@@ -62,6 +75,8 @@ public:
     bool isIblEnabled() const;
     SceneEnvironmentSettings& environmentSettings();
     const SceneEnvironmentSettings& environmentSettings() const;
+    SceneShadowSettings& shadowSettings();
+    const SceneShadowSettings& shadowSettings() const;
 
     EntityManager& entityManager();
     const EntityManager& entityManager() const;
@@ -74,6 +89,7 @@ private:
     std::string m_name{"Untitled"};
     AssetLoadBehavior m_asset_load_behavior = AssetLoadBehavior::Blocking;
     SceneEnvironmentSettings m_environment_settings{};
+    SceneShadowSettings m_shadow_settings{};
     EntityManager m_entity_manager;
 };
 

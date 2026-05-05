@@ -22,6 +22,8 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <string>
+#include <string_view>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -33,13 +35,20 @@ constexpr float kCascadeShadowDistance = 120.0f;
 constexpr float kCascadeSplitLambda = 0.55f;
 constexpr float kCascadeLightDepthPadding = 40.0f;
 constexpr float kCascadeBoundsPaddingScale = 1.08f;
+constexpr float kShadowDepthBias = 0.0018f;
 
-ShadowResources createShadowResources(RenderGraphBuilder& graph)
+uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
 {
-    const uint32_t shadow_map_size = render_flow::default_scene_detail::kShadowCascadeAtlasSize;
+    constexpr uint32_t kMinShadowMapSize = 256;
+    constexpr uint32_t kMaxShadowMapSize = 8192;
+    return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
+}
+
+ShadowResources createShadowResources(RenderGraphBuilder& graph, uint32_t shadow_map_size, std::string_view name)
+{
     return ShadowResources{
         .shadow_map = graph.CreateTexture(RenderGraphTextureDesc{
-            .Name = "SceneShadowMap",
+            .Name = std::string(name),
             .Width = shadow_map_size,
             .Height = shadow_map_size,
             .Format = render_flow::default_scene_detail::kShadowMapFormat,
@@ -48,7 +57,7 @@ ShadowResources createShadowResources(RenderGraphBuilder& graph)
             .SampleCount = luna::RHI::SampleCount::Count1,
         }),
         .shadow_depth = graph.CreateTexture(RenderGraphTextureDesc{
-            .Name = "SceneShadowDepth",
+            .Name = std::string(name) + "Depth",
             .Width = shadow_map_size,
             .Height = shadow_map_size,
             .Format = luna::RHI::Format::D32_FLOAT,
@@ -56,6 +65,48 @@ ShadowResources createShadowResources(RenderGraphBuilder& graph)
             .InitialState = luna::RHI::ResourceState::Undefined,
             .SampleCount = luna::RHI::SampleCount::Count1,
         }),
+        .render_params = {},
+    };
+}
+
+uint32_t csmCascadeSize(const RenderWorld* world)
+{
+    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().csm_cascade_size : 2048u, 2048u);
+}
+
+uint32_t csmAtlasSize(uint32_t cascade_size)
+{
+    return cascade_size * render_flow::default_scene_detail::kShadowCascadeAtlasColumns;
+}
+
+uint32_t pcfShadowMapSize(const RenderWorld* world)
+{
+    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().pcf_map_size : 4096u, 4096u);
+}
+
+ShadowResources createCascadedShadowResources(RenderGraphBuilder& graph, uint32_t cascade_size)
+{
+    return createShadowResources(graph, csmAtlasSize(cascade_size), "SceneShadowMap");
+}
+
+ShadowResources createPcfShadowResources(RenderGraphBuilder& graph, uint32_t shadow_map_size)
+{
+    return createShadowResources(graph, shadow_map_size, "ScenePcfShadowMap");
+}
+
+ShadowResources createDisabledShadowResources(RenderGraphBuilder& graph)
+{
+    return ShadowResources{
+        .shadow_map = graph.CreateTexture(RenderGraphTextureDesc{
+            .Name = "SceneShadowMapDisabled",
+            .Width = 1,
+            .Height = 1,
+            .Format = render_flow::default_scene_detail::kShadowMapFormat,
+            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+            .InitialState = luna::RHI::ResourceState::Undefined,
+            .SampleCount = luna::RHI::SampleCount::Count1,
+        }),
+        .shadow_depth = {},
         .render_params = {},
     };
 }
@@ -71,22 +122,30 @@ glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
     return length_squared > 1.0e-6f ? glm::normalize(value) : fallback;
 }
 
-void configureCascadeViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t cascade_index)
+void configureCascadeViewportAndScissor(luna::RHI::CommandBufferEncoder& commands,
+                                        uint32_t cascade_index,
+                                        uint32_t cascade_size)
 {
-    const uint32_t tile_size = render_flow::default_scene_detail::kShadowCascadeTileSize;
     const uint32_t atlas_columns = render_flow::default_scene_detail::kShadowCascadeAtlasColumns;
     const uint32_t tile_x = cascade_index % atlas_columns;
     const uint32_t tile_y = cascade_index / atlas_columns;
-    const uint32_t offset_x = tile_x * tile_size;
-    const uint32_t offset_y = tile_y * tile_size;
+    const uint32_t offset_x = tile_x * cascade_size;
+    const uint32_t offset_y = tile_y * cascade_size;
 
     commands.SetViewport({static_cast<float>(offset_x),
                           static_cast<float>(offset_y),
-                          static_cast<float>(tile_size),
-                          static_cast<float>(tile_size),
+                          static_cast<float>(cascade_size),
+                          static_cast<float>(cascade_size),
                           0.0f,
                           1.0f});
-    commands.SetScissor({static_cast<int32_t>(offset_x), static_cast<int32_t>(offset_y), tile_size, tile_size});
+    commands.SetScissor({static_cast<int32_t>(offset_x), static_cast<int32_t>(offset_y), cascade_size, cascade_size});
+}
+
+void configurePcfViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t shadow_map_size)
+{
+    commands.SetViewport(
+        {0.0f, 0.0f, static_cast<float>(shadow_map_size), static_cast<float>(shadow_map_size), 0.0f, 1.0f});
+    commands.SetScissor({0, 0, shadow_map_size, shadow_map_size});
 }
 
 float viewportAspectRatio(const SceneRenderContext& context)
@@ -119,6 +178,22 @@ std::array<float, render_flow::default_scene_detail::kShadowCascadeCount>
 
     splits.back() = clamped_far;
     return splits;
+}
+
+float calculatePcfBiasScale(float near_clip, float far_clip)
+{
+    const auto csm_splits = calculateCascadeSplits(near_clip, far_clip);
+    const float first_cascade_span = (std::max)(csm_splits[0], 0.001f);
+    return std::sqrt((std::max)(far_clip / first_cascade_span, 1.0f));
+}
+
+float pcfShadowDistance(const RenderWorld* world)
+{
+    if (world == nullptr) {
+        return 40.0f;
+    }
+
+    return (std::clamp)(world->shadowSettings().pcf_shadow_distance, 1.0f, 1000.0f);
 }
 
 std::array<glm::vec3, 8>
@@ -179,7 +254,8 @@ std::array<glm::vec3, 8> orthographicFrustumCorners(const Camera& camera, float 
 
 glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
                                      const glm::vec3& light_direction,
-                                     const luna::RHI::RHIConventions& conventions)
+                                     const luna::RHI::RHIConventions& conventions,
+                                     uint32_t shadow_map_size)
 {
     glm::vec3 center{0.0f};
     for (const glm::vec3& corner : corners) {
@@ -210,10 +286,8 @@ glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
 
     const float cascade_width = max_bounds.x - min_bounds.x;
     const float cascade_height = max_bounds.y - min_bounds.y;
-    const float texel_size_x =
-        cascade_width / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize);
-    const float texel_size_y =
-        cascade_height / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize);
+    const float texel_size_x = cascade_width / static_cast<float>((std::max)(shadow_map_size, 1u));
+    const float texel_size_y = cascade_height / static_cast<float>((std::max)(shadow_map_size, 1u));
     if (texel_size_x > 0.0f && texel_size_y > 0.0f) {
         const glm::vec2 snapped_center{
             std::floor(bounds_center.x / texel_size_x) * texel_size_x,
@@ -238,10 +312,10 @@ render_flow::default_scene_detail::ShadowRenderParams
 {
     render_flow::default_scene_detail::ShadowRenderParams params{};
     params.params = glm::vec4(0.0f,
-                              0.0018f,
+                              kShadowDepthBias,
                               static_cast<float>(render_flow::default_scene_detail::kShadowCascadeCount),
                               1.0f / static_cast<float>(render_flow::default_scene_detail::kShadowCascadeTileSize));
-    if (!world || world->directionalLights().empty() ||
+    if (!world || world->shadowSettings().mode == RenderShadowMode::None || world->directionalLights().empty() ||
         draw_queue.drawCommands(luna::RenderPhase::ShadowCaster).empty()) {
         return params;
     }
@@ -254,31 +328,57 @@ render_flow::default_scene_detail::ShadowRenderParams
     const glm::vec3 light_direction = safeNormalize(light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
     const Camera& camera = world->camera();
     const float aspect_ratio = viewportAspectRatio(context);
+    const RenderShadowMode shadow_mode = world->shadowSettings().mode;
+    const uint32_t shadow_count =
+        shadow_mode == RenderShadowMode::PcfShadowMap ? 1u : render_flow::default_scene_detail::kShadowCascadeCount;
+    const uint32_t shadow_map_size =
+        shadow_mode == RenderShadowMode::PcfShadowMap ? pcfShadowMapSize(world) : csmCascadeSize(world);
+    params.params.z = static_cast<float>(shadow_count);
+    params.params.w = 1.0f / static_cast<float>(shadow_map_size);
+    if (shadow_mode == RenderShadowMode::PcfShadowMap) {
+        params.atlas_params = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    }
 
     if (camera.getProjectionType() == Camera::ProjectionType::Perspective) {
         const auto& perspective = camera.getPerspectiveSettings();
         const float near_clip = (std::max)(perspective.near_clip, 0.001f);
-        const float far_clip = (std::min)(perspective.far_clip, kCascadeShadowDistance);
+        const float far_clip = shadow_mode == RenderShadowMode::PcfShadowMap
+                                   ? (std::min)(perspective.far_clip, pcfShadowDistance(world))
+                                   : (std::min)(perspective.far_clip, kCascadeShadowDistance);
+        if (shadow_mode == RenderShadowMode::PcfShadowMap) {
+            const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, near_clip, far_clip);
+            params.view_projections[0] =
+                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
+            params.cascade_splits[0] = far_clip;
+            params.params.y = kShadowDepthBias * calculatePcfBiasScale(near_clip, far_clip);
+            params.params.x = 1.0f;
+            return params;
+        }
+
         const auto splits = calculateCascadeSplits(near_clip, far_clip);
 
         float cascade_near = near_clip;
-        for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
-             ++cascade_index) {
+        for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
             const float cascade_far = splits[cascade_index];
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, cascade_near, cascade_far);
             params.view_projections[cascade_index] =
-                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions);
+                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
             params.cascade_splits[cascade_index] = cascade_far;
             cascade_near = cascade_far;
         }
     } else {
         const auto corners = orthographicFrustumCorners(camera, aspect_ratio);
         const glm::mat4 view_projection =
-            buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions);
-        for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
-             ++cascade_index) {
+            buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
+        for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
             params.view_projections[cascade_index] = view_projection;
-            params.cascade_splits[cascade_index] = static_cast<float>(cascade_index + 1u);
+            params.cascade_splits[cascade_index] =
+                shadow_mode == RenderShadowMode::PcfShadowMap
+                    ? (std::max)(camera.getOrthographicSettings().far_clip, 0.001f)
+                    : static_cast<float>(cascade_index + 1u);
+        }
+        if (shadow_mode == RenderShadowMode::PcfShadowMap) {
+            params.params.y = kShadowDepthBias * 3.0f;
         }
     }
 
@@ -302,8 +402,16 @@ std::span<const RenderPassResourceUsage> ShadowDepthPass::resourceUsages() const
 
 void ShadowDepthPass::setup(RenderPassContext& context)
 {
-    ShadowResources shadow = createShadowResources(context.graph());
-    shadow.render_params = buildDirectionalShadowParams(m_state->world(), context.sceneContext(), m_state->drawQueue());
+    const render_flow::default_scene_detail::ShadowRenderParams render_params =
+        buildDirectionalShadowParams(m_state->world(), context.sceneContext(), m_state->drawQueue());
+    const uint32_t shadow_count = static_cast<uint32_t>(render_params.params.z + 0.5f);
+    const uint32_t cascade_size = csmCascadeSize(m_state->world());
+    const uint32_t pcf_map_size = pcfShadowMapSize(m_state->world());
+    ShadowResources shadow = render_params.params.x <= 0.5f
+                                 ? createDisabledShadowResources(context.graph())
+                                 : (shadow_count <= 1u ? createPcfShadowResources(context.graph(), pcf_map_size)
+                                                       : createCascadedShadowResources(context.graph(), cascade_size));
+    shadow.render_params = render_params;
     m_state->setShadowParams(shadow.render_params);
 
     context.blackboard().set(blackboard::ShadowMap, shadow.shadow_map);
@@ -315,10 +423,12 @@ void ShadowDepthPass::setup(RenderPassContext& context)
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
-            pass_builder.WriteDepth(shadow.shadow_depth,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    {1.0f, 0});
+            if (shadow.shadow_depth.isValid()) {
+                pass_builder.WriteDepth(shadow.shadow_depth,
+                                        luna::RHI::AttachmentLoadOp::Clear,
+                                        luna::RHI::AttachmentStoreOp::Store,
+                                        {1.0f, 0});
+            }
         },
         [this, scene_context = context.sceneContext()](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, scene_context);
@@ -327,6 +437,13 @@ void ShadowDepthPass::setup(RenderPassContext& context)
 
 void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const SceneRenderContext& context)
 {
+    if (m_state->shadowParams().params.x <= 0.5f) {
+        pass_context.beginRendering();
+        pass_context.endRendering();
+        LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass skipped because cascaded shadows are disabled or unavailable");
+        return;
+    }
+
     AssetCache& assets = m_state->assets();
     PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
@@ -353,16 +470,24 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     size_t recorded_draw_count = 0;
-    for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
-         ++cascade_index) {
-        configureCascadeViewportAndScissor(commands, cascade_index);
+    const uint32_t shadow_count =
+        (std::min)(static_cast<uint32_t>(m_state->shadowParams().params.z + 0.5f),
+                   render_flow::default_scene_detail::kShadowCascadeCount);
+    const uint32_t cascade_size = csmCascadeSize(m_state->world());
+    const uint32_t pcf_map_size = pcfShadowMapSize(m_state->world());
+    for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
+        if (shadow_count <= 1u) {
+            configurePcfViewportAndScissor(commands, pcf_map_size);
+        } else {
+            configureCascadeViewportAndScissor(commands, cascade_index, cascade_size);
+        }
         recorded_draw_count +=
             recordShadowDrawCommands(commands, pass_resources, shadow_draw_commands, assets, default_material, cascade_index);
     }
     LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} draw command(s) across {} cascade(s)",
                               recorded_draw_count,
-                              shadow_draw_commands.size() * render_flow::default_scene_detail::kShadowCascadeCount,
-                              render_flow::default_scene_detail::kShadowCascadeCount);
+                              shadow_draw_commands.size() * shadow_count,
+                              shadow_count);
     pass_context.endRendering();
 }
 

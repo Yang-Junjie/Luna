@@ -16,7 +16,6 @@ inline constexpr uint32_t kShadowCascadeAtlasColumns = 2;
 inline constexpr uint32_t kShadowCascadeAtlasRows = 2;
 inline constexpr uint32_t kShadowCascadeTileSize = 2048;
 inline constexpr uint32_t kShadowCascadeAtlasSize = kShadowCascadeTileSize * kShadowCascadeAtlasColumns;
-inline constexpr uint32_t kShadowMapSize = kShadowCascadeTileSize;
 
 inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
 inline constexpr luna::RHI::Format kEnvironmentIblFormat = luna::RHI::Format::RGBA16_FLOAT;

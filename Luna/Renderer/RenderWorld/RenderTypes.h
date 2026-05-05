@@ -101,6 +101,19 @@ struct RenderEnvironment {
     float procedural_sky_exposure{1.5f};
 };
 
+enum class RenderShadowMode : uint8_t {
+    None,
+    PcfShadowMap,
+    CascadedShadowMaps,
+};
+
+struct RenderShadowSettings {
+    RenderShadowMode mode{RenderShadowMode::CascadedShadowMaps};
+    float pcf_shadow_distance{40.0f};
+    uint32_t pcf_map_size{4096};
+    uint32_t csm_cascade_size{2048};
+};
+
 } // namespace luna
 
 

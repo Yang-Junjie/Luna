@@ -20,6 +20,7 @@ std::unique_ptr<Scene> Scene::clone() const
     cloned_scene->m_name = m_name;
     cloned_scene->m_asset_load_behavior = m_asset_load_behavior;
     cloned_scene->m_environment_settings = m_environment_settings;
+    cloned_scene->m_shadow_settings = m_shadow_settings;
 
     auto& cloned_entity_manager = cloned_scene->entityManager();
     const auto& registry = m_entity_manager.registry();
@@ -171,6 +172,16 @@ SceneEnvironmentSettings& Scene::environmentSettings()
 const SceneEnvironmentSettings& Scene::environmentSettings() const
 {
     return m_environment_settings;
+}
+
+SceneShadowSettings& Scene::shadowSettings()
+{
+    return m_shadow_settings;
+}
+
+const SceneShadowSettings& Scene::shadowSettings() const
+{
+    return m_shadow_settings;
 }
 
 EntityManager& Scene::entityManager()

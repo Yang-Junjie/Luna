@@ -3,6 +3,7 @@
 #include "EditorContext.h"
 #include "EditorUI.h"
 
+#include <algorithm>
 #include <cmath>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
@@ -31,6 +32,14 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const lu
            lhs.proceduralSkyExposure == rhs.proceduralSkyExposure;
 }
 
+bool sameShadowSettings(const luna::SceneShadowSettings& lhs, const luna::SceneShadowSettings& rhs)
+{
+    return lhs.mode == rhs.mode &&
+           lhs.pcfShadowDistance == rhs.pcfShadowDistance &&
+           lhs.pcfMapSize == rhs.pcfMapSize &&
+           lhs.csmCascadeSize == rhs.csmCascadeSize;
+}
+
 const char* backgroundModeLabel(luna::SceneBackgroundMode mode)
 {
     switch (mode) {
@@ -43,6 +52,20 @@ const char* backgroundModeLabel(luna::SceneBackgroundMode mode)
     }
 
     return "Default Sky";
+}
+
+const char* shadowModeLabel(luna::SceneShadowMode mode)
+{
+    switch (mode) {
+        case luna::SceneShadowMode::None:
+            return "None";
+        case luna::SceneShadowMode::PcfShadowMap:
+            return "PCF Shadow Map";
+        case luna::SceneShadowMode::CascadedShadowMaps:
+            return "CSM";
+    }
+
+    return "CSM";
 }
 
 bool drawBackgroundModeCombo(luna::SceneBackgroundMode& mode)
@@ -69,6 +92,49 @@ bool drawBackgroundModeCombo(luna::SceneBackgroundMode& mode)
     });
 }
 
+bool drawShadowModeCombo(luna::SceneShadowMode& mode)
+{
+    return luna::editor::ui::drawCombo("Mode", shadowModeLabel(mode), [&]() {
+        bool changed = false;
+        const luna::SceneShadowMode modes[] = {
+            luna::SceneShadowMode::CascadedShadowMaps,
+            luna::SceneShadowMode::PcfShadowMap,
+            luna::SceneShadowMode::None,
+        };
+
+        for (const luna::SceneShadowMode candidate : modes) {
+            const bool selected = mode == candidate;
+            if (ImGui::Selectable(shadowModeLabel(candidate), selected)) {
+                mode = candidate;
+                changed = true;
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        return changed;
+    });
+}
+
+uint32_t sanitizeShadowMapSize(int size, uint32_t fallback)
+{
+    constexpr int kMinShadowMapSize = 256;
+    constexpr int kMaxShadowMapSize = 8192;
+    return static_cast<uint32_t>(std::clamp(size <= 0 ? static_cast<int>(fallback) : size,
+                                           kMinShadowMapSize,
+                                           kMaxShadowMapSize));
+}
+
+bool drawShadowMapSize(const char* label, uint32_t& size)
+{
+    int value = static_cast<int>(size);
+    const bool changed = luna::editor::ui::drawInt(label, value, 256, 1024);
+    if (changed) {
+        size = sanitizeShadowMapSize(value, size);
+    }
+    return changed;
+}
+
 } // namespace
 
 namespace luna {
@@ -85,7 +151,9 @@ void SceneSettingPanel::syncFromScene()
 
     m_environment_draft = m_editor_context->getScene().environmentSettings();
     m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
+    m_shadow_draft = m_editor_context->getScene().shadowSettings();
     m_environment_draft_dirty = false;
+    m_shadow_draft_dirty = false;
     m_has_environment_draft = true;
 }
 
@@ -165,7 +233,9 @@ void SceneSettingPanel::onImGuiRender()
         }
         ImGui::SameLine();
         if (editor::ui::drawButton("Revert", editor::ui::ButtonVariant::Subtle, editor::ui::scaled(120.0f, 0.0f))) {
-            syncFromScene();
+            m_environment_draft = scene_environment;
+            m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
+            m_environment_draft_dirty = false;
         }
         if (disable_apply_controls) {
             ImGui::EndDisabled();
@@ -173,6 +243,58 @@ void SceneSettingPanel::onImGuiRender()
 
         if (m_environment_draft_dirty) {
             ImGui::TextDisabled("Environment changes are pending.");
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Shadows", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const SceneShadowSettings& scene_shadows = m_editor_context->getScene().shadowSettings();
+        SceneShadowSettings& shadows = m_shadow_draft;
+
+        drawShadowModeCombo(shadows.mode);
+        if (shadows.mode == SceneShadowMode::PcfShadowMap) {
+            editor::ui::drawFloat("Shadow Distance",
+                                  shadows.pcfShadowDistance,
+                                  1.0f,
+                                  1.0f,
+                                  1000.0f,
+                                  "%.1f");
+            drawShadowMapSize("Resolution", shadows.pcfMapSize);
+        } else if (shadows.mode == SceneShadowMode::CascadedShadowMaps) {
+            drawShadowMapSize("Cascade Size", shadows.csmCascadeSize);
+        }
+        m_shadow_draft_dirty = !sameShadowSettings(shadows, scene_shadows);
+
+        ImGui::Separator();
+        const bool disable_apply_controls = !m_shadow_draft_dirty;
+        if (disable_apply_controls) {
+            ImGui::BeginDisabled();
+        }
+        if (editor::ui::drawButton("Apply##Shadows",
+                                   editor::ui::ButtonVariant::Primary,
+                                   editor::ui::scaled(120.0f, 0.0f))) {
+            m_shadow_draft.pcfShadowDistance =
+                std::clamp(m_shadow_draft.pcfShadowDistance, 1.0f, 1000.0f);
+            m_shadow_draft.pcfMapSize =
+                sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.pcfMapSize), 4096);
+            m_shadow_draft.csmCascadeSize =
+                sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.csmCascadeSize), 2048);
+            m_editor_context->getScene().shadowSettings() = m_shadow_draft;
+            m_shadow_draft_dirty = false;
+            m_editor_context->markSceneDirty();
+        }
+        ImGui::SameLine();
+        if (editor::ui::drawButton("Revert##Shadows",
+                                   editor::ui::ButtonVariant::Subtle,
+                                   editor::ui::scaled(120.0f, 0.0f))) {
+            m_shadow_draft = scene_shadows;
+            m_shadow_draft_dirty = false;
+        }
+        if (disable_apply_controls) {
+            ImGui::EndDisabled();
+        }
+
+        if (m_shadow_draft_dirty) {
+            ImGui::TextDisabled("Shadow changes are pending.");
         }
     }
 

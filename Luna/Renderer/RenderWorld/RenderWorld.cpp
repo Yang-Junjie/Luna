@@ -19,6 +19,7 @@ void RenderWorld::clear()
     m_spot_lights.clear();
     m_has_environment = false;
     m_environment = {};
+    m_shadow_settings = {};
     m_mesh_instances.clear();
     m_draw_packets.clear();
 }
@@ -54,6 +55,11 @@ void RenderWorld::setEnvironment(const RenderEnvironment& environment)
     m_has_environment = true;
 }
 
+void RenderWorld::setShadowSettings(const RenderShadowSettings& shadow_settings)
+{
+    m_shadow_settings = shadow_settings;
+}
+
 void RenderWorld::addMeshInstance(RenderMeshInstance instance)
 {
     m_mesh_instances.push_back(std::move(instance));
@@ -87,6 +93,11 @@ bool RenderWorld::hasEnvironment() const
 const RenderEnvironment& RenderWorld::environment() const
 {
     return m_environment;
+}
+
+const RenderShadowSettings& RenderWorld::shadowSettings() const
+{
+    return m_shadow_settings;
 }
 
 const std::vector<RenderMeshInstance>& RenderWorld::meshInstances() const

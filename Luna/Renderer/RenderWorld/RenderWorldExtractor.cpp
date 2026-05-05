@@ -14,6 +14,13 @@ namespace luna {
 
 namespace {
 
+uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
+{
+    constexpr uint32_t kMinShadowMapSize = 256;
+    constexpr uint32_t kMaxShadowMapSize = 8192;
+    return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
+}
+
 std::vector<std::shared_ptr<Material>>
     resolveSubmeshMaterials(const MeshComponent& mesh_component,
                             const Mesh& mesh,
@@ -79,6 +86,20 @@ RenderBackgroundMode resolveBackgroundMode(const SceneEnvironmentSettings& envir
     return RenderBackgroundMode::ProceduralSky;
 }
 
+RenderShadowMode resolveShadowMode(const SceneShadowSettings& shadow_settings)
+{
+    switch (shadow_settings.mode) {
+        case SceneShadowMode::None:
+            return RenderShadowMode::None;
+        case SceneShadowMode::PcfShadowMap:
+            return RenderShadowMode::PcfShadowMap;
+        case SceneShadowMode::CascadedShadowMaps:
+            return RenderShadowMode::CascadedShadowMaps;
+    }
+
+    return RenderShadowMode::CascadedShadowMaps;
+}
+
 } // namespace
 
 void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWorld& render_world) const
@@ -110,6 +131,12 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
         .procedural_sky_color_horizon = environment_settings.proceduralSkyColorHorizon,
         .procedural_ground_color = environment_settings.proceduralGroundColor,
         .procedural_sky_exposure = (std::max)(environment_settings.proceduralSkyExposure, 0.0f),
+    });
+    render_world.setShadowSettings(RenderShadowSettings{
+        .mode = resolveShadowMode(scene.shadowSettings()),
+        .pcf_shadow_distance = std::clamp(scene.shadowSettings().pcfShadowDistance, 1.0f, 1000.0f),
+        .pcf_map_size = sanitizeShadowMapSize(scene.shadowSettings().pcfMapSize, 4096),
+        .csm_cascade_size = sanitizeShadowMapSize(scene.shadowSettings().csmCascadeSize, 2048),
     });
 
     bool has_directional_light = false;

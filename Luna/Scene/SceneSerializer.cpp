@@ -4,6 +4,7 @@
 #include "Entity.h"
 #include "Scene.h"
 
+#include <algorithm>
 #include <fstream>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
@@ -60,6 +61,20 @@ const char* sceneBackgroundModeToString(luna::SceneBackgroundMode mode)
     return "ProceduralSky";
 }
 
+const char* sceneShadowModeToString(luna::SceneShadowMode mode)
+{
+    switch (mode) {
+        case luna::SceneShadowMode::None:
+            return "None";
+        case luna::SceneShadowMode::PcfShadowMap:
+            return "PcfShadowMap";
+        case luna::SceneShadowMode::CascadedShadowMaps:
+            return "CascadedShadowMaps";
+    }
+
+    return "CascadedShadowMaps";
+}
+
 luna::SceneBackgroundMode readSceneBackgroundMode(const YAML::Node& node, luna::SceneBackgroundMode fallback)
 {
     if (!node) {
@@ -80,9 +95,36 @@ luna::SceneBackgroundMode readSceneBackgroundMode(const YAML::Node& node, luna::
     return fallback;
 }
 
+luna::SceneShadowMode readSceneShadowMode(const YAML::Node& node, luna::SceneShadowMode fallback)
+{
+    if (!node) {
+        return fallback;
+    }
+
+    const std::string mode = node.as<std::string>();
+    if (mode == "None") {
+        return luna::SceneShadowMode::None;
+    }
+    if (mode == "PcfShadowMap" || mode == "PCF" || mode == "PCFShadowMap") {
+        return luna::SceneShadowMode::PcfShadowMap;
+    }
+    if (mode == "CascadedShadowMaps" || mode == "CSM") {
+        return luna::SceneShadowMode::CascadedShadowMaps;
+    }
+
+    return fallback;
+}
+
 bool sceneBackgroundModeHasVisibleSky(luna::SceneBackgroundMode mode)
 {
     return mode != luna::SceneBackgroundMode::SolidColor;
+}
+
+uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
+{
+    constexpr uint32_t kMinShadowMapSize = 256;
+    constexpr uint32_t kMaxShadowMapSize = 8192;
+    return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
 const char* scriptPropertyTypeToString(luna::ScriptPropertyType type)
@@ -243,6 +285,16 @@ void emitSceneEnvironment(YAML::Emitter& out, const luna::SceneEnvironmentSettin
     out << YAML::EndMap;
 }
 
+void emitSceneShadows(YAML::Emitter& out, const luna::SceneShadowSettings& shadows)
+{
+    out << YAML::Key << "Shadows" << YAML::Value << YAML::BeginMap;
+    out << YAML::Key << "Mode" << YAML::Value << sceneShadowModeToString(shadows.mode);
+    out << YAML::Key << "PcfShadowDistance" << YAML::Value << shadows.pcfShadowDistance;
+    out << YAML::Key << "PcfMapSize" << YAML::Value << shadows.pcfMapSize;
+    out << YAML::Key << "CsmCascadeSize" << YAML::Value << shadows.csmCascadeSize;
+    out << YAML::EndMap;
+}
+
 void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings& environment)
 {
     if (!node) {
@@ -302,6 +354,29 @@ void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings
     }
 }
 
+void readSceneShadows(const YAML::Node& node, luna::SceneShadowSettings& shadows)
+{
+    if (!node) {
+        return;
+    }
+
+    if (node["Mode"]) {
+        shadows.mode = readSceneShadowMode(node["Mode"], shadows.mode);
+    } else if (node["CascadedShadowsEnabled"]) {
+        shadows.mode = node["CascadedShadowsEnabled"].as<bool>() ? luna::SceneShadowMode::CascadedShadowMaps
+                                                                 : luna::SceneShadowMode::None;
+    }
+    if (node["PcfShadowDistance"]) {
+        shadows.pcfShadowDistance = std::clamp(node["PcfShadowDistance"].as<float>(), 1.0f, 1000.0f);
+    }
+    if (node["PcfMapSize"]) {
+        shadows.pcfMapSize = sanitizeShadowMapSize(node["PcfMapSize"].as<uint32_t>(), shadows.pcfMapSize);
+    }
+    if (node["CsmCascadeSize"]) {
+        shadows.csmCascadeSize = sanitizeShadowMapSize(node["CsmCascadeSize"].as<uint32_t>(), shadows.csmCascadeSize);
+    }
+}
+
 const char* lightTypeToString(luna::LightComponent::Type type)
 {
     switch (type) {
@@ -341,6 +416,7 @@ bool emitSceneYaml(const luna::Scene& scene, YAML::Emitter& out, std::string_vie
     out << YAML::BeginMap;
     out << YAML::Key << "Scene" << YAML::Value << scene.getName();
     emitSceneEnvironment(out, scene.environmentSettings());
+    emitSceneShadows(out, scene.shadowSettings());
     out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
 
     const auto& registry = scene.entityManager().registry();
@@ -481,9 +557,13 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
 
     std::vector<SerializedEntityData> entities;
     SceneEnvironmentSettings environment_settings{};
+    SceneShadowSettings shadow_settings{};
     try {
         if (const YAML::Node environment_node = data["Environment"]; environment_node) {
             readSceneEnvironment(environment_node, environment_settings);
+        }
+        if (const YAML::Node shadows_node = data["Shadows"]; shadows_node) {
+            readSceneShadows(shadows_node, shadow_settings);
         }
 
         const YAML::Node entities_node = data["Entities"];
@@ -652,6 +732,7 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
     scene.entityManager().clear();
     scene.setName(scene_name);
     scene.environmentSettings() = environment_settings;
+    scene.shadowSettings() = shadow_settings;
 
     auto& entity_manager = scene.entityManager();
     for (const auto& entity_data : entities) {

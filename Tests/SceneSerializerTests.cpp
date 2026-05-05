@@ -108,6 +108,59 @@ Entities: []
                    "legacy enabled field should remain true after environment-map inference");
 }
 
+void testSceneShadowSettingsRoundTrip(TestContext& context)
+{
+    luna::Scene scene;
+    scene.shadowSettings().mode = luna::SceneShadowMode::PcfShadowMap;
+    scene.shadowSettings().pcfShadowDistance = 72.0f;
+    scene.shadowSettings().pcfMapSize = 8192;
+    scene.shadowSettings().csmCascadeSize = 4096;
+
+    const std::string serialized = luna::SceneSerializer::serializeToString(scene);
+    context.expect(serialized.find("Shadows:") != std::string::npos,
+                   "scene shadow settings should serialize");
+    context.expect(serialized.find("Mode: PcfShadowMap") != std::string::npos,
+                   "scene shadow settings should serialize PCF shadow mode");
+    context.expect(serialized.find("PcfShadowDistance: 72") != std::string::npos,
+                   "scene shadow settings should serialize PCF shadow distance");
+    context.expect(serialized.find("PcfMapSize: 8192") != std::string::npos,
+                   "scene shadow settings should serialize PCF map size");
+    context.expect(serialized.find("CsmCascadeSize: 4096") != std::string::npos,
+                   "scene shadow settings should serialize CSM cascade size");
+
+    luna::Scene loaded_scene;
+    context.expect(luna::SceneSerializer::deserializeFromString(loaded_scene, serialized, "shadow settings scene"),
+                   "scene with shadow settings should deserialize");
+    context.expect(loaded_scene.shadowSettings().mode == luna::SceneShadowMode::PcfShadowMap,
+                   "PCF shadow mode should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfShadowDistance == 72.0f,
+                   "PCF shadow distance should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfMapSize == 8192,
+                   "PCF map size should round-trip");
+    context.expect(loaded_scene.shadowSettings().csmCascadeSize == 4096,
+                   "CSM cascade size should round-trip");
+}
+
+void testLegacyCsmEnabledMigration(TestContext& context)
+{
+    constexpr std::string_view scene_data = R"(
+Scene: LegacyNoCsm
+Environment:
+  Enabled: true
+  IblEnabled: true
+  EnvironmentMapHandle: 0
+Shadows:
+  CascadedShadowsEnabled: false
+Entities: []
+)";
+
+    luna::Scene scene;
+    context.expect(luna::SceneSerializer::deserializeFromString(scene, scene_data, "legacy no-csm scene"),
+                   "legacy scene with disabled CSM should deserialize");
+    context.expect(scene.shadowSettings().mode == luna::SceneShadowMode::None,
+                   "legacy disabled CSM should migrate to no shadows");
+}
+
 } // namespace
 
 int main()
@@ -118,6 +171,8 @@ int main()
     testSceneEnvironmentBackgroundRoundTrip(context);
     testLegacyEnvironmentEnabledMigration(context);
     testLegacyEnvironmentMapInference(context);
+    testSceneShadowSettingsRoundTrip(context);
+    testLegacyCsmEnabledMigration(context);
 
     luna::Logger::shutdown();
     return context.result();

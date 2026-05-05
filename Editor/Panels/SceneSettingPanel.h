@@ -16,7 +16,9 @@ public:
 private:
     EditorContext* m_editor_context{nullptr};
     SceneEnvironmentSettings m_environment_draft{};
+    SceneShadowSettings m_shadow_draft{};
     bool m_environment_draft_dirty{false};
+    bool m_shadow_draft_dirty{false};
     bool m_has_environment_draft{false};
 };
 

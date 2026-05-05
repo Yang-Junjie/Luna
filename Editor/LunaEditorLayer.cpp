@@ -1081,6 +1081,7 @@ void LunaEditorLayer::resetEditorState()
     m_scene->entityManager().clear();
     m_scene->setName("Untitled");
     m_scene->environmentSettings() = {};
+    m_scene->shadowSettings() = {};
     m_scene_setting_panel->syncFromScene();
     m_selected_entity_id = UUID(0);
     m_scene_file_path.clear();
