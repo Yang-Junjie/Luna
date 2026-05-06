@@ -158,7 +158,7 @@ void InspectorPanel::onImGuiRender()
                 }
                 if (ImGui::BeginPopupContextItem("ParentContext")) {
                     if (ImGui::MenuItem("Detach From Parent")) {
-                        changed |= selected_entity.clearParent(true);
+                        changed |= m_editor_context->reparentEntity(selected_entity, {}, true);
                     }
                     ImGui::EndPopup();
                 }

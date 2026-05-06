@@ -8,6 +8,11 @@ add_executable(
     SceneSerializerTests.cpp
 )
 
+add_executable(
+    AuthoringSessionTests
+    AuthoringSessionTests.cpp
+)
+
 set(LUNA_TEST_SCRIPT_PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ScriptPluginTestPlugins")
 set(LUNA_TEST_SCRIPT_PLUGIN_TARGETS)
 
@@ -76,6 +81,12 @@ target_link_libraries(
         LunaCore
 )
 
+target_link_libraries(
+    AuthoringSessionTests
+    PRIVATE
+        LunaCore
+)
+
 target_compile_features(
     ScriptPluginContractTests
     PRIVATE
@@ -84,6 +95,12 @@ target_compile_features(
 
 target_compile_features(
     SceneSerializerTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    AuthoringSessionTests
     PRIVATE
         cxx_std_20
 )
@@ -108,4 +125,9 @@ add_test(
 add_test(
     NAME SceneSerializerTests
     COMMAND SceneSerializerTests
+)
+
+add_test(
+    NAME AuthoringSessionTests
+    COMMAND AuthoringSessionTests
 )

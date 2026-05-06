@@ -185,6 +185,11 @@ set(PROJECT_SOURCE
     Project/ProjectManager.h
     Project/ProjectManager.cpp)
 
+set(AUTHORING_SOURCE
+    Authoring/AuthoringTypes.h
+    Authoring/AuthoringSession.h
+    Authoring/AuthoringSession.cpp)
+
 set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h
     Platform/Common/NativeWindowHandle.h)
@@ -286,6 +291,7 @@ add_library(
     JobSystem/TaskSystem.cpp
 
     ${PROJECT_SOURCE}
+    ${AUTHORING_SOURCE}
 
     ${ASSET_SOURCE}
 

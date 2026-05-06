@@ -26,6 +26,7 @@ public:
     virtual void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index) = 0;
 
     virtual bool openSceneFile(const std::filesystem::path& scene_file_path) = 0;
+    virtual Entity createEntity(const std::string& name = std::string{}, Entity parent = {}) = 0;
     virtual Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {}) = 0;
     virtual Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {}) = 0;
     virtual Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {}) = 0;
@@ -33,7 +34,11 @@ public:
     virtual Entity createDirectionalLightEntity(Entity parent = {}) = 0;
     virtual Entity createPointLightEntity(Entity parent = {}) = 0;
     virtual Entity createSpotLightEntity(Entity parent = {}) = 0;
+    virtual bool destroyEntity(Entity entity) = 0;
+    virtual bool reparentEntity(Entity entity, Entity parent, bool preserve_world_transform = true) = 0;
     virtual void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle) = 0;
+    virtual bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) = 0;
+    virtual bool setSceneShadowSettings(const SceneShadowSettings& settings) = 0;
     virtual void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) = 0;
 
     virtual bool hasProjectLoaded() const = 0;

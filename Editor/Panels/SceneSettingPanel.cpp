@@ -227,9 +227,9 @@ void SceneSettingPanel::onImGuiRender()
         }
         if (editor::ui::drawButton("Apply", editor::ui::ButtonVariant::Primary, editor::ui::scaled(120.0f, 0.0f))) {
             m_environment_draft.enabled = m_environment_draft.backgroundMode != SceneBackgroundMode::SolidColor;
-            m_editor_context->getScene().environmentSettings() = m_environment_draft;
-            m_environment_draft_dirty = false;
-            m_editor_context->markSceneDirty();
+            if (m_editor_context->setSceneEnvironmentSettings(m_environment_draft)) {
+                m_environment_draft_dirty = false;
+            }
         }
         ImGui::SameLine();
         if (editor::ui::drawButton("Revert", editor::ui::ButtonVariant::Subtle, editor::ui::scaled(120.0f, 0.0f))) {
@@ -278,9 +278,9 @@ void SceneSettingPanel::onImGuiRender()
                 sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.pcfMapSize), 4096);
             m_shadow_draft.csmCascadeSize =
                 sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.csmCascadeSize), 2048);
-            m_editor_context->getScene().shadowSettings() = m_shadow_draft;
-            m_shadow_draft_dirty = false;
-            m_editor_context->markSceneDirty();
+            if (m_editor_context->setSceneShadowSettings(m_shadow_draft)) {
+                m_shadow_draft_dirty = false;
+            }
         }
         ImGui::SameLine();
         if (editor::ui::drawButton("Revert##Shadows",

@@ -1,8 +1,7 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
-#include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/ImporterManager.h"
-#include "Asset/Model.h"
+#include "Authoring/AuthoringSession.h"
 #include "Core/Log.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
@@ -25,7 +24,6 @@
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
-#include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
@@ -163,7 +161,9 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this)),
       m_backend_capabilities_panel(std::make_unique<BackendCapabilitiesPanel>())
-{}
+{
+    m_authoring_session.bindScene(*m_scene);
+}
 
 LunaEditorLayer::~LunaEditorLayer() = default;
 
@@ -207,6 +207,7 @@ void LunaEditorLayer::onDetach()
 void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
+    processAuthoringEvents();
     consumePendingScenePick();
     setRuntimeViewportEnabled(m_runtime_viewport_requested);
 
@@ -709,12 +710,8 @@ void LunaEditorLayer::setSelectedEntityId(UUID entity_id)
 
 void LunaEditorLayer::markSceneDirty()
 {
-    if (m_scene_dirty) {
-        return;
-    }
-
-    m_scene_dirty = true;
-    updateSceneLabel();
+    m_authoring_session.markSceneDirty();
+    processAuthoringEvents();
 }
 
 void LunaEditorLayer::patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index)
@@ -748,255 +745,148 @@ bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path
     return openScene(scene_file_path, true);
 }
 
+Entity LunaEditorLayer::createEntity(const std::string& name, Entity parent)
+{
+    Entity entity = m_authoring_session.createEntity(name, parent);
+    if (!entity) {
+        return {};
+    }
+
+    setSelectedEntity(entity);
+    processAuthoringEvents();
+    return entity;
+}
+
 Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Entity parent)
 {
-    if (!model_handle.isValid() || !AssetDatabase::exists(model_handle)) {
-        return {};
-    }
-
-    const auto& metadata = AssetDatabase::getAssetMetadata(model_handle);
-    if (metadata.Type != AssetType::Model) {
-        return {};
-    }
-
-    const auto model = AssetManager::get().loadAssetAs<Model>(model_handle);
-    if (!model || !model->isValid()) {
-        return {};
-    }
-
-    const std::string root_name =
-        !model->getName().empty()
-            ? model->getName()
-            : (!metadata.Name.empty() ? metadata.Name
-                                      : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Model"));
-
-    auto& entity_manager = m_scene->entityManager();
-    Entity root = parent ? entity_manager.createChildEntity(parent, root_name) : entity_manager.createEntity(root_name);
+    Entity root = m_authoring_session.createEntityFromModelAsset(model_handle, parent);
     if (!root) {
         return {};
     }
 
-    const auto& nodes = model->getNodes();
-    std::vector<Entity> node_entities(nodes.size());
-    for (size_t node_index = 0; node_index < nodes.size(); ++node_index) {
-        const ModelNode& model_node = nodes[node_index];
-        const std::string node_name =
-            model_node.Name.empty() ? root_name + "_Node_" + std::to_string(node_index) : model_node.Name;
-
-        Entity node_entity = entity_manager.createChildEntity(root, node_name);
-        if (!node_entity) {
-            continue;
-        }
-
-        auto& transform = node_entity.transform();
-        transform.translation = model_node.Translation;
-        transform.rotation = model_node.Rotation;
-        transform.scale = model_node.Scale;
-
-        if (model_node.MeshHandle.isValid()) {
-            applyMeshAssetToEntity(node_entity, model_node.MeshHandle);
-            if (node_entity.hasComponent<MeshComponent>()) {
-                auto& mesh_component = node_entity.getComponent<MeshComponent>();
-                for (uint32_t material_index = 0; material_index < model_node.SubmeshMaterials.size();
-                     ++material_index) {
-                    const AssetHandle material_handle = model_node.SubmeshMaterials[material_index];
-                    if (material_handle.isValid()) {
-                        mesh_component.setSubmeshMaterial(material_index, material_handle);
-                    }
-                }
-            }
-        }
-
-        node_entities[node_index] = node_entity;
-    }
-
-    for (size_t node_index = 0; node_index < nodes.size(); ++node_index) {
-        Entity node_entity = node_entities[node_index];
-        if (!node_entity) {
-            continue;
-        }
-
-        const int32_t parent_index = nodes[node_index].Parent;
-        if (parent_index < 0 || static_cast<size_t>(parent_index) >= node_entities.size()) {
-            continue;
-        }
-
-        Entity parent_entity = node_entities[static_cast<size_t>(parent_index)];
-        if (parent_entity) {
-            entity_manager.setParent(node_entity, parent_entity, false);
-        }
-    }
-
     setSelectedEntity(root);
-    markSceneDirty();
+    processAuthoringEvents();
     return root;
 }
 
 Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent)
 {
-    if (!mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
-        return {};
-    }
-
-    const auto& metadata = AssetDatabase::getAssetMetadata(mesh_handle);
-    if (metadata.Type != AssetType::Mesh) {
-        return {};
-    }
-
-    const std::string entity_name =
-        !metadata.Name.empty() ? metadata.Name
-                               : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Mesh Entity");
-
-    Entity entity = parent ? m_scene->entityManager().createChildEntity(parent, entity_name)
-                           : m_scene->entityManager().createEntity(entity_name);
+    Entity entity = m_authoring_session.createEntityFromMeshAsset(mesh_handle, parent);
     if (!entity) {
         return {};
     }
 
-    applyMeshAssetToEntity(entity, mesh_handle);
     setSelectedEntity(entity);
-    markSceneDirty();
+    processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity parent)
 {
-    if (!BuiltinAssets::isBuiltinMesh(mesh_handle)) {
-        return {};
-    }
-
-    return createEntityFromMeshAsset(mesh_handle, parent);
-}
-
-Entity LunaEditorLayer::createCameraEntity(Entity parent)
-{
-    auto& entity_manager = m_scene->entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Camera") : entity_manager.createEntity("Camera");
+    Entity entity = m_authoring_session.createPrimitiveEntity(mesh_handle, parent);
     if (!entity) {
         return {};
     }
 
-    entity.addComponent<CameraComponent>();
-    auto& transform = entity.transform();
-    transform.translation = {0.0f, 1.0f, 6.0f};
-    transform.rotation = {0.0f, 0.0f, 0.0f};
     setSelectedEntity(entity);
-    markSceneDirty();
+    processAuthoringEvents();
+    return entity;
+}
+
+Entity LunaEditorLayer::createCameraEntity(Entity parent)
+{
+    Entity entity = m_authoring_session.createCameraEntity(parent);
+    if (!entity) {
+        return {};
+    }
+
+    setSelectedEntity(entity);
+    processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene->entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Directional Light")
-                           : entity_manager.createEntity("Directional Light");
+    Entity entity = m_authoring_session.createDirectionalLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    auto& light = entity.addComponent<LightComponent>();
-    light.type = LightComponent::Type::Directional;
-    light.enabled = true;
-    light.color = {1.0f, 0.98f, 0.95f};
-    light.intensity = 4.0f;
-
-    auto& transform = entity.transform();
-    transform.rotation = glm::radians(glm::vec3{-45.0f, 35.0f, 0.0f});
     setSelectedEntity(entity);
-    markSceneDirty();
+    processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene->entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Point Light")
-                           : entity_manager.createEntity("Point Light");
+    Entity entity = m_authoring_session.createPointLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    auto& light = entity.addComponent<LightComponent>();
-    light.type = LightComponent::Type::Point;
-    light.enabled = true;
-    light.color = {1.0f, 1.0f, 1.0f};
-    light.intensity = 20.0f;
-    light.range = 10.0f;
-
-    auto& transform = entity.transform();
-    transform.translation = {0.0f, 2.0f, 0.0f};
     setSelectedEntity(entity);
-    markSceneDirty();
+    processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
 {
-    auto& entity_manager = m_scene->entityManager();
-    Entity entity = parent ? entity_manager.createChildEntity(parent, "Spot Light")
-                           : entity_manager.createEntity("Spot Light");
+    Entity entity = m_authoring_session.createSpotLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    auto& light = entity.addComponent<LightComponent>();
-    light.type = LightComponent::Type::Spot;
-    light.enabled = true;
-    light.color = {1.0f, 0.96f, 0.86f};
-    light.intensity = 40.0f;
-    light.range = 15.0f;
-    light.innerConeAngleRadians = glm::radians(20.0f);
-    light.outerConeAngleRadians = glm::radians(35.0f);
-
-    auto& transform = entity.transform();
-    transform.translation = {0.0f, 3.0f, 3.0f};
-    transform.rotation = glm::radians(glm::vec3{-35.0f, 0.0f, 0.0f});
     setSelectedEntity(entity);
-    markSceneDirty();
+    processAuthoringEvents();
     return entity;
+}
+
+bool LunaEditorLayer::destroyEntity(Entity entity)
+{
+    const bool destroyed = m_authoring_session.destroyEntity(entity);
+    if (!destroyed) {
+        return false;
+    }
+
+    if (m_selected_entity_id.isValid() && !m_scene->entityManager().containsEntity(m_selected_entity_id)) {
+        m_selected_entity_id = UUID(0);
+    }
+    processAuthoringEvents();
+    return true;
+}
+
+bool LunaEditorLayer::reparentEntity(Entity entity, Entity parent, bool preserve_world_transform)
+{
+    const bool changed = m_authoring_session.reparentEntity(entity, parent, preserve_world_transform);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
 }
 
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
-    if (!entity || !mesh_handle.isValid() || !AssetDatabase::exists(mesh_handle)) {
-        return;
+    if (m_authoring_session.applyMeshAssetToEntity(entity, mesh_handle)) {
+        processAuthoringEvents();
     }
+}
 
-    const auto& metadata = AssetDatabase::getAssetMetadata(mesh_handle);
-    if (metadata.Type != AssetType::Mesh) {
-        return;
-    }
-
-    bool changed = false;
-    if (!entity.hasComponent<MeshComponent>()) {
-        entity.addComponent<MeshComponent>();
-        changed = true;
-    }
-
-    auto& mesh_component = entity.getComponent<MeshComponent>();
-    const bool changed_mesh = mesh_component.meshHandle != mesh_handle;
-    mesh_component.meshHandle = mesh_handle;
-    if (changed_mesh) {
-        mesh_component.clearAllSubmeshMaterials();
-        changed = true;
-    }
-
-    const auto mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
-    if (mesh && mesh->isValid()) {
-        const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
-        mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
-        changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
-        for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
-            if (!mesh_component.getSubmeshMaterial(submesh_index).isValid()) {
-                mesh_component.setSubmeshMaterial(submesh_index, BuiltinMaterials::DefaultLit);
-                changed = true;
-            }
-        }
-    }
-
+bool LunaEditorLayer::setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings)
+{
+    const bool changed = m_authoring_session.setSceneEnvironmentSettings(settings);
     if (changed) {
-        markSceneDirty();
+        processAuthoringEvents();
     }
+    return changed;
+}
+
+bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings)
+{
+    const bool changed = m_authoring_session.setSceneShadowSettings(settings);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
 }
 
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
@@ -1078,15 +968,10 @@ void LunaEditorLayer::resetEditorState()
 {
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
-    m_scene->entityManager().clear();
-    m_scene->setName("Untitled");
-    m_scene->environmentSettings() = {};
-    m_scene->shadowSettings() = {};
+    m_authoring_session.resetScene();
     m_scene_setting_panel->syncFromScene();
     m_selected_entity_id = UUID(0);
-    m_scene_file_path.clear();
     m_asset_label = "No scene loaded";
-    m_scene_dirty = false;
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
     syncEditorGridFeatureState();
@@ -1166,13 +1051,72 @@ Scene& LunaEditorLayer::activeRenderScene()
     return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : *m_scene;
 }
 
+void LunaEditorLayer::processAuthoringEvents()
+{
+    const std::vector<authoring::AuthoringEvent> events = m_authoring_session.consumeEvents();
+    if (events.empty()) {
+        return;
+    }
+
+    bool update_scene_label = false;
+    bool sync_scene_settings = false;
+    bool validate_selection = false;
+
+    for (const auto& event : events) {
+        switch (event.type) {
+            case authoring::AuthoringEventType::SceneReset:
+            case authoring::AuthoringEventType::SceneCreated:
+            case authoring::AuthoringEventType::SceneLoaded:
+                update_scene_label = true;
+                sync_scene_settings = true;
+                validate_selection = true;
+                break;
+            case authoring::AuthoringEventType::SceneSaved:
+            case authoring::AuthoringEventType::SceneDirtyChanged:
+            case authoring::AuthoringEventType::EntityCreated:
+            case authoring::AuthoringEventType::EntityModified:
+            case authoring::AuthoringEventType::EntityDestroyed:
+            case authoring::AuthoringEventType::EntityReparented:
+                update_scene_label = true;
+                validate_selection = true;
+                break;
+            case authoring::AuthoringEventType::SceneSettingsChanged:
+                update_scene_label = true;
+                sync_scene_settings = true;
+                break;
+        }
+    }
+
+    if (validate_selection && m_selected_entity_id.isValid() &&
+        !m_scene->entityManager().containsEntity(m_selected_entity_id)) {
+        m_selected_entity_id = UUID(0);
+    }
+
+    if (sync_scene_settings && m_scene_setting_panel) {
+        m_scene_setting_panel->syncFromScene();
+    }
+
+    if (update_scene_label) {
+        updateSceneLabel();
+    }
+}
+
 void LunaEditorLayer::createScene()
 {
-    resetEditorState();
-    createCameraEntity();
-    createDirectionalLightEntity();
-    m_scene_dirty = false;
-    updateSceneLabel();
+    endRuntimeViewport();
+    m_runtime_viewport_requested = false;
+    m_selected_entity_id = UUID(0);
+    m_show_pick_debug_visualization = false;
+    syncPickDebugVisualizationState();
+    syncEditorGridFeatureState();
+
+    const auto bootstrap = m_authoring_session.createScene();
+    if (bootstrap.directional_light) {
+        setSelectedEntity(bootstrap.directional_light);
+    } else if (bootstrap.camera) {
+        setSelectedEntity(bootstrap.camera);
+    }
+    processAuthoringEvents();
     LUNA_EDITOR_INFO("Created a new scene with a primary camera and directional light");
 }
 
@@ -1219,11 +1163,11 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
         if (std::filesystem::exists(start_scene_path)) {
             if (!openScene(start_scene_path, false)) {
                 createScene();
-                m_scene_file_path = start_scene_path;
+                m_authoring_session.setSceneFilePath(start_scene_path);
                 updateSceneLabel();
             }
         } else {
-            m_scene_file_path = start_scene_path;
+            m_authoring_session.setSceneFilePath(start_scene_path);
             updateSceneLabel();
             LUNA_EDITOR_WARN("Configured StartScene '{}' does not exist. Saving will create it at that location.",
                              start_scene_path.string());
@@ -1262,16 +1206,13 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
 
-    if (!SceneSerializer::deserialize(*m_scene, normalized_scene_path)) {
+    if (!m_authoring_session.openScene(normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to open scene '{}'", normalized_scene_path.string());
         return false;
     }
 
-    m_scene_file_path = normalized_scene_path;
     m_selected_entity_id = UUID(0);
-    m_scene_dirty = false;
-    m_scene_setting_panel->syncFromScene();
-    updateSceneLabel();
+    processAuthoringEvents();
 
     if (update_project_start_scene) {
         syncProjectStartScene(normalized_scene_path);
@@ -1284,11 +1225,11 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
 
 bool LunaEditorLayer::saveScene()
 {
-    if (m_scene_file_path.empty()) {
+    if (m_authoring_session.sceneFilePath().empty()) {
         return saveSceneAs();
     }
 
-    return saveSceneAs(m_scene_file_path);
+    return saveSceneAs(m_authoring_session.sceneFilePath());
 }
 
 bool LunaEditorLayer::saveSceneAs()
@@ -1309,18 +1250,12 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
         return false;
     }
 
-    if (m_scene->getName().empty() || m_scene->getName() == "Untitled") {
-        m_scene->setName(normalized_scene_path.stem().string());
-    }
-
-    if (!SceneSerializer::serialize(*m_scene, normalized_scene_path)) {
+    if (!m_authoring_session.saveSceneAs(normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to save scene '{}'", normalized_scene_path.string());
         return false;
     }
 
-    m_scene_file_path = normalized_scene_path;
-    m_scene_dirty = false;
-    updateSceneLabel();
+    processAuthoringEvents();
     syncProjectStartScene(normalized_scene_path);
     m_content_browser_panel->requestRefresh();
 
@@ -1330,8 +1265,8 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
 
 std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
 {
-    if (!m_scene_file_path.empty()) {
-        const std::filesystem::path parent_path = m_scene_file_path.parent_path();
+    if (!m_authoring_session.sceneFilePath().empty()) {
+        const std::filesystem::path parent_path = m_authoring_session.sceneFilePath().parent_path();
         if (!parent_path.empty() && std::filesystem::exists(parent_path)) {
             return parent_path;
         }
@@ -1359,14 +1294,14 @@ std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
 
 void LunaEditorLayer::updateSceneLabel()
 {
-    const char* dirty_suffix = m_scene_dirty ? " *" : "";
-    if (!m_scene_file_path.empty()) {
-        if (const auto relative_path = makeScenePathRelativeToProject(m_scene_file_path)) {
+    const char* dirty_suffix = m_authoring_session.isSceneDirty() ? " *" : "";
+    if (!m_authoring_session.sceneFilePath().empty()) {
+        if (const auto relative_path = makeScenePathRelativeToProject(m_authoring_session.sceneFilePath())) {
             m_asset_label = relative_path->generic_string() + dirty_suffix;
             return;
         }
 
-        m_asset_label = m_scene_file_path.lexically_normal().string() + dirty_suffix;
+        m_asset_label = m_authoring_session.sceneFilePath().lexically_normal().string() + dirty_suffix;
         return;
     }
 

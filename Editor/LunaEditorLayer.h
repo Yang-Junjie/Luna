@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Layer.h"
+#include "Authoring/AuthoringSession.h"
 #include "EditorCamera.h"
 #include "EditorContext.h"
 #include "Events/Event.h"
@@ -70,6 +71,7 @@ public:
     void markSceneDirty() override;
     void patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index) override;
     bool openSceneFile(const std::filesystem::path& scene_file_path) override;
+    Entity createEntity(const std::string& name = std::string{}, Entity parent = {}) override;
     Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {}) override;
     Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {}) override;
     Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {}) override;
@@ -77,7 +79,11 @@ public:
     Entity createDirectionalLightEntity(Entity parent = {}) override;
     Entity createPointLightEntity(Entity parent = {}) override;
     Entity createSpotLightEntity(Entity parent = {}) override;
+    bool destroyEntity(Entity entity) override;
+    bool reparentEntity(Entity entity, Entity parent, bool preserve_world_transform = true) override;
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle) override;
+    bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) override;
+    bool setSceneShadowSettings(const SceneShadowSettings& settings) override;
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) override;
     bool hasProjectLoaded() const override;
     void refreshProjectScriptPlugins() override;
@@ -106,6 +112,7 @@ private:
     void beginRuntimeViewport();
     void endRuntimeViewport();
     Scene& activeRenderScene();
+    void processAuthoringEvents();
 
     bool syncProjectAssets();
     bool openProject(const std::filesystem::path& project_file_path);
@@ -128,12 +135,11 @@ private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
     std::unique_ptr<Scene> m_scene;
+    authoring::AuthoringSession m_authoring_session;
     std::unique_ptr<Scene> m_runtime_scene;
     std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
     UUID m_selected_entity_id{0};
-    std::filesystem::path m_scene_file_path;
     std::string m_asset_label{"No scene loaded"};
-    bool m_scene_dirty{false};
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};

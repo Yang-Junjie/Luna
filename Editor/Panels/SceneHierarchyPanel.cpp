@@ -71,15 +71,7 @@ luna::Entity createEmptyEntity(luna::EditorContext& editor_context, luna::Entity
         return {};
     }
 
-    auto& entity_manager = editor_context.getScene().entityManager();
-    luna::Entity entity = parent ? entity_manager.createChildEntity(parent, "Empty Entity")
-                                 : entity_manager.createEntity("Empty Entity");
-    if (entity) {
-        editor_context.setSelectedEntity(entity);
-        editor_context.markSceneDirty();
-    }
-
-    return entity;
+    return editor_context.createEntity("Empty Entity", parent);
 }
 
 void drawCreateEntityMenu(luna::EditorContext& editor_context, luna::Entity parent = {})
@@ -161,9 +153,7 @@ bool drawEntityContextMenu(luna::EditorContext& editor_context, luna::Entity ent
 
     ImGui::Separator();
     if (entity.hasParent() && ImGui::MenuItem("Detach From Parent")) {
-        if (entity.clearParent(true)) {
-            editor_context.markSceneDirty();
-        }
+        editor_context.reparentEntity(entity, {}, true);
     }
 
     if (ImGui::MenuItem("Delete Entity")) {
@@ -222,13 +212,9 @@ bool reparentDroppedEntity(HierarchyDrawContext& context, luna::Entity dropped_e
         if (dropped_entity == new_parent || isDescendantOf(new_parent, dropped_entity)) {
             return false;
         }
-        changed = context.entity_manager.setParent(dropped_entity, new_parent, true);
+        changed = context.editor_context.reparentEntity(dropped_entity, new_parent, true);
     } else if (dropped_entity.hasParent()) {
-        changed = dropped_entity.clearParent(true);
-    }
-
-    if (changed) {
-        context.editor_context.markSceneDirty();
+        changed = context.editor_context.reparentEntity(dropped_entity, {}, true);
     }
     return changed;
 }
@@ -289,8 +275,7 @@ void destroyEntityAndFixSelection(HierarchyDrawContext& context, luna::Entity en
     const luna::Entity current_selection = context.editor_context.getSelectedEntity();
     const bool clear_selection =
         current_selection && (current_selection == entity || isDescendantOf(current_selection, entity));
-    context.entity_manager.destroyEntity(entity);
-    context.editor_context.markSceneDirty();
+    context.editor_context.destroyEntity(entity);
     if (clear_selection) {
         context.editor_context.setSelectedEntity({});
     }
