@@ -338,25 +338,12 @@ float shadowCascadeBiasScale(uint cascadeIndex)
     return sqrt(max(cascadeSpan / firstCascadeSpan, 1.0));
 }
 
-float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 lightDirection)
+float sampleDirectionalShadowCascade(uint cascadeIndex, float3 worldPosition, float3 normalWS, float3 lightDirection)
 {
-    if (gSceneParams.shadowParams.x <= 0.5)
-    {
-        return 1.0;
-    }
-
-    const float3 viewPosition = mul(gSceneParams.view, float4(worldPosition, 1.0)).xyz;
-    const float viewDepth = -viewPosition.z;
-    if (viewDepth <= 0.0 || viewDepth > shadowSplit(shadowCascadeCount() - 1u))
-    {
-        return 1.0;
-    }
-
-    const uint cascadeIndex = selectShadowCascade(viewDepth);
     const float4 shadowClip = mul(gSceneParams.shadowViewProjections[cascadeIndex], float4(worldPosition, 1.0));
     if (abs(shadowClip.w) <= 1e-6)
     {
-        return 1.0;
+        return -1.0;
     }
 
     const float3 shadowNdc = shadowClip.xyz / shadowClip.w;
@@ -364,7 +351,7 @@ float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 li
     if (shadowUv.x < 0.0 || shadowUv.x > 1.0 || shadowUv.y < 0.0 || shadowUv.y > 1.0 ||
         shadowNdc.z < 0.0 || shadowNdc.z > 1.0)
     {
-        return 1.0;
+        return -1.0;
     }
 
     const float normalLightFactor = 1.0 - saturate(dot(safeNormalize(normalWS, float3(0.0, 0.0, 1.0)),
@@ -398,6 +385,83 @@ float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 li
     }
 
     return visibility / kShadowPcfSampleCount;
+}
+
+float validShadowOrLit(float shadowVisibility)
+{
+    return shadowVisibility >= 0.0 ? shadowVisibility : 1.0;
+}
+
+float shadowCascadeBlendRange(uint cascadeIndex)
+{
+    return max(shadowCascadeDepthSpan(cascadeIndex) * 0.10, 0.001);
+}
+
+float evaluateDirectionalShadow(float3 worldPosition, float3 normalWS, float3 lightDirection)
+{
+    if (gSceneParams.shadowParams.x <= 0.5)
+    {
+        return 1.0;
+    }
+
+    const float3 viewPosition = mul(gSceneParams.view, float4(worldPosition, 1.0)).xyz;
+    const float viewDepth = -viewPosition.z;
+    const uint cascadeCount = shadowCascadeCount();
+    if (viewDepth <= 0.0 || viewDepth > shadowSplit(cascadeCount - 1u))
+    {
+        return 1.0;
+    }
+
+    const uint cascadeIndex = selectShadowCascade(viewDepth);
+    float shadowVisibility = sampleDirectionalShadowCascade(cascadeIndex, worldPosition, normalWS, lightDirection);
+
+    if (shadowVisibility < 0.0 && cascadeIndex > 0u)
+    {
+        shadowVisibility = sampleDirectionalShadowCascade(cascadeIndex - 1u, worldPosition, normalWS, lightDirection);
+    }
+    if (shadowVisibility < 0.0 && cascadeIndex + 1u < cascadeCount)
+    {
+        shadowVisibility = sampleDirectionalShadowCascade(cascadeIndex + 1u, worldPosition, normalWS, lightDirection);
+    }
+    if (shadowVisibility < 0.0)
+    {
+        return 1.0;
+    }
+
+    if (cascadeIndex > 0u)
+    {
+        const float splitStart = shadowSplit(cascadeIndex - 1u);
+        const float startBlend =
+            1.0 - saturate((viewDepth - splitStart) / shadowCascadeBlendRange(cascadeIndex - 1u));
+        if (startBlend > 0.0)
+        {
+            const float previousVisibility =
+                sampleDirectionalShadowCascade(cascadeIndex - 1u, worldPosition, normalWS, lightDirection);
+            if (previousVisibility >= 0.0)
+            {
+                shadowVisibility = lerp(shadowVisibility, previousVisibility, startBlend);
+            }
+        }
+    }
+
+    if (cascadeIndex + 1u < cascadeCount)
+    {
+        const float splitEnd = shadowSplit(cascadeIndex);
+        const float endBlend =
+            saturate((viewDepth - (splitEnd - shadowCascadeBlendRange(cascadeIndex))) /
+                     shadowCascadeBlendRange(cascadeIndex));
+        if (endBlend > 0.0)
+        {
+            const float nextVisibility =
+                sampleDirectionalShadowCascade(cascadeIndex + 1u, worldPosition, normalWS, lightDirection);
+            if (nextVisibility >= 0.0)
+            {
+                shadowVisibility = lerp(shadowVisibility, nextVisibility, endBlend);
+            }
+        }
+    }
+
+    return validShadowOrLit(shadowVisibility);
 }
 
 float3 reconstructViewDirection(float2 uv)

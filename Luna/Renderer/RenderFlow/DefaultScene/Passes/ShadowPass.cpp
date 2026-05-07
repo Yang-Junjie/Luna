@@ -35,6 +35,9 @@ constexpr float kCascadeShadowDistance = 120.0f;
 constexpr float kCascadeSplitLambda = 0.55f;
 constexpr float kCascadeLightDepthPadding = 40.0f;
 constexpr float kCascadeBoundsPaddingScale = 1.08f;
+constexpr float kCascadeOverlapScale = 0.12f;
+constexpr float kMinCascadeOverlap = 0.5f;
+constexpr float kMaxCascadeOverlap = 12.0f;
 constexpr float kShadowDepthBias = 0.0018f;
 
 uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
@@ -185,6 +188,12 @@ float calculatePcfBiasScale(float near_clip, float far_clip)
     const auto csm_splits = calculateCascadeSplits(near_clip, far_clip);
     const float first_cascade_span = (std::max)(csm_splits[0], 0.001f);
     return std::sqrt((std::max)(far_clip / first_cascade_span, 1.0f));
+}
+
+float calculateCascadeOverlap(float cascade_near, float cascade_far)
+{
+    const float cascade_span = (std::max)(cascade_far - cascade_near, 0.001f);
+    return std::clamp(cascade_span * kCascadeOverlapScale, kMinCascadeOverlap, kMaxCascadeOverlap);
 }
 
 float pcfShadowDistance(const RenderWorld* world)
@@ -360,7 +369,12 @@ render_flow::default_scene_detail::ShadowRenderParams
         float cascade_near = near_clip;
         for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
             const float cascade_far = splits[cascade_index];
-            const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, cascade_near, cascade_far);
+            const float overlap = calculateCascadeOverlap(cascade_near, cascade_far);
+            const float shadow_near =
+                cascade_index == 0u ? cascade_near : (std::max)(near_clip, cascade_near - overlap);
+            const float shadow_far =
+                cascade_index + 1u >= shadow_count ? cascade_far : (std::min)(far_clip, cascade_far + overlap);
+            const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, shadow_near, shadow_far);
             params.view_projections[cascade_index] =
                 buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
             params.cascade_splits[cascade_index] = cascade_far;
