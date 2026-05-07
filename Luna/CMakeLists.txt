@@ -187,6 +187,8 @@ set(PROJECT_SOURCE
 
 set(AUTHORING_SOURCE
     Authoring/AuthoringTypes.h
+    Authoring/AuthoringHistory.h
+    Authoring/AuthoringHistory.cpp
     Authoring/AuthoringInspection.h
     Authoring/AuthoringInspection.cpp
     Authoring/AuthoringVerification.h

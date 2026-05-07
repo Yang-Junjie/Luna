@@ -222,6 +222,38 @@ void testExecutorReportsStructuredDiagnostics(TestContext& context)
     }
 }
 
+void testExecutorRollsBackFailedPlan(TestContext& context)
+{
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    (void) session.createScene();
+    (void) session.consumeEvents();
+    const size_t entity_count_before = scene.entityManager().entityCount();
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::CreateEntity,
+        .alias = "Temporary",
+        .name = "Temporary Entity",
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
+        .entity = {.value = "MissingEntity"},
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(!executor.execute(plan, report), "failed executor plan should report failure");
+    context.expect(scene.entityManager().entityCount() == entity_count_before,
+                   "failed executor plan should rollback scene mutations");
+    context.expect(!scene.entityManager().findEntityByUUID(report.entities.empty()
+                                                               ? luna::UUID(0)
+                                                               : report.entities.front().entity_id),
+                   "failed executor plan should remove created alias entity from the scene");
+    context.expect(!session.hasOpenTransaction(), "failed executor plan should close its transaction");
+}
+
 } // namespace
 
 int main()
@@ -232,6 +264,7 @@ int main()
     TestContext context;
     testExecutorAppliesTypedPlan(context);
     testExecutorReportsStructuredDiagnostics(context);
+    testExecutorRollsBackFailedPlan(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();

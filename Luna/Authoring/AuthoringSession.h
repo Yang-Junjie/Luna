@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Asset/Asset.h"
+#include "Authoring/AuthoringHistory.h"
 #include "Authoring/AuthoringTypes.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
@@ -36,6 +37,16 @@ public:
 
     [[nodiscard]] std::vector<AuthoringEvent> consumeEvents();
 
+    [[nodiscard]] bool beginTransaction(std::string name);
+    [[nodiscard]] bool commitTransaction();
+    [[nodiscard]] bool rollbackTransaction();
+    [[nodiscard]] bool hasOpenTransaction() const noexcept;
+    [[nodiscard]] bool undo();
+    [[nodiscard]] bool redo();
+    [[nodiscard]] bool canUndo() const noexcept;
+    [[nodiscard]] bool canRedo() const noexcept;
+    void clearHistory();
+
     void resetScene();
     [[nodiscard]] SceneBootstrapResult createScene();
 
@@ -70,12 +81,19 @@ private:
     void queueEvent(AuthoringEvent event);
     void queueEntityModified(Entity entity, std::string message = {});
     [[nodiscard]] bool hasBoundScene() const noexcept;
+    [[nodiscard]] bool beginImplicitTransaction(std::string name);
+    bool finishImplicitTransaction(bool implicit_transaction, bool changed);
+    void suppressImplicitHistory();
+    void resumeImplicitHistory();
+    void restoreHistoryState(AuthoringSceneState state, std::string message);
 
 private:
     Scene* m_scene{nullptr};
     std::filesystem::path m_scene_file_path;
     bool m_scene_dirty{false};
     std::vector<AuthoringEvent> m_events;
+    AuthoringHistory m_history;
+    size_t m_implicit_history_suppression_depth{0};
 };
 
 } // namespace luna::authoring

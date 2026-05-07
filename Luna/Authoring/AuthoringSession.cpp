@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -222,6 +223,8 @@ void AuthoringSession::bindScene(Scene& scene)
     m_scene_file_path.clear();
     m_scene_dirty = false;
     m_events.clear();
+    m_history.clear();
+    m_implicit_history_suppression_depth = 0;
 }
 
 bool AuthoringSession::hasScene() const noexcept
@@ -292,6 +295,77 @@ std::vector<AuthoringEvent> AuthoringSession::consumeEvents()
     return events;
 }
 
+bool AuthoringSession::beginTransaction(std::string name)
+{
+    if (!hasBoundScene()) {
+        return false;
+    }
+
+    return m_history.beginTransaction(std::move(name), scene(), m_scene_file_path, m_scene_dirty);
+}
+
+bool AuthoringSession::commitTransaction()
+{
+    if (!hasBoundScene()) {
+        return false;
+    }
+
+    return m_history.commitTransaction(scene(), m_scene_file_path, m_scene_dirty);
+}
+
+bool AuthoringSession::rollbackTransaction()
+{
+    std::optional<AuthoringSceneState> state = m_history.rollbackTransaction();
+    if (!state.has_value()) {
+        return false;
+    }
+
+    restoreHistoryState(std::move(*state), "Transaction rolled back");
+    return true;
+}
+
+bool AuthoringSession::hasOpenTransaction() const noexcept
+{
+    return m_history.hasOpenTransaction();
+}
+
+bool AuthoringSession::undo()
+{
+    std::optional<AuthoringSceneState> state = m_history.undo();
+    if (!state.has_value()) {
+        return false;
+    }
+
+    restoreHistoryState(std::move(*state), "Undo");
+    return true;
+}
+
+bool AuthoringSession::redo()
+{
+    std::optional<AuthoringSceneState> state = m_history.redo();
+    if (!state.has_value()) {
+        return false;
+    }
+
+    restoreHistoryState(std::move(*state), "Redo");
+    return true;
+}
+
+bool AuthoringSession::canUndo() const noexcept
+{
+    return m_history.canUndo();
+}
+
+bool AuthoringSession::canRedo() const noexcept
+{
+    return m_history.canRedo();
+}
+
+void AuthoringSession::clearHistory()
+{
+    m_history.clear();
+}
+
 void AuthoringSession::resetScene()
 {
     if (!hasBoundScene()) {
@@ -299,13 +373,16 @@ void AuthoringSession::resetScene()
         return;
     }
 
+    const bool keep_history = hasOpenTransaction();
     const bool was_dirty = m_scene_dirty;
+    suppressImplicitHistory();
     scene().entityManager().clear();
     scene().setName("Untitled");
     scene().environmentSettings() = {};
     scene().shadowSettings() = {};
     m_scene_file_path.clear();
     m_scene_dirty = false;
+    resumeImplicitHistory();
     if (was_dirty) {
         queueEvent(AuthoringEvent{
             .type = AuthoringEventType::SceneDirtyChanged,
@@ -316,6 +393,9 @@ void AuthoringSession::resetScene()
         .type = AuthoringEventType::SceneReset,
         .message = "Scene reset",
     });
+    if (!keep_history) {
+        clearHistory();
+    }
 }
 
 SceneBootstrapResult AuthoringSession::createScene()
@@ -327,8 +407,10 @@ SceneBootstrapResult AuthoringSession::createScene()
     }
 
     resetScene();
+    suppressImplicitHistory();
     result.camera = createCameraEntity();
     result.directional_light = createDirectionalLightEntity();
+    resumeImplicitHistory();
     clearSceneDirty();
     queueEvent(AuthoringEvent{
         .type = AuthoringEventType::SceneCreated,
@@ -361,6 +443,9 @@ bool AuthoringSession::openScene(const std::filesystem::path& scene_file_path)
         .path = normalized_scene_path,
         .message = "Scene loaded",
     });
+    if (!hasOpenTransaction()) {
+        clearHistory();
+    }
     return true;
 }
 
@@ -397,6 +482,7 @@ bool AuthoringSession::saveSceneAs(const std::filesystem::path& scene_file_path)
 
     m_scene_file_path = normalized_scene_path;
     clearSceneDirty();
+    m_history.markCurrentStateSaved(scene(), m_scene_file_path);
     queueEvent(AuthoringEvent{
         .type = AuthoringEventType::SceneSaved,
         .path = normalized_scene_path,
@@ -412,9 +498,11 @@ Entity AuthoringSession::createEntity(const std::string& name, Entity parent)
         return {};
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Create Entity");
     Entity entity = parent ? scene().entityManager().createChildEntity(parent, name)
                            : scene().entityManager().createEntity(name);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
@@ -424,50 +512,63 @@ Entity AuthoringSession::createEntity(const std::string& name, Entity parent)
         .entity_id = entity.getUUID(),
         .message = entity.getName(),
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
 Entity AuthoringSession::createCameraEntity(Entity parent)
 {
+    const bool implicit_transaction = beginImplicitTransaction("Create Camera");
     Entity entity = createEntity("Camera", parent);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
     configureCameraEntity(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
 Entity AuthoringSession::createDirectionalLightEntity(Entity parent)
 {
+    const bool implicit_transaction = beginImplicitTransaction("Create Directional Light");
     Entity entity = createEntity("Directional Light", parent);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
     configureDirectionalLightEntity(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
 Entity AuthoringSession::createPointLightEntity(Entity parent)
 {
+    const bool implicit_transaction = beginImplicitTransaction("Create Point Light");
     Entity entity = createEntity("Point Light", parent);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
     configurePointLightEntity(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
 Entity AuthoringSession::createSpotLightEntity(Entity parent)
 {
+    const bool implicit_transaction = beginImplicitTransaction("Create Spot Light");
     Entity entity = createEntity("Spot Light", parent);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
     configureSpotLightEntity(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
@@ -482,6 +583,7 @@ bool AuthoringSession::destroyEntity(Entity entity)
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Destroy Entity");
     const UUID entity_id = entity.getUUID();
     const std::string entity_name = entity.getName();
     scene().entityManager().destroyEntity(entity);
@@ -491,6 +593,7 @@ bool AuthoringSession::destroyEntity(Entity entity)
         .entity_id = entity_id,
         .message = entity_name,
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -511,7 +614,9 @@ bool AuthoringSession::reparentEntity(Entity entity, Entity parent, bool preserv
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Reparent Entity");
     if (!scene().entityManager().setParent(entity, parent, preserve_world_transform)) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return false;
     }
 
@@ -521,6 +626,7 @@ bool AuthoringSession::reparentEntity(Entity entity, Entity parent, bool preserv
         .entity_id = entity.getUUID(),
         .message = entity.getName(),
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -535,6 +641,7 @@ bool AuthoringSession::addComponent(Entity entity, AuthoringComponentKind compon
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Add Component");
     bool added = false;
     switch (component_kind) {
         case AuthoringComponentKind::Camera:
@@ -564,6 +671,7 @@ bool AuthoringSession::addComponent(Entity entity, AuthoringComponentKind compon
     }
 
     if (!added) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return false;
     }
 
@@ -573,6 +681,7 @@ bool AuthoringSession::addComponent(Entity entity, AuthoringComponentKind compon
         .entity_id = entity.getUUID(),
         .message = componentKindName(component_kind),
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -587,6 +696,7 @@ bool AuthoringSession::removeComponent(Entity entity, AuthoringComponentKind com
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Remove Component");
     bool removed = false;
     switch (component_kind) {
         case AuthoringComponentKind::Camera:
@@ -616,6 +726,7 @@ bool AuthoringSession::removeComponent(Entity entity, AuthoringComponentKind com
     }
 
     if (!removed) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return false;
     }
 
@@ -625,6 +736,7 @@ bool AuthoringSession::removeComponent(Entity entity, AuthoringComponentKind com
         .entity_id = entity.getUUID(),
         .message = componentKindName(component_kind),
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -650,8 +762,10 @@ Entity AuthoringSession::createEntityFromModelAsset(AssetHandle model_handle, En
             : (!metadata.Name.empty() ? metadata.Name
                                       : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Model"));
 
+    const bool implicit_transaction = beginImplicitTransaction("Create Model Entity");
     Entity root = createEntity(root_name, parent);
     if (!root) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
@@ -706,6 +820,7 @@ Entity AuthoringSession::createEntityFromModelAsset(AssetHandle model_handle, En
         }
     }
 
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return root;
 }
 
@@ -724,12 +839,15 @@ Entity AuthoringSession::createEntityFromMeshAsset(AssetHandle mesh_handle, Enti
         !metadata.Name.empty() ? metadata.Name
                                : (!metadata.FilePath.empty() ? metadata.FilePath.stem().string() : "Mesh Entity");
 
+    const bool implicit_transaction = beginImplicitTransaction("Create Mesh Entity");
     Entity entity = createEntity(entity_name, parent);
     if (!entity) {
+        (void) finishImplicitTransaction(implicit_transaction, false);
         return {};
     }
 
     (void) applyMeshAssetToEntity(entity, mesh_handle);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return entity;
 }
 
@@ -739,7 +857,10 @@ Entity AuthoringSession::createPrimitiveEntity(AssetHandle mesh_handle, Entity p
         return {};
     }
 
-    return createEntityFromMeshAsset(mesh_handle, parent);
+    const bool implicit_transaction = beginImplicitTransaction("Create Primitive");
+    Entity entity = createEntityFromMeshAsset(mesh_handle, parent);
+    (void) finishImplicitTransaction(implicit_transaction, static_cast<bool>(entity));
+    return entity;
 }
 
 bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
@@ -753,6 +874,7 @@ bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_ha
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Apply Mesh Asset");
     bool changed = false;
     if (!entity.hasComponent<MeshComponent>()) {
         entity.addComponent<MeshComponent>();
@@ -789,6 +911,7 @@ bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_ha
         });
     }
 
+    (void) finishImplicitTransaction(implicit_transaction, changed);
     return changed;
 }
 
@@ -808,9 +931,11 @@ bool AuthoringSession::setEntityName(Entity entity, std::string name)
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Rename Entity");
     tag = std::move(name);
     markSceneDirty();
     queueEntityModified(entity, tag);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -829,9 +954,11 @@ bool AuthoringSession::setEntityTransform(Entity entity, const TransformComponen
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Entity Transform");
     entity.getComponent<TransformComponent>() = transform;
     markSceneDirty();
     queueEntityModified(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -847,19 +974,27 @@ bool AuthoringSession::setCameraComponent(Entity entity, const CameraComponent& 
     }
 
     if (!entity.hasComponent<CameraComponent>()) {
+        const bool implicit_transaction = beginImplicitTransaction("Set Camera Component");
         entity.addComponent<CameraComponent>();
         queueEvent(AuthoringEvent{
             .type = AuthoringEventType::ComponentAdded,
             .entity_id = entity.getUUID(),
             .message = componentKindName(AuthoringComponentKind::Camera),
         });
+        entity.getComponent<CameraComponent>() = camera_component;
+        markSceneDirty();
+        queueEntityModified(entity);
+        (void) finishImplicitTransaction(implicit_transaction, true);
+        return true;
     } else if (sameCameraComponent(entity.getComponent<CameraComponent>(), camera_component)) {
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Camera Component");
     entity.getComponent<CameraComponent>() = camera_component;
     markSceneDirty();
     queueEntityModified(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -875,19 +1010,27 @@ bool AuthoringSession::setLightComponent(Entity entity, const LightComponent& li
     }
 
     if (!entity.hasComponent<LightComponent>()) {
+        const bool implicit_transaction = beginImplicitTransaction("Set Light Component");
         entity.addComponent<LightComponent>();
         queueEvent(AuthoringEvent{
             .type = AuthoringEventType::ComponentAdded,
             .entity_id = entity.getUUID(),
             .message = componentKindName(AuthoringComponentKind::Light),
         });
+        entity.getComponent<LightComponent>() = light_component;
+        markSceneDirty();
+        queueEntityModified(entity);
+        (void) finishImplicitTransaction(implicit_transaction, true);
+        return true;
     } else if (sameLightComponent(entity.getComponent<LightComponent>(), light_component)) {
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Light Component");
     entity.getComponent<LightComponent>() = light_component;
     markSceneDirty();
     queueEntityModified(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -903,19 +1046,27 @@ bool AuthoringSession::setMeshComponent(Entity entity, const MeshComponent& mesh
     }
 
     if (!entity.hasComponent<MeshComponent>()) {
+        const bool implicit_transaction = beginImplicitTransaction("Set Mesh Component");
         entity.addComponent<MeshComponent>();
         queueEvent(AuthoringEvent{
             .type = AuthoringEventType::ComponentAdded,
             .entity_id = entity.getUUID(),
             .message = componentKindName(AuthoringComponentKind::Mesh),
         });
+        entity.getComponent<MeshComponent>() = mesh_component;
+        markSceneDirty();
+        queueEntityModified(entity);
+        (void) finishImplicitTransaction(implicit_transaction, true);
+        return true;
     } else if (sameMeshComponent(entity.getComponent<MeshComponent>(), mesh_component)) {
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Mesh Component");
     entity.getComponent<MeshComponent>() = mesh_component;
     markSceneDirty();
     queueEntityModified(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -931,19 +1082,27 @@ bool AuthoringSession::setScriptComponent(Entity entity, const ScriptComponent& 
     }
 
     if (!entity.hasComponent<ScriptComponent>()) {
+        const bool implicit_transaction = beginImplicitTransaction("Set Script Component");
         entity.addComponent<ScriptComponent>();
         queueEvent(AuthoringEvent{
             .type = AuthoringEventType::ComponentAdded,
             .entity_id = entity.getUUID(),
             .message = componentKindName(AuthoringComponentKind::Script),
         });
+        entity.getComponent<ScriptComponent>() = script_component;
+        markSceneDirty();
+        queueEntityModified(entity);
+        (void) finishImplicitTransaction(implicit_transaction, true);
+        return true;
     } else if (sameScriptComponent(entity.getComponent<ScriptComponent>(), script_component)) {
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Script Component");
     entity.getComponent<ScriptComponent>() = script_component;
     markSceneDirty();
     queueEntityModified(entity);
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -958,12 +1117,14 @@ bool AuthoringSession::setSceneEnvironmentSettings(const SceneEnvironmentSetting
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Scene Environment");
     scene().environmentSettings() = settings;
     markSceneDirty();
     queueEvent(AuthoringEvent{
         .type = AuthoringEventType::SceneSettingsChanged,
         .message = "Scene environment settings changed",
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -978,12 +1139,14 @@ bool AuthoringSession::setSceneShadowSettings(const SceneShadowSettings& setting
         return false;
     }
 
+    const bool implicit_transaction = beginImplicitTransaction("Set Scene Shadows");
     scene().shadowSettings() = settings;
     markSceneDirty();
     queueEvent(AuthoringEvent{
         .type = AuthoringEventType::SceneSettingsChanged,
         .message = "Scene shadow settings changed",
     });
+    (void) finishImplicitTransaction(implicit_transaction, true);
     return true;
 }
 
@@ -1007,6 +1170,66 @@ void AuthoringSession::queueEntityModified(Entity entity, std::string message)
         .entity_id = entity.getUUID(),
         .message = std::move(message),
     });
+}
+
+bool AuthoringSession::beginImplicitTransaction(std::string name)
+{
+    if (m_implicit_history_suppression_depth > 0 || m_history.hasOpenTransaction()) {
+        return false;
+    }
+
+    return beginTransaction(std::move(name));
+}
+
+bool AuthoringSession::finishImplicitTransaction(bool implicit_transaction, bool changed)
+{
+    if (!implicit_transaction) {
+        return changed;
+    }
+
+    if (changed) {
+        (void) commitTransaction();
+    } else {
+        (void) rollbackTransaction();
+    }
+    return changed;
+}
+
+void AuthoringSession::suppressImplicitHistory()
+{
+    ++m_implicit_history_suppression_depth;
+}
+
+void AuthoringSession::resumeImplicitHistory()
+{
+    if (m_implicit_history_suppression_depth > 0) {
+        --m_implicit_history_suppression_depth;
+    }
+}
+
+void AuthoringSession::restoreHistoryState(AuthoringSceneState state, std::string message)
+{
+    if (!hasBoundScene() || state.scene == nullptr) {
+        return;
+    }
+
+    const bool dirty_changed = m_scene_dirty != state.scene_dirty;
+    scene().copyFrom(*state.scene);
+    m_scene_file_path = std::move(state.scene_file_path);
+    m_scene_dirty = state.scene_dirty;
+
+    queueEvent(AuthoringEvent{
+        .type = AuthoringEventType::HistoryChanged,
+        .path = m_scene_file_path,
+        .message = std::move(message),
+    });
+
+    if (dirty_changed) {
+        queueEvent(AuthoringEvent{
+            .type = AuthoringEventType::SceneDirtyChanged,
+            .message = m_scene_dirty ? "Scene marked dirty" : "Scene marked clean",
+        });
+    }
 }
 
 } // namespace luna::authoring

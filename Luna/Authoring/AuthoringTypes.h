@@ -15,6 +15,7 @@ enum class AuthoringEventType : uint8_t {
     SceneSaved,
     SceneDirtyChanged,
     SceneSettingsChanged,
+    HistoryChanged,
     EntityCreated,
     EntityModified,
     EntityDestroyed,

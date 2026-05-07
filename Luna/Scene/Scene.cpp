@@ -17,16 +17,27 @@ Scene::Scene()
 std::unique_ptr<Scene> Scene::clone() const
 {
     auto cloned_scene = std::make_unique<Scene>();
-    cloned_scene->m_name = m_name;
-    cloned_scene->m_asset_load_behavior = m_asset_load_behavior;
-    cloned_scene->m_environment_settings = m_environment_settings;
-    cloned_scene->m_shadow_settings = m_shadow_settings;
+    cloned_scene->copyFrom(*this);
+    return cloned_scene;
+}
 
-    auto& cloned_entity_manager = cloned_scene->entityManager();
-    const auto& registry = m_entity_manager.registry();
+void Scene::copyFrom(const Scene& source)
+{
+    if (this == &source) {
+        return;
+    }
+
+    m_name = source.m_name;
+    m_asset_load_behavior = source.m_asset_load_behavior;
+    m_environment_settings = source.m_environment_settings;
+    m_shadow_settings = source.m_shadow_settings;
+    m_entity_manager.clear();
+
+    auto& target_entity_manager = entityManager();
+    const auto& registry = source.m_entity_manager.registry();
 
     std::vector<UUID> serialized_entity_ids;
-    serialized_entity_ids.reserve(m_entity_manager.entityCount());
+    serialized_entity_ids.reserve(source.m_entity_manager.entityCount());
 
     auto view = registry.view<const IDComponent>();
     for (const auto entity_handle : view) {
@@ -38,7 +49,7 @@ std::unique_ptr<Scene> Scene::clone() const
             tag = registry.get<const TagComponent>(entity_handle).tag;
         }
 
-        Entity cloned_entity = cloned_entity_manager.createEntityWithUUID(id_component.id, tag);
+        Entity cloned_entity = target_entity_manager.createEntityWithUUID(id_component.id, tag);
         if (!cloned_entity) {
             continue;
         }
@@ -65,8 +76,8 @@ std::unique_ptr<Scene> Scene::clone() const
     }
 
     for (const UUID entity_id : serialized_entity_ids) {
-        const auto source_entity_handle = m_entity_manager.findEntityHandleByUUID(entity_id);
-        Entity cloned_entity = cloned_entity_manager.findEntityByUUID(entity_id);
+        const auto source_entity_handle = source.m_entity_manager.findEntityHandleByUUID(entity_id);
+        Entity cloned_entity = target_entity_manager.findEntityByUUID(entity_id);
         if (!source_entity_handle.has_value() || !cloned_entity) {
             continue;
         }
@@ -79,13 +90,11 @@ std::unique_ptr<Scene> Scene::clone() const
             continue;
         }
 
-        Entity cloned_parent = cloned_entity_manager.findEntityByUUID(parent_id);
+        Entity cloned_parent = target_entity_manager.findEntityByUUID(parent_id);
         if (cloned_parent) {
-            cloned_entity_manager.setParent(cloned_entity, cloned_parent, false);
+            target_entity_manager.setParent(cloned_entity, cloned_parent, false);
         }
     }
-
-    return cloned_scene;
 }
 
 void Scene::renderFromRuntimeCamera()

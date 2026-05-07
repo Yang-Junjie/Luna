@@ -256,6 +256,77 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
                    "opening should emit scene loaded");
 }
 
+void testAuthoringSessionHistory(TestContext& context)
+{
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    (void) session.createScene();
+    (void) session.consumeEvents();
+
+    const size_t bootstrap_count = scene.entityManager().entityCount();
+    luna::Entity entity = session.createEntity("UndoBox");
+    const luna::UUID entity_id = entity ? entity.getUUID() : luna::UUID(0);
+    context.expect(entity, "history test should create an entity");
+    context.expect(session.canUndo(), "creating an entity should add an undo step");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
+                   "created entity should increase entity count");
+
+    context.expect(session.undo(), "undo should restore the scene before entity creation");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count,
+                   "undo should remove created entity");
+    context.expect(!scene.entityManager().containsEntity(entity_id),
+                   "undo should remove created entity UUID");
+    context.expect(session.canRedo(), "undo should enable redo");
+
+    context.expect(session.redo(), "redo should restore entity creation");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
+                   "redo should restore created entity count");
+    entity = scene.entityManager().findEntityByUUID(entity_id);
+    context.expect(entity && entity.getName() == "UndoBox", "redo should restore created entity identity");
+
+    luna::TransformComponent transform = entity.transform();
+    transform.translation = {4.0f, 5.0f, 6.0f};
+    context.expect(session.setEntityTransform(entity, transform),
+                   "transform edit should create a history step");
+    context.expect(session.undo(), "undo should restore previous transform");
+    entity = scene.entityManager().findEntityByUUID(entity_id);
+    context.expect(entity && sameVec3(entity.transform().translation, glm::vec3{0.0f, 0.0f, 0.0f}),
+                   "undo should restore transform translation");
+    context.expect(session.redo(), "redo should reapply transform");
+    entity = scene.entityManager().findEntityByUUID(entity_id);
+    context.expect(entity && sameVec3(entity.transform().translation, glm::vec3{4.0f, 5.0f, 6.0f}),
+                   "redo should restore transform translation");
+
+    context.expect(session.beginTransaction("Batch Create"), "explicit transaction should begin");
+    luna::Entity first = session.createEntity("BatchA");
+    luna::Entity second = session.createEntity("BatchB");
+    const luna::UUID first_id = first ? first.getUUID() : luna::UUID(0);
+    const luna::UUID second_id = second ? second.getUUID() : luna::UUID(0);
+    context.expect(first && second, "explicit transaction should allow multiple creates");
+    context.expect(session.commitTransaction(), "explicit transaction should commit");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 3,
+                   "batch transaction should add two entities");
+    context.expect(session.undo(), "undo should revert the whole explicit transaction");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
+                   "batch undo should remove both batch entities");
+    context.expect(!scene.entityManager().containsEntity(first_id) &&
+                       !scene.entityManager().containsEntity(second_id),
+                   "batch undo should remove both entity UUIDs");
+
+    const bool can_undo_before_rollback = session.canUndo();
+    context.expect(session.beginTransaction("Rollback Create"), "rollback transaction should begin");
+    luna::Entity rollback_entity = session.createEntity("RollbackOnly");
+    const luna::UUID rollback_entity_id = rollback_entity ? rollback_entity.getUUID() : luna::UUID(0);
+    context.expect(rollback_entity, "rollback transaction should create temporary entity");
+    context.expect(session.rollbackTransaction(), "rollback transaction should restore previous state");
+    context.expect(!scene.entityManager().containsEntity(rollback_entity_id),
+                   "rollback should remove temporary entity");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
+                   "rollback should preserve entity count");
+    context.expect(session.canUndo() == can_undo_before_rollback,
+                   "rollback should not add a new undo step");
+}
+
 } // namespace
 
 int main()
@@ -264,6 +335,7 @@ int main()
 
     TestContext context;
     testAuthoringSessionSceneLifecycle(context);
+    testAuthoringSessionHistory(context);
 
     luna::Logger::shutdown();
     return context.result();

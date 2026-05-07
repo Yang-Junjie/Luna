@@ -112,6 +112,7 @@ private:
                              const luna::RHI::Extent2D& texture_extent) const;
     void drawDockSpace();
     void onImGuiMenuBar();
+    void updateEditorShortcuts();
     void drawViewport();
     void updateGizmoShortcuts();
     bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size);
@@ -131,6 +132,8 @@ private:
     bool saveScene();
     bool saveSceneAs();
     bool saveSceneAs(const std::filesystem::path& scene_file_path);
+    bool undo();
+    bool redo();
 
     std::filesystem::path sceneDialogDefaultPath() const;
     void updateSceneLabel();
@@ -152,6 +155,7 @@ private:
     bool m_viewport_focused{false};
     bool m_viewport_hovered{false};
     bool m_show_editor_grid{true};
+    bool m_gizmo_transform_transaction_active{false};
     bool m_show_builtin_materials_panel{false};
     float m_editor_ui_scale{0.0f};
 

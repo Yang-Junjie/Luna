@@ -247,6 +247,7 @@ void LunaEditorLayer::onImGuiRender()
 
     syncEditorUiScale();
     ImGuizmo::BeginFrame();
+    updateEditorShortcuts();
 
     drawDockSpace();
 
@@ -437,6 +438,19 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Edit")) {
+        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !m_runtime_viewport_enabled && m_authoring_session.canUndo())) {
+            undo();
+        }
+        if (ImGui::MenuItem("Redo",
+                            "Ctrl+Y",
+                            false,
+                            !m_runtime_viewport_enabled && m_authoring_session.canRedo())) {
+            redo();
+        }
+        ImGui::EndMenu();
+    }
+
     if (ImGui::BeginMenu("Viewport")) {
         ImGui::MenuItem("Runtime Viewport", nullptr, &m_runtime_viewport_requested);
         ImGui::EndMenu();
@@ -451,6 +465,29 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
         ImGui::MenuItem("Backend Capabilities", nullptr, &m_show_backend_capabilities_panel);
         ImGui::EndMenu();
+    }
+}
+
+void LunaEditorLayer::updateEditorShortcuts()
+{
+    if (m_runtime_viewport_enabled) {
+        return;
+    }
+
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.WantTextInput || !io.KeyCtrl) {
+        return;
+    }
+
+    const bool redo_shortcut = ImGui::IsKeyPressed(ImGuiKey_Y, false) ||
+                               (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false));
+    if (redo_shortcut) {
+        redo();
+        return;
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+        undo();
     }
 }
 
@@ -538,6 +575,11 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
 {
     Entity selected_entity = getSelectedEntity();
     if (!selected_entity || !selected_entity.isValid() || !selected_entity.hasComponent<TransformComponent>()) {
+        if (m_gizmo_transform_transaction_active) {
+            (void) m_authoring_session.commitTransaction();
+            m_gizmo_transform_transaction_active = false;
+            processAuthoringEvents();
+        }
         return false;
     }
 
@@ -564,11 +606,20 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
                          mode,
                          glm::value_ptr(transform));
 
-    if (ImGuizmo::IsUsing()) {
+    const bool gizmo_using = ImGuizmo::IsUsing();
+    if (gizmo_using) {
+        if (!m_gizmo_transform_transaction_active) {
+            m_gizmo_transform_transaction_active = m_authoring_session.beginTransaction("Transform Entity");
+        }
         m_scene->entityManager().setWorldSpaceTransform(selected_entity, transform);
+        m_authoring_session.markSceneDirty();
+    } else if (m_gizmo_transform_transaction_active) {
+        (void) m_authoring_session.commitTransaction();
+        m_gizmo_transform_transaction_active = false;
+        processAuthoringEvents();
     }
 
-    const bool gizmo_active = ImGuizmo::IsOver() || ImGuizmo::IsUsing();
+    const bool gizmo_active = ImGuizmo::IsOver() || gizmo_using;
     ImGuizmo::PopID();
     return gizmo_active;
 }
@@ -1056,6 +1107,12 @@ void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
         return;
     }
 
+    if (m_gizmo_transform_transaction_active) {
+        (void) m_authoring_session.commitTransaction();
+        m_gizmo_transform_transaction_active = false;
+        processAuthoringEvents();
+    }
+
     if (enabled) {
         beginRuntimeViewport();
     } else {
@@ -1140,6 +1197,7 @@ void LunaEditorLayer::processAuthoringEvents()
             case authoring::AuthoringEventType::SceneReset:
             case authoring::AuthoringEventType::SceneCreated:
             case authoring::AuthoringEventType::SceneLoaded:
+            case authoring::AuthoringEventType::HistoryChanged:
                 update_scene_label = true;
                 sync_scene_settings = true;
                 validate_selection = true;
@@ -1335,6 +1393,26 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
     m_content_browser_panel->requestRefresh();
 
     LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene->getName(), normalized_scene_path.string());
+    return true;
+}
+
+bool LunaEditorLayer::undo()
+{
+    if (m_runtime_viewport_enabled || !m_authoring_session.undo()) {
+        return false;
+    }
+
+    processAuthoringEvents();
+    return true;
+}
+
+bool LunaEditorLayer::redo()
+{
+    if (m_runtime_viewport_enabled || !m_authoring_session.redo()) {
+        return false;
+    }
+
+    processAuthoringEvents();
     return true;
 }
 

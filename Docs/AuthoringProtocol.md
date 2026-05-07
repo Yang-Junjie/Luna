@@ -6,6 +6,8 @@
 
 Commands are executed left-to-right against `AuthoringSession` through `AuthoringExecutor`.
 
+`AuthoringExecutor` runs each plan inside one authoring transaction. A successful plan commits as one undo step. A failed plan rolls back scene mutations before returning diagnostics.
+
 Errors are terminal:
 
 - Parse error: `ok=false`, no commands execute.
@@ -13,6 +15,17 @@ Errors are terminal:
 - Verification failure: `ok=false`, execution stops at the failing verification.
 - Inspect commands do not mutate the scene.
 - `summary` is text-only and has no JSON-side effect.
+
+## History And Transactions
+
+Editor actions, AI plans, and future MCP tools share the same `AuthoringSession` history layer.
+
+- `beginTransaction(name)` captures the scene state before a batch.
+- `commitTransaction()` captures the scene state after the batch and pushes one undo step.
+- `rollbackTransaction()` restores the pre-transaction scene state.
+- `undo()` and `redo()` restore committed transaction snapshots.
+
+The current implementation uses scene-level snapshots for correctness and broad coverage. High-frequency editor interactions, such as viewport gizmo transforms, should use an explicit transaction so a drag gesture becomes one undo step.
 
 ## CLI Commands
 

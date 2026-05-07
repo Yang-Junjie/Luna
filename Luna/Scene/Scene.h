@@ -63,6 +63,7 @@ public:
     ~Scene() = default;
 
     [[nodiscard]] std::unique_ptr<Scene> clone() const;
+    void copyFrom(const Scene& source);
 
     void renderFromRuntimeCamera();
     void renderFromEditorCamera(const Camera& camera);

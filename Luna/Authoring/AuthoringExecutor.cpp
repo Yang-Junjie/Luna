@@ -21,6 +21,43 @@
 namespace luna::authoring {
 namespace {
 
+class AuthoringTransactionGuard {
+public:
+    AuthoringTransactionGuard(AuthoringSession& session, AuthoringReport& report, bool owns_transaction)
+        : m_session(session),
+          m_report(report),
+          m_owns_transaction(owns_transaction)
+    {}
+
+    AuthoringTransactionGuard(const AuthoringTransactionGuard&) = delete;
+    AuthoringTransactionGuard& operator=(const AuthoringTransactionGuard&) = delete;
+
+    ~AuthoringTransactionGuard()
+    {
+        if (m_owns_transaction && !m_committed) {
+            (void) m_session.rollbackTransaction();
+            m_report.entities.clear();
+            m_report.scene = captureAuthoringSceneSnapshot(m_session);
+        }
+    }
+
+    void commit()
+    {
+        if (!m_owns_transaction || m_committed) {
+            return;
+        }
+
+        (void) m_session.commitTransaction();
+        m_committed = true;
+    }
+
+private:
+    AuthoringSession& m_session;
+    AuthoringReport& m_report;
+    bool m_owns_transaction{false};
+    bool m_committed{false};
+};
+
 const char* commandKindName(AuthoringCommandKind kind)
 {
     switch (kind) {
@@ -348,6 +385,8 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
         report.scene = captureAuthoringSceneSnapshot(m_session);
         return false;
     }
+
+    AuthoringTransactionGuard transaction_guard(m_session, report, m_session.beginTransaction("Authoring Plan"));
 
     for (size_t command_index = 0; command_index < plan.commands.size(); ++command_index) {
         const AuthoringCommand& command = plan.commands[command_index];
@@ -820,6 +859,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
         }
     }
 
+    transaction_guard.commit();
     report.scene = captureAuthoringSceneSnapshot(m_session);
     return true;
 }
