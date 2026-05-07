@@ -1,12 +1,11 @@
 #include "Asset/Editor/TextureLoader.h"
-
 #include "Project/ProjectManager.h"
 #include "TextureImporter.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
 
+#include <algorithm>
 #include <glm/vec4.hpp>
 
 namespace luna::texture_loader_detail {
@@ -302,8 +301,8 @@ ImageData applyImportSettings(ImageData image_data, const ImportSettings& import
     }
 
     if (isSrgbCapableFormat(image_data.ImageFormat)) {
-        image_data.ImageFormat = import_settings.SRGB ? toSrgbFormat(image_data.ImageFormat)
-                                                      : toLinearFormat(image_data.ImageFormat);
+        image_data.ImageFormat =
+            import_settings.SRGB ? toSrgbFormat(image_data.ImageFormat) : toLinearFormat(image_data.ImageFormat);
     }
 
     if (!import_settings.GenerateMipmaps) {
@@ -338,7 +337,7 @@ std::shared_ptr<Texture> TextureLoader::loadFromFile(const std::filesystem::path
 }
 
 std::shared_ptr<Texture> TextureLoader::loadFromMetadata(const std::filesystem::path& path,
-                                                              const AssetMetadata& meta_data)
+                                                         const AssetMetadata& meta_data)
 {
     ImageData image_data = ImageLoader::LoadImageFromFile(path.string());
     if (!image_data.isValid()) {
@@ -348,9 +347,8 @@ std::shared_ptr<Texture> TextureLoader::loadFromMetadata(const std::filesystem::
     const auto import_settings = texture_loader_detail::parseImportSettings(meta_data.SpecializedConfig, path);
     image_data = texture_loader_detail::applyImportSettings(std::move(image_data), import_settings);
 
-    return Texture::create(meta_data.Name.empty() ? path.stem().string() : meta_data.Name,
-                                std::move(image_data),
-                                import_settings);
+    return Texture::create(
+        meta_data.Name.empty() ? path.stem().string() : meta_data.Name, std::move(image_data), import_settings);
 }
 
 } // namespace luna

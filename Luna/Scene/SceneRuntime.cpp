@@ -1,7 +1,6 @@
-#include "SceneRuntime.h"
-
 #include "Core/Log.h"
 #include "Scene.h"
+#include "SceneRuntime.h"
 #include "Script/ScriptRuntime.h"
 
 namespace luna {

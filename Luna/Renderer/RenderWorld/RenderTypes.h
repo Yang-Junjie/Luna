@@ -2,10 +2,10 @@
 
 #include "Asset/Asset.h"
 
+#include <cstdint>
+
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
-
-#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -110,12 +110,8 @@ enum class RenderShadowMode : uint8_t {
 struct RenderShadowSettings {
     RenderShadowMode mode{RenderShadowMode::CascadedShadowMaps};
     float pcf_shadow_distance{40.0f};
-    uint32_t pcf_map_size{4096};
-    uint32_t csm_cascade_size{2048};
+    uint32_t pcf_map_size{4'096};
+    uint32_t csm_cascade_size{2'048};
 };
 
 } // namespace luna
-
-
-
-

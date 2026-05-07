@@ -5,9 +5,9 @@
 
 #include <Capabilities.h>
 #include <Core.h>
-#include <Instance.h>
 #include <filesystem>
 #include <glm/vec4.hpp>
+#include <Instance.h>
 
 namespace luna::RHI {
 class Device;
@@ -66,7 +66,8 @@ struct SceneRenderContext {
 
     [[nodiscard]] bool isValid() const
     {
-        return device && color_target.isValid() && depth_target.isValid() && framebuffer_width > 0 && framebuffer_height > 0;
+        return device && color_target.isValid() && depth_target.isValid() && framebuffer_width > 0 &&
+               framebuffer_height > 0;
     }
 };
 
@@ -87,8 +88,7 @@ enum class RenderFeatureHistoryInvalidationFlags : uint32_t {
 inline RenderFeatureHistoryInvalidationFlags operator|(RenderFeatureHistoryInvalidationFlags lhs,
                                                        RenderFeatureHistoryInvalidationFlags rhs) noexcept
 {
-    return static_cast<RenderFeatureHistoryInvalidationFlags>(static_cast<uint32_t>(lhs) |
-                                                              static_cast<uint32_t>(rhs));
+    return static_cast<RenderFeatureHistoryInvalidationFlags>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
 }
 
 inline RenderFeatureHistoryInvalidationFlags& operator|=(RenderFeatureHistoryInvalidationFlags& lhs,
@@ -98,8 +98,7 @@ inline RenderFeatureHistoryInvalidationFlags& operator|=(RenderFeatureHistoryInv
     return lhs;
 }
 
-inline bool operator&(RenderFeatureHistoryInvalidationFlags lhs,
-                      RenderFeatureHistoryInvalidationFlags rhs) noexcept
+inline bool operator&(RenderFeatureHistoryInvalidationFlags lhs, RenderFeatureHistoryInvalidationFlags rhs) noexcept
 {
     return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
 }
@@ -112,8 +111,7 @@ struct RenderFeatureFrameContext {
     uint32_t framebuffer_width{0};
     uint32_t framebuffer_height{0};
     luna::RenderViewFrameState view;
-    RenderFeatureHistoryInvalidationFlags history_invalidation_flags{
-        RenderFeatureHistoryInvalidationFlags::None};
+    RenderFeatureHistoryInvalidationFlags history_invalidation_flags{RenderFeatureHistoryInvalidationFlags::None};
 
     [[nodiscard]] bool historyInvalidated() const noexcept
     {
@@ -127,7 +125,3 @@ struct RenderFeatureFrameContext {
 };
 
 } // namespace luna::render_flow
-
-
-
-

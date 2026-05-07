@@ -1,5 +1,3 @@
-#include "ScriptComponentInspector.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "EditorUI.h"
@@ -9,13 +7,14 @@
 #include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
 #include "Script/ScriptPropertySchema.h"
+#include "ScriptComponentInspector.h"
 
-#include <imgui.h>
-
-#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
+#include <imgui.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -88,9 +87,7 @@ void resetScriptPropertyValue(luna::ScriptProperty& property)
     property.assetValue = luna::AssetHandle(0);
 }
 
-std::string makeUniquePropertyName(const luna::ScriptEntry& script,
-                                   size_t property_index,
-                                   std::string desired_name)
+std::string makeUniquePropertyName(const luna::ScriptEntry& script, size_t property_index, std::string desired_name)
 {
     desired_name = trimString(std::move(desired_name));
     if (desired_name.empty()) {
@@ -116,7 +113,7 @@ std::string makeUniquePropertyName(const luna::ScriptEntry& script,
     }
 
     const std::string base_name = desired_name;
-    for (uint32_t suffix = 1; suffix < 10000; ++suffix) {
+    for (uint32_t suffix = 1; suffix < 10'000; ++suffix) {
         std::string candidate = base_name + std::to_string(suffix);
         if (is_name_available(candidate)) {
             return candidate;
@@ -223,9 +220,8 @@ bool isScriptAssetLanguageAccepted(const luna::AssetMetadata& metadata,
     return true;
 }
 
-const luna::ScriptProperty* findMatchingProperty(const luna::ScriptEntry& script,
-                                                 const std::string& name,
-                                                 luna::ScriptPropertyType type)
+const luna::ScriptProperty*
+    findMatchingProperty(const luna::ScriptEntry& script, const std::string& name, luna::ScriptPropertyType type)
 {
     for (const luna::ScriptProperty& property : script.properties) {
         if (property.type == type && equalsIgnoreCase(property.name, name)) {
@@ -265,9 +261,9 @@ bool applyScriptPropertySchema(luna::ScriptEntry& script, const std::vector<luna
                                      [](const luna::ScriptProperty& lhs, const luna::ScriptProperty& rhs) {
                                          return equalsIgnoreCase(lhs.name, rhs.name) && lhs.type == rhs.type &&
                                                 lhs.boolValue == rhs.boolValue && lhs.intValue == rhs.intValue &&
-                                                lhs.floatValue == rhs.floatValue && lhs.stringValue == rhs.stringValue &&
-                                                lhs.vec3Value == rhs.vec3Value && lhs.entityValue == rhs.entityValue &&
-                                                lhs.assetValue == rhs.assetValue;
+                                                lhs.floatValue == rhs.floatValue &&
+                                                lhs.stringValue == rhs.stringValue && lhs.vec3Value == rhs.vec3Value &&
+                                                lhs.entityValue == rhs.entityValue && lhs.assetValue == rhs.assetValue;
                                      });
 
     if (changed) {
@@ -373,8 +369,8 @@ std::vector<luna::ScriptPropertySchema> loadScriptPropertySchema(const luna::Scr
     request.source = script_asset->source;
 
     const auto& project_info = luna::ProjectManager::instance().getProjectInfo();
-    return luna::ScriptPluginManager::instance().getPropertySchemaForProject(
-        project_info ? &*project_info : nullptr, request);
+    return luna::ScriptPluginManager::instance().getPropertySchemaForProject(project_info ? &*project_info : nullptr,
+                                                                             request);
 }
 
 bool drawSchemaSyncControls(luna::ScriptEntry& script)
@@ -695,7 +691,8 @@ ScriptComponentInspectorChange drawScriptComponentInspector(Entity owner_entity,
         }
 
         if (remove_script_requested) {
-            script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
+            script_component.scripts.erase(script_component.scripts.begin() +
+                                           static_cast<std::ptrdiff_t>(script_index));
             change.changed = true;
             change.script_structure_changed = true;
             ImGui::PopID();

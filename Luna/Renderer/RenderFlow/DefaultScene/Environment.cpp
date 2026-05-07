@@ -1,16 +1,15 @@
-#include "Renderer/RenderFlow/DefaultScene/Environment.h"
-
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "Renderer/Image/ImageDataUtils.h"
+#include "Renderer/RenderFlow/DefaultScene/Environment.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 #include "Renderer/Texture.h"
 
-#include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstring>
 
+#include <algorithm>
+#include <array>
 #include <Builders.h>
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
@@ -23,7 +22,7 @@ namespace luna::render_flow::default_scene {
 
 namespace {
 
-constexpr uint32_t kProceduralSkyWidth = 1024;
+constexpr uint32_t kProceduralSkyWidth = 1'024;
 constexpr uint32_t kProceduralSkyHeight = 512;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kTwoPi = 6.28318530717958647692f;
@@ -124,8 +123,7 @@ EnvironmentResources::SourceSignature defaultSkySignature(const RenderEnvironmen
 
 EnvironmentResources::SourceSignature requestedSourceSignature(const RenderEnvironment* environment)
 {
-    if (environment == nullptr ||
-        environment->background_mode == RenderBackgroundMode::ProceduralSky ||
+    if (environment == nullptr || environment->background_mode == RenderBackgroundMode::ProceduralSky ||
         !environment->environment_map_handle.isValid()) {
         return defaultSkySignature(environment);
     }
@@ -146,9 +144,8 @@ bool isUsableEnvironmentTexture(const std::shared_ptr<Texture>& texture)
     return image.ImageFormat == render_flow::default_scene_detail::kEnvironmentFormat;
 }
 
-glm::vec3 computeRayleighScattering(const glm::vec3& direction,
-                                    const glm::vec3& zenith_color,
-                                    const glm::vec3& horizon_color)
+glm::vec3
+    computeRayleighScattering(const glm::vec3& direction, const glm::vec3& zenith_color, const glm::vec3& horizon_color)
 {
     const float height = (std::max)(direction.y, 0.0f);
     const float zenith_factor = std::pow(height, 0.5f);
@@ -168,10 +165,8 @@ glm::vec3 computeMieScattering(const glm::vec3& direction, const glm::vec3& sun_
     return glm::vec3(1.0f, 0.9f, 0.7f) * phase * 0.15f;
 }
 
-glm::vec3 computeSunDisc(const glm::vec3& direction,
-                         const glm::vec3& sun_dir,
-                         float sun_angular_radius,
-                         float sun_intensity)
+glm::vec3
+    computeSunDisc(const glm::vec3& direction, const glm::vec3& sun_dir, float sun_angular_radius, float sun_intensity)
 {
     const float radius = (std::max)(sun_angular_radius, 0.0001f);
     const float cos_theta = glm::dot(direction, sun_dir);
@@ -246,9 +241,9 @@ ImageData createProceduralSkyImageData(const EnvironmentResources::SourceSignatu
 ProceduralSkyParams proceduralSkyParams(const EnvironmentResources::SourceSignature& signature)
 {
     return ProceduralSkyParams{
-        .sun_direction_intensity =
-            glm::vec4(safeNormalize(signature.procedural_sun_direction, glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
-                      signature.procedural_sun_intensity),
+        .sun_direction_intensity = glm::vec4(
+            safeNormalize(signature.procedural_sun_direction, glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
+            signature.procedural_sun_intensity),
         .sky_color_zenith_exposure =
             glm::vec4(signature.procedural_sky_color_zenith, signature.procedural_sky_exposure),
         .sky_color_horizon_sun_radius =
@@ -415,7 +410,8 @@ luna::RHI::Ref<luna::RHI::ComputePipeline>
         return {};
     }
 
-    return device->CreateComputePipeline(luna::RHI::ComputePipelineBuilder().SetShader(shader).SetLayout(layout).Build());
+    return device->CreateComputePipeline(
+        luna::RHI::ComputePipelineBuilder().SetShader(shader).SetLayout(layout).Build());
 }
 
 } // namespace
@@ -489,14 +485,13 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     SourceSignature source_signature_to_prepare = requested_signature;
     bool requested_texture_is_available = false;
     std::shared_ptr<Texture> requested_texture;
-    const bool source_matches_request =
-        m_has_source_signature && m_source_texture.texture && sameSourceSignature(m_source_signature, requested_signature);
+    const bool source_matches_request = m_has_source_signature && m_source_texture.texture &&
+                                        sameSourceSignature(m_source_signature, requested_signature);
 
     if (!source_matches_request && requested_signature.kind == SourceKind::TextureAsset) {
-        requested_texture =
-            environment != nullptr && environment->allow_async_load
-                ? AssetManager::get().requestAssetAs<Texture>(requested_signature.texture_handle)
-                : AssetManager::get().loadAssetAs<Texture>(requested_signature.texture_handle);
+        requested_texture = environment != nullptr && environment->allow_async_load
+                                ? AssetManager::get().requestAssetAs<Texture>(requested_signature.texture_handle)
+                                : AssetManager::get().loadAssetAs<Texture>(requested_signature.texture_handle);
         requested_texture_is_available = isUsableEnvironmentTexture(requested_texture);
 
         if (!requested_texture_is_available) {
@@ -506,11 +501,12 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                     requested_signature.texture_handle.toString());
             }
 
-            const bool texture_load_is_pending =
-                requested_texture == nullptr && environment != nullptr && environment->allow_async_load &&
-                AssetManager::get().isAssetLoading(requested_signature.texture_handle);
-            source_signature_to_prepare =
-                texture_load_is_pending && m_source_texture.texture ? m_source_signature : defaultSkySignature(environment);
+            const bool texture_load_is_pending = requested_texture == nullptr && environment != nullptr &&
+                                                 environment->allow_async_load &&
+                                                 AssetManager::get().isAssetLoading(requested_signature.texture_handle);
+            source_signature_to_prepare = texture_load_is_pending && m_source_texture.texture
+                                              ? m_source_signature
+                                              : defaultSkySignature(environment);
         }
     }
 
@@ -580,8 +576,8 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (m_source_is_gpu_generated && !m_procedural_source_uav && m_source_texture.texture) {
-        m_procedural_source_uav =
-            m_source_texture.texture->CreateView(texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentFormat));
+        m_procedural_source_uav = m_source_texture.texture->CreateView(
+            texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentFormat));
     }
     if (!m_environment_cube_uav && m_environment_cube_texture) {
         m_environment_cube_uav = m_environment_cube_texture->CreateView(
@@ -601,8 +597,8 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
         }
     }
     if (!m_brdf_lut_uav && m_brdf_lut_texture) {
-        m_brdf_lut_uav =
-            m_brdf_lut_texture->CreateView(texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat));
+        m_brdf_lut_uav = m_brdf_lut_texture->CreateView(
+            texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat));
     }
 
     if (!m_sampler) {

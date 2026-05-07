@@ -3,10 +3,10 @@
 #include "Script/ScriptHostApi.h"
 #include "Script/ScriptPluginApi.h"
 
-#include <sol/sol.hpp>
-
 #include <cstddef>
+
 #include <memory>
+#include <sol/sol.hpp>
 #include <string>
 #include <vector>
 

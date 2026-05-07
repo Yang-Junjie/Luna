@@ -6,13 +6,13 @@
 #include "Scene/Entity.h"
 
 #include <cstddef>
-#include <functional>
-#include <initializer_list>
-#include <string>
 
+#include <functional>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <imgui.h>
+#include <initializer_list>
+#include <string>
 
 namespace luna::editor::ui {
 
@@ -81,7 +81,9 @@ bool drawCombo(const char* label,
                const char* preview_value,
                const std::function<bool()>& draw_options,
                const PropertyLayout& layout = {});
-bool drawButton(const char* label, ButtonVariant variant = ButtonVariant::Default, const ImVec2& size = ImVec2{0.0f, 0.0f});
+bool drawButton(const char* label,
+                ButtonVariant variant = ButtonVariant::Default,
+                const ImVec2& size = ImVec2{0.0f, 0.0f});
 
 void pushCompactInspectorStyle();
 void popCompactInspectorStyle();

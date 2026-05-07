@@ -1,5 +1,4 @@
 #include "AssetDatabase.h"
-
 #include "Core/FileTool.h"
 #include "Project/ProjectManager.h"
 

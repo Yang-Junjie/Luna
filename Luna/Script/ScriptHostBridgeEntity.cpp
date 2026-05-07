@@ -1,6 +1,5 @@
-#include "ScriptHostBridgeInternal.h"
-
 #include "Scene/Components/TransformComponent.h"
+#include "ScriptHostBridgeInternal.h"
 
 namespace {
 

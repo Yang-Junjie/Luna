@@ -2,8 +2,8 @@
 
 #include "Project/ProjectInfo.h"
 #include "ScriptBackend.h"
-#include "ScriptPluginManifest.h"
 #include "ScriptHostApi.h"
+#include "ScriptPluginManifest.h"
 
 #include <filesystem>
 #include <memory>
@@ -57,9 +57,9 @@ public:
     [[nodiscard]] ScriptPluginSelectionResult resolveProjectSelection(const ProjectInfo* project_info) const;
     [[nodiscard]] ScriptPluginSelectionResult resolveAndLoadProjectSelection(const ProjectInfo* project_info);
     [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchema(std::string_view backend_name,
-                                                                       const ScriptSchemaRequest& request) const;
+                                                                      const ScriptSchemaRequest& request) const;
     [[nodiscard]] std::vector<ScriptPropertySchema> getPropertySchemaForProject(const ProjectInfo* project_info,
-                                                                                 const ScriptSchemaRequest& request);
+                                                                                const ScriptSchemaRequest& request);
     [[nodiscard]] std::unique_ptr<IScriptRuntime> createRuntime(std::string_view backend_name) const;
     [[nodiscard]] std::unique_ptr<IScriptRuntime> createRuntimeForProject(const ProjectInfo* project_info);
     bool registerBackend(std::unique_ptr<IScriptBackend> backend);

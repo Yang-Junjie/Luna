@@ -1,9 +1,8 @@
-﻿#include "Renderer/RenderWorld/RenderWorldExtractor.h"
-
-#include "Asset/AssetManager.h"
+﻿#include "Asset/AssetManager.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
+#include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene/Entity.h"
 
 #include <algorithm>
@@ -17,15 +16,14 @@ namespace {
 uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
 {
     constexpr uint32_t kMinShadowMapSize = 256;
-    constexpr uint32_t kMaxShadowMapSize = 8192;
+    constexpr uint32_t kMaxShadowMapSize = 8'192;
     return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
-std::vector<std::shared_ptr<Material>>
-    resolveSubmeshMaterials(const MeshComponent& mesh_component,
-                            const Mesh& mesh,
-                            AssetManager& asset_manager,
-                            Scene::AssetLoadBehavior asset_load_behavior)
+std::vector<std::shared_ptr<Material>> resolveSubmeshMaterials(const MeshComponent& mesh_component,
+                                                               const Mesh& mesh,
+                                                               AssetManager& asset_manager,
+                                                               Scene::AssetLoadBehavior asset_load_behavior)
 {
     const auto& sub_meshes = mesh.getSubMeshes();
     std::vector<std::shared_ptr<Material>> submesh_materials(sub_meshes.size());
@@ -124,7 +122,7 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
         .specular_intensity = (std::max)(environment_settings.specularIntensity, 0.0f),
         .allow_async_load = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking,
         .procedural_sun_direction = safeNormalize(environment_settings.proceduralSunDirection,
-                                                   glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
+                                                  glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
         .procedural_sun_intensity = (std::max)(environment_settings.proceduralSunIntensity, 0.0f),
         .procedural_sun_angular_radius = (std::max)(environment_settings.proceduralSunAngularRadius, 0.0f),
         .procedural_sky_color_zenith = environment_settings.proceduralSkyColorZenith,
@@ -135,8 +133,8 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
     render_world.setShadowSettings(RenderShadowSettings{
         .mode = resolveShadowMode(scene.shadowSettings()),
         .pcf_shadow_distance = std::clamp(scene.shadowSettings().pcfShadowDistance, 1.0f, 1000.0f),
-        .pcf_map_size = sanitizeShadowMapSize(scene.shadowSettings().pcfMapSize, 4096),
-        .csm_cascade_size = sanitizeShadowMapSize(scene.shadowSettings().csmCascadeSize, 2048),
+        .pcf_map_size = sanitizeShadowMapSize(scene.shadowSettings().pcfMapSize, 4'096),
+        .csm_cascade_size = sanitizeShadowMapSize(scene.shadowSettings().csmCascadeSize, 2'048),
     });
 
     bool has_directional_light = false;
@@ -229,7 +227,3 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
 }
 
 } // namespace luna
-
-
-
-

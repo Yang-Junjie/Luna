@@ -3,6 +3,7 @@
 #include "Script/ScriptSystem.h"
 
 #include <cstddef>
+
 #include <memory>
 
 namespace luna {

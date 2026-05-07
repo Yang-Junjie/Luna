@@ -35,8 +35,3 @@ const render_flow::RenderFeatureFrameContext& RenderFlowContext::featureFrameCon
 }
 
 } // namespace luna
-
-
-
-
-

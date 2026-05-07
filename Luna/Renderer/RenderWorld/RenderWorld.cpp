@@ -122,7 +122,3 @@ std::vector<RenderDrawPacket> RenderWorld::drawPackets(RenderPhase phase) const
 }
 
 } // namespace luna
-
-
-
-

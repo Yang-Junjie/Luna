@@ -1,15 +1,13 @@
-#include "BuiltinMaterialsPanel.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
+#include "BuiltinMaterialsPanel.h"
 #include "EditorUI.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Renderer/Material.h"
 
 #include <algorithm>
 #include <filesystem>
-
 #include <imgui.h>
 
 namespace luna {
@@ -90,7 +88,8 @@ void BuiltinMaterialsPanel::onImGuiRender(bool& open)
     ImGui::TextDisabled("Global built-in asset. Changes affect every user of this material.");
     ImGui::TextDisabled("Version: %llu", static_cast<unsigned long long>(material->getVersion()));
     const std::filesystem::path overrides_path = BuiltinMaterialOverrides::getOverridesPath();
-    ImGui::TextDisabled("Overrides: %s", overrides_path.empty() ? "No project loaded" : overrides_path.generic_string().c_str());
+    ImGui::TextDisabled("Overrides: %s",
+                        overrides_path.empty() ? "No project loaded" : overrides_path.generic_string().c_str());
 
     ImGui::SeparatorText("Surface");
     Material::SurfaceProperties surface = material->getSurface();

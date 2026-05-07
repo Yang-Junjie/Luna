@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
@@ -10,19 +10,12 @@
 #include "Renderer/RenderFlow/RenderResourceKey.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
+
+#include <cstring>
 
 #include <algorithm>
 #include <array>
-#include <cstring>
-#include <filesystem>
-#include <glm/vec4.hpp>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <utility>
-
 #include <Buffer.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -30,11 +23,17 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <glm/vec4.hpp>
+#include <memory>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
+#include <string>
+#include <string_view>
 #include <Texture.h>
+#include <utility>
 
 namespace luna::render_flow {
 
@@ -59,9 +58,8 @@ inline constexpr RenderResourceKey<RenderGraphTextureHandle> kTemporalColor{kTem
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> kHistoryRead{kHistoryReadName};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> kHistoryWrite{kHistoryWriteName};
 constexpr RenderFeatureGraphResourceFlags kOptionalExternalGraphResourceFlags =
-    static_cast<RenderFeatureGraphResourceFlags>(
-        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::Optional) |
-        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
+    static_cast<RenderFeatureGraphResourceFlags>(static_cast<uint32_t>(RenderFeatureGraphResourceFlags::Optional) |
+                                                 static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
 
 constexpr std::array<RenderFeatureGraphResource, 4> kGraphInputs{{
     {blackboard::SceneSkyCompositedColor.value()},
@@ -82,9 +80,7 @@ constexpr std::array<RenderPassResourceUsage, 7> kPassResources{{
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Depth.value(), .access = RenderPassResourceAccess::Read},
     {.name = blackboard::Velocity.value(), .access = RenderPassResourceAccess::Read},
-    {.name = kHistoryReadName,
-     .access = RenderPassResourceAccess::Read,
-     .flags = kOptionalExternalGraphResourceFlags},
+    {.name = kHistoryReadName, .access = RenderPassResourceAccess::Read, .flags = kOptionalExternalGraphResourceFlags},
     {.name = kTemporalColorName,
      .access = RenderPassResourceAccess::Write,
      .flags = RenderFeatureGraphResourceFlags::External},
@@ -157,8 +153,7 @@ bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
 
 std::filesystem::path shaderPath()
 {
-    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
-           "TemporalAntiAliasing.slang";
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" / "TemporalAntiAliasing.slang";
 }
 
 luna::RHI::DescriptorSetLayoutCreateInfo makeTaaDescriptorSetLayoutCreateInfo()
@@ -177,8 +172,8 @@ ShaderBindingContract makeTaaShaderBindingContract()
     });
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device)
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
+    createDescriptorSetLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -216,9 +211,9 @@ luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI:
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+luna::RHI::Ref<luna::RHI::PipelineLayout>
+    createPipelineLayout(const luna::RHI::Ref<luna::RHI::Device>& device,
+                         const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -227,13 +222,13 @@ luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
     return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline> createPipeline(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-    luna::RHI::Format color_format,
-    uint32_t color_attachment_count)
+luna::RHI::Ref<luna::RHI::GraphicsPipeline>
+    createPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
+                   const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
+                   const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
+                   const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
+                   luna::RHI::Format color_format,
+                   uint32_t color_attachment_count)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED ||
         color_attachment_count == 0) {
@@ -308,8 +303,7 @@ public:
 
     [[nodiscard]] bool ensurePipeline(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision =
-            m_resource_set.prepareGpuResourceBuild(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision = m_resource_set.prepareGpuResourceBuild(context, isComplete());
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -382,25 +376,23 @@ public:
 
     [[nodiscard]] RenderGraphTextureHandle importHistoryRead(RenderGraphBuilder& graph)
     {
-        return m_resource_set.importHistoryReadTexture2D(
-            graph,
-            m_history,
-            RenderFeatureTextureImportOptions{
-                .name = "TemporalAntiAliasingHistoryRead",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
-                .export_texture = false,
-            });
+        return m_resource_set.importHistoryReadTexture2D(graph,
+                                                         m_history,
+                                                         RenderFeatureTextureImportOptions{
+                                                             .name = "TemporalAntiAliasingHistoryRead",
+                                                             .final_state = luna::RHI::ResourceState::ShaderRead,
+                                                             .export_texture = false,
+                                                         });
     }
 
     [[nodiscard]] RenderGraphTextureHandle importHistoryWrite(RenderGraphBuilder& graph)
     {
-        return m_resource_set.importHistoryWriteTexture2D(
-            graph,
-            m_history,
-            RenderFeatureTextureImportOptions{
-                .name = "TemporalAntiAliasingHistoryWrite",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
-            });
+        return m_resource_set.importHistoryWriteTexture2D(graph,
+                                                          m_history,
+                                                          RenderFeatureTextureImportOptions{
+                                                              .name = "TemporalAntiAliasingHistoryWrite",
+                                                              .final_state = luna::RHI::ResourceState::ShaderRead,
+                                                          });
     }
 
     void commitFrame() noexcept
@@ -417,8 +409,8 @@ public:
     [[nodiscard]] bool isComplete() const noexcept
     {
         return m_resource_set.hasGpuContext() && m_state.vertex_shader && m_state.fragment_shader && m_state.layout &&
-               m_state.copy_fragment_shader && m_state.descriptor_pool && m_state.pipeline_layout &&
-               m_state.pipeline && m_state.copy_pipeline && m_state.sampler && m_state.resolve_params_buffer &&
+               m_state.copy_fragment_shader && m_state.descriptor_pool && m_state.pipeline_layout && m_state.pipeline &&
+               m_state.copy_pipeline && m_state.sampler && m_state.resolve_params_buffer &&
                m_state.copy_params_buffer && m_state.resolve_descriptor_set && m_state.copy_descriptor_set;
     }
 
@@ -520,8 +512,7 @@ public:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
-            m_state.resolve_descriptor_set};
+        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{m_state.resolve_descriptor_set};
         commands.BindDescriptorSets(m_state.pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
         pass_context.endRendering();
@@ -582,8 +573,7 @@ private:
                                   has_readable_history ? 1.0f : 0.0f,
                                   kVarianceClipGamma,
                                   kMotionRejectScale),
-            .jitter_pixels = glm::vec4(m_frame_context.view.jitter_pixels,
-                                       m_frame_context.view.previous_jitter_pixels),
+            .jitter_pixels = glm::vec4(m_frame_context.view.jitter_pixels, m_frame_context.view.previous_jitter_pixels),
         };
         if (void* mapped = params_buffer->Map()) {
             std::memcpy(mapped, &params, sizeof(params));
@@ -779,9 +769,8 @@ public:
                     return;
                 }
 
-                m_resources->updateCopyBindings(temporal_texture,
-                                                scene_context.framebuffer_width,
-                                                scene_context.framebuffer_height);
+                m_resources->updateCopyBindings(
+                    temporal_texture, scene_context.framebuffer_width, scene_context.framebuffer_height);
                 m_resources->drawCopy(pass_context);
             });
     }
@@ -818,20 +807,21 @@ RenderFeatureContract TemporalAntiAliasingFeature::contract() const noexcept
         .display_name = "Temporal Anti-Aliasing",
         .category = "Anti-Aliasing",
         .runtime_toggleable = true,
-        .requirements = RenderFeatureRequirements{
-            .scene_inputs = RenderFeatureSceneInputFlags::SceneColor | RenderFeatureSceneInputFlags::Depth |
-                            RenderFeatureSceneInputFlags::Velocity,
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
-                         RenderFeatureResourceFlags::Sampler,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = false,
-            .uses_history_resources = true,
-            .uses_temporal_jitter = true,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .scene_inputs = RenderFeatureSceneInputFlags::SceneColor | RenderFeatureSceneInputFlags::Depth |
+                                RenderFeatureSceneInputFlags::Velocity,
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                             RenderFeatureResourceFlags::Sampler,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = false,
+                .uses_history_resources = true,
+                .uses_temporal_jitter = true,
+            },
     };
 }
 
@@ -860,10 +850,10 @@ bool TemporalAntiAliasingFeature::registerPasses(RenderFlowBuilder& builder)
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered = builder.insertFeaturePassBetween(kFeatureName,
-                                                            extension_slots::AfterSky,
-                                                            extension_slots::BeforeTransparent,
-                                                            "TemporalAntiAliasing",
-                                                            std::make_unique<TemporalAntiAliasingPass>(*m_resources));
+                                                             extension_slots::AfterSky,
+                                                             extension_slots::BeforeTransparent,
+                                                             "TemporalAntiAliasing",
+                                                             std::make_unique<TemporalAntiAliasingPass>(*m_resources));
     if (registered) {
         LUNA_RENDERER_INFO("Registered TemporalAntiAliasing between '{}' and '{}'",
                            extension_slots::AfterSky,

@@ -10,9 +10,7 @@ Model::Model(std::string name, std::filesystem::path source, std::vector<ModelNo
       m_nodes(std::move(nodes))
 {}
 
-std::shared_ptr<Model> Model::create(std::string name,
-                                     std::filesystem::path source,
-                                     std::vector<ModelNode> nodes)
+std::shared_ptr<Model> Model::create(std::string name, std::filesystem::path source, std::vector<ModelNode> nodes)
 {
     return std::make_shared<Model>(std::move(name), std::move(source), std::move(nodes));
 }

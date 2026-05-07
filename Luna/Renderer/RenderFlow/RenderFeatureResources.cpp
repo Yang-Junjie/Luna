@@ -1,15 +1,13 @@
-#include "Renderer/RenderFlow/RenderFeatureResources.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
+#include "Renderer/RenderFlow/RenderFeatureResources.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <Backend.h>
 #include <Builders.h>
 #include <Device.h>
-
 #include <string>
 #include <utility>
 
@@ -35,9 +33,8 @@ PersistentTexture2DDesc historyDesc(PersistentTexture2DDesc desc, uint32_t index
     return desc;
 }
 
-RenderFeatureResourceReport makeResourceReport(bool evaluated,
-                                                bool resources_complete,
-                                                std::span<const RenderFeatureResourceStatus> resources)
+RenderFeatureResourceReport
+    makeResourceReport(bool evaluated, bool resources_complete, std::span<const RenderFeatureResourceStatus> resources)
 {
     RenderFeatureResourceReport report;
     report.evaluated = evaluated;
@@ -57,8 +54,7 @@ RenderFeatureResourceReport makeResourceReport(bool evaluated,
     return report;
 }
 
-void copyResourceReportEntries(const RenderFeatureResourceReport& report,
-                               std::vector<RenderFeatureStatusEntry>& target)
+void copyResourceReportEntries(const RenderFeatureResourceReport& report, std::vector<RenderFeatureStatusEntry>& target)
 {
     target.clear();
     target.reserve(report.resources.size());
@@ -151,8 +147,8 @@ bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState&
         complete = complete && resource.ready;
     }
 
-    const std::string_view feature_name = state.featureName().empty() ? std::string_view("RenderFeature")
-                                                                      : std::string_view(state.featureName());
+    const std::string_view feature_name =
+        state.featureName().empty() ? std::string_view("RenderFeature") : std::string_view(state.featureName());
     if (complete) {
         LUNA_RENDERER_INFO("Created GPU resources for feature '{}' on backend '{}'",
                            feature_name,
@@ -177,8 +173,7 @@ bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState&
     return false;
 }
 
-bool PersistentTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device,
-                                 const PersistentTexture2DDesc& desc)
+bool PersistentTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device, const PersistentTexture2DDesc& desc)
 {
     if (!device || !isValidDesc(desc)) {
         reset();
@@ -256,8 +251,7 @@ bool PersistentTexture2D::matches(const luna::RHI::Ref<luna::RHI::Device>& devic
            m_texture->GetUsage() == desc.usage && m_texture->GetSampleCount() == desc.sample_count;
 }
 
-bool HistoryTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device,
-                              const PersistentTexture2DDesc& desc)
+bool HistoryTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device, const PersistentTexture2DDesc& desc)
 {
     if (!isValidDesc(desc)) {
         reset();
@@ -409,16 +403,14 @@ const std::string& RenderFeatureResourceSet::featureName() const noexcept
     return m_gpu_resources.featureName();
 }
 
-RenderFeatureGpuResourceDecision RenderFeatureResourceSet::evaluateGpuResources(
-    const SceneRenderContext& context,
-    bool resources_complete) const noexcept
+RenderFeatureGpuResourceDecision RenderFeatureResourceSet::evaluateGpuResources(const SceneRenderContext& context,
+                                                                                bool resources_complete) const noexcept
 {
     return m_gpu_resources.evaluate(context, resources_complete);
 }
 
-RenderFeatureGpuResourceDecision RenderFeatureResourceSet::prepareGpuResourceBuild(
-    const SceneRenderContext& context,
-    bool resources_complete) noexcept
+RenderFeatureGpuResourceDecision RenderFeatureResourceSet::prepareGpuResourceBuild(const SceneRenderContext& context,
+                                                                                   bool resources_complete) noexcept
 {
     const RenderFeatureGpuResourceDecision decision = evaluateGpuResources(context, resources_complete);
     if (decision.action == RenderFeatureGpuResourceAction::Rebuild) {
@@ -452,8 +444,7 @@ luna::RHI::BackendType RenderFeatureResourceSet::backendType() const noexcept
     return m_gpu_resources.backendType();
 }
 
-bool RenderFeatureResourceSet::logGpuResourceBuildResult(
-    std::span<const RenderFeatureResourceStatus> resources) const
+bool RenderFeatureResourceSet::logGpuResourceBuildResult(std::span<const RenderFeatureResourceStatus> resources) const
 {
     return logRenderFeatureGpuResourceBuildResult(m_gpu_resources, resources);
 }
@@ -464,10 +455,9 @@ void RenderFeatureResourceSet::resetBindingContractDiagnostics() noexcept
     m_binding_contract_summary = "not evaluated";
 }
 
-bool RenderFeatureResourceSet::validateShaderBindingContract(
-    std::span<const RenderFeatureShaderBindingCheck> shaders,
-    const ShaderBindingContract& contract,
-    const std::filesystem::path& shader_file)
+bool RenderFeatureResourceSet::validateShaderBindingContract(std::span<const RenderFeatureShaderBindingCheck> shaders,
+                                                             const ShaderBindingContract& contract,
+                                                             const std::filesystem::path& shader_file)
 {
     bool complete = true;
     bool missing_shader = false;
@@ -501,24 +491,22 @@ void RenderFeatureResourceSet::writeBindingContractDiagnostics(RenderFeatureDiag
     diagnostics.binding_contract_summary = m_binding_contract_summary;
 }
 
-RenderFeatureResourceReport RenderFeatureResourceSet::gpuResourceReport(
-    bool resources_complete,
-    std::span<const RenderFeatureResourceStatus> resources) const
+RenderFeatureResourceReport
+    RenderFeatureResourceSet::gpuResourceReport(bool resources_complete,
+                                                std::span<const RenderFeatureResourceStatus> resources) const
 {
     return makeResourceReport(m_gpu_resources.hasContext(), resources_complete, resources);
 }
 
-RenderFeatureResourceReport RenderFeatureResourceSet::resourceReport(
-    bool evaluated,
-    std::span<const RenderFeatureResourceStatus> resources) const
+RenderFeatureResourceReport
+    RenderFeatureResourceSet::resourceReport(bool evaluated,
+                                             std::span<const RenderFeatureResourceStatus> resources) const
 {
     return makeResourceReport(evaluated, true, resources);
 }
 
 RenderFeatureResourceReport RenderFeatureResourceSet::historyResourceReport(
-    bool evaluated,
-    const HistoryTexture2D& history,
-    std::span<const RenderFeatureResourceStatus> resources) const
+    bool evaluated, const HistoryTexture2D& history, std::span<const RenderFeatureResourceStatus> resources) const
 {
     RenderFeatureResourceReport report = resourceReport(evaluated, resources);
     if (!evaluated) {
@@ -546,9 +534,7 @@ void RenderFeatureResourceSet::writePipelineResourceDiagnostics(
 }
 
 void RenderFeatureResourceSet::writePersistentResourceDiagnostics(
-    RenderFeatureDiagnostics& diagnostics,
-    bool evaluated,
-    std::span<const RenderFeatureResourceStatus> resources) const
+    RenderFeatureDiagnostics& diagnostics, bool evaluated, std::span<const RenderFeatureResourceStatus> resources) const
 {
     const RenderFeatureResourceReport report = resourceReport(evaluated, resources);
     diagnostics.persistent_resources_valid = report.valid;
@@ -580,10 +566,10 @@ void RenderFeatureResourceSet::releasePersistentTexture2D(PersistentTexture2D& t
     texture.reset();
 }
 
-RenderGraphTextureHandle RenderFeatureResourceSet::importPersistentTexture2D(
-    luna::RenderGraphBuilder& graph,
-    PersistentTexture2D& texture,
-    const RenderFeatureTextureImportOptions& options) const
+RenderGraphTextureHandle
+    RenderFeatureResourceSet::importPersistentTexture2D(luna::RenderGraphBuilder& graph,
+                                                        PersistentTexture2D& texture,
+                                                        const RenderFeatureTextureImportOptions& options) const
 {
     return luna::render_flow::importPersistentTexture2D(graph, texture, options);
 }
@@ -632,17 +618,13 @@ void RenderFeatureResourceSet::resetHistoryTexture2D(HistoryTexture2D& history) 
 }
 
 RenderGraphTextureHandle RenderFeatureResourceSet::importHistoryReadTexture2D(
-    luna::RenderGraphBuilder& graph,
-    HistoryTexture2D& history,
-    const RenderFeatureTextureImportOptions& options) const
+    luna::RenderGraphBuilder& graph, HistoryTexture2D& history, const RenderFeatureTextureImportOptions& options) const
 {
     return luna::render_flow::importHistoryReadTexture2D(graph, history, options);
 }
 
 RenderGraphTextureHandle RenderFeatureResourceSet::importHistoryWriteTexture2D(
-    luna::RenderGraphBuilder& graph,
-    HistoryTexture2D& history,
-    const RenderFeatureTextureImportOptions& options) const
+    luna::RenderGraphBuilder& graph, HistoryTexture2D& history, const RenderFeatureTextureImportOptions& options) const
 {
     return luna::render_flow::importHistoryWriteTexture2D(graph, history, options);
 }

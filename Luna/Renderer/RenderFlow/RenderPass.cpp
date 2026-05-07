@@ -1,5 +1,4 @@
 ﻿#include "Renderer/RenderFlow/RenderPass.h"
-
 #include "Renderer/RenderGraphBuilder.h"
 
 namespace luna::render_flow {
@@ -9,8 +8,7 @@ void RenderPassBlackboard::set(RenderResourceKey<RenderGraphTextureHandle> key, 
     m_textures[std::string(key.name)] = handle;
 }
 
-std::optional<RenderGraphTextureHandle> RenderPassBlackboard::get(
-    RenderResourceKey<RenderGraphTextureHandle> key) const
+std::optional<RenderGraphTextureHandle> RenderPassBlackboard::get(RenderResourceKey<RenderGraphTextureHandle> key) const
 {
     const auto iterator = m_textures.find(std::string(key.name));
     if (iterator == m_textures.end()) {
@@ -34,7 +32,10 @@ RenderPassContext::RenderPassContext(RenderGraphBuilder& graph,
                                      const RenderWorld& world,
                                      const SceneRenderContext& scene_context,
                                      RenderPassBlackboard& blackboard)
-    : m_graph(&graph), m_world(&world), m_scene_context(&scene_context), m_blackboard(&blackboard)
+    : m_graph(&graph),
+      m_world(&world),
+      m_scene_context(&scene_context),
+      m_blackboard(&blackboard)
 {}
 
 RenderGraphBuilder& RenderPassContext::graph() const noexcept
@@ -58,6 +59,3 @@ RenderPassBlackboard& RenderPassContext::blackboard() const noexcept
 }
 
 } // namespace luna::render_flow
-
-
-

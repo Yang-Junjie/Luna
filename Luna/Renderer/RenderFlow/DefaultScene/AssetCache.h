@@ -4,10 +4,9 @@
 // Converts meshes, materials, and textures into uploaded resources and descriptor sets,
 // then reuses them across frames until pipeline/device state changes.
 
+#include "Asset/Asset.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/Resources/TextureUpload.h"
-
-#include "Asset/Asset.h"
 
 #include <memory>
 #include <span>
@@ -103,8 +102,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

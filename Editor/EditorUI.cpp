@@ -1,10 +1,10 @@
-#include "EditorUI.h"
-
 #include "Asset/AssetDatabase.h"
 #include "EditorAssetDragDrop.h"
+#include "EditorUI.h"
+
+#include <cstdint>
 
 #include <algorithm>
-#include <cstdint>
 #include <vector>
 
 namespace luna::editor::ui {
@@ -156,8 +156,8 @@ bool drawAssetPreview(const char* id,
     const ImVec4 fill = hovered || active ? mixColor(frame_bg, accent, 0.12f) : mixColor(frame_bg, accent, 0.06f);
     const ImVec4 border = hovered || active ? withAlpha(accent, 0.70f) : ImGui::GetStyleColorVec4(ImGuiCol_Border);
     const ImGuiCol label_color_index = handle.isValid() ? ImGuiCol_Text : ImGuiCol_TextDisabled;
-    const ImU32 label_color = info.missing ? ImGui::GetColorU32(ImVec4{1.0f, 0.48f, 0.48f, 1.0f})
-                                           : ImGui::GetColorU32(label_color_index);
+    const ImU32 label_color =
+        info.missing ? ImGui::GetColorU32(ImVec4{1.0f, 0.48f, 0.48f, 1.0f}) : ImGui::GetColorU32(label_color_index);
     const ImU32 detail_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -172,21 +172,15 @@ bool drawAssetPreview(const char* id,
     const ImVec2 text_max{max.x - scale(8.0f), max.y - style.FramePadding.y};
     draw_list->PushClipRect(text_min, text_max, true);
     draw_list->AddText(text_min, label_color, info.label.c_str());
-    draw_list->AddText(ImVec2{text_min.x, text_min.y + ImGui::GetTextLineHeight() + scale(3.0f)},
-                       detail_color,
-                       info.detail.c_str());
+    draw_list->AddText(
+        ImVec2{text_min.x, text_min.y + ImGui::GetTextLineHeight() + scale(3.0f)}, detail_color, info.detail.c_str());
     draw_list->PopClipRect();
 
     return changed;
 }
 
-bool drawAxisControl(const char* label,
-                     char axis,
-                     float& value,
-                     float reset_value,
-                     float drag_speed,
-                     float width,
-                     bool last)
+bool drawAxisControl(
+    const char* label, char axis, float& value, float reset_value, float drag_speed, float width, bool last)
 {
     bool changed = false;
     const float line_height = ImGui::GetFrameHeight();
@@ -374,11 +368,8 @@ bool drawTextInput(const char* label,
     return changed;
 }
 
-bool drawTextMultiline(const char* label,
-                       std::string& value,
-                       std::size_t buffer_size,
-                       float visible_lines,
-                       const PropertyLayout& layout)
+bool drawTextMultiline(
+    const char* label, std::string& value, std::size_t buffer_size, float visible_lines, const PropertyLayout& layout)
 {
     if (!beginPropertyRow(label, layout)) {
         return false;
@@ -490,11 +481,8 @@ bool drawVec2Control(const char* label,
     return changed;
 }
 
-bool drawVec3Control(const char* label,
-                     glm::vec3& values,
-                     float reset_value,
-                     float drag_speed,
-                     const PropertyLayout& layout)
+bool drawVec3Control(
+    const char* label, glm::vec3& values, float reset_value, float drag_speed, const PropertyLayout& layout)
 {
     if (!beginPropertyRow(label, compactVectorLayout(layout))) {
         return false;

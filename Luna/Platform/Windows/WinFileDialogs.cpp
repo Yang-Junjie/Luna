@@ -1,27 +1,26 @@
-#include "Platform/Common/FileDialogs.h"
-
 #include "Core/Application.h"
 #include "Core/Log.h"
+#include "Platform/Common/FileDialogs.h"
 #include "Platform/Common/NativeWindowHandle.h"
 
 #if !defined(WIN32_LEAN_AND_MEAN)
-#    define WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #endif
 #if !defined(NOMINMAX)
-#    define NOMINMAX
+#define NOMINMAX
 #endif
 
-#include <Windows.h>
-#include <commdlg.h>
-#include <shobjidl.h>
-#include <wrl/client.h>
+#include <cwchar>
 
 #include <array>
-#include <cwchar>
+#include <commdlg.h>
 #include <filesystem>
 #include <memory>
+#include <shobjidl.h>
 #include <string>
 #include <string_view>
+#include <Windows.h>
+#include <wrl/client.h>
 
 namespace luna::FileDialogs {
 namespace {
@@ -142,9 +141,8 @@ void logCommonDialogError(std::string_view operation)
 void logHResultError(std::string_view operation, HRESULT result)
 {
     if (FAILED(result)) {
-        LUNA_PLATFORM_WARN("Windows {} dialog failed with HRESULT 0x{:x}",
-                           operation,
-                           static_cast<unsigned long>(result));
+        LUNA_PLATFORM_WARN(
+            "Windows {} dialog failed with HRESULT 0x{:x}", operation, static_cast<unsigned long>(result));
     }
 }
 

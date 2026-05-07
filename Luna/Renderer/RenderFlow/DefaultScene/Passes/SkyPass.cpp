@@ -1,11 +1,10 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/SkyPass.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/SkyPass.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 
@@ -26,7 +25,9 @@ constexpr std::array<RenderPassResourceUsage, 5> kSkyPassResources{{
 
 } // namespace
 
-SkyPass::SkyPass(PassSharedState& state) : m_state(&state) {}
+SkyPass::SkyPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* SkyPass::name() const noexcept
 {
@@ -47,8 +48,7 @@ void SkyPass::setup(RenderPassContext& context)
         readBlackboardTexture(context.blackboard(), blackboard::GBufferBaseColor, name());
     const RenderGraphTextureHandle normal_metallic =
         readBlackboardTexture(context.blackboard(), blackboard::GBufferNormalMetallic, name());
-    const RenderGraphTextureHandle pick_texture =
-        readBlackboardTexture(context.blackboard(), blackboard::Pick, name());
+    const RenderGraphTextureHandle pick_texture = readBlackboardTexture(context.blackboard(), blackboard::Pick, name());
 
     context.graph().AddRasterPass(
         name(),
@@ -56,9 +56,8 @@ void SkyPass::setup(RenderPassContext& context)
             pass_builder.ReadTexture(base_color);
             pass_builder.ReadTexture(normal_metallic);
             pass_builder.ReadTexture(pick_texture);
-            pass_builder.WriteColor(scene_context.color_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteColor(
+                scene_context.color_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
         },
         [this, base_color, normal_metallic, pick_texture](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, base_color, normal_metallic, pick_texture);
@@ -75,12 +74,12 @@ void SkyPass::execute(RenderGraphRasterPassContext& pass_context,
 
     const SkyPassResources pass_resources = pipelines.skyPassResources();
     if (!pass_resources.isValid()) {
-        LUNA_RENDERER_ERROR(
-            "Scene sky pass aborted: sky_pipeline={} gbuffer_descriptor_set={} scene_descriptor_set={} gbuffer_sampler={}",
-            static_cast<bool>(pass_resources.pipeline),
-            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
-            static_cast<bool>(pass_resources.scene_descriptor_set),
-            static_cast<bool>(pass_resources.gbuffer_sampler));
+        LUNA_RENDERER_ERROR("Scene sky pass aborted: sky_pipeline={} gbuffer_descriptor_set={} scene_descriptor_set={} "
+                            "gbuffer_sampler={}",
+                            static_cast<bool>(pass_resources.pipeline),
+                            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
+                            static_cast<bool>(pass_resources.scene_descriptor_set),
+                            static_cast<bool>(pass_resources.gbuffer_sampler));
         return;
     }
 

@@ -3,6 +3,7 @@
 #include "ScriptHostApi.h"
 
 #include <cstdint>
+
 #include <filesystem>
 #include <string>
 #include <vector>

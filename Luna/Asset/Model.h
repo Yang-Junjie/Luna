@@ -3,12 +3,12 @@
 #include "Asset/Asset.h"
 
 #include <cstdint>
+
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <glm/vec3.hpp>
 
 namespace luna {
 
@@ -31,9 +31,7 @@ public:
 
     Model(std::string name, std::filesystem::path source, std::vector<ModelNode> nodes);
 
-    static std::shared_ptr<Model> create(std::string name,
-                                         std::filesystem::path source,
-                                         std::vector<ModelNode> nodes);
+    static std::shared_ptr<Model> create(std::string name, std::filesystem::path source, std::vector<ModelNode> nodes);
 
     const std::string& getName() const;
     const std::filesystem::path& getSourcePath() const;

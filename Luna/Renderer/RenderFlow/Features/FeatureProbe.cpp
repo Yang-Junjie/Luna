@@ -1,6 +1,5 @@
-#include "Renderer/RenderFlow/Features/FeatureProbe.h"
-
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/Features/FeatureProbe.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
@@ -91,13 +90,14 @@ RenderFeatureContract FeatureProbe::contract() const noexcept
         .display_name = "Feature Probe Ambient Occlusion",
         .category = "Debug",
         .runtime_toggleable = false,
-        .requirements = RenderFeatureRequirements{
-            .resources = RenderFeatureResourceFlags::ColorAttachment,
-            .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .resources = RenderFeatureResourceFlags::ColorAttachment,
+                .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+            },
     };
 }
 
@@ -106,10 +106,10 @@ bool FeatureProbe::registerPasses(RenderFlowBuilder& builder)
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered = builder.insertFeaturePassBetween(kFeatureName,
-                                                            extension_slots::AfterGBuffer,
-                                                            extension_slots::BeforeLighting,
-                                                            "FeatureProbeAmbientOcclusion",
-                                                            std::make_unique<ProbePass>());
+                                                             extension_slots::AfterGBuffer,
+                                                             extension_slots::BeforeLighting,
+                                                             "FeatureProbeAmbientOcclusion",
+                                                             std::make_unique<ProbePass>());
     if (registered) {
         LUNA_RENDERER_INFO("Registered FeatureProbeAmbientOcclusion between '{}' and '{}'",
                            extension_slots::AfterGBuffer,

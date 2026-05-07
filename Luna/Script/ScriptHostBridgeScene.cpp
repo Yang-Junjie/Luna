@@ -1,9 +1,8 @@
-#include "ScriptHostBridgeInternal.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Script/ScriptAsset.h"
+#include "ScriptHostBridgeInternal.h"
 
 namespace {
 
@@ -71,7 +70,8 @@ int sceneEnumerateScriptInstances(void* scene_context, void* user_data, LunaScri
                 continue;
             }
 
-            const auto script_asset = luna::AssetManager::get().loadAssetAs<luna::ScriptAsset>(script_entry.scriptAsset);
+            const auto script_asset =
+                luna::AssetManager::get().loadAssetAs<luna::ScriptAsset>(script_entry.scriptAsset);
             if (!script_asset) {
                 continue;
             }

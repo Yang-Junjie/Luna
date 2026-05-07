@@ -1,6 +1,5 @@
-#include "Asset/Editor/FbxModelAssetGenerator.h"
-
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/FbxModelAssetGenerator.h"
 #include "Asset/Editor/Importer.h"
 #include "Asset/Editor/MaterialFactory.h"
 #include "Asset/Editor/MaterialImporter.h"
@@ -10,22 +9,22 @@
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
 
-#include <algorithm>
-#include <array>
 #include <cctype>
 #include <cstdint>
+
+#include <algorithm>
+#include <array>
 #include <filesystem>
 #include <fstream>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <vector>
-
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
 #include <ufbx.h>
+#include <vector>
 #include <yaml-cpp/yaml.h>
 
 namespace luna::fbx_model_asset_generator_detail {
@@ -84,8 +83,7 @@ bool hasSupportedTextureExtension(const std::filesystem::path& texture_path)
     const std::array<std::string_view, 9> supported_extensions{
         ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".hdr", ".dds", ".ktx", ".ktx2"};
 
-    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) !=
-           supported_extensions.end();
+    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) != supported_extensions.end();
 }
 
 std::optional<std::filesystem::path> makeRelativeToProject(const std::filesystem::path& path)
@@ -282,8 +280,8 @@ AssetMetadata ensureTextureMetadata(const std::filesystem::path& texture_path,
                                     FbxModelAssetGenerator::GenerateResult& result)
 {
     AssetMetadata metadata;
-    if (texture_path.empty() || !std::filesystem::exists(texture_path) ||
-        !hasSupportedTextureExtension(texture_path) || !makeRelativeToProject(texture_path).has_value()) {
+    if (texture_path.empty() || !std::filesystem::exists(texture_path) || !hasSupportedTextureExtension(texture_path) ||
+        !makeRelativeToProject(texture_path).has_value()) {
         return metadata;
     }
 
@@ -368,41 +366,38 @@ MaterialAssetDescriptor makeMaterialDescriptor(const std::filesystem::path& fbx_
     descriptor.Surface.MetallicFactor = mapReal(fbx_material.pbr.metalness, 0.0f);
     descriptor.Surface.RoughnessFactor = mapReal(fbx_material.pbr.roughness, 1.0f);
     descriptor.Surface.NormalScale = mapReal(fbx_material.fbx.bump_factor, 1.0f);
-    descriptor.Surface.BlendModeValue =
-        alpha < 0.999f ? Material::BlendMode::Transparent : Material::BlendMode::Opaque;
+    descriptor.Surface.BlendModeValue = alpha < 0.999f ? Material::BlendMode::Transparent : Material::BlendMode::Opaque;
 
-    descriptor.Textures.BaseColor = textureHandleForMaps(fbx_path,
-                                                         material_name,
-                                                         TextureRole::BaseColor,
-                                                         result,
-                                                         {&fbx_material.pbr.base_color, &fbx_material.fbx.diffuse_color});
-    descriptor.Textures.Normal = textureHandleForMaps(fbx_path,
-                                                      material_name,
-                                                      TextureRole::Normal,
-                                                      result,
-                                                      {&fbx_material.pbr.normal_map,
-                                                       &fbx_material.fbx.normal_map,
-                                                       &fbx_material.fbx.bump});
-    descriptor.Textures.MetallicRoughness =
+    descriptor.Textures.BaseColor =
         textureHandleForMaps(fbx_path,
                              material_name,
-                             TextureRole::MetallicRoughness,
+                             TextureRole::BaseColor,
                              result,
-                             {&fbx_material.pbr.roughness,
-                              &fbx_material.pbr.metalness,
-                              &fbx_material.fbx.specular_factor});
-    descriptor.Textures.Emissive = textureHandleForMaps(fbx_path,
-                                                        material_name,
-                                                        TextureRole::Emissive,
-                                                        result,
-                                                        {&fbx_material.pbr.emission_color,
-                                                         &fbx_material.fbx.emission_color});
-    descriptor.Textures.Occlusion = textureHandleForMaps(fbx_path,
-                                                         material_name,
-                                                         TextureRole::Occlusion,
-                                                         result,
-                                                         {&fbx_material.pbr.ambient_occlusion,
-                                                          &fbx_material.fbx.ambient_color});
+                             {&fbx_material.pbr.base_color, &fbx_material.fbx.diffuse_color});
+    descriptor.Textures.Normal =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Normal,
+                             result,
+                             {&fbx_material.pbr.normal_map, &fbx_material.fbx.normal_map, &fbx_material.fbx.bump});
+    descriptor.Textures.MetallicRoughness = textureHandleForMaps(
+        fbx_path,
+        material_name,
+        TextureRole::MetallicRoughness,
+        result,
+        {&fbx_material.pbr.roughness, &fbx_material.pbr.metalness, &fbx_material.fbx.specular_factor});
+    descriptor.Textures.Emissive =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Emissive,
+                             result,
+                             {&fbx_material.pbr.emission_color, &fbx_material.fbx.emission_color});
+    descriptor.Textures.Occlusion =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Occlusion,
+                             result,
+                             {&fbx_material.pbr.ambient_occlusion, &fbx_material.fbx.ambient_color});
 
     return descriptor;
 }
@@ -521,8 +516,7 @@ std::vector<AssetHandle> buildSubmeshMaterialBindings(const ufbx_scene& scene,
                 continue;
             }
 
-            submesh_materials.push_back(
-                materialHandleForMeshPart(scene, *mesh, mesh_part.index, generated_materials));
+            submesh_materials.push_back(materialHandleForMeshPart(scene, *mesh, mesh_part.index, generated_materials));
             emitted_material_part = true;
         }
 
@@ -662,10 +656,8 @@ FbxModelAssetGenerator::GenerateResult
     }
 
     const std::filesystem::path model_path = fbx_path.parent_path() / (fbx_path.stem().string() + ".lmodel");
-    const std::vector<GeneratedMaterial> generated_materials =
-        ensureGeneratedMaterials(*scene, fbx_path, result);
-    const std::vector<AssetHandle> submesh_materials =
-        buildSubmeshMaterialBindings(*scene, generated_materials);
+    const std::vector<GeneratedMaterial> generated_materials = ensureGeneratedMaterials(*scene, fbx_path, result);
+    const std::vector<AssetHandle> submesh_materials = buildSubmeshMaterialBindings(*scene, generated_materials);
 
     if (!std::filesystem::exists(model_path)) {
         if (writeModelFile(model_path, mesh_metadata, generated_materials, submesh_materials)) {

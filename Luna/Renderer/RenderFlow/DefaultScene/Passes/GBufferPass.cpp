@@ -1,14 +1,13 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
-
 #include "Core/Log.h"
 #include "Renderer/Material.h"
-#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 
@@ -78,7 +77,9 @@ GBufferTextures createGBufferTextures(RenderGraphBuilder& graph, const SceneRend
 
 } // namespace
 
-GeometryPass::GeometryPass(PassSharedState& state) : m_state(&state) {}
+GeometryPass::GeometryPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* GeometryPass::name() const noexcept
 {
@@ -148,7 +149,8 @@ void GeometryPass::execute(RenderGraphRasterPassContext& pass_context, const Sce
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
     const auto geometry_draw_commands = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
-    LUNA_RENDERER_FRAME_DEBUG("Executing scene geometry pass with {} GBuffer draw command(s)", geometry_draw_commands.size());
+    LUNA_RENDERER_FRAME_DEBUG("Executing scene geometry pass with {} GBuffer draw command(s)",
+                              geometry_draw_commands.size());
 
     const DrawPassResources pass_resources = pipelines.geometryPassResources();
     if (!pass_resources.isValid()) {
@@ -159,20 +161,22 @@ void GeometryPass::execute(RenderGraphRasterPassContext& pass_context, const Sce
     }
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, geometry_draw_commands, default_material, AssetCache::Bindings{
-        .device = pipelines.device(),
-        .descriptor_pool = pipelines.descriptorPool(),
-        .material_layout = pipelines.materialLayout(),
-    });
+    assets.prepareDraws(commands,
+                        geometry_draw_commands,
+                        default_material,
+                        AssetCache::Bindings{
+                            .device = pipelines.device(),
+                            .descriptor_pool = pipelines.descriptorPool(),
+                            .material_layout = pipelines.materialLayout(),
+                        });
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
     const size_t recorded_draw_count =
         recordDrawCommands(commands, pass_resources, geometry_draw_commands, assets, default_material);
-    LUNA_RENDERER_FRAME_DEBUG("Scene geometry pass recorded {}/{} draw command(s)",
-                              recorded_draw_count,
-                              geometry_draw_commands.size());
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Scene geometry pass recorded {}/{} draw command(s)", recorded_draw_count, geometry_draw_commands.size());
     pass_context.endRendering();
 }
 

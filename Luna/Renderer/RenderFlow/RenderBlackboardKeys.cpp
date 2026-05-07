@@ -1,5 +1,4 @@
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
-
 #include "Renderer/RenderFlow/RenderPass.h"
 
 namespace luna::render_flow::blackboard {

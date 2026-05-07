@@ -166,7 +166,8 @@ RenderFlowBuilder::CompileResult RenderFlowBuilder::compile() const
         const auto before = indices.find(edge.before);
         const auto after = indices.find(edge.after);
         if (before == indices.end() || after == indices.end()) {
-            result.error = "RenderFlow dependency references a missing pass: '" + edge.before + "' -> '" + edge.after + "'";
+            result.error =
+                "RenderFlow dependency references a missing pass: '" + edge.before + "' -> '" + edge.after + "'";
             setError(result.error);
             return result;
         }

@@ -1,12 +1,10 @@
 #include "BackendCapabilitiesPanel.h"
-
 #include "EditorUI.h"
 
 #include <Backend.h>
-#include <Instance.h>
-#include <imgui.h>
-
 #include <exception>
+#include <imgui.h>
+#include <Instance.h>
 #include <optional>
 #include <string>
 #include <vector>
@@ -121,7 +119,8 @@ void BackendCapabilitiesPanel::onImGuiRender(bool& open, const Renderer& rendere
     }
 
     ImGui::Spacing();
-    if (ImGui::BeginTable("BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
+    if (ImGui::BeginTable(
+            "BackendResourceCapabilitiesTable", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, editor::ui::scale(170.0f));
         ImGui::TableHeadersRow();

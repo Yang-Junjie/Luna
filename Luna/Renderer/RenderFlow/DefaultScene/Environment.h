@@ -6,8 +6,8 @@
 
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/Resources/TextureUpload.h"
 #include "Renderer/RenderWorld/RenderTypes.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include <array>
 
@@ -72,6 +72,7 @@ public:
     }
 
     [[nodiscard]] float prefilteredMaxMipLevel() const noexcept;
+
     [[nodiscard]] bool hasPrecomputedIbl() const noexcept
     {
         return m_precomputed;
@@ -133,8 +134,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

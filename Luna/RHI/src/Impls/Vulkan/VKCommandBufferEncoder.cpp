@@ -125,19 +125,17 @@ vk::RenderingInfo VKCommandBufferEncoder::ConvertRenderingInfoBegin(const Render
         if (attachment.LoadOp == AttachmentLoadOp::Clear) {
             const Format format = attachment.Texture->GetFormat();
             if (IsUnsignedIntegerFormat(format)) {
-                vkAttachment.clearValue =
-                    vk::ClearValue(vk::ClearColorValue(std::array<uint32_t, 4>{
-                        static_cast<uint32_t>(attachment.ClearValue.Color[0]),
-                        static_cast<uint32_t>(attachment.ClearValue.Color[1]),
-                        static_cast<uint32_t>(attachment.ClearValue.Color[2]),
-                        static_cast<uint32_t>(attachment.ClearValue.Color[3])}));
+                vkAttachment.clearValue = vk::ClearValue(vk::ClearColorValue(
+                    std::array<uint32_t, 4>{static_cast<uint32_t>(attachment.ClearValue.Color[0]),
+                                            static_cast<uint32_t>(attachment.ClearValue.Color[1]),
+                                            static_cast<uint32_t>(attachment.ClearValue.Color[2]),
+                                            static_cast<uint32_t>(attachment.ClearValue.Color[3])}));
             } else if (IsSignedIntegerFormat(format)) {
-                vkAttachment.clearValue =
-                    vk::ClearValue(vk::ClearColorValue(std::array<int32_t, 4>{
-                        static_cast<int32_t>(attachment.ClearValue.Color[0]),
-                        static_cast<int32_t>(attachment.ClearValue.Color[1]),
-                        static_cast<int32_t>(attachment.ClearValue.Color[2]),
-                        static_cast<int32_t>(attachment.ClearValue.Color[3])}));
+                vkAttachment.clearValue = vk::ClearValue(
+                    vk::ClearColorValue(std::array<int32_t, 4>{static_cast<int32_t>(attachment.ClearValue.Color[0]),
+                                                               static_cast<int32_t>(attachment.ClearValue.Color[1]),
+                                                               static_cast<int32_t>(attachment.ClearValue.Color[2]),
+                                                               static_cast<int32_t>(attachment.ClearValue.Color[3])}));
             } else {
                 vkAttachment.clearValue =
                     vk::ClearValue(vk::ClearColorValue(std::array<float, 4>{attachment.ClearValue.Color[0],

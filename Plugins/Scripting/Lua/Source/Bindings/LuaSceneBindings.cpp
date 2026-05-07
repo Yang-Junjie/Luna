@@ -1,10 +1,8 @@
-#include "LuaSceneBindings.h"
-
 #include "../LuaPluginRuntime.h"
+#include "LuaSceneBindings.h"
 
 #include <glm/vec3.hpp>
 #include <sol/sol.hpp>
-
 #include <string>
 #include <utility>
 

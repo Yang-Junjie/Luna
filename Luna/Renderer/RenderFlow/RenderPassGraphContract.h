@@ -28,7 +28,7 @@ struct RenderPassGraphContractResult {
     std::string summary;
 };
 
-[[nodiscard]] std::vector<RenderPassGraphContractResult> validateRenderPassGraphContracts(
-    std::span<const RenderPassGraphContractFeatureInput> features);
+[[nodiscard]] std::vector<RenderPassGraphContractResult>
+    validateRenderPassGraphContracts(std::span<const RenderPassGraphContractFeatureInput> features);
 
 } // namespace luna::render_flow

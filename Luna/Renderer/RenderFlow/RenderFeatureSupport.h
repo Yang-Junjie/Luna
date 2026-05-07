@@ -14,13 +14,12 @@ struct RenderFeatureSupportResult {
     std::vector<std::string> deferred_checks;
 };
 
-[[nodiscard]] RenderFeatureSupportResult evaluateRenderFeatureRequirements(
-    const RenderFeatureRequirements& requirements,
-    const SceneRenderContext& scene_context);
+[[nodiscard]] RenderFeatureSupportResult
+    evaluateRenderFeatureRequirements(const RenderFeatureRequirements& requirements,
+                                      const SceneRenderContext& scene_context);
 
-[[nodiscard]] RenderFeatureSupportResult evaluateRenderFeatureSupport(
-    const IRenderFeature& feature,
-    const SceneRenderContext& scene_context);
+[[nodiscard]] RenderFeatureSupportResult evaluateRenderFeatureSupport(const IRenderFeature& feature,
+                                                                      const SceneRenderContext& scene_context);
 
 [[nodiscard]] std::string summarizeRenderFeatureSupport(const RenderFeatureSupportResult& result);
 

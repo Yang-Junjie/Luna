@@ -212,14 +212,13 @@ glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::
     return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
-RenderViewMatrices buildViewMatrices(const Camera& camera,
-                                     float aspect_ratio,
-                                     const luna::RHI::RHICapabilities& capabilities)
+RenderViewMatrices
+    buildViewMatrices(const Camera& camera, float aspect_ratio, const luna::RHI::RHICapabilities& capabilities)
 {
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
-                                                         capabilities.conventions);
+    matrices.projection =
+        adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio), capabilities.conventions);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);
     matrices.inverse_projection = glm::inverse(matrices.projection);
@@ -469,10 +468,9 @@ bool PipelineState::hasCompleteState(const SceneRenderContext& context) const no
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
            m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.sky_pipeline &&
-           m_state.transparent_pipeline && m_state.transparent_composite_pipeline &&
-           m_state.material_layout && m_state.descriptor_pool && m_state.gbuffer_descriptor_set &&
-           m_state.transparent_composite_descriptor_set && m_state.scene_descriptor_set &&
-           m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
+           m_state.transparent_pipeline && m_state.transparent_composite_pipeline && m_state.material_layout &&
+           m_state.descriptor_pool && m_state.gbuffer_descriptor_set && m_state.transparent_composite_descriptor_set &&
+           m_state.scene_descriptor_set && m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
            m_state.gbuffer_sampler && m_state.transparent_composite_sampler && m_state.environment_source_sampler &&
            m_state.shadow_sampler;
 }
@@ -580,17 +578,16 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         makePipelineShaderBindingContract(lightingPipelineLayoutSchema(), binding_address_mode);
     const ShaderBindingContract transparent_contract =
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
-    const ShaderBindingContract transparent_composite_contract =
-        makeTransparentCompositeShaderBindingContract();
+    const ShaderBindingContract transparent_composite_contract = makeTransparentCompositeShaderBindingContract();
 
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_vertex_path,
-                                 "sceneGeometryVertexMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_vertex_path,
+                                                    "sceneGeometryVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_fragment_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneGeometryFragmentMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneGeometryFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_vertex_shader,
                                                     transparent_contract,
                                                     shader_paths.geometry_vertex_path,
@@ -600,25 +597,23 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_fragment_shader, shadow_contract, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_vertex_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_vertex_path,
-                                 "sceneLightingVertexMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_vertex_path,
+                                                    "sceneLightingVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneLightingFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneLightingFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.debug_view_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneDebugFragmentMain");
-    validateAndLogRenderFeatureShaderModuleBindings(m_state.sky_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneSkyFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneDebugFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(
+        m_state.sky_fragment_shader, lighting_contract, shader_paths.lighting_fragment_path, "sceneSkyFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_fragment_shader,
-                                 transparent_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneTransparentFragmentMain");
+                                                    transparent_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneTransparentFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_composite_vertex_shader,
                                                     transparent_composite_contract,
                                                     shader_paths.transparent_composite_path,
@@ -860,10 +855,10 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
         params.light_color_exposure = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
-    const uint32_t point_light_count = (std::min) (static_cast<uint32_t>(lights.point_lights.size()),
-                                                   render_flow::default_scene_detail::kMaxPointLights);
-    const uint32_t spot_light_count = (std::min) (static_cast<uint32_t>(lights.spot_lights.size()),
-                                                  render_flow::default_scene_detail::kMaxSpotLights);
+    const uint32_t point_light_count = (std::min)(static_cast<uint32_t>(lights.point_lights.size()),
+                                                  render_flow::default_scene_detail::kMaxPointLights);
+    const uint32_t spot_light_count =
+        (std::min)(static_cast<uint32_t>(lights.spot_lights.size()), render_flow::default_scene_detail::kMaxSpotLights);
     params.light_counts =
         glm::vec4(static_cast<float>(point_light_count), static_cast<float>(spot_light_count), 0.0f, 0.0f);
 
@@ -883,22 +878,22 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
     const bool ibl_enabled = environment == nullptr || environment->ibl_enabled;
     const float environment_intensity = environment != nullptr ? (std::max)(environment->intensity, 0.0f) : 1.0f;
     const float ibl_environment_intensity = ibl_enabled ? environment_intensity : 0.0f;
-    const float diffuse_intensity =
-        ibl_enabled && environment != nullptr ? (std::max)(environment->diffuse_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
-    const float specular_intensity =
-        ibl_enabled && environment != nullptr ? (std::max)(environment->specular_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
+    const float diffuse_intensity = ibl_enabled && environment != nullptr
+                                        ? (std::max)(environment->diffuse_intensity, 0.0f)
+                                        : (ibl_enabled ? 1.0f : 0.0f);
+    const float specular_intensity = ibl_enabled && environment != nullptr
+                                         ? (std::max)(environment->specular_intensity, 0.0f)
+                                         : (ibl_enabled ? 1.0f : 0.0f);
     const float sky_intensity = environment != nullptr ? (std::max)(environment->sky_intensity, 0.0f) : 1.0f;
-    params.ibl_factors = glm::vec4(diffuse_intensity,
-                                   specular_intensity,
-                                   ibl_environment_intensity,
-                                   sky_intensity * environment_intensity);
+    params.ibl_factors = glm::vec4(
+        diffuse_intensity, specular_intensity, ibl_environment_intensity, sky_intensity * environment_intensity);
     const RenderBackgroundMode background_mode =
         environment != nullptr ? environment->background_mode : RenderBackgroundMode::SolidColor;
     const glm::vec3 background_color =
         environment != nullptr ? environment->background_color
                                : glm::vec3(context.clear_color.r, context.clear_color.g, context.clear_color.b);
-    params.background_color_mode = glm::vec4(background_color,
-                                             static_cast<float>(static_cast<uint32_t>(background_mode)));
+    params.background_color_mode =
+        glm::vec4(background_color, static_cast<float>(static_cast<uint32_t>(background_mode)));
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f,
                                             0.65f,
                                             static_cast<float>(context.debug_view_mode),
@@ -1094,11 +1089,9 @@ void PipelineState::updateShadowResources(const luna::RHI::Ref<luna::RHI::Textur
     m_state.shadow_bindings_valid = true;
 }
 
-void PipelineState::updateTransparentCompositeResources(
-    const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
+void PipelineState::updateTransparentCompositeResources(const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
 {
-    if (!m_state.transparent_composite_descriptor_set || !m_state.transparent_composite_sampler ||
-        !transparent_color) {
+    if (!m_state.transparent_composite_descriptor_set || !m_state.transparent_composite_sampler || !transparent_color) {
         LUNA_RENDERER_WARN("Cannot update transparent composite resources: descriptor_set={} sampler={} color={}",
                            static_cast<bool>(m_state.transparent_composite_descriptor_set),
                            static_cast<bool>(m_state.transparent_composite_sampler),
@@ -1106,8 +1099,7 @@ void PipelineState::updateTransparentCompositeResources(
         return;
     }
 
-    if (m_state.transparent_composite_bindings_valid &&
-        m_state.bound_transparent_color_texture == transparent_color) {
+    if (m_state.transparent_composite_bindings_valid && m_state.bound_transparent_color_texture == transparent_color) {
         return;
     }
 

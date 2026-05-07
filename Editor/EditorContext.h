@@ -7,6 +7,7 @@
 #include "Script/ScriptPluginManifest.h"
 
 #include <cstddef>
+
 #include <filesystem>
 #include <string>
 #include <vector>

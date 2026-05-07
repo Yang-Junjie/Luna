@@ -1,7 +1,8 @@
 ﻿#include "Renderer/PrimitiveMeshFactory.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <glm/geometric.hpp>
 
 namespace luna {
@@ -59,8 +60,8 @@ void addDisk(SubMesh& submesh, float y, float radius, const glm::vec3& normal, u
         const float angle = u * kPi * 2.0f;
         const float x = std::cos(angle) * radius;
         const float z = std::sin(angle) * radius;
-        submesh.Vertices.push_back(
-            makeVertex({x, y, z}, {x / (radius * 2.0f) + 0.5f, z / (radius * 2.0f) + 0.5f}, normal, tangent, bitangent));
+        submesh.Vertices.push_back(makeVertex(
+            {x, y, z}, {x / (radius * 2.0f) + 0.5f, z / (radius * 2.0f) + 0.5f}, normal, tangent, bitangent));
     }
 
     for (uint32_t segment = 0; segment < segments; ++segment) {
@@ -306,7 +307,3 @@ std::shared_ptr<Mesh> PrimitiveMeshFactory::createCone(uint32_t segments)
 }
 
 } // namespace luna
-
-
-
-

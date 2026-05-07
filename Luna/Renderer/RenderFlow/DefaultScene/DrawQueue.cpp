@@ -1,9 +1,9 @@
 ﻿#include "Core/Log.h"
+#include "Math/Math.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Math/Math.h"
 
 #include <algorithm>
 
@@ -41,9 +41,8 @@ void DrawQueue::submitDrawPacket(const RenderDrawPacket& packet)
 
     const auto& sub_mesh = sub_meshes[packet.submesh_index];
     if (sub_mesh.Vertices.empty() || sub_mesh.Indices.empty()) {
-        LUNA_RENDERER_FRAME_TRACE("Skipping empty draw packet submesh {} from mesh '{}'",
-                                  packet.submesh_index,
-                                  packet.mesh->getName());
+        LUNA_RENDERER_FRAME_TRACE(
+            "Skipping empty draw packet submesh {} from mesh '{}'", packet.submesh_index, packet.mesh->getName());
         return;
     }
 
@@ -75,17 +74,11 @@ void DrawQueue::sortBackToFront(std::vector<DrawCommand>& draw_commands) const
 {
     LUNA_RENDERER_FRAME_TRACE("Sorting {} draw command(s) back-to-front", draw_commands.size());
     const glm::vec3 camera_position = m_camera.getPosition();
-    std::sort(draw_commands.begin(),
-              draw_commands.end(),
-              [camera_position](const DrawCommand& lhs, const DrawCommand& rhs) {
-                  return luna::translationDistanceSquared(lhs.transform, camera_position) >
-                         luna::translationDistanceSquared(rhs.transform, camera_position);
-              });
+    std::sort(
+        draw_commands.begin(), draw_commands.end(), [camera_position](const DrawCommand& lhs, const DrawCommand& rhs) {
+            return luna::translationDistanceSquared(lhs.transform, camera_position) >
+                   luna::translationDistanceSquared(rhs.transform, camera_position);
+        });
 }
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

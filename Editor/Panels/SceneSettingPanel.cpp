@@ -1,10 +1,10 @@
-#include "SceneSettingPanel.h"
-
 #include "EditorContext.h"
 #include "EditorUI.h"
+#include "SceneSettingPanel.h"
+
+#include <cmath>
 
 #include <algorithm>
-#include <cmath>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 
@@ -17,10 +17,8 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
 
 bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const luna::SceneEnvironmentSettings& rhs)
 {
-    return lhs.backgroundMode == rhs.backgroundMode &&
-           sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
-           lhs.iblEnabled == rhs.iblEnabled &&
-           lhs.environmentMapHandle == rhs.environmentMapHandle &&
+    return lhs.backgroundMode == rhs.backgroundMode && sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
+           lhs.iblEnabled == rhs.iblEnabled && lhs.environmentMapHandle == rhs.environmentMapHandle &&
            lhs.intensity == rhs.intensity && lhs.skyIntensity == rhs.skyIntensity &&
            lhs.diffuseIntensity == rhs.diffuseIntensity && lhs.specularIntensity == rhs.specularIntensity &&
            sameVec3(lhs.proceduralSunDirection, rhs.proceduralSunDirection) &&
@@ -34,9 +32,7 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const lu
 
 bool sameShadowSettings(const luna::SceneShadowSettings& lhs, const luna::SceneShadowSettings& rhs)
 {
-    return lhs.mode == rhs.mode &&
-           lhs.pcfShadowDistance == rhs.pcfShadowDistance &&
-           lhs.pcfMapSize == rhs.pcfMapSize &&
+    return lhs.mode == rhs.mode && lhs.pcfShadowDistance == rhs.pcfShadowDistance && lhs.pcfMapSize == rhs.pcfMapSize &&
            lhs.csmCascadeSize == rhs.csmCascadeSize;
 }
 
@@ -119,16 +115,15 @@ bool drawShadowModeCombo(luna::SceneShadowMode& mode)
 uint32_t sanitizeShadowMapSize(int size, uint32_t fallback)
 {
     constexpr int kMinShadowMapSize = 256;
-    constexpr int kMaxShadowMapSize = 8192;
-    return static_cast<uint32_t>(std::clamp(size <= 0 ? static_cast<int>(fallback) : size,
-                                           kMinShadowMapSize,
-                                           kMaxShadowMapSize));
+    constexpr int kMaxShadowMapSize = 8'192;
+    return static_cast<uint32_t>(
+        std::clamp(size <= 0 ? static_cast<int>(fallback) : size, kMinShadowMapSize, kMaxShadowMapSize));
 }
 
 bool drawShadowMapSize(const char* label, uint32_t& size)
 {
     int value = static_cast<int>(size);
-    const bool changed = luna::editor::ui::drawInt(label, value, 256, 1024);
+    const bool changed = luna::editor::ui::drawInt(label, value, 256, 1'024);
     if (changed) {
         size = sanitizeShadowMapSize(value, size);
     }
@@ -185,7 +180,8 @@ void SceneSettingPanel::onImGuiRender()
 
         if (environment.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
             environment.backgroundMode == SceneBackgroundMode::SolidColor) {
-            editor::ui::drawAssetHandleSelector("Environment Map", environment.environmentMapHandle, {AssetType::Texture});
+            editor::ui::drawAssetHandleSelector(
+                "Environment Map", environment.environmentMapHandle, {AssetType::Texture});
         }
 
         editor::ui::drawFloat("Intensity", environment.intensity, 0.01f, 0.0f, 100.0f, "%.2f");
@@ -195,23 +191,11 @@ void SceneSettingPanel::onImGuiRender()
 
         if (environment.backgroundMode == SceneBackgroundMode::ProceduralSky) {
             ImGui::SeparatorText("Default Sky");
-            editor::ui::drawVec3Control("Sun Direction",
-                                         environment.proceduralSunDirection,
-                                         0.0f,
-                                         0.01f,
-                                         editor::ui::PropertyLayout{120.0f});
-            editor::ui::drawFloat("Sun Intensity",
-                                  environment.proceduralSunIntensity,
-                                  0.05f,
-                                  0.0f,
-                                  1000.0f,
-                                  "%.2f");
-            editor::ui::drawFloat("Sun Angular Radius",
-                                  environment.proceduralSunAngularRadius,
-                                  0.001f,
-                                  0.0f,
-                                  0.25f,
-                                  "%.4f");
+            editor::ui::drawVec3Control(
+                "Sun Direction", environment.proceduralSunDirection, 0.0f, 0.01f, editor::ui::PropertyLayout{120.0f});
+            editor::ui::drawFloat("Sun Intensity", environment.proceduralSunIntensity, 0.05f, 0.0f, 1000.0f, "%.2f");
+            editor::ui::drawFloat(
+                "Sun Angular Radius", environment.proceduralSunAngularRadius, 0.001f, 0.0f, 0.25f, "%.4f");
             editor::ui::drawColor3("Sky Zenith", environment.proceduralSkyColorZenith);
             editor::ui::drawColor3("Sky Horizon", environment.proceduralSkyColorHorizon);
             editor::ui::drawColor3("Ground", environment.proceduralGroundColor);
@@ -252,12 +236,7 @@ void SceneSettingPanel::onImGuiRender()
 
         drawShadowModeCombo(shadows.mode);
         if (shadows.mode == SceneShadowMode::PcfShadowMap) {
-            editor::ui::drawFloat("Shadow Distance",
-                                  shadows.pcfShadowDistance,
-                                  1.0f,
-                                  1.0f,
-                                  1000.0f,
-                                  "%.1f");
+            editor::ui::drawFloat("Shadow Distance", shadows.pcfShadowDistance, 1.0f, 1.0f, 1000.0f, "%.1f");
             drawShadowMapSize("Resolution", shadows.pcfMapSize);
         } else if (shadows.mode == SceneShadowMode::CascadedShadowMaps) {
             drawShadowMapSize("Cascade Size", shadows.csmCascadeSize);
@@ -269,23 +248,19 @@ void SceneSettingPanel::onImGuiRender()
         if (disable_apply_controls) {
             ImGui::BeginDisabled();
         }
-        if (editor::ui::drawButton("Apply##Shadows",
-                                   editor::ui::ButtonVariant::Primary,
-                                   editor::ui::scaled(120.0f, 0.0f))) {
-            m_shadow_draft.pcfShadowDistance =
-                std::clamp(m_shadow_draft.pcfShadowDistance, 1.0f, 1000.0f);
-            m_shadow_draft.pcfMapSize =
-                sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.pcfMapSize), 4096);
+        if (editor::ui::drawButton(
+                "Apply##Shadows", editor::ui::ButtonVariant::Primary, editor::ui::scaled(120.0f, 0.0f))) {
+            m_shadow_draft.pcfShadowDistance = std::clamp(m_shadow_draft.pcfShadowDistance, 1.0f, 1000.0f);
+            m_shadow_draft.pcfMapSize = sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.pcfMapSize), 4'096);
             m_shadow_draft.csmCascadeSize =
-                sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.csmCascadeSize), 2048);
+                sanitizeShadowMapSize(static_cast<int>(m_shadow_draft.csmCascadeSize), 2'048);
             if (m_editor_context->setSceneShadowSettings(m_shadow_draft)) {
                 m_shadow_draft_dirty = false;
             }
         }
         ImGui::SameLine();
-        if (editor::ui::drawButton("Revert##Shadows",
-                                   editor::ui::ButtonVariant::Subtle,
-                                   editor::ui::scaled(120.0f, 0.0f))) {
+        if (editor::ui::drawButton(
+                "Revert##Shadows", editor::ui::ButtonVariant::Subtle, editor::ui::scaled(120.0f, 0.0f))) {
             m_shadow_draft = scene_shadows;
             m_shadow_draft_dirty = false;
         }

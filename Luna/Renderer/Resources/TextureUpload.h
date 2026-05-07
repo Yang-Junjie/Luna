@@ -5,7 +5,6 @@
 #include <Barrier.h>
 #include <CommandBufferEncoder.h>
 #include <Core.h>
-
 #include <string>
 #include <string_view>
 #include <vector>

@@ -3,6 +3,7 @@
 #include "Renderer/RenderFlow/RenderPass.h"
 
 #include <cstdint>
+
 #include <memory>
 #include <span>
 #include <string>
@@ -38,8 +39,14 @@ public:
                         std::unique_ptr<IRenderPass> pass,
                         int32_t priority = 0);
     bool addDependency(std::string_view before_name, std::string_view after_name);
-    bool insertPassBefore(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
-    bool insertPassAfter(std::string_view anchor_name, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority = 0);
+    bool insertPassBefore(std::string_view anchor_name,
+                          std::string name,
+                          std::unique_ptr<IRenderPass> pass,
+                          int32_t priority = 0);
+    bool insertPassAfter(std::string_view anchor_name,
+                         std::string name,
+                         std::unique_ptr<IRenderPass> pass,
+                         int32_t priority = 0);
     bool insertPassBetween(std::string_view after_name,
                            std::string_view before_name,
                            std::string name,
@@ -84,10 +91,7 @@ private:
     [[nodiscard]] NodeList::iterator findNode(std::string_view name) noexcept;
     [[nodiscard]] NodeList::const_iterator findNode(std::string_view name) const noexcept;
     [[nodiscard]] bool canInsert(std::string_view name, const std::unique_ptr<IRenderPass>& pass) const noexcept;
-    bool addPassImpl(std::string owner_feature,
-                     std::string name,
-                     std::unique_ptr<IRenderPass> pass,
-                     int32_t priority);
+    bool addPassImpl(std::string owner_feature, std::string name, std::unique_ptr<IRenderPass> pass, int32_t priority);
     [[nodiscard]] bool hasDependency(std::string_view before_name, std::string_view after_name) const noexcept;
     void removeDependenciesFor(std::string_view name) noexcept;
     void clearError() const noexcept;

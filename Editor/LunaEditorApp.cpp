@@ -5,7 +5,6 @@
 
 #include <Backend.h>
 #include <Capabilities.h>
-
 #include <exception>
 #include <memory>
 #include <string>
@@ -76,8 +75,7 @@ void logBackendStartupSelection(luna::RHI::BackendType requested_backend)
     if (requested_backend == luna::RHI::BackendType::Auto) {
         try {
             const luna::RHI::BackendType default_backend = luna::RHI::Instance::GetDefaultBackend();
-            LUNA_EDITOR_INFO("Auto RHI backend will resolve to '{}'",
-                             luna::RHI::BackendTypeToString(default_backend));
+            LUNA_EDITOR_INFO("Auto RHI backend will resolve to '{}'", luna::RHI::BackendTypeToString(default_backend));
         } catch (const std::exception& error) {
             LUNA_EDITOR_WARN("Failed to resolve default RHI backend: {}", error.what());
         }
@@ -85,10 +83,11 @@ void logBackendStartupSelection(luna::RHI::BackendType requested_backend)
     }
 
     if (!luna::RHI::Instance::IsBackendCompiled(requested_backend)) {
-        LUNA_EDITOR_WARN("Requested RHI backend '{}' is not compiled into this build; renderer initialization will fail. "
-                         "Compiled backends: {}",
-                         luna::RHI::BackendTypeToString(requested_backend),
-                         compiled_backend_names);
+        LUNA_EDITOR_WARN(
+            "Requested RHI backend '{}' is not compiled into this build; renderer initialization will fail. "
+            "Compiled backends: {}",
+            luna::RHI::BackendTypeToString(requested_backend),
+            compiled_backend_names);
     }
 }
 

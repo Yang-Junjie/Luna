@@ -3,12 +3,12 @@
 #include "Renderer/RenderFlow/ShaderBindingContract.h"
 
 #include <cstdint>
-#include <filesystem>
-#include <span>
-#include <string_view>
 
 #include <DescriptorSetLayout.h>
+#include <filesystem>
 #include <ShaderModule.h>
+#include <span>
+#include <string_view>
 
 namespace luna::render_flow {
 
@@ -29,17 +29,17 @@ struct RenderFeatureDescriptorSetContract {
     std::span<const RenderFeatureDescriptorBinding> bindings;
 };
 
-[[nodiscard]] luna::RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
-    std::span<const RenderFeatureDescriptorBinding> bindings);
+[[nodiscard]] luna::RHI::DescriptorSetLayoutCreateInfo
+    makeRenderFeatureDescriptorSetLayoutCreateInfo(std::span<const RenderFeatureDescriptorBinding> bindings);
 
-[[nodiscard]] ShaderBindingContract makeRenderFeatureShaderBindingContract(
-    const RenderFeatureDescriptorSetContract& descriptor_set);
+[[nodiscard]] ShaderBindingContract
+    makeRenderFeatureShaderBindingContract(const RenderFeatureDescriptorSetContract& descriptor_set);
 
-[[nodiscard]] ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
-    const ShaderBindingContract& contract,
-    const std::filesystem::path& shader_file,
-    std::string_view entry_point);
+[[nodiscard]] ShaderBindingValidationResult
+    validateRenderFeatureShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+                                              const ShaderBindingContract& contract,
+                                              const std::filesystem::path& shader_file,
+                                              std::string_view entry_point);
 
 bool validateAndLogRenderFeatureShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
                                                      const ShaderBindingContract& contract,

@@ -1,11 +1,11 @@
 #include "LuaPropertySchema.h"
 
-#include <glm/vec3.hpp>
-#include <sol/sol.hpp>
-
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
+
+#include <algorithm>
+#include <glm/vec3.hpp>
+#include <sol/sol.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -170,9 +170,8 @@ sol::table resolvePrototypeTable(sol::state& lua_state,
                                  const sol::environment& environment,
                                  const sol::protected_function_result& execute_result)
 {
-    sol::object returned_object = execute_result.return_count() > 0
-                                      ? execute_result.get<sol::object>()
-                                      : sol::make_object(lua_state, sol::nil);
+    sol::object returned_object =
+        execute_result.return_count() > 0 ? execute_result.get<sol::object>() : sol::make_object(lua_state, sol::nil);
     if (returned_object.is<sol::table>()) {
         return returned_object.as<sol::table>();
     }
@@ -293,7 +292,8 @@ int enumerateLuaPropertySchema(const LunaScriptHostApi* host_api,
     sol::protected_function_result execute_result = chunk();
     if (!execute_result.valid()) {
         sol::error error = execute_result;
-        hostLog(host_api, LunaScriptHostLogLevel_Warn, "Lua schema initialization failed: " + std::string(error.what()));
+        hostLog(
+            host_api, LunaScriptHostLogLevel_Warn, "Lua schema initialization failed: " + std::string(error.what()));
         return 1;
     }
 

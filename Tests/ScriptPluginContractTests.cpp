@@ -1,12 +1,12 @@
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/ImporterManager.h"
+#include "Asset/Editor/ScriptLoader.h"
 #include "Core/Log.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
-#include "Asset/Editor/ImporterManager.h"
-#include "Asset/Editor/ScriptLoader.h"
+#include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginDiscovery.h"
 #include "Script/ScriptPluginManager.h"
-#include "Script/ScriptAsset.h"
 #include "yaml-cpp/yaml.h"
 
 #include <algorithm>
@@ -30,8 +30,7 @@ public:
     explicit TempDirectory(std::string_view name)
     {
         const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-        m_path = std::filesystem::temp_directory_path() /
-                 ("Luna-" + std::string(name) + "-" + std::to_string(now));
+        m_path = std::filesystem::temp_directory_path() / ("Luna-" + std::string(name) + "-" + std::to_string(now));
         std::filesystem::create_directories(m_path);
     }
 
@@ -387,10 +386,8 @@ void testProjectSelectionContract(TestContext& context)
     context.expect(manager.findDiscoveredPlugin("luna.official.lua") != nullptr,
                    "official Lua script plugin should be discoverable from engine plugins");
 
-    expectState(context,
-                manager.resolveProjectSelection(nullptr),
-                luna::ScriptPluginSelectionState::NoProject,
-                "null project");
+    expectState(
+        context, manager.resolveProjectSelection(nullptr), luna::ScriptPluginSelectionState::NoProject, "null project");
 
     luna::ProjectInfo project;
     expectState(context,

@@ -54,7 +54,3 @@ bool Mesh::isValid() const
 }
 
 } // namespace luna
-
-
-
-

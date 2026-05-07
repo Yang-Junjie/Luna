@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Core/Layer.h"
 #include "Authoring/AuthoringSession.h"
+#include "Core/Layer.h"
 #include "EditorCamera.h"
 #include "EditorContext.h"
 #include "Events/Event.h"

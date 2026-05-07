@@ -172,7 +172,3 @@ luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMod
 }
 
 } // namespace luna::renderer_detail
-
-
-
-

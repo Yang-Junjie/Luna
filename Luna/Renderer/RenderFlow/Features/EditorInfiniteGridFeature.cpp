@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/Features/EditorInfiniteGridFeature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/Features/EditorInfiniteGridFeature.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
@@ -8,21 +8,12 @@
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
-#include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
+
+#include <cstring>
 
 #include <algorithm>
 #include <array>
-#include <cstring>
-#include <filesystem>
-#include <glm/mat4x4.hpp>
-#include <glm/vec4.hpp>
-#include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <utility>
-
 #include <Buffer.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -30,11 +21,19 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
+#include <memory>
+#include <optional>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
+#include <string>
+#include <string_view>
 #include <Texture.h>
+#include <utility>
 
 namespace luna::render_flow {
 
@@ -131,8 +130,7 @@ bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
 
 std::filesystem::path shaderPath()
 {
-    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
-           "EditorInfiniteGrid.slang";
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" / "EditorInfiniteGrid.slang";
 }
 
 luna::RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
@@ -165,8 +163,8 @@ ShaderBindingContract makeGridShaderBindingContract()
     });
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device)
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
+    createDescriptorSetLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -204,9 +202,9 @@ luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI:
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+luna::RHI::Ref<luna::RHI::PipelineLayout>
+    createPipelineLayout(const luna::RHI::Ref<luna::RHI::Device>& device,
+                         const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -215,12 +213,12 @@ luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
     return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline> createPipeline(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-    luna::RHI::Format color_format)
+luna::RHI::Ref<luna::RHI::GraphicsPipeline>
+    createPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
+                   const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
+                   const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
+                   const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
+                   luna::RHI::Format color_format)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED) {
         return {};
@@ -312,8 +310,8 @@ public:
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
         m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
-        m_state.pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format);
+        m_state.pipeline = createPipeline(
+            device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format);
         m_state.sampler = createSampler(device);
         m_state.params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
                                                          .SetSize(sizeof(GridGpuParams))
@@ -332,8 +330,8 @@ public:
     [[nodiscard]] bool isComplete() const noexcept
     {
         return m_resource_set.hasGpuContext() && m_state.vertex_shader && m_state.fragment_shader && m_state.layout &&
-               m_state.descriptor_pool && m_state.pipeline_layout && m_state.pipeline && m_state.sampler && m_state.params_buffer &&
-               m_state.descriptor_set && m_state.color_format != luna::RHI::Format::UNDEFINED;
+               m_state.descriptor_pool && m_state.pipeline_layout && m_state.pipeline && m_state.sampler &&
+               m_state.params_buffer && m_state.descriptor_set && m_state.color_format != luna::RHI::Format::UNDEFINED;
     }
 
     [[nodiscard]] bool isCompleteFor(const SceneRenderContext& context) const noexcept
@@ -424,8 +422,8 @@ private:
             return;
         }
 
-        const float framebuffer_width = static_cast<float>((std::max) (width, 1u));
-        const float framebuffer_height = static_cast<float>((std::max) (height, 1u));
+        const float framebuffer_width = static_cast<float>((std::max)(width, 1u));
+        const float framebuffer_height = static_cast<float>((std::max)(height, 1u));
         const RenderViewMatrices& matrices = m_frame_context.view.current;
         const glm::vec3 camera_position = glm::vec3(matrices.inverse_view[3]);
         const GridGpuParams params{
@@ -433,14 +431,10 @@ private:
             .inverse_view_projection = matrices.inverse_view_projection,
             .camera_position_fade_distance =
                 glm::vec4(camera_position, std::clamp(options.fade_distance, 1.0f, 10000.0f)),
-            .framebuffer = glm::vec4(1.0f / framebuffer_width,
-                                     1.0f / framebuffer_height,
-                                     framebuffer_width,
-                                     framebuffer_height),
-            .settings = glm::vec4(std::clamp(options.grid_scale, 0.001f, 1000.0f),
-                                  std::clamp(options.opacity, 0.0f, 1.0f),
-                                  0.0f,
-                                  0.0f),
+            .framebuffer =
+                glm::vec4(1.0f / framebuffer_width, 1.0f / framebuffer_height, framebuffer_width, framebuffer_height),
+            .settings = glm::vec4(
+                std::clamp(options.grid_scale, 0.001f, 1000.0f), std::clamp(options.opacity, 0.0f, 1.0f), 0.0f, 0.0f),
             .thin_color = glm::vec4(0.50f, 0.50f, 0.50f, 0.40f),
             .thick_color = glm::vec4(0.50f, 0.50f, 0.50f, 0.60f),
             .axis_color_x = glm::vec4(0.90f, 0.20f, 0.20f, 1.0f),
@@ -518,39 +512,43 @@ public:
         const auto scene_color = context.blackboard().get(blackboard::SceneSkyCompositedColor);
         const auto gbuffer_base_color = context.blackboard().get(blackboard::GBufferBaseColor);
         const auto gbuffer_normal_metallic = context.blackboard().get(blackboard::GBufferNormalMetallic);
-        const auto gbuffer_world_position_roughness = context.blackboard().get(blackboard::GBufferWorldPositionRoughness);
+        const auto gbuffer_world_position_roughness =
+            context.blackboard().get(blackboard::GBufferWorldPositionRoughness);
         if (!isValidTextureHandle(scene_color) || !isValidTextureHandle(gbuffer_base_color) ||
             !isValidTextureHandle(gbuffer_normal_metallic) || !isValidTextureHandle(gbuffer_world_position_roughness)) {
-            LUNA_RENDERER_WARN("EditorInfiniteGrid missing input texture(s): color={} baseColor={} normal={} position={}",
-                               isValidTextureHandle(scene_color),
-                               isValidTextureHandle(gbuffer_base_color),
-                               isValidTextureHandle(gbuffer_normal_metallic),
-                               isValidTextureHandle(gbuffer_world_position_roughness));
+            LUNA_RENDERER_WARN(
+                "EditorInfiniteGrid missing input texture(s): color={} baseColor={} normal={} position={}",
+                isValidTextureHandle(scene_color),
+                isValidTextureHandle(gbuffer_base_color),
+                isValidTextureHandle(gbuffer_normal_metallic),
+                isValidTextureHandle(gbuffer_world_position_roughness));
             return;
         }
 
         const bool resources_ready = m_resources != nullptr && m_resources->ensure(scene_context);
-        blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::SkyComposited, *scene_color);
+        blackboard::publishSceneColorStage(
+            context.blackboard(), blackboard::SceneColorStage::SkyComposited, *scene_color);
 
         context.graph().AddRasterPass(
             name(),
             [scene_color = *scene_color,
              gbuffer_base_color = *gbuffer_base_color,
              gbuffer_normal_metallic = *gbuffer_normal_metallic,
-             gbuffer_world_position_roughness = *gbuffer_world_position_roughness](RenderGraphRasterPassBuilder& pass_builder) {
+             gbuffer_world_position_roughness =
+                 *gbuffer_world_position_roughness](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(gbuffer_base_color);
                 pass_builder.ReadTexture(gbuffer_normal_metallic);
                 pass_builder.ReadTexture(gbuffer_world_position_roughness);
-                pass_builder.WriteColor(scene_color,
-                                        luna::RHI::AttachmentLoadOp::Load,
-                                        luna::RHI::AttachmentStoreOp::Store);
+                pass_builder.WriteColor(
+                    scene_color, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
             },
             [this,
              options,
              resources_ready,
              gbuffer_base_color = *gbuffer_base_color,
              gbuffer_normal_metallic = *gbuffer_normal_metallic,
-             gbuffer_world_position_roughness = *gbuffer_world_position_roughness](RenderGraphRasterPassContext& pass_context) {
+             gbuffer_world_position_roughness =
+                 *gbuffer_world_position_roughness](RenderGraphRasterPassContext& pass_context) {
                 if (!resources_ready || m_resources == nullptr || !m_resources->isComplete()) {
                     clearGridPass(pass_context);
                     return;
@@ -558,7 +556,8 @@ public:
 
                 const auto& base_color_texture = pass_context.getTexture(gbuffer_base_color);
                 const auto& normal_metallic_texture = pass_context.getTexture(gbuffer_normal_metallic);
-                const auto& world_position_roughness_texture = pass_context.getTexture(gbuffer_world_position_roughness);
+                const auto& world_position_roughness_texture =
+                    pass_context.getTexture(gbuffer_world_position_roughness);
                 if (!base_color_texture || !normal_metallic_texture || !world_position_roughness_texture) {
                     clearGridPass(pass_context);
                     return;
@@ -612,22 +611,23 @@ RenderFeatureContract EditorInfiniteGridFeature::contract() const noexcept
         .display_name = "Editor Infinite Grid",
         .category = "Editor",
         .runtime_toggleable = true,
-        .requirements = RenderFeatureRequirements{
-            .scene_inputs = RenderFeatureSceneInputFlags::SceneColor |
-                            RenderFeatureSceneInputFlags::GBufferBaseColor |
-                            RenderFeatureSceneInputFlags::GBufferNormalMetallic |
-                            RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
-                         RenderFeatureResourceFlags::Sampler,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = false,
-            .uses_history_resources = false,
-            .uses_temporal_jitter = false,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .scene_inputs = RenderFeatureSceneInputFlags::SceneColor |
+                                RenderFeatureSceneInputFlags::GBufferBaseColor |
+                                RenderFeatureSceneInputFlags::GBufferNormalMetallic |
+                                RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                             RenderFeatureResourceFlags::Sampler,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = false,
+                .uses_history_resources = false,
+                .uses_temporal_jitter = false,
+            },
     };
 }
 
@@ -661,8 +661,7 @@ bool EditorInfiniteGridFeature::setEnabled(bool enabled) noexcept
     return true;
 }
 
-bool EditorInfiniteGridFeature::setParameter(std::string_view name,
-                                             const RenderFeatureParameterValue& value) noexcept
+bool EditorInfiniteGridFeature::setParameter(std::string_view name, const RenderFeatureParameterValue& value) noexcept
 {
     if (!m_options || value.type != RenderFeatureParameterType::Float) {
         return false;
@@ -698,11 +697,12 @@ bool EditorInfiniteGridFeature::registerPasses(RenderFlowBuilder& builder)
 {
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
-    const bool registered = builder.insertFeaturePassBetween(kFeatureName,
-                                                            extension_slots::AfterSky,
-                                                            extension_slots::BeforeTransparent,
-                                                            "EditorInfiniteGrid",
-                                                            std::make_unique<EditorInfiniteGridPass>(*m_resources, m_options));
+    const bool registered =
+        builder.insertFeaturePassBetween(kFeatureName,
+                                         extension_slots::AfterSky,
+                                         extension_slots::BeforeTransparent,
+                                         "EditorInfiniteGrid",
+                                         std::make_unique<EditorInfiniteGridPass>(*m_resources, m_options));
     if (registered) {
         LUNA_RENDERER_INFO("Registered EditorInfiniteGrid between '{}' and '{}'",
                            extension_slots::AfterSky,

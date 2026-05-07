@@ -5,8 +5,8 @@
 #include "Scene.h"
 
 #include <memory>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace luna {
 

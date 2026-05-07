@@ -1,6 +1,5 @@
-#include "LuaCoreBindings.h"
-
 #include "../LuaPluginRuntime.h"
+#include "LuaCoreBindings.h"
 
 #include <sol/sol.hpp>
 

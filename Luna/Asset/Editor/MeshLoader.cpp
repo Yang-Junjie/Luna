@@ -1,20 +1,19 @@
 #include "Asset/Editor/MeshLoader.h"
-
 #include "Project/ProjectManager.h"
 
+#include <cmath>
 #include <cstdint>
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/types.hpp>
-#include <cmath>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 #include <optional>
 #include <string>
+#include <ufbx.h>
 #include <unordered_map>
 #include <vector>
-#include <ufbx.h>
 
 #if defined(_MSC_VER)
 #define TINYOBJLOADER_DISABLE_FAST_FLOAT
@@ -153,8 +152,8 @@ void computeTangents(SubMesh& sub_mesh)
         auto& v0 = sub_mesh.Vertices[i0];
         auto& v1 = sub_mesh.Vertices[i1];
         auto& v2 = sub_mesh.Vertices[i2];
-        const auto tangent_space = computeTangentSpace(
-            v0.Position, v1.Position, v2.Position, v0.TexCoord, v1.TexCoord, v2.TexCoord);
+        const auto tangent_space =
+            computeTangentSpace(v0.Position, v1.Position, v2.Position, v0.TexCoord, v1.TexCoord, v2.TexCoord);
 
         v0.Tangent += tangent_space.first;
         v1.Tangent += tangent_space.first;
@@ -465,19 +464,17 @@ std::shared_ptr<Mesh> MeshLoader::loadFromGltf(const std::filesystem::path& path
         return {};
     }
 
-    fastgltf::Parser parser(fastgltf::Extensions::KHR_texture_transform |
-                            fastgltf::Extensions::KHR_mesh_quantization |
-                            fastgltf::Extensions::MSFT_texture_dds |
-                            fastgltf::Extensions::EXT_texture_webp);
+    fastgltf::Parser parser(fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_mesh_quantization |
+                            fastgltf::Extensions::MSFT_texture_dds | fastgltf::Extensions::EXT_texture_webp);
 
-    auto asset = parser.loadGltf(
-        data.get(),
-        path.parent_path(),
-        fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages |
-            fastgltf::Options::GenerateMeshIndices,
-        fastgltf::Category::Buffers | fastgltf::Category::BufferViews | fastgltf::Category::Accessors |
-            fastgltf::Category::Images | fastgltf::Category::Textures | fastgltf::Category::Materials |
-            fastgltf::Category::Meshes);
+    auto asset =
+        parser.loadGltf(data.get(),
+                        path.parent_path(),
+                        fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages |
+                            fastgltf::Options::GenerateMeshIndices,
+                        fastgltf::Category::Buffers | fastgltf::Category::BufferViews | fastgltf::Category::Accessors |
+                            fastgltf::Category::Images | fastgltf::Category::Textures | fastgltf::Category::Materials |
+                            fastgltf::Category::Meshes);
     if (asset.error() != fastgltf::Error::None) {
         return {};
     }

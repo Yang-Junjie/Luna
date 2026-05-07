@@ -1,7 +1,6 @@
-#include "EntityManager.h"
-
 #include "Core/Log.h"
 #include "Entity.h"
+#include "EntityManager.h"
 
 #include <algorithm>
 #include <glm/matrix.hpp>
@@ -268,8 +267,7 @@ glm::mat4 EntityManager::getWorldSpaceTransformMatrix(entt::entity entity_handle
         }
 
         if (current_uuid.isValid() && !visited.insert(current_uuid).second) {
-            LUNA_CORE_WARN("Cycle detected while computing world transform for entity '{}'",
-                           current_uuid.toString());
+            LUNA_CORE_WARN("Cycle detected while computing world transform for entity '{}'", current_uuid.toString());
             break;
         }
 

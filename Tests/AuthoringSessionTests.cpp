@@ -66,8 +66,7 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-bool hasEventType(const std::vector<luna::authoring::AuthoringEvent>& events,
-                  luna::authoring::AuthoringEventType type)
+bool hasEventType(const std::vector<luna::authoring::AuthoringEvent>& events, luna::authoring::AuthoringEventType type)
 {
     return std::any_of(events.begin(), events.end(), [type](const auto& event) {
         return event.type == type;
@@ -118,8 +117,7 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
 
     context.expect(session.reparentEntity(spot_light, point_light, false),
                    "reparent helper should move an entity under a new parent");
-    context.expect(spot_light.getParentUUID() == point_light.getUUID(),
-                   "spot light should remember the new parent");
+    context.expect(spot_light.getParentUUID() == point_light.getUUID(), "spot light should remember the new parent");
 
     luna::SceneEnvironmentSettings environment_settings = scene.environmentSettings();
     environment_settings.backgroundMode = luna::SceneBackgroundMode::SolidColor;
@@ -130,8 +128,7 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
 
     luna::SceneShadowSettings shadow_settings = scene.shadowSettings();
     shadow_settings.mode = luna::SceneShadowMode::None;
-    context.expect(session.setSceneShadowSettings(shadow_settings),
-                   "setting scene shadows should report a change");
+    context.expect(session.setSceneShadowSettings(shadow_settings), "setting scene shadows should report a change");
 
     const auto temporary_entity = session.createEntity("Temporary");
     luna::UUID temporary_entity_id(0);

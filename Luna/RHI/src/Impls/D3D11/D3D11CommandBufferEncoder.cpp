@@ -9,8 +9,9 @@
 #include "Impls/D3D11/D3D11Texture.h"
 #include "Logging.h"
 
-#include <algorithm>
 #include <cstring>
+
+#include <algorithm>
 
 namespace luna::RHI {
 namespace {
@@ -34,7 +35,7 @@ void ClearComputeResourceBindings(ID3D11DeviceContext* context)
     ID3D11ShaderResourceView* nullSrvs[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT] = {};
     context->CSSetShaderResources(0, D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, nullSrvs);
 }
-}
+} // namespace
 
 D3D11CommandBufferEncoder::D3D11CommandBufferEncoder(Ref<D3D11Device> device, CommandBufferType type)
     : m_device(std::move(device)),
@@ -400,12 +401,10 @@ void D3D11CommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
     srcTex->GetNativeTexture()->GetDesc(&srcDesc);
     const uint32_t bytesPerPixel = D3D11GetFormatBytesPerPixel(D3D11_ToDXGIFormat(srcImage->GetFormat()));
     for (const auto& region : regions) {
-        const uint32_t subresource = D3D11CalcSubresource(region.ImageSubresource.MipLevel,
-                                                          region.ImageSubresource.BaseArrayLayer,
-                                                          srcImage->GetMipLevels());
+        const uint32_t subresource = D3D11CalcSubresource(
+            region.ImageSubresource.MipLevel, region.ImageSubresource.BaseArrayLayer, srcImage->GetMipLevels());
         const uint32_t naturalRowPitch = region.ImageExtentWidth * bytesPerPixel;
-        const uint32_t rowPitch =
-            region.BufferRowLength > 0 ? region.BufferRowLength * bytesPerPixel : naturalRowPitch;
+        const uint32_t rowPitch = region.BufferRowLength > 0 ? region.BufferRowLength * bytesPerPixel : naturalRowPitch;
 
         D3D11_TEXTURE2D_DESC stagingDesc = srcDesc;
         stagingDesc.Width = region.ImageExtentWidth;
@@ -432,14 +431,8 @@ void D3D11CommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
         srcBox.right = static_cast<UINT>(region.ImageOffsetX + static_cast<int32_t>(region.ImageExtentWidth));
         srcBox.bottom = static_cast<UINT>(region.ImageOffsetY + static_cast<int32_t>(region.ImageExtentHeight));
         srcBox.back = srcBox.front + 1u;
-        m_context->CopySubresourceRegion(stagingTexture.Get(),
-                                         0,
-                                         0,
-                                         0,
-                                         0,
-                                         srcTex->GetNativeTexture(),
-                                         subresource,
-                                         &srcBox);
+        m_context->CopySubresourceRegion(
+            stagingTexture.Get(), 0, 0, 0, 0, srcTex->GetNativeTexture(), subresource, &srcBox);
 
         D3D11_MAPPED_SUBRESOURCE mapped{};
         if (FAILED(m_context->Map(stagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapped))) {
@@ -449,9 +442,7 @@ void D3D11CommandBufferEncoder::CopyImageToBuffer(const Ref<Texture>& srcImage,
         const auto* srcMapped = static_cast<const uint8_t*>(mapped.pData);
         for (uint32_t y = 0; y < region.ImageExtentHeight; ++y) {
             const uint64_t dstOffset = region.BufferOffset + static_cast<uint64_t>(y) * rowPitch;
-            std::memcpy(dstMapped + dstOffset,
-                        srcMapped + static_cast<uint64_t>(y) * mapped.RowPitch,
-                        naturalRowPitch);
+            std::memcpy(dstMapped + dstOffset, srcMapped + static_cast<uint64_t>(y) * mapped.RowPitch, naturalRowPitch);
         }
         m_context->Unmap(stagingTexture.Get(), 0);
     }

@@ -1,6 +1,5 @@
-#include "Platform/Common/FileDialogs.h"
-
 #include "Core/Log.h"
+#include "Platform/Common/FileDialogs.h"
 
 namespace luna::FileDialogs {
 

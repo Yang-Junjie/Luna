@@ -1,18 +1,17 @@
-#include "AuthoringSession.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Model.h"
+#include "AuthoringSession.h"
 #include "Core/Log.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
-#include <glm/trigonometric.hpp>
-
 #include <cstddef>
 #include <cstdint>
+
+#include <glm/trigonometric.hpp>
 #include <string>
 #include <utility>
 
@@ -72,17 +71,12 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs,
-                             const luna::SceneEnvironmentSettings& rhs)
+bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const luna::SceneEnvironmentSettings& rhs)
 {
-    return lhs.backgroundMode == rhs.backgroundMode &&
-           sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
-           lhs.enabled == rhs.enabled &&
-           lhs.iblEnabled == rhs.iblEnabled &&
-           lhs.environmentMapHandle == rhs.environmentMapHandle &&
-           lhs.intensity == rhs.intensity &&
-           lhs.skyIntensity == rhs.skyIntensity &&
-           lhs.diffuseIntensity == rhs.diffuseIntensity &&
+    return lhs.backgroundMode == rhs.backgroundMode && sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
+           lhs.enabled == rhs.enabled && lhs.iblEnabled == rhs.iblEnabled &&
+           lhs.environmentMapHandle == rhs.environmentMapHandle && lhs.intensity == rhs.intensity &&
+           lhs.skyIntensity == rhs.skyIntensity && lhs.diffuseIntensity == rhs.diffuseIntensity &&
            lhs.specularIntensity == rhs.specularIntensity &&
            sameVec3(lhs.proceduralSunDirection, rhs.proceduralSunDirection) &&
            lhs.proceduralSunIntensity == rhs.proceduralSunIntensity &&
@@ -95,9 +89,7 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs,
 
 bool sameShadowSettings(const luna::SceneShadowSettings& lhs, const luna::SceneShadowSettings& rhs)
 {
-    return lhs.mode == rhs.mode &&
-           lhs.pcfShadowDistance == rhs.pcfShadowDistance &&
-           lhs.pcfMapSize == rhs.pcfMapSize &&
+    return lhs.mode == rhs.mode && lhs.pcfShadowDistance == rhs.pcfShadowDistance && lhs.pcfMapSize == rhs.pcfMapSize &&
            lhs.csmCascadeSize == rhs.csmCascadeSize;
 }
 
@@ -311,8 +303,8 @@ Entity AuthoringSession::createEntity(const std::string& name, Entity parent)
         return {};
     }
 
-    Entity entity = parent ? scene().entityManager().createChildEntity(parent, name)
-                           : scene().entityManager().createEntity(name);
+    Entity entity =
+        parent ? scene().entityManager().createChildEntity(parent, name) : scene().entityManager().createEntity(name);
     if (!entity) {
         return {};
     }

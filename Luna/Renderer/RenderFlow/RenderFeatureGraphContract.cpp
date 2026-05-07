@@ -1,6 +1,7 @@
 #include "Renderer/RenderFlow/RenderFeatureGraphContract.h"
 
 #include <cstddef>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -97,13 +98,11 @@ void addDeclarationIssues(std::string_view role,
         }
 
         if (seen_it->second == resource.kind) {
-            issues.push_back("graph " + std::string(role) + " '" + resource_name +
-                             "' is declared more than once");
+            issues.push_back("graph " + std::string(role) + " '" + resource_name + "' is declared more than once");
         } else {
             issues.push_back("graph " + std::string(role) + " '" + resource_name +
                              "' is declared more than once with different kinds: " +
-                             graphResourceKindLabel(seen_it->second) + " and " +
-                             graphResourceKindLabel(resource.kind));
+                             graphResourceKindLabel(seen_it->second) + " and " + graphResourceKindLabel(resource.kind));
         }
     }
 }
@@ -185,8 +184,8 @@ void addConsumerCompatibilityIssues(const RenderFeatureGraphResource& output,
 
 } // namespace
 
-std::vector<RenderFeatureGraphContractResult> validateRenderFeatureGraphContracts(
-    std::span<const RenderFeatureGraphContractInput> features)
+std::vector<RenderFeatureGraphContractResult>
+    validateRenderFeatureGraphContracts(std::span<const RenderFeatureGraphContractInput> features)
 {
     std::vector<FeatureValidationState> states;
     states.reserve(features.size());

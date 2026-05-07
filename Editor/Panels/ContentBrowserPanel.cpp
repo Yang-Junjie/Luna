@@ -731,7 +731,7 @@ void ContentBrowserPanel::drawDirectoryContents()
     const float available_width = ImGui::GetContentRegionAvail().x;
     const float tile_width = editor::ui::scale(104.0f);
     const float tile_height = editor::ui::scale(88.0f);
-    const int column_count = (std::max) (1, static_cast<int>(available_width / tile_width));
+    const int column_count = (std::max)(1, static_cast<int>(available_width / tile_width));
 
     if (!ImGui::BeginTable(
             "##ContentBrowserGrid", column_count, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings)) {
@@ -763,11 +763,11 @@ void ContentBrowserPanel::drawDirectoryContents()
                 BrowserEntry& entry = directory_cache.Entries[visible_entries[entry_index]];
                 ImGui::PushID(entry.Path.lexically_normal().string().c_str());
 
-                const EntryTileResult tile_result = drawEntryTile(entry,
-                                                                  entryIconTextureId(*m_state, entry.Kind),
-                                                                  m_state->SelectedEntry == entry.Path,
-                                                                  ImVec2(tile_width - editor::ui::scale(8.0f),
-                                                                         tile_height - editor::ui::scale(8.0f)));
+                const EntryTileResult tile_result =
+                    drawEntryTile(entry,
+                                  entryIconTextureId(*m_state, entry.Kind),
+                                  m_state->SelectedEntry == entry.Path,
+                                  ImVec2(tile_width - editor::ui::scale(8.0f), tile_height - editor::ui::scale(8.0f)));
                 if (tile_result.Clicked) {
                     m_state->SelectedEntry = entry.Path;
                 }

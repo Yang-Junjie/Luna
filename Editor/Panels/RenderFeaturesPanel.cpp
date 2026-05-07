@@ -1,6 +1,5 @@
-#include "RenderFeaturesPanel.h"
-
 #include "EditorUI.h"
+#include "RenderFeaturesPanel.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
@@ -17,9 +16,8 @@ std::string makeFeatureScopedLabel(std::string_view label, std::string_view feat
     return scoped_label;
 }
 
-std::string makeParameterScopedLabel(std::string_view label,
-                                     std::string_view feature_name,
-                                     std::string_view parameter_name)
+std::string
+    makeParameterScopedLabel(std::string_view label, std::string_view feature_name, std::string_view parameter_name)
 {
     std::string scoped_label = makeFeatureScopedLabel(label, feature_name);
     scoped_label += ".";
@@ -48,8 +46,8 @@ void drawFeatureStatusTooltip(const render_flow::RenderFeatureInfo& feature)
     }
 
     if (!feature.supported) {
-        const char* summary = feature.support_summary.empty() ? "Requirements are not satisfied."
-                                                               : feature.support_summary.c_str();
+        const char* summary =
+            feature.support_summary.empty() ? "Requirements are not satisfied." : feature.support_summary.c_str();
         ImGui::SetTooltip("%s", summary);
         return;
     }
@@ -166,9 +164,8 @@ void drawFeatureArchitectureSummary(const render_flow::RenderFeatureInfo& featur
     drawStatusLine("Support", feature.supported, feature.support_summary);
     drawStatusLine("Graph Contract", feature.graph_contract_valid, feature.graph_contract_summary);
     drawStatusLine("Pass Contract", feature.pass_contract_valid, feature.pass_contract_summary);
-    drawStatusLine("Binding Contract",
-                   feature.diagnostics.binding_contract_valid,
-                   feature.diagnostics.binding_contract_summary);
+    drawStatusLine(
+        "Binding Contract", feature.diagnostics.binding_contract_valid, feature.diagnostics.binding_contract_summary);
     drawStatusLine("Pipeline Resources",
                    feature.diagnostics.pipeline_resources_valid,
                    feature.diagnostics.pipeline_resources_summary);
@@ -201,8 +198,8 @@ void drawFeatureGraphContract(const render_flow::RenderFeatureInfo& feature)
     ImGui::SameLine();
     ImGui::TextDisabled("%s", statusValueLabel(feature.graph_contract_valid, feature.graph_contract_summary));
     if (ImGui::IsItemHovered()) {
-        const char* summary = feature.graph_contract_summary.empty() ? "not evaluated"
-                                                                     : feature.graph_contract_summary.c_str();
+        const char* summary =
+            feature.graph_contract_summary.empty() ? "not evaluated" : feature.graph_contract_summary.c_str();
         ImGui::SetTooltip("%s", summary);
     }
 
@@ -226,8 +223,8 @@ void drawFeaturePassContract(const render_flow::RenderFeatureInfo& feature)
     ImGui::SameLine();
     ImGui::TextDisabled("%s", statusValueLabel(feature.pass_contract_valid, feature.pass_contract_summary));
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", feature.pass_contract_summary.empty() ? "not evaluated"
-                                                                      : feature.pass_contract_summary.c_str());
+        ImGui::SetTooltip(
+            "%s", feature.pass_contract_summary.empty() ? "not evaluated" : feature.pass_contract_summary.c_str());
     }
 
     ImGui::TextDisabled("Passes");
@@ -265,13 +262,11 @@ void drawStatusEntryList(const std::vector<render_flow::RenderFeatureStatusEntry
 void drawFeatureResourceDiagnostics(const render_flow::RenderFeatureInfo& feature)
 {
     const auto& diagnostics = feature.diagnostics;
-    const bool has_diagnostics = !diagnostics.binding_contract_summary.empty() ||
-                                 !diagnostics.pipeline_resources_summary.empty() ||
-                                 !diagnostics.pipeline_resources.empty() ||
-                                 !diagnostics.persistent_resources_summary.empty() ||
-                                 !diagnostics.persistent_resources.empty() ||
-                                 !diagnostics.history_resources_summary.empty() ||
-                                 !diagnostics.history_resources.empty();
+    const bool has_diagnostics =
+        !diagnostics.binding_contract_summary.empty() || !diagnostics.pipeline_resources_summary.empty() ||
+        !diagnostics.pipeline_resources.empty() || !diagnostics.persistent_resources_summary.empty() ||
+        !diagnostics.persistent_resources.empty() || !diagnostics.history_resources_summary.empty() ||
+        !diagnostics.history_resources.empty();
     if (!has_diagnostics) {
         return;
     }
@@ -281,23 +276,16 @@ void drawFeatureResourceDiagnostics(const render_flow::RenderFeatureInfo& featur
         return;
     }
 
-    drawStatusLine("Binding Contract",
-                   diagnostics.binding_contract_valid,
-                   diagnostics.binding_contract_summary);
-    drawStatusLine("Pipeline Resources",
-                   diagnostics.pipeline_resources_valid,
-                   diagnostics.pipeline_resources_summary);
+    drawStatusLine("Binding Contract", diagnostics.binding_contract_valid, diagnostics.binding_contract_summary);
+    drawStatusLine("Pipeline Resources", diagnostics.pipeline_resources_valid, diagnostics.pipeline_resources_summary);
     drawStatusEntryList(diagnostics.pipeline_resources);
     if (!diagnostics.persistent_resources_summary.empty() || !diagnostics.persistent_resources.empty()) {
-        drawStatusLine("Persistent Resources",
-                       diagnostics.persistent_resources_valid,
-                       diagnostics.persistent_resources_summary);
+        drawStatusLine(
+            "Persistent Resources", diagnostics.persistent_resources_valid, diagnostics.persistent_resources_summary);
         drawStatusEntryList(diagnostics.persistent_resources);
     }
     if (!diagnostics.history_resources_summary.empty() || !diagnostics.history_resources.empty()) {
-        drawStatusLine("History Resources",
-                       diagnostics.history_resources_valid,
-                       diagnostics.history_resources_summary);
+        drawStatusLine("History Resources", diagnostics.history_resources_valid, diagnostics.history_resources_summary);
         drawStatusEntryList(diagnostics.history_resources);
     }
     ImGui::TreePop();

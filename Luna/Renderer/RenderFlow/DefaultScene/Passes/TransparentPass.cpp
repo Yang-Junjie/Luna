@@ -1,13 +1,12 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h"
-
 #include "Core/Log.h"
 #include "Renderer/Material.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 #include <DescriptorSet.h>
@@ -55,7 +54,9 @@ RenderGraphTextureDesc makeTransparentColorDesc(const SceneRenderContext& scene_
 
 } // namespace
 
-TransparentPass::TransparentPass(PassSharedState& state) : m_state(&state) {}
+TransparentPass::TransparentPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* TransparentPass::name() const noexcept
 {
@@ -78,7 +79,8 @@ void TransparentPass::setup(RenderPassContext& context)
         return;
     }
 
-    const RenderGraphTextureHandle transparent_color = context.graph().CreateTexture(makeTransparentColorDesc(scene_context));
+    const RenderGraphTextureHandle transparent_color =
+        context.graph().CreateTexture(makeTransparentColorDesc(scene_context));
     if (!transparent_color.isValid()) {
         return;
     }
@@ -90,12 +92,10 @@ void TransparentPass::setup(RenderPassContext& context)
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
-            pass_builder.WriteColor(scene_context.pick_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
-            pass_builder.WriteDepth(scene_context.depth_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteColor(
+                scene_context.pick_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteDepth(
+                scene_context.depth_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
         },
         [this, scene_context](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, scene_context);
@@ -105,9 +105,8 @@ void TransparentPass::setup(RenderPassContext& context)
         "SceneTransparentComposite",
         [scene_context, transparent_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(transparent_color);
-            pass_builder.WriteColor(scene_context.color_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteColor(
+                scene_context.color_target, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
         },
         [this, transparent_color](RenderGraphRasterPassContext& pass_context) {
             composite(pass_context, transparent_color);
@@ -121,34 +120,38 @@ void TransparentPass::execute(RenderGraphRasterPassContext& pass_context, const 
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
     auto transparent_draw_commands = draw_queue.drawCommands(luna::RenderPhase::Transparent);
-    LUNA_RENDERER_FRAME_DEBUG("Executing scene transparent pass with {} draw command(s)", transparent_draw_commands.size());
+    LUNA_RENDERER_FRAME_DEBUG("Executing scene transparent pass with {} draw command(s)",
+                              transparent_draw_commands.size());
 
     const DrawPassResources pass_resources = pipelines.transparentPassResources();
     if (!pass_resources.isValid() || transparent_draw_commands.empty()) {
-        LUNA_RENDERER_FRAME_DEBUG("Scene transparent pass skipped: transparent_pipeline={} scene_descriptor_set={} has_draws={}",
-                                  static_cast<bool>(pass_resources.pipeline),
-                                  static_cast<bool>(pass_resources.scene_descriptor_set),
-                                  !transparent_draw_commands.empty());
+        LUNA_RENDERER_FRAME_DEBUG(
+            "Scene transparent pass skipped: transparent_pipeline={} scene_descriptor_set={} has_draws={}",
+            static_cast<bool>(pass_resources.pipeline),
+            static_cast<bool>(pass_resources.scene_descriptor_set),
+            !transparent_draw_commands.empty());
         return;
     }
 
     draw_queue.sortBackToFront(transparent_draw_commands);
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, transparent_draw_commands, default_material, AssetCache::Bindings{
-        .device = pipelines.device(),
-        .descriptor_pool = pipelines.descriptorPool(),
-        .material_layout = pipelines.materialLayout(),
-    });
+    assets.prepareDraws(commands,
+                        transparent_draw_commands,
+                        default_material,
+                        AssetCache::Bindings{
+                            .device = pipelines.device(),
+                            .descriptor_pool = pipelines.descriptorPool(),
+                            .material_layout = pipelines.materialLayout(),
+                        });
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
     const size_t recorded_draw_count =
         recordDrawCommands(commands, pass_resources, transparent_draw_commands, assets, default_material);
-    LUNA_RENDERER_FRAME_DEBUG("Scene transparent pass recorded {}/{} draw command(s)",
-                              recorded_draw_count,
-                              transparent_draw_commands.size());
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Scene transparent pass recorded {}/{} draw command(s)", recorded_draw_count, transparent_draw_commands.size());
     pass_context.endRendering();
 }
 

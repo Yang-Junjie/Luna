@@ -1,6 +1,6 @@
 ﻿#include "Core/Log.h"
-#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderGraphBuilder.h"
 
 #include <Builders.h>
 #include <Device.h>
@@ -583,8 +583,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             compiled_pass.FramebufferWidth = pass_extent.width;
             compiled_pass.FramebufferHeight = pass_extent.height;
             compiled_pass.ReadTextureCount = static_cast<uint32_t>(pass_node.Reads.size());
-            compiled_pass.WriteTextureCount = static_cast<uint32_t>(
-                pass_node.ColorAttachments.size() + (pass_node.DepthAttachment.has_value() ? 1u : 0u));
+            compiled_pass.WriteTextureCount = static_cast<uint32_t>(pass_node.ColorAttachments.size() +
+                                                                    (pass_node.DepthAttachment.has_value() ? 1u : 0u));
             compiled_pass.RenderingInfo.RenderArea = {0, 0, pass_extent.width, pass_extent.height};
             compiled_pass.RenderingInfo.LayerCount = 1;
 
@@ -717,7 +717,3 @@ bool RenderGraphBuilder::isHandleValid(RenderGraphTextureHandle handle, size_t r
 }
 
 } // namespace luna
-
-
-
-

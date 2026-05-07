@@ -3,6 +3,7 @@
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 
 #include <cstdint>
+
 #include <glm/vec4.hpp>
 #include <span>
 #include <string>
@@ -167,8 +168,7 @@ inline RenderFeatureResourceFlags operator|(RenderFeatureResourceFlags lhs, Rend
     return static_cast<RenderFeatureResourceFlags>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
 }
 
-inline RenderFeatureResourceFlags& operator|=(RenderFeatureResourceFlags& lhs,
-                                              RenderFeatureResourceFlags rhs) noexcept
+inline RenderFeatureResourceFlags& operator|=(RenderFeatureResourceFlags& lhs, RenderFeatureResourceFlags rhs) noexcept
 {
     lhs = lhs | rhs;
     return lhs;
@@ -283,10 +283,12 @@ public:
     virtual ~IRenderFeature() = default;
 
     [[nodiscard]] virtual RenderFeatureContract contract() const noexcept = 0;
+
     [[nodiscard]] virtual bool enabled() const noexcept
     {
         return true;
     }
+
     [[nodiscard]] virtual RenderFeatureInfo info() const noexcept
     {
         const RenderFeatureContract feature_contract = contract();
@@ -298,36 +300,45 @@ public:
             .runtime_toggleable = feature_contract.runtime_toggleable,
         };
     }
+
     [[nodiscard]] virtual std::vector<RenderFeatureParameterInfo> parameters() const
     {
         return {};
     }
+
     [[nodiscard]] virtual RenderFeatureRequirements requirements() const noexcept
     {
         return contract().requirements;
     }
+
     [[nodiscard]] virtual RenderFeatureDiagnostics diagnostics() const
     {
         return {};
     }
+
     virtual bool setEnabled(bool enabled) noexcept
     {
         (void) enabled;
         return false;
     }
+
     virtual bool setParameter(std::string_view name, const RenderFeatureParameterValue& value) noexcept
     {
         (void) name;
         (void) value;
         return false;
     }
+
     virtual bool registerPasses(RenderFlowBuilder& builder) = 0;
     virtual void prepareFrame(const RenderWorld& world,
                               const SceneRenderContext& scene_context,
                               const RenderFeatureFrameContext& frame_context,
                               RenderPassBlackboard& blackboard) = 0;
+
     virtual void commitFrame() {}
+
     virtual void releasePersistentResources() {}
+
     virtual void shutdown() = 0;
 };
 

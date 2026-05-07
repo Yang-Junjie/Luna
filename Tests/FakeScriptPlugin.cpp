@@ -3,9 +3,9 @@
 #include <cstddef>
 
 #if defined(_WIN32)
-#    define LUNA_TEST_PLUGIN_EXPORT extern "C" __declspec(dllexport)
+#define LUNA_TEST_PLUGIN_EXPORT extern "C" __declspec(dllexport)
 #else
-#    define LUNA_TEST_PLUGIN_EXPORT extern "C"
+#define LUNA_TEST_PLUGIN_EXPORT extern "C"
 #endif
 
 namespace {
@@ -25,10 +25,7 @@ int createRuntime(void*, LunaScriptRuntimeApi* out_runtime_api)
     return 1;
 }
 
-int enumeratePropertySchema(void*,
-                            const LunaScriptSchemaRequest*,
-                            void*,
-                            LunaScriptEnumeratePropertySchemaFn)
+int enumeratePropertySchema(void*, const LunaScriptSchemaRequest*, void*, LunaScriptEnumeratePropertySchemaFn)
 {
     return 1;
 }
@@ -76,9 +73,8 @@ constexpr LunaScriptBackendApi kBackends[] = {
 
 } // namespace
 
-LUNA_TEST_PLUGIN_EXPORT int LunaCreateScriptPlugin(uint32_t host_api_version,
-                                                  const LunaScriptHostApi*,
-                                                  LunaScriptPluginApi* out_plugin_api)
+LUNA_TEST_PLUGIN_EXPORT int
+    LunaCreateScriptPlugin(uint32_t host_api_version, const LunaScriptHostApi*, LunaScriptPluginApi* out_plugin_api)
 {
     if (host_api_version != LUNA_SCRIPT_HOST_API_VERSION || out_plugin_api == nullptr) {
         return 0;

@@ -6,6 +6,7 @@
 #include "SceneHierarchyPanel.h"
 
 #include <cstdint>
+
 #include <imgui.h>
 #include <unordered_set>
 #include <vector>
@@ -314,8 +315,8 @@ void drawEntityNode(HierarchyDrawContext& context, luna::Entity entity)
     const bool has_children = entity.hasChildren();
     const luna::Entity selected_entity = context.editor_context.getSelectedEntity();
 
-    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                               ImGuiTreeNodeFlags_SpanAvailWidth;
+    ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (!has_children) {
         flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
     }
@@ -323,10 +324,8 @@ void drawEntityNode(HierarchyDrawContext& context, luna::Entity entity)
         flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    const bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint64_t>(entity.getUUID()))),
-                                          flags,
-                                          "%s",
-                                          label);
+    const bool opened = ImGui::TreeNodeEx(
+        reinterpret_cast<void*>(static_cast<uintptr_t>(static_cast<uint64_t>(entity.getUUID()))), flags, "%s", label);
 
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
         context.editor_context.setSelectedEntity(entity);
@@ -357,8 +356,7 @@ void drawEntityNode(HierarchyDrawContext& context, luna::Entity entity)
     }
 }
 
-template <typename View>
-void drawHierarchyTree(HierarchyDrawContext& context, View&& view)
+template <typename View> void drawHierarchyTree(HierarchyDrawContext& context, View&& view)
 {
     std::unordered_set<luna::UUID> owned_entities;
 

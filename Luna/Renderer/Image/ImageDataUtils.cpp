@@ -1,8 +1,9 @@
 #include "Renderer/Image/ImageDataUtils.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstring>
+
+#include <algorithm>
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
 #include <glm/vec3.hpp>
@@ -48,7 +49,8 @@ std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image
 {
     std::array<glm::vec4, 9> result{};
     if (!image.isValid() || image.ImageFormat != expected_format ||
-        image.ByteData.size() != static_cast<size_t>(image.Width) * static_cast<size_t>(image.Height) * 4u * sizeof(float)) {
+        image.ByteData.size() !=
+            static_cast<size_t>(image.Width) * static_cast<size_t>(image.Height) * 4u * sizeof(float)) {
         return result;
     }
 
@@ -116,7 +118,8 @@ std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image
     };
 
     for (size_t coefficient_index = 0; coefficient_index < coefficients.size(); ++coefficient_index) {
-        const glm::dvec3 irradiance = coefficients[coefficient_index] * (normalization * lambert_band_scale[coefficient_index]);
+        const glm::dvec3 irradiance =
+            coefficients[coefficient_index] * (normalization * lambert_band_scale[coefficient_index]);
         result[coefficient_index] = glm::vec4(glm::vec3(irradiance), 0.0f);
     }
 

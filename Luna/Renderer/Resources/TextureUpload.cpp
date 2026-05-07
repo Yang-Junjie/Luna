@@ -1,14 +1,13 @@
-#include "Renderer/Resources/TextureUpload.h"
-
 #include "Core/Log.h"
 #include "Renderer/RendererUtilities.h"
+#include "Renderer/Resources/TextureUpload.h"
 
-#include <Builders.h>
-#include <Device.h>
+#include <cstring>
 
 #include <algorithm>
 #include <array>
-#include <cstring>
+#include <Builders.h>
+#include <Device.h>
 
 namespace luna::renderer_detail {
 namespace {
@@ -83,15 +82,15 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
                         static_cast<int>(image.ImageFormat),
                         image.ByteData.size());
 
-    uploaded_texture.texture = device->CreateTexture(luna::RHI::TextureBuilder()
-                                                         .SetSize(image.Width, image.Height)
-                                                         .SetMipLevels(mip_level_count)
-                                                         .SetFormat(image.ImageFormat)
-                                                         .SetUsage(luna::RHI::TextureUsageFlags::Sampled |
-                                                                   luna::RHI::TextureUsageFlags::TransferDst)
-                                                         .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                         .SetName(uploaded_texture.debug_name)
-                                                         .Build());
+    uploaded_texture.texture = device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(image.Width, image.Height)
+            .SetMipLevels(mip_level_count)
+            .SetFormat(image.ImageFormat)
+            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::TransferDst)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName(uploaded_texture.debug_name)
+            .Build());
 
     const float max_lod = sampler_settings.MipFilter == luna::Texture::MipFilterMode::None
                               ? 0.0f
@@ -186,9 +185,8 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
                                                                .SetName(uploaded_texture.debug_name + "_Staging")
                                                                .Build());
     if (!uploaded_texture.staging_buffer) {
-        LUNA_RENDERER_WARN("Failed to create staging buffer for texture '{}' ({} bytes)",
-                           uploaded_texture.debug_name,
-                           buffer_offset);
+        LUNA_RENDERER_WARN(
+            "Failed to create staging buffer for texture '{}' ({} bytes)", uploaded_texture.debug_name, buffer_offset);
         return uploaded_texture;
     }
 
@@ -201,7 +199,8 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
 
             const size_t source_row_pitch = packed_region.source->size() / packed_region.height;
             for (uint32_t row = 0; row < packed_region.height; ++row) {
-                std::memcpy(destination + packed_region.offset + static_cast<size_t>(row) * packed_region.row_pitch_bytes,
+                std::memcpy(destination + packed_region.offset +
+                                static_cast<size_t>(row) * packed_region.row_pitch_bytes,
                             packed_region.source->data() + static_cast<size_t>(row) * source_row_pitch,
                             source_row_pitch);
             }

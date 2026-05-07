@@ -1,7 +1,6 @@
-#include "RenderDebugPanel.h"
-
 #include "EditorUI.h"
 #include "Imgui/ImGuiContext.h"
+#include "RenderDebugPanel.h"
 
 #include <algorithm>
 #include <array>

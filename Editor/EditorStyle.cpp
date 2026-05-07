@@ -1,8 +1,8 @@
 #include "EditorStyle.h"
 
-#include <algorithm>
 #include <cmath>
 
+#include <algorithm>
 #include <imgui.h>
 
 namespace luna::editor {

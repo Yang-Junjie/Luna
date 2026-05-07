@@ -1,10 +1,8 @@
-#include "ScriptPluginsPanel.h"
-
 #include "EditorContext.h"
 #include "EditorUI.h"
+#include "ScriptPluginsPanel.h"
 
 #include <imgui.h>
-
 #include <string>
 #include <vector>
 
@@ -89,8 +87,8 @@ void ScriptPluginsPanel::onImGuiRender(bool& open)
     }
 
     for (const auto& candidate : candidates) {
-        const bool is_selected = selected_candidate != nullptr &&
-                                 selected_candidate->Manifest.PluginId == candidate.Manifest.PluginId;
+        const bool is_selected =
+            selected_candidate != nullptr && selected_candidate->Manifest.PluginId == candidate.Manifest.PluginId;
 
         ImGui::PushID(candidate.Manifest.PluginId.c_str());
         if (ImGui::RadioButton("##selected", is_selected)) {

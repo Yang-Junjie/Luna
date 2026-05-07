@@ -1,9 +1,8 @@
-#include "InspectorPanel.h"
-
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "EditorContext.h"
 #include "EditorUI.h"
+#include "InspectorPanel.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
@@ -131,7 +130,9 @@ void InspectorPanel::onImGuiRender()
     scene_changed |= drawEntityHeader(selected_entity);
 
     scene_changed |= editor::ui::drawComponentSection<TransformComponent>(
-        "Transform", selected_entity, [&](TransformComponent& transform) {
+        "Transform",
+        selected_entity,
+        [&](TransformComponent& transform) {
             bool changed = false;
             changed |= editor::ui::drawVec3Control("Translation", transform.translation, 0.0f);
 
@@ -147,13 +148,14 @@ void InspectorPanel::onImGuiRender()
         false);
 
     scene_changed |= editor::ui::drawComponentSection<RelationshipComponent>(
-        "Relationship", selected_entity, [&](RelationshipComponent&) {
+        "Relationship",
+        selected_entity,
+        [&](RelationshipComponent&) {
             bool changed = false;
             Entity parent = selected_entity.getParent();
             if (parent) {
-                if (editor::ui::drawButton(parent.getName().c_str(),
-                                           editor::ui::ButtonVariant::Subtle,
-                                           ImVec2(-1.0f, 0.0f))) {
+                if (editor::ui::drawButton(
+                        parent.getName().c_str(), editor::ui::ButtonVariant::Subtle, ImVec2(-1.0f, 0.0f))) {
                     m_editor_context->setSelectedEntity(parent);
                 }
                 if (ImGui::BeginPopupContextItem("ParentContext")) {
@@ -188,7 +190,9 @@ void InspectorPanel::onImGuiRender()
         false);
 
     scene_changed |= editor::ui::drawComponentSection<CameraComponent>(
-        "Camera", selected_entity, [&](CameraComponent& camera_component) {
+        "Camera",
+        selected_entity,
+        [&](CameraComponent& camera_component) {
             bool changed = false;
             changed |= editor::ui::drawBool("Primary", camera_component.primary);
             changed |= editor::ui::drawBool("Fixed Aspect", camera_component.fixedAspectRatio);
@@ -225,17 +229,17 @@ void InspectorPanel::onImGuiRender()
                 changed |= editor::ui::drawFloat("Far", camera_component.perspectiveFar, 1.0f, 0.001f, 10000.0f);
             } else {
                 changed |= editor::ui::drawFloat("Size", camera_component.orthographicSize, 0.1f, 0.001f, 10000.0f);
-                changed |=
-                    editor::ui::drawFloat("Near", camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
-                changed |=
-                    editor::ui::drawFloat("Far", camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
+                changed |= editor::ui::drawFloat("Near", camera_component.orthographicNear, 0.1f, -10000.0f, 10000.0f);
+                changed |= editor::ui::drawFloat("Far", camera_component.orthographicFar, 0.1f, -10000.0f, 10000.0f);
             }
             return changed;
         },
         true);
 
     scene_changed |= editor::ui::drawComponentSection<LightComponent>(
-        "Light", selected_entity, [](LightComponent& light_component) {
+        "Light",
+        selected_entity,
+        [](LightComponent& light_component) {
             bool changed = false;
             changed |= editor::ui::drawBool("Enabled", light_component.enabled);
 
@@ -270,12 +274,13 @@ void InspectorPanel::onImGuiRender()
 
             changed |= editor::ui::drawColor3("Color", light_component.color);
             changed |= editor::ui::drawFloat("Intensity", light_component.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
-            if (light_component.type == LightComponent::Type::Point || light_component.type == LightComponent::Type::Spot) {
+            if (light_component.type == LightComponent::Type::Point ||
+                light_component.type == LightComponent::Type::Spot) {
                 changed |= editor::ui::drawFloat("Range", light_component.range, 0.1f, 0.001f, 1000.0f, "%.2f");
             }
             if (light_component.type == LightComponent::Type::Spot) {
-                glm::vec2 cone_angles = glm::degrees(glm::vec2(light_component.innerConeAngleRadians,
-                                                               light_component.outerConeAngleRadians));
+                glm::vec2 cone_angles = glm::degrees(
+                    glm::vec2(light_component.innerConeAngleRadians, light_component.outerConeAngleRadians));
                 if (editor::ui::drawVec2Control("Cone Angles", cone_angles, 0.5f, 0.1f, 89.0f, "%.1f")) {
                     cone_angles.x = (std::clamp)(cone_angles.x, 0.1f, 89.0f);
                     cone_angles.y = (std::clamp)(cone_angles.y, cone_angles.x, 89.0f);
@@ -296,12 +301,14 @@ void InspectorPanel::onImGuiRender()
         true);
 
     scene_changed |= editor::ui::drawComponentSection<MeshComponent>(
-        "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
+        "Mesh",
+        selected_entity,
+        [&](MeshComponent& mesh_component) {
             bool changed = false;
             const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
             const std::string current_builtin_label = BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle)
-                                                        ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
-                                                        : "None";
+                                                          ? BuiltinAssets::getDisplayName(mesh_component.meshHandle)
+                                                          : "None";
             changed |= editor::ui::drawCombo("Primitive", current_builtin_label.c_str(), [&]() {
                 bool primitive_changed = false;
                 if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMesh(mesh_component.meshHandle))) {
@@ -343,7 +350,8 @@ void InspectorPanel::onImGuiRender()
             if (mesh_loaded) {
                 editor::ui::drawTextValue("Submeshes", std::to_string(mesh->getSubMeshes().size()));
             } else {
-                if (mesh_component.meshHandle.isValid() && AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
+                if (mesh_component.meshHandle.isValid() &&
+                    AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
                     ImGui::TextDisabled("Mesh asset is loading...");
                 }
                 int slot_count = static_cast<int>(mesh_component.getSubmeshMaterialCount());
@@ -363,7 +371,8 @@ void InspectorPanel::onImGuiRender()
                 if (ImGui::MenuItem("Sync Material Slots To Mesh", nullptr, false, mesh_loaded)) {
                     sync_material_slots = true;
                 }
-                if (ImGui::MenuItem("Clear All Materials", nullptr, false, mesh_component.getSubmeshMaterialCount() > 0)) {
+                if (ImGui::MenuItem(
+                        "Clear All Materials", nullptr, false, mesh_component.getSubmeshMaterialCount() > 0)) {
                     mesh_component.clearAllSubmeshMaterials();
                     changed = true;
                 }
@@ -396,10 +405,8 @@ void InspectorPanel::onImGuiRender()
                         if (ImGui::MenuItem("Clear Material", nullptr, false, material_handle.isValid())) {
                             clear_material = true;
                         }
-                        if (ImGui::MenuItem("Clear All Materials",
-                                            nullptr,
-                                            false,
-                                            mesh_component.getSubmeshMaterialCount() > 0)) {
+                        if (ImGui::MenuItem(
+                                "Clear All Materials", nullptr, false, mesh_component.getSubmeshMaterialCount() > 0)) {
                             mesh_component.clearAllSubmeshMaterials();
                             material_handle = AssetHandle(0);
                             changed = true;
@@ -409,9 +416,10 @@ void InspectorPanel::onImGuiRender()
                     if (edit_builtin_material && BuiltinAssets::isBuiltinMaterial(material_handle)) {
                         m_editor_context->openBuiltinMaterialsPanel(material_handle);
                     }
-                    const std::string current_builtin_material_label = BuiltinAssets::isBuiltinMaterial(material_handle)
-                                                                     ? BuiltinAssets::getDisplayName(material_handle)
-                                                                     : "None";
+                    const std::string current_builtin_material_label =
+                        BuiltinAssets::isBuiltinMaterial(material_handle)
+                            ? BuiltinAssets::getDisplayName(material_handle)
+                            : "None";
                     changed |= editor::ui::drawCombo("Builtin Material", current_builtin_material_label.c_str(), [&]() {
                         bool material_changed = false;
                         if (ImGui::Selectable("None", !BuiltinAssets::isBuiltinMaterial(material_handle))) {
@@ -436,8 +444,8 @@ void InspectorPanel::onImGuiRender()
                         return material_changed;
                     });
 
-                    changed |= editor::ui::drawAssetHandleSelector(
-                        "Material Asset", material_handle, {AssetType::Material});
+                    changed |=
+                        editor::ui::drawAssetHandleSelector("Material Asset", material_handle, {AssetType::Material});
                     if (mesh_component.getSubmeshMaterial(submesh_index) != material_handle) {
                         mesh_component.setSubmeshMaterial(submesh_index, material_handle);
                         changed = true;
@@ -462,12 +470,14 @@ void InspectorPanel::onImGuiRender()
         true);
 
     scene_changed |= editor::ui::drawComponentSection<ScriptComponent>(
-        "Script", selected_entity, [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
-            const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
+        "Script",
+        selected_entity,
+        [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
+            const ScriptComponentInspectorChange change =
+                drawScriptComponentInspector(selected_entity, script_component);
             if (editing_runtime_scene && change.property_value_changed) {
-                m_editor_context->patchRuntimeScriptProperty(selected_entity.getUUID(),
-                                                           change.script_index,
-                                                           change.property_index);
+                m_editor_context->patchRuntimeScriptProperty(
+                    selected_entity.getUUID(), change.script_index, change.property_index);
             }
             return change.changed;
         },

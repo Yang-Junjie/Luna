@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/DefaultScene/Feature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/DefaultScene/Feature.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/EnvironmentPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/GBufferPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
@@ -14,11 +14,9 @@
 #include "Renderer/RenderFlow/RenderSlotPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
-
-#include <Backend.h>
 
 #include <array>
+#include <Backend.h>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -28,16 +26,14 @@ namespace {
 
 inline constexpr std::string_view kFeatureName = "DefaultScene";
 constexpr RenderFeatureGraphResourceFlags kOptionalExternalGraphResourceFlags =
-    static_cast<RenderFeatureGraphResourceFlags>(
-        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::Optional) |
-        static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
+    static_cast<RenderFeatureGraphResourceFlags>(static_cast<uint32_t>(RenderFeatureGraphResourceFlags::Optional) |
+                                                 static_cast<uint32_t>(RenderFeatureGraphResourceFlags::External));
 
 constexpr std::array<RenderFeatureGraphResource, 14> kGraphOutputs{{
     {.name = blackboard::SceneColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::SceneLitColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::SceneSkyCompositedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
-    {.name = blackboard::SceneTransparentCompositedColor.value(),
-     .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneTransparentCompositedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::SceneFinalColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Depth.value(), .flags = RenderFeatureGraphResourceFlags::External},
     {blackboard::Pick.value()},
@@ -71,9 +67,8 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
     namespace pass_slots = luna::render_flow::slots::passes;
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
-    return builder.addFeaturePass(kFeatureName,
-                                  std::string(pass_slots::Environment),
-                                  std::make_unique<EnvironmentPass>(state)) &&
+    return builder.addFeaturePass(
+               kFeatureName, std::string(pass_slots::Environment), std::make_unique<EnvironmentPass>(state)) &&
            builder.insertFeaturePassAfter(kFeatureName,
                                           pass_slots::Environment,
                                           std::string(pass_slots::ShadowDepth),
@@ -101,20 +96,18 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
                pass_slots::Lighting,
                std::string(extension_slots::AfterLighting),
                std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterLighting))) &&
-           builder.insertFeaturePassAfter(
-               kFeatureName,
-               extension_slots::AfterLighting,
-               std::string(extension_slots::BeforeSky),
-               std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeSky))) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          extension_slots::AfterLighting,
+                                          std::string(extension_slots::BeforeSky),
+                                          std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeSky))) &&
            builder.insertFeaturePassAfter(kFeatureName,
                                           extension_slots::BeforeSky,
                                           std::string(pass_slots::Sky),
                                           std::make_unique<SkyPass>(state)) &&
-           builder.insertFeaturePassAfter(
-               kFeatureName,
-               pass_slots::Sky,
-               std::string(extension_slots::AfterSky),
-               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterSky))) &&
+           builder.insertFeaturePassAfter(kFeatureName,
+                                          pass_slots::Sky,
+                                          std::string(extension_slots::AfterSky),
+                                          std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterSky))) &&
            builder.insertFeaturePassAfter(
                kFeatureName,
                extension_slots::AfterSky,
@@ -160,17 +153,18 @@ RenderFeatureContract Feature::contract() const noexcept
         .display_name = "Default Scene",
         .category = "Scene",
         .runtime_toggleable = false,
-        .requirements = RenderFeatureRequirements{
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
-                         RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = true,
-            .uses_history_resources = true,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::DepthAttachment |
+                             RenderFeatureResourceFlags::UniformBuffer | RenderFeatureResourceFlags::Sampler,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = true,
+                .uses_history_resources = true,
+            },
     };
 }
 
@@ -199,7 +193,6 @@ void Feature::prepareFrame(const RenderWorld& world,
     m_scene_state.setWorld(world);
     m_scene_state.setFrameContext(frame_context);
     m_scene_state.setShadowParams({});
-
 }
 
 void Feature::prepareResources(const SceneRenderContext& scene_context)

@@ -2,28 +2,27 @@
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
 #include "Platform/Common/NativeWindowHandle.h"
-#include "Renderer/RenderFlow/DefaultRenderFlow.h"
-#include "Renderer/RenderFlow/RenderFlow.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererUtilities.h"
-
-#include <Buffer.h>
-#include <Builders.h>
-#include <CommandBufferEncoder.h>
-#include <Device.h>
-#include <QueryPool.h>
-#include <Queue.h>
-#include <Swapchain.h>
-#include <Synchronization.h>
+#include "Renderer/RenderFlow/DefaultRenderFlow.h"
+#include "Renderer/RenderFlow/RenderFlow.h"
 
 #include <cstring>
 
 #include <algorithm>
 #include <array>
+#include <Buffer.h>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <Device.h>
 #include <GLFW/glfw3.h>
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
+#include <QueryPool.h>
+#include <Queue.h>
 #include <stdexcept>
+#include <Swapchain.h>
+#include <Synchronization.h>
 
 namespace luna {
 
@@ -141,9 +140,9 @@ bool Renderer::init(Window& window, InitializationOptions options)
         device_context.shader_compiler = device_context.instance->CreateShaderCompiler();
         device_context.surface = device_context.instance->CreateSurface(window_handle);
         if (!device_context.surface) {
-            throw std::runtime_error(
-                "Failed to create surface for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
+            throw std::runtime_error("Failed to create surface for backend '" +
+                                     std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) +
+                                     "'");
         }
 
         const auto adapters = device_context.instance->EnumerateAdapters();
@@ -165,9 +164,9 @@ bool Renderer::init(Window& window, InitializationOptions options)
         }
         device_context.adapter = renderer_detail::selectAdapter(adapters);
         if (!device_context.adapter) {
-            throw std::runtime_error(
-                "No compatible adapter available for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
+            throw std::runtime_error("No compatible adapter available for backend '" +
+                                     std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) +
+                                     "'");
         }
         const auto selected_adapter_properties = device_context.adapter->GetProperties();
         LUNA_RENDERER_INFO("Selected renderer adapter '{}' ({}, {} MiB dedicated VRAM)",
@@ -412,8 +411,7 @@ void Renderer::renderFrame()
                 .Width = extent.width,
                 .Height = extent.height,
                 .Format = luna::RHI::Format::D32_FLOAT,
-                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment |
-                         luna::RHI::TextureUsageFlags::Sampled,
+                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment | luna::RHI::TextureUsageFlags::Sampled,
                 .InitialState = luna::RHI::ResourceState::Undefined,
                 .SampleCount = luna::RHI::SampleCount::Count1,
             });
@@ -476,7 +474,8 @@ void Renderer::renderFrame()
                 .show_pick_debug_visualization = scene_output.pick_debug_visualization_enabled,
                 .debug_pick_pixel_x = scene_output.debug_pick_marker.x,
                 .debug_pick_pixel_y = scene_output.debug_pick_marker.y,
-                .show_pick_debug_marker = scene_output.pick_debug_visualization_enabled && scene_output.debug_pick_marker.valid,
+                .show_pick_debug_marker =
+                    scene_output.pick_debug_visualization_enabled && scene_output.debug_pick_marker.valid,
                 .debug_target = scene_debug_handle,
                 .debug_format = scene_debug_format,
                 .debug_view_mode = scene_output.debug_view_mode,
@@ -484,12 +483,8 @@ void Renderer::renderFrame()
                 .framebuffer_width = scene_width,
                 .framebuffer_height = scene_height,
             };
-            const render_flow::RenderFeatureFrameContext feature_frame_context =
-                makeRenderFeatureFrameContext(backend_type,
-                                              scene_output.mode,
-                                              frame_resources.frame_index,
-                                              scene_width,
-                                              scene_height);
+            const render_flow::RenderFeatureFrameContext feature_frame_context = makeRenderFeatureFrameContext(
+                backend_type, scene_output.mode, frame_resources.frame_index, scene_width, scene_height);
             render_flow::RenderFeatureFrameContext feature_frame_context_with_view = feature_frame_context;
             feature_frame_context_with_view.view =
                 m_render_view_history.beginFrame(m_render_world.camera(),
@@ -503,7 +498,8 @@ void Renderer::renderFrame()
                                           frame_resources.frame_index,
                                           static_cast<uint32_t>(feature_frame_context.history_invalidation_flags));
             }
-            RenderFlowContext flow_context(graph_builder, m_render_world, scene_context, feature_frame_context_with_view);
+            RenderFlowContext flow_context(
+                graph_builder, m_render_world, scene_context, feature_frame_context_with_view);
             m_render_flow->render(flow_context);
             if (m_render_world.hasCamera()) {
                 stageRenderFeatureFrameContext(backend_type, scene_output.mode, scene_width, scene_height);
@@ -605,7 +601,8 @@ void Renderer::renderFrame()
             m_render_view_history.commitFrame();
             commitStagedRenderFeatureFrameContext();
         }
-        const RenderGraphProfileSnapshot& profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
+        const RenderGraphProfileSnapshot& profile =
+            frame_resources.render_graphs[frame_resources.frame_index]->profile();
         if (runtime.render_graph_profiling_enabled) {
             if (!storePendingGpuTimingProfile(frame_resources.frame_index, profile)) {
                 m_last_render_graph_profile = profile;
@@ -893,8 +890,8 @@ void Renderer::requestScenePick(uint32_t x, uint32_t y)
         return;
     }
 
-    const uint32_t clamped_x = (std::min) (x, m_scene_output.extent.width - 1);
-    const uint32_t clamped_y = (std::min) (y, m_scene_output.extent.height - 1);
+    const uint32_t clamped_x = (std::min)(x, m_scene_output.extent.width - 1);
+    const uint32_t clamped_y = (std::min)(y, m_scene_output.extent.height - 1);
     if (clamped_x != x || clamped_y != y) {
         LUNA_RENDERER_DEBUG("Clamped scene pick request from ({}, {}) to ({}, {}) within {}x{}",
                             x,
@@ -1018,7 +1015,8 @@ bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeatu
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot add default render feature because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot add default render feature because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1039,14 +1037,16 @@ bool Renderer::setDefaultRenderFeatureEnabled(std::string_view name, bool enable
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot toggle default render feature because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot toggle default render feature because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
     return default_render_flow->setFeatureEnabled(name, enabled);
 }
 
-std::vector<render_flow::RenderFeatureParameterInfo> Renderer::getDefaultRenderFeatureParameters(std::string_view name) const
+std::vector<render_flow::RenderFeatureParameterInfo>
+    Renderer::getDefaultRenderFeatureParameters(std::string_view name) const
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
     if (!default_render_flow) {
@@ -1062,7 +1062,8 @@ bool Renderer::setDefaultRenderFeatureParameter(std::string_view feature_name,
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot set default render feature parameter because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot set default render feature parameter because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1073,7 +1074,8 @@ bool Renderer::configureDefaultRenderFlow(const DefaultRenderFlowConfigureFuncti
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(m_render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot configure default render flow because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot configure default render flow because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1121,9 +1123,9 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
                        renderer_detail::formatToString(surface_format.format),
                        static_cast<int>(surface_format.format));
 
-    uint32_t min_image_count = (std::max) (2u, capabilities.minImageCount);
+    uint32_t min_image_count = (std::max)(2u, capabilities.minImageCount);
     if (capabilities.maxImageCount != 0) {
-        min_image_count = (std::min) (min_image_count, capabilities.maxImageCount);
+        min_image_count = (std::min)(min_image_count, capabilities.maxImageCount);
     }
 
     if (selected_present_mode != requested_present_mode) {
@@ -1153,9 +1155,8 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
     }
 
     device_context.surface_format = surface_format.format;
-    frame_resources.frames_in_flight =
-        (std::max) (1u,
-                    device_context.swapchain->GetImageCount() > 1 ? device_context.swapchain->GetImageCount() - 1 : 1u);
+    frame_resources.frames_in_flight = (std::max)(
+        1u, device_context.swapchain->GetImageCount() > 1 ? device_context.swapchain->GetImageCount() - 1 : 1u);
     device_context.synchronization = device_context.device->CreateSynchronization(frame_resources.frames_in_flight);
     if (!device_context.synchronization) {
         throw std::runtime_error("Failed to create frame synchronization objects");
@@ -1198,7 +1199,7 @@ luna::RHI::Extent2D Renderer::getFramebufferExtent() const
     int width = 0;
     int height = 0;
     glfwGetFramebufferSize(m_window_context.native_window, &width, &height);
-    return {static_cast<uint32_t>((std::max) (width, 0)), static_cast<uint32_t>((std::max) (height, 0))};
+    return {static_cast<uint32_t>((std::max)(width, 0)), static_cast<uint32_t>((std::max)(height, 0))};
 }
 
 void Renderer::handlePendingResize()
@@ -1240,15 +1241,13 @@ void Renderer::invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryI
     m_render_feature_history.pending_flags |= flags;
 }
 
-render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
-    luna::RHI::BackendType backend_type,
-    SceneOutputMode scene_output_mode,
-    uint64_t frame_index,
-    uint32_t framebuffer_width,
-    uint32_t framebuffer_height) const
+render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
+                                                                               SceneOutputMode scene_output_mode,
+                                                                               uint64_t frame_index,
+                                                                               uint32_t framebuffer_width,
+                                                                               uint32_t framebuffer_height) const
 {
-    render_flow::RenderFeatureHistoryInvalidationFlags invalidation_flags =
-        m_render_feature_history.pending_flags;
+    render_flow::RenderFeatureHistoryInvalidationFlags invalidation_flags = m_render_feature_history.pending_flags;
 
     if (!m_render_feature_history.has_previous_frame) {
         invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::FirstFrame;
@@ -1356,15 +1355,14 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
             .SetName("SceneOutputColor")
             .Build());
 
-    m_scene_output.depth =
-        m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
-                                                   .SetSize(width, height)
-                                                   .SetFormat(luna::RHI::Format::D32_FLOAT)
-                                                   .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment |
-                                                             luna::RHI::TextureUsageFlags::Sampled)
-                                                   .SetInitialState(luna::RHI::ResourceState::Undefined)
-                                                   .SetName("SceneOutputDepth")
-                                                   .Build());
+    m_scene_output.depth = m_device_context.device->CreateTexture(
+        luna::RHI::TextureBuilder()
+            .SetSize(width, height)
+            .SetFormat(luna::RHI::Format::D32_FLOAT)
+            .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment | luna::RHI::TextureUsageFlags::Sampled)
+            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetName("SceneOutputDepth")
+            .Build());
 
     m_scene_output.pick = m_device_context.device->CreateTexture(
         luna::RHI::TextureBuilder()
@@ -1405,8 +1403,8 @@ void Renderer::ensureSceneOutputTargets(uint32_t width, uint32_t height)
 
 void Renderer::releaseSceneOutputTargets()
 {
-    const bool had_targets = m_scene_output.color || m_scene_output.depth || m_scene_output.pick ||
-                             m_scene_output.debug_color;
+    const bool had_targets =
+        m_scene_output.color || m_scene_output.depth || m_scene_output.pick || m_scene_output.debug_color;
     m_scene_output.color.reset();
     m_scene_output.depth.reset();
     m_scene_output.pick.reset();
@@ -1437,12 +1435,12 @@ void Renderer::releaseFrameCommandBuffers()
     }
     if (released_count > 0 || !m_frame_resources.scene_pick_readback_slots.empty() ||
         !m_frame_resources.gpu_timing_slots.empty() || !m_frame_resources.transient_texture_caches.empty()) {
-        LUNA_RENDERER_DEBUG(
-            "Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback slot(s), {} GPU timing slot(s)",
-            released_count,
-            m_frame_resources.transient_texture_caches.size(),
-            m_frame_resources.scene_pick_readback_slots.size(),
-            m_frame_resources.gpu_timing_slots.size());
+        LUNA_RENDERER_DEBUG("Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback "
+                            "slot(s), {} GPU timing slot(s)",
+                            released_count,
+                            m_frame_resources.transient_texture_caches.size(),
+                            m_frame_resources.scene_pick_readback_slots.size(),
+                            m_frame_resources.gpu_timing_slots.size());
     }
     m_frame_resources.command_buffers.clear();
     m_frame_resources.transient_texture_caches.clear();
@@ -1475,11 +1473,12 @@ void Renderer::ensureGpuTimingResources()
 
     frame_resources.gpu_timing_slots.clear();
     frame_resources.gpu_timing_slots.resize(frame_resources.frames_in_flight);
-    LUNA_RENDERER_INFO("Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
-                       frame_resources.frames_in_flight,
-                       kRenderGraphGpuTimestampQueryCount,
-                       use_disjoint_timestamps ? "disjoint" : "fixed-period",
-                       timestamp_period_ns);
+    LUNA_RENDERER_INFO(
+        "Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
+        frame_resources.frames_in_flight,
+        kRenderGraphGpuTimestampQueryCount,
+        use_disjoint_timestamps ? "disjoint" : "fixed-period",
+        timestamp_period_ns);
     for (uint32_t frame_index = 0; frame_index < frame_resources.frames_in_flight; ++frame_index) {
         auto& slot = frame_resources.gpu_timing_slots[frame_index];
         slot.query_pool = m_device_context.device->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
@@ -1563,7 +1562,7 @@ void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
     completed_profile.GpuTimingSupported = true;
     completed_profile.GpuTimingPending = false;
 
-    const size_t pass_count = (std::min) (completed_profile.Passes.size(), timestamps.size() / 2);
+    const size_t pass_count = (std::min)(completed_profile.Passes.size(), timestamps.size() / 2);
     const uint64_t first_timestamp = !timestamps.empty() ? timestamps.front() : 0;
     for (size_t pass_index = 0; pass_index < pass_count; ++pass_index) {
         const uint64_t begin_timestamp = timestamps[pass_index * 2];
@@ -1687,9 +1686,3 @@ void Renderer::waitForGpuIdle() noexcept
 }
 
 } // namespace luna
-
-
-
-
-
-

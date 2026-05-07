@@ -113,12 +113,11 @@ void testSceneShadowSettingsRoundTrip(TestContext& context)
     luna::Scene scene;
     scene.shadowSettings().mode = luna::SceneShadowMode::PcfShadowMap;
     scene.shadowSettings().pcfShadowDistance = 72.0f;
-    scene.shadowSettings().pcfMapSize = 8192;
-    scene.shadowSettings().csmCascadeSize = 4096;
+    scene.shadowSettings().pcfMapSize = 8'192;
+    scene.shadowSettings().csmCascadeSize = 4'096;
 
     const std::string serialized = luna::SceneSerializer::serializeToString(scene);
-    context.expect(serialized.find("Shadows:") != std::string::npos,
-                   "scene shadow settings should serialize");
+    context.expect(serialized.find("Shadows:") != std::string::npos, "scene shadow settings should serialize");
     context.expect(serialized.find("Mode: PcfShadowMap") != std::string::npos,
                    "scene shadow settings should serialize PCF shadow mode");
     context.expect(serialized.find("PcfShadowDistance: 72") != std::string::npos,
@@ -133,12 +132,9 @@ void testSceneShadowSettingsRoundTrip(TestContext& context)
                    "scene with shadow settings should deserialize");
     context.expect(loaded_scene.shadowSettings().mode == luna::SceneShadowMode::PcfShadowMap,
                    "PCF shadow mode should round-trip");
-    context.expect(loaded_scene.shadowSettings().pcfShadowDistance == 72.0f,
-                   "PCF shadow distance should round-trip");
-    context.expect(loaded_scene.shadowSettings().pcfMapSize == 8192,
-                   "PCF map size should round-trip");
-    context.expect(loaded_scene.shadowSettings().csmCascadeSize == 4096,
-                   "CSM cascade size should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfShadowDistance == 72.0f, "PCF shadow distance should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfMapSize == 8'192, "PCF map size should round-trip");
+    context.expect(loaded_scene.shadowSettings().csmCascadeSize == 4'096, "CSM cascade size should round-trip");
 }
 
 void testLegacyCsmEnabledMigration(TestContext& context)

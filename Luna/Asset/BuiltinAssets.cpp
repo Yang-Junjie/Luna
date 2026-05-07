@@ -1,7 +1,6 @@
-#include "Asset/BuiltinAssets.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Asset/BuiltinAssets.h"
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/PrimitiveMeshFactory.h"
@@ -64,15 +63,16 @@ void BuiltinAssets::registerAll()
     if (asset_manager.isAssetLoaded(BuiltinMeshes::Cube) && asset_manager.isAssetLoaded(BuiltinMeshes::Sphere) &&
         asset_manager.isAssetLoaded(BuiltinMeshes::Plane) && asset_manager.isAssetLoaded(BuiltinMeshes::Cylinder) &&
         asset_manager.isAssetLoaded(BuiltinMeshes::Cone) && asset_manager.isAssetLoaded(BuiltinMaterials::DefaultLit) &&
-        asset_manager.isAssetLoaded(BuiltinMaterials::DefaultUnlit) && asset_manager.isAssetLoaded(BuiltinMaterials::DebugRed) &&
-        asset_manager.isAssetLoaded(BuiltinMaterials::DebugGreen) && asset_manager.isAssetLoaded(BuiltinMaterials::DebugBlue) &&
-        asset_manager.isAssetLoaded(BuiltinMaterials::Transparent) &&
-        AssetDatabase::exists(BuiltinMeshes::Cube) && AssetDatabase::exists(BuiltinMeshes::Sphere) &&
-        AssetDatabase::exists(BuiltinMeshes::Plane) && AssetDatabase::exists(BuiltinMeshes::Cylinder) &&
-        AssetDatabase::exists(BuiltinMeshes::Cone) && AssetDatabase::exists(BuiltinMaterials::DefaultLit) &&
-        AssetDatabase::exists(BuiltinMaterials::DefaultUnlit) && AssetDatabase::exists(BuiltinMaterials::DebugRed) &&
-        AssetDatabase::exists(BuiltinMaterials::DebugGreen) && AssetDatabase::exists(BuiltinMaterials::DebugBlue) &&
-        AssetDatabase::exists(BuiltinMaterials::Transparent)) {
+        asset_manager.isAssetLoaded(BuiltinMaterials::DefaultUnlit) &&
+        asset_manager.isAssetLoaded(BuiltinMaterials::DebugRed) &&
+        asset_manager.isAssetLoaded(BuiltinMaterials::DebugGreen) &&
+        asset_manager.isAssetLoaded(BuiltinMaterials::DebugBlue) &&
+        asset_manager.isAssetLoaded(BuiltinMaterials::Transparent) && AssetDatabase::exists(BuiltinMeshes::Cube) &&
+        AssetDatabase::exists(BuiltinMeshes::Sphere) && AssetDatabase::exists(BuiltinMeshes::Plane) &&
+        AssetDatabase::exists(BuiltinMeshes::Cylinder) && AssetDatabase::exists(BuiltinMeshes::Cone) &&
+        AssetDatabase::exists(BuiltinMaterials::DefaultLit) && AssetDatabase::exists(BuiltinMaterials::DefaultUnlit) &&
+        AssetDatabase::exists(BuiltinMaterials::DebugRed) && AssetDatabase::exists(BuiltinMaterials::DebugGreen) &&
+        AssetDatabase::exists(BuiltinMaterials::DebugBlue) && AssetDatabase::exists(BuiltinMaterials::Transparent)) {
         LUNA_CORE_TRACE("Built-in assets already registered");
         return;
     }
@@ -101,8 +101,10 @@ void BuiltinAssets::registerAll()
 
     asset_manager.registerMemoryAsset(BuiltinMaterials::DefaultLit,
                                       createBuiltinMaterial("Default Lit", {1.0f, 1.0f, 1.0f, 1.0f}));
-    setBuiltinMetadata(BuiltinMaterials::DefaultLit, AssetType::Material, "Default Lit", "builtin://material/default-lit");
-    LUNA_CORE_TRACE("Registered built-in material '{}' handle={}", "Default Lit", BuiltinMaterials::DefaultLit.toString());
+    setBuiltinMetadata(
+        BuiltinMaterials::DefaultLit, AssetType::Material, "Default Lit", "builtin://material/default-lit");
+    LUNA_CORE_TRACE(
+        "Registered built-in material '{}' handle={}", "Default Lit", BuiltinMaterials::DefaultLit.toString());
 
     asset_manager.registerMemoryAsset(BuiltinMaterials::DefaultUnlit,
                                       createBuiltinMaterial("Default Unlit", {1.0f, 1.0f, 1.0f, 1.0f}, true));
@@ -126,16 +128,16 @@ void BuiltinAssets::registerAll()
     asset_manager.registerMemoryAsset(BuiltinMaterials::DebugBlue,
                                       createBuiltinMaterial("Debug Blue", {0.1f, 0.25f, 1.0f, 1.0f}, true));
     setBuiltinMetadata(BuiltinMaterials::DebugBlue, AssetType::Material, "Debug Blue", "builtin://material/debug-blue");
-    LUNA_CORE_TRACE("Registered built-in material '{}' handle={}", "Debug Blue", BuiltinMaterials::DebugBlue.toString());
+    LUNA_CORE_TRACE(
+        "Registered built-in material '{}' handle={}", "Debug Blue", BuiltinMaterials::DebugBlue.toString());
 
-    asset_manager.registerMemoryAsset(BuiltinMaterials::Transparent,
-                                      createBuiltinMaterial("Transparent",
-                                                            {1.0f, 1.0f, 1.0f, 0.35f},
-                                                            false,
-                                                            Material::BlendMode::Transparent));
+    asset_manager.registerMemoryAsset(
+        BuiltinMaterials::Transparent,
+        createBuiltinMaterial("Transparent", {1.0f, 1.0f, 1.0f, 0.35f}, false, Material::BlendMode::Transparent));
     setBuiltinMetadata(
         BuiltinMaterials::Transparent, AssetType::Material, "Transparent", "builtin://material/transparent");
-    LUNA_CORE_TRACE("Registered built-in material '{}' handle={}", "Transparent", BuiltinMaterials::Transparent.toString());
+    LUNA_CORE_TRACE(
+        "Registered built-in material '{}' handle={}", "Transparent", BuiltinMaterials::Transparent.toString());
 }
 
 bool BuiltinAssets::isBuiltinAsset(AssetHandle handle)

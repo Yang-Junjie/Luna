@@ -1,6 +1,6 @@
+#include "Core/Log.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 
-#include "Core/Log.h"
 #include <filesystem>
 
 namespace luna::render_flow::default_scene {
@@ -65,10 +65,9 @@ void PipelineResources::rebuild(const SceneRenderContext& context)
     m_pipeline_state.rebuild(context, m_shader_paths);
 }
 
-void PipelineResources::updateSceneBindings(
-    const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture)
+void PipelineResources::updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
+                                            const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture)
 {
     m_pipeline_state.updateSceneBindings(environment_texture, prefiltered_environment_texture, brdf_lut_texture);
 }
@@ -95,15 +94,14 @@ void PipelineResources::updateLightingResources(
     const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
     const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions)
 {
-    m_pipeline_state.updateLightingResources(
-        commands,
-        gbuffer_base_color,
-        gbuffer_normal_metallic,
-        gbuffer_world_position_roughness,
-        gbuffer_emissive_ao,
-        velocity_texture,
-        pick_texture,
-        lighting_extensions);
+    m_pipeline_state.updateLightingResources(commands,
+                                             gbuffer_base_color,
+                                             gbuffer_normal_metallic,
+                                             gbuffer_world_position_roughness,
+                                             gbuffer_emissive_ao,
+                                             velocity_texture,
+                                             pick_texture,
+                                             lighting_extensions);
 }
 
 void PipelineResources::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
@@ -111,8 +109,7 @@ void PipelineResources::updateShadowResources(const luna::RHI::Ref<luna::RHI::Te
     m_pipeline_state.updateShadowResources(shadow_map);
 }
 
-void PipelineResources::updateTransparentCompositeResources(
-    const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
+void PipelineResources::updateTransparentCompositeResources(const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
 {
     m_pipeline_state.updateTransparentCompositeResources(transparent_color);
 }
