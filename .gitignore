@@ -8,6 +8,8 @@ logs/
 /DesignTarget.md
 __pycache__/
 docs/
+!Docs/
+!Docs/**
 shader_cache/
 imgui.ini
 .codex/

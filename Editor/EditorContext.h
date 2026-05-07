@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Authoring/AuthoringTypes.h"
 #include "Asset/Asset.h"
 #include "Core/UUID.h"
 #include "Scene/Entity.h"
@@ -36,7 +37,15 @@ public:
     virtual Entity createSpotLightEntity(Entity parent = {}) = 0;
     virtual bool destroyEntity(Entity entity) = 0;
     virtual bool reparentEntity(Entity entity, Entity parent, bool preserve_world_transform = true) = 0;
+    virtual bool addComponent(Entity entity, authoring::AuthoringComponentKind component_kind) = 0;
+    virtual bool removeComponent(Entity entity, authoring::AuthoringComponentKind component_kind) = 0;
     virtual void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle) = 0;
+    virtual bool setEntityName(Entity entity, std::string name) = 0;
+    virtual bool setEntityTransform(Entity entity, const TransformComponent& transform) = 0;
+    virtual bool setCameraComponent(Entity entity, const CameraComponent& camera_component) = 0;
+    virtual bool setLightComponent(Entity entity, const LightComponent& light_component) = 0;
+    virtual bool setMeshComponent(Entity entity, const MeshComponent& mesh_component) = 0;
+    virtual bool setScriptComponent(Entity entity, const ScriptComponent& script_component) = 0;
     virtual bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) = 0;
     virtual bool setSceneShadowSettings(const SceneShadowSettings& settings) = 0;
     virtual void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) = 0;

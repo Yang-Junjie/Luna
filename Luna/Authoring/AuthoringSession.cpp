@@ -106,6 +106,107 @@ bool isBoundSceneEntity(luna::Scene& scene, luna::Entity entity)
     return entity && entity.getEntityManager() == &scene.entityManager();
 }
 
+bool sameTransformComponent(const luna::TransformComponent& lhs, const luna::TransformComponent& rhs)
+{
+    return sameVec3(lhs.translation, rhs.translation) &&
+           sameVec3(lhs.rotation, rhs.rotation) &&
+           sameVec3(lhs.scale, rhs.scale);
+}
+
+bool sameCameraComponent(const luna::CameraComponent& lhs, const luna::CameraComponent& rhs)
+{
+    return lhs.primary == rhs.primary &&
+           lhs.fixedAspectRatio == rhs.fixedAspectRatio &&
+           lhs.projectionType == rhs.projectionType &&
+           lhs.perspectiveVerticalFovRadians == rhs.perspectiveVerticalFovRadians &&
+           lhs.perspectiveNear == rhs.perspectiveNear &&
+           lhs.perspectiveFar == rhs.perspectiveFar &&
+           lhs.orthographicSize == rhs.orthographicSize &&
+           lhs.orthographicNear == rhs.orthographicNear &&
+           lhs.orthographicFar == rhs.orthographicFar;
+}
+
+bool sameLightComponent(const luna::LightComponent& lhs, const luna::LightComponent& rhs)
+{
+    return lhs.type == rhs.type &&
+           lhs.enabled == rhs.enabled &&
+           sameVec3(lhs.color, rhs.color) &&
+           lhs.intensity == rhs.intensity &&
+           lhs.range == rhs.range &&
+           lhs.innerConeAngleRadians == rhs.innerConeAngleRadians &&
+           lhs.outerConeAngleRadians == rhs.outerConeAngleRadians;
+}
+
+bool sameMeshComponent(const luna::MeshComponent& lhs, const luna::MeshComponent& rhs)
+{
+    return lhs.meshHandle == rhs.meshHandle &&
+           lhs.submeshMaterials == rhs.submeshMaterials;
+}
+
+bool sameScriptProperty(const luna::ScriptProperty& lhs, const luna::ScriptProperty& rhs)
+{
+    return lhs.name == rhs.name &&
+           lhs.type == rhs.type &&
+           lhs.boolValue == rhs.boolValue &&
+           lhs.intValue == rhs.intValue &&
+           lhs.floatValue == rhs.floatValue &&
+           lhs.stringValue == rhs.stringValue &&
+           sameVec3(lhs.vec3Value, rhs.vec3Value) &&
+           lhs.entityValue == rhs.entityValue &&
+           lhs.assetValue == rhs.assetValue;
+}
+
+bool sameScriptEntry(const luna::ScriptEntry& lhs, const luna::ScriptEntry& rhs)
+{
+    if (lhs.id != rhs.id ||
+        lhs.enabled != rhs.enabled ||
+        lhs.scriptAsset != rhs.scriptAsset ||
+        lhs.typeName != rhs.typeName ||
+        lhs.executionOrder != rhs.executionOrder ||
+        lhs.properties.size() != rhs.properties.size()) {
+        return false;
+    }
+
+    for (size_t index = 0; index < lhs.properties.size(); ++index) {
+        if (!sameScriptProperty(lhs.properties[index], rhs.properties[index])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool sameScriptComponent(const luna::ScriptComponent& lhs, const luna::ScriptComponent& rhs)
+{
+    if (lhs.enabled != rhs.enabled || lhs.scripts.size() != rhs.scripts.size()) {
+        return false;
+    }
+
+    for (size_t index = 0; index < lhs.scripts.size(); ++index) {
+        if (!sameScriptEntry(lhs.scripts[index], rhs.scripts[index])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+const char* componentKindName(luna::authoring::AuthoringComponentKind component_kind)
+{
+    switch (component_kind) {
+        case luna::authoring::AuthoringComponentKind::Camera:
+            return "Camera";
+        case luna::authoring::AuthoringComponentKind::Light:
+            return "Light";
+        case luna::authoring::AuthoringComponentKind::Mesh:
+            return "Mesh";
+        case luna::authoring::AuthoringComponentKind::Script:
+            return "Script";
+    }
+
+    return "Component";
+}
+
 } // namespace
 
 namespace luna::authoring {
@@ -423,6 +524,110 @@ bool AuthoringSession::reparentEntity(Entity entity, Entity parent, bool preserv
     return true;
 }
 
+bool AuthoringSession::addComponent(Entity entity, AuthoringComponentKind component_kind)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot add component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    bool added = false;
+    switch (component_kind) {
+        case AuthoringComponentKind::Camera:
+            if (!entity.hasComponent<CameraComponent>()) {
+                entity.addComponent<CameraComponent>();
+                added = true;
+            }
+            break;
+        case AuthoringComponentKind::Light:
+            if (!entity.hasComponent<LightComponent>()) {
+                entity.addComponent<LightComponent>();
+                added = true;
+            }
+            break;
+        case AuthoringComponentKind::Mesh:
+            if (!entity.hasComponent<MeshComponent>()) {
+                entity.addComponent<MeshComponent>();
+                added = true;
+            }
+            break;
+        case AuthoringComponentKind::Script:
+            if (!entity.hasComponent<ScriptComponent>()) {
+                entity.addComponent<ScriptComponent>();
+                added = true;
+            }
+            break;
+    }
+
+    if (!added) {
+        return false;
+    }
+
+    markSceneDirty();
+    queueEvent(AuthoringEvent{
+        .type = AuthoringEventType::ComponentAdded,
+        .entity_id = entity.getUUID(),
+        .message = componentKindName(component_kind),
+    });
+    return true;
+}
+
+bool AuthoringSession::removeComponent(Entity entity, AuthoringComponentKind component_kind)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot remove component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    bool removed = false;
+    switch (component_kind) {
+        case AuthoringComponentKind::Camera:
+            if (entity.hasComponent<CameraComponent>()) {
+                entity.removeComponent<CameraComponent>();
+                removed = true;
+            }
+            break;
+        case AuthoringComponentKind::Light:
+            if (entity.hasComponent<LightComponent>()) {
+                entity.removeComponent<LightComponent>();
+                removed = true;
+            }
+            break;
+        case AuthoringComponentKind::Mesh:
+            if (entity.hasComponent<MeshComponent>()) {
+                entity.removeComponent<MeshComponent>();
+                removed = true;
+            }
+            break;
+        case AuthoringComponentKind::Script:
+            if (entity.hasComponent<ScriptComponent>()) {
+                entity.removeComponent<ScriptComponent>();
+                removed = true;
+            }
+            break;
+    }
+
+    if (!removed) {
+        return false;
+    }
+
+    markSceneDirty();
+    queueEvent(AuthoringEvent{
+        .type = AuthoringEventType::ComponentRemoved,
+        .entity_id = entity.getUUID(),
+        .message = componentKindName(component_kind),
+    });
+    return true;
+}
+
 Entity AuthoringSession::createEntityFromModelAsset(AssetHandle model_handle, Entity parent)
 {
     if (!model_handle.isValid() || !AssetDatabase::exists(model_handle)) {
@@ -587,6 +792,161 @@ bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_ha
     return changed;
 }
 
+bool AuthoringSession::setEntityName(Entity entity, std::string name)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot rename entity because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity) || !entity.hasComponent<TagComponent>()) {
+        return false;
+    }
+
+    auto& tag = entity.getComponent<TagComponent>().tag;
+    if (tag == name) {
+        return false;
+    }
+
+    tag = std::move(name);
+    markSceneDirty();
+    queueEntityModified(entity, tag);
+    return true;
+}
+
+bool AuthoringSession::setEntityTransform(Entity entity, const TransformComponent& transform)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot set entity transform because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity) || !entity.hasComponent<TransformComponent>()) {
+        return false;
+    }
+
+    if (sameTransformComponent(entity.getComponent<TransformComponent>(), transform)) {
+        return false;
+    }
+
+    entity.getComponent<TransformComponent>() = transform;
+    markSceneDirty();
+    queueEntityModified(entity);
+    return true;
+}
+
+bool AuthoringSession::setCameraComponent(Entity entity, const CameraComponent& camera_component)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot set camera component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    if (!entity.hasComponent<CameraComponent>()) {
+        entity.addComponent<CameraComponent>();
+        queueEvent(AuthoringEvent{
+            .type = AuthoringEventType::ComponentAdded,
+            .entity_id = entity.getUUID(),
+            .message = componentKindName(AuthoringComponentKind::Camera),
+        });
+    } else if (sameCameraComponent(entity.getComponent<CameraComponent>(), camera_component)) {
+        return false;
+    }
+
+    entity.getComponent<CameraComponent>() = camera_component;
+    markSceneDirty();
+    queueEntityModified(entity);
+    return true;
+}
+
+bool AuthoringSession::setLightComponent(Entity entity, const LightComponent& light_component)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot set light component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    if (!entity.hasComponent<LightComponent>()) {
+        entity.addComponent<LightComponent>();
+        queueEvent(AuthoringEvent{
+            .type = AuthoringEventType::ComponentAdded,
+            .entity_id = entity.getUUID(),
+            .message = componentKindName(AuthoringComponentKind::Light),
+        });
+    } else if (sameLightComponent(entity.getComponent<LightComponent>(), light_component)) {
+        return false;
+    }
+
+    entity.getComponent<LightComponent>() = light_component;
+    markSceneDirty();
+    queueEntityModified(entity);
+    return true;
+}
+
+bool AuthoringSession::setMeshComponent(Entity entity, const MeshComponent& mesh_component)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot set mesh component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    if (!entity.hasComponent<MeshComponent>()) {
+        entity.addComponent<MeshComponent>();
+        queueEvent(AuthoringEvent{
+            .type = AuthoringEventType::ComponentAdded,
+            .entity_id = entity.getUUID(),
+            .message = componentKindName(AuthoringComponentKind::Mesh),
+        });
+    } else if (sameMeshComponent(entity.getComponent<MeshComponent>(), mesh_component)) {
+        return false;
+    }
+
+    entity.getComponent<MeshComponent>() = mesh_component;
+    markSceneDirty();
+    queueEntityModified(entity);
+    return true;
+}
+
+bool AuthoringSession::setScriptComponent(Entity entity, const ScriptComponent& script_component)
+{
+    if (!hasBoundScene()) {
+        LUNA_CORE_WARN("Cannot set script component because no scene is bound");
+        return false;
+    }
+
+    if (!isBoundSceneEntity(scene(), entity)) {
+        return false;
+    }
+
+    if (!entity.hasComponent<ScriptComponent>()) {
+        entity.addComponent<ScriptComponent>();
+        queueEvent(AuthoringEvent{
+            .type = AuthoringEventType::ComponentAdded,
+            .entity_id = entity.getUUID(),
+            .message = componentKindName(AuthoringComponentKind::Script),
+        });
+    } else if (sameScriptComponent(entity.getComponent<ScriptComponent>(), script_component)) {
+        return false;
+    }
+
+    entity.getComponent<ScriptComponent>() = script_component;
+    markSceneDirty();
+    queueEntityModified(entity);
+    return true;
+}
+
 bool AuthoringSession::setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings)
 {
     if (!hasBoundScene()) {
@@ -630,6 +990,23 @@ bool AuthoringSession::setSceneShadowSettings(const SceneShadowSettings& setting
 void AuthoringSession::queueEvent(AuthoringEvent event)
 {
     m_events.push_back(std::move(event));
+}
+
+void AuthoringSession::queueEntityModified(Entity entity, std::string message)
+{
+    if (!entity) {
+        return;
+    }
+
+    if (message.empty()) {
+        message = entity.getName();
+    }
+
+    queueEvent(AuthoringEvent{
+        .type = AuthoringEventType::EntityModified,
+        .entity_id = entity.getUUID(),
+        .message = std::move(message),
+    });
 }
 
 } // namespace luna::authoring

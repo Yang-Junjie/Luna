@@ -19,6 +19,15 @@ enum class AuthoringEventType : uint8_t {
     EntityModified,
     EntityDestroyed,
     EntityReparented,
+    ComponentAdded,
+    ComponentRemoved,
+};
+
+enum class AuthoringComponentKind : uint8_t {
+    Camera,
+    Light,
+    Mesh,
+    Script,
 };
 
 struct AuthoringEvent {

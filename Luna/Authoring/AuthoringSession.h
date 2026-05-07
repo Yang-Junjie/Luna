@@ -50,16 +50,25 @@ public:
     [[nodiscard]] Entity createSpotLightEntity(Entity parent = {});
     [[nodiscard]] bool destroyEntity(Entity entity);
     [[nodiscard]] bool reparentEntity(Entity entity, Entity parent, bool preserve_world_transform = true);
+    [[nodiscard]] bool addComponent(Entity entity, AuthoringComponentKind component_kind);
+    [[nodiscard]] bool removeComponent(Entity entity, AuthoringComponentKind component_kind);
 
     [[nodiscard]] Entity createEntityFromModelAsset(AssetHandle model_handle, Entity parent = {});
     [[nodiscard]] Entity createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent = {});
     [[nodiscard]] Entity createPrimitiveEntity(AssetHandle mesh_handle, Entity parent = {});
     [[nodiscard]] bool applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle);
+    [[nodiscard]] bool setEntityName(Entity entity, std::string name);
+    [[nodiscard]] bool setEntityTransform(Entity entity, const TransformComponent& transform);
+    [[nodiscard]] bool setCameraComponent(Entity entity, const CameraComponent& camera_component);
+    [[nodiscard]] bool setLightComponent(Entity entity, const LightComponent& light_component);
+    [[nodiscard]] bool setMeshComponent(Entity entity, const MeshComponent& mesh_component);
+    [[nodiscard]] bool setScriptComponent(Entity entity, const ScriptComponent& script_component);
     [[nodiscard]] bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings);
     [[nodiscard]] bool setSceneShadowSettings(const SceneShadowSettings& settings);
 
 private:
     void queueEvent(AuthoringEvent event);
+    void queueEntityModified(Entity entity, std::string message = {});
     [[nodiscard]] bool hasBoundScene() const noexcept;
 
 private:

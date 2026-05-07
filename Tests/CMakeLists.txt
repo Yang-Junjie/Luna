@@ -13,6 +13,16 @@ add_executable(
     AuthoringSessionTests.cpp
 )
 
+add_executable(
+    AuthoringExecutorTests
+    AuthoringExecutorTests.cpp
+)
+
+add_executable(
+    AuthoringProtocolTests
+    AuthoringProtocolTests.cpp
+)
+
 set(LUNA_TEST_SCRIPT_PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ScriptPluginTestPlugins")
 set(LUNA_TEST_SCRIPT_PLUGIN_TARGETS)
 
@@ -87,6 +97,18 @@ target_link_libraries(
         LunaCore
 )
 
+target_link_libraries(
+    AuthoringExecutorTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
+    AuthoringProtocolTests
+    PRIVATE
+        LunaCore
+)
+
 target_compile_features(
     ScriptPluginContractTests
     PRIVATE
@@ -101,6 +123,18 @@ target_compile_features(
 
 target_compile_features(
     AuthoringSessionTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    AuthoringExecutorTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    AuthoringProtocolTests
     PRIVATE
         cxx_std_20
 )
@@ -130,4 +164,14 @@ add_test(
 add_test(
     NAME AuthoringSessionTests
     COMMAND AuthoringSessionTests
+)
+
+add_test(
+    NAME AuthoringExecutorTests
+    COMMAND AuthoringExecutorTests
+)
+
+add_test(
+    NAME AuthoringProtocolTests
+    COMMAND AuthoringProtocolTests
 )

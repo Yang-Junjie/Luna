@@ -133,6 +133,42 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
     context.expect(session.setSceneShadowSettings(shadow_settings),
                    "setting scene shadows should report a change");
 
+    context.expect(session.setEntityName(point_light, "Key Point Light"),
+                   "entity rename should report a change");
+    luna::TransformComponent point_transform = point_light.transform();
+    point_transform.translation = {1.0f, 2.0f, 3.0f};
+    context.expect(session.setEntityTransform(point_light, point_transform),
+                   "transform update should report a change");
+
+    luna::CameraComponent camera_component = bootstrap.camera.getComponent<luna::CameraComponent>();
+    camera_component.primary = false;
+    context.expect(session.setCameraComponent(bootstrap.camera, camera_component),
+                   "camera component update should report a change");
+
+    luna::LightComponent light_component = point_light.getComponent<luna::LightComponent>();
+    light_component.intensity = 25.0f;
+    context.expect(session.setLightComponent(point_light, light_component),
+                   "light component update should report a change");
+
+    context.expect(session.addComponent(point_light, luna::authoring::AuthoringComponentKind::Mesh),
+                   "component add helper should add a mesh component");
+    luna::MeshComponent mesh_component = point_light.getComponent<luna::MeshComponent>();
+    mesh_component.resizeSubmeshMaterials(1);
+    mesh_component.setSubmeshMaterial(0, luna::AssetHandle(123));
+    context.expect(session.setMeshComponent(point_light, mesh_component),
+                   "mesh component update should report a change");
+    context.expect(session.removeComponent(point_light, luna::authoring::AuthoringComponentKind::Mesh),
+                   "component remove helper should remove a mesh component");
+
+    context.expect(session.addComponent(point_light, luna::authoring::AuthoringComponentKind::Script),
+                   "component add helper should add a script component");
+    luna::ScriptComponent script_component = point_light.getComponent<luna::ScriptComponent>();
+    script_component.enabled = false;
+    context.expect(session.setScriptComponent(point_light, script_component),
+                   "script component update should report a change");
+    context.expect(session.removeComponent(point_light, luna::authoring::AuthoringComponentKind::Script),
+                   "component remove helper should remove a script component");
+
     const auto temporary_entity = session.createEntity("Temporary");
     luna::UUID temporary_entity_id(0);
     context.expect(temporary_entity, "generic entity helper should create an entity");
@@ -148,6 +184,12 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
                    "reparenting should emit entity reparented");
     context.expect(countEventType(mutation_events, luna::authoring::AuthoringEventType::SceneSettingsChanged) == 2,
                    "environment and shadow edits should emit scene settings events");
+    context.expect(hasEventType(mutation_events, luna::authoring::AuthoringEventType::ComponentAdded),
+                   "component additions should emit component added");
+    context.expect(hasEventType(mutation_events, luna::authoring::AuthoringEventType::ComponentRemoved),
+                   "component removals should emit component removed");
+    context.expect(hasEventType(mutation_events, luna::authoring::AuthoringEventType::EntityModified),
+                   "component and property edits should emit entity modified");
     context.expect(hasEventType(mutation_events, luna::authoring::AuthoringEventType::EntityDestroyed),
                    "destroying should emit entity destroyed");
 
@@ -194,6 +236,12 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
         context.expect(reloaded_point_light.getComponent<luna::LightComponent>().type ==
                            luna::LightComponent::Type::Point,
                        "point light should keep its type");
+        context.expect(reloaded_point_light.getName() == "Key Point Light",
+                       "point light should keep its authored name");
+        context.expect(sameVec3(reloaded_point_light.transform().translation, glm::vec3{1.0f, 2.0f, 3.0f}),
+                       "point light should keep its authored transform");
+        context.expect(reloaded_point_light.getComponent<luna::LightComponent>().intensity == 25.0f,
+                       "point light should keep its authored intensity");
     }
     if (reloaded_spot_light) {
         context.expect(reloaded_spot_light.getComponent<luna::LightComponent>().type ==

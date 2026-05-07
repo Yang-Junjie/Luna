@@ -81,7 +81,15 @@ public:
     Entity createSpotLightEntity(Entity parent = {}) override;
     bool destroyEntity(Entity entity) override;
     bool reparentEntity(Entity entity, Entity parent, bool preserve_world_transform = true) override;
+    bool addComponent(Entity entity, authoring::AuthoringComponentKind component_kind) override;
+    bool removeComponent(Entity entity, authoring::AuthoringComponentKind component_kind) override;
     void applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle) override;
+    bool setEntityName(Entity entity, std::string name) override;
+    bool setEntityTransform(Entity entity, const TransformComponent& transform) override;
+    bool setCameraComponent(Entity entity, const CameraComponent& camera_component) override;
+    bool setLightComponent(Entity entity, const LightComponent& light_component) override;
+    bool setMeshComponent(Entity entity, const MeshComponent& mesh_component) override;
+    bool setScriptComponent(Entity entity, const ScriptComponent& script_component) override;
     bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) override;
     bool setSceneShadowSettings(const SceneShadowSettings& settings) override;
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) override;

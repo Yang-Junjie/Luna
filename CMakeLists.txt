@@ -123,6 +123,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Runtime/CMakeLists.txt")
     add_subdirectory(Runtime)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/CLI/CMakeLists.txt")
+    add_subdirectory(CLI)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Plugins/CMakeLists.txt")
     add_subdirectory(Plugins)
 endif()

@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "luna": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts",
+    "interactive": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts interactive",
+    "smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts plan examples/smoke.plan.json"
+  }
+}

@@ -41,6 +41,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -864,11 +865,83 @@ bool LunaEditorLayer::reparentEntity(Entity entity, Entity parent, bool preserve
     return changed;
 }
 
+bool LunaEditorLayer::addComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
+{
+    const bool changed = m_authoring_session.addComponent(entity, component_kind);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::removeComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
+{
+    const bool changed = m_authoring_session.removeComponent(entity, component_kind);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
     if (m_authoring_session.applyMeshAssetToEntity(entity, mesh_handle)) {
         processAuthoringEvents();
     }
+}
+
+bool LunaEditorLayer::setEntityName(Entity entity, std::string name)
+{
+    const bool changed = m_authoring_session.setEntityName(entity, std::move(name));
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::setEntityTransform(Entity entity, const TransformComponent& transform)
+{
+    const bool changed = m_authoring_session.setEntityTransform(entity, transform);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::setCameraComponent(Entity entity, const CameraComponent& camera_component)
+{
+    const bool changed = m_authoring_session.setCameraComponent(entity, camera_component);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::setLightComponent(Entity entity, const LightComponent& light_component)
+{
+    const bool changed = m_authoring_session.setLightComponent(entity, light_component);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::setMeshComponent(Entity entity, const MeshComponent& mesh_component)
+{
+    const bool changed = m_authoring_session.setMeshComponent(entity, mesh_component);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
+}
+
+bool LunaEditorLayer::setScriptComponent(Entity entity, const ScriptComponent& script_component)
+{
+    const bool changed = m_authoring_session.setScriptComponent(entity, script_component);
+    if (changed) {
+        processAuthoringEvents();
+    }
+    return changed;
 }
 
 bool LunaEditorLayer::setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings)
@@ -1077,6 +1150,8 @@ void LunaEditorLayer::processAuthoringEvents()
             case authoring::AuthoringEventType::EntityModified:
             case authoring::AuthoringEventType::EntityDestroyed:
             case authoring::AuthoringEventType::EntityReparented:
+            case authoring::AuthoringEventType::ComponentAdded:
+            case authoring::AuthoringEventType::ComponentRemoved:
                 update_scene_label = true;
                 validate_selection = true;
                 break;

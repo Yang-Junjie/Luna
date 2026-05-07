@@ -187,8 +187,17 @@ set(PROJECT_SOURCE
 
 set(AUTHORING_SOURCE
     Authoring/AuthoringTypes.h
+    Authoring/AuthoringInspection.h
+    Authoring/AuthoringInspection.cpp
+    Authoring/AuthoringVerification.h
+    Authoring/AuthoringJson.h
+    Authoring/AuthoringJson.cpp
+    Authoring/AuthoringProtocol.h
+    Authoring/AuthoringProtocol.cpp
     Authoring/AuthoringSession.h
-    Authoring/AuthoringSession.cpp)
+    Authoring/AuthoringSession.cpp
+    Authoring/AuthoringExecutor.h
+    Authoring/AuthoringExecutor.cpp)
 
 set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h

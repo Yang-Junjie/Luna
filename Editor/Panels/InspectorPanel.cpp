@@ -13,6 +13,7 @@
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -41,31 +42,78 @@ void assignDefaultMaterialSlots(luna::MeshComponent& mesh_component)
     }
 }
 
-bool drawAddComponentPopup(luna::Entity selected_entity)
+bool addComponent(luna::EditorContext& editor_context,
+                  luna::Entity selected_entity,
+                  luna::authoring::AuthoringComponentKind component_kind,
+                  bool use_authoring)
+{
+    if (use_authoring) {
+        return editor_context.addComponent(selected_entity, component_kind);
+    }
+
+    switch (component_kind) {
+        case luna::authoring::AuthoringComponentKind::Mesh:
+            if (!selected_entity.hasComponent<luna::MeshComponent>()) {
+                selected_entity.addComponent<luna::MeshComponent>();
+                return true;
+            }
+            break;
+        case luna::authoring::AuthoringComponentKind::Camera:
+            if (!selected_entity.hasComponent<luna::CameraComponent>()) {
+                selected_entity.addComponent<luna::CameraComponent>();
+                return true;
+            }
+            break;
+        case luna::authoring::AuthoringComponentKind::Light:
+            if (!selected_entity.hasComponent<luna::LightComponent>()) {
+                selected_entity.addComponent<luna::LightComponent>();
+                return true;
+            }
+            break;
+        case luna::authoring::AuthoringComponentKind::Script:
+            if (!selected_entity.hasComponent<luna::ScriptComponent>()) {
+                selected_entity.addComponent<luna::ScriptComponent>();
+                return true;
+            }
+            break;
+    }
+
+    return false;
+}
+
+bool drawAddComponentPopup(luna::EditorContext& editor_context, luna::Entity selected_entity, bool use_authoring)
 {
     bool changed = false;
     if (ImGui::BeginPopup("AddComponentPopup")) {
         if (!selected_entity.hasComponent<luna::MeshComponent>() && ImGui::MenuItem("Mesh")) {
-            selected_entity.addComponent<luna::MeshComponent>();
-            changed = true;
+            changed |= addComponent(editor_context,
+                                    selected_entity,
+                                    luna::authoring::AuthoringComponentKind::Mesh,
+                                    use_authoring);
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<luna::CameraComponent>() && ImGui::MenuItem("Camera")) {
-            selected_entity.addComponent<luna::CameraComponent>();
-            changed = true;
+            changed |= addComponent(editor_context,
+                                    selected_entity,
+                                    luna::authoring::AuthoringComponentKind::Camera,
+                                    use_authoring);
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<luna::LightComponent>() && ImGui::MenuItem("Light")) {
-            selected_entity.addComponent<luna::LightComponent>();
-            changed = true;
+            changed |= addComponent(editor_context,
+                                    selected_entity,
+                                    luna::authoring::AuthoringComponentKind::Light,
+                                    use_authoring);
             ImGui::CloseCurrentPopup();
         }
 
         if (!selected_entity.hasComponent<luna::ScriptComponent>() && ImGui::MenuItem("Script")) {
-            selected_entity.addComponent<luna::ScriptComponent>();
-            changed = true;
+            changed |= addComponent(editor_context,
+                                    selected_entity,
+                                    luna::authoring::AuthoringComponentKind::Script,
+                                    use_authoring);
             ImGui::CloseCurrentPopup();
         }
 
@@ -75,23 +123,80 @@ bool drawAddComponentPopup(luna::Entity selected_entity)
     return changed;
 }
 
-bool drawEntityHeader(luna::Entity selected_entity)
+bool drawEntityHeader(luna::EditorContext& editor_context, luna::Entity selected_entity, bool use_authoring)
 {
     bool changed = false;
 
     ImGui::TextDisabled("Entity");
     auto& tag_component = selected_entity.getComponent<luna::TagComponent>();
-    changed |= luna::editor::ui::drawTextInput("Name", tag_component.tag, 256, kInspectorHeaderLayout);
+    if (use_authoring) {
+        std::string name = tag_component.tag;
+        if (luna::editor::ui::drawTextInput("Name", name, 256, kInspectorHeaderLayout)) {
+            changed |= editor_context.setEntityName(selected_entity, std::move(name));
+        }
+    } else {
+        changed |= luna::editor::ui::drawTextInput("Name", tag_component.tag, 256, kInspectorHeaderLayout);
+    }
     luna::editor::ui::drawTextValue("UUID", selected_entity.getUUID().toString(), kInspectorHeaderLayout);
 
     if (luna::editor::ui::drawButton("Add Component", luna::editor::ui::ButtonVariant::Subtle, ImVec2(-1.0f, 0.0f))) {
         ImGui::OpenPopup("AddComponentPopup");
     }
 
-    changed |= drawAddComponentPopup(selected_entity);
+    changed |= drawAddComponentPopup(editor_context, selected_entity, use_authoring);
     ImGui::Spacing();
     ImGui::Separator();
     return changed;
+}
+
+template <typename T, typename UIFunction, typename CommitFunction, typename RemoveFunction>
+bool drawInspectorComponentSection(const char* label,
+                                   luna::Entity entity,
+                                   UIFunction&& ui_function,
+                                   bool allow_remove,
+                                   bool use_authoring,
+                                   CommitFunction&& commit_component,
+                                   RemoveFunction&& remove_component)
+{
+    if (!entity.hasComponent<T>()) {
+        return false;
+    }
+
+    if (!use_authoring) {
+        return luna::editor::ui::drawComponentSection<T>(
+            label, entity, std::forward<UIFunction>(ui_function), allow_remove);
+    }
+
+    T component_draft = entity.getComponent<T>();
+    bool changed = false;
+    ImGui::PushID(label);
+
+    const bool open = luna::editor::ui::beginSection(label);
+
+    bool remove_requested = false;
+    if (allow_remove && ImGui::BeginPopupContextItem("ComponentSettings")) {
+        if (ImGui::MenuItem("Remove Component")) {
+            remove_requested = true;
+        }
+        ImGui::EndPopup();
+    }
+
+    if (open) {
+        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, luna::editor::ui::scale(10.0f));
+        changed |= ui_function(component_draft);
+        ImGui::PopStyleVar();
+        luna::editor::ui::endSection();
+    }
+
+    bool committed = false;
+    if (remove_requested) {
+        committed = remove_component();
+    } else if (changed) {
+        committed = commit_component(component_draft);
+    }
+
+    ImGui::PopID();
+    return committed || changed || remove_requested;
 }
 
 } // namespace
@@ -113,6 +218,7 @@ void InspectorPanel::onImGuiRender()
     editor::ui::pushCompactInspectorStyle();
 
     const bool editing_runtime_scene = m_editor_context->isRuntimeViewportEnabled();
+    const bool use_authoring = !editing_runtime_scene;
     bool scene_changed = false;
 
     Entity selected_entity = m_editor_context->getSelectedEntity();
@@ -128,9 +234,9 @@ void InspectorPanel::onImGuiRender()
         return;
     }
 
-    scene_changed |= drawEntityHeader(selected_entity);
+    scene_changed |= drawEntityHeader(*m_editor_context, selected_entity, use_authoring);
 
-    scene_changed |= editor::ui::drawComponentSection<TransformComponent>(
+    scene_changed |= drawInspectorComponentSection<TransformComponent>(
         "Transform", selected_entity, [&](TransformComponent& transform) {
             bool changed = false;
             changed |= editor::ui::drawVec3Control("Translation", transform.translation, 0.0f);
@@ -144,7 +250,14 @@ void InspectorPanel::onImGuiRender()
             changed |= editor::ui::drawVec3Control("Scale", transform.scale, 1.0f);
             return changed;
         },
-        false);
+        false,
+        use_authoring,
+        [&](const TransformComponent& transform) {
+            return m_editor_context->setEntityTransform(selected_entity, transform);
+        },
+        []() {
+            return false;
+        });
 
     scene_changed |= editor::ui::drawComponentSection<RelationshipComponent>(
         "Relationship", selected_entity, [&](RelationshipComponent&) {
@@ -158,7 +271,11 @@ void InspectorPanel::onImGuiRender()
                 }
                 if (ImGui::BeginPopupContextItem("ParentContext")) {
                     if (ImGui::MenuItem("Detach From Parent")) {
-                        changed |= m_editor_context->reparentEntity(selected_entity, {}, true);
+                        if (use_authoring) {
+                            changed |= m_editor_context->reparentEntity(selected_entity, {}, true);
+                        } else {
+                            changed |= selected_entity.clearParent(true);
+                        }
                     }
                     ImGui::EndPopup();
                 }
@@ -187,7 +304,7 @@ void InspectorPanel::onImGuiRender()
         },
         false);
 
-    scene_changed |= editor::ui::drawComponentSection<CameraComponent>(
+    scene_changed |= drawInspectorComponentSection<CameraComponent>(
         "Camera", selected_entity, [&](CameraComponent& camera_component) {
             bool changed = false;
             changed |= editor::ui::drawBool("Primary", camera_component.primary);
@@ -232,9 +349,16 @@ void InspectorPanel::onImGuiRender()
             }
             return changed;
         },
-        true);
+        true,
+        use_authoring,
+        [&](const CameraComponent& camera_component) {
+            return m_editor_context->setCameraComponent(selected_entity, camera_component);
+        },
+        [&]() {
+            return m_editor_context->removeComponent(selected_entity, authoring::AuthoringComponentKind::Camera);
+        });
 
-    scene_changed |= editor::ui::drawComponentSection<LightComponent>(
+    scene_changed |= drawInspectorComponentSection<LightComponent>(
         "Light", selected_entity, [](LightComponent& light_component) {
             bool changed = false;
             changed |= editor::ui::drawBool("Enabled", light_component.enabled);
@@ -293,9 +417,16 @@ void InspectorPanel::onImGuiRender()
             }
             return changed;
         },
-        true);
+        true,
+        use_authoring,
+        [&](const LightComponent& light_component) {
+            return m_editor_context->setLightComponent(selected_entity, light_component);
+        },
+        [&]() {
+            return m_editor_context->removeComponent(selected_entity, authoring::AuthoringComponentKind::Light);
+        });
 
-    scene_changed |= editor::ui::drawComponentSection<MeshComponent>(
+    scene_changed |= drawInspectorComponentSection<MeshComponent>(
         "Mesh", selected_entity, [&](MeshComponent& mesh_component) {
             bool changed = false;
             const AssetHandle previous_mesh_handle = mesh_component.meshHandle;
@@ -459,9 +590,16 @@ void InspectorPanel::onImGuiRender()
             }
             return changed;
         },
-        true);
+        true,
+        use_authoring,
+        [&](const MeshComponent& mesh_component) {
+            return m_editor_context->setMeshComponent(selected_entity, mesh_component);
+        },
+        [&]() {
+            return m_editor_context->removeComponent(selected_entity, authoring::AuthoringComponentKind::Mesh);
+        });
 
-    scene_changed |= editor::ui::drawComponentSection<ScriptComponent>(
+    scene_changed |= drawInspectorComponentSection<ScriptComponent>(
         "Script", selected_entity, [this, selected_entity, editing_runtime_scene](ScriptComponent& script_component) {
             const ScriptComponentInspectorChange change = drawScriptComponentInspector(selected_entity, script_component);
             if (editing_runtime_scene && change.property_value_changed) {
@@ -471,11 +609,14 @@ void InspectorPanel::onImGuiRender()
             }
             return change.changed;
         },
-        true);
-
-    if (scene_changed && !editing_runtime_scene) {
-        m_editor_context->markSceneDirty();
-    }
+        true,
+        use_authoring,
+        [&](const ScriptComponent& script_component) {
+            return m_editor_context->setScriptComponent(selected_entity, script_component);
+        },
+        [&]() {
+            return m_editor_context->removeComponent(selected_entity, authoring::AuthoringComponentKind::Script);
+        });
 
     editor::ui::popCompactInspectorStyle();
     ImGui::End();
