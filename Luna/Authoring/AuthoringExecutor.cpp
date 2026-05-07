@@ -21,14 +21,100 @@
 namespace luna::authoring {
 namespace {
 
-void addError(AuthoringReport& report, std::string message)
+const char* commandKindName(AuthoringCommandKind kind)
 {
-    report.errors.push_back(std::move(message));
+    switch (kind) {
+        case AuthoringCommandKind::NewScene:
+            return "new";
+        case AuthoringCommandKind::OpenScene:
+            return "open";
+        case AuthoringCommandKind::SaveScene:
+            return "save";
+        case AuthoringCommandKind::CreateEntity:
+            return "entity";
+        case AuthoringCommandKind::CreateCamera:
+            return "camera";
+        case AuthoringCommandKind::CreateDirectionalLight:
+            return "directional-light";
+        case AuthoringCommandKind::CreatePointLight:
+            return "point-light";
+        case AuthoringCommandKind::CreateSpotLight:
+            return "spot-light";
+        case AuthoringCommandKind::CreatePrimitive:
+            return "primitive";
+        case AuthoringCommandKind::Parent:
+            return "parent";
+        case AuthoringCommandKind::Unparent:
+            return "unparent";
+        case AuthoringCommandKind::Rename:
+            return "name";
+        case AuthoringCommandKind::SetTransform:
+            return "transform";
+        case AuthoringCommandKind::SetLightIntensity:
+            return "light-intensity";
+        case AuthoringCommandKind::SetLightColor:
+            return "light-color";
+        case AuthoringCommandKind::SetCameraPerspective:
+            return "camera-perspective";
+        case AuthoringCommandKind::SetCameraOrthographic:
+            return "camera-orthographic";
+        case AuthoringCommandKind::InspectScene:
+        case AuthoringCommandKind::InspectEntity:
+        case AuthoringCommandKind::InspectHierarchy:
+            return "inspect";
+        case AuthoringCommandKind::VerifySceneSaved:
+        case AuthoringCommandKind::VerifyEntityExists:
+        case AuthoringCommandKind::VerifyHasComponent:
+        case AuthoringCommandKind::VerifyEntityCountAtLeast:
+            return "verify";
+        case AuthoringCommandKind::Summary:
+            return "summary";
+    }
+
+    return "unknown";
 }
 
-bool failVerification(AuthoringReport& report, AuthoringVerification verification)
+void addDiagnostic(AuthoringReport& report,
+                   AuthoringDiagnosticCode code,
+                   std::string message,
+                   size_t command_index,
+                   const AuthoringCommand& command,
+                   AuthoringDiagnosticPhase phase = AuthoringDiagnosticPhase::Execute,
+                   std::string entity_ref = {},
+                   std::string component = {},
+                   std::filesystem::path path = {},
+                   std::string field = {})
 {
-    report.errors.push_back("Verification failed: " + verification.message);
+    appendAuthoringDiagnostic(report,
+                              {
+                                  .severity = AuthoringDiagnosticSeverity::Error,
+                                  .phase = phase,
+                                  .code = code,
+                                  .has_command_index = true,
+                                  .command_index = command_index,
+                                  .command = commandKindName(command.kind),
+                                  .field = std::move(field),
+                                  .entity_ref = std::move(entity_ref),
+                                  .component = std::move(component),
+                                  .path = std::move(path),
+                                  .message = std::move(message),
+                              });
+}
+
+bool failVerification(AuthoringReport& report,
+                      AuthoringVerification verification,
+                      AuthoringDiagnosticCode code,
+                      size_t command_index,
+                      const AuthoringCommand& command)
+{
+    addDiagnostic(report,
+                  code,
+                  "Verification failed: " + verification.message,
+                  command_index,
+                  command,
+                  AuthoringDiagnosticPhase::Verify,
+                  verification.ref,
+                  verification.component);
     report.verifications.push_back(std::move(verification));
     return false;
 }
@@ -177,26 +263,52 @@ Entity AuthoringExecutor::resolveEntity(std::string_view reference) const
     return m_session.scene().entityManager().findEntityByUUID(UUID(uuid));
 }
 
-bool AuthoringExecutor::requireEntity(std::string_view reference, Entity& entity, AuthoringReport& report) const
+bool AuthoringExecutor::requireEntity(std::string_view reference,
+                                      Entity& entity,
+                                      AuthoringReport& report,
+                                      size_t command_index,
+                                      const AuthoringCommand& command) const
 {
     entity = resolveEntity(reference);
     if (entity) {
         return true;
     }
 
-    addError(report, "Unknown entity reference '" + std::string(reference) + "'.");
+    addDiagnostic(report,
+                  AuthoringDiagnosticCode::UnknownEntity,
+                  "Unknown entity reference '" + std::string(reference) + "'.",
+                  command_index,
+                  command,
+                  AuthoringDiagnosticPhase::Execute,
+                  std::string(reference));
     return false;
 }
 
-bool AuthoringExecutor::rememberAlias(const std::string& alias, Entity entity, AuthoringReport& report)
+bool AuthoringExecutor::rememberAlias(const std::string& alias,
+                                      Entity entity,
+                                      AuthoringReport& report,
+                                      size_t command_index,
+                                      const AuthoringCommand& command)
 {
     if (alias.empty()) {
-        addError(report, "Entity alias cannot be empty.");
+        addDiagnostic(report,
+                      AuthoringDiagnosticCode::InvalidArgument,
+                      "Entity alias cannot be empty.",
+                      command_index,
+                      command,
+                      AuthoringDiagnosticPhase::Execute,
+                      alias);
         return false;
     }
 
     if (!entity) {
-        addError(report, "Command did not create an entity for alias '" + alias + "'.");
+        addDiagnostic(report,
+                      AuthoringDiagnosticCode::ExecutionFailed,
+                      "Command did not create an entity for alias '" + alias + "'.",
+                      command_index,
+                      command,
+                      AuthoringDiagnosticPhase::Execute,
+                      alias);
         return false;
     }
 
@@ -226,12 +338,19 @@ void AuthoringExecutor::refreshEntityBindingName(Entity entity, AuthoringReport&
 bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& report)
 {
     if (!m_session.hasScene()) {
-        addError(report, "Authoring executor has no bound scene.");
+        appendAuthoringDiagnostic(report,
+                                  {
+                                      .severity = AuthoringDiagnosticSeverity::Error,
+                                      .phase = AuthoringDiagnosticPhase::Execute,
+                                      .code = AuthoringDiagnosticCode::NoBoundScene,
+                                      .message = "Authoring executor has no bound scene.",
+                                  });
         report.scene = captureAuthoringSceneSnapshot(m_session);
         return false;
     }
 
-    for (const AuthoringCommand& command : plan.commands) {
+    for (size_t command_index = 0; command_index < plan.commands.size(); ++command_index) {
+        const AuthoringCommand& command = plan.commands[command_index];
         switch (command.kind) {
             case AuthoringCommandKind::NewScene:
                 (void) m_session.createScene();
@@ -242,7 +361,15 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             case AuthoringCommandKind::OpenScene: {
                 const std::filesystem::path scene_path = resolveScenePath(command.path);
                 if (!m_session.openScene(scene_path)) {
-                    addError(report, "Failed to open scene '" + scene_path.string() + "'.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::OpenSceneFailed,
+                                  "Failed to open scene '" + scene_path.string() + "'.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  {},
+                                  {},
+                                  scene_path);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -254,7 +381,15 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             case AuthoringCommandKind::SaveScene: {
                 const std::filesystem::path scene_path = resolveScenePath(command.path);
                 if (!m_session.saveSceneAs(scene_path)) {
-                    addError(report, "Failed to save scene '" + scene_path.string() + "'.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::SaveSceneFailed,
+                                  "Failed to save scene '" + scene_path.string() + "'.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  {},
+                                  {},
+                                  scene_path);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -263,35 +398,39 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             }
 
             case AuthoringCommandKind::CreateEntity:
-                if (!rememberAlias(command.alias, m_session.createEntity(command.name), report)) {
+                if (!rememberAlias(command.alias, m_session.createEntity(command.name), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 break;
 
             case AuthoringCommandKind::CreateCamera:
-                if (!rememberAlias(command.alias, m_session.createCameraEntity(), report)) {
+                if (!rememberAlias(command.alias, m_session.createCameraEntity(), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 break;
 
             case AuthoringCommandKind::CreateDirectionalLight:
-                if (!rememberAlias(command.alias, m_session.createDirectionalLightEntity(), report)) {
+                if (!rememberAlias(command.alias,
+                                   m_session.createDirectionalLightEntity(),
+                                   report,
+                                   command_index,
+                                   command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 break;
 
             case AuthoringCommandKind::CreatePointLight:
-                if (!rememberAlias(command.alias, m_session.createPointLightEntity(), report)) {
+                if (!rememberAlias(command.alias, m_session.createPointLightEntity(), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 break;
 
             case AuthoringCommandKind::CreateSpotLight:
-                if (!rememberAlias(command.alias, m_session.createSpotLightEntity(), report)) {
+                if (!rememberAlias(command.alias, m_session.createSpotLightEntity(), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -300,11 +439,24 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             case AuthoringCommandKind::CreatePrimitive: {
                 const std::optional<AssetHandle> mesh_handle = findBuiltinMesh(command.mesh);
                 if (!mesh_handle) {
-                    addError(report, "Unknown builtin mesh '" + command.mesh + "'.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::UnknownBuiltinAsset,
+                                  "Unknown builtin mesh '" + command.mesh + "'.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  {},
+                                  {},
+                                  {},
+                                  "mesh");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
-                if (!rememberAlias(command.alias, m_session.createPrimitiveEntity(*mesh_handle), report)) {
+                if (!rememberAlias(command.alias,
+                                   m_session.createPrimitiveEntity(*mesh_handle),
+                                   report,
+                                   command_index,
+                                   command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -314,13 +466,17 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             case AuthoringCommandKind::Parent: {
                 Entity child;
                 Entity parent;
-                if (!requireEntity(command.child.value, child, report) ||
-                    !requireEntity(command.parent.value, parent, report)) {
+                if (!requireEntity(command.child.value, child, report, command_index, command) ||
+                    !requireEntity(command.parent.value, parent, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (!m_session.reparentEntity(child, parent, true)) {
-                    addError(report, "Failed to parent entity.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to parent entity.",
+                                  command_index,
+                                  command);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -329,12 +485,16 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::Unparent: {
                 Entity child;
-                if (!requireEntity(command.child.value, child, report)) {
+                if (!requireEntity(command.child.value, child, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (!m_session.reparentEntity(child, {}, true)) {
-                    addError(report, "Failed to unparent entity.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to unparent entity.",
+                                  command_index,
+                                  command);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -343,12 +503,18 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::Rename: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (entity.getName() != command.name && !m_session.setEntityName(entity, command.name)) {
-                    addError(report, "Failed to rename entity.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to rename entity.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -358,12 +524,19 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SetTransform: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (!entity.hasComponent<TransformComponent>()) {
-                    addError(report, "Entity does not have a Transform component.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::MissingComponent,
+                                  "Entity does not have a Transform component.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Transform");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -373,7 +546,13 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 transform.scale = command.scale;
                 if (!sameTransformComponent(entity.transform(), transform) &&
                     !m_session.setEntityTransform(entity, transform)) {
-                    addError(report, "Failed to set transform.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to set transform.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value);
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -382,12 +561,19 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SetLightIntensity: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (!entity.hasComponent<LightComponent>()) {
-                    addError(report, "Entity does not have a Light component.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::MissingComponent,
+                                  "Entity does not have a Light component.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Light");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -395,7 +581,14 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 light.intensity = command.value;
                 if (!sameLightComponent(entity.getComponent<LightComponent>(), light) &&
                     !m_session.setLightComponent(entity, light)) {
-                    addError(report, "Failed to set light intensity.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to set light intensity.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Light");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -404,12 +597,19 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SetLightColor: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
                 if (!entity.hasComponent<LightComponent>()) {
-                    addError(report, "Entity does not have a Light component.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::MissingComponent,
+                                  "Entity does not have a Light component.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Light");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -417,7 +617,14 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 light.color = command.color;
                 if (!sameLightComponent(entity.getComponent<LightComponent>(), light) &&
                     !m_session.setLightComponent(entity, light)) {
-                    addError(report, "Failed to set light color.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to set light color.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Light");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -426,7 +633,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SetCameraPerspective: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -438,7 +645,14 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 camera.perspectiveFar = command.far_plane;
                 if (!(had_camera && sameCameraComponent(entity.getComponent<CameraComponent>(), camera)) &&
                     !m_session.setCameraComponent(entity, camera)) {
-                    addError(report, "Failed to set camera perspective.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to set camera perspective.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Camera");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -447,7 +661,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SetCameraOrthographic: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -459,7 +673,14 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 camera.orthographicFar = command.far_plane;
                 if (!(had_camera && sameCameraComponent(entity.getComponent<CameraComponent>(), camera)) &&
                     !m_session.setCameraComponent(entity, camera)) {
-                    addError(report, "Failed to set camera orthographic projection.");
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::ExecutionFailed,
+                                  "Failed to set camera orthographic projection.",
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  command.entity.value,
+                                  "Camera");
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -472,7 +693,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::InspectEntity: {
                 Entity entity;
-                if (!requireEntity(command.entity.value, entity, report)) {
+                if (!requireEntity(command.entity.value, entity, report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -493,12 +714,20 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 if (m_session.sceneFilePath().empty()) {
                     verification.message = "Scene has no save path.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::VerificationFailed,
+                                            command_index,
+                                            command);
                 }
                 if (m_session.isSceneDirty()) {
                     verification.message = "Scene has unsaved changes.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::VerificationFailed,
+                                            command_index,
+                                            command);
                 }
 
                 (void) passVerification(report, std::move(verification));
@@ -516,7 +745,11 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 if (!entity) {
                     verification.message = "Unknown entity reference '" + command.entity.value + "'.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::UnknownEntity,
+                                            command_index,
+                                            command);
                 }
 
                 verification.entity_id = entity.getUUID();
@@ -536,7 +769,11 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 if (!entity) {
                     verification.message = "Unknown entity reference '" + command.entity.value + "'.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::UnknownEntity,
+                                            command_index,
+                                            command);
                 }
 
                 verification.entity_id = entity.getUUID();
@@ -544,7 +781,11 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                     verification.message =
                         "Entity '" + command.entity.value + "' does not have component '" + command.component + "'.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::MissingComponent,
+                                            command_index,
+                                            command);
                 }
 
                 (void) passVerification(report, std::move(verification));
@@ -563,7 +804,11 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 if (actual_count < command.count) {
                     verification.message = "Scene entity count is below minimum.";
                     report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return failVerification(report, std::move(verification));
+                    return failVerification(report,
+                                            std::move(verification),
+                                            AuthoringDiagnosticCode::VerificationFailed,
+                                            command_index,
+                                            command);
                 }
 
                 (void) passVerification(report, std::move(verification));

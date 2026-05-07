@@ -88,11 +88,50 @@ The `protocol` field is optional for v1 compatibility. If present, `name` must b
   "savedScenes": [],
   "inspections": [],
   "verifications": [],
+  "diagnostics": [],
   "errors": []
 }
 ```
 
 Exit code is `0` when `ok=true`, otherwise `1`.
+
+`errors` is retained as the legacy human-readable error list. New automation, AI, and editor integrations should prefer `diagnostics`.
+
+Diagnostics are structured objects:
+
+```json
+{
+  "severity": "error",
+  "phase": "execute",
+  "code": "UnknownEntity",
+  "message": "Unknown entity reference 'Box'.",
+  "commandIndex": 2,
+  "command": "transform",
+  "field": null,
+  "entityRef": "Box",
+  "component": null,
+  "path": null
+}
+```
+
+Stable diagnostic codes currently include:
+
+- `InvalidPlan`
+- `ProtocolMismatch`
+- `UnsupportedCommand`
+- `UnsupportedVerifyCheck`
+- `MissingArgument`
+- `InvalidArgument`
+- `InvalidNumber`
+- `NoBoundScene`
+- `UnknownEntity`
+- `UnknownBuiltinAsset`
+- `MissingComponent`
+- `OpenSceneFailed`
+- `SaveSceneFailed`
+- `ProjectLoadFailed`
+- `ExecutionFailed`
+- `VerificationFailed`
 
 ## Versioning
 

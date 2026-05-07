@@ -48,6 +48,38 @@ enum class AuthoringCommandKind : uint8_t {
     Summary,
 };
 
+enum class AuthoringDiagnosticSeverity : uint8_t {
+    Info,
+    Warning,
+    Error,
+};
+
+enum class AuthoringDiagnosticPhase : uint8_t {
+    Parse,
+    Validate,
+    Execute,
+    Verify,
+};
+
+enum class AuthoringDiagnosticCode : uint8_t {
+    InvalidPlan,
+    ProtocolMismatch,
+    UnsupportedCommand,
+    UnsupportedVerifyCheck,
+    MissingArgument,
+    InvalidArgument,
+    InvalidNumber,
+    NoBoundScene,
+    UnknownEntity,
+    UnknownBuiltinAsset,
+    MissingComponent,
+    OpenSceneFailed,
+    SaveSceneFailed,
+    ProjectLoadFailed,
+    ExecutionFailed,
+    VerificationFailed,
+};
+
 struct AuthoringEntityRef {
     std::string value;
 };
@@ -102,6 +134,20 @@ struct AuthoringSceneSnapshot {
     bool dirty{false};
 };
 
+struct AuthoringDiagnostic {
+    AuthoringDiagnosticSeverity severity{AuthoringDiagnosticSeverity::Error};
+    AuthoringDiagnosticPhase phase{AuthoringDiagnosticPhase::Execute};
+    AuthoringDiagnosticCode code{AuthoringDiagnosticCode::ExecutionFailed};
+    bool has_command_index{false};
+    size_t command_index{0};
+    std::string command;
+    std::string field;
+    std::string entity_ref;
+    std::string component;
+    std::filesystem::path path;
+    std::string message;
+};
+
 struct AuthoringReport {
     AuthoringProtocolInfo protocol;
     AuthoringSceneSnapshot scene;
@@ -109,14 +155,18 @@ struct AuthoringReport {
     std::vector<std::filesystem::path> saved_scenes;
     std::vector<AuthoringInspection> inspections;
     std::vector<AuthoringVerification> verifications;
+    std::vector<AuthoringDiagnostic> diagnostics;
     std::vector<std::string> errors;
 };
 
 [[nodiscard]] AuthoringSceneSnapshot captureAuthoringSceneSnapshot(const AuthoringSession& session);
 
+void appendAuthoringDiagnostic(AuthoringReport& report, AuthoringDiagnostic diagnostic);
+
 [[nodiscard]] bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
                                                AuthoringPlan& plan,
                                                std::vector<std::string>& errors,
-                                               size_t start_index = 0);
+                                               size_t start_index = 0,
+                                               std::vector<AuthoringDiagnostic>* diagnostics = nullptr);
 
 } // namespace luna::authoring

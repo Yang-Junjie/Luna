@@ -81,9 +81,21 @@ void testCommandTokenParseErrors(TestContext& context)
 
     luna::authoring::AuthoringPlan plan;
     std::vector<std::string> errors;
-    context.expect(!luna::authoring::parseAuthoringCommandTokens(tokens, plan, errors),
+    std::vector<luna::authoring::AuthoringDiagnostic> diagnostics;
+    context.expect(!luna::authoring::parseAuthoringCommandTokens(tokens, plan, errors, 0, &diagnostics),
                    "invalid authoring tokens should fail");
     context.expect(!errors.empty(), "invalid authoring tokens should report parse errors");
+    context.expect(diagnostics.size() == 1, "invalid authoring tokens should report one diagnostic");
+    if (!diagnostics.empty()) {
+        context.expect(diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                       "invalid entity count should use InvalidNumber diagnostic code");
+        context.expect(diagnostics.front().phase == luna::authoring::AuthoringDiagnosticPhase::Parse,
+                       "token parse diagnostic should use parse phase");
+        context.expect(diagnostics.front().has_command_index && diagnostics.front().command_index == 0,
+                       "token parse diagnostic should include command index");
+        context.expect(diagnostics.front().command == "verify",
+                       "token parse diagnostic should include command name");
+    }
 }
 
 void testAuthoringReportJson(TestContext& context)
@@ -107,9 +119,21 @@ void testAuthoringReportJson(TestContext& context)
         .entity_id = luna::UUID(42),
         .message = "Entity exists.",
     });
+    luna::authoring::appendAuthoringDiagnostic(report,
+                                               {
+                                                   .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                                                   .phase = luna::authoring::AuthoringDiagnosticPhase::Execute,
+                                                   .code = luna::authoring::AuthoringDiagnosticCode::MissingComponent,
+                                                   .has_command_index = true,
+                                                   .command_index = 2,
+                                                   .command = "transform",
+                                                   .entity_ref = "Box",
+                                                   .component = "Transform",
+                                                   .message = "Entity does not have a Transform component.",
+                                               });
 
     std::ostringstream stream;
-    luna::authoring::writeAuthoringReportJson(stream, report, true);
+    luna::authoring::writeAuthoringReportJson(stream, report, false);
 
     YAML::Node root;
     try {
@@ -123,13 +147,32 @@ void testAuthoringReportJson(TestContext& context)
                    "report JSON should include protocol name");
     context.expect(root["protocol"]["version"].as<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
                    "report JSON should include protocol version");
-    context.expect(root["ok"].as<bool>(), "report JSON should include ok flag");
+    context.expect(!root["ok"].as<bool>(), "report JSON should include ok flag");
     context.expect(root["scene"]["entityCount"].as<size_t>() == 3,
                    "report JSON should include scene entity count");
     context.expect(root["entities"].IsSequence() && root["entities"].size() == 1,
                    "report JSON should include entity bindings");
     context.expect(root["verifications"].IsSequence() && root["verifications"].size() == 1,
                    "report JSON should include verifications");
+    context.expect(root["diagnostics"].IsSequence() && root["diagnostics"].size() == 1,
+                   "report JSON should include diagnostics");
+    if (root["diagnostics"].IsSequence() && root["diagnostics"].size() == 1) {
+        const YAML::Node diagnostic = root["diagnostics"][0];
+        context.expect(diagnostic["code"].as<std::string>() == "MissingComponent",
+                       "diagnostic JSON should include stable code");
+        context.expect(diagnostic["phase"].as<std::string>() == "execute",
+                       "diagnostic JSON should include phase");
+        context.expect(diagnostic["severity"].as<std::string>() == "error",
+                       "diagnostic JSON should include severity");
+        context.expect(diagnostic["commandIndex"].as<size_t>() == 2,
+                       "diagnostic JSON should include command index");
+        context.expect(diagnostic["entityRef"].as<std::string>() == "Box",
+                       "diagnostic JSON should include entity ref");
+        context.expect(diagnostic["component"].as<std::string>() == "Transform",
+                       "diagnostic JSON should include component");
+    }
+    context.expect(root["errors"].IsSequence() && root["errors"].size() == 1,
+                   "diagnostic errors should still be mirrored into errors array");
 }
 
 } // namespace

@@ -21,8 +21,16 @@ public:
 
 private:
     [[nodiscard]] Entity resolveEntity(std::string_view reference) const;
-    [[nodiscard]] bool requireEntity(std::string_view reference, Entity& entity, AuthoringReport& report) const;
-    [[nodiscard]] bool rememberAlias(const std::string& alias, Entity entity, AuthoringReport& report);
+    [[nodiscard]] bool requireEntity(std::string_view reference,
+                                     Entity& entity,
+                                     AuthoringReport& report,
+                                     size_t command_index,
+                                     const AuthoringCommand& command) const;
+    [[nodiscard]] bool rememberAlias(const std::string& alias,
+                                     Entity entity,
+                                     AuthoringReport& report,
+                                     size_t command_index,
+                                     const AuthoringCommand& command);
     void refreshEntityBindingName(Entity entity, AuthoringReport& report) const;
 
 private:

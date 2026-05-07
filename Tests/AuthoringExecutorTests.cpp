@@ -147,6 +147,7 @@ void testExecutorAppliesTypedPlan(TestContext& context)
     luna::authoring::AuthoringReport report;
     context.expect(executor.execute(plan, report), "typed authoring plan should execute");
     context.expect(report.errors.empty(), "typed authoring plan should not report errors");
+    context.expect(report.diagnostics.empty(), "typed authoring plan should not report diagnostics");
     context.expect(report.entities.size() == 2, "report should include two explicit aliases");
     context.expect(report.inspections.size() == 2, "report should include requested inspections");
     context.expect(report.verifications.size() == 4, "report should include requested verifications");
@@ -189,6 +190,38 @@ void testExecutorAppliesTypedPlan(TestContext& context)
     context.expect(report.inspections.back().entities.size() == 4, "hierarchy inspection should include all entities");
 }
 
+void testExecutorReportsStructuredDiagnostics(TestContext& context)
+{
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::Rename,
+        .name = "NeverRenamed",
+        .entity = {.value = "MissingEntity"},
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(!executor.execute(plan, report), "unknown entity plan should fail");
+    context.expect(!report.errors.empty(), "unknown entity plan should preserve legacy errors");
+    context.expect(report.diagnostics.size() == 1, "unknown entity plan should report one diagnostic");
+    if (!report.diagnostics.empty()) {
+        const luna::authoring::AuthoringDiagnostic& diagnostic = report.diagnostics.front();
+        context.expect(diagnostic.code == luna::authoring::AuthoringDiagnosticCode::UnknownEntity,
+                       "unknown entity should use UnknownEntity code");
+        context.expect(diagnostic.phase == luna::authoring::AuthoringDiagnosticPhase::Execute,
+                       "unknown entity should use execute phase");
+        context.expect(diagnostic.has_command_index && diagnostic.command_index == 1,
+                       "unknown entity should include failing command index");
+        context.expect(diagnostic.command == "name", "unknown entity should include command name");
+        context.expect(diagnostic.entity_ref == "MissingEntity",
+                       "unknown entity should include unresolved entity ref");
+    }
+}
+
 } // namespace
 
 int main()
@@ -198,6 +231,7 @@ int main()
 
     TestContext context;
     testExecutorAppliesTypedPlan(context);
+    testExecutorReportsStructuredDiagnostics(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();

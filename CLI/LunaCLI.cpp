@@ -21,6 +21,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -81,10 +82,60 @@ void printUsage()
 
 void reportError(CliState& state, std::string message)
 {
-    state.report.errors.push_back(message);
+    luna::authoring::appendAuthoringDiagnostic(state.report,
+                                               {
+                                                   .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                                                   .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
+                                                   .code = luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                                                   .message = message,
+                                               });
     if (!state.json_output) {
         std::cerr << message << '\n';
     }
+}
+
+void reportDiagnostic(CliState& state, luna::authoring::AuthoringDiagnostic diagnostic)
+{
+    const std::string message = diagnostic.message;
+    luna::authoring::appendAuthoringDiagnostic(state.report, std::move(diagnostic));
+    if (!state.json_output) {
+        std::cerr << message << '\n';
+    }
+}
+
+void reportPlanDiagnostic(CliState& state,
+                          luna::authoring::AuthoringDiagnosticCode code,
+                          std::string message,
+                          std::string field = {})
+{
+    reportDiagnostic(state,
+                     {
+                         .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                         .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
+                         .code = code,
+                         .field = std::move(field),
+                         .message = std::move(message),
+                     });
+}
+
+void reportCommandDiagnostic(CliState& state,
+                             luna::authoring::AuthoringDiagnosticCode code,
+                             std::string message,
+                             size_t command_index,
+                             std::string command = {},
+                             std::string field = {})
+{
+    reportDiagnostic(state,
+                     {
+                         .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                         .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
+                         .code = code,
+                         .has_command_index = true,
+                         .command_index = command_index,
+                         .command = std::move(command),
+                         .field = std::move(field),
+                         .message = std::move(message),
+                     });
 }
 
 ParsedCliOptions parseCliOptions(const std::vector<std::string>& args)
@@ -150,19 +201,28 @@ std::string planFieldName(size_t command_index, std::string_view field_name)
 bool readPlanStringNode(CliState& state, const YAML::Node& node, const std::string& field_name, std::string& value)
 {
     if (!node || !node.IsScalar()) {
-        reportError(state, "Plan field '" + field_name + "' must be a non-empty string.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan field '" + field_name + "' must be a non-empty string.",
+                             field_name);
         return false;
     }
 
     try {
         value = node.as<std::string>();
     } catch (const YAML::Exception&) {
-        reportError(state, "Plan field '" + field_name + "' must be a non-empty string.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan field '" + field_name + "' must be a non-empty string.",
+                             field_name);
         return false;
     }
 
     if (value.empty()) {
-        reportError(state, "Plan field '" + field_name + "' must be a non-empty string.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan field '" + field_name + "' must be a non-empty string.",
+                             field_name);
         return false;
     }
 
@@ -181,19 +241,28 @@ bool readPlanStringField(CliState& state,
 bool readPlanNumberNode(CliState& state, const YAML::Node& node, const std::string& field_name, double& value)
 {
     if (!node || !node.IsScalar()) {
-        reportError(state, "Plan field '" + field_name + "' must be a finite number.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                             "Plan field '" + field_name + "' must be a finite number.",
+                             field_name);
         return false;
     }
 
     try {
         value = node.as<double>();
     } catch (const YAML::Exception&) {
-        reportError(state, "Plan field '" + field_name + "' must be a finite number.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                             "Plan field '" + field_name + "' must be a finite number.",
+                             field_name);
         return false;
     }
 
     if (!std::isfinite(value)) {
-        reportError(state, "Plan field '" + field_name + "' must be a finite number.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                             "Plan field '" + field_name + "' must be a finite number.",
+                             field_name);
         return false;
     }
 
@@ -215,7 +284,10 @@ bool appendPlanVec3(CliState& state,
                     const std::string& field_name)
 {
     if (!node || !node.IsSequence() || node.size() != 3) {
-        reportError(state, "Plan field '" + field_name + "' must be a 3-number array.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan field '" + field_name + "' must be a 3-number array.",
+                             field_name);
         return false;
     }
 
@@ -243,7 +315,10 @@ bool appendPlanCommand(CliState& state,
                        std::vector<std::string>& args)
 {
     if (!command_node || !command_node.IsMap()) {
-        reportError(state, "Plan command " + std::to_string(command_index) + " must be an object.");
+        reportCommandDiagnostic(state,
+                                luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                                "Plan command " + std::to_string(command_index) + " must be an object.",
+                                command_index);
         return false;
     }
 
@@ -496,9 +571,17 @@ bool appendPlanCommand(CliState& state,
         }
         if (check == "entityCountAtLeast") {
             double count = 0.0;
-            if (!readPlanNumberField(state, command_node, "count", planFieldName(command_index, "count"), count) ||
-                count < 0.0 || std::floor(count) != count) {
-                reportError(state, "Plan field '" + planFieldName(command_index, "count") + "' must be a non-negative integer.");
+            if (!readPlanNumberField(state, command_node, "count", planFieldName(command_index, "count"), count)) {
+                return false;
+            }
+            if (count < 0.0 || std::floor(count) != count) {
+                reportCommandDiagnostic(state,
+                                        luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                                        "Plan field '" + planFieldName(command_index, "count") +
+                                            "' must be a non-negative integer.",
+                                        command_index,
+                                        "verify",
+                                        planFieldName(command_index, "count"));
                 return false;
             }
             args.push_back("entity-count-at-least");
@@ -506,11 +589,21 @@ bool appendPlanCommand(CliState& state,
             return true;
         }
 
-        reportError(state, "Unsupported verify check '" + check + "'.");
+        reportCommandDiagnostic(state,
+                                luna::authoring::AuthoringDiagnosticCode::UnsupportedVerifyCheck,
+                                "Unsupported verify check '" + check + "'.",
+                                command_index,
+                                "verify",
+                                planFieldName(command_index, "check"));
         return false;
     }
 
-    reportError(state, "Unsupported plan op '" + op + "'.");
+    reportCommandDiagnostic(state,
+                            luna::authoring::AuthoringDiagnosticCode::UnsupportedCommand,
+                            "Unsupported plan op '" + op + "'.",
+                            command_index,
+                            op,
+                            planFieldName(command_index, "op"));
     return false;
 }
 
@@ -520,18 +613,30 @@ bool loadPlan(CliState& state, const std::filesystem::path& plan_path, luna::aut
     try {
         root = YAML::LoadFile(plan_path.string());
     } catch (const YAML::Exception& error) {
-        reportError(state, "Failed to read plan '" + plan_path.string() + "': " + error.what());
+        reportDiagnostic(state,
+                         {
+                             .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                             .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
+                             .code = luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             .path = plan_path,
+                             .message = "Failed to read plan '" + plan_path.string() + "': " + error.what(),
+                         });
         return false;
     }
 
     if (!root || !root.IsMap()) {
-        reportError(state, "Plan root must be an object.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan root must be an object.");
         return false;
     }
 
     if (const YAML::Node protocol = root["protocol"]) {
         if (!protocol.IsMap()) {
-            reportError(state, "Plan field 'protocol' must be an object.");
+            reportPlanDiagnostic(state,
+                                 luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                                 "Plan field 'protocol' must be an object.",
+                                 "protocol");
             return false;
         }
 
@@ -540,18 +645,29 @@ bool loadPlan(CliState& state, const std::filesystem::path& plan_path, luna::aut
             return false;
         }
         if (protocol_name != luna::authoring::kAuthoringProtocolName) {
-            reportError(state, "Unsupported authoring protocol '" + protocol_name + "'.");
+            reportPlanDiagnostic(state,
+                                 luna::authoring::AuthoringDiagnosticCode::ProtocolMismatch,
+                                 "Unsupported authoring protocol '" + protocol_name + "'.",
+                                 "protocol.name");
             return false;
         }
 
         double protocol_version = 0.0;
-        if (!readPlanNumberNode(state, protocol["version"], "protocol.version", protocol_version) ||
-            protocol_version < 0.0 || std::floor(protocol_version) != protocol_version) {
-            reportError(state, "Plan field 'protocol.version' must be a non-negative integer.");
+        if (!readPlanNumberNode(state, protocol["version"], "protocol.version", protocol_version)) {
+            return false;
+        }
+        if (protocol_version < 0.0 || std::floor(protocol_version) != protocol_version) {
+            reportPlanDiagnostic(state,
+                                 luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+                                 "Plan field 'protocol.version' must be a non-negative integer.",
+                                 "protocol.version");
             return false;
         }
         if (static_cast<uint32_t>(protocol_version) != luna::authoring::kAuthoringProtocolVersion) {
-            reportError(state, "Unsupported authoring protocol version '" + toCliNumberToken(protocol_version) + "'.");
+            reportPlanDiagnostic(state,
+                                 luna::authoring::AuthoringDiagnosticCode::ProtocolMismatch,
+                                 "Unsupported authoring protocol version '" + toCliNumberToken(protocol_version) + "'.",
+                                 "protocol.version");
             return false;
         }
 
@@ -569,7 +685,10 @@ bool loadPlan(CliState& state, const std::filesystem::path& plan_path, luna::aut
 
     const YAML::Node commands = root["commands"];
     if (!commands || !commands.IsSequence()) {
-        reportError(state, "Plan field 'commands' must be an array.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             "Plan field 'commands' must be an array.",
+                             "commands");
         return false;
     }
 
@@ -581,9 +700,16 @@ bool loadPlan(CliState& state, const std::filesystem::path& plan_path, luna::aut
     }
 
     std::vector<std::string> parse_errors;
-    if (!luna::authoring::parseAuthoringCommandTokens(command_tokens, plan, parse_errors)) {
-        for (const std::string& error : parse_errors) {
-            reportError(state, error);
+    std::vector<luna::authoring::AuthoringDiagnostic> parse_diagnostics;
+    if (!luna::authoring::parseAuthoringCommandTokens(command_tokens, plan, parse_errors, 0, &parse_diagnostics)) {
+        if (parse_diagnostics.empty()) {
+            for (const std::string& error : parse_errors) {
+                reportError(state, error);
+            }
+        } else {
+            for (luna::authoring::AuthoringDiagnostic& diagnostic : parse_diagnostics) {
+                reportDiagnostic(state, std::move(diagnostic));
+            }
         }
         return false;
     }
@@ -649,7 +775,7 @@ int main(int argc, char** argv)
 
     bool ok = true;
     for (const std::string& error : options.errors) {
-        reportError(state, error);
+        reportPlanDiagnostic(state, luna::authoring::AuthoringDiagnosticCode::MissingArgument, error);
         ok = false;
     }
 
@@ -658,13 +784,17 @@ int main(int argc, char** argv)
     luna::authoring::AuthoringPlan plan;
 
     if (ok && command_args.empty()) {
-        reportError(state, "No commands specified.");
+        reportPlanDiagnostic(state,
+                             luna::authoring::AuthoringDiagnosticCode::MissingArgument,
+                             "No commands specified.");
         ok = false;
     }
 
     if (ok && !command_args.empty() && command_args[0] == "plan") {
         if (command_args.size() != 2) {
-            reportError(state, "Command 'plan' expects exactly one plan path.");
+            reportPlanDiagnostic(state,
+                                 luna::authoring::AuthoringDiagnosticCode::MissingArgument,
+                                 "Command 'plan' expects exactly one plan path.");
             ok = false;
         } else {
             ok = loadPlan(state, command_args[1], plan);
@@ -676,9 +806,16 @@ int main(int argc, char** argv)
         }
     } else if (ok) {
         std::vector<std::string> parse_errors;
-        ok = luna::authoring::parseAuthoringCommandTokens(command_args, plan, parse_errors);
-        for (const std::string& error : parse_errors) {
-            reportError(state, error);
+        std::vector<luna::authoring::AuthoringDiagnostic> parse_diagnostics;
+        ok = luna::authoring::parseAuthoringCommandTokens(command_args, plan, parse_errors, 0, &parse_diagnostics);
+        if (parse_diagnostics.empty()) {
+            for (const std::string& error : parse_errors) {
+                reportError(state, error);
+            }
+        } else {
+            for (luna::authoring::AuthoringDiagnostic& diagnostic : parse_diagnostics) {
+                reportDiagnostic(state, std::move(diagnostic));
+            }
         }
     }
 
@@ -696,7 +833,14 @@ int main(int argc, char** argv)
     if (!project_file_path.empty()) {
         const std::filesystem::path resolved_project_path = resolveProjectFilePath(project_file_path);
         if (resolved_project_path.empty() || !luna::ProjectManager::instance().loadProject(resolved_project_path)) {
-            reportError(state, "Failed to load project '" + project_file_path.string() + "'.");
+            reportDiagnostic(state,
+                             {
+                                 .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
+                                 .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
+                                 .code = luna::authoring::AuthoringDiagnosticCode::ProjectLoadFailed,
+                                 .path = project_file_path,
+                                 .message = "Failed to load project '" + project_file_path.string() + "'.",
+                             });
             ok = false;
         }
     }

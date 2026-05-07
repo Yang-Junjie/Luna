@@ -39,9 +39,99 @@ const char* verificationKindName(AuthoringVerificationKind kind)
     return "unknown";
 }
 
+const char* diagnosticSeverityName(AuthoringDiagnosticSeverity severity)
+{
+    switch (severity) {
+        case AuthoringDiagnosticSeverity::Info:
+            return "info";
+        case AuthoringDiagnosticSeverity::Warning:
+            return "warning";
+        case AuthoringDiagnosticSeverity::Error:
+            return "error";
+    }
+
+    return "unknown";
+}
+
+const char* diagnosticPhaseName(AuthoringDiagnosticPhase phase)
+{
+    switch (phase) {
+        case AuthoringDiagnosticPhase::Parse:
+            return "parse";
+        case AuthoringDiagnosticPhase::Validate:
+            return "validate";
+        case AuthoringDiagnosticPhase::Execute:
+            return "execute";
+        case AuthoringDiagnosticPhase::Verify:
+            return "verify";
+    }
+
+    return "unknown";
+}
+
+const char* diagnosticCodeName(AuthoringDiagnosticCode code)
+{
+    switch (code) {
+        case AuthoringDiagnosticCode::InvalidPlan:
+            return "InvalidPlan";
+        case AuthoringDiagnosticCode::ProtocolMismatch:
+            return "ProtocolMismatch";
+        case AuthoringDiagnosticCode::UnsupportedCommand:
+            return "UnsupportedCommand";
+        case AuthoringDiagnosticCode::UnsupportedVerifyCheck:
+            return "UnsupportedVerifyCheck";
+        case AuthoringDiagnosticCode::MissingArgument:
+            return "MissingArgument";
+        case AuthoringDiagnosticCode::InvalidArgument:
+            return "InvalidArgument";
+        case AuthoringDiagnosticCode::InvalidNumber:
+            return "InvalidNumber";
+        case AuthoringDiagnosticCode::NoBoundScene:
+            return "NoBoundScene";
+        case AuthoringDiagnosticCode::UnknownEntity:
+            return "UnknownEntity";
+        case AuthoringDiagnosticCode::UnknownBuiltinAsset:
+            return "UnknownBuiltinAsset";
+        case AuthoringDiagnosticCode::MissingComponent:
+            return "MissingComponent";
+        case AuthoringDiagnosticCode::OpenSceneFailed:
+            return "OpenSceneFailed";
+        case AuthoringDiagnosticCode::SaveSceneFailed:
+            return "SaveSceneFailed";
+        case AuthoringDiagnosticCode::ProjectLoadFailed:
+            return "ProjectLoadFailed";
+        case AuthoringDiagnosticCode::ExecutionFailed:
+            return "ExecutionFailed";
+        case AuthoringDiagnosticCode::VerificationFailed:
+            return "VerificationFailed";
+    }
+
+    return "Unknown";
+}
+
 void writeJsonVec3(std::ostream& out, const glm::vec3& value)
 {
     out << "[" << value.x << ", " << value.y << ", " << value.z << "]";
+}
+
+void writeJsonNullableString(std::ostream& out, std::string_view value)
+{
+    if (value.empty()) {
+        out << "null";
+        return;
+    }
+
+    out << "\"" << escapeAuthoringJsonString(value) << "\"";
+}
+
+void writeJsonNullablePath(std::ostream& out, const std::filesystem::path& value)
+{
+    if (value.empty()) {
+        out << "null";
+        return;
+    }
+
+    out << "\"" << escapeAuthoringJsonString(value.string()) << "\"";
 }
 
 void writeJsonUuid(std::ostream& out, UUID uuid)
@@ -227,6 +317,47 @@ void writeJsonVerifications(std::ostream& out, const std::vector<AuthoringVerifi
     out << "  ],\n";
 }
 
+void writeJsonDiagnostics(std::ostream& out, const std::vector<AuthoringDiagnostic>& diagnostics)
+{
+    out << "  \"diagnostics\": [\n";
+    for (size_t index = 0; index < diagnostics.size(); ++index) {
+        const AuthoringDiagnostic& diagnostic = diagnostics[index];
+        out << "    {\n";
+        out << "      \"severity\": \"" << diagnosticSeverityName(diagnostic.severity) << "\",\n";
+        out << "      \"phase\": \"" << diagnosticPhaseName(diagnostic.phase) << "\",\n";
+        out << "      \"code\": \"" << diagnosticCodeName(diagnostic.code) << "\",\n";
+        out << "      \"message\": \"" << escapeAuthoringJsonString(diagnostic.message) << "\",\n";
+        out << "      \"commandIndex\": ";
+        if (diagnostic.has_command_index) {
+            out << diagnostic.command_index;
+        } else {
+            out << "null";
+        }
+        out << ",\n";
+        out << "      \"command\": ";
+        writeJsonNullableString(out, diagnostic.command);
+        out << ",\n";
+        out << "      \"field\": ";
+        writeJsonNullableString(out, diagnostic.field);
+        out << ",\n";
+        out << "      \"entityRef\": ";
+        writeJsonNullableString(out, diagnostic.entity_ref);
+        out << ",\n";
+        out << "      \"component\": ";
+        writeJsonNullableString(out, diagnostic.component);
+        out << ",\n";
+        out << "      \"path\": ";
+        writeJsonNullablePath(out, diagnostic.path);
+        out << "\n";
+        out << "    }";
+        if (index + 1 < diagnostics.size()) {
+            out << ',';
+        }
+        out << '\n';
+    }
+    out << "  ],\n";
+}
+
 } // namespace
 
 std::string escapeAuthoringJsonString(std::string_view value)
@@ -310,6 +441,7 @@ void writeAuthoringReportJson(std::ostream& out, const AuthoringReport& report, 
     out << "  ],\n";
     writeJsonInspections(out, report.inspections);
     writeJsonVerifications(out, report.verifications);
+    writeJsonDiagnostics(out, report.diagnostics);
     out << "  \"errors\": [\n";
     for (size_t index = 0; index < report.errors.size(); ++index) {
         out << "    \"" << escapeAuthoringJsonString(report.errors[index]) << "\"";

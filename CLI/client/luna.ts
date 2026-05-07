@@ -46,6 +46,7 @@ type AuthoringPlan = {
 type ClientOptions = {
     host?: string;
     project?: string;
+    jsonOutput: boolean;
     dryRun: boolean;
     passthrough: string[];
 };
@@ -54,9 +55,9 @@ function printUsage(): void {
     console.log(`Luna TS CLI
 
 Usage:
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] run <commands...>
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] plan <plan.json>
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] interactive
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] run <commands...>
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] plan <plan.json>
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--json] interactive
 
 Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts run new primitive CubeBox Cube save build/CLI/Smoke/TsScene
@@ -75,7 +76,7 @@ function takeOptionValue(args: string[], index: number, option: string): string 
 }
 
 function parseClientOptions(args: string[]): ClientOptions {
-    const options: ClientOptions = { dryRun: false, passthrough: [] };
+    const options: ClientOptions = { jsonOutput: false, dryRun: false, passthrough: [] };
 
     for (let index = 0; index < args.length;) {
         const arg = args[index];
@@ -101,6 +102,11 @@ function parseClientOptions(args: string[]): ClientOptions {
         }
         if (arg === "--dry-run") {
             options.dryRun = true;
+            index += 1;
+            continue;
+        }
+        if (arg === "--json") {
+            options.jsonOutput = true;
             index += 1;
             continue;
         }
@@ -597,9 +603,17 @@ async function runInteractiveMenu(
 type InteractiveContext = {
     host: string;
     project?: string;
+    jsonOutput: boolean;
     queuedCommands: string[];
     dryRun: boolean;
 };
+
+function baseHostArgs(project: string | undefined, jsonOutput: boolean): string[] {
+    return [
+        ...(jsonOutput ? ["--json"] : []),
+        ...(project == null ? [] : ["--project", project]),
+    ];
+}
 
 async function handleInteractiveLine(
     line: string,
@@ -633,7 +647,7 @@ async function handleInteractiveLine(
         context.queuedCommands.splice(
             0,
             context.queuedCommands.length,
-            ...(context.project == null ? [] : ["--project", context.project]),
+            ...baseHostArgs(context.project, context.jsonOutput),
         );
         console.log("Queued commands cleared.");
         return null;
@@ -651,11 +665,17 @@ async function handleInteractiveLine(
     return null;
 }
 
-async function runInteractive(host: string, project: string | undefined, dryRun: boolean): Promise<number> {
+async function runInteractive(
+    host: string,
+    project: string | undefined,
+    jsonOutput: boolean,
+    dryRun: boolean,
+): Promise<number> {
     const context: InteractiveContext = {
         host,
         project,
-        queuedCommands: project == null ? [] : ["--project", project],
+        jsonOutput,
+        queuedCommands: baseHostArgs(project, jsonOutput),
         dryRun,
     };
 
@@ -726,13 +746,16 @@ async function main(): Promise<number> {
         project = project ?? plan.project;
         hostArgs = plan.commands.flatMap(planCommandToArgs);
     } else if (command === "interactive") {
-        return await runInteractive(host, project, options.dryRun);
+        return await runInteractive(host, project, options.jsonOutput, options.dryRun);
     } else {
         throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', or 'interactive'.`);
     }
 
     if (project != null) {
         hostArgs = ["--project", project, ...hostArgs];
+    }
+    if (options.jsonOutput) {
+        hostArgs = ["--json", ...hostArgs];
     }
 
     return runHost(host, hostArgs, options.dryRun);
