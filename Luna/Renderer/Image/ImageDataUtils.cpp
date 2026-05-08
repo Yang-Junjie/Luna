@@ -66,7 +66,9 @@ std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image
     for (uint32_t y = 0; y < image.Height; ++y) {
         const double theta = kPi * (static_cast<double>(y) + 0.5) / height;
         const double sin_theta = std::sin(theta);
-        const double cos_theta = std::cos(theta);
+        // Keep CPU diffuse SH projection aligned with shader equirect sampling:
+        // directionToEquirectUv() maps +Y to v=1, so the first image row represents -Y.
+        const double cos_theta = -std::cos(theta);
 
         for (uint32_t x = 0; x < image.Width; ++x) {
             const double phi = kTwoPi * (static_cast<double>(x) + 0.5) / width - kPi;
