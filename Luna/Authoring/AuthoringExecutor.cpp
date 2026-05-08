@@ -5,6 +5,7 @@
 #include "Authoring/AuthoringSession.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components.h"
+#include "Scene/SceneSerializer.h"
 
 #include <glm/trigonometric.hpp>
 
@@ -14,9 +15,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace luna::authoring {
 namespace {
@@ -37,6 +41,7 @@ public:
         if (m_owns_transaction && !m_committed) {
             (void) m_session.rollbackTransaction();
             m_report.entities.clear();
+            m_report.saved_scenes.clear();
             m_report.scene = captureAuthoringSceneSnapshot(m_session);
         }
     }
@@ -55,6 +60,113 @@ private:
     AuthoringSession& m_session;
     AuthoringReport& m_report;
     bool m_owns_transaction{false};
+    bool m_committed{false};
+};
+
+class AuthoringFileEffectGuard {
+public:
+    AuthoringFileEffectGuard() = default;
+
+    AuthoringFileEffectGuard(const AuthoringFileEffectGuard&) = delete;
+    AuthoringFileEffectGuard& operator=(const AuthoringFileEffectGuard&) = delete;
+
+    ~AuthoringFileEffectGuard()
+    {
+        if (!m_committed) {
+            rollback();
+        }
+    }
+
+    bool capture(const std::filesystem::path& path, std::string& error_message)
+    {
+        if (path.empty() || hasCapture(path)) {
+            return true;
+        }
+
+        FileSnapshot snapshot;
+        snapshot.path = path;
+
+        std::error_code ec;
+        snapshot.existed = std::filesystem::exists(path, ec);
+        if (ec) {
+            error_message = "Failed to inspect scene file '" + path.string() + "': " + ec.message() + ".";
+            return false;
+        }
+
+        if (snapshot.existed) {
+            snapshot.was_regular_file = std::filesystem::is_regular_file(path, ec);
+            if (ec) {
+                error_message = "Failed to inspect scene file '" + path.string() + "': " + ec.message() + ".";
+                return false;
+            }
+            if (!snapshot.was_regular_file) {
+                error_message = "Refusing to overwrite non-file scene path '" + path.string() + "'.";
+                return false;
+            }
+
+            std::ifstream input_stream(path, std::ios::binary);
+            if (!input_stream.is_open()) {
+                error_message = "Failed to snapshot existing scene file '" + path.string() + "'.";
+                return false;
+            }
+
+            snapshot.contents.assign(std::istreambuf_iterator<char>(input_stream),
+                                     std::istreambuf_iterator<char>());
+            if (input_stream.bad()) {
+                error_message = "Failed to read existing scene file '" + path.string() + "'.";
+                return false;
+            }
+        }
+
+        m_snapshots.push_back(std::move(snapshot));
+        return true;
+    }
+
+    void commit() noexcept
+    {
+        m_committed = true;
+    }
+
+private:
+    struct FileSnapshot {
+        std::filesystem::path path;
+        bool existed{false};
+        bool was_regular_file{false};
+        std::string contents;
+    };
+
+    bool hasCapture(const std::filesystem::path& path) const
+    {
+        return std::any_of(m_snapshots.begin(), m_snapshots.end(), [&path](const FileSnapshot& snapshot) {
+            return snapshot.path == path;
+        });
+    }
+
+    void rollback() noexcept
+    {
+        for (auto snapshot_it = m_snapshots.rbegin(); snapshot_it != m_snapshots.rend(); ++snapshot_it) {
+            const FileSnapshot& snapshot = *snapshot_it;
+            std::error_code ec;
+            if (snapshot.existed) {
+                if (!snapshot.path.parent_path().empty()) {
+                    std::filesystem::create_directories(snapshot.path.parent_path(), ec);
+                    if (ec) {
+                        continue;
+                    }
+                }
+
+                std::ofstream output_stream(snapshot.path, std::ios::binary | std::ios::trunc);
+                if (!output_stream.is_open()) {
+                    continue;
+                }
+                output_stream << snapshot.contents;
+            } else {
+                std::filesystem::remove(snapshot.path, ec);
+            }
+        }
+    }
+
+    std::vector<FileSnapshot> m_snapshots;
     bool m_committed{false};
 };
 
@@ -386,6 +498,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
         return false;
     }
 
+    AuthoringFileEffectGuard file_effect_guard;
     AuthoringTransactionGuard transaction_guard(m_session, report, m_session.beginTransaction("Authoring Plan"));
 
     for (size_t command_index = 0; command_index < plan.commands.size(); ++command_index) {
@@ -419,6 +532,21 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SaveScene: {
                 const std::filesystem::path scene_path = resolveScenePath(command.path);
+                const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_path);
+                std::string file_snapshot_error;
+                if (!file_effect_guard.capture(normalized_scene_path, file_snapshot_error)) {
+                    addDiagnostic(report,
+                                  AuthoringDiagnosticCode::SaveSceneFailed,
+                                  file_snapshot_error,
+                                  command_index,
+                                  command,
+                                  AuthoringDiagnosticPhase::Execute,
+                                  {},
+                                  {},
+                                  normalized_scene_path);
+                    report.scene = captureAuthoringSceneSnapshot(m_session);
+                    return false;
+                }
                 if (!m_session.saveSceneAs(scene_path)) {
                     addDiagnostic(report,
                                   AuthoringDiagnosticCode::SaveSceneFailed,
@@ -860,6 +988,7 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
     }
 
     transaction_guard.commit();
+    file_effect_guard.commit();
     report.scene = captureAuthoringSceneSnapshot(m_session);
     return true;
 }

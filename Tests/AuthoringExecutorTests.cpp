@@ -11,7 +11,9 @@
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string_view>
 #include <vector>
 
@@ -76,6 +78,18 @@ bool containsString(const std::vector<std::string>& values, std::string_view val
     return std::any_of(values.begin(), values.end(), [value](const std::string& candidate) {
         return candidate == value;
     });
+}
+
+void writeTextFile(const std::filesystem::path& path, std::string_view contents)
+{
+    std::ofstream output_stream(path, std::ios::binary | std::ios::trunc);
+    output_stream << contents;
+}
+
+std::string readTextFile(const std::filesystem::path& path)
+{
+    std::ifstream input_stream(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input_stream), std::istreambuf_iterator<char>()};
 }
 
 void testExecutorAppliesTypedPlan(TestContext& context)
@@ -254,6 +268,78 @@ void testExecutorRollsBackFailedPlan(TestContext& context)
     context.expect(!session.hasOpenTransaction(), "failed executor plan should close its transaction");
 }
 
+void testExecutorRemovesSavedFileWhenFailedPlanRollsBack(TestContext& context)
+{
+    TempDirectory temp("AuthoringExecutorFileRollback");
+    const std::filesystem::path scene_path = temp.path() / "GeneratedScene";
+    const std::filesystem::path normalized_scene_path = luna::SceneSerializer::normalizeScenePath(scene_path);
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::CreateEntity,
+        .alias = "Temporary",
+        .name = "Temporary Entity",
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::SaveScene,
+        .path = scene_path,
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
+        .entity = {.value = "MissingEntity"},
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(!executor.execute(plan, report), "failed saved plan should report failure");
+    context.expect(!std::filesystem::exists(normalized_scene_path),
+                   "failed saved plan should remove newly-created scene file");
+    context.expect(report.saved_scenes.empty(), "rolled back save should not remain in saved scene report");
+    context.expect(!session.hasOpenTransaction(), "failed saved plan should close its transaction");
+}
+
+void testExecutorRestoresExistingSavedFileWhenFailedPlanRollsBack(TestContext& context)
+{
+    TempDirectory temp("AuthoringExecutorFileRestore");
+    const std::filesystem::path scene_path = temp.path() / "ExistingScene";
+    const std::filesystem::path normalized_scene_path = luna::SceneSerializer::normalizeScenePath(scene_path);
+    const std::string original_contents = "Scene: Original\nEntities: []\n";
+    writeTextFile(normalized_scene_path, original_contents);
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::CreateEntity,
+        .alias = "Temporary",
+        .name = "Temporary Entity",
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::SaveScene,
+        .path = scene_path,
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
+        .entity = {.value = "MissingEntity"},
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(!executor.execute(plan, report), "failed overwrite plan should report failure");
+    context.expect(std::filesystem::exists(normalized_scene_path),
+                   "failed overwrite plan should keep existing scene file");
+    context.expect(readTextFile(normalized_scene_path) == original_contents,
+                   "failed overwrite plan should restore original scene file contents");
+    context.expect(report.saved_scenes.empty(), "rolled back overwrite should not remain in saved scene report");
+    context.expect(!session.hasOpenTransaction(), "failed overwrite plan should close its transaction");
+}
+
 } // namespace
 
 int main()
@@ -265,6 +351,8 @@ int main()
     testExecutorAppliesTypedPlan(context);
     testExecutorReportsStructuredDiagnostics(context);
     testExecutorRollsBackFailedPlan(context);
+    testExecutorRemovesSavedFileWhenFailedPlanRollsBack(context);
+    testExecutorRestoresExistingSavedFileWhenFailedPlanRollsBack(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();
