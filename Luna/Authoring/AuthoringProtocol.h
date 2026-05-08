@@ -48,6 +48,26 @@ enum class AuthoringCommandKind : uint8_t {
     Summary,
 };
 
+enum class AuthoringCommandEffect : uint8_t {
+    None = 0,
+    ReadsScene = 1 << 0,
+    MutatesScene = 1 << 1,
+    ReadsFileSystem = 1 << 2,
+    WritesFileSystem = 1 << 3,
+};
+
+[[nodiscard]] constexpr AuthoringCommandEffect operator|(AuthoringCommandEffect lhs,
+                                                         AuthoringCommandEffect rhs) noexcept
+{
+    return static_cast<AuthoringCommandEffect>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+}
+
+[[nodiscard]] constexpr bool hasAuthoringCommandEffect(AuthoringCommandEffect effects,
+                                                       AuthoringCommandEffect effect) noexcept
+{
+    return (static_cast<uint8_t>(effects) & static_cast<uint8_t>(effect)) != 0;
+}
+
 enum class AuthoringDiagnosticSeverity : uint8_t {
     Info,
     Warning,
@@ -160,6 +180,13 @@ struct AuthoringReport {
 };
 
 [[nodiscard]] AuthoringSceneSnapshot captureAuthoringSceneSnapshot(const AuthoringSession& session);
+
+[[nodiscard]] AuthoringCommandEffect authoringCommandEffects(AuthoringCommandKind kind);
+[[nodiscard]] bool authoringCommandReadsScene(AuthoringCommandKind kind);
+[[nodiscard]] bool authoringCommandMutatesScene(AuthoringCommandKind kind);
+[[nodiscard]] bool authoringCommandReadsFileSystem(AuthoringCommandKind kind);
+[[nodiscard]] bool authoringCommandWritesFileSystem(AuthoringCommandKind kind);
+[[nodiscard]] bool authoringCommandIsReadOnly(AuthoringCommandKind kind);
 
 void appendAuthoringDiagnostic(AuthoringReport& report, AuthoringDiagnostic diagnostic);
 

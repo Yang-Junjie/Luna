@@ -383,6 +383,46 @@ std::filesystem::path resolveScenePath(const std::filesystem::path& input_path)
     return input_path;
 }
 
+bool prepareCommandFileWrites(AuthoringFileEffectGuard& file_effect_guard,
+                              const AuthoringCommand& command,
+                              AuthoringReport& report,
+                              size_t command_index)
+{
+    if (!authoringCommandWritesFileSystem(command.kind)) {
+        return true;
+    }
+
+    switch (command.kind) {
+        case AuthoringCommandKind::SaveScene: {
+            const std::filesystem::path scene_path = resolveScenePath(command.path);
+            const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_path);
+            std::string file_snapshot_error;
+            if (!file_effect_guard.capture(normalized_scene_path, file_snapshot_error)) {
+                addDiagnostic(report,
+                              AuthoringDiagnosticCode::SaveSceneFailed,
+                              file_snapshot_error,
+                              command_index,
+                              command,
+                              AuthoringDiagnosticPhase::Execute,
+                              {},
+                              {},
+                              normalized_scene_path);
+                return false;
+            }
+            return true;
+        }
+
+        default:
+            addDiagnostic(report,
+                          AuthoringDiagnosticCode::ExecutionFailed,
+                          "Filesystem-writing command '" + std::string(commandKindName(command.kind)) +
+                              "' has no authoring rollback boundary.",
+                          command_index,
+                          command);
+            return false;
+    }
+}
+
 } // namespace
 
 AuthoringExecutor::AuthoringExecutor(AuthoringSession& session)
@@ -503,6 +543,11 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
     for (size_t command_index = 0; command_index < plan.commands.size(); ++command_index) {
         const AuthoringCommand& command = plan.commands[command_index];
+        if (!prepareCommandFileWrites(file_effect_guard, command, report, command_index)) {
+            report.scene = captureAuthoringSceneSnapshot(m_session);
+            return false;
+        }
+
         switch (command.kind) {
             case AuthoringCommandKind::NewScene:
                 (void) m_session.createScene();
@@ -532,21 +577,6 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
 
             case AuthoringCommandKind::SaveScene: {
                 const std::filesystem::path scene_path = resolveScenePath(command.path);
-                const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_path);
-                std::string file_snapshot_error;
-                if (!file_effect_guard.capture(normalized_scene_path, file_snapshot_error)) {
-                    addDiagnostic(report,
-                                  AuthoringDiagnosticCode::SaveSceneFailed,
-                                  file_snapshot_error,
-                                  command_index,
-                                  command,
-                                  AuthoringDiagnosticPhase::Execute,
-                                  {},
-                                  {},
-                                  normalized_scene_path);
-                    report.scene = captureAuthoringSceneSnapshot(m_session);
-                    return false;
-                }
                 if (!m_session.saveSceneAs(scene_path)) {
                     addDiagnostic(report,
                                   AuthoringDiagnosticCode::SaveSceneFailed,

@@ -98,6 +98,73 @@ void testCommandTokenParseErrors(TestContext& context)
     }
 }
 
+void testCommandEffectClassification(TestContext& context)
+{
+    using luna::authoring::AuthoringCommandKind;
+
+    const std::vector<AuthoringCommandKind> command_kinds{
+        AuthoringCommandKind::NewScene,
+        AuthoringCommandKind::OpenScene,
+        AuthoringCommandKind::SaveScene,
+        AuthoringCommandKind::CreateEntity,
+        AuthoringCommandKind::CreateCamera,
+        AuthoringCommandKind::CreateDirectionalLight,
+        AuthoringCommandKind::CreatePointLight,
+        AuthoringCommandKind::CreateSpotLight,
+        AuthoringCommandKind::CreatePrimitive,
+        AuthoringCommandKind::Parent,
+        AuthoringCommandKind::Unparent,
+        AuthoringCommandKind::Rename,
+        AuthoringCommandKind::SetTransform,
+        AuthoringCommandKind::SetLightIntensity,
+        AuthoringCommandKind::SetLightColor,
+        AuthoringCommandKind::SetCameraPerspective,
+        AuthoringCommandKind::SetCameraOrthographic,
+        AuthoringCommandKind::InspectScene,
+        AuthoringCommandKind::InspectEntity,
+        AuthoringCommandKind::InspectHierarchy,
+        AuthoringCommandKind::VerifySceneSaved,
+        AuthoringCommandKind::VerifyEntityExists,
+        AuthoringCommandKind::VerifyHasComponent,
+        AuthoringCommandKind::VerifyEntityCountAtLeast,
+        AuthoringCommandKind::Summary,
+    };
+
+    size_t file_read_count = 0;
+    size_t file_write_count = 0;
+    for (const AuthoringCommandKind kind : command_kinds) {
+        if (luna::authoring::authoringCommandReadsFileSystem(kind)) {
+            ++file_read_count;
+        }
+        if (luna::authoring::authoringCommandWritesFileSystem(kind)) {
+            ++file_write_count;
+        }
+    }
+
+    context.expect(file_read_count == 1, "only open should currently read the filesystem");
+    context.expect(file_write_count == 1, "only save should currently write the filesystem");
+    context.expect(luna::authoring::authoringCommandReadsFileSystem(AuthoringCommandKind::OpenScene),
+                   "open should declare filesystem read");
+    context.expect(luna::authoring::authoringCommandMutatesScene(AuthoringCommandKind::OpenScene),
+                   "open should declare scene mutation");
+    context.expect(!luna::authoring::authoringCommandWritesFileSystem(AuthoringCommandKind::OpenScene),
+                   "open should not declare filesystem write");
+    context.expect(luna::authoring::authoringCommandWritesFileSystem(AuthoringCommandKind::SaveScene),
+                   "save should declare filesystem write");
+    context.expect(luna::authoring::authoringCommandMutatesScene(AuthoringCommandKind::SaveScene),
+                   "save should declare scene mutation");
+    context.expect(!luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::SaveScene),
+                   "save should not be read-only");
+    context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::InspectScene),
+                   "inspect scene should be read-only");
+    context.expect(luna::authoring::authoringCommandReadsScene(AuthoringCommandKind::InspectEntity),
+                   "inspect entity should declare scene read");
+    context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::VerifyEntityExists),
+                   "verify entity should be read-only");
+    context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::Summary),
+                   "summary should be read-only");
+}
+
 void testAuthoringReportJson(TestContext& context)
 {
     luna::authoring::AuthoringReport report;
@@ -182,6 +249,7 @@ int main()
     TestContext context;
     testCommandTokenParsing(context);
     testCommandTokenParseErrors(context);
+    testCommandEffectClassification(context);
     testAuthoringReportJson(context);
     return context.result();
 }

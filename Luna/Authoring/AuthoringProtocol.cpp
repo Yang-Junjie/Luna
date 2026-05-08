@@ -119,6 +119,77 @@ AuthoringSceneSnapshot captureAuthoringSceneSnapshot(const AuthoringSession& ses
     };
 }
 
+AuthoringCommandEffect authoringCommandEffects(AuthoringCommandKind kind)
+{
+    using Effect = AuthoringCommandEffect;
+
+    switch (kind) {
+        case AuthoringCommandKind::NewScene:
+        case AuthoringCommandKind::CreateEntity:
+        case AuthoringCommandKind::CreateCamera:
+        case AuthoringCommandKind::CreateDirectionalLight:
+        case AuthoringCommandKind::CreatePointLight:
+        case AuthoringCommandKind::CreateSpotLight:
+        case AuthoringCommandKind::CreatePrimitive:
+        case AuthoringCommandKind::Parent:
+        case AuthoringCommandKind::Unparent:
+        case AuthoringCommandKind::Rename:
+        case AuthoringCommandKind::SetTransform:
+        case AuthoringCommandKind::SetLightIntensity:
+        case AuthoringCommandKind::SetLightColor:
+        case AuthoringCommandKind::SetCameraPerspective:
+        case AuthoringCommandKind::SetCameraOrthographic:
+            return Effect::MutatesScene;
+
+        case AuthoringCommandKind::OpenScene:
+            return Effect::ReadsFileSystem | Effect::MutatesScene;
+
+        case AuthoringCommandKind::SaveScene:
+            return Effect::ReadsScene | Effect::MutatesScene | Effect::WritesFileSystem;
+
+        case AuthoringCommandKind::InspectScene:
+        case AuthoringCommandKind::InspectEntity:
+        case AuthoringCommandKind::InspectHierarchy:
+        case AuthoringCommandKind::VerifySceneSaved:
+        case AuthoringCommandKind::VerifyEntityExists:
+        case AuthoringCommandKind::VerifyHasComponent:
+        case AuthoringCommandKind::VerifyEntityCountAtLeast:
+            return Effect::ReadsScene;
+
+        case AuthoringCommandKind::Summary:
+            return Effect::None;
+    }
+
+    return Effect::None;
+}
+
+bool authoringCommandReadsScene(AuthoringCommandKind kind)
+{
+    return hasAuthoringCommandEffect(authoringCommandEffects(kind), AuthoringCommandEffect::ReadsScene);
+}
+
+bool authoringCommandMutatesScene(AuthoringCommandKind kind)
+{
+    return hasAuthoringCommandEffect(authoringCommandEffects(kind), AuthoringCommandEffect::MutatesScene);
+}
+
+bool authoringCommandReadsFileSystem(AuthoringCommandKind kind)
+{
+    return hasAuthoringCommandEffect(authoringCommandEffects(kind), AuthoringCommandEffect::ReadsFileSystem);
+}
+
+bool authoringCommandWritesFileSystem(AuthoringCommandKind kind)
+{
+    return hasAuthoringCommandEffect(authoringCommandEffects(kind), AuthoringCommandEffect::WritesFileSystem);
+}
+
+bool authoringCommandIsReadOnly(AuthoringCommandKind kind)
+{
+    const AuthoringCommandEffect effects = authoringCommandEffects(kind);
+    return !hasAuthoringCommandEffect(effects, AuthoringCommandEffect::MutatesScene) &&
+           !hasAuthoringCommandEffect(effects, AuthoringCommandEffect::WritesFileSystem);
+}
+
 void appendAuthoringDiagnostic(AuthoringReport& report, AuthoringDiagnostic diagnostic)
 {
     if (diagnostic.severity == AuthoringDiagnosticSeverity::Error && !diagnostic.message.empty()) {

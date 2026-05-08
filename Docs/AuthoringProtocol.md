@@ -8,6 +8,15 @@ Commands are executed left-to-right against `AuthoringSession` through `Authorin
 
 `AuthoringExecutor` runs each plan inside one authoring transaction. A successful plan commits as one undo step. A failed plan rolls back scene mutations before returning diagnostics.
 
+Command effects are explicit in the protocol layer:
+
+- Scene mutation commands include `new`, entity creation, parenting, renaming, transforms, lights, cameras, `open`, and `save`.
+- Filesystem read commands currently include `open`.
+- Filesystem write commands currently include `save`.
+- Read-only commands include `inspect`, `verify`, and `summary`.
+
+Filesystem writes must be registered with the executor's side-effect boundary before the write happens. Today `save` snapshots the target `.lunascene` file first: a failed plan removes a newly-created scene file or restores the original contents of an overwritten file. Future file-writing authoring commands, such as asset import, project save, or script generation, should declare `WritesFileSystem` and add a matching rollback boundary before implementation.
+
 Errors are terminal:
 
 - Parse error: `ok=false`, no commands execute.

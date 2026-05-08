@@ -340,6 +340,34 @@ void testExecutorRestoresExistingSavedFileWhenFailedPlanRollsBack(TestContext& c
     context.expect(!session.hasOpenTransaction(), "failed overwrite plan should close its transaction");
 }
 
+void testExecutorRefusesNonFileSaveTarget(TestContext& context)
+{
+    TempDirectory temp("AuthoringExecutorNonFileSave");
+    const std::filesystem::path scene_path = temp.path() / "Blocked.lunascene";
+    std::filesystem::create_directories(scene_path);
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::SaveScene,
+        .path = scene_path,
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(!executor.execute(plan, report), "save to a non-file target should fail");
+    context.expect(std::filesystem::is_directory(scene_path), "non-file save target should remain a directory");
+    context.expect(report.diagnostics.size() == 1, "non-file save target should report one diagnostic");
+    if (!report.diagnostics.empty()) {
+        context.expect(report.diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::SaveSceneFailed,
+                       "non-file save target should use SaveSceneFailed diagnostic code");
+    }
+    context.expect(!session.hasOpenTransaction(), "non-file save target failure should close its transaction");
+}
+
 } // namespace
 
 int main()
@@ -353,6 +381,7 @@ int main()
     testExecutorRollsBackFailedPlan(context);
     testExecutorRemovesSavedFileWhenFailedPlanRollsBack(context);
     testExecutorRestoresExistingSavedFileWhenFailedPlanRollsBack(context);
+    testExecutorRefusesNonFileSaveTarget(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();
