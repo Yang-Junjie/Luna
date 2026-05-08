@@ -88,6 +88,7 @@ void reportError(CliState& state, std::string message)
                                                    .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
                                                    .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
                                                    .code = luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                                                   .recoverable = true,
                                                    .message = message,
                                                });
     if (!state.json_output) {
@@ -114,6 +115,7 @@ void reportPlanDiagnostic(CliState& state,
                          .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
                          .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
                          .code = code,
+                         .recoverable = true,
                          .field = std::move(field),
                          .message = std::move(message),
                      });
@@ -133,6 +135,7 @@ void reportCommandDiagnostic(CliState& state,
                          .code = code,
                          .has_command_index = true,
                          .command_index = command_index,
+                         .recoverable = true,
                          .command = std::move(command),
                          .field = std::move(field),
                          .message = std::move(message),
@@ -625,6 +628,7 @@ bool loadPlan(CliState& state, const std::filesystem::path& plan_path, luna::aut
                              .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
                              .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
                              .code = luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                             .recoverable = true,
                              .path = plan_path,
                              .message = "Failed to read plan '" + plan_path.string() + "': " + error.what(),
                          });
@@ -854,6 +858,7 @@ int main(int argc, char** argv)
                                  .severity = luna::authoring::AuthoringDiagnosticSeverity::Error,
                                  .phase = luna::authoring::AuthoringDiagnosticPhase::Validate,
                                  .code = luna::authoring::AuthoringDiagnosticCode::ProjectLoadFailed,
+                                 .recoverable = true,
                                  .path = project_file_path,
                                  .message = "Failed to load project '" + project_file_path.string() + "'.",
                              });

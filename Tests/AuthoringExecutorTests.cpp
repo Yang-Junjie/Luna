@@ -233,6 +233,11 @@ void testExecutorReportsStructuredDiagnostics(TestContext& context)
         context.expect(diagnostic.command == "name", "unknown entity should include command name");
         context.expect(diagnostic.entity_ref == "MissingEntity",
                        "unknown entity should include unresolved entity ref");
+        context.expect(diagnostic.recoverable, "unknown entity should be recoverable");
+        context.expect(diagnostic.expected == "resolvable entity reference",
+                       "unknown entity should include expected value");
+        context.expect(diagnostic.actual == "MissingEntity",
+                       "unknown entity should include actual value");
     }
 }
 
@@ -364,6 +369,11 @@ void testExecutorRefusesNonFileSaveTarget(TestContext& context)
     if (!report.diagnostics.empty()) {
         context.expect(report.diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::SaveSceneFailed,
                        "non-file save target should use SaveSceneFailed diagnostic code");
+        context.expect(report.diagnostics.front().recoverable, "non-file save target failure should be recoverable");
+        context.expect(report.diagnostics.front().expected == "regular file path",
+                       "non-file save target failure should include expected value");
+        context.expect(report.diagnostics.front().actual == scene_path.string(),
+                       "non-file save target failure should include actual value");
     }
     context.expect(!session.hasOpenTransaction(), "non-file save target failure should close its transaction");
 }
@@ -429,6 +439,11 @@ void testExecutorValidateReportsOverwriteWarning(TestContext& context)
                        "overwrite diagnostic should be a warning");
         context.expect(report.diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::FileOverwrite,
                        "overwrite diagnostic should use FileOverwrite code");
+        context.expect(report.diagnostics.front().recoverable, "overwrite warning should be recoverable");
+        context.expect(report.diagnostics.front().expected == "non-existing scene file",
+                       "overwrite warning should include expected value");
+        context.expect(report.diagnostics.front().actual == normalized_scene_path.string(),
+                       "overwrite warning should include actual value");
     }
     context.expect(readTextFile(normalized_scene_path) == original_contents,
                    "overwrite dry-run should not change existing file contents");

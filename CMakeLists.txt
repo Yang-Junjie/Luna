@@ -59,6 +59,10 @@ set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
 
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
+set(JSON_SystemInclude ON CACHE BOOL "" FORCE)
+
 set(ENKITS_BUILD_C_INTERFACE OFF CACHE BOOL "" FORCE)
 set(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ENKITS_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -71,6 +75,7 @@ add_subdirectory(third_party/stb)
 add_subdirectory(third_party/simdjson)
 add_subdirectory(third_party/fastgltf)
 add_subdirectory(third_party/yaml-cpp)
+add_subdirectory(third_party/json)
 
 add_library(ufbx STATIC third_party/ufbx/ufbx.c)
 target_include_directories(ufbx PUBLIC third_party/ufbx)

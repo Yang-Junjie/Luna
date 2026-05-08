@@ -161,11 +161,15 @@ struct AuthoringDiagnostic {
     AuthoringDiagnosticCode code{AuthoringDiagnosticCode::ExecutionFailed};
     bool has_command_index{false};
     size_t command_index{0};
+    bool recoverable{false};
     std::string command;
     std::string field;
     std::string entity_ref;
     std::string component;
     std::filesystem::path path;
+    std::string expected;
+    std::string actual;
+    std::string suggested_command;
     std::string message;
 };
 

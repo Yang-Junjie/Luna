@@ -99,7 +99,11 @@ void addValidationDiagnostic(AuthoringReport& report,
                              std::string entity_ref = {},
                              std::string component = {},
                              std::filesystem::path path = {},
-                             std::string field = {})
+                             std::string field = {},
+                             std::string expected = {},
+                             std::string actual = {},
+                             bool recoverable = true,
+                             std::string suggested_command = {})
 {
     appendAuthoringDiagnostic(report,
                               {
@@ -108,22 +112,36 @@ void addValidationDiagnostic(AuthoringReport& report,
                                   .code = code,
                                   .has_command_index = true,
                                   .command_index = command_index,
+                                  .recoverable = recoverable,
                                   .command = authoringCommandName(command.kind),
                                   .field = std::move(field),
                                   .entity_ref = std::move(entity_ref),
                                   .component = std::move(component),
                                   .path = std::move(path),
+                                  .expected = std::move(expected),
+                                  .actual = std::move(actual),
+                                  .suggested_command = std::move(suggested_command),
                                   .message = std::move(message),
                               });
 }
 
-void addPlanDiagnostic(AuthoringReport& report, AuthoringDiagnosticCode code, std::string message)
+void addPlanDiagnostic(AuthoringReport& report,
+                       AuthoringDiagnosticCode code,
+                       std::string message,
+                       std::string expected = {},
+                       std::string actual = {},
+                       bool recoverable = true,
+                       std::string suggested_command = {})
 {
     appendAuthoringDiagnostic(report,
                               {
                                   .severity = AuthoringDiagnosticSeverity::Error,
                                   .phase = AuthoringDiagnosticPhase::Validate,
                                   .code = code,
+                                  .recoverable = recoverable,
+                                  .expected = std::move(expected),
+                                  .actual = std::move(actual),
+                                  .suggested_command = std::move(suggested_command),
                                   .message = std::move(message),
                               });
 }
@@ -252,7 +270,10 @@ std::optional<EntityFacts> resolveEntityFacts(const AuthoringCommand& command,
                                 std::string(reference),
                                 {},
                                 {},
-                                "entity");
+                                "entity",
+                                "resolvable entity reference",
+                                "empty reference",
+                                true);
         return std::nullopt;
     }
 
@@ -268,6 +289,11 @@ std::optional<EntityFacts> resolveEntityFacts(const AuthoringCommand& command,
                                 "Unknown entity reference '" + std::string(reference) + "'.",
                                 command_index,
                                 command,
+                                std::string(reference),
+                                {},
+                                {},
+                                "entity",
+                                "resolvable entity reference",
                                 std::string(reference));
         return std::nullopt;
     }
@@ -289,6 +315,11 @@ std::optional<EntityFacts> resolveEntityFacts(const AuthoringCommand& command,
                             "Unknown entity reference '" + std::string(reference) + "'.",
                             command_index,
                             command,
+                            std::string(reference),
+                            {},
+                            {},
+                            "entity",
+                            "resolvable entity reference",
                             std::string(reference));
     return std::nullopt;
 }
@@ -329,6 +360,10 @@ bool requireComponent(const AuthoringCommand& command,
                                 command_index,
                                 command,
                                 std::string(reference),
+                                std::string(component_name),
+                                {},
+                                "component",
+                                "known component name",
                                 std::string(component_name));
         return false;
     }
@@ -342,7 +377,11 @@ bool requireComponent(const AuthoringCommand& command,
                                 command_index,
                                 command,
                                 std::string(reference),
-                                std::string(component_name));
+                                std::string(component_name),
+                                {},
+                                "component",
+                                "entity has the requested component",
+                                "missing " + std::string(component_name) + " component");
         return false;
     }
 
@@ -366,7 +405,9 @@ bool validateOpenPath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "existing scene file path",
+                                "empty path");
         return false;
     }
 
@@ -386,7 +427,9 @@ bool validateOpenPath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "existing scene file path",
+                                normalized_scene_path.string());
         return false;
     }
 
@@ -401,7 +444,9 @@ bool validateOpenPath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "regular scene file",
+                                normalized_scene_path.string());
         return false;
     }
 
@@ -426,7 +471,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "writable scene file path",
+                                "empty path");
         return false;
     }
 
@@ -442,7 +489,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "unique save target per plan",
+                                normalized_scene_path.string());
     }
 
     if (!options.check_file_system) {
@@ -462,7 +511,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 normalized_scene_path,
-                                "path");
+                                "path",
+                                "inspectable file path",
+                                normalized_scene_path.string());
         return false;
     }
 
@@ -479,7 +530,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                     {},
                                     {},
                                     normalized_scene_path,
-                                    "path");
+                                    "path",
+                                    "regular file path",
+                                    normalized_scene_path.string());
             return false;
         }
 
@@ -493,7 +546,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                     {},
                                     {},
                                     normalized_scene_path,
-                                    "path");
+                                    "path",
+                                    "non-existing scene file",
+                                    normalized_scene_path.string());
         }
     }
 
@@ -514,7 +569,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                 {},
                                 {},
                                 parent_path,
-                                "path");
+                                "path",
+                                "inspectable directory path",
+                                parent_path.string());
         return false;
     }
 
@@ -530,7 +587,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                     {},
                                     {},
                                     parent_path,
-                                    "path");
+                                    "path",
+                                    "directory path",
+                                    parent_path.string());
             return false;
         }
         return true;
@@ -553,7 +612,9 @@ bool validateSavePath(const AuthoringCommand& command,
                                         {},
                                         {},
                                         probe,
-                                        "path");
+                                        "path",
+                                        "directory ancestor path",
+                                        probe.string());
                 return false;
             }
             return true;
@@ -585,7 +646,9 @@ bool validateAliasAvailable(const AuthoringCommand& command,
                                 command.alias,
                                 {},
                                 {},
-                                "alias");
+                                "alias",
+                                "non-empty unique alias",
+                                "empty alias");
         return false;
     }
 
@@ -599,7 +662,9 @@ bool validateAliasAvailable(const AuthoringCommand& command,
                                 command.alias,
                                 {},
                                 {},
-                                "alias");
+                                "alias",
+                                "unique alias",
+                                command.alias);
         return false;
     }
 
@@ -631,17 +696,31 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
         addPlanDiagnostic(report,
                           AuthoringDiagnosticCode::ProtocolMismatch,
                           "Unsupported authoring protocol '" + plan.protocol.name + "' version '" +
-                              std::to_string(plan.protocol.version) + "'.");
+                              std::to_string(plan.protocol.version) + "'.",
+                          std::string(kAuthoringProtocolName) + "@" + std::to_string(kAuthoringProtocolVersion),
+                          plan.protocol.name + "@" + std::to_string(plan.protocol.version),
+                          true);
         return false;
     }
 
     if (!session.hasScene()) {
-        addPlanDiagnostic(report, AuthoringDiagnosticCode::NoBoundScene, "Authoring session has no bound scene.");
+        addPlanDiagnostic(report,
+                          AuthoringDiagnosticCode::NoBoundScene,
+                          "Authoring session has no bound scene.",
+                          "bound scene",
+                          "no scene bound",
+                          false);
         return false;
     }
 
     if (plan.commands.empty()) {
-        addPlanDiagnostic(report, AuthoringDiagnosticCode::InvalidPlan, "Authoring plan has no commands.");
+        addPlanDiagnostic(report,
+                          AuthoringDiagnosticCode::InvalidPlan,
+                          "Authoring plan has no commands.",
+                          "at least one command",
+                          "empty command list",
+                          true,
+                          "new");
         return false;
     }
 
@@ -700,7 +779,9 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             {},
                                             {},
                                             {},
-                                            "mesh");
+                                            "mesh",
+                                            "builtin mesh name",
+                                            command.mesh);
                     break;
                 }
                 (void) validateAliasAvailable(command, state, meshEntityFacts(), report, command_index);
@@ -730,7 +811,9 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             command.entity.value,
                                             {},
                                             {},
-                                            "name");
+                                            "name",
+                                            "non-empty name",
+                                            "empty name");
                     break;
                 }
                 if (requireEntityFacts(command, command.entity.value, session, state, report, command_index)) {
@@ -772,7 +855,14 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             "Camera perspective requires 0 < fovDeg < 180 and 0 < near < far.",
                                             command_index,
                                             command,
-                                            command.entity.value);
+                                            command.entity.value,
+                                            {},
+                                            {},
+                                            "parameters",
+                                            "0 < fovDeg < 180 and 0 < near < far",
+                                            "fovDeg=" + std::to_string(command.fov_degrees) + ", near=" +
+                                                std::to_string(command.near_plane) + ", far=" +
+                                                std::to_string(command.far_plane));
                     break;
                 }
                 if (const size_t errors_before = report.errors.size();
@@ -800,7 +890,14 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             "Camera orthographic projection requires size > 0 and near < far.",
                                             command_index,
                                             command,
-                                            command.entity.value);
+                                            command.entity.value,
+                                            {},
+                                            {},
+                                            "parameters",
+                                            "size > 0 and near < far",
+                                            "size=" + std::to_string(command.size) + ", near=" +
+                                                std::to_string(command.near_plane) + ", far=" +
+                                                std::to_string(command.far_plane));
                     break;
                 }
                 if (const size_t errors_before = report.errors.size();
@@ -835,12 +932,20 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             AuthoringDiagnosticCode::VerificationFailed,
                                             "Verification failed: Scene has no known saved state.",
                                             command_index,
-                                            command);
+                                            command,
+                                            {},
+                                            {},
+                                            {},
+                                            "scene",
+                                            "saved scene state",
+                                            "scene has not been saved yet");
                 }
                 break;
 
             case AuthoringCommandKind::VerifyEntityExists:
-                (void) requireEntityFacts(command, command.entity.value, session, state, report, command_index);
+                if (!requireEntityFacts(command, command.entity.value, session, state, report, command_index)) {
+                    break;
+                }
                 break;
 
             case AuthoringCommandKind::VerifyHasComponent:
@@ -860,7 +965,14 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             AuthoringDiagnosticCode::VerificationFailed,
                                             "Verification failed: Scene entity count is below minimum.",
                                             command_index,
-                                            command);
+                                            command,
+                                            {},
+                                            {},
+                                            {},
+                                            "count",
+                                            "minimum entity count",
+                                            "entityCount=" + std::to_string(*state.entity_count) +
+                                                ", expectedAtLeast=" + std::to_string(command.count));
                 }
                 break;
 

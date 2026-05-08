@@ -36,7 +36,11 @@ void addParseDiagnostic(std::vector<std::string>& errors,
                         std::string message,
                         size_t command_index,
                         std::string command = {},
-                        std::string field = {})
+                        std::string field = {},
+                        std::string expected = {},
+                        std::string actual = {},
+                        bool recoverable = true,
+                        std::string suggested_command = {})
 {
     errors.push_back(message);
     if (diagnostics == nullptr) {
@@ -49,8 +53,12 @@ void addParseDiagnostic(std::vector<std::string>& errors,
         .code = code,
         .has_command_index = true,
         .command_index = command_index,
+        .recoverable = recoverable,
         .command = std::move(command),
         .field = std::move(field),
+        .expected = std::move(expected),
+        .actual = std::move(actual),
+        .suggested_command = std::move(suggested_command),
         .message = std::move(message),
     });
 }

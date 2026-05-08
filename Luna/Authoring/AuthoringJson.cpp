@@ -1,13 +1,18 @@
 #include "AuthoringJson.h"
 
+#include <nlohmann/json.hpp>
+
 #include <glm/vec3.hpp>
 
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace luna::authoring {
 namespace {
+
+using Json = nlohmann::ordered_json;
 
 const char* inspectionKindName(AuthoringInspectionKind kind)
 {
@@ -111,349 +116,270 @@ const char* diagnosticCodeName(AuthoringDiagnosticCode code)
     return "Unknown";
 }
 
-void writeJsonVec3(std::ostream& out, const glm::vec3& value)
+Json jsonVec3(const glm::vec3& value)
 {
-    out << "[" << value.x << ", " << value.y << ", " << value.z << "]";
+    Json vector = Json::array();
+    vector.push_back(value.x);
+    vector.push_back(value.y);
+    vector.push_back(value.z);
+    return vector;
 }
 
-void writeJsonNullableString(std::ostream& out, std::string_view value)
-{
-    if (value.empty()) {
-        out << "null";
-        return;
-    }
-
-    out << "\"" << escapeAuthoringJsonString(value) << "\"";
-}
-
-void writeJsonNullablePath(std::ostream& out, const std::filesystem::path& value)
+Json jsonNullableString(std::string_view value)
 {
     if (value.empty()) {
-        out << "null";
-        return;
+        return nullptr;
     }
 
-    out << "\"" << escapeAuthoringJsonString(value.string()) << "\"";
+    return std::string(value);
 }
 
-void writeJsonUuid(std::ostream& out, UUID uuid)
+Json jsonNullablePath(const std::filesystem::path& value)
+{
+    if (value.empty()) {
+        return nullptr;
+    }
+
+    return value.string();
+}
+
+Json jsonUuidOrNull(UUID uuid)
 {
     if (!uuid.isValid()) {
-        out << "null";
-        return;
+        return nullptr;
     }
 
-    out << "\"" << escapeAuthoringJsonString(uuid.toString()) << "\"";
+    return uuid.toString();
 }
 
-void writeJsonStringArray(std::ostream& out, const std::vector<std::string>& values, size_t indent)
+Json jsonStringArray(const std::vector<std::string>& values)
 {
-    const std::string padding(indent, ' ');
-    out << "[\n";
-    for (size_t index = 0; index < values.size(); ++index) {
-        out << padding << "  \"" << escapeAuthoringJsonString(values[index]) << "\"";
-        if (index + 1 < values.size()) {
-            out << ',';
-        }
-        out << '\n';
+    Json result = Json::array();
+    for (const std::string& value : values) {
+        result.push_back(value);
     }
-    out << padding << "]";
+    return result;
 }
 
-void writeJsonUuidArray(std::ostream& out, const std::vector<UUID>& values, size_t indent)
+Json jsonUuidArray(const std::vector<UUID>& values)
 {
-    const std::string padding(indent, ' ');
-    out << "[\n";
-    for (size_t index = 0; index < values.size(); ++index) {
-        out << padding << "  ";
-        writeJsonUuid(out, values[index]);
-        if (index + 1 < values.size()) {
-            out << ',';
-        }
-        out << '\n';
+    Json result = Json::array();
+    for (const UUID uuid : values) {
+        result.push_back(jsonUuidOrNull(uuid));
     }
-    out << padding << "]";
+    return result;
 }
 
-void writeJsonAssetArray(std::ostream& out, const std::vector<AssetHandle>& values, size_t indent)
+Json jsonAssetArray(const std::vector<AssetHandle>& values)
 {
-    const std::string padding(indent, ' ');
-    out << "[\n";
-    for (size_t index = 0; index < values.size(); ++index) {
-        out << padding << "  ";
-        writeJsonUuid(out, values[index]);
-        if (index + 1 < values.size()) {
-            out << ',';
-        }
-        out << '\n';
+    Json result = Json::array();
+    for (const AssetHandle handle : values) {
+        result.push_back(jsonUuidOrNull(handle));
     }
-    out << padding << "]";
+    return result;
 }
 
-void writeJsonEntityInspection(std::ostream& out, const AuthoringEntityInspection& entity)
+Json jsonEntityInspection(const AuthoringEntityInspection& entity)
 {
-    out << "      {\n";
-    out << "        \"ref\": \"" << escapeAuthoringJsonString(entity.ref) << "\",\n";
-    out << "        \"uuid\": ";
-    writeJsonUuid(out, entity.entity_id);
-    out << ",\n";
-    out << "        \"name\": \"" << escapeAuthoringJsonString(entity.name) << "\",\n";
-    out << "        \"parentUuid\": ";
-    writeJsonUuid(out, entity.parent_id);
-    out << ",\n";
-    out << "        \"children\": ";
-    writeJsonUuidArray(out, entity.children, 8);
-    out << ",\n";
-    out << "        \"components\": ";
-    writeJsonStringArray(out, entity.components, 8);
+    Json result = Json::object();
+    result["ref"] = entity.ref;
+    result["uuid"] = jsonUuidOrNull(entity.entity_id);
+    result["name"] = entity.name;
+    result["parentUuid"] = jsonUuidOrNull(entity.parent_id);
+    result["children"] = jsonUuidArray(entity.children);
+    result["components"] = jsonStringArray(entity.components);
 
     if (entity.has_transform) {
-        out << ",\n";
-        out << "        \"transform\": {\n";
-        out << "          \"translation\": ";
-        writeJsonVec3(out, entity.transform.translation);
-        out << ",\n";
-        out << "          \"rotationDeg\": ";
-        writeJsonVec3(out, entity.transform.rotation_degrees);
-        out << ",\n";
-        out << "          \"scale\": ";
-        writeJsonVec3(out, entity.transform.scale);
-        out << "\n";
-        out << "        }";
+        Json transform = Json::object();
+        transform["translation"] = jsonVec3(entity.transform.translation);
+        transform["rotationDeg"] = jsonVec3(entity.transform.rotation_degrees);
+        transform["scale"] = jsonVec3(entity.transform.scale);
+        result["transform"] = std::move(transform);
     }
 
     if (entity.has_camera) {
-        out << ",\n";
-        out << "        \"camera\": {\n";
-        out << "          \"primary\": " << (entity.camera.primary ? "true" : "false") << ",\n";
-        out << "          \"fixedAspectRatio\": " << (entity.camera.fixed_aspect_ratio ? "true" : "false") << ",\n";
-        out << "          \"projection\": \"" << escapeAuthoringJsonString(entity.camera.projection) << "\",\n";
-        out << "          \"perspectiveFovDeg\": " << entity.camera.perspective_fov_degrees << ",\n";
-        out << "          \"perspectiveNear\": " << entity.camera.perspective_near << ",\n";
-        out << "          \"perspectiveFar\": " << entity.camera.perspective_far << ",\n";
-        out << "          \"orthographicSize\": " << entity.camera.orthographic_size << ",\n";
-        out << "          \"orthographicNear\": " << entity.camera.orthographic_near << ",\n";
-        out << "          \"orthographicFar\": " << entity.camera.orthographic_far << "\n";
-        out << "        }";
+        Json camera = Json::object();
+        camera["primary"] = entity.camera.primary;
+        camera["fixedAspectRatio"] = entity.camera.fixed_aspect_ratio;
+        camera["projection"] = entity.camera.projection;
+        camera["perspectiveFovDeg"] = entity.camera.perspective_fov_degrees;
+        camera["perspectiveNear"] = entity.camera.perspective_near;
+        camera["perspectiveFar"] = entity.camera.perspective_far;
+        camera["orthographicSize"] = entity.camera.orthographic_size;
+        camera["orthographicNear"] = entity.camera.orthographic_near;
+        camera["orthographicFar"] = entity.camera.orthographic_far;
+        result["camera"] = std::move(camera);
     }
 
     if (entity.has_light) {
-        out << ",\n";
-        out << "        \"light\": {\n";
-        out << "          \"type\": \"" << escapeAuthoringJsonString(entity.light.type) << "\",\n";
-        out << "          \"enabled\": " << (entity.light.enabled ? "true" : "false") << ",\n";
-        out << "          \"color\": ";
-        writeJsonVec3(out, entity.light.color);
-        out << ",\n";
-        out << "          \"intensity\": " << entity.light.intensity << ",\n";
-        out << "          \"range\": " << entity.light.range << ",\n";
-        out << "          \"innerConeAngleDeg\": " << entity.light.inner_cone_angle_degrees << ",\n";
-        out << "          \"outerConeAngleDeg\": " << entity.light.outer_cone_angle_degrees << "\n";
-        out << "        }";
+        Json light = Json::object();
+        light["type"] = entity.light.type;
+        light["enabled"] = entity.light.enabled;
+        light["color"] = jsonVec3(entity.light.color);
+        light["intensity"] = entity.light.intensity;
+        light["range"] = entity.light.range;
+        light["innerConeAngleDeg"] = entity.light.inner_cone_angle_degrees;
+        light["outerConeAngleDeg"] = entity.light.outer_cone_angle_degrees;
+        result["light"] = std::move(light);
     }
 
     if (entity.has_mesh) {
-        out << ",\n";
-        out << "        \"mesh\": {\n";
-        out << "          \"meshHandle\": ";
-        writeJsonUuid(out, entity.mesh.mesh_handle);
-        out << ",\n";
-        out << "          \"submeshMaterials\": ";
-        writeJsonAssetArray(out, entity.mesh.submesh_materials, 10);
-        out << "\n";
-        out << "        }";
+        Json mesh = Json::object();
+        mesh["meshHandle"] = jsonUuidOrNull(entity.mesh.mesh_handle);
+        mesh["submeshMaterials"] = jsonAssetArray(entity.mesh.submesh_materials);
+        result["mesh"] = std::move(mesh);
     }
 
-    out << "\n";
-    out << "      }";
+    return result;
 }
 
-void writeJsonInspections(std::ostream& out, const std::vector<AuthoringInspection>& inspections)
+Json jsonInspection(const AuthoringInspection& inspection)
 {
-    out << "  \"inspections\": [\n";
-    for (size_t inspection_index = 0; inspection_index < inspections.size(); ++inspection_index) {
-        const AuthoringInspection& inspection = inspections[inspection_index];
-        out << "    {\n";
-        out << "      \"type\": \"" << inspectionKindName(inspection.kind) << "\",\n";
-        out << "      \"ref\": \"" << escapeAuthoringJsonString(inspection.ref) << "\",\n";
-        out << "      \"entities\": [\n";
-        for (size_t entity_index = 0; entity_index < inspection.entities.size(); ++entity_index) {
-            writeJsonEntityInspection(out, inspection.entities[entity_index]);
-            if (entity_index + 1 < inspection.entities.size()) {
-                out << ',';
-            }
-            out << '\n';
-        }
-        out << "      ]\n";
-        out << "    }";
-        if (inspection_index + 1 < inspections.size()) {
-            out << ',';
-        }
-        out << '\n';
+    Json result = Json::object();
+    result["type"] = inspectionKindName(inspection.kind);
+    result["ref"] = inspection.ref;
+
+    Json entities = Json::array();
+    for (const AuthoringEntityInspection& entity : inspection.entities) {
+        entities.push_back(jsonEntityInspection(entity));
     }
-    out << "  ],\n";
+    result["entities"] = std::move(entities);
+    return result;
 }
 
-void writeJsonVerifications(std::ostream& out, const std::vector<AuthoringVerification>& verifications)
+Json jsonVerification(const AuthoringVerification& verification)
 {
-    out << "  \"verifications\": [\n";
-    for (size_t index = 0; index < verifications.size(); ++index) {
-        const AuthoringVerification& verification = verifications[index];
-        out << "    {\n";
-        out << "      \"type\": \"" << verificationKindName(verification.kind) << "\",\n";
-        out << "      \"ok\": " << (verification.ok ? "true" : "false") << ",\n";
-        out << "      \"ref\": \"" << escapeAuthoringJsonString(verification.ref) << "\",\n";
-        out << "      \"uuid\": ";
-        writeJsonUuid(out, verification.entity_id);
-        out << ",\n";
-        out << "      \"component\": \"" << escapeAuthoringJsonString(verification.component) << "\",\n";
-        out << "      \"expectedCount\": " << verification.expected_count << ",\n";
-        out << "      \"actualCount\": " << verification.actual_count << ",\n";
-        out << "      \"message\": \"" << escapeAuthoringJsonString(verification.message) << "\"\n";
-        out << "    }";
-        if (index + 1 < verifications.size()) {
-            out << ',';
-        }
-        out << '\n';
-    }
-    out << "  ],\n";
+    Json result = Json::object();
+    result["type"] = verificationKindName(verification.kind);
+    result["ok"] = verification.ok;
+    result["ref"] = verification.ref;
+    result["uuid"] = jsonUuidOrNull(verification.entity_id);
+    result["component"] = verification.component;
+    result["expectedCount"] = verification.expected_count;
+    result["actualCount"] = verification.actual_count;
+    result["message"] = verification.message;
+    return result;
 }
 
-void writeJsonDiagnostics(std::ostream& out, const std::vector<AuthoringDiagnostic>& diagnostics)
+Json jsonDiagnostic(const AuthoringDiagnostic& diagnostic)
 {
-    out << "  \"diagnostics\": [\n";
-    for (size_t index = 0; index < diagnostics.size(); ++index) {
-        const AuthoringDiagnostic& diagnostic = diagnostics[index];
-        out << "    {\n";
-        out << "      \"severity\": \"" << diagnosticSeverityName(diagnostic.severity) << "\",\n";
-        out << "      \"phase\": \"" << diagnosticPhaseName(diagnostic.phase) << "\",\n";
-        out << "      \"code\": \"" << diagnosticCodeName(diagnostic.code) << "\",\n";
-        out << "      \"message\": \"" << escapeAuthoringJsonString(diagnostic.message) << "\",\n";
-        out << "      \"commandIndex\": ";
-        if (diagnostic.has_command_index) {
-            out << diagnostic.command_index;
-        } else {
-            out << "null";
-        }
-        out << ",\n";
-        out << "      \"command\": ";
-        writeJsonNullableString(out, diagnostic.command);
-        out << ",\n";
-        out << "      \"field\": ";
-        writeJsonNullableString(out, diagnostic.field);
-        out << ",\n";
-        out << "      \"entityRef\": ";
-        writeJsonNullableString(out, diagnostic.entity_ref);
-        out << ",\n";
-        out << "      \"component\": ";
-        writeJsonNullableString(out, diagnostic.component);
-        out << ",\n";
-        out << "      \"path\": ";
-        writeJsonNullablePath(out, diagnostic.path);
-        out << "\n";
-        out << "    }";
-        if (index + 1 < diagnostics.size()) {
-            out << ',';
-        }
-        out << '\n';
+    Json result = Json::object();
+    result["severity"] = diagnosticSeverityName(diagnostic.severity);
+    result["phase"] = diagnosticPhaseName(diagnostic.phase);
+    result["code"] = diagnosticCodeName(diagnostic.code);
+    result["message"] = diagnostic.message;
+    result["commandIndex"] = diagnostic.has_command_index ? Json(diagnostic.command_index) : Json(nullptr);
+    result["command"] = jsonNullableString(diagnostic.command);
+    result["field"] = jsonNullableString(diagnostic.field);
+    result["entityRef"] = jsonNullableString(diagnostic.entity_ref);
+    result["component"] = jsonNullableString(diagnostic.component);
+    result["path"] = jsonNullablePath(diagnostic.path);
+    result["recoverable"] = diagnostic.recoverable;
+    result["expected"] = jsonNullableString(diagnostic.expected);
+    result["actual"] = jsonNullableString(diagnostic.actual);
+    result["suggestedCommand"] = jsonNullableString(diagnostic.suggested_command);
+    return result;
+}
+
+Json jsonEntityBindings(const std::vector<AuthoringEntityBinding>& bindings)
+{
+    Json result = Json::array();
+    for (const AuthoringEntityBinding& binding : bindings) {
+        Json entity = Json::object();
+        entity["alias"] = binding.alias;
+        entity["uuid"] = binding.entity_id.toString();
+        entity["name"] = binding.name;
+        result.push_back(std::move(entity));
     }
-    out << "  ],\n";
+    return result;
+}
+
+Json jsonPathArray(const std::vector<std::filesystem::path>& paths)
+{
+    Json result = Json::array();
+    for (const std::filesystem::path& path : paths) {
+        result.push_back(path.string());
+    }
+    return result;
+}
+
+Json jsonInspections(const std::vector<AuthoringInspection>& inspections)
+{
+    Json result = Json::array();
+    for (const AuthoringInspection& inspection : inspections) {
+        result.push_back(jsonInspection(inspection));
+    }
+    return result;
+}
+
+Json jsonVerifications(const std::vector<AuthoringVerification>& verifications)
+{
+    Json result = Json::array();
+    for (const AuthoringVerification& verification : verifications) {
+        result.push_back(jsonVerification(verification));
+    }
+    return result;
+}
+
+Json jsonDiagnostics(const std::vector<AuthoringDiagnostic>& diagnostics)
+{
+    Json result = Json::array();
+    for (const AuthoringDiagnostic& diagnostic : diagnostics) {
+        result.push_back(jsonDiagnostic(diagnostic));
+    }
+    return result;
+}
+
+Json jsonErrors(const std::vector<std::string>& errors)
+{
+    Json result = Json::array();
+    for (const std::string& error : errors) {
+        result.push_back(error);
+    }
+    return result;
+}
+
+Json jsonAuthoringReport(const AuthoringReport& report, bool ok)
+{
+    Json protocol = Json::object();
+    protocol["name"] = report.protocol.name;
+    protocol["version"] = report.protocol.version;
+
+    Json scene = Json::object();
+    scene["name"] = report.scene.name;
+    scene["path"] = jsonNullablePath(report.scene.path);
+    scene["entityCount"] = report.scene.entity_count;
+    scene["dirty"] = report.scene.dirty;
+
+    Json result = Json::object();
+    result["protocol"] = std::move(protocol);
+    result["ok"] = ok;
+    result["scene"] = std::move(scene);
+    result["entities"] = jsonEntityBindings(report.entities);
+    result["savedScenes"] = jsonPathArray(report.saved_scenes);
+    result["inspections"] = jsonInspections(report.inspections);
+    result["verifications"] = jsonVerifications(report.verifications);
+    result["diagnostics"] = jsonDiagnostics(report.diagnostics);
+    result["errors"] = jsonErrors(report.errors);
+    return result;
 }
 
 } // namespace
 
 std::string escapeAuthoringJsonString(std::string_view value)
 {
-    std::string escaped;
-    escaped.reserve(value.size() + 8);
-
-    for (const char c : value) {
-        switch (c) {
-            case '"':
-                escaped += "\\\"";
-                break;
-            case '\\':
-                escaped += "\\\\";
-                break;
-            case '\b':
-                escaped += "\\b";
-                break;
-            case '\f':
-                escaped += "\\f";
-                break;
-            case '\n':
-                escaped += "\\n";
-                break;
-            case '\r':
-                escaped += "\\r";
-                break;
-            case '\t':
-                escaped += "\\t";
-                break;
-            default:
-                escaped += c;
-                break;
-        }
+    const Json string_value = std::string(value);
+    const std::string quoted = string_value.dump(-1, ' ', false, Json::error_handler_t::replace);
+    if (quoted.size() < 2) {
+        return quoted;
     }
 
-    return escaped;
+    return quoted.substr(1, quoted.size() - 2);
 }
 
 void writeAuthoringReportJson(std::ostream& out, const AuthoringReport& report, bool ok)
 {
-    out << "{\n";
-    out << "  \"protocol\": {\n";
-    out << "    \"name\": \"" << escapeAuthoringJsonString(report.protocol.name) << "\",\n";
-    out << "    \"version\": " << report.protocol.version << "\n";
-    out << "  },\n";
-    out << "  \"ok\": " << (ok ? "true" : "false") << ",\n";
-    out << "  \"scene\": {\n";
-    out << "    \"name\": \"" << escapeAuthoringJsonString(report.scene.name) << "\",\n";
-    out << "    \"path\": ";
-    if (report.scene.path.empty()) {
-        out << "null,\n";
-    } else {
-        out << "\"" << escapeAuthoringJsonString(report.scene.path.string()) << "\",\n";
-    }
-    out << "    \"entityCount\": " << report.scene.entity_count << ",\n";
-    out << "    \"dirty\": " << (report.scene.dirty ? "true" : "false") << "\n";
-    out << "  },\n";
-    out << "  \"entities\": [\n";
-    for (size_t index = 0; index < report.entities.size(); ++index) {
-        const AuthoringEntityBinding& binding = report.entities[index];
-        out << "    {"
-            << "\"alias\": \"" << escapeAuthoringJsonString(binding.alias) << "\", "
-            << "\"uuid\": \"" << escapeAuthoringJsonString(binding.entity_id.toString()) << "\", "
-            << "\"name\": \"" << escapeAuthoringJsonString(binding.name) << "\""
-            << "}";
-        if (index + 1 < report.entities.size()) {
-            out << ',';
-        }
-        out << '\n';
-    }
-    out << "  ],\n";
-    out << "  \"savedScenes\": [\n";
-    for (size_t index = 0; index < report.saved_scenes.size(); ++index) {
-        out << "    \"" << escapeAuthoringJsonString(report.saved_scenes[index].string()) << "\"";
-        if (index + 1 < report.saved_scenes.size()) {
-            out << ',';
-        }
-        out << '\n';
-    }
-    out << "  ],\n";
-    writeJsonInspections(out, report.inspections);
-    writeJsonVerifications(out, report.verifications);
-    writeJsonDiagnostics(out, report.diagnostics);
-    out << "  \"errors\": [\n";
-    for (size_t index = 0; index < report.errors.size(); ++index) {
-        out << "    \"" << escapeAuthoringJsonString(report.errors[index]) << "\"";
-        if (index + 1 < report.errors.size()) {
-            out << ',';
-        }
-        out << '\n';
-    }
-    out << "  ]\n";
-    out << "}\n";
+    out << jsonAuthoringReport(report, ok).dump(2, ' ', false, Json::error_handler_t::replace) << '\n';
 }
 
 } // namespace luna::authoring

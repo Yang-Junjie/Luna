@@ -134,6 +134,13 @@ Exit code is `0` when `ok=true`, otherwise `1`.
 
 `errors` is retained as the legacy human-readable error list. New automation, AI, and editor integrations should prefer `diagnostics`.
 
+Diagnostics may also carry machine-readable hint fields:
+
+- `recoverable`
+- `expected`
+- `actual`
+- `suggestedCommand`
+
 Diagnostics are structured objects:
 
 ```json
@@ -147,7 +154,11 @@ Diagnostics are structured objects:
   "field": null,
   "entityRef": "Box",
   "component": null,
-  "path": null
+  "path": null,
+  "recoverable": true,
+  "expected": "resolvable entity reference",
+  "actual": "Box",
+  "suggestedCommand": null
 }
 ```
 

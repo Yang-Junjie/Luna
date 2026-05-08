@@ -95,6 +95,7 @@ void testCommandTokenParseErrors(TestContext& context)
                        "token parse diagnostic should include command index");
         context.expect(diagnostics.front().command == "verify",
                        "token parse diagnostic should include command name");
+        context.expect(diagnostics.front().recoverable, "token parse diagnostic should be recoverable");
     }
 }
 
@@ -193,9 +194,13 @@ void testAuthoringReportJson(TestContext& context)
                                                    .code = luna::authoring::AuthoringDiagnosticCode::MissingComponent,
                                                    .has_command_index = true,
                                                    .command_index = 2,
+                                                   .recoverable = true,
                                                    .command = "transform",
                                                    .entity_ref = "Box",
                                                    .component = "Transform",
+                                                   .expected = "Transform component",
+                                                   .actual = "missing Transform component",
+                                                   .suggested_command = "transform Box ...",
                                                    .message = "Entity does not have a Transform component.",
                                                });
 
@@ -237,6 +242,13 @@ void testAuthoringReportJson(TestContext& context)
                        "diagnostic JSON should include entity ref");
         context.expect(diagnostic["component"].as<std::string>() == "Transform",
                        "diagnostic JSON should include component");
+        context.expect(diagnostic["recoverable"].as<bool>(), "diagnostic JSON should include recoverable flag");
+        context.expect(diagnostic["expected"].as<std::string>() == "Transform component",
+                       "diagnostic JSON should include expected field");
+        context.expect(diagnostic["actual"].as<std::string>() == "missing Transform component",
+                       "diagnostic JSON should include actual field");
+        context.expect(diagnostic["suggestedCommand"].as<std::string>() == "transform Box ...",
+                       "diagnostic JSON should include suggested command");
     }
     context.expect(root["errors"].IsSequence() && root["errors"].size() == 1,
                    "diagnostic errors should still be mirrored into errors array");

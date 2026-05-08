@@ -348,6 +348,11 @@ target_link_libraries(LunaCore
         yaml-cpp::yaml-cpp
 )
 
+target_link_libraries(LunaCore
+        PRIVATE
+        nlohmann_json::nlohmann_json
+)
+
 target_compile_definitions(
     LunaCore
     PUBLIC
