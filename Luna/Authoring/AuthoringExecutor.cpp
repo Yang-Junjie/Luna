@@ -3,6 +3,7 @@
 #include "Asset/BuiltinAssets.h"
 #include "Authoring/AuthoringInspection.h"
 #include "Authoring/AuthoringSession.h"
+#include "Authoring/AuthoringValidator.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
@@ -170,59 +171,6 @@ private:
     bool m_committed{false};
 };
 
-const char* commandKindName(AuthoringCommandKind kind)
-{
-    switch (kind) {
-        case AuthoringCommandKind::NewScene:
-            return "new";
-        case AuthoringCommandKind::OpenScene:
-            return "open";
-        case AuthoringCommandKind::SaveScene:
-            return "save";
-        case AuthoringCommandKind::CreateEntity:
-            return "entity";
-        case AuthoringCommandKind::CreateCamera:
-            return "camera";
-        case AuthoringCommandKind::CreateDirectionalLight:
-            return "directional-light";
-        case AuthoringCommandKind::CreatePointLight:
-            return "point-light";
-        case AuthoringCommandKind::CreateSpotLight:
-            return "spot-light";
-        case AuthoringCommandKind::CreatePrimitive:
-            return "primitive";
-        case AuthoringCommandKind::Parent:
-            return "parent";
-        case AuthoringCommandKind::Unparent:
-            return "unparent";
-        case AuthoringCommandKind::Rename:
-            return "name";
-        case AuthoringCommandKind::SetTransform:
-            return "transform";
-        case AuthoringCommandKind::SetLightIntensity:
-            return "light-intensity";
-        case AuthoringCommandKind::SetLightColor:
-            return "light-color";
-        case AuthoringCommandKind::SetCameraPerspective:
-            return "camera-perspective";
-        case AuthoringCommandKind::SetCameraOrthographic:
-            return "camera-orthographic";
-        case AuthoringCommandKind::InspectScene:
-        case AuthoringCommandKind::InspectEntity:
-        case AuthoringCommandKind::InspectHierarchy:
-            return "inspect";
-        case AuthoringCommandKind::VerifySceneSaved:
-        case AuthoringCommandKind::VerifyEntityExists:
-        case AuthoringCommandKind::VerifyHasComponent:
-        case AuthoringCommandKind::VerifyEntityCountAtLeast:
-            return "verify";
-        case AuthoringCommandKind::Summary:
-            return "summary";
-    }
-
-    return "unknown";
-}
-
 void addDiagnostic(AuthoringReport& report,
                    AuthoringDiagnosticCode code,
                    std::string message,
@@ -241,7 +189,7 @@ void addDiagnostic(AuthoringReport& report,
                                   .code = code,
                                   .has_command_index = true,
                                   .command_index = command_index,
-                                  .command = commandKindName(command.kind),
+                                  .command = authoringCommandName(command.kind),
                                   .field = std::move(field),
                                   .entity_ref = std::move(entity_ref),
                                   .component = std::move(component),
@@ -415,7 +363,7 @@ bool prepareCommandFileWrites(AuthoringFileEffectGuard& file_effect_guard,
         default:
             addDiagnostic(report,
                           AuthoringDiagnosticCode::ExecutionFailed,
-                          "Filesystem-writing command '" + std::string(commandKindName(command.kind)) +
+                          "Filesystem-writing command '" + std::string(authoringCommandName(command.kind)) +
                               "' has no authoring rollback boundary.",
                           command_index,
                           command);
@@ -428,6 +376,11 @@ bool prepareCommandFileWrites(AuthoringFileEffectGuard& file_effect_guard,
 AuthoringExecutor::AuthoringExecutor(AuthoringSession& session)
     : m_session(session)
 {}
+
+bool AuthoringExecutor::validate(const AuthoringPlan& plan, AuthoringReport& report) const
+{
+    return validateAuthoringPlan(plan, m_session, report);
+}
 
 void AuthoringExecutor::clearAliases()
 {
@@ -526,6 +479,10 @@ void AuthoringExecutor::refreshEntityBindingName(Entity entity, AuthoringReport&
 
 bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& report)
 {
+    if (!validate(plan, report)) {
+        return false;
+    }
+
     if (!m_session.hasScene()) {
         appendAuthoringDiagnostic(report,
                                   {

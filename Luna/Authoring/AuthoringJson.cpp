@@ -98,6 +98,8 @@ const char* diagnosticCodeName(AuthoringDiagnosticCode code)
             return "OpenSceneFailed";
         case AuthoringDiagnosticCode::SaveSceneFailed:
             return "SaveSceneFailed";
+        case AuthoringDiagnosticCode::FileOverwrite:
+            return "FileOverwrite";
         case AuthoringDiagnosticCode::ProjectLoadFailed:
             return "ProjectLoadFailed";
         case AuthoringDiagnosticCode::ExecutionFailed:

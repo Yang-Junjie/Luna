@@ -226,8 +226,8 @@ void testExecutorReportsStructuredDiagnostics(TestContext& context)
         const luna::authoring::AuthoringDiagnostic& diagnostic = report.diagnostics.front();
         context.expect(diagnostic.code == luna::authoring::AuthoringDiagnosticCode::UnknownEntity,
                        "unknown entity should use UnknownEntity code");
-        context.expect(diagnostic.phase == luna::authoring::AuthoringDiagnosticPhase::Execute,
-                       "unknown entity should use execute phase");
+        context.expect(diagnostic.phase == luna::authoring::AuthoringDiagnosticPhase::Validate,
+                       "unknown entity should be caught during validation");
         context.expect(diagnostic.has_command_index && diagnostic.command_index == 1,
                        "unknown entity should include failing command index");
         context.expect(diagnostic.command == "name", "unknown entity should include command name");
@@ -253,8 +253,8 @@ void testExecutorRollsBackFailedPlan(TestContext& context)
         .name = "Temporary Entity",
     });
     plan.commands.push_back({
-        .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
-        .entity = {.value = "MissingEntity"},
+        .kind = luna::authoring::AuthoringCommandKind::Unparent,
+        .child = {.value = "Temporary"},
     });
 
     luna::authoring::AuthoringReport report;
@@ -290,8 +290,8 @@ void testExecutorRemovesSavedFileWhenFailedPlanRollsBack(TestContext& context)
         .path = scene_path,
     });
     plan.commands.push_back({
-        .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
-        .entity = {.value = "MissingEntity"},
+        .kind = luna::authoring::AuthoringCommandKind::Unparent,
+        .child = {.value = "Temporary"},
     });
 
     luna::authoring::AuthoringReport report;
@@ -368,6 +368,72 @@ void testExecutorRefusesNonFileSaveTarget(TestContext& context)
     context.expect(!session.hasOpenTransaction(), "non-file save target failure should close its transaction");
 }
 
+void testExecutorValidateDoesNotMutateOrWriteFiles(TestContext& context)
+{
+    TempDirectory temp("AuthoringExecutorDryRun");
+    const std::filesystem::path scene_path = temp.path() / "DryRunScene";
+    const std::filesystem::path normalized_scene_path = luna::SceneSerializer::normalizeScenePath(scene_path);
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+    const size_t entity_count_before = scene.entityManager().entityCount();
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::CreatePrimitive,
+        .alias = "DryRunBox",
+        .mesh = "Cube",
+    });
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::SaveScene,
+        .path = scene_path,
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(executor.validate(plan, report), "valid dry-run plan should validate");
+    context.expect(report.errors.empty(), "valid dry-run plan should not report errors");
+    context.expect(report.diagnostics.empty(), "valid dry-run plan should not report diagnostics");
+    context.expect(scene.entityManager().entityCount() == entity_count_before,
+                   "dry-run validation should not mutate the scene");
+    context.expect(!std::filesystem::exists(normalized_scene_path),
+                   "dry-run validation should not write scene files");
+}
+
+void testExecutorValidateReportsOverwriteWarning(TestContext& context)
+{
+    TempDirectory temp("AuthoringExecutorDryRunOverwrite");
+    const std::filesystem::path scene_path = temp.path() / "ExistingScene";
+    const std::filesystem::path normalized_scene_path = luna::SceneSerializer::normalizeScenePath(scene_path);
+    const std::string original_contents = "Scene: Original\nEntities: []\n";
+    writeTextFile(normalized_scene_path, original_contents);
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringExecutor executor(session);
+
+    luna::authoring::AuthoringPlan plan;
+    plan.commands.push_back({.kind = luna::authoring::AuthoringCommandKind::NewScene});
+    plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::SaveScene,
+        .path = scene_path,
+    });
+
+    luna::authoring::AuthoringReport report;
+    context.expect(executor.validate(plan, report), "overwrite dry-run should validate with a warning");
+    context.expect(report.errors.empty(), "overwrite dry-run warning should not be an error");
+    context.expect(report.diagnostics.size() == 1, "overwrite dry-run should report one diagnostic");
+    if (!report.diagnostics.empty()) {
+        context.expect(report.diagnostics.front().severity == luna::authoring::AuthoringDiagnosticSeverity::Warning,
+                       "overwrite diagnostic should be a warning");
+        context.expect(report.diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::FileOverwrite,
+                       "overwrite diagnostic should use FileOverwrite code");
+    }
+    context.expect(readTextFile(normalized_scene_path) == original_contents,
+                   "overwrite dry-run should not change existing file contents");
+}
+
 } // namespace
 
 int main()
@@ -382,6 +448,8 @@ int main()
     testExecutorRemovesSavedFileWhenFailedPlanRollsBack(context);
     testExecutorRestoresExistingSavedFileWhenFailedPlanRollsBack(context);
     testExecutorRefusesNonFileSaveTarget(context);
+    testExecutorValidateDoesNotMutateOrWriteFiles(context);
+    testExecutorValidateReportsOverwriteWarning(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();

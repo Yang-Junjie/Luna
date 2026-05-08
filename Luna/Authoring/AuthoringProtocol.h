@@ -95,6 +95,7 @@ enum class AuthoringDiagnosticCode : uint8_t {
     MissingComponent,
     OpenSceneFailed,
     SaveSceneFailed,
+    FileOverwrite,
     ProjectLoadFailed,
     ExecutionFailed,
     VerificationFailed,
@@ -182,6 +183,7 @@ struct AuthoringReport {
 [[nodiscard]] AuthoringSceneSnapshot captureAuthoringSceneSnapshot(const AuthoringSession& session);
 
 [[nodiscard]] AuthoringCommandEffect authoringCommandEffects(AuthoringCommandKind kind);
+[[nodiscard]] const char* authoringCommandName(AuthoringCommandKind kind);
 [[nodiscard]] bool authoringCommandReadsScene(AuthoringCommandKind kind);
 [[nodiscard]] bool authoringCommandMutatesScene(AuthoringCommandKind kind);
 [[nodiscard]] bool authoringCommandReadsFileSystem(AuthoringCommandKind kind);

@@ -55,9 +55,9 @@ function printUsage(): void {
     console.log(`Luna TS CLI
 
 Usage:
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] run <commands...>
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] plan <plan.json>
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--json] interactive
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] run <commands...>
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] plan <plan.json>
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--json] [--dry-run] interactive
 
 Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts run new primitive CubeBox Cube save build/CLI/Smoke/TsScene
@@ -404,12 +404,7 @@ function readPlan(planPath: string): AuthoringPlan {
 }
 
 function runHost(host: string, args: string[], dryRun: boolean): number {
-    if (dryRun) {
-        console.log([host, ...args].map((part) => JSON.stringify(part)).join(" "));
-        return 0;
-    }
-
-    const result = spawnSync(host, args, { stdio: "inherit" });
+    const result = spawnSync(host, dryRun ? ["--dry-run", ...args] : args, { stdio: "inherit" });
     if (typeof result.status === "number") {
         return result.status;
     }

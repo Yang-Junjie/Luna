@@ -36,6 +36,7 @@ struct CliState {
 struct ParsedCliOptions {
     bool help{false};
     bool json_output{false};
+    bool dry_run{false};
     std::filesystem::path project_file_path;
     std::vector<std::string> commands;
     std::vector<std::string> errors;
@@ -47,8 +48,8 @@ void printUsage()
         << "LunaCLI\n"
         << "\n"
         << "Usage:\n"
-        << "  LunaCLI [--json] [--project <path>] <commands...>\n"
-        << "  LunaCLI [--json] [--project <path>] plan <plan.json>\n"
+        << "  LunaCLI [--json] [--dry-run] [--project <path>] <commands...>\n"
+        << "  LunaCLI [--json] [--dry-run] [--project <path>] plan <plan.json>\n"
         << "\n"
         << "Commands run left-to-right:\n"
         << "  new\n"
@@ -151,6 +152,12 @@ ParsedCliOptions parseCliOptions(const std::vector<std::string>& args)
 
         if (arg == "--json") {
             options.json_output = true;
+            ++index;
+            continue;
+        }
+
+        if (arg == "--dry-run") {
+            options.dry_run = true;
             ++index;
             continue;
         }
@@ -754,6 +761,15 @@ void printEntityBindings(const luna::authoring::AuthoringReport& report)
     }
 }
 
+void printWarnings(const luna::authoring::AuthoringReport& report)
+{
+    for (const luna::authoring::AuthoringDiagnostic& diagnostic : report.diagnostics) {
+        if (diagnostic.severity == luna::authoring::AuthoringDiagnosticSeverity::Warning) {
+            std::cerr << "Warning: " << diagnostic.message << '\n';
+        }
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -848,15 +864,20 @@ int main(int argc, char** argv)
     const size_t error_count_before_execute = state.report.errors.size();
     if (ok) {
         luna::authoring::AuthoringExecutor executor(state.session);
-        ok = executor.execute(plan, state.report);
+        ok = options.dry_run ? executor.validate(plan, state.report) : executor.execute(plan, state.report);
     }
 
     if (state.json_output) {
         state.report.scene = luna::authoring::captureAuthoringSceneSnapshot(state.session);
         luna::authoring::writeAuthoringReportJson(std::cout, state.report, ok);
     } else if (ok) {
-        printEntityBindings(state.report);
-        printSummary(state);
+        printWarnings(state.report);
+        if (options.dry_run) {
+            std::cout << "Dry run: valid\n";
+        } else {
+            printEntityBindings(state.report);
+            printSummary(state);
+        }
     } else {
         for (size_t index = error_count_before_execute; index < state.report.errors.size(); ++index) {
             std::cerr << state.report.errors[index] << '\n';

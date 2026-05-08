@@ -16,6 +16,7 @@ class AuthoringExecutor {
 public:
     explicit AuthoringExecutor(AuthoringSession& session);
 
+    [[nodiscard]] bool validate(const AuthoringPlan& plan, AuthoringReport& report) const;
     [[nodiscard]] bool execute(const AuthoringPlan& plan, AuthoringReport& report);
     void clearAliases();
 

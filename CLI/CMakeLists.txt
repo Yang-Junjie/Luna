@@ -40,6 +40,17 @@ if(BUILD_TESTING)
     )
 
     add_test(
+        NAME CliDryRunSmokeTest
+        COMMAND
+            LunaCLI
+            --dry-run
+            --json
+            new
+            primitive DryRunCube Cube
+            save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliDryRunSmoke"
+    )
+
+    add_test(
         NAME CliPlanSmokeTest
         COMMAND
             LunaCLI

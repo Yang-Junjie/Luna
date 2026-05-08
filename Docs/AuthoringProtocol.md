@@ -6,7 +6,9 @@
 
 Commands are executed left-to-right against `AuthoringSession` through `AuthoringExecutor`.
 
-`AuthoringExecutor` runs each plan inside one authoring transaction. A successful plan commits as one undo step. A failed plan rolls back scene mutations before returning diagnostics.
+`AuthoringExecutor` validates each plan before execution. Validation does not mutate the scene or write files; it checks protocol compatibility, command references, builtin asset names, component requirements, verification conditions that can be known ahead of time, and filesystem boundaries for `open` and `save`.
+
+`AuthoringExecutor` runs each valid plan inside one authoring transaction. A successful plan commits as one undo step. A failed plan rolls back scene mutations before returning diagnostics.
 
 Command effects are explicit in the protocol layer:
 
@@ -17,9 +19,16 @@ Command effects are explicit in the protocol layer:
 
 Filesystem writes must be registered with the executor's side-effect boundary before the write happens. Today `save` snapshots the target `.lunascene` file first: a failed plan removes a newly-created scene file or restores the original contents of an overwritten file. Future file-writing authoring commands, such as asset import, project save, or script generation, should declare `WritesFileSystem` and add a matching rollback boundary before implementation.
 
+Dry-run mode uses the same validation path and exits before execution:
+
+```powershell
+build\CLI\LunaCLI.exe --dry-run --json new primitive Box Cube save Generated/BoxScene
+```
+
 Errors are terminal:
 
 - Parse error: `ok=false`, no commands execute.
+- Validation error: `ok=false`, no commands execute.
 - Execution error: `ok=false`, execution stops at the failing command.
 - Verification failure: `ok=false`, execution stops at the failing verification.
 - Inspect commands do not mutate the scene.
@@ -37,6 +46,12 @@ Editor actions, AI plans, and future MCP tools share the same `AuthoringSession`
 The current implementation uses scene-level snapshots for correctness and broad coverage. High-frequency editor interactions, such as viewport gizmo transforms, should use an explicit transaction so a drag gesture becomes one undo step.
 
 ## CLI Commands
+
+Global options:
+
+- `--json`
+- `--dry-run`
+- `--project <path>`
 
 Authoring commands:
 
@@ -151,6 +166,7 @@ Stable diagnostic codes currently include:
 - `MissingComponent`
 - `OpenSceneFailed`
 - `SaveSceneFailed`
+- `FileOverwrite`
 - `ProjectLoadFailed`
 - `ExecutionFailed`
 - `VerificationFailed`
