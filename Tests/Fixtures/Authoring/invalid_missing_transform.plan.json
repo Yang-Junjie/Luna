@@ -1,0 +1,6 @@
+{
+  "protocol": { "name": "luna.authoring", "version": 1 },
+  "commands": [
+    { "op": "transform", "entity": "CubeBox" }
+  ]
+}

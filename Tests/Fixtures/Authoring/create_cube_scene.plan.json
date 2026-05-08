@@ -1,0 +1,20 @@
+{
+  "protocol": { "name": "luna.authoring", "version": 1 },
+  "commands": [
+    { "op": "new" },
+    { "op": "primitive", "alias": "CubeBox", "mesh": "Cube" },
+    {
+      "op": "transform",
+      "entity": "CubeBox",
+      "translation": [1, 2, 3],
+      "rotationDeg": [0, 45, 0],
+      "scale": [1, 1, 1]
+    },
+    { "op": "inspect", "target": "entity", "entity": "CubeBox" },
+    { "op": "inspect", "target": "hierarchy" },
+    { "op": "verify", "check": "entityExists", "entity": "CubeBox" },
+    { "op": "verify", "check": "hasComponent", "entity": "CubeBox", "component": "Mesh" },
+    { "op": "verify", "check": "entityCountAtLeast", "count": 1 },
+    { "op": "summary" }
+  ]
+}

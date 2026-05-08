@@ -194,6 +194,8 @@ set(AUTHORING_SOURCE
     Authoring/AuthoringVerification.h
     Authoring/AuthoringJson.h
     Authoring/AuthoringJson.cpp
+    Authoring/AuthoringPlanJson.h
+    Authoring/AuthoringPlanJson.cpp
     Authoring/AuthoringProtocol.h
     Authoring/AuthoringProtocol.cpp
     Authoring/AuthoringValidator.h

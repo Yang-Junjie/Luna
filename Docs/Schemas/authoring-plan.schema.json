@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luna.local/schemas/authoring-plan.schema.json",
+  "title": "Luna Authoring Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commands"],
+  "properties": {
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "project": { "$ref": "#/$defs/nonEmptyString" },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/command" }
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "luna.authoring" },
+        "version": { "const": 1 }
+      }
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vec3": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "command": {
+      "oneOf": [
+        { "$ref": "#/$defs/newSceneCommand" },
+        { "$ref": "#/$defs/openSceneCommand" },
+        { "$ref": "#/$defs/saveSceneCommand" },
+        { "$ref": "#/$defs/createEntityCommand" },
+        { "$ref": "#/$defs/createCameraCommand" },
+        { "$ref": "#/$defs/createDirectionalLightCommand" },
+        { "$ref": "#/$defs/createPointLightCommand" },
+        { "$ref": "#/$defs/createSpotLightCommand" },
+        { "$ref": "#/$defs/createPrimitiveCommand" },
+        { "$ref": "#/$defs/parentCommand" },
+        { "$ref": "#/$defs/unparentCommand" },
+        { "$ref": "#/$defs/renameCommand" },
+        { "$ref": "#/$defs/transformCommand" },
+        { "$ref": "#/$defs/lightIntensityCommand" },
+        { "$ref": "#/$defs/lightColorCommand" },
+        { "$ref": "#/$defs/cameraPerspectiveCommand" },
+        { "$ref": "#/$defs/cameraOrthographicCommand" },
+        { "$ref": "#/$defs/inspectSceneCommand" },
+        { "$ref": "#/$defs/inspectEntityCommand" },
+        { "$ref": "#/$defs/inspectHierarchyCommand" },
+        { "$ref": "#/$defs/verifySceneSavedCommand" },
+        { "$ref": "#/$defs/verifyEntityExistsCommand" },
+        { "$ref": "#/$defs/verifyHasComponentCommand" },
+        { "$ref": "#/$defs/verifyEntityCountAtLeastCommand" },
+        { "$ref": "#/$defs/summaryCommand" }
+      ]
+    },
+    "newSceneCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "const": "new" }
+      }
+    },
+    "openSceneCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "path"],
+      "properties": {
+        "op": { "const": "open" },
+        "path": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "saveSceneCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "path"],
+      "properties": {
+        "op": { "const": "save" },
+        "path": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createEntityCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias", "name"],
+      "properties": {
+        "op": { "const": "entity" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createCameraCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias"],
+      "properties": {
+        "op": { "const": "camera" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createDirectionalLightCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias"],
+      "properties": {
+        "op": { "const": "directional-light" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createPointLightCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias"],
+      "properties": {
+        "op": { "const": "point-light" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createSpotLightCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias"],
+      "properties": {
+        "op": { "const": "spot-light" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "createPrimitiveCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "alias", "mesh"],
+      "properties": {
+        "op": { "const": "primitive" },
+        "alias": { "$ref": "#/$defs/nonEmptyString" },
+        "mesh": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "parentCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "child", "parent"],
+      "properties": {
+        "op": { "const": "parent" },
+        "child": { "$ref": "#/$defs/nonEmptyString" },
+        "parent": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "unparentCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "child"],
+      "properties": {
+        "op": { "const": "unparent" },
+        "child": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "renameCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "name"],
+      "properties": {
+        "op": { "const": "name" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "transformCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "translation"],
+      "properties": {
+        "op": { "const": "transform" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "translation": { "$ref": "#/$defs/vec3" },
+        "rotationDeg": { "$ref": "#/$defs/vec3" },
+        "scale": { "$ref": "#/$defs/vec3" }
+      }
+    },
+    "lightIntensityCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "value"],
+      "properties": {
+        "op": { "const": "light-intensity" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "value": { "type": "number" }
+      }
+    },
+    "lightColorCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "color"],
+      "properties": {
+        "op": { "const": "light-color" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "color": { "$ref": "#/$defs/vec3" }
+      }
+    },
+    "cameraPerspectiveCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "fovDeg", "near", "far"],
+      "properties": {
+        "op": { "const": "camera-perspective" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "fovDeg": { "type": "number" },
+        "near": { "type": "number" },
+        "far": { "type": "number" }
+      }
+    },
+    "cameraOrthographicCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "entity", "size", "near", "far"],
+      "properties": {
+        "op": { "const": "camera-orthographic" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "size": { "type": "number" },
+        "near": { "type": "number" },
+        "far": { "type": "number" }
+      }
+    },
+    "inspectSceneCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "target"],
+      "properties": {
+        "op": { "const": "inspect" },
+        "target": { "const": "scene" }
+      }
+    },
+    "inspectEntityCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "target", "entity"],
+      "properties": {
+        "op": { "const": "inspect" },
+        "target": { "const": "entity" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "inspectHierarchyCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "target"],
+      "properties": {
+        "op": { "const": "inspect" },
+        "target": { "const": "hierarchy" }
+      }
+    },
+    "verifySceneSavedCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "check"],
+      "properties": {
+        "op": { "const": "verify" },
+        "check": { "const": "sceneSaved" }
+      }
+    },
+    "verifyEntityExistsCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "check", "entity"],
+      "properties": {
+        "op": { "const": "verify" },
+        "check": { "const": "entityExists" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "verifyHasComponentCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "check", "entity", "component"],
+      "properties": {
+        "op": { "const": "verify" },
+        "check": { "const": "hasComponent" },
+        "entity": { "$ref": "#/$defs/nonEmptyString" },
+        "component": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "verifyEntityCountAtLeastCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "check", "count"],
+      "properties": {
+        "op": { "const": "verify" },
+        "check": { "const": "entityCountAtLeast" },
+        "count": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "summaryCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "const": "summary" }
+      }
+    }
+  }
+}

@@ -145,6 +145,13 @@ target_compile_definitions(
         LUNA_TEST_SCRIPT_PLUGIN_DIR="${LUNA_TEST_SCRIPT_PLUGIN_OUTPUT_DIR}"
 )
 
+target_compile_definitions(
+    AuthoringProtocolTests
+    PRIVATE
+        LUNA_AUTHORING_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Fixtures/Authoring"
+        LUNA_AUTHORING_SCHEMA_DIR="${PROJECT_SOURCE_DIR}/Docs/Schemas"
+)
+
 if(TARGET LunaScriptLuaPlugin)
     add_dependencies(ScriptPluginContractTests LunaScriptLuaPlugin)
 endif()

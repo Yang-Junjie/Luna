@@ -86,6 +86,17 @@ if(BUILD_TESTING)
     find_program(LUNA_NODE_EXECUTABLE node)
     if(LUNA_NODE_EXECUTABLE)
         add_test(
+            NAME CliTsAuthoringProtocolSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/authoringProtocol.smoke.ts"
+                "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/create_cube_scene.plan.json"
+                "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/invalid_unknown_command.plan.json"
+        )
+
+        add_test(
             NAME CliTsClientSmokeTest
             COMMAND
                 "${LUNA_NODE_EXECUTABLE}"
@@ -98,6 +109,30 @@ if(BUILD_TESTING)
                 primitive TsCube Cube
                 transform TsCube 2 1 0 0 30 0 1 1 1
                 save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliTsClientSmoke"
+        )
+
+        add_test(
+            NAME CliTsClientPlanFixtureSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+                --host "$<TARGET_FILE:LunaCLI>"
+                --json
+                plan
+                "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/create_cube_scene.plan.json"
+        )
+
+        add_test(
+            NAME CliTsInteractivePlanSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/interactive.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+                "$<TARGET_FILE:LunaCLI>"
         )
     endif()
 endif()

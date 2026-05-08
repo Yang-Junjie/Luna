@@ -1,0 +1,29 @@
+{
+  "protocol": { "name": "luna.authoring", "version": 1 },
+  "commands": [
+    { "op": "new" },
+    { "op": "camera", "alias": "MainCamera" },
+    { "op": "camera-perspective", "entity": "MainCamera", "fovDeg": 60, "near": 0.1, "far": 500 },
+    {
+      "op": "transform",
+      "entity": "MainCamera",
+      "translation": [0, 3, 8],
+      "rotationDeg": [-20, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    { "op": "point-light", "alias": "KeyLight" },
+    { "op": "light-intensity", "entity": "KeyLight", "value": 3.5 },
+    { "op": "light-color", "entity": "KeyLight", "color": [1, 0.92, 0.78] },
+    {
+      "op": "transform",
+      "entity": "KeyLight",
+      "translation": [2, 4, 1],
+      "rotationDeg": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    { "op": "verify", "check": "entityExists", "entity": "MainCamera" },
+    { "op": "verify", "check": "entityExists", "entity": "KeyLight" },
+    { "op": "verify", "check": "entityCountAtLeast", "count": 2 },
+    { "op": "summary" }
+  ]
+}

@@ -107,6 +107,17 @@ Plan files are JSON objects:
 
 The `protocol` field is optional for v1 compatibility. If present, `name` must be `luna.authoring` and `version` must be `1`.
 
+Plan JSON uses stable protocol names rather than the CLI shorthand. For example, the scene-saved verification is `{ "op": "verify", "check": "sceneSaved" }`. The JSON loader still accepts the legacy check name `"saved"` for compatibility, but writers emit `"sceneSaved"`.
+
+Machine-readable JSON Schema files are kept in `Docs/Schemas`:
+
+- `authoring-plan.schema.json`
+- `authoring-report.schema.json`
+
+Golden plan fixtures are kept in `Tests/Fixtures/Authoring` and are covered by `AuthoringProtocolTests`. These fixtures are the compatibility samples for CLI, editor, AI, and future MCP integrations.
+
+The TypeScript CLI client keeps its typed protocol facade in `CLI/client/authoringProtocol.ts`. Future AI-facing client code should build plans through that facade instead of hand-writing command objects in multiple places. The interactive TS client also queues typed `PlanCommand` objects and executes them by writing a temporary plan JSON for the C++ `plan` entrypoint.
+
 ## Report JSON
 
 `LunaCLI --json ...` emits one report object:

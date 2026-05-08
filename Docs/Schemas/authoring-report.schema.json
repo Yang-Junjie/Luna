@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luna.local/schemas/authoring-report.schema.json",
+  "title": "Luna Authoring Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "ok",
+    "scene",
+    "entities",
+    "savedScenes",
+    "inspections",
+    "verifications",
+    "diagnostics",
+    "errors"
+  ],
+  "properties": {
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "ok": { "type": "boolean" },
+    "scene": { "$ref": "#/$defs/sceneSnapshot" },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entityBinding" }
+    },
+    "savedScenes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "inspections": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/inspection" }
+    },
+    "verifications": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/verification" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/diagnostic" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "luna.authoring" },
+        "version": { "const": 1 }
+      }
+    },
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "uuidOrNull": {
+      "type": ["string", "null"]
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "vec3": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "sceneSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "path", "entityCount", "dirty"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "$ref": "#/$defs/nullableString" },
+        "entityCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "dirty": { "type": "boolean" }
+      }
+    },
+    "entityBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alias", "uuid", "name"],
+      "properties": {
+        "alias": { "type": "string" },
+        "uuid": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ref", "entities"],
+      "properties": {
+        "type": { "enum": ["scene", "entity", "hierarchy"] },
+        "ref": { "type": "string" },
+        "entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entityInspection" }
+        }
+      }
+    },
+    "entityInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "uuid", "name", "parentUuid", "children", "components"],
+      "properties": {
+        "ref": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuidOrNull" },
+        "name": { "type": "string" },
+        "parentUuid": { "$ref": "#/$defs/uuidOrNull" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uuidOrNull" }
+        },
+        "components": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "transform": { "$ref": "#/$defs/transformInspection" },
+        "camera": { "$ref": "#/$defs/cameraInspection" },
+        "light": { "$ref": "#/$defs/lightInspection" },
+        "mesh": { "$ref": "#/$defs/meshInspection" }
+      }
+    },
+    "transformInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["translation", "rotationDeg", "scale"],
+      "properties": {
+        "translation": { "$ref": "#/$defs/vec3" },
+        "rotationDeg": { "$ref": "#/$defs/vec3" },
+        "scale": { "$ref": "#/$defs/vec3" }
+      }
+    },
+    "cameraInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "fixedAspectRatio",
+        "projection",
+        "perspectiveFovDeg",
+        "perspectiveNear",
+        "perspectiveFar",
+        "orthographicSize",
+        "orthographicNear",
+        "orthographicFar"
+      ],
+      "properties": {
+        "primary": { "type": "boolean" },
+        "fixedAspectRatio": { "type": "boolean" },
+        "projection": { "type": "string" },
+        "perspectiveFovDeg": { "type": "number" },
+        "perspectiveNear": { "type": "number" },
+        "perspectiveFar": { "type": "number" },
+        "orthographicSize": { "type": "number" },
+        "orthographicNear": { "type": "number" },
+        "orthographicFar": { "type": "number" }
+      }
+    },
+    "lightInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "enabled",
+        "color",
+        "intensity",
+        "range",
+        "innerConeAngleDeg",
+        "outerConeAngleDeg"
+      ],
+      "properties": {
+        "type": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "color": { "$ref": "#/$defs/vec3" },
+        "intensity": { "type": "number" },
+        "range": { "type": "number" },
+        "innerConeAngleDeg": { "type": "number" },
+        "outerConeAngleDeg": { "type": "number" }
+      }
+    },
+    "meshInspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["meshHandle", "submeshMaterials"],
+      "properties": {
+        "meshHandle": { "$ref": "#/$defs/uuidOrNull" },
+        "submeshMaterials": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/uuidOrNull" }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "ok",
+        "ref",
+        "uuid",
+        "component",
+        "expectedCount",
+        "actualCount",
+        "message"
+      ],
+      "properties": {
+        "type": {
+          "enum": ["sceneSaved", "entityExists", "hasComponent", "entityCountAtLeast"]
+        },
+        "ok": { "type": "boolean" },
+        "ref": { "type": "string" },
+        "uuid": { "$ref": "#/$defs/uuidOrNull" },
+        "component": { "type": "string" },
+        "expectedCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "actualCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "message": { "type": "string" }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "phase",
+        "code",
+        "message",
+        "commandIndex",
+        "command",
+        "field",
+        "entityRef",
+        "component",
+        "path",
+        "recoverable",
+        "expected",
+        "actual",
+        "suggestedCommand"
+      ],
+      "properties": {
+        "severity": { "enum": ["info", "warning", "error"] },
+        "phase": { "enum": ["parse", "validate", "execute", "verify"] },
+        "code": {
+          "enum": [
+            "InvalidPlan",
+            "ProtocolMismatch",
+            "UnsupportedCommand",
+            "UnsupportedVerifyCheck",
+            "MissingArgument",
+            "InvalidArgument",
+            "InvalidNumber",
+            "NoBoundScene",
+            "UnknownEntity",
+            "UnknownBuiltinAsset",
+            "MissingComponent",
+            "OpenSceneFailed",
+            "SaveSceneFailed",
+            "FileOverwrite",
+            "ProjectLoadFailed",
+            "ExecutionFailed",
+            "VerificationFailed"
+          ]
+        },
+        "message": { "type": "string" },
+        "commandIndex": { "type": ["integer", "null"], "minimum": 0 },
+        "command": { "$ref": "#/$defs/nullableString" },
+        "field": { "$ref": "#/$defs/nullableString" },
+        "entityRef": { "$ref": "#/$defs/nullableString" },
+        "component": { "$ref": "#/$defs/nullableString" },
+        "path": { "$ref": "#/$defs/nullableString" },
+        "recoverable": { "type": "boolean" },
+        "expected": { "$ref": "#/$defs/nullableString" },
+        "actual": { "$ref": "#/$defs/nullableString" },
+        "suggestedCommand": { "$ref": "#/$defs/nullableString" }
+      }
+    }
+  }
+}
