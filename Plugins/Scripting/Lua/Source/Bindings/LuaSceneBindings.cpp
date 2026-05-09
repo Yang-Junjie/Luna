@@ -1,5 +1,7 @@
 #include "LuaSceneBindings.h"
 
+#include "LuaSharedBindings.h"
+
 #include "../LuaPluginRuntime.h"
 
 #include <glm/vec3.hpp>
@@ -294,19 +296,8 @@ void bindLuaSceneApi(LuaPluginRuntime& runtime)
 {
     sol::state& lua_state = runtime.luaState();
 
-    sol::table camera_projection = lua_state.create_named_table("CameraProjection");
-    camera_projection["Perspective"] = static_cast<int>(LunaScriptCameraProjectionType_Perspective);
-    camera_projection["Orthographic"] = static_cast<int>(LunaScriptCameraProjectionType_Orthographic);
-
-    lua_state.new_usertype<glm::vec3>("Vec3",
-                                      sol::call_constructor,
-                                      sol::constructors<glm::vec3(), glm::vec3(float, float, float)>(),
-                                      "x",
-                                      &glm::vec3::x,
-                                      "y",
-                                      &glm::vec3::y,
-                                      "z",
-                                      &glm::vec3::z);
+    bindLuaCameraProjectionConstants(lua_state);
+    bindLuaVec3Type(lua_state);
     lua_state.new_usertype<LuaCamera>("Camera",
                                       sol::call_constructor,
                                       sol::constructors<LuaCamera()>(),

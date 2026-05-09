@@ -34,6 +34,65 @@ typedef enum LunaScriptCameraProjectionType {
     LunaScriptCameraProjectionType_Orthographic = 1,
 } LunaScriptCameraProjectionType;
 
+typedef enum LunaScriptKeyCode {
+    LunaScriptKeyCode_None = 0,
+    LunaScriptKeyCode_LeftShift = 1,
+    LunaScriptKeyCode_RightShift = 2,
+    LunaScriptKeyCode_LeftControl = 3,
+    LunaScriptKeyCode_RightControl = 4,
+    LunaScriptKeyCode_LeftAlt = 5,
+    LunaScriptKeyCode_RightAlt = 6,
+    LunaScriptKeyCode_Space = 7,
+    LunaScriptKeyCode_Enter = 8,
+    LunaScriptKeyCode_Delete = 9,
+    LunaScriptKeyCode_Escape = 10,
+    LunaScriptKeyCode_Up = 11,
+    LunaScriptKeyCode_Down = 12,
+    LunaScriptKeyCode_Left = 13,
+    LunaScriptKeyCode_Right = 14,
+    LunaScriptKeyCode_A = 65,
+    LunaScriptKeyCode_B = 66,
+    LunaScriptKeyCode_C = 67,
+    LunaScriptKeyCode_D = 68,
+    LunaScriptKeyCode_E = 69,
+    LunaScriptKeyCode_F = 70,
+    LunaScriptKeyCode_G = 71,
+    LunaScriptKeyCode_H = 72,
+    LunaScriptKeyCode_I = 73,
+    LunaScriptKeyCode_J = 74,
+    LunaScriptKeyCode_K = 75,
+    LunaScriptKeyCode_L = 76,
+    LunaScriptKeyCode_M = 77,
+    LunaScriptKeyCode_N = 78,
+    LunaScriptKeyCode_O = 79,
+    LunaScriptKeyCode_P = 80,
+    LunaScriptKeyCode_Q = 81,
+    LunaScriptKeyCode_R = 82,
+    LunaScriptKeyCode_S = 83,
+    LunaScriptKeyCode_T = 84,
+    LunaScriptKeyCode_U = 85,
+    LunaScriptKeyCode_V = 86,
+    LunaScriptKeyCode_W = 87,
+    LunaScriptKeyCode_X = 88,
+    LunaScriptKeyCode_Y = 89,
+    LunaScriptKeyCode_Z = 90,
+} LunaScriptKeyCode;
+
+typedef enum LunaScriptMouseCode {
+    LunaScriptMouseCode_None = 0,
+    LunaScriptMouseCode_Left = 1,
+    LunaScriptMouseCode_Right = 2,
+    LunaScriptMouseCode_Middle = 3,
+    LunaScriptMouseCode_XButton1 = 4,
+    LunaScriptMouseCode_XButton2 = 5,
+} LunaScriptMouseCode;
+
+typedef enum LunaScriptCursorMode {
+    LunaScriptCursorMode_Normal = 0,
+    LunaScriptCursorMode_Hidden = 1,
+    LunaScriptCursorMode_Locked = 2,
+} LunaScriptCursorMode;
+
 typedef enum LunaScriptHostLogLevel {
     LunaScriptHostLogLevel_Trace = 0,
     LunaScriptHostLogLevel_Info = 1,

@@ -11,6 +11,8 @@ add_library(
     Source/Bindings/LuaInputBindings.cpp
     Source/Bindings/LuaSceneBindings.h
     Source/Bindings/LuaSceneBindings.cpp
+    Source/Bindings/LuaSharedBindings.h
+    Source/Bindings/LuaSharedBindings.cpp
     Source/LuaScriptPlugin.cpp
 )
 
