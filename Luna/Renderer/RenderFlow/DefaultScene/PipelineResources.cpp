@@ -15,7 +15,6 @@ SceneShaderPaths defaultShaderPaths()
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
     const std::filesystem::path transparent_composite_shader_path = shader_root / "TransparentComposite.slang";
     const std::filesystem::path environment_ibl_shader_path = shader_root / "EnvironmentIBL.slang";
-    const std::filesystem::path procedural_sky_shader_path = shader_root / "ProceduralSky.slang";
     return SceneShaderPaths{
         .geometry_vertex_path = geometry_shader_path,
         .geometry_fragment_path = geometry_shader_path,
@@ -25,7 +24,6 @@ SceneShaderPaths defaultShaderPaths()
         .lighting_fragment_path = lighting_shader_path,
         .transparent_composite_path = transparent_composite_shader_path,
         .environment_ibl_path = environment_ibl_shader_path,
-        .procedural_sky_path = procedural_sky_shader_path,
     };
 }
 

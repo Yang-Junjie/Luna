@@ -1,7 +1,0 @@
-Asset:
-  Name: EnvironmentTest_DielectricSpheresMat
-  Handle: 10413243856417206030
-  Type: Material
-  FilePath: Assets/EnvironmentTest/glTF/Materials/1_EnvironmentTest_DielectricSpheresMat.lunamat
-  Config:
-    UseMaterialFileParameters: true

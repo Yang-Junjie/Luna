@@ -32,15 +32,7 @@ struct IblDispatchParams {
     uint32_t output_size{1};
     uint32_t sample_count{1};
     float roughness{0.0f};
-    uint32_t reserved{0};
-};
-
-struct ProceduralSkyParams {
-    glm::vec4 sun_direction_intensity{0.51214755f, 0.76822126f, 0.38411063f, 20.0f};
-    glm::vec4 sky_color_zenith_exposure{0.15f, 0.30f, 0.60f, 1.5f};
-    glm::vec4 sky_color_horizon_sun_radius{0.60f, 0.50f, 0.40f, 0.02f};
-    glm::vec4 ground_color{0.10f, 0.08f, 0.06f, 0.0f};
-    glm::uvec4 output_size{kProceduralSkyWidth, kProceduralSkyHeight, 0u, 0u};
+    uint32_t source_mip_levels{1};
 };
 
 namespace environment_binding {
@@ -50,10 +42,6 @@ constexpr uint32_t OutputTexture = 2;
 constexpr uint32_t SourceCubeTexture = 3;
 constexpr uint32_t BrdfLutOutputTexture = 4;
 } // namespace environment_binding
-
-namespace procedural_sky_binding {
-constexpr uint32_t OutputTexture = 0;
-} // namespace procedural_sky_binding
 
 uint32_t divideRoundUp(uint32_t value, uint32_t divisor)
 {
@@ -144,6 +132,15 @@ bool isUsableEnvironmentTexture(const std::shared_ptr<Texture>& texture)
 
     const ImageData& image = texture->getImageData();
     return image.ImageFormat == render_flow::default_scene_detail::kEnvironmentFormat;
+}
+
+uint32_t mipLevelCount(const luna::RHI::Ref<luna::RHI::Texture>& texture)
+{
+    if (!texture || texture->GetMipLevels() == 0) {
+        return 1;
+    }
+
+    return texture->GetMipLevels();
 }
 
 glm::vec3 computeRayleighScattering(const glm::vec3& direction,
@@ -243,21 +240,6 @@ ImageData createProceduralSkyImageData(const EnvironmentResources::SourceSignatu
     };
 }
 
-ProceduralSkyParams proceduralSkyParams(const EnvironmentResources::SourceSignature& signature)
-{
-    return ProceduralSkyParams{
-        .sun_direction_intensity =
-            glm::vec4(safeNormalize(signature.procedural_sun_direction, glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
-                      signature.procedural_sun_intensity),
-        .sky_color_zenith_exposure =
-            glm::vec4(signature.procedural_sky_color_zenith, signature.procedural_sky_exposure),
-        .sky_color_horizon_sun_radius =
-            glm::vec4(signature.procedural_sky_color_horizon, signature.procedural_sun_angular_radius),
-        .ground_color = glm::vec4(signature.procedural_ground_color, 0.0f),
-        .output_size = glm::uvec4(kProceduralSkyWidth, kProceduralSkyHeight, 0u, 0u),
-    };
-}
-
 luna::RHI::ImageSubresourceRange fullColorRange(const luna::RHI::Ref<luna::RHI::Texture>& texture)
 {
     if (!texture) {
@@ -316,22 +298,6 @@ luna::RHI::TextureViewDesc texture2DStorageViewDesc(luna::RHI::Format format)
         .ArrayLayerCount = 1,
         .Aspect = luna::RHI::AspectMask::Color,
     };
-}
-
-luna::RHI::Ref<luna::RHI::Texture> createProceduralSourceTexture(const luna::RHI::Ref<luna::RHI::Device>& device)
-{
-    if (!device) {
-        return {};
-    }
-
-    return device->CreateTexture(
-        luna::RHI::TextureBuilder()
-            .SetSize(kProceduralSkyWidth, kProceduralSkyHeight)
-            .SetFormat(render_flow::default_scene_detail::kEnvironmentFormat)
-            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::Storage)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
-            .SetName("SceneEnvironmentProceduralSkySource")
-            .Build());
 }
 
 luna::RHI::Ref<luna::RHI::Texture> createCubeTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
@@ -426,8 +392,6 @@ void EnvironmentResources::reset()
     m_backend_type = luna::RHI::BackendType::Auto;
     m_source_signature = {};
     m_has_source_signature = false;
-    m_source_is_gpu_generated = false;
-    m_procedural_source_generated = false;
     m_source_texture = {};
     m_irradiance_sh = {};
 
@@ -435,34 +399,30 @@ void EnvironmentResources::reset()
     m_irradiance_texture.reset();
     m_prefiltered_texture.reset();
     m_brdf_lut_texture.reset();
-    m_procedural_source_uav.reset();
     m_environment_cube_uav.reset();
     m_irradiance_uav.reset();
     m_prefiltered_uavs = {};
     m_brdf_lut_uav.reset();
 
-    m_procedural_sky_layout.reset();
     m_equirect_to_cube_layout.reset();
     m_cube_filter_layout.reset();
+    m_prefilter_layout.reset();
     m_brdf_lut_layout.reset();
-    m_procedural_sky_pipeline_layout.reset();
     m_equirect_to_cube_pipeline_layout.reset();
     m_cube_filter_pipeline_layout.reset();
+    m_prefilter_pipeline_layout.reset();
     m_brdf_lut_pipeline_layout.reset();
     m_descriptor_pool.reset();
-    m_procedural_sky_descriptor_set.reset();
     m_equirect_to_cube_descriptor_set.reset();
     m_irradiance_descriptor_set.reset();
     m_prefilter_descriptor_sets = {};
     m_brdf_lut_descriptor_set.reset();
     m_sampler.reset();
 
-    m_procedural_sky_shader.reset();
     m_equirect_to_cube_shader.reset();
     m_irradiance_shader.reset();
     m_prefilter_shader.reset();
     m_brdf_lut_shader.reset();
-    m_procedural_sky_pipeline.reset();
     m_equirect_to_cube_pipeline.reset();
     m_irradiance_pipeline.reset();
     m_prefilter_pipeline.reset();
@@ -532,8 +492,6 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                 environment_image, render_flow::default_scene_detail::kEnvironmentFormat);
             m_source_texture = renderer_detail::createTextureUpload(
                 context.device, environment_image, Texture::SamplerSettings{}, "SceneEnvironmentSource");
-            m_source_is_gpu_generated = false;
-            m_procedural_source_generated = false;
             LUNA_RENDERER_INFO("Prepared scene environment texture asset '{}' ({}x{}, mips={})",
                                source_signature_to_prepare.texture_handle.toString(),
                                environment_image.Width,
@@ -543,18 +501,14 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
             ImageData procedural_sky_image = createProceduralSkyImageData(source_signature_to_prepare);
             m_irradiance_sh = renderer_detail::computeDiffuseIrradianceSH(
                 procedural_sky_image, render_flow::default_scene_detail::kEnvironmentFormat);
-            m_source_texture.texture = createProceduralSourceTexture(context.device);
-            m_source_texture.debug_name = "SceneEnvironmentProceduralSkySource";
-            m_source_texture.uploaded = true;
-            m_source_is_gpu_generated = true;
-            m_procedural_source_generated = false;
-            if (m_source_texture.texture) {
-                m_procedural_source_uav = m_source_texture.texture->CreateView(
-                    texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentFormat));
-            }
-            LUNA_RENDERER_INFO("Prepared GPU procedural scene environment source texture ({}x{})",
+            procedural_sky_image = renderer_detail::generateEnvironmentMipChain(
+                procedural_sky_image, render_flow::default_scene_detail::kEnvironmentFormat);
+            m_source_texture = renderer_detail::createTextureUpload(
+                context.device, procedural_sky_image, Texture::SamplerSettings{}, "SceneEnvironmentProceduralSkySource");
+            LUNA_RENDERER_INFO("Prepared procedural scene environment source texture ({}x{}, mips={})",
                                kProceduralSkyWidth,
-                               kProceduralSkyHeight);
+                               kProceduralSkyHeight,
+                               1u + static_cast<uint32_t>(procedural_sky_image.MipLevels.size()));
         }
 
         m_source_signature = source_signature_to_prepare;
@@ -579,10 +533,6 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
         m_brdf_lut_texture = createBrdfLutTexture(context.device);
     }
 
-    if (m_source_is_gpu_generated && !m_procedural_source_uav && m_source_texture.texture) {
-        m_procedural_source_uav =
-            m_source_texture.texture->CreateView(texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentFormat));
-    }
     if (!m_environment_cube_uav && m_environment_cube_texture) {
         m_environment_cube_uav = m_environment_cube_texture->CreateView(
             cubeStorageViewDesc(0, render_flow::default_scene_detail::kEnvironmentIblFormat));
@@ -610,13 +560,6 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (!m_equirect_to_cube_layout) {
-        m_procedural_sky_layout =
-            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
-                                                          .AddBinding(procedural_sky_binding::OutputTexture,
-                                                                      luna::RHI::DescriptorType::StorageImage,
-                                                                      1,
-                                                                      luna::RHI::ShaderStage::Compute)
-                                                          .Build());
         m_equirect_to_cube_layout =
             context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::SourceTexture,
@@ -647,6 +590,21 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                                                                       1,
                                                                       luna::RHI::ShaderStage::Compute)
                                                           .Build());
+        m_prefilter_layout =
+            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+                                                          .AddBinding(environment_binding::SourceTexture,
+                                                                      luna::RHI::DescriptorType::SampledImage,
+                                                                      1,
+                                                                      luna::RHI::ShaderStage::Compute)
+                                                          .AddBinding(environment_binding::Sampler,
+                                                                      luna::RHI::DescriptorType::Sampler,
+                                                                      1,
+                                                                      luna::RHI::ShaderStage::Compute)
+                                                          .AddBinding(environment_binding::OutputTexture,
+                                                                      luna::RHI::DescriptorType::StorageImage,
+                                                                      1,
+                                                                      luna::RHI::ShaderStage::Compute)
+                                                          .Build());
         m_brdf_lut_layout =
             context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::BrdfLutOutputTexture,
@@ -667,22 +625,21 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (m_descriptor_pool && !m_equirect_to_cube_descriptor_set) {
-        m_procedural_sky_descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_procedural_sky_layout);
         m_equirect_to_cube_descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_equirect_to_cube_layout);
         m_irradiance_descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_cube_filter_layout);
         for (auto& descriptor_set : m_prefilter_descriptor_sets) {
-            descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_cube_filter_layout);
+            descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_prefilter_layout);
         }
         m_brdf_lut_descriptor_set = m_descriptor_pool->AllocateDescriptorSet(m_brdf_lut_layout);
     }
 
     if (!m_equirect_to_cube_pipeline_layout) {
-        m_procedural_sky_pipeline_layout =
-            createComputePipelineLayout(context.device, m_procedural_sky_layout, sizeof(ProceduralSkyParams));
         m_equirect_to_cube_pipeline_layout =
             createComputePipelineLayout(context.device, m_equirect_to_cube_layout, sizeof(IblDispatchParams));
         m_cube_filter_pipeline_layout =
             createComputePipelineLayout(context.device, m_cube_filter_layout, sizeof(IblDispatchParams));
+        m_prefilter_pipeline_layout =
+            createComputePipelineLayout(context.device, m_prefilter_layout, sizeof(IblDispatchParams));
         m_brdf_lut_pipeline_layout =
             createComputePipelineLayout(context.device, m_brdf_lut_layout, sizeof(IblDispatchParams));
     }
@@ -693,11 +650,6 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (!m_equirect_to_cube_shader) {
-        m_procedural_sky_shader = renderer_detail::loadShaderModule(context.device,
-                                                                    context.compiler,
-                                                                    shader_paths.procedural_sky_path,
-                                                                    "proceduralSkyEquirectMain",
-                                                                    luna::RHI::ShaderStage::Compute);
         m_equirect_to_cube_shader = renderer_detail::loadShaderModule(context.device,
                                                                       context.compiler,
                                                                       shader_paths.environment_ibl_path,
@@ -721,23 +673,17 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (!m_equirect_to_cube_pipeline) {
-        m_procedural_sky_pipeline =
-            createComputePipeline(context.device, m_procedural_sky_pipeline_layout, m_procedural_sky_shader);
         m_equirect_to_cube_pipeline =
             createComputePipeline(context.device, m_equirect_to_cube_pipeline_layout, m_equirect_to_cube_shader);
         m_irradiance_pipeline =
             createComputePipeline(context.device, m_cube_filter_pipeline_layout, m_irradiance_shader);
-        m_prefilter_pipeline = createComputePipeline(context.device, m_cube_filter_pipeline_layout, m_prefilter_shader);
+        m_prefilter_pipeline = createComputePipeline(context.device, m_prefilter_pipeline_layout, m_prefilter_shader);
         m_brdf_lut_pipeline = createComputePipeline(context.device, m_brdf_lut_pipeline_layout, m_brdf_lut_shader);
     }
 }
 
 void EnvironmentResources::uploadIfNeeded(luna::RHI::CommandBufferEncoder& commands)
 {
-    if (m_source_is_gpu_generated) {
-        return;
-    }
-
     if (!m_source_texture.uploaded) {
         LUNA_RENDERER_DEBUG("Uploading environment source texture '{}'", m_source_texture.debug_name);
     }
@@ -766,45 +712,10 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
         return;
     }
 
-    if (m_source_is_gpu_generated) {
-        if (!m_procedural_sky_pipeline || !m_procedural_sky_descriptor_set || !m_procedural_source_uav) {
-            LUNA_RENDERER_WARN("Skipping procedural environment generation because GPU resources are incomplete");
-            return;
-        }
-
-        if (!m_procedural_source_generated) {
-            transitionTexture(commands,
-                              m_source_texture.texture,
-                              luna::RHI::ResourceState::Undefined,
-                              luna::RHI::ResourceState::UnorderedAccess);
-            m_procedural_sky_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-                .Binding = procedural_sky_binding::OutputTexture,
-                .TextureView = m_procedural_source_uav,
-                .Layout = luna::RHI::ResourceState::UnorderedAccess,
-                .Type = luna::RHI::DescriptorType::StorageImage,
-            });
-            m_procedural_sky_descriptor_set->Update();
-
-            const ProceduralSkyParams params = proceduralSkyParams(m_source_signature);
-            const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
-                m_procedural_sky_descriptor_set};
-            commands.BindComputePipeline(m_procedural_sky_pipeline);
-            commands.BindComputeDescriptorSets(m_procedural_sky_pipeline, 0, descriptor_sets);
-            commands.ComputePushConstants(
-                m_procedural_sky_pipeline, luna::RHI::ShaderStage::Compute, 0, sizeof(ProceduralSkyParams), &params);
-            commands.Dispatch(divideRoundUp(kProceduralSkyWidth, 8u), divideRoundUp(kProceduralSkyHeight, 8u), 1);
-            commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
-            transitionTexture(commands,
-                              m_source_texture.texture,
-                              luna::RHI::ResourceState::UnorderedAccess,
-                              luna::RHI::ResourceState::ShaderRead);
-            m_procedural_source_generated = true;
-        }
-    } else {
-        uploadIfNeeded(commands);
-    }
+    uploadIfNeeded(commands);
 
     LUNA_RENDERER_INFO("Precomputing scene environment IBL maps on GPU");
+    const uint32_t source_mip_levels = mipLevelCount(m_source_texture.texture);
 
     auto dispatchCube = [&commands](const luna::RHI::Ref<luna::RHI::ComputePipeline>& pipeline,
                                     const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set,
@@ -849,7 +760,8 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                  m_equirect_to_cube_descriptor_set,
                  IblDispatchParams{.output_size = render_flow::default_scene_detail::kEnvironmentCubeSize,
                                    .sample_count = 1,
-                                   .roughness = 0.0f});
+                                   .roughness = 0.0f,
+                                   .source_mip_levels = source_mip_levels});
     commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(commands,
                       m_environment_cube_texture,
@@ -879,6 +791,7 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                      .output_size = render_flow::default_scene_detail::kEnvironmentIrradianceCubeSize,
                      .sample_count = render_flow::default_scene_detail::kEnvironmentIrradianceSampleCount,
                      .roughness = 0.0f,
+                     .source_mip_levels = source_mip_levels,
                  });
     commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(commands,
@@ -910,8 +823,8 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
             .Type = luna::RHI::DescriptorType::StorageImage,
         });
         prefilter_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
-            .Binding = environment_binding::SourceCubeTexture,
-            .TextureView = m_environment_cube_texture->GetDefaultView(),
+            .Binding = environment_binding::SourceTexture,
+            .TextureView = m_source_texture.texture->GetDefaultView(),
             .Layout = luna::RHI::ResourceState::ShaderRead,
             .Type = luna::RHI::DescriptorType::SampledImage,
         });
@@ -922,6 +835,7 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                          .output_size = mip_size,
                          .sample_count = render_flow::default_scene_detail::kEnvironmentPrefilterSampleCount,
                          .roughness = roughness,
+                         .source_mip_levels = source_mip_levels,
                      });
         commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
     }
@@ -945,6 +859,7 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                    .output_size = render_flow::default_scene_detail::kEnvironmentBrdfLutSize,
                    .sample_count = render_flow::default_scene_detail::kEnvironmentBrdfSampleCount,
                    .roughness = 0.0f,
+                   .source_mip_levels = source_mip_levels,
                });
     commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(

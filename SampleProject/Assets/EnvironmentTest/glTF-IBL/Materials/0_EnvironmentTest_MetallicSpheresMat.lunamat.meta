@@ -1,7 +1,0 @@
-Asset:
-  Name: EnvironmentTest_MetallicSpheresMat
-  Handle: 12566377121231922418
-  Type: Material
-  FilePath: Assets/EnvironmentTest/glTF-IBL/Materials/0_EnvironmentTest_MetallicSpheresMat.lunamat
-  Config:
-    UseMaterialFileParameters: true

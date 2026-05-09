@@ -345,7 +345,12 @@ float3 sampleEnvironmentPrefilter(float3 direction, float lod)
 
 float2 sampleEnvironmentBrdf(float roughness, float NdotV)
 {
-    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, float2(NdotV, roughness), 0.0).rg;
+    uint lutWidth = 1;
+    uint lutHeight = 1;
+    gEnvironmentBrdfLut.GetDimensions(lutWidth, lutHeight);
+    const float2 halfTexel = 0.5 / max(float2(lutWidth, lutHeight), float2(1.0, 1.0));
+    const float2 uv = clamp(float2(NdotV, roughness), halfTexel, 1.0 - halfTexel);
+    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, uv, 0.0).rg;
 }
 
 float distributionGGX(float3 N, float3 H, float roughness)

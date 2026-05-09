@@ -117,7 +117,6 @@ set(RENDERER_SOURCE
     Renderer/Resources/TextureUpload.h
     Renderer/Resources/TextureUpload.cpp
     Renderer/Shaders/EnvironmentIBL.slang
-    Renderer/Shaders/ProceduralSky.slang
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang
     Renderer/Shaders/TransparentComposite.slang

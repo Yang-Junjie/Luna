@@ -1,8 +1,0 @@
-Asset:
-  Name: EnvironmentTest
-  Handle: 7119095278487201265
-  Type: Mesh
-  FilePath: Assets/EnvironmentTest/glTF/EnvironmentTest.gltf
-  Config:
-    GenerateTangents: true
-    Triangulate: true

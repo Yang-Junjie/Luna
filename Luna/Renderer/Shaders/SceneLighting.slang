@@ -257,7 +257,12 @@ float3 sampleEnvironmentPrefilter(float3 direction, float lod)
 
 float2 sampleEnvironmentBrdf(float roughness, float NdotV)
 {
-    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, float2(NdotV, roughness), 0.0).rg;
+    uint lutWidth = 1;
+    uint lutHeight = 1;
+    gEnvironmentBrdfLut.GetDimensions(lutWidth, lutHeight);
+    const float2 halfTexel = 0.5 / max(float2(lutWidth, lutHeight), float2(1.0, 1.0));
+    const float2 uv = clamp(float2(NdotV, roughness), halfTexel, 1.0 - halfTexel);
+    return gEnvironmentBrdfLut.SampleLevel(gEnvironmentSampler, uv, 0.0).rg;
 }
 
 float2 shadowUvFromClip(float2 clipXY)
@@ -567,20 +572,14 @@ float calculateRangeAttenuation(float distanceToLight, float range)
     return smoothFalloff * smoothFalloff / max(distanceToLight * distanceToLight, 0.01);
 }
 
-float3 evaluatePbrLighting(float3 worldPosition,
-                           float3 normalWS,
-                           float3 baseColor,
-                           float metallic,
-                           float roughness,
-                           float3 emissive,
-                           float ao,
-                           float2 uv)
+float3 evaluateDirectLighting(float3 worldPosition,
+                              float3 N,
+                              float3 V,
+                              float3 baseColor,
+                              float metallic,
+                              float roughness,
+                              float3 F0)
 {
-    const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
-    const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
-    const float NdotV = saturate(dot(N, V));
-
-    const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
     const float3 directionalL = safeNormalize(gSceneParams.lightDirectionIntensity.xyz, float3(0.0, 1.0, 0.0));
     const float directionalShadow = evaluateDirectionalShadow(worldPosition, N, directionalL);
     float3 directLighting = evaluateDirectLight(N,
@@ -635,15 +634,39 @@ float3 evaluatePbrLighting(float3 worldPosition,
                                              F0);
     }
 
+    return directLighting;
+}
+
+float3 evaluateSpecularIbl(float3 N, float3 V, float3 F0, float roughness, float NdotV)
+{
     const float maxEnvMip = gSceneParams.cameraPositionEnvMip.w;
     const float3 ambientKs = fresnelSchlickRoughness(NdotV, F0, roughness);
-    const float3 ambientKd = (1.0 - ambientKs) * (1.0 - metallic);
-    const float3 diffuseIbl = sampleEnvironmentIrradiance(N) * baseColor;
-
     const float3 R = reflect(-V, N);
     const float3 prefilteredColor = sampleEnvironmentPrefilter(R, roughness * maxEnvMip);
     const float2 envBrdf = sampleEnvironmentBrdf(roughness, NdotV);
-    const float3 specularIbl = prefilteredColor * (ambientKs * envBrdf.x + envBrdf.y);
+    return prefilteredColor * (ambientKs * envBrdf.x + envBrdf.y);
+}
+
+float3 evaluatePbrLighting(float3 worldPosition,
+                           float3 normalWS,
+                           float3 baseColor,
+                           float metallic,
+                           float roughness,
+                           float3 emissive,
+                           float ao,
+                           float2 uv)
+{
+    const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
+    const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPosition, float3(0.0, 0.0, 1.0));
+    const float NdotV = saturate(dot(N, V));
+
+    const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+    const float3 directLighting = evaluateDirectLighting(worldPosition, N, V, baseColor, metallic, roughness, F0);
+
+    const float3 ambientKs = fresnelSchlickRoughness(NdotV, F0, roughness);
+    const float3 ambientKd = (1.0 - ambientKs) * (1.0 - metallic);
+    const float3 diffuseIbl = sampleEnvironmentIrradiance(N) * baseColor;
+    const float3 specularIbl = evaluateSpecularIbl(N, V, F0, roughness, NdotV);
     const float3 extensionDiffuse = gIndirectDiffuseTexture.Sample(gGBufferSampler, uv).rgb;
     const float3 extensionSpecular =
         gIndirectSpecularTexture.Sample(gGBufferSampler, uv).rgb + gReflectionTexture.Sample(gGBufferSampler, uv).rgb;
@@ -817,6 +840,65 @@ float4 sceneDebugFragmentMain(SceneLightingVertexOutput input) : SV_Target
     if (mode == 3u)
     {
         return debugShadowCascades(input.uv);
+    }
+
+    if (mode == 4u)
+    {
+        return float4(gGBufferBaseColor.Sample(gGBufferSampler, input.uv).rgb, 1.0);
+    }
+
+    if (mode == 5u)
+    {
+        const float3 normalWS = safeNormalize(gGBufferNormalMetallic.Sample(gGBufferSampler, input.uv).xyz,
+                                              float3(0.0, 0.0, 1.0));
+        return float4(normalWS * 0.5 + 0.5, 1.0);
+    }
+
+    if (mode == 6u)
+    {
+        const float metallic = saturate(gGBufferNormalMetallic.Sample(gGBufferSampler, input.uv).w);
+        return float4(metallic, metallic, metallic, 1.0);
+    }
+
+    if (mode == 7u)
+    {
+        const float roughness = saturate(gGBufferWorldPositionRoughness.Sample(gGBufferSampler, input.uv).w);
+        return float4(roughness, roughness, roughness, 1.0);
+    }
+
+    if (mode == 8u || mode == 9u)
+    {
+        const float4 baseColorAlpha = gGBufferBaseColor.Sample(gGBufferSampler, input.uv);
+        const float4 normalMetallic = gGBufferNormalMetallic.Sample(gGBufferSampler, input.uv);
+        const float4 worldPositionRoughness = gGBufferWorldPositionRoughness.Sample(gGBufferSampler, input.uv);
+        const float4 emissiveAo = gGBufferEmissiveAo.Sample(gGBufferSampler, input.uv);
+        if (!isGBufferSurface(baseColorAlpha, normalMetallic))
+        {
+            return float4(0.0, 0.0, 0.0, 1.0);
+        }
+
+        const float3 baseColor = baseColorAlpha.rgb;
+        const float3 N = safeNormalize(normalMetallic.xyz, float3(0.0, 0.0, 1.0));
+        const float metallic = saturate(normalMetallic.w);
+        const float roughness = clamp(worldPositionRoughness.w, kMinRoughness, 1.0);
+        const float3 V = safeNormalize(gSceneParams.cameraPositionEnvMip.xyz - worldPositionRoughness.xyz,
+                                       float3(0.0, 0.0, 1.0));
+        const float NdotV = saturate(dot(N, V));
+        const float3 F0 = lerp(float3(0.04, 0.04, 0.04), baseColor, metallic);
+        const float ao = abs(emissiveAo.a) * saturate(gAmbientOcclusionTexture.Sample(gGBufferSampler, input.uv).r);
+
+        float3 debugColor = 0.0;
+        if (mode == 8u)
+        {
+            debugColor = evaluateDirectLighting(worldPositionRoughness.xyz, N, V, baseColor, metallic, roughness, F0);
+        }
+        else
+        {
+            debugColor = evaluateSpecularIbl(N, V, F0, roughness, NdotV) *
+                         gSceneParams.iblFactors.y * gSceneParams.iblFactors.z * ao;
+        }
+
+        return float4(linearToSrgb(toneMapACES(max(debugColor, 0.0) * gSceneParams.lightColorExposure.a)), 1.0);
     }
 
     return float4(0.0, 0.0, 0.0, 1.0);

@@ -23,10 +23,10 @@ inline constexpr luna::RHI::Format kEnvironmentBrdfLutFormat = luna::RHI::Format
 inline constexpr uint32_t kEnvironmentCubeSize = 512;
 inline constexpr uint32_t kEnvironmentIrradianceCubeSize = 32;
 inline constexpr uint32_t kEnvironmentPrefilterCubeSize = 128;
-inline constexpr uint32_t kEnvironmentPrefilterMipLevels = 5;
+inline constexpr uint32_t kEnvironmentPrefilterMipLevels = 8;
 inline constexpr uint32_t kEnvironmentBrdfLutSize = 256;
 inline constexpr uint32_t kEnvironmentIrradianceSampleCount = 64;
-inline constexpr uint32_t kEnvironmentPrefilterSampleCount = 128;
+inline constexpr uint32_t kEnvironmentPrefilterSampleCount = 1024;
 inline constexpr uint32_t kEnvironmentBrdfSampleCount = 128;
 inline constexpr float kEnvironmentFallbackValue = 0.08f;
 

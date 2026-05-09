@@ -5,7 +5,7 @@ struct IblDispatchParams
     uint outputSize;
     uint sampleCount;
     float roughness;
-    uint reserved;
+    uint sourceMipLevels;
 };
 
 #if defined(LUNA_BACKEND_D3D11)
@@ -62,6 +62,11 @@ float3 sampleEnvironmentSource(float3 direction)
     return gEnvironmentEquirectTexture.SampleLevel(gEnvironmentSampler, directionToEquirectUv(direction), 0.0).rgb;
 }
 
+float3 sampleEnvironmentSource(float3 direction, float lod)
+{
+    return gEnvironmentEquirectTexture.SampleLevel(gEnvironmentSampler, directionToEquirectUv(direction), lod).rgb;
+}
+
 float3 sampleEnvironmentCube(float3 direction)
 {
     return gEnvironmentCubeTexture.SampleLevel(gEnvironmentSampler, safeNormalize(direction, float3(0.0, 1.0, 0.0)), 0.0)
@@ -103,7 +108,8 @@ float radicalInverseVdC(uint bits)
 
 float2 hammersley(uint sampleIndex, uint sampleCount)
 {
-    return float2(float(sampleIndex) / max(float(sampleCount), 1.0), radicalInverseVdC(sampleIndex));
+    const float count = max(float(sampleCount), 1.0);
+    return float2((float(sampleIndex) + 0.5) / count, radicalInverseVdC(sampleIndex + 1u));
 }
 
 float3 buildWorldVector(float3 N, float3 tangentSpaceVector)
@@ -132,6 +138,34 @@ float3 importanceSampleGGX(float2 xi, float roughness, float3 N)
 
     const float3 Ht = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
     return safeNormalize(buildWorldVector(N, Ht), N);
+}
+
+float distributionGGX(float NdotH, float roughness)
+{
+    const float a = roughness * roughness;
+    const float a2 = a * a;
+    const float NdotH2 = NdotH * NdotH;
+    const float denominator = NdotH2 * (a2 - 1.0) + 1.0;
+    return a2 / max(kPi * denominator * denominator, 1e-5);
+}
+
+float sourceEnvironmentMipLevel(float roughness, float sampleCount, float NdotH, float HdotV)
+{
+    uint sourceWidth = 1;
+    uint sourceHeight = 1;
+    gEnvironmentEquirectTexture.GetDimensions(sourceWidth, sourceHeight);
+
+    const float sourceMaxMip = max(float(gDispatchParams.sourceMipLevels) - 1.0, 0.0);
+    if (roughness <= 0.0 || sourceMaxMip <= 0.0)
+    {
+        return 0.0;
+    }
+
+    const float pdf = max(distributionGGX(NdotH, roughness) * NdotH / max(4.0 * HdotV, 1e-4), 1e-6);
+    const float sourceTexelSolidAngle = (4.0 * kPi) / max(float(sourceWidth) * float(sourceHeight), 1.0);
+    const float sampleSolidAngle = 1.0 / max(sampleCount * pdf, 1e-6);
+    const float importanceMip = 0.5 * log2(sampleSolidAngle / sourceTexelSolidAngle);
+    return clamp(importanceMip, 0.0, sourceMaxMip);
 }
 
 float geometrySchlickGGX(float NdotV, float roughness)
@@ -246,7 +280,10 @@ void environmentPrefilterMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         if (NdotL > 0.0)
         {
-            prefilteredColor += sampleEnvironmentCube(L) * NdotL;
+            const float NdotH = saturate(dot(N, H));
+            const float HdotV = saturate(dot(H, V));
+            const float sourceLod = sourceEnvironmentMipLevel(roughness, float(sampleCount), NdotH, HdotV);
+            prefilteredColor += sampleEnvironmentSource(L, sourceLod) * NdotL;
             totalWeight += NdotL;
         }
     }

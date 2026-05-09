@@ -55,6 +55,18 @@ const char* renderDebugViewModeToString(RenderDebugViewMode mode)
             return "HistoryValidity";
         case RenderDebugViewMode::ShadowCascades:
             return "ShadowCascades";
+        case RenderDebugViewMode::BaseColor:
+            return "BaseColor";
+        case RenderDebugViewMode::Normal:
+            return "Normal";
+        case RenderDebugViewMode::Metallic:
+            return "Metallic";
+        case RenderDebugViewMode::Roughness:
+            return "Roughness";
+        case RenderDebugViewMode::DirectLighting:
+            return "DirectLighting";
+        case RenderDebugViewMode::SpecularIbl:
+            return "SpecularIBL";
         default:
             return "Unknown";
     }
