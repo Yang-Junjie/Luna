@@ -196,6 +196,8 @@
       "required": ["meshHandle", "submeshMaterials"],
       "properties": {
         "meshHandle": { "$ref": "#/$defs/uuidOrNull" },
+        "firstSubmesh": { "$ref": "#/$defs/nonNegativeInteger" },
+        "submeshCount": { "$ref": "#/$defs/nonNegativeInteger" },
         "submeshMaterials": {
           "type": "array",
           "items": { "$ref": "#/$defs/uuidOrNull" }

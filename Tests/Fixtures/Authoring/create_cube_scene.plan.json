@@ -15,6 +15,7 @@
     { "op": "verify", "check": "entityExists", "entity": "CubeBox" },
     { "op": "verify", "check": "hasComponent", "entity": "CubeBox", "component": "Mesh" },
     { "op": "verify", "check": "entityCountAtLeast", "count": 1 },
+    { "op": "snapshot" },
     { "op": "summary" }
   ]
 }

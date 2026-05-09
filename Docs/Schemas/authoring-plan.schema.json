@@ -68,7 +68,8 @@
         { "$ref": "#/$defs/verifyEntityExistsCommand" },
         { "$ref": "#/$defs/verifyHasComponentCommand" },
         { "$ref": "#/$defs/verifyEntityCountAtLeastCommand" },
-        { "$ref": "#/$defs/summaryCommand" }
+        { "$ref": "#/$defs/summaryCommand" },
+        { "$ref": "#/$defs/snapshotCommand" }
       ]
     },
     "newSceneCommand": {
@@ -312,6 +313,14 @@
       "required": ["op"],
       "properties": {
         "op": { "const": "summary" }
+      }
+    },
+    "snapshotCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "const": "snapshot" }
       }
     }
   }

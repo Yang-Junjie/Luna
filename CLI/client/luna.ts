@@ -10,10 +10,17 @@ import { fileURLToPath } from "node:url";
 
 import {
     AuthoringPlanBuilder,
+    buildAuthoringRepairContext,
+    normalizeAuthoringCapabilities,
+    normalizeAuthoringReport,
     parseAuthoringCommandTokens,
     readAuthoringPlanJson,
     requireFiniteNumber,
     writeAuthoringPlanJson,
+    type AuthoringCapabilitiesDocument,
+    type AuthoringPlan,
+    type AuthoringRepairContext,
+    type AuthoringReport,
     type PlanCommand,
     type Vec3,
 } from "./authoringProtocol.ts";
@@ -23,7 +30,24 @@ type ClientOptions = {
     project?: string;
     jsonOutput: boolean;
     dryRun: boolean;
+    execute: boolean;
     passthrough: string[];
+};
+
+type HostJsonResult = {
+    status: number;
+    report: AuthoringReport;
+    stdout: string;
+    stderr: string;
+};
+
+type ComposeResult = {
+    ok: boolean;
+    mode: "dry-run" | "execute";
+    intent: string;
+    plan: AuthoringPlan;
+    report: AuthoringReport;
+    repair: AuthoringRepairContext;
 };
 
 function printUsage(): void {
@@ -32,11 +56,14 @@ function printUsage(): void {
 Usage:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] run <commands...>
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] plan <plan.json>
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] capabilities
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--execute] compose "<intent>"
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--json] [--dry-run] interactive
 
 Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts run new primitive CubeBox Cube save build/CLI/Smoke/TsScene
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts plan CLI/client/examples/smoke.plan.json
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts compose "create a simple scene with a cube, camera, and light"
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts interactive
 
 The TypeScript client delegates execution to the C++ LunaCLI host.`);
@@ -51,7 +78,7 @@ function takeOptionValue(args: string[], index: number, option: string): string 
 }
 
 function parseClientOptions(args: string[]): ClientOptions {
-    const options: ClientOptions = { jsonOutput: false, dryRun: false, passthrough: [] };
+    const options: ClientOptions = { jsonOutput: false, dryRun: false, execute: false, passthrough: [] };
 
     for (let index = 0; index < args.length;) {
         const arg = args[index];
@@ -77,6 +104,11 @@ function parseClientOptions(args: string[]): ClientOptions {
         }
         if (arg === "--dry-run") {
             options.dryRun = true;
+            index += 1;
+            continue;
+        }
+        if (arg === "--execute") {
+            options.execute = true;
             index += 1;
             continue;
         }
@@ -121,6 +153,197 @@ function runHost(host: string, args: string[], dryRun: boolean): number {
         throw result.error;
     }
     return 1;
+}
+
+function runHostJson(host: string, args: string[], dryRun: boolean): HostJsonResult {
+    const result = spawnSync(host, dryRun ? ["--dry-run", ...args] : args, { encoding: "utf8" });
+    if (result.error != null) {
+        throw result.error;
+    }
+    const stdout = result.stdout ?? "";
+    const stderr = result.stderr ?? "";
+    let report: AuthoringReport;
+    try {
+        report = normalizeAuthoringReport(JSON.parse(stdout) as unknown);
+    } catch (error) {
+        throw new Error(`Host did not return a valid authoring report: ${error instanceof Error ? error.message : String(error)}\n${stderr}`);
+    }
+    return {
+        status: typeof result.status === "number" ? result.status : 1,
+        report,
+        stdout,
+        stderr,
+    };
+}
+
+function readCapabilitiesFromHost(host: string): AuthoringCapabilitiesDocument {
+    const result = spawnSync(host, ["capabilities", "--json"], { encoding: "utf8" });
+    if (result.status !== 0) {
+        throw new Error(result.stderr.trim() || `Host exited with status ${result.status}.`);
+    }
+    return normalizeAuthoringCapabilities(JSON.parse(result.stdout) as unknown);
+}
+
+function printCapabilities(capabilities: AuthoringCapabilitiesDocument): void {
+    console.log(JSON.stringify(capabilities, null, 2));
+}
+
+function requireCapability(capabilities: AuthoringCapabilitiesDocument, op: string): void {
+    if (!capabilities.capabilities.some((capability) => capability.op === op)) {
+        throw new Error(`Host does not expose required authoring capability '${op}'.`);
+    }
+}
+
+function containsAny(text: string, words: string[]): boolean {
+    return words.some((word) => text.includes(word));
+}
+
+function composeLocalPlan(intent: string, capabilities: AuthoringCapabilitiesDocument, project?: string): AuthoringPlan {
+    const lower = intent.toLowerCase();
+    const builder = new AuthoringPlanBuilder();
+    if (project != null) {
+        builder.project(project);
+    }
+
+    requireCapability(capabilities, "new");
+    builder.newScene();
+
+    const wants_floor = containsAny(lower, ["floor", "ground", "plane", "地面", "平面"]);
+    const wants_sphere = containsAny(lower, ["sphere", "ball", "orb", "球"]);
+    const wants_cylinder = containsAny(lower, ["cylinder", "柱"]);
+    const wants_cone = containsAny(lower, ["cone", "锥"]);
+    const wants_cube = containsAny(lower, ["cube", "box", "block", "simple", "简单", "方块", "立方体"]) ||
+                       (!wants_floor && !wants_sphere && !wants_cylinder && !wants_cone);
+
+    if (wants_floor) {
+        requireCapability(capabilities, "primitive");
+        requireCapability(capabilities, "transform");
+        builder.primitive("Floor", "Plane")
+            .transform("Floor", [0, -0.5, 0], [0, 0, 0], [8, 1, 8]);
+    }
+
+    if (wants_cube) {
+        requireCapability(capabilities, "primitive");
+        requireCapability(capabilities, "transform");
+        builder.primitive("Cube", "Cube")
+            .transform("Cube", [0, 0, 0], [0, 35, 0], [1, 1, 1]);
+    }
+    if (wants_sphere) {
+        requireCapability(capabilities, "primitive");
+        requireCapability(capabilities, "transform");
+        builder.primitive("Sphere", "Sphere")
+            .transform("Sphere", [0, 0, 0], [0, 0, 0], [1, 1, 1]);
+    }
+    if (wants_cylinder) {
+        requireCapability(capabilities, "primitive");
+        requireCapability(capabilities, "transform");
+        builder.primitive("Cylinder", "Cylinder")
+            .transform("Cylinder", [0, 0, 0], [0, 0, 0], [1, 1, 1]);
+    }
+    if (wants_cone) {
+        requireCapability(capabilities, "primitive");
+        requireCapability(capabilities, "transform");
+        builder.primitive("Cone", "Cone")
+            .transform("Cone", [0, 0, 0], [0, 0, 0], [1, 1, 1]);
+    }
+
+    requireCapability(capabilities, "camera");
+    requireCapability(capabilities, "transform");
+    requireCapability(capabilities, "camera-perspective");
+    builder.camera("MainCamera")
+        .transform("MainCamera", [0, 3, 7], [-20, 0, 0], [1, 1, 1])
+        .cameraPerspective("MainCamera", 60, 0.1, 500);
+
+    requireCapability(capabilities, "point-light");
+    requireCapability(capabilities, "transform");
+    requireCapability(capabilities, "light-intensity");
+    requireCapability(capabilities, "light-color");
+    builder.pointLight("KeyLight")
+        .transform("KeyLight", [2, 4, 2], [0, 0, 0], [1, 1, 1])
+        .lightIntensity("KeyLight", 3.5)
+        .lightColor("KeyLight", [1, 0.92, 0.78]);
+
+    requireCapability(capabilities, "inspect");
+    requireCapability(capabilities, "verify");
+    requireCapability(capabilities, "snapshot");
+    builder.inspectHierarchy()
+        .verifyEntityCountAtLeast(1)
+        .summary()
+        .snapshot();
+
+    return builder.toPlan();
+}
+
+function printPlan(plan: AuthoringPlan): void {
+    console.log(writeAuthoringPlanJson(plan).trimEnd());
+}
+
+function runAuthoringPlanJson(host: string, plan: AuthoringPlan, dryRun: boolean): HostJsonResult {
+    if (plan.commands.length === 0) {
+        throw new Error("No authoring commands.");
+    }
+
+    const tempDir = mkdtempSync(join(tmpdir(), "luna-authoring-"));
+    const planPath = join(tempDir, "plan.json");
+    writeFileSync(planPath, writeAuthoringPlanJson(plan), "utf8");
+
+    try {
+        return runHostJson(host, ["--json", "plan", planPath], dryRun);
+    } finally {
+        try {
+            unlinkSync(planPath);
+            rmdirSync(tempDir);
+        } catch {
+            // Best-effort cleanup only.
+        }
+    }
+}
+
+function runCompose(host: string, intent: string, plan: AuthoringPlan, execute: boolean): ComposeResult {
+    const hostResult = runAuthoringPlanJson(host, plan, !execute);
+    return {
+        ok: hostResult.report.ok && hostResult.status === 0,
+        mode: execute ? "execute" : "dry-run",
+        intent,
+        plan,
+        report: hostResult.report,
+        repair: buildAuthoringRepairContext(hostResult.report),
+    };
+}
+
+type ComposeRequest = {
+    intent: string;
+    execute: boolean;
+    printPlanOnly: boolean;
+};
+
+function parseComposeRequest(args: string[], globalExecute: boolean): ComposeRequest {
+    let execute = globalExecute;
+    let printPlanOnly = false;
+    const intentParts: string[] = [];
+
+    for (const arg of args) {
+        if (arg === "--execute") {
+            execute = true;
+            continue;
+        }
+        if (arg === "--dry-run") {
+            execute = false;
+            continue;
+        }
+        if (arg === "--plan-only") {
+            printPlanOnly = true;
+            continue;
+        }
+        intentParts.push(arg);
+    }
+
+    const intent = intentParts.join(" ").trim();
+    if (intent.length === 0) {
+        throw new Error("Missing compose intent.");
+    }
+
+    return { intent, execute, printPlanOnly };
 }
 
 function runAuthoringPlan(
@@ -214,6 +437,7 @@ Authoring commands are parsed into AuthoringPlan JSON before execution:
   point-light KeyLight
   transform Box 0 0 0 0 45 0 1 1 1
   inspect entity Box
+  snapshot
   verify component Box Mesh
   save SampleProject/Assets/Scenes/Generated
 `);
@@ -495,10 +719,28 @@ async function main(): Promise<number> {
         const plan = readAuthoringPlanJson(planPath);
         project = project ?? plan.project;
         hostArgs = ["plan", planPath];
+    } else if (command === "capabilities") {
+        if (options.passthrough.length !== 1) {
+            throw new Error("Command 'capabilities' does not accept arguments.");
+        }
+        printCapabilities(readCapabilitiesFromHost(host));
+        return 0;
+    } else if (command === "compose") {
+        const request = parseComposeRequest(options.passthrough.slice(1), options.execute);
+        const capabilities = readCapabilitiesFromHost(host);
+        const plan = composeLocalPlan(request.intent, capabilities, project);
+        if (request.printPlanOnly) {
+            printPlan(plan);
+            return 0;
+        }
+
+        const result = runCompose(host, request.intent, plan, request.execute);
+        console.log(JSON.stringify(result, null, 2));
+        return result.ok ? 0 : 1;
     } else if (command === "interactive") {
         return await runInteractive(host, project, options.jsonOutput, options.dryRun);
     } else {
-        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', or 'interactive'.`);
+        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', or 'interactive'.`);
     }
 
     if (project != null) {

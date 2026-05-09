@@ -1,5 +1,6 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Authoring/AuthoringCapabilities.h"
 #include "Authoring/AuthoringExecutor.h"
 #include "Authoring/AuthoringJson.h"
 #include "Authoring/AuthoringPlanJson.h"
@@ -44,6 +45,7 @@ void printUsage()
         << "Usage:\n"
         << "  LunaCLI [--json] [--dry-run] [--project <path>] <commands...>\n"
         << "  LunaCLI [--json] [--dry-run] [--project <path>] plan <plan.json>\n"
+        << "  LunaCLI capabilities [--json]\n"
         << "\n"
         << "Commands run left-to-right:\n"
         << "  new\n"
@@ -66,6 +68,7 @@ void printUsage()
         << "  inspect scene\n"
         << "  inspect entity <entity-ref>\n"
         << "  inspect hierarchy\n"
+        << "  snapshot\n"
         << "  verify saved\n"
         << "  verify entity <entity-ref>\n"
         << "  verify component <entity-ref> <component>\n"
@@ -247,6 +250,15 @@ int main(int argc, char** argv)
     if (args.empty() || options.help) {
         printUsage();
         return args.empty() ? 1 : 0;
+    }
+
+    if (!options.commands.empty() && options.commands[0] == "capabilities") {
+        if (options.commands.size() > 2 || (options.commands.size() == 2 && options.commands[1] != "--json")) {
+            std::cerr << "Command 'capabilities' does not accept arguments.\n";
+            return 1;
+        }
+        luna::authoring::writeDefaultAuthoringCapabilitiesJson(std::cout);
+        return 0;
     }
 
     CliState state;

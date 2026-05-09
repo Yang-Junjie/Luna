@@ -67,6 +67,7 @@ if(BUILD_TESTING)
             transform InspectCube 1 2 3 0 30 0 1 1 1
             inspect entity InspectCube
             inspect hierarchy
+            snapshot
     )
 
     add_test(
@@ -81,6 +82,14 @@ if(BUILD_TESTING)
             verify entity-count-at-least 3
             save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliVerifySmoke"
             verify saved
+    )
+
+    add_test(
+        NAME CliCapabilitiesSmokeTest
+        COMMAND
+            LunaCLI
+            capabilities
+            --json
     )
 
     find_program(LUNA_NODE_EXECUTABLE node)
@@ -131,6 +140,17 @@ if(BUILD_TESTING)
                 --disable-warning=ExperimentalWarning
                 --experimental-strip-types
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/interactive.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+                "$<TARGET_FILE:LunaCLI>"
+        )
+
+        add_test(
+            NAME CliTsComposeSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/compose.smoke.ts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
                 "$<TARGET_FILE:LunaCLI>"
         )

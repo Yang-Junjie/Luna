@@ -35,13 +35,164 @@ export type PlanCommand =
     | { op: "verify"; check: "entityExists"; entity: string }
     | { op: "verify"; check: "hasComponent"; entity: string; component: string }
     | { op: "verify"; check: "entityCountAtLeast"; count: number }
-    | { op: "summary" };
+    | { op: "summary" }
+    | { op: "snapshot" };
 
 export type AuthoringPlan = {
     protocol?: AuthoringProtocolInfo;
     project?: string;
     commands: PlanCommand[];
 };
+
+export type AuthoringCapabilityParameterType = "string" | "number" | "integer" | "boolean" | "vec3";
+
+export type AuthoringCapabilityParameter = {
+    type: AuthoringCapabilityParameterType;
+    required: boolean;
+    description: string;
+    enum?: string[];
+};
+
+export type AuthoringCapabilityExample = {
+    description: string;
+    command: PlanCommand | string;
+};
+
+export type AuthoringCapability = {
+    op: string;
+    title: string;
+    description: string;
+    effects: string[];
+    requiresConfirmation: boolean;
+    parameters: Record<string, AuthoringCapabilityParameter>;
+    examples: AuthoringCapabilityExample[];
+};
+
+export type AuthoringCapabilitiesDocument = {
+    protocol: AuthoringProtocolInfo;
+    capabilities: AuthoringCapability[];
+};
+
+export type AuthoringDiagnostic = {
+    severity: "info" | "warning" | "error";
+    phase: "parse" | "validate" | "execute" | "verify";
+    code: string;
+    message: string;
+    commandIndex: number | null;
+    command: string | null;
+    field: string | null;
+    entityRef: string | null;
+    component: string | null;
+    path: string | null;
+    recoverable: boolean;
+    expected: string | null;
+    actual: string | null;
+    suggestedCommand: string | null;
+};
+
+export type AuthoringSceneSnapshot = {
+    name: string;
+    path: string | null;
+    entityCount: number;
+    dirty: boolean;
+};
+
+export type AuthoringEntityBinding = {
+    alias: string;
+    uuid: string;
+    name: string;
+};
+
+export type AuthoringTransformInspection = {
+    translation: Vec3;
+    rotationDeg: Vec3;
+    scale: Vec3;
+};
+
+export type AuthoringCameraInspection = {
+    primary: boolean;
+    fixedAspectRatio: boolean;
+    projection: string;
+    perspectiveFovDeg: number;
+    perspectiveNear: number;
+    perspectiveFar: number;
+    orthographicSize: number;
+    orthographicNear: number;
+    orthographicFar: number;
+};
+
+export type AuthoringLightInspection = {
+    type: string;
+    enabled: boolean;
+    color: Vec3;
+    intensity: number;
+    range: number;
+    innerConeAngleDeg: number;
+    outerConeAngleDeg: number;
+};
+
+export type AuthoringMeshInspection = {
+    meshHandle: string | null;
+    firstSubmesh?: number;
+    submeshCount?: number;
+    submeshMaterials: Array<string | null>;
+};
+
+export type AuthoringEntityInspection = {
+    ref: string;
+    uuid: string | null;
+    name: string;
+    parentUuid: string | null;
+    children: Array<string | null>;
+    components: string[];
+    transform?: AuthoringTransformInspection;
+    camera?: AuthoringCameraInspection;
+    light?: AuthoringLightInspection;
+    mesh?: AuthoringMeshInspection;
+};
+
+export type AuthoringInspection = {
+    type: "scene" | "entity" | "hierarchy";
+    ref: string;
+    entities: AuthoringEntityInspection[];
+};
+
+export type AuthoringVerification = {
+    type: "sceneSaved" | "entityExists" | "hasComponent" | "entityCountAtLeast";
+    ok: boolean;
+    ref: string;
+    uuid: string | null;
+    component: string;
+    expectedCount: number;
+    actualCount: number;
+    message: string;
+};
+
+export type AuthoringReport = {
+    protocol: AuthoringProtocolInfo;
+    ok: boolean;
+    scene: AuthoringSceneSnapshot;
+    entities: AuthoringEntityBinding[];
+    savedScenes: string[];
+    inspections: AuthoringInspection[];
+    verifications: AuthoringVerification[];
+    diagnostics: AuthoringDiagnostic[];
+    errors: string[];
+};
+
+export type AuthoringRepairContext = {
+    ok: boolean;
+    diagnostics: AuthoringDiagnostic[];
+    errors: string[];
+    retryable: boolean;
+};
+
+export function requireString(value: unknown, field: string): string {
+    if (typeof value !== "string") {
+        throw new Error(`Field '${field}' must be a string.`);
+    }
+    return value;
+}
 
 export function requireNonEmptyString(value: unknown, field: string): string {
     if (typeof value !== "string" || value.length === 0) {
@@ -76,6 +227,48 @@ export function requireVec3(value: unknown, field: string): Vec3 {
     ];
 }
 
+function requireObjectRecord(value: unknown, field: string): Record<string, unknown> {
+    if (typeof value !== "object" || value == null || Array.isArray(value)) {
+        throw new Error(`Field '${field}' must be an object.`);
+    }
+    return value as Record<string, unknown>;
+}
+
+function requireArray(value: unknown, field: string): unknown[] {
+    if (!Array.isArray(value)) {
+        throw new Error(`Field '${field}' must be an array.`);
+    }
+    return value;
+}
+
+function requireStringEnum<T extends string>(value: unknown, field: string, allowed: readonly T[]): T {
+    const text = requireString(value, field);
+    if (!allowed.includes(text as T)) {
+        throw new Error(`Field '${field}' must be one of: ${allowed.join(", ")}.`);
+    }
+    return text as T;
+}
+
+function requireNullableStringArray(value: unknown, field: string): Array<string | null> {
+    if (!Array.isArray(value) || !value.every((item) => item == null || typeof item === "string")) {
+        throw new Error(`Field '${field}' must be a nullable string array.`);
+    }
+    return [...value] as Array<string | null>;
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function rejectUnknownFields(record: Record<string, unknown>, field: string, allowedFields: readonly string[]): void {
+    const allowed = new Set(allowedFields);
+    for (const key of Object.keys(record)) {
+        if (!allowed.has(key)) {
+            throw new Error(`Plan field '${field.length === 0 ? key : `${field}.${key}`}' is not supported.`);
+        }
+    }
+}
+
 export function normalizeAuthoringPlanCommand(input: unknown, index: number): PlanCommand {
     if (typeof input !== "object" || input == null || Array.isArray(input)) {
         throw new Error(`Plan command ${index} must be an object.`);
@@ -87,11 +280,15 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
     switch (op) {
         case "new":
         case "summary":
+        case "snapshot":
+            rejectUnknownFields(record, `commands[${index}]`, ["op"]);
             return { op };
         case "open":
         case "save":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "path"]);
             return { op, path: requireNonEmptyString(record.path, `commands[${index}].path`) };
         case "entity":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "alias", "name"]);
             return {
                 op,
                 alias: requireNonEmptyString(record.alias, `commands[${index}].alias`),
@@ -101,28 +298,34 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
         case "directional-light":
         case "point-light":
         case "spot-light":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "alias"]);
             return { op, alias: requireNonEmptyString(record.alias, `commands[${index}].alias`) };
         case "primitive":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "alias", "mesh"]);
             return {
                 op,
                 alias: requireNonEmptyString(record.alias, `commands[${index}].alias`),
                 mesh: requireNonEmptyString(record.mesh, `commands[${index}].mesh`),
             };
         case "parent":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "child", "parent"]);
             return {
                 op,
                 child: requireNonEmptyString(record.child, `commands[${index}].child`),
                 parent: requireNonEmptyString(record.parent, `commands[${index}].parent`),
             };
         case "unparent":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "child"]);
             return { op, child: requireNonEmptyString(record.child, `commands[${index}].child`) };
         case "name":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "name"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
                 name: requireNonEmptyString(record.name, `commands[${index}].name`),
             };
         case "transform":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "translation", "rotationDeg", "scale"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
@@ -133,18 +336,21 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
                 scale: record.scale == null ? undefined : requireVec3(record.scale, `commands[${index}].scale`),
             };
         case "light-intensity":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "value"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
                 value: requireFiniteNumber(record.value, `commands[${index}].value`),
             };
         case "light-color":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "color"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
                 color: requireVec3(record.color, `commands[${index}].color`),
             };
         case "camera-perspective":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "fovDeg", "near", "far"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
@@ -153,6 +359,7 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
                 far: requireFiniteNumber(record.far, `commands[${index}].far`),
             };
         case "camera-orthographic":
+            rejectUnknownFields(record, `commands[${index}]`, ["op", "entity", "size", "near", "far"]);
             return {
                 op,
                 entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
@@ -163,9 +370,11 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
         case "inspect": {
             const target = requireNonEmptyString(record.target, `commands[${index}].target`);
             if (target === "scene" || target === "hierarchy") {
+                rejectUnknownFields(record, `commands[${index}]`, ["op", "target"]);
                 return { op, target };
             }
             if (target === "entity") {
+                rejectUnknownFields(record, `commands[${index}]`, ["op", "target", "entity"]);
                 return {
                     op,
                     target,
@@ -179,14 +388,17 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
             switch (check) {
                 case "sceneSaved":
                 case "saved":
+                    rejectUnknownFields(record, `commands[${index}]`, ["op", "check"]);
                     return { op, check: "sceneSaved" };
                 case "entityExists":
+                    rejectUnknownFields(record, `commands[${index}]`, ["op", "check", "entity"]);
                     return {
                         op,
                         check,
                         entity: requireNonEmptyString(record.entity, `commands[${index}].entity`),
                     };
                 case "hasComponent":
+                    rejectUnknownFields(record, `commands[${index}]`, ["op", "check", "entity", "component"]);
                     return {
                         op,
                         check,
@@ -194,6 +406,7 @@ export function normalizeAuthoringPlanCommand(input: unknown, index: number): Pl
                         component: requireNonEmptyString(record.component, `commands[${index}].component`),
                     };
                 case "entityCountAtLeast":
+                    rejectUnknownFields(record, `commands[${index}]`, ["op", "check", "count"]);
                     return {
                         op,
                         check,
@@ -214,12 +427,14 @@ export function normalizeAuthoringPlan(input: unknown): AuthoringPlan {
     }
 
     const record = input as Record<string, unknown>;
+    rejectUnknownFields(record, "", ["protocol", "project", "commands"]);
     if (record.protocol != null) {
         if (typeof record.protocol !== "object" || Array.isArray(record.protocol)) {
             throw new Error("Plan field 'protocol' must be an object.");
         }
 
         const protocol = record.protocol as Record<string, unknown>;
+        rejectUnknownFields(protocol, "protocol", ["name", "version"]);
         if (protocol.name !== AUTHORING_PROTOCOL_NAME || protocol.version !== AUTHORING_PROTOCOL_VERSION) {
             throw new Error("Unsupported Luna authoring protocol.");
         }
@@ -242,6 +457,388 @@ export function readAuthoringPlanJson(planPath: string): AuthoringPlan {
 
 export function writeAuthoringPlanJson(plan: AuthoringPlan): string {
     return `${JSON.stringify(normalizeAuthoringPlan(plan), null, 2)}\n`;
+}
+
+function requireBoolean(value: unknown, field: string): boolean {
+    if (typeof value !== "boolean") {
+        throw new Error(`Capability field '${field}' must be a boolean.`);
+    }
+    return value;
+}
+
+function requireStringArray(value: unknown, field: string): string[] {
+    if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+        throw new Error(`Field '${field}' must be a string array.`);
+    }
+    return [...value];
+}
+
+function normalizeCapabilityParameter(input: unknown, field: string): AuthoringCapabilityParameter {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error(`Capability field '${field}' must be an object.`);
+    }
+
+    const record = input as Record<string, unknown>;
+    const type = requireNonEmptyString(record.type, `${field}.type`);
+    if (type !== "string" && type !== "number" && type !== "integer" && type !== "boolean" && type !== "vec3") {
+        throw new Error(`Capability field '${field}.type' is not a supported parameter type.`);
+    }
+
+    return {
+        type,
+        required: requireBoolean(record.required, `${field}.required`),
+        description: requireNonEmptyString(record.description, `${field}.description`),
+        enum: record.enum == null ? undefined : requireStringArray(record.enum, `${field}.enum`),
+    };
+}
+
+function normalizeCapabilityExample(input: unknown, field: string): AuthoringCapabilityExample {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error(`Capability field '${field}' must be an object.`);
+    }
+
+    const record = input as Record<string, unknown>;
+    return {
+        description: requireNonEmptyString(record.description, `${field}.description`),
+        command: typeof record.command === "string"
+            ? record.command
+            : normalizeAuthoringPlanCommand(record.command, 0),
+    };
+}
+
+function normalizeCapability(input: unknown, index: number): AuthoringCapability {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error(`Capability ${index} must be an object.`);
+    }
+
+    const record = input as Record<string, unknown>;
+    const parameter_record = record.parameters;
+    if (typeof parameter_record !== "object" || parameter_record == null || Array.isArray(parameter_record)) {
+        throw new Error(`Capability field 'capabilities[${index}].parameters' must be an object.`);
+    }
+    const parameters: Record<string, AuthoringCapabilityParameter> = {};
+    for (const [name, parameter] of Object.entries(parameter_record as Record<string, unknown>)) {
+        parameters[name] = normalizeCapabilityParameter(parameter, `capabilities[${index}].parameters.${name}`);
+    }
+
+    const examples = record.examples;
+    if (!Array.isArray(examples)) {
+        throw new Error(`Capability field 'capabilities[${index}].examples' must be an array.`);
+    }
+
+    return {
+        op: requireNonEmptyString(record.op, `capabilities[${index}].op`),
+        title: requireNonEmptyString(record.title, `capabilities[${index}].title`),
+        description: requireNonEmptyString(record.description, `capabilities[${index}].description`),
+        effects: requireStringArray(record.effects, `capabilities[${index}].effects`),
+        requiresConfirmation: requireBoolean(record.requiresConfirmation, `capabilities[${index}].requiresConfirmation`),
+        parameters,
+        examples: examples.map((example, exampleIndex) =>
+            normalizeCapabilityExample(example, `capabilities[${index}].examples[${exampleIndex}]`)
+        ),
+    };
+}
+
+export function normalizeAuthoringCapabilities(input: unknown): AuthoringCapabilitiesDocument {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error("Capabilities root must be an object.");
+    }
+
+    const record = input as Record<string, unknown>;
+    if (typeof record.protocol !== "object" || record.protocol == null || Array.isArray(record.protocol)) {
+        throw new Error("Capabilities field 'protocol' must be an object.");
+    }
+    const protocol = record.protocol as Record<string, unknown>;
+    if (protocol.name !== AUTHORING_PROTOCOL_NAME || protocol.version !== AUTHORING_PROTOCOL_VERSION) {
+        throw new Error("Unsupported Luna authoring protocol.");
+    }
+
+    if (!Array.isArray(record.capabilities)) {
+        throw new Error("Capabilities field 'capabilities' must be an array.");
+    }
+
+    return {
+        protocol: { name: AUTHORING_PROTOCOL_NAME, version: AUTHORING_PROTOCOL_VERSION },
+        capabilities: record.capabilities.map((capability, index) => normalizeCapability(capability, index)),
+    };
+}
+
+function nullableString(value: unknown, field: string): string | null {
+    if (value == null) {
+        return null;
+    }
+    return requireNonEmptyString(value, field);
+}
+
+function nullableInteger(value: unknown, field: string): number | null {
+    if (value == null) {
+        return null;
+    }
+    return requireNonNegativeInteger(value, field);
+}
+
+function normalizeSceneSnapshot(input: unknown): AuthoringSceneSnapshot {
+    const record = requireObjectRecord(input, "scene");
+    return {
+        name: requireString(record.name, "scene.name"),
+        path: nullableString(record.path, "scene.path"),
+        entityCount: requireNonNegativeInteger(record.entityCount, "scene.entityCount"),
+        dirty: requireBoolean(record.dirty, "scene.dirty"),
+    };
+}
+
+function normalizeEntityBinding(input: unknown, index: number): AuthoringEntityBinding {
+    const record = requireObjectRecord(input, `entities[${index}]`);
+    return {
+        alias: requireString(record.alias, `entities[${index}].alias`),
+        uuid: requireNonEmptyString(record.uuid, `entities[${index}].uuid`),
+        name: requireString(record.name, `entities[${index}].name`),
+    };
+}
+
+function normalizeTransformInspection(input: unknown, field: string): AuthoringTransformInspection {
+    const record = requireObjectRecord(input, field);
+    return {
+        translation: requireVec3(record.translation, `${field}.translation`),
+        rotationDeg: requireVec3(record.rotationDeg, `${field}.rotationDeg`),
+        scale: requireVec3(record.scale, `${field}.scale`),
+    };
+}
+
+function normalizeCameraInspection(input: unknown, field: string): AuthoringCameraInspection {
+    const record = requireObjectRecord(input, field);
+    return {
+        primary: requireBoolean(record.primary, `${field}.primary`),
+        fixedAspectRatio: requireBoolean(record.fixedAspectRatio, `${field}.fixedAspectRatio`),
+        projection: requireString(record.projection, `${field}.projection`),
+        perspectiveFovDeg: requireFiniteNumber(record.perspectiveFovDeg, `${field}.perspectiveFovDeg`),
+        perspectiveNear: requireFiniteNumber(record.perspectiveNear, `${field}.perspectiveNear`),
+        perspectiveFar: requireFiniteNumber(record.perspectiveFar, `${field}.perspectiveFar`),
+        orthographicSize: requireFiniteNumber(record.orthographicSize, `${field}.orthographicSize`),
+        orthographicNear: requireFiniteNumber(record.orthographicNear, `${field}.orthographicNear`),
+        orthographicFar: requireFiniteNumber(record.orthographicFar, `${field}.orthographicFar`),
+    };
+}
+
+function normalizeLightInspection(input: unknown, field: string): AuthoringLightInspection {
+    const record = requireObjectRecord(input, field);
+    return {
+        type: requireString(record.type, `${field}.type`),
+        enabled: requireBoolean(record.enabled, `${field}.enabled`),
+        color: requireVec3(record.color, `${field}.color`),
+        intensity: requireFiniteNumber(record.intensity, `${field}.intensity`),
+        range: requireFiniteNumber(record.range, `${field}.range`),
+        innerConeAngleDeg: requireFiniteNumber(record.innerConeAngleDeg, `${field}.innerConeAngleDeg`),
+        outerConeAngleDeg: requireFiniteNumber(record.outerConeAngleDeg, `${field}.outerConeAngleDeg`),
+    };
+}
+
+function normalizeMeshInspection(input: unknown, field: string): AuthoringMeshInspection {
+    const record = requireObjectRecord(input, field);
+    return {
+        meshHandle: nullableString(record.meshHandle, `${field}.meshHandle`),
+        firstSubmesh: hasOwn(record, "firstSubmesh")
+            ? requireNonNegativeInteger(record.firstSubmesh, `${field}.firstSubmesh`)
+            : undefined,
+        submeshCount: hasOwn(record, "submeshCount")
+            ? requireNonNegativeInteger(record.submeshCount, `${field}.submeshCount`)
+            : undefined,
+        submeshMaterials: requireNullableStringArray(record.submeshMaterials, `${field}.submeshMaterials`),
+    };
+}
+
+function normalizeEntityInspection(input: unknown, index: number): AuthoringEntityInspection {
+    const field = `inspections[].entities[${index}]`;
+    const record = requireObjectRecord(input, field);
+    return {
+        ref: requireString(record.ref, `${field}.ref`),
+        uuid: nullableString(record.uuid, `${field}.uuid`),
+        name: requireString(record.name, `${field}.name`),
+        parentUuid: nullableString(record.parentUuid, `${field}.parentUuid`),
+        children: requireNullableStringArray(record.children, `${field}.children`),
+        components: requireStringArray(record.components, `${field}.components`),
+        transform: hasOwn(record, "transform")
+            ? normalizeTransformInspection(record.transform, `${field}.transform`)
+            : undefined,
+        camera: hasOwn(record, "camera") ? normalizeCameraInspection(record.camera, `${field}.camera`) : undefined,
+        light: hasOwn(record, "light") ? normalizeLightInspection(record.light, `${field}.light`) : undefined,
+        mesh: hasOwn(record, "mesh") ? normalizeMeshInspection(record.mesh, `${field}.mesh`) : undefined,
+    };
+}
+
+function normalizeInspection(input: unknown, index: number): AuthoringInspection {
+    const field = `inspections[${index}]`;
+    const record = requireObjectRecord(input, field);
+    const entities = requireArray(record.entities, `${field}.entities`);
+    return {
+        type: requireStringEnum(record.type, `${field}.type`, ["scene", "entity", "hierarchy"]),
+        ref: requireString(record.ref, `${field}.ref`),
+        entities: entities.map((entity, entityIndex) => normalizeEntityInspection(entity, entityIndex)),
+    };
+}
+
+function normalizeVerification(input: unknown, index: number): AuthoringVerification {
+    const field = `verifications[${index}]`;
+    const record = requireObjectRecord(input, field);
+    return {
+        type: requireStringEnum(record.type, `${field}.type`, [
+            "sceneSaved",
+            "entityExists",
+            "hasComponent",
+            "entityCountAtLeast",
+        ]),
+        ok: requireBoolean(record.ok, `${field}.ok`),
+        ref: requireString(record.ref, `${field}.ref`),
+        uuid: nullableString(record.uuid, `${field}.uuid`),
+        component: requireString(record.component, `${field}.component`),
+        expectedCount: requireNonNegativeInteger(record.expectedCount, `${field}.expectedCount`),
+        actualCount: requireNonNegativeInteger(record.actualCount, `${field}.actualCount`),
+        message: requireString(record.message, `${field}.message`),
+    };
+}
+
+function normalizeDiagnostic(input: unknown, index: number): AuthoringDiagnostic {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error(`Report diagnostic ${index} must be an object.`);
+    }
+
+    const record = input as Record<string, unknown>;
+    return {
+        severity: requireStringEnum(record.severity, `diagnostics[${index}].severity`, ["info", "warning", "error"]),
+        phase: requireStringEnum(record.phase, `diagnostics[${index}].phase`, ["parse", "validate", "execute", "verify"]),
+        code: requireNonEmptyString(record.code, `diagnostics[${index}].code`),
+        message: requireNonEmptyString(record.message, `diagnostics[${index}].message`),
+        commandIndex: nullableInteger(record.commandIndex, `diagnostics[${index}].commandIndex`),
+        command: nullableString(record.command, `diagnostics[${index}].command`),
+        field: nullableString(record.field, `diagnostics[${index}].field`),
+        entityRef: nullableString(record.entityRef, `diagnostics[${index}].entityRef`),
+        component: nullableString(record.component, `diagnostics[${index}].component`),
+        path: nullableString(record.path, `diagnostics[${index}].path`),
+        recoverable: requireBoolean(record.recoverable, `diagnostics[${index}].recoverable`),
+        expected: nullableString(record.expected, `diagnostics[${index}].expected`),
+        actual: nullableString(record.actual, `diagnostics[${index}].actual`),
+        suggestedCommand: nullableString(record.suggestedCommand, `diagnostics[${index}].suggestedCommand`),
+    };
+}
+
+export function normalizeAuthoringReport(input: unknown): AuthoringReport {
+    if (typeof input !== "object" || input == null || Array.isArray(input)) {
+        throw new Error("Report root must be an object.");
+    }
+
+    const record = input as Record<string, unknown>;
+    if (typeof record.protocol !== "object" || record.protocol == null || Array.isArray(record.protocol)) {
+        throw new Error("Report field 'protocol' must be an object.");
+    }
+    const protocol = record.protocol as Record<string, unknown>;
+    if (protocol.name !== AUTHORING_PROTOCOL_NAME || protocol.version !== AUTHORING_PROTOCOL_VERSION) {
+        throw new Error("Unsupported Luna authoring protocol.");
+    }
+
+    const entities = requireArray(record.entities, "entities");
+    const inspections = requireArray(record.inspections, "inspections");
+    const verifications = requireArray(record.verifications, "verifications");
+    const diagnostics = requireArray(record.diagnostics, "diagnostics");
+
+    return {
+        protocol: { name: AUTHORING_PROTOCOL_NAME, version: AUTHORING_PROTOCOL_VERSION },
+        ok: requireBoolean(record.ok, "ok"),
+        scene: normalizeSceneSnapshot(record.scene),
+        entities: entities.map((entity, index) => normalizeEntityBinding(entity, index)),
+        savedScenes: requireStringArray(record.savedScenes, "savedScenes"),
+        inspections: inspections.map((inspection, index) => normalizeInspection(inspection, index)),
+        verifications: verifications.map((verification, index) => normalizeVerification(verification, index)),
+        diagnostics: diagnostics.map((diagnostic, index) => normalizeDiagnostic(diagnostic, index)),
+        errors: requireStringArray(record.errors, "errors"),
+    };
+}
+
+export function latestInspection(
+    report: AuthoringReport,
+    type?: AuthoringInspection["type"],
+): AuthoringInspection | undefined {
+    for (let index = report.inspections.length - 1; index >= 0; --index) {
+        const inspection = report.inspections[index];
+        if (inspection != null && (type == null || inspection.type === type)) {
+            return inspection;
+        }
+    }
+    return undefined;
+}
+
+export function latestHierarchy(report: AuthoringReport): AuthoringInspection | undefined {
+    return latestInspection(report, "hierarchy");
+}
+
+export function latestHierarchyEntities(report: AuthoringReport): AuthoringEntityInspection[] {
+    return latestHierarchy(report)?.entities ?? [];
+}
+
+export function findEntityBinding(report: AuthoringReport, ref: string): AuthoringEntityBinding | undefined {
+    return report.entities.find((binding) => binding.alias === ref || binding.uuid === ref);
+}
+
+function inspectedEntitiesNewestFirst(report: AuthoringReport): AuthoringEntityInspection[] {
+    const entities: AuthoringEntityInspection[] = [];
+    for (let inspectionIndex = report.inspections.length - 1; inspectionIndex >= 0; --inspectionIndex) {
+        const inspection = report.inspections[inspectionIndex];
+        if (inspection == null) {
+            continue;
+        }
+        entities.push(...inspection.entities);
+    }
+    return entities;
+}
+
+function preferredEntitySearchScope(report: AuthoringReport): AuthoringEntityInspection[] {
+    const hierarchyEntities = latestHierarchyEntities(report);
+    return hierarchyEntities.length > 0 ? hierarchyEntities : inspectedEntitiesNewestFirst(report);
+}
+
+export function findEntityByUuid(report: AuthoringReport, uuid: string): AuthoringEntityInspection | undefined {
+    if (uuid.length === 0) {
+        return undefined;
+    }
+    return preferredEntitySearchScope(report).find((entity) => entity.uuid === uuid);
+}
+
+export function findEntityByRef(report: AuthoringReport, ref: string): AuthoringEntityInspection | undefined {
+    if (ref.length === 0) {
+        return undefined;
+    }
+
+    const binding = findEntityBinding(report, ref);
+    if (binding != null) {
+        const boundEntity = findEntityByUuid(report, binding.uuid);
+        if (boundEntity != null) {
+            return boundEntity;
+        }
+    }
+
+    return preferredEntitySearchScope(report).find((entity) => entity.ref === ref || entity.uuid === ref);
+}
+
+export function findEntityByName(report: AuthoringReport, name: string): AuthoringEntityInspection | undefined {
+    if (name.length === 0) {
+        return undefined;
+    }
+    return preferredEntitySearchScope(report).find((entity) => entity.name === name);
+}
+
+export function findEntitiesByComponent(report: AuthoringReport, component: string): AuthoringEntityInspection[] {
+    if (component.length === 0) {
+        return [];
+    }
+    return preferredEntitySearchScope(report).filter((entity) => entity.components.includes(component));
+}
+
+export function buildAuthoringRepairContext(report: AuthoringReport): AuthoringRepairContext {
+    return {
+        ok: report.ok,
+        diagnostics: report.diagnostics,
+        errors: report.errors,
+        retryable: report.diagnostics.some((diagnostic) => diagnostic.recoverable),
+    };
 }
 
 export class AuthoringPlanBuilder {
@@ -437,6 +1034,11 @@ export class AuthoringPlanBuilder {
         return this;
     }
 
+    snapshot(): this {
+        this.#commands.push({ op: "snapshot" });
+        return this;
+    }
+
     toPlan(): AuthoringPlan {
         return normalizeAuthoringPlan({
             protocol: { name: AUTHORING_PROTOCOL_NAME, version: AUTHORING_PROTOCOL_VERSION },
@@ -493,6 +1095,9 @@ export function parseAuthoringCommandTokens(tokens: string[]): PlanCommand {
         case "summary":
             expectTokenCount(tokens, 1, "no arguments");
             return firstBuiltCommand(builder.summary());
+        case "snapshot":
+            expectTokenCount(tokens, 1, "no arguments");
+            return firstBuiltCommand(builder.snapshot());
         case "open":
             expectTokenCount(tokens, 2, "<scene-path>");
             return firstBuiltCommand(builder.openScene(requireNonEmptyString(tokens[1], "path")));

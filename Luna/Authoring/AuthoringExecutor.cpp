@@ -859,6 +859,10 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 report.inspections.push_back(inspectAuthoringHierarchy(m_session));
                 break;
 
+            case AuthoringCommandKind::Snapshot:
+                report.inspections.push_back(inspectAuthoringHierarchy(m_session));
+                break;
+
             case AuthoringCommandKind::VerifySceneSaved: {
                 AuthoringVerification verification{
                     .kind = AuthoringVerificationKind::SceneSaved,

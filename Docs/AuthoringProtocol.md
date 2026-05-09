@@ -78,6 +78,7 @@ Query commands:
 - `inspect scene`
 - `inspect entity <entity-ref>`
 - `inspect hierarchy`
+- `snapshot`
 
 Verification commands:
 
@@ -100,7 +101,8 @@ Plan files are JSON objects:
     { "op": "new" },
     { "op": "primitive", "alias": "Box", "mesh": "Cube" },
     { "op": "inspect", "target": "entity", "entity": "Box" },
-    { "op": "verify", "check": "hasComponent", "entity": "Box", "component": "Mesh" }
+    { "op": "verify", "check": "hasComponent", "entity": "Box", "component": "Mesh" },
+    { "op": "snapshot" }
   ]
 }
 ```
@@ -109,14 +111,78 @@ The `protocol` field is optional for v1 compatibility. If present, `name` must b
 
 Plan JSON uses stable protocol names rather than the CLI shorthand. For example, the scene-saved verification is `{ "op": "verify", "check": "sceneSaved" }`. The JSON loader still accepts the legacy check name `"saved"` for compatibility, but writers emit `"sceneSaved"`.
 
+`snapshot` is the stable read endpoint for AI and editor refreshes. It appends a hierarchy inspection to the report and leaves scene mutation state unchanged.
+
 Machine-readable JSON Schema files are kept in `Docs/Schemas`:
 
 - `authoring-plan.schema.json`
 - `authoring-report.schema.json`
+- `authoring-capabilities.schema.json`
 
 Golden plan fixtures are kept in `Tests/Fixtures/Authoring` and are covered by `AuthoringProtocolTests`. These fixtures are the compatibility samples for CLI, editor, AI, and future MCP integrations.
 
-The TypeScript CLI client keeps its typed protocol facade in `CLI/client/authoringProtocol.ts`. Future AI-facing client code should build plans through that facade instead of hand-writing command objects in multiple places. The interactive TS client also queues typed `PlanCommand` objects and executes them by writing a temporary plan JSON for the C++ `plan` entrypoint.
+The TypeScript CLI client keeps its typed protocol facade in `CLI/client/authoringProtocol.ts`. Future AI-facing client code should build plans through that facade instead of hand-writing command objects in multiple places. The same facade normalizes report JSON into typed scene snapshots, entity bindings, inspections, verifications, and diagnostics so TS editor panels and AI agents can consume `snapshot` results without treating report arrays as unstructured data.
+
+Use the report helper APIs for common scene reads:
+
+- `latestHierarchy(report)`
+- `latestHierarchyEntities(report)`
+- `findEntityBinding(report, ref)`
+- `findEntityByRef(report, ref)`
+- `findEntityByUuid(report, uuid)`
+- `findEntityByName(report, name)`
+- `findEntitiesByComponent(report, component)`
+
+The interactive TS client also queues typed `PlanCommand` objects and executes them by writing a temporary plan JSON for the C++ `plan` entrypoint.
+
+## Capabilities
+
+The authoring capability registry describes what this engine build can currently author. It is a discovery layer for AI, editor command palettes, plugins, and future MCP tools; it does not execute commands.
+
+Export the current capability list:
+
+```powershell
+build\CLI\LunaCLI.exe capabilities --json
+```
+
+Capability JSON includes:
+
+- `op`: stable plan operation name
+- `title` and `description`: concise human/model-facing description
+- `effects`: declared side effects such as `readsScene`, `mutatesScene`, `readsFileSystem`, and `writesFileSystem`
+- `requiresConfirmation`: whether a UI or agent should ask before running the command
+- `parameters`: machine-readable parameter descriptions and enum hints
+- `examples`: valid command JSON examples
+
+AI clients should use capabilities as the first layer of runtime context, then use the plan schema and diagnostics for validation and repair.
+
+The TS client has a local compose skeleton that exercises this flow without a model provider:
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts capabilities
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts compose "create a simple scene with a cube, camera, and light"
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --execute compose "create a simple scene with a cube, floor, camera, and light"
+```
+
+By default `compose` prints a structured result containing the generated plan, the dry-run report, and a compact repair context. `--execute` runs the plan and returns the same result shape with `mode` set to `execute`. `--plan-only` prints only the generated plan. The current composer is intentionally rule-based; future OpenAI-style integration should replace only the intent-to-plan step while keeping the same capabilities, plan, dry-run, report, and diagnostics loop.
+
+The compose result shape is:
+
+```json
+{
+  "ok": true,
+  "mode": "dry-run",
+  "intent": "create a simple scene with a cube",
+  "plan": {},
+  "report": {},
+  "repair": {
+    "ok": true,
+    "diagnostics": [],
+    "errors": [],
+    "retryable": false
+  }
+}
+```
 
 ## Report JSON
 

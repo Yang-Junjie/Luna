@@ -1,0 +1,55 @@
+{
+  "protocol": {
+    "name": "luna.authoring",
+    "version": 1
+  },
+  "ok": false,
+  "scene": {
+    "name": "Protocol Scene",
+    "path": "Generated/ProtocolScene.lunascene",
+    "entityCount": 3,
+    "dirty": false
+  },
+  "entities": [
+    {
+      "alias": "Box",
+      "uuid": "42",
+      "name": "Cube"
+    }
+  ],
+  "savedScenes": [],
+  "inspections": [],
+  "verifications": [
+    {
+      "type": "entityExists",
+      "ok": true,
+      "ref": "Box",
+      "uuid": "42",
+      "component": "",
+      "expectedCount": 0,
+      "actualCount": 0,
+      "message": "Entity exists."
+    }
+  ],
+  "diagnostics": [
+    {
+      "severity": "error",
+      "phase": "execute",
+      "code": "MissingComponent",
+      "message": "Entity does not have a Transform component.",
+      "commandIndex": 2,
+      "command": "transform",
+      "field": null,
+      "entityRef": "Box",
+      "component": "Transform",
+      "path": null,
+      "recoverable": true,
+      "expected": "Transform component",
+      "actual": "missing Transform component",
+      "suggestedCommand": "transform Box ..."
+    }
+  ],
+  "errors": [
+    "Entity does not have a Transform component."
+  ]
+}

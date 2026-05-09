@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luna.local/schemas/authoring-capabilities.schema.json",
+  "title": "Luna Authoring Capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "capabilities"],
+  "properties": {
+    "protocol": { "$ref": "#/$defs/protocol" },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "luna.authoring" },
+        "version": { "const": 1 }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op",
+        "title",
+        "description",
+        "effects",
+        "requiresConfirmation",
+        "parameters",
+        "examples"
+      ],
+      "properties": {
+        "op": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "effects": {
+          "type": "array",
+          "items": {
+            "enum": ["readsScene", "mutatesScene", "readsFileSystem", "writesFileSystem"]
+          },
+          "uniqueItems": true
+        },
+        "requiresConfirmation": { "type": "boolean" },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/parameter" }
+        },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/example" }
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "required", "description"],
+      "properties": {
+        "type": { "enum": ["string", "number", "integer", "boolean", "vec3"] },
+        "required": { "type": "boolean" },
+        "description": { "type": "string" },
+        "enum": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "command"],
+      "properties": {
+        "description": { "type": "string" },
+        "command": { "type": ["object", "string"] }
+      }
+    }
+  }
+}

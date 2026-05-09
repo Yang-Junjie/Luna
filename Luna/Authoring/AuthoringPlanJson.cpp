@@ -6,6 +6,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <istream>
 #include <ostream>
 #include <string>
@@ -27,6 +28,16 @@ struct PlanJsonContext {
 std::string commandFieldName(size_t command_index, std::string_view field_name)
 {
     return "commands[" + std::to_string(command_index) + "]." + std::string(field_name);
+}
+
+bool isAllowedObjectField(std::string_view key, std::initializer_list<std::string_view> allowed_fields)
+{
+    for (std::string_view allowed_field : allowed_fields) {
+        if (key == allowed_field) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void appendPlanDiagnostic(const PlanJsonContext& context,
@@ -65,6 +76,52 @@ void appendPlanDiagnostic(const PlanJsonContext& context,
     }
 
     context.diagnostics->push_back(std::move(diagnostic));
+}
+
+bool validateObjectFields(const PlanJsonContext& context,
+                          const Json& node,
+                          std::string_view object_field_name,
+                          std::initializer_list<std::string_view> allowed_fields,
+                          size_t command_index = 0,
+                          bool has_command_index = false,
+                          std::string_view command = {})
+{
+    for (auto it = node.begin(); it != node.end(); ++it) {
+        const std::string key = it.key();
+        if (isAllowedObjectField(key, allowed_fields)) {
+            continue;
+        }
+
+        const std::string field = object_field_name.empty() ? key : std::string(object_field_name) + "." + key;
+        appendPlanDiagnostic(context,
+                             AuthoringDiagnosticCode::InvalidPlan,
+                             AuthoringDiagnosticPhase::Validate,
+                             "Plan field '" + field + "' is not supported.",
+                             field,
+                             command_index,
+                             has_command_index,
+                             std::string(command),
+                             "supported field",
+                             key);
+        return false;
+    }
+
+    return true;
+}
+
+bool validateCommandFields(const PlanJsonContext& context,
+                           const Json& node,
+                           size_t command_index,
+                           std::string_view command,
+                           std::initializer_list<std::string_view> allowed_fields)
+{
+    return validateObjectFields(context,
+                                node,
+                                "commands[" + std::to_string(command_index) + "]",
+                                allowed_fields,
+                                command_index,
+                                true,
+                                command);
 }
 
 bool readStringValue(const PlanJsonContext& context,
@@ -382,7 +439,7 @@ bool parseCommand(const PlanJsonContext& context,
 
     if (op == "new") {
         command.kind = AuthoringCommandKind::NewScene;
-        return true;
+        return validateCommandFields(context, command_node, command_index, op, {"op"});
     }
 
     if (op == "open") {
@@ -399,7 +456,7 @@ bool parseCommand(const PlanJsonContext& context,
             return false;
         }
         command.path = std::move(path);
-        return true;
+        return validateCommandFields(context, command_node, command_index, op, {"op", "path"});
     }
 
     if (op == "save") {
@@ -416,7 +473,7 @@ bool parseCommand(const PlanJsonContext& context,
             return false;
         }
         command.path = std::move(path);
-        return true;
+        return validateCommandFields(context, command_node, command_index, op, {"op", "path"});
     }
 
     if (op == "entity") {
@@ -436,7 +493,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.name,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias", "name"});
     }
 
     if (op == "camera") {
@@ -448,7 +506,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.alias,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias"});
     }
 
     if (op == "directional-light") {
@@ -460,7 +519,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.alias,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias"});
     }
 
     if (op == "point-light") {
@@ -472,7 +532,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.alias,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias"});
     }
 
     if (op == "spot-light") {
@@ -484,7 +545,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.alias,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias"});
     }
 
     if (op == "primitive") {
@@ -504,7 +566,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.mesh,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "alias", "mesh"});
     }
 
     if (op == "parent") {
@@ -524,7 +587,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.parent.value,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "child", "parent"});
     }
 
     if (op == "unparent") {
@@ -536,7 +600,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.child.value,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "child"});
     }
 
     if (op == "name") {
@@ -556,7 +621,8 @@ bool parseCommand(const PlanJsonContext& context,
                                command.name,
                                command_index,
                                true,
-                               op);
+                               op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "entity", "name"});
     }
 
     if (op == "transform") {
@@ -589,7 +655,12 @@ bool parseCommand(const PlanJsonContext& context,
                                      commandFieldName(command_index, "scale"),
                                      command.scale,
                                      command_index,
-                                     op);
+                                     op) &&
+               validateCommandFields(context,
+                                     command_node,
+                                     command_index,
+                                     op,
+                                     {"op", "entity", "translation", "rotationDeg", "scale"});
     }
 
     if (op == "light-intensity") {
@@ -608,7 +679,8 @@ bool parseCommand(const PlanJsonContext& context,
                               commandFieldName(command_index, "value"),
                               command.value,
                               command_index,
-                              op);
+                              op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "entity", "value"});
     }
 
     if (op == "light-color") {
@@ -627,7 +699,8 @@ bool parseCommand(const PlanJsonContext& context,
                              commandFieldName(command_index, "color"),
                              command.color,
                              command_index,
-                             op);
+                             op) &&
+               validateCommandFields(context, command_node, command_index, op, {"op", "entity", "color"});
     }
 
     if (op == "camera-perspective") {
@@ -660,7 +733,12 @@ bool parseCommand(const PlanJsonContext& context,
                               commandFieldName(command_index, "far"),
                               command.far_plane,
                               command_index,
-                              op);
+                              op) &&
+               validateCommandFields(context,
+                                     command_node,
+                                     command_index,
+                                     op,
+                                     {"op", "entity", "fovDeg", "near", "far"});
     }
 
     if (op == "camera-orthographic") {
@@ -693,7 +771,12 @@ bool parseCommand(const PlanJsonContext& context,
                               commandFieldName(command_index, "far"),
                               command.far_plane,
                               command_index,
-                              op);
+                              op) &&
+               validateCommandFields(context,
+                                     command_node,
+                                     command_index,
+                                     op,
+                                     {"op", "entity", "size", "near", "far"});
     }
 
     if (op == "inspect") {
@@ -711,11 +794,11 @@ bool parseCommand(const PlanJsonContext& context,
 
         if (target == "scene") {
             command.kind = AuthoringCommandKind::InspectScene;
-            return true;
+            return validateCommandFields(context, command_node, command_index, op, {"op", "target"});
         }
         if (target == "hierarchy") {
             command.kind = AuthoringCommandKind::InspectHierarchy;
-            return true;
+            return validateCommandFields(context, command_node, command_index, op, {"op", "target"});
         }
         if (target == "entity") {
             command.kind = AuthoringCommandKind::InspectEntity;
@@ -726,7 +809,8 @@ bool parseCommand(const PlanJsonContext& context,
                                    command.entity.value,
                                    command_index,
                                    true,
-                                   op);
+                                   op) &&
+                   validateCommandFields(context, command_node, command_index, op, {"op", "target", "entity"});
         }
 
         appendPlanDiagnostic(context,
@@ -757,7 +841,7 @@ bool parseCommand(const PlanJsonContext& context,
 
         if (check == "sceneSaved" || check == "saved") {
             command.kind = AuthoringCommandKind::VerifySceneSaved;
-            return true;
+            return validateCommandFields(context, command_node, command_index, op, {"op", "check"});
         }
         if (check == "entityExists") {
             command.kind = AuthoringCommandKind::VerifyEntityExists;
@@ -768,7 +852,8 @@ bool parseCommand(const PlanJsonContext& context,
                                    command.entity.value,
                                    command_index,
                                    true,
-                                   op);
+                                   op) &&
+                   validateCommandFields(context, command_node, command_index, op, {"op", "check", "entity"});
         }
         if (check == "hasComponent") {
             command.kind = AuthoringCommandKind::VerifyHasComponent;
@@ -787,7 +872,12 @@ bool parseCommand(const PlanJsonContext& context,
                                    command.component,
                                    command_index,
                                    true,
-                                   op);
+                                   op) &&
+                   validateCommandFields(context,
+                                         command_node,
+                                         command_index,
+                                         op,
+                                         {"op", "check", "entity", "component"});
         }
         if (check == "entityCountAtLeast") {
             command.kind = AuthoringCommandKind::VerifyEntityCountAtLeast;
@@ -798,7 +888,8 @@ bool parseCommand(const PlanJsonContext& context,
                                                command.count,
                                                command_index,
                                                true,
-                                               op);
+                                               op) &&
+                   validateCommandFields(context, command_node, command_index, op, {"op", "check", "count"});
         }
 
         appendPlanDiagnostic(context,
@@ -816,7 +907,12 @@ bool parseCommand(const PlanJsonContext& context,
 
     if (op == "summary") {
         command.kind = AuthoringCommandKind::Summary;
-        return true;
+        return validateCommandFields(context, command_node, command_index, op, {"op"});
+    }
+
+    if (op == "snapshot") {
+        command.kind = AuthoringCommandKind::Snapshot;
+        return validateCommandFields(context, command_node, command_index, op, {"op"});
     }
 
     appendPlanDiagnostic(context,
@@ -962,6 +1058,9 @@ Json writeCommand(const AuthoringCommand& command)
         case AuthoringCommandKind::Summary:
             result["op"] = "summary";
             return result;
+        case AuthoringCommandKind::Snapshot:
+            result["op"] = "snapshot";
+            return result;
     }
 
     result["op"] = "summary";
@@ -1006,6 +1105,10 @@ bool parsePlanJson(const Json& root,
         return false;
     }
 
+    if (!validateObjectFields(context, root, "", {"protocol", "project", "commands"})) {
+        return false;
+    }
+
     AuthoringPlan parsed_plan;
 
     if (const auto protocol = root.find("protocol"); protocol != root.end()) {
@@ -1015,6 +1118,10 @@ bool parsePlanJson(const Json& root,
                                  AuthoringDiagnosticPhase::Validate,
                                  "Plan field 'protocol' must be an object.",
                                  "protocol");
+            return false;
+        }
+
+        if (!validateObjectFields(context, *protocol, "protocol", {"name", "version"})) {
             return false;
         }
 

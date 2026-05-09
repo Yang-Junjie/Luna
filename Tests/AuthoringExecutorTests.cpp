@@ -138,6 +138,9 @@ void testExecutorAppliesTypedPlan(TestContext& context)
         .kind = luna::authoring::AuthoringCommandKind::InspectHierarchy,
     });
     plan.commands.push_back({
+        .kind = luna::authoring::AuthoringCommandKind::Snapshot,
+    });
+    plan.commands.push_back({
         .kind = luna::authoring::AuthoringCommandKind::VerifyEntityExists,
         .entity = {.value = "Box"},
     });
@@ -163,7 +166,7 @@ void testExecutorAppliesTypedPlan(TestContext& context)
     context.expect(report.errors.empty(), "typed authoring plan should not report errors");
     context.expect(report.diagnostics.empty(), "typed authoring plan should not report diagnostics");
     context.expect(report.entities.size() == 2, "report should include two explicit aliases");
-    context.expect(report.inspections.size() == 2, "report should include requested inspections");
+    context.expect(report.inspections.size() == 3, "report should include requested inspections and snapshot");
     context.expect(report.verifications.size() == 4, "report should include requested verifications");
     context.expect(std::all_of(report.verifications.begin(), report.verifications.end(), [](const auto& verification) {
                        return verification.ok;
@@ -200,8 +203,8 @@ void testExecutorAppliesTypedPlan(TestContext& context)
     context.expect(light && light.getComponent<luna::LightComponent>().intensity == 25.0f,
                    "light command should update intensity");
     context.expect(report.inspections.back().kind == luna::authoring::AuthoringInspectionKind::Hierarchy,
-                   "second inspection should be hierarchy inspection");
-    context.expect(report.inspections.back().entities.size() == 4, "hierarchy inspection should include all entities");
+                   "snapshot inspection should be emitted as hierarchy inspection");
+    context.expect(report.inspections.back().entities.size() == 4, "snapshot inspection should include all entities");
 }
 
 void testExecutorReportsStructuredDiagnostics(TestContext& context)

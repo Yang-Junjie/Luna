@@ -195,6 +195,8 @@ set(AUTHORING_SOURCE
     Authoring/AuthoringTypes.h
     Authoring/AuthoringHistory.h
     Authoring/AuthoringHistory.cpp
+    Authoring/AuthoringCapabilities.h
+    Authoring/AuthoringCapabilities.cpp
     Authoring/AuthoringInspection.h
     Authoring/AuthoringInspection.cpp
     Authoring/AuthoringVerification.h

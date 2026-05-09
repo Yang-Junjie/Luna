@@ -45,6 +45,7 @@ enum class AuthoringCommandKind : uint8_t {
     VerifyEntityExists,
     VerifyHasComponent,
     VerifyEntityCountAtLeast,
+    Snapshot,
     Summary,
 };
 

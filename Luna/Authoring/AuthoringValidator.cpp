@@ -919,6 +919,7 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
 
             case AuthoringCommandKind::InspectScene:
             case AuthoringCommandKind::InspectHierarchy:
+            case AuthoringCommandKind::Snapshot:
                 break;
 
             case AuthoringCommandKind::InspectEntity:

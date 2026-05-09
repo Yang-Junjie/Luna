@@ -1,3 +1,4 @@
+#include "Authoring/AuthoringCapabilities.h"
 #include "Authoring/AuthoringJson.h"
 #include "Authoring/AuthoringPlanJson.h"
 #include "Authoring/AuthoringProtocol.h"
@@ -5,7 +6,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -35,6 +39,40 @@ private:
     int m_failures{0};
 };
 
+std::vector<luna::authoring::AuthoringCommandKind> allAuthoringCommandKinds()
+{
+    using luna::authoring::AuthoringCommandKind;
+
+    return {
+        AuthoringCommandKind::NewScene,
+        AuthoringCommandKind::OpenScene,
+        AuthoringCommandKind::SaveScene,
+        AuthoringCommandKind::CreateEntity,
+        AuthoringCommandKind::CreateCamera,
+        AuthoringCommandKind::CreateDirectionalLight,
+        AuthoringCommandKind::CreatePointLight,
+        AuthoringCommandKind::CreateSpotLight,
+        AuthoringCommandKind::CreatePrimitive,
+        AuthoringCommandKind::Parent,
+        AuthoringCommandKind::Unparent,
+        AuthoringCommandKind::Rename,
+        AuthoringCommandKind::SetTransform,
+        AuthoringCommandKind::SetLightIntensity,
+        AuthoringCommandKind::SetLightColor,
+        AuthoringCommandKind::SetCameraPerspective,
+        AuthoringCommandKind::SetCameraOrthographic,
+        AuthoringCommandKind::InspectScene,
+        AuthoringCommandKind::InspectEntity,
+        AuthoringCommandKind::InspectHierarchy,
+        AuthoringCommandKind::VerifySceneSaved,
+        AuthoringCommandKind::VerifyEntityExists,
+        AuthoringCommandKind::VerifyHasComponent,
+        AuthoringCommandKind::VerifyEntityCountAtLeast,
+        AuthoringCommandKind::Snapshot,
+        AuthoringCommandKind::Summary,
+    };
+}
+
 void testCommandTokenParsing(TestContext& context)
 {
     const std::vector<std::string> tokens{
@@ -52,6 +90,7 @@ void testCommandTokenParsing(TestContext& context)
         "verify",
         "entity-count-at-least",
         "3",
+        "snapshot",
     };
 
     luna::authoring::AuthoringPlan plan;
@@ -59,7 +98,7 @@ void testCommandTokenParsing(TestContext& context)
     context.expect(luna::authoring::parseAuthoringCommandTokens(tokens, plan, errors),
                    "valid authoring tokens should parse");
     context.expect(errors.empty(), "valid authoring tokens should not report parse errors");
-    context.expect(plan.commands.size() == 5, "valid authoring tokens should produce five commands");
+    context.expect(plan.commands.size() == 6, "valid authoring tokens should produce six commands");
     context.expect(plan.commands[0].kind == luna::authoring::AuthoringCommandKind::NewScene,
                    "first command should be new scene");
     context.expect(plan.commands[1].kind == luna::authoring::AuthoringCommandKind::CreatePrimitive,
@@ -75,6 +114,8 @@ void testCommandTokenParsing(TestContext& context)
     context.expect(plan.commands[4].kind == luna::authoring::AuthoringCommandKind::VerifyEntityCountAtLeast,
                    "fifth command should be verify entity count");
     context.expect(plan.commands[4].count == 3, "verify entity count should parse count");
+    context.expect(plan.commands[5].kind == luna::authoring::AuthoringCommandKind::Snapshot,
+                   "sixth command should be snapshot");
 }
 
 void testCommandTokenParseErrors(TestContext& context)
@@ -105,37 +146,9 @@ void testCommandEffectClassification(TestContext& context)
 {
     using luna::authoring::AuthoringCommandKind;
 
-    const std::vector<AuthoringCommandKind> command_kinds{
-        AuthoringCommandKind::NewScene,
-        AuthoringCommandKind::OpenScene,
-        AuthoringCommandKind::SaveScene,
-        AuthoringCommandKind::CreateEntity,
-        AuthoringCommandKind::CreateCamera,
-        AuthoringCommandKind::CreateDirectionalLight,
-        AuthoringCommandKind::CreatePointLight,
-        AuthoringCommandKind::CreateSpotLight,
-        AuthoringCommandKind::CreatePrimitive,
-        AuthoringCommandKind::Parent,
-        AuthoringCommandKind::Unparent,
-        AuthoringCommandKind::Rename,
-        AuthoringCommandKind::SetTransform,
-        AuthoringCommandKind::SetLightIntensity,
-        AuthoringCommandKind::SetLightColor,
-        AuthoringCommandKind::SetCameraPerspective,
-        AuthoringCommandKind::SetCameraOrthographic,
-        AuthoringCommandKind::InspectScene,
-        AuthoringCommandKind::InspectEntity,
-        AuthoringCommandKind::InspectHierarchy,
-        AuthoringCommandKind::VerifySceneSaved,
-        AuthoringCommandKind::VerifyEntityExists,
-        AuthoringCommandKind::VerifyHasComponent,
-        AuthoringCommandKind::VerifyEntityCountAtLeast,
-        AuthoringCommandKind::Summary,
-    };
-
     size_t file_read_count = 0;
     size_t file_write_count = 0;
-    for (const AuthoringCommandKind kind : command_kinds) {
+    for (const AuthoringCommandKind kind : allAuthoringCommandKinds()) {
         if (luna::authoring::authoringCommandReadsFileSystem(kind)) {
             ++file_read_count;
         }
@@ -164,6 +177,10 @@ void testCommandEffectClassification(TestContext& context)
                    "inspect entity should declare scene read");
     context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::VerifyEntityExists),
                    "verify entity should be read-only");
+    context.expect(luna::authoring::authoringCommandReadsScene(AuthoringCommandKind::Snapshot),
+                   "snapshot should declare scene read");
+    context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::Snapshot),
+                   "snapshot should be read-only");
     context.expect(luna::authoring::authoringCommandIsReadOnly(AuthoringCommandKind::Summary),
                    "summary should be read-only");
 }
@@ -181,6 +198,93 @@ std::filesystem::path authoringFixturePath(std::string_view filename)
 std::filesystem::path authoringSchemaPath(std::string_view filename)
 {
     return std::filesystem::path{LUNA_AUTHORING_SCHEMA_DIR} / std::string(filename);
+}
+
+std::string normalizeNewlines(std::string text)
+{
+    std::string normalized;
+    normalized.reserve(text.size());
+
+    for (size_t index = 0; index < text.size(); ++index) {
+        if (text[index] == '\r') {
+            if (index + 1 < text.size() && text[index + 1] == '\n') {
+                ++index;
+            }
+            normalized.push_back('\n');
+        } else {
+            normalized.push_back(text[index]);
+        }
+    }
+
+    return normalized;
+}
+
+bool readTextFile(const std::filesystem::path& path, std::string& text)
+{
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        return false;
+    }
+
+    text.assign(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+    return true;
+}
+
+void expectGoldenText(TestContext& context,
+                      std::string_view actual,
+                      const std::filesystem::path& golden_path,
+                      std::string_view message)
+{
+    std::string expected;
+    if (!context.expect(readTextFile(golden_path, expected), "golden snapshot should be readable")) {
+        return;
+    }
+
+    context.expect(normalizeNewlines(std::string(actual)) == normalizeNewlines(expected), message);
+}
+
+std::set<std::string> uniqueAuthoringCommandNames()
+{
+    std::set<std::string> names;
+    for (const luna::authoring::AuthoringCommandKind kind : allAuthoringCommandKinds()) {
+        names.insert(luna::authoring::authoringCommandName(kind));
+    }
+    return names;
+}
+
+std::set<std::string> schemaCommandOps(const YAML::Node& plan_schema)
+{
+    std::set<std::string> ops;
+    const YAML::Node refs = plan_schema["$defs"]["command"]["oneOf"];
+    if (!refs.IsSequence()) {
+        return ops;
+    }
+
+    for (const YAML::Node ref : refs) {
+        const std::string ref_path = ref["$ref"].as<std::string>();
+        const size_t name_begin = ref_path.rfind('/');
+        if (name_begin == std::string::npos || name_begin + 1 >= ref_path.size()) {
+            continue;
+        }
+
+        const std::string def_name = ref_path.substr(name_begin + 1);
+        const YAML::Node command_def = plan_schema["$defs"][def_name];
+        const YAML::Node op = command_def["properties"]["op"]["const"];
+        if (op.IsScalar()) {
+            ops.insert(op.as<std::string>());
+        }
+    }
+
+    return ops;
+}
+
+std::set<std::string> capabilityOps(const std::vector<luna::authoring::AuthoringCapability>& capabilities)
+{
+    std::set<std::string> ops;
+    for (const luna::authoring::AuthoringCapability& capability : capabilities) {
+        ops.insert(capability.op);
+    }
+    return ops;
 }
 
 void testAuthoringPlanJsonRoundTrip(TestContext& context)
@@ -289,6 +393,7 @@ void testAuthoringPlanJsonRoundTrip(TestContext& context)
         .kind = AuthoringCommandKind::VerifyEntityCountAtLeast,
         .count = 5,
     });
+    plan.commands.push_back({.kind = AuthoringCommandKind::Snapshot});
     plan.commands.push_back({.kind = AuthoringCommandKind::Summary});
 
     std::ostringstream stream;
@@ -378,6 +483,8 @@ void testAuthoringPlanJsonRoundTrip(TestContext& context)
                    "authoring plan JSON should preserve verify component command");
     context.expect(parsed_plan.commands[23].count == 5,
                    "authoring plan JSON should preserve verify count command");
+    context.expect(parsed_plan.commands[24].kind == AuthoringCommandKind::Snapshot,
+                   "authoring plan JSON should preserve snapshot command");
 }
 
 void testAuthoringPlanJsonAcceptsMissingProtocol(TestContext& context)
@@ -429,6 +536,76 @@ void testAuthoringPlanJsonReportsProtocolMismatch(TestContext& context)
                        "mismatched protocol plan should validate protocol");
         context.expect(diagnostics.front().field == "protocol.name",
                        "mismatched protocol plan should identify the protocol field");
+    }
+}
+
+void testAuthoringPlanJsonRejectsUnknownFields(TestContext& context)
+{
+    struct Case {
+        const char* plan_text;
+        const char* expected_field;
+        bool has_command_index;
+        size_t command_index;
+        const char* command;
+    };
+
+    const Case cases[]{
+        {
+            R"({ "extra": true, "commands": [] })",
+            "extra",
+            false,
+            0,
+            "",
+        },
+        {
+            R"({
+  "protocol": { "name": "luna.authoring", "version": 1, "extra": true },
+  "commands": []
+})",
+            "protocol.extra",
+            false,
+            0,
+            "",
+        },
+        {
+            R"({
+  "commands": [
+    { "op": "primitive", "alias": "Box", "mesh": "Cube", "material": "Default" }
+  ]
+})",
+            "commands[0].material",
+            true,
+            0,
+            "primitive",
+        },
+    };
+
+    for (const Case& test_case : cases) {
+        luna::authoring::AuthoringPlan plan;
+        std::vector<std::string> errors;
+        std::vector<luna::authoring::AuthoringDiagnostic> diagnostics;
+        std::istringstream input{test_case.plan_text};
+        context.expect(!luna::authoring::loadAuthoringPlanJson(input, plan, errors, &diagnostics),
+                       "authoring plan JSON should reject unknown fields");
+        context.expect(!errors.empty(), "unknown fields should report errors");
+        context.expect(diagnostics.size() == 1, "unknown fields should report one diagnostic");
+        if (!diagnostics.empty()) {
+            context.expect(diagnostics.front().code == luna::authoring::AuthoringDiagnosticCode::InvalidPlan,
+                           "unknown fields should use InvalidPlan diagnostic code");
+            context.expect(diagnostics.front().phase == luna::authoring::AuthoringDiagnosticPhase::Validate,
+                           "unknown fields should use validate phase");
+            context.expect(diagnostics.front().field == test_case.expected_field,
+                           "unknown fields should report stable field path");
+            context.expect(diagnostics.front().has_command_index == test_case.has_command_index,
+                           "unknown fields should report command index only for command fields");
+            if (test_case.has_command_index) {
+                context.expect(diagnostics.front().command_index == test_case.command_index,
+                               "unknown command fields should report command index");
+                context.expect(diagnostics.front().command == test_case.command,
+                               "unknown command fields should report command name");
+            }
+            context.expect(diagnostics.front().recoverable, "unknown fields should be recoverable");
+        }
     }
 }
 
@@ -514,7 +691,11 @@ void testAuthoringPlanJsonParseDiagnostics(TestContext& context)
 
 void testAuthoringJsonSchemasParse(TestContext& context)
 {
-    for (const char* filename : {"authoring-plan.schema.json", "authoring-report.schema.json"}) {
+    for (const char* filename : {
+             "authoring-plan.schema.json",
+             "authoring-report.schema.json",
+             "authoring-capabilities.schema.json",
+         }) {
         const std::filesystem::path path = authoringSchemaPath(filename);
         try {
             const YAML::Node root = YAML::LoadFile(path.string());
@@ -530,6 +711,159 @@ void testAuthoringJsonSchemasParse(TestContext& context)
     }
 }
 
+void testAuthoringCapabilities(TestContext& context)
+{
+    const std::vector<luna::authoring::AuthoringCapability> capabilities =
+        luna::authoring::defaultAuthoringCapabilities();
+    context.expect(capabilities.size() == 21, "default authoring capabilities should cover current ops");
+
+    bool has_primitive = false;
+    bool has_save = false;
+    bool has_verify = false;
+    bool has_snapshot = false;
+    for (const luna::authoring::AuthoringCapability& capability : capabilities) {
+        if (capability.op == "primitive") {
+            has_primitive = true;
+            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
+                                                                      luna::authoring::AuthoringCommandEffect::MutatesScene),
+                           "primitive capability should declare scene mutation");
+            bool has_mesh_enum = false;
+            for (const luna::authoring::AuthoringCapabilityParameter& parameter : capability.parameters) {
+                if (parameter.name == "mesh") {
+                    has_mesh_enum = parameter.enum_values.size() == 5 &&
+                                    parameter.enum_values.front() == "Cube" &&
+                                    parameter.enum_values.back() == "Cone";
+                }
+            }
+            context.expect(has_mesh_enum, "primitive capability should expose builtin mesh enum");
+        }
+        if (capability.op == "save") {
+            has_save = true;
+            context.expect(capability.requires_confirmation,
+                           "save capability should require confirmation");
+            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
+                                                                      luna::authoring::AuthoringCommandEffect::WritesFileSystem),
+                           "save capability should declare filesystem write");
+        }
+        if (capability.op == "verify") {
+            has_verify = true;
+            bool has_check_enum = false;
+            for (const luna::authoring::AuthoringCapabilityParameter& parameter : capability.parameters) {
+                if (parameter.name == "check") {
+                    has_check_enum = parameter.enum_values.size() == 4 &&
+                                     parameter.enum_values.front() == "sceneSaved";
+                }
+            }
+            context.expect(has_check_enum, "verify capability should expose check enum");
+        }
+        if (capability.op == "snapshot") {
+            has_snapshot = true;
+            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
+                                                                      luna::authoring::AuthoringCommandEffect::ReadsScene),
+                           "snapshot capability should declare scene read");
+            context.expect(!luna::authoring::hasAuthoringCommandEffect(capability.effects,
+                                                                       luna::authoring::AuthoringCommandEffect::MutatesScene),
+                           "snapshot capability should not declare scene mutation");
+        }
+    }
+
+    context.expect(has_primitive, "default authoring capabilities should include primitive");
+    context.expect(has_save, "default authoring capabilities should include save");
+    context.expect(has_verify, "default authoring capabilities should include verify");
+    context.expect(has_snapshot, "default authoring capabilities should include snapshot");
+}
+
+void testAuthoringCapabilitiesJson(TestContext& context)
+{
+    std::ostringstream stream;
+    luna::authoring::writeDefaultAuthoringCapabilitiesJson(stream);
+    expectGoldenText(context,
+                     stream.str(),
+                     authoringFixturePath("Golden/authoring-capabilities.golden.json"),
+                     "capabilities JSON should match the golden snapshot");
+
+    YAML::Node root;
+    try {
+        root = YAML::Load(stream.str());
+    } catch (const YAML::Exception& error) {
+        context.expect(false, std::string("capabilities JSON should parse: ") + error.what());
+        return;
+    }
+
+    context.expect(root["protocol"]["name"].as<std::string>() == std::string(luna::authoring::kAuthoringProtocolName),
+                   "capabilities JSON should include protocol name");
+    context.expect(root["protocol"]["version"].as<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
+                   "capabilities JSON should include protocol version");
+    context.expect(root["capabilities"].IsSequence() && root["capabilities"].size() == 21,
+                   "capabilities JSON should include current capability count");
+
+    bool found_primitive = false;
+    for (const YAML::Node capability : root["capabilities"]) {
+        if (capability["op"].as<std::string>() == "primitive") {
+            found_primitive = true;
+            context.expect(capability["parameters"]["mesh"]["enum"].IsSequence() &&
+                               capability["parameters"]["mesh"]["enum"].size() == 5,
+                           "primitive capability JSON should include mesh enum");
+            context.expect(capability["effects"].IsSequence() && capability["effects"].size() == 1 &&
+                               capability["effects"][0].as<std::string>() == "mutatesScene",
+                           "primitive capability JSON should include effects");
+        }
+    }
+    context.expect(found_primitive, "capabilities JSON should include primitive capability");
+}
+
+void testAuthoringProtocolDiscoveryContract(TestContext& context)
+{
+    YAML::Node plan_schema;
+    try {
+        plan_schema = YAML::LoadFile(authoringSchemaPath("authoring-plan.schema.json").string());
+    } catch (const YAML::Exception& error) {
+        context.expect(false, std::string("authoring plan schema should parse for discovery contract: ") + error.what());
+        return;
+    }
+
+    const std::vector<luna::authoring::AuthoringCapability> capabilities =
+        luna::authoring::defaultAuthoringCapabilities();
+    const std::set<std::string> command_names = uniqueAuthoringCommandNames();
+    const std::set<std::string> schema_ops = schemaCommandOps(plan_schema);
+    const std::set<std::string> discovered_ops = capabilityOps(capabilities);
+
+    context.expect(command_names.size() == 21,
+                   "unique C++ authoring command names should match current protocol op count");
+    context.expect(schema_ops == command_names,
+                   "plan schema command ops should match C++ authoring command names");
+    context.expect(discovered_ops == command_names,
+                   "default capabilities should expose every C++ authoring command op");
+
+    std::map<std::string, size_t> op_counts;
+    for (const luna::authoring::AuthoringCapability& capability : capabilities) {
+        ++op_counts[capability.op];
+        context.expect(!capability.title.empty(), "capability should include a title");
+        context.expect(!capability.description.empty(), "capability should include a description");
+        context.expect(!capability.examples.empty(), "capability should include at least one example");
+
+        for (const luna::authoring::AuthoringCapabilityExample& example : capability.examples) {
+            const std::string plan_text = std::string(R"({ "commands": [)") + example.plan_json + R"(] })";
+            luna::authoring::AuthoringPlan plan;
+            std::vector<std::string> errors;
+            std::vector<luna::authoring::AuthoringDiagnostic> diagnostics;
+            std::istringstream input(plan_text);
+            context.expect(luna::authoring::loadAuthoringPlanJson(input, plan, errors, &diagnostics),
+                           "capability examples should parse as authoring plan commands");
+            context.expect(errors.empty(), "capability examples should not report parse errors");
+            context.expect(diagnostics.empty(), "capability examples should not report diagnostics");
+            if (!plan.commands.empty()) {
+                context.expect(luna::authoring::authoringCommandName(plan.commands.front().kind) == capability.op,
+                               "capability example op should match capability op");
+            }
+        }
+    }
+
+    for (const auto& [op, count] : op_counts) {
+        context.expect(count == 1, "capability ops should be unique");
+    }
+}
+
 void testAuthoringPlanJsonFixtures(TestContext& context)
 {
     struct ValidFixture {
@@ -538,7 +872,7 @@ void testAuthoringPlanJsonFixtures(TestContext& context)
     };
 
     const ValidFixture valid_fixtures[]{
-        {"create_cube_scene.plan.json", 9},
+        {"create_cube_scene.plan.json", 10},
         {"lights_camera.plan.json", 12},
     };
 
@@ -661,6 +995,10 @@ void testAuthoringReportJson(TestContext& context)
 
     std::ostringstream stream;
     luna::authoring::writeAuthoringReportJson(stream, report, false);
+    expectGoldenText(context,
+                     stream.str(),
+                     authoringFixturePath("Golden/authoring-report.error.golden.json"),
+                     "report JSON should match the golden snapshot");
 
     YAML::Node root;
     try {
@@ -720,9 +1058,13 @@ int main()
     testAuthoringPlanJsonRoundTrip(context);
     testAuthoringPlanJsonAcceptsMissingProtocol(context);
     testAuthoringPlanJsonReportsProtocolMismatch(context);
+    testAuthoringPlanJsonRejectsUnknownFields(context);
     testAuthoringPlanJsonAcceptsLegacySavedCheck(context);
     testAuthoringPlanJsonParseDiagnostics(context);
     testAuthoringJsonSchemasParse(context);
+    testAuthoringCapabilities(context);
+    testAuthoringCapabilitiesJson(context);
+    testAuthoringProtocolDiscoveryContract(context);
     testAuthoringPlanJsonFixtures(context);
     testAuthoringPlanJsonInvalidFixtures(context);
     testAuthoringReportJson(context);

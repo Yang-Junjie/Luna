@@ -1,0 +1,675 @@
+{
+  "protocol": {
+    "name": "luna.authoring",
+    "version": 1
+  },
+  "capabilities": [
+    {
+      "op": "new",
+      "title": "New Scene",
+      "description": "Create a new empty scene.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {},
+      "examples": [
+        {
+          "description": "Start a fresh scene.",
+          "command": {
+            "op": "new"
+          }
+        }
+      ]
+    },
+    {
+      "op": "open",
+      "title": "Open Scene",
+      "description": "Open a scene file from disk.",
+      "effects": [
+        "mutatesScene",
+        "readsFileSystem"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "description": "Scene file path to open."
+        }
+      },
+      "examples": [
+        {
+          "description": "Open an existing scene.",
+          "command": {
+            "op": "open",
+            "path": "Scenes/Level.lunascene"
+          }
+        }
+      ]
+    },
+    {
+      "op": "save",
+      "title": "Save Scene",
+      "description": "Save the current scene to disk.",
+      "effects": [
+        "readsScene",
+        "mutatesScene",
+        "writesFileSystem"
+      ],
+      "requiresConfirmation": true,
+      "parameters": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "description": "Scene file path to write."
+        }
+      },
+      "examples": [
+        {
+          "description": "Save the current scene.",
+          "command": {
+            "op": "save",
+            "path": "Scenes/Generated.lunascene"
+          }
+        }
+      ]
+    },
+    {
+      "op": "entity",
+      "title": "Create Entity",
+      "description": "Create a named empty entity and bind it to an alias for later commands.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "Entity display name."
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a game controller entity.",
+          "command": {
+            "op": "entity",
+            "alias": "GameController",
+            "name": "Game Controller"
+          }
+        }
+      ]
+    },
+    {
+      "op": "camera",
+      "title": "Create Camera",
+      "description": "Create a camera entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a main camera.",
+          "command": {
+            "op": "camera",
+            "alias": "MainCamera"
+          }
+        }
+      ]
+    },
+    {
+      "op": "directional-light",
+      "title": "Create Directional Light",
+      "description": "Create a directional light entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a sun light.",
+          "command": {
+            "op": "directional-light",
+            "alias": "Sun"
+          }
+        }
+      ]
+    },
+    {
+      "op": "point-light",
+      "title": "Create Point Light",
+      "description": "Create a point light entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a point light.",
+          "command": {
+            "op": "point-light",
+            "alias": "KeyLight"
+          }
+        }
+      ]
+    },
+    {
+      "op": "spot-light",
+      "title": "Create Spot Light",
+      "description": "Create a spot light entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a spot light.",
+          "command": {
+            "op": "spot-light",
+            "alias": "SpotLight"
+          }
+        }
+      ]
+    },
+    {
+      "op": "primitive",
+      "title": "Create Primitive",
+      "description": "Create an entity using a builtin primitive mesh.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "alias": {
+          "type": "string",
+          "required": true,
+          "description": "Alias used by later commands."
+        },
+        "mesh": {
+          "type": "string",
+          "required": true,
+          "description": "Builtin primitive mesh name.",
+          "enum": [
+            "Cube",
+            "Sphere",
+            "Plane",
+            "Cylinder",
+            "Cone"
+          ]
+        }
+      },
+      "examples": [
+        {
+          "description": "Create a cube entity.",
+          "command": {
+            "op": "primitive",
+            "alias": "Player",
+            "mesh": "Cube"
+          }
+        }
+      ]
+    },
+    {
+      "op": "parent",
+      "title": "Parent Entity",
+      "description": "Parent one entity under another entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "child": {
+          "type": "string",
+          "required": true,
+          "description": "Child entity alias or UUID."
+        },
+        "parent": {
+          "type": "string",
+          "required": true,
+          "description": "Parent entity alias or UUID."
+        }
+      },
+      "examples": [
+        {
+          "description": "Parent a mesh under a root.",
+          "command": {
+            "op": "parent",
+            "child": "Body",
+            "parent": "Root"
+          }
+        }
+      ]
+    },
+    {
+      "op": "unparent",
+      "title": "Unparent Entity",
+      "description": "Remove an entity from its current parent.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "child": {
+          "type": "string",
+          "required": true,
+          "description": "Child entity alias or UUID."
+        }
+      },
+      "examples": [
+        {
+          "description": "Detach an entity from its parent.",
+          "command": {
+            "op": "unparent",
+            "child": "Body"
+          }
+        }
+      ]
+    },
+    {
+      "op": "name",
+      "title": "Rename Entity",
+      "description": "Rename an existing entity.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Entity alias or UUID."
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "New entity display name."
+        }
+      },
+      "examples": [
+        {
+          "description": "Rename an entity.",
+          "command": {
+            "op": "name",
+            "entity": "Player",
+            "name": "Player Character"
+          }
+        }
+      ]
+    },
+    {
+      "op": "transform",
+      "title": "Set Transform",
+      "description": "Set entity translation, rotation in degrees, and scale.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Entity alias or UUID."
+        },
+        "translation": {
+          "type": "vec3",
+          "required": true,
+          "description": "Position as [x, y, z]."
+        },
+        "rotationDeg": {
+          "type": "vec3",
+          "required": false,
+          "description": "Euler rotation in degrees as [x, y, z]."
+        },
+        "scale": {
+          "type": "vec3",
+          "required": false,
+          "description": "Scale as [x, y, z]."
+        }
+      },
+      "examples": [
+        {
+          "description": "Move and rotate an entity.",
+          "command": {
+            "op": "transform",
+            "entity": "Player",
+            "translation": [
+              0,
+              1,
+              0
+            ],
+            "rotationDeg": [
+              0,
+              45,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "op": "light-intensity",
+      "title": "Set Light Intensity",
+      "description": "Set the intensity of a light component.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Light entity alias or UUID."
+        },
+        "value": {
+          "type": "number",
+          "required": true,
+          "description": "Light intensity value."
+        }
+      },
+      "examples": [
+        {
+          "description": "Set a light intensity.",
+          "command": {
+            "op": "light-intensity",
+            "entity": "KeyLight",
+            "value": 3.5
+          }
+        }
+      ]
+    },
+    {
+      "op": "light-color",
+      "title": "Set Light Color",
+      "description": "Set the RGB color of a light component.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Light entity alias or UUID."
+        },
+        "color": {
+          "type": "vec3",
+          "required": true,
+          "description": "RGB color as [r, g, b]."
+        }
+      },
+      "examples": [
+        {
+          "description": "Set a warm light color.",
+          "command": {
+            "op": "light-color",
+            "entity": "KeyLight",
+            "color": [
+              1,
+              0.92,
+              0.78
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "op": "camera-perspective",
+      "title": "Set Perspective Camera",
+      "description": "Configure a camera for perspective projection.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Camera entity alias or UUID."
+        },
+        "fovDeg": {
+          "type": "number",
+          "required": true,
+          "description": "Vertical field of view in degrees."
+        },
+        "near": {
+          "type": "number",
+          "required": true,
+          "description": "Near clip plane."
+        },
+        "far": {
+          "type": "number",
+          "required": true,
+          "description": "Far clip plane."
+        }
+      },
+      "examples": [
+        {
+          "description": "Configure a perspective camera.",
+          "command": {
+            "op": "camera-perspective",
+            "entity": "MainCamera",
+            "fovDeg": 60,
+            "near": 0.1,
+            "far": 500
+          }
+        }
+      ]
+    },
+    {
+      "op": "camera-orthographic",
+      "title": "Set Orthographic Camera",
+      "description": "Configure a camera for orthographic projection.",
+      "effects": [
+        "mutatesScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "entity": {
+          "type": "string",
+          "required": true,
+          "description": "Camera entity alias or UUID."
+        },
+        "size": {
+          "type": "number",
+          "required": true,
+          "description": "Orthographic size."
+        },
+        "near": {
+          "type": "number",
+          "required": true,
+          "description": "Near clip plane."
+        },
+        "far": {
+          "type": "number",
+          "required": true,
+          "description": "Far clip plane."
+        }
+      },
+      "examples": [
+        {
+          "description": "Configure an orthographic camera.",
+          "command": {
+            "op": "camera-orthographic",
+            "entity": "MainCamera",
+            "size": 12,
+            "near": 0.1,
+            "far": 500
+          }
+        }
+      ]
+    },
+    {
+      "op": "inspect",
+      "title": "Inspect Scene Data",
+      "description": "Read scene, hierarchy, or entity details without mutating the scene.",
+      "effects": [
+        "readsScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "target": {
+          "type": "string",
+          "required": true,
+          "description": "Inspection target.",
+          "enum": [
+            "scene",
+            "entity",
+            "hierarchy"
+          ]
+        },
+        "entity": {
+          "type": "string",
+          "required": false,
+          "description": "Entity alias or UUID when target is entity."
+        }
+      },
+      "examples": [
+        {
+          "description": "Inspect the scene.",
+          "command": {
+            "op": "inspect",
+            "target": "scene"
+          }
+        },
+        {
+          "description": "Inspect an entity.",
+          "command": {
+            "op": "inspect",
+            "target": "entity",
+            "entity": "Player"
+          }
+        }
+      ]
+    },
+    {
+      "op": "verify",
+      "title": "Verify Scene Conditions",
+      "description": "Check scene conditions and report structured verification results.",
+      "effects": [
+        "readsScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {
+        "check": {
+          "type": "string",
+          "required": true,
+          "description": "Verification check name.",
+          "enum": [
+            "sceneSaved",
+            "entityExists",
+            "hasComponent",
+            "entityCountAtLeast"
+          ]
+        },
+        "entity": {
+          "type": "string",
+          "required": false,
+          "description": "Entity alias or UUID for entity checks."
+        },
+        "component": {
+          "type": "string",
+          "required": false,
+          "description": "Component name for hasComponent."
+        },
+        "count": {
+          "type": "integer",
+          "required": false,
+          "description": "Minimum entity count for entityCountAtLeast."
+        }
+      },
+      "examples": [
+        {
+          "description": "Verify an entity exists.",
+          "command": {
+            "op": "verify",
+            "check": "entityExists",
+            "entity": "Player"
+          }
+        },
+        {
+          "description": "Verify a component exists.",
+          "command": {
+            "op": "verify",
+            "check": "hasComponent",
+            "entity": "Player",
+            "component": "Mesh"
+          }
+        }
+      ]
+    },
+    {
+      "op": "summary",
+      "title": "Print Summary",
+      "description": "Print a human-readable scene summary.",
+      "effects": [],
+      "requiresConfirmation": false,
+      "parameters": {},
+      "examples": [
+        {
+          "description": "Request a summary.",
+          "command": {
+            "op": "summary"
+          }
+        }
+      ]
+    },
+    {
+      "op": "snapshot",
+      "title": "Read Scene Snapshot",
+      "description": "Read the current scene hierarchy and component overview without mutating the scene.",
+      "effects": [
+        "readsScene"
+      ],
+      "requiresConfirmation": false,
+      "parameters": {},
+      "examples": [
+        {
+          "description": "Read a full scene snapshot.",
+          "command": {
+            "op": "snapshot"
+          }
+        }
+      ]
+    }
+  ]
+}

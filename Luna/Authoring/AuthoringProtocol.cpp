@@ -162,6 +162,7 @@ AuthoringCommandEffect authoringCommandEffects(AuthoringCommandKind kind)
         case AuthoringCommandKind::VerifyEntityExists:
         case AuthoringCommandKind::VerifyHasComponent:
         case AuthoringCommandKind::VerifyEntityCountAtLeast:
+        case AuthoringCommandKind::Snapshot:
             return Effect::ReadsScene;
 
         case AuthoringCommandKind::Summary:
@@ -217,6 +218,8 @@ const char* authoringCommandName(AuthoringCommandKind kind)
         case AuthoringCommandKind::VerifyHasComponent:
         case AuthoringCommandKind::VerifyEntityCountAtLeast:
             return "verify";
+        case AuthoringCommandKind::Snapshot:
+            return "snapshot";
         case AuthoringCommandKind::Summary:
             return "summary";
     }
@@ -579,6 +582,12 @@ bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
 
         if (command_name == "summary") {
             command.kind = AuthoringCommandKind::Summary;
+            plan.commands.push_back(std::move(command));
+            continue;
+        }
+
+        if (command_name == "snapshot") {
+            command.kind = AuthoringCommandKind::Snapshot;
             plan.commands.push_back(std::move(command));
             continue;
         }
