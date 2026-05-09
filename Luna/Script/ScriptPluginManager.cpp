@@ -668,14 +668,44 @@ private:
         auto& schemas = *static_cast<std::vector<luna::ScriptPropertySchema>*>(user_data);
         luna::ScriptPropertySchema schema{};
         schema.name = property_schema->name;
-        schema.displayName = property_schema->display_name != nullptr ? property_schema->display_name : schema.name;
-        schema.description = property_schema->description != nullptr ? property_schema->description : std::string{};
         schema.type = toPropertyType(property_schema->type);
+        schema.metadata.displayName =
+            property_schema->display_name != nullptr ? property_schema->display_name : schema.name;
+        schema.metadata.description =
+            property_schema->description != nullptr ? property_schema->description : std::string{};
+        schema.metadata.category = property_schema->category != nullptr ? property_schema->category : std::string{};
+        schema.metadata.hasMinValue = hasSchemaFlag(property_schema->flags, LunaScriptPropertySchemaFlag_HasMin);
+        schema.metadata.hasMaxValue = hasSchemaFlag(property_schema->flags, LunaScriptPropertySchemaFlag_HasMax);
+        schema.metadata.hasStepValue = hasSchemaFlag(property_schema->flags, LunaScriptPropertySchemaFlag_HasStep);
+        schema.metadata.minValue = property_schema->min_value;
+        schema.metadata.maxValue = property_schema->max_value;
+        schema.metadata.stepValue = property_schema->step_value;
+        schema.metadata.assetType =
+            property_schema->asset_type != nullptr ? property_schema->asset_type : std::string{};
+        schema.metadata.entityFilter =
+            property_schema->entity_filter != nullptr ? property_schema->entity_filter : std::string{};
+        if (property_schema->options != nullptr) {
+            schema.metadata.options.reserve(property_schema->option_count);
+            for (size_t option_index = 0; option_index < property_schema->option_count; ++option_index) {
+                const LunaScriptPropertyOptionDesc& option_desc = property_schema->options[option_index];
+                luna::ScriptPropertyOption option{};
+                option.label = option_desc.label != nullptr ? option_desc.label : "";
+                option.intValue = option_desc.int_value;
+                option.stringValue = option_desc.string_value != nullptr ? option_desc.string_value : "";
+                schema.metadata.options.push_back(std::move(option));
+            }
+        }
         schema.defaultValue.name = schema.name;
         schema.defaultValue.type = schema.type;
+        schema.defaultValue.metadata = schema.metadata;
         applyDefaultValue(schema.defaultValue, *property_schema);
         schemas.push_back(std::move(schema));
         return 1;
+    }
+
+    static bool hasSchemaFlag(uint32_t flags, LunaScriptPropertySchemaFlags flag)
+    {
+        return (flags & static_cast<uint32_t>(flag)) != 0;
     }
 
     static luna::ScriptPropertyType toPropertyType(LunaScriptPropertyType type)

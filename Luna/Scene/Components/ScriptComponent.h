@@ -21,6 +21,27 @@ enum class ScriptPropertyType : uint8_t {
     Asset,
 };
 
+struct ScriptPropertyOption {
+    std::string label;
+    int intValue{0};
+    std::string stringValue;
+};
+
+struct ScriptPropertyMetadata {
+    std::string displayName;
+    std::string description;
+    std::string category;
+    bool hasMinValue{false};
+    bool hasMaxValue{false};
+    bool hasStepValue{false};
+    float minValue{0.0f};
+    float maxValue{0.0f};
+    float stepValue{0.0f};
+    std::string assetType;
+    std::string entityFilter;
+    std::vector<ScriptPropertyOption> options;
+};
+
 struct ScriptProperty {
     std::string name;
     ScriptPropertyType type{ScriptPropertyType::Float};
@@ -31,6 +52,7 @@ struct ScriptProperty {
     glm::vec3 vec3Value{0.0f};
     UUID entityValue{0};
     AssetHandle assetValue{0};
+    ScriptPropertyMetadata metadata;
 };
 
 struct ScriptEntry {

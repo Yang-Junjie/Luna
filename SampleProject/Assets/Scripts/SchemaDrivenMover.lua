@@ -5,53 +5,76 @@ SchemaDrivenMover.Properties = {
         type = "Bool",
         default = true,
         display_name = "Enabled",
-        description = "Controls whether this script updates the entity."
+        description = "Controls whether this script updates the entity.",
+        category = "General"
     },
     speed = {
         type = "Float",
         default = 1.0,
         display_name = "Speed",
-        description = "Horizontal movement speed."
+        description = "Horizontal movement speed.",
+        category = "Motion",
+        min = 0.0,
+        max = 10.0,
+        step = 0.1
     },
     amplitude = {
         type = "Float",
         default = 0.5,
         display_name = "Amplitude",
-        description = "Vertical bob amplitude."
+        description = "Vertical bob amplitude.",
+        category = "Motion",
+        min = 0.0,
+        max = 5.0,
+        step = 0.05
     },
     frequency = {
         type = "Float",
         default = 1.5,
         display_name = "Frequency",
-        description = "Vertical bob frequency."
+        description = "Vertical bob frequency.",
+        category = "Motion",
+        min = 0.0,
+        max = 20.0,
+        step = 0.1
     },
     rotation_speed = {
         type = "Float",
         default = 45.0,
         display_name = "Rotation Speed",
-        description = "Rotation speed in degrees per second."
+        description = "Rotation speed in degrees per second.",
+        category = "Motion",
+        min = -360.0,
+        max = 360.0,
+        step = 1.0
     },
     offset = {
         type = "Vec3",
         default = { x = 0.0, y = 0.0, z = 0.0 },
         display_name = "Offset",
-        description = "Additional world-space offset from the starting position."
+        description = "Additional world-space offset from the starting position.",
+        category = "Motion",
+        step = 0.05
     },
     label = {
         type = "String",
         default = "SchemaDrivenMover",
         display_name = "Label",
-        description = "Text printed when the script starts."
+        description = "Text printed when the script starts.",
+        category = "Debug"
     },
     target = {
         type = "Entity",
         display_name = "Target",
-        description = "Optional entity reference used to verify Entity property injection."
+        description = "Optional entity reference used to verify Entity property injection.",
+        category = "References"
     },
     preview_asset = {
         type = "Asset",
         display_name = "Preview Asset",
-        description = "Optional asset reference used to verify Asset property injection."
+        description = "Optional asset reference used to verify Asset property injection.",
+        category = "References",
+        asset_type = "Texture"
     }
 }
 

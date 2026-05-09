@@ -9,10 +9,9 @@ namespace luna {
 
 struct ScriptPropertySchema {
     std::string name;
-    std::string displayName;
-    std::string description;
     ScriptPropertyType type{ScriptPropertyType::Float};
     ScriptProperty defaultValue;
+    ScriptPropertyMetadata metadata;
 };
 
 struct ScriptSchemaRequest {

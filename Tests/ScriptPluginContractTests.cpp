@@ -670,6 +670,121 @@ return ConstructorSmoke
                    "Camera() should preserve orthographic size");
 }
 
+void testLuaPropertySchemaMetadataContract(TestContext& context)
+{
+    luna::ScriptPluginManager& manager = luna::ScriptPluginManager::instance();
+
+    luna::ProjectInfo project;
+    project.Scripting.SelectedPluginId = "luna.official.lua";
+    project.Scripting.SelectedBackendName = "Lua";
+    expectState(context,
+                manager.resolveAndLoadProjectSelection(&project),
+                luna::ScriptPluginSelectionState::Resolved,
+                "official Lua plugin load for property metadata contract");
+
+    luna::ScriptSchemaRequest request{};
+    request.assetName = "MetadataSmoke.lua";
+    request.typeName = "MetadataSmoke";
+    request.language = "Lua";
+    request.source = R"(
+local MetadataSmoke = {}
+
+MetadataSmoke.Properties = {
+    speed = {
+        type = "Float",
+        default = 2.5,
+        display_name = "Move Speed",
+        description = "Base movement speed.",
+        category = "Movement",
+        min = 0.0,
+        max = 20.0,
+        step = 0.25
+    },
+    capture_button = {
+        type = "Int",
+        default = MouseCode.Right,
+        options = {
+            { label = "Right Mouse", value = MouseCode.Right },
+            { label = "Middle Mouse", value = MouseCode.Middle }
+        }
+    },
+    mode = {
+        type = "String",
+        default = "walk",
+        options = {
+            { label = "Walk", value = "walk" },
+            { label = "Fly", value = "fly" }
+        }
+    },
+    camera = {
+        type = "Entity",
+        entity_filter = "Camera"
+    },
+    preview = {
+        type = "Asset",
+        asset_type = "Texture"
+    }
+}
+
+return MetadataSmoke
+)";
+
+    const std::vector<luna::ScriptPropertySchema> schemas = manager.getPropertySchema("Lua", request);
+    context.expect(schemas.size() == 5, "Lua schema metadata contract should enumerate all properties");
+
+    auto find_schema = [&](std::string_view name) -> const luna::ScriptPropertySchema* {
+        const auto it = std::find_if(schemas.begin(), schemas.end(), [&](const luna::ScriptPropertySchema& schema) {
+            return schema.name == name;
+        });
+        return it != schemas.end() ? &*it : nullptr;
+    };
+
+    const luna::ScriptPropertySchema* speed = find_schema("speed");
+    if (context.expect(speed != nullptr, "speed schema should exist")) {
+        context.expect(speed->metadata.displayName == "Move Speed", "schema should preserve display_name");
+        context.expect(speed->metadata.description == "Base movement speed.", "schema should preserve description");
+        context.expect(speed->metadata.category == "Movement", "schema should preserve category");
+        context.expect(speed->metadata.hasMinValue && speed->metadata.minValue == 0.0f,
+                       "schema should preserve min metadata");
+        context.expect(speed->metadata.hasMaxValue && speed->metadata.maxValue == 20.0f,
+                       "schema should preserve max metadata");
+        context.expect(speed->metadata.hasStepValue && speed->metadata.stepValue == 0.25f,
+                       "schema should preserve step metadata");
+        context.expect(speed->defaultValue.floatValue == 2.5f, "schema should preserve default float value");
+    }
+
+    const luna::ScriptPropertySchema* capture_button = find_schema("capture_button");
+    if (context.expect(capture_button != nullptr, "capture_button schema should exist")) {
+        context.expect(capture_button->metadata.options.size() == 2, "int options should be preserved");
+        if (capture_button->metadata.options.size() == 2) {
+            context.expect(capture_button->metadata.options[0].label == "Right Mouse",
+                           "int option label should be preserved");
+            context.expect(capture_button->metadata.options[0].intValue == 2,
+                           "int option value should be preserved");
+        }
+    }
+
+    const luna::ScriptPropertySchema* mode = find_schema("mode");
+    if (context.expect(mode != nullptr, "mode schema should exist")) {
+        context.expect(mode->metadata.options.size() == 2, "string options should be preserved");
+        if (mode->metadata.options.size() == 2) {
+            context.expect(mode->metadata.options[1].label == "Fly", "string option label should be preserved");
+            context.expect(mode->metadata.options[1].stringValue == "fly",
+                           "string option value should be preserved");
+        }
+    }
+
+    const luna::ScriptPropertySchema* camera = find_schema("camera");
+    if (context.expect(camera != nullptr, "camera schema should exist")) {
+        context.expect(camera->metadata.entityFilter == "Camera", "entity filter should be preserved");
+    }
+
+    const luna::ScriptPropertySchema* preview = find_schema("preview");
+    if (context.expect(preview != nullptr, "preview schema should exist")) {
+        context.expect(preview->metadata.assetType == "Texture", "asset type filter should be preserved");
+    }
+}
+
 void testPluginDllManifestContract(TestContext& context)
 {
     constexpr std::string_view contract_extensions[] = {".contract"};
@@ -946,6 +1061,7 @@ int main()
     testOfficialLuaPluginLoadContract(context);
     testHostCameraAndInputApiContract(context);
     testLuaRuntimeConstructorCallContract(context);
+    testLuaPropertySchemaMetadataContract(context);
     testPluginDllManifestContract(context);
     testFailedPluginLoadClearsPreviouslyLoadedBackend(context);
     testLuaScriptImportWritesLanguageMetadata(context);

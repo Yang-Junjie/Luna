@@ -5,60 +5,95 @@ PlayerController.Properties = {
         type = "Bool",
         default = true,
         display_name = "Enabled",
-        description = "Controls whether this script updates the player."
+        description = "Controls whether this script updates the player.",
+        category = "General"
     },
     camera = {
         type = "Entity",
         display_name = "Camera",
-        description = "Child camera entity driven by pitch."
+        description = "Child camera entity driven by pitch.",
+        category = "References",
+        entity_filter = "Camera"
     },
     require_mouse_button = {
         type = "Bool",
         default = true,
         display_name = "Require Mouse Button",
-        description = "Only captures look input while the capture button is pressed."
+        description = "Only captures look input while the capture button is pressed.",
+        category = "Input"
     },
     capture_button = {
         type = "Int",
         default = MouseCode.Right,
         display_name = "Capture Button",
-        description = "Mouse button used to capture first-person input."
+        description = "Mouse button used to capture first-person input.",
+        category = "Input",
+        options = {
+            { label = "Right Mouse", value = MouseCode.Right },
+            { label = "Middle Mouse", value = MouseCode.Middle },
+            { label = "Mouse 4", value = MouseCode.XButton1 },
+            { label = "Mouse 5", value = MouseCode.XButton2 }
+        }
     },
     move_speed = {
         type = "Float",
         default = 5.0,
         display_name = "Move Speed",
-        description = "Horizontal movement speed in world units per second."
+        description = "Horizontal movement speed in world units per second.",
+        category = "Movement",
+        min = 0.0,
+        max = 30.0,
+        step = 0.1
     },
     sprint_multiplier = {
         type = "Float",
         default = 2.0,
         display_name = "Sprint Multiplier",
-        description = "Movement multiplier while Left Shift is held."
+        description = "Movement multiplier while Left Shift is held.",
+        category = "Movement",
+        min = 1.0,
+        max = 8.0,
+        step = 0.1
     },
     mouse_sensitivity = {
         type = "Float",
         default = 0.0025,
         display_name = "Mouse Sensitivity",
-        description = "Radians of camera rotation applied per mouse pixel."
+        description = "Radians of camera rotation applied per mouse pixel.",
+        category = "Look",
+        min = 0.0001,
+        max = 0.02,
+        step = 0.0001
     },
     max_mouse_delta = {
         type = "Float",
         default = 240.0,
         display_name = "Max Mouse Delta",
-        description = "Maximum mouse delta consumed in one frame."
+        description = "Maximum mouse delta consumed in one frame.",
+        category = "Look",
+        min = 1.0,
+        max = 1000.0,
+        step = 1.0
     },
     min_pitch = {
         type = "Float",
         default = -1.553343,
         display_name = "Min Pitch",
-        description = "Minimum camera pitch in radians."
+        description = "Minimum camera pitch in radians.",
+        category = "Look",
+        min = -1.570796,
+        max = 0.0,
+        step = 0.01
     },
     max_pitch = {
         type = "Float",
         default = 1.553343,
         display_name = "Max Pitch",
-        description = "Maximum camera pitch in radians."
+        description = "Maximum camera pitch in radians.",
+        category = "Look",
+        min = 0.0,
+        max = 1.570796,
+        step = 0.01
     }
 }
 

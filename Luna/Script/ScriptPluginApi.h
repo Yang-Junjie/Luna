@@ -11,7 +11,7 @@ extern "C" {
 
 enum {
     LUNA_SCRIPT_PLUGIN_API_VERSION = 1u,
-    LUNA_SCRIPT_BACKEND_API_VERSION = 1u,
+    LUNA_SCRIPT_BACKEND_API_VERSION = 2u,
     LUNA_SCRIPT_RUNTIME_API_VERSION = 1u,
 };
 
@@ -21,6 +21,19 @@ typedef struct LunaScriptSchemaRequest {
     const char* language;
     const char* source;
 } LunaScriptSchemaRequest;
+
+typedef enum LunaScriptPropertySchemaFlags {
+    LunaScriptPropertySchemaFlag_None = 0,
+    LunaScriptPropertySchemaFlag_HasMin = 1u << 0,
+    LunaScriptPropertySchemaFlag_HasMax = 1u << 1,
+    LunaScriptPropertySchemaFlag_HasStep = 1u << 2,
+} LunaScriptPropertySchemaFlags;
+
+typedef struct LunaScriptPropertyOptionDesc {
+    const char* label;
+    int32_t int_value;
+    const char* string_value;
+} LunaScriptPropertyOptionDesc;
 
 typedef struct LunaScriptPropertySchemaDesc {
     const char* name;
@@ -34,6 +47,15 @@ typedef struct LunaScriptPropertySchemaDesc {
     LunaScriptVec3 default_vec3_value;
     uint64_t default_entity_value;
     uint64_t default_asset_value;
+    const char* category;
+    uint32_t flags;
+    float min_value;
+    float max_value;
+    float step_value;
+    const char* asset_type;
+    const char* entity_filter;
+    const LunaScriptPropertyOptionDesc* options;
+    size_t option_count;
 } LunaScriptPropertySchemaDesc;
 
 typedef struct LunaScriptPropertyValueDesc {

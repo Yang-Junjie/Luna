@@ -11,6 +11,7 @@
 
 #include <glm/trigonometric.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -154,7 +155,27 @@ bool sameScriptProperty(const luna::ScriptProperty& lhs, const luna::ScriptPrope
            lhs.stringValue == rhs.stringValue &&
            sameVec3(lhs.vec3Value, rhs.vec3Value) &&
            lhs.entityValue == rhs.entityValue &&
-           lhs.assetValue == rhs.assetValue;
+           lhs.assetValue == rhs.assetValue &&
+           lhs.metadata.displayName == rhs.metadata.displayName &&
+           lhs.metadata.description == rhs.metadata.description &&
+           lhs.metadata.category == rhs.metadata.category &&
+           lhs.metadata.hasMinValue == rhs.metadata.hasMinValue &&
+           lhs.metadata.hasMaxValue == rhs.metadata.hasMaxValue &&
+           lhs.metadata.hasStepValue == rhs.metadata.hasStepValue &&
+           lhs.metadata.minValue == rhs.metadata.minValue &&
+           lhs.metadata.maxValue == rhs.metadata.maxValue &&
+           lhs.metadata.stepValue == rhs.metadata.stepValue &&
+           lhs.metadata.assetType == rhs.metadata.assetType &&
+           lhs.metadata.entityFilter == rhs.metadata.entityFilter &&
+           lhs.metadata.options.size() == rhs.metadata.options.size() &&
+           std::equal(lhs.metadata.options.begin(),
+                      lhs.metadata.options.end(),
+                      rhs.metadata.options.begin(),
+                      [](const luna::ScriptPropertyOption& left, const luna::ScriptPropertyOption& right) {
+                          return left.label == right.label &&
+                                 left.intValue == right.intValue &&
+                                 left.stringValue == right.stringValue;
+                      });
 }
 
 bool sameScriptEntry(const luna::ScriptEntry& lhs, const luna::ScriptEntry& rhs)

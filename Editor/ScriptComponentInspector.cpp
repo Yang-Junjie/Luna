@@ -4,6 +4,9 @@
 #include "Asset/AssetManager.h"
 #include "EditorUI.h"
 #include "Project/ProjectManager.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Components/LightComponent.h"
+#include "Scene/Components/MeshComponent.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Entity.h"
 #include "Script/ScriptAsset.h"
@@ -14,6 +17,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -86,6 +90,48 @@ void resetScriptPropertyValue(luna::ScriptProperty& property)
     property.vec3Value = glm::vec3(0.0f);
     property.entityValue = luna::UUID(0);
     property.assetValue = luna::AssetHandle(0);
+}
+
+void clearScriptPropertyMetadata(luna::ScriptProperty& property)
+{
+    property.metadata = {};
+}
+
+bool sameScriptPropertyOption(const luna::ScriptPropertyOption& lhs, const luna::ScriptPropertyOption& rhs)
+{
+    return lhs.label == rhs.label &&
+           lhs.intValue == rhs.intValue &&
+           lhs.stringValue == rhs.stringValue;
+}
+
+bool sameScriptPropertyMetadata(const luna::ScriptPropertyMetadata& lhs, const luna::ScriptPropertyMetadata& rhs)
+{
+    return lhs.displayName == rhs.displayName &&
+           lhs.description == rhs.description &&
+           lhs.category == rhs.category &&
+           lhs.hasMinValue == rhs.hasMinValue &&
+           lhs.hasMaxValue == rhs.hasMaxValue &&
+           lhs.hasStepValue == rhs.hasStepValue &&
+           lhs.minValue == rhs.minValue &&
+           lhs.maxValue == rhs.maxValue &&
+           lhs.stepValue == rhs.stepValue &&
+           lhs.assetType == rhs.assetType &&
+           lhs.entityFilter == rhs.entityFilter &&
+           lhs.options.size() == rhs.options.size() &&
+           std::equal(lhs.options.begin(), lhs.options.end(), rhs.options.begin(), sameScriptPropertyOption);
+}
+
+bool hasScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
+{
+    return !metadata.displayName.empty() ||
+           !metadata.description.empty() ||
+           !metadata.category.empty() ||
+           metadata.hasMinValue ||
+           metadata.hasMaxValue ||
+           metadata.hasStepValue ||
+           !metadata.assetType.empty() ||
+           !metadata.entityFilter.empty() ||
+           !metadata.options.empty();
 }
 
 std::string makeUniquePropertyName(const luna::ScriptEntry& script,
@@ -249,6 +295,7 @@ bool applyScriptPropertySchema(luna::ScriptEntry& script, const std::vector<luna
         luna::ScriptProperty property = schema.defaultValue;
         property.name = schema.name;
         property.type = schema.type;
+        property.metadata = schema.metadata;
 
         if (const luna::ScriptProperty* existing = findMatchingProperty(script, schema.name, schema.type)) {
             copyScriptPropertyValue(property, *existing);
@@ -267,7 +314,8 @@ bool applyScriptPropertySchema(luna::ScriptEntry& script, const std::vector<luna
                                                 lhs.boolValue == rhs.boolValue && lhs.intValue == rhs.intValue &&
                                                 lhs.floatValue == rhs.floatValue && lhs.stringValue == rhs.stringValue &&
                                                 lhs.vec3Value == rhs.vec3Value && lhs.entityValue == rhs.entityValue &&
-                                                lhs.assetValue == rhs.assetValue;
+                                                lhs.assetValue == rhs.assetValue &&
+                                                sameScriptPropertyMetadata(lhs.metadata, rhs.metadata);
                                      });
 
     if (changed) {
@@ -404,7 +452,159 @@ bool drawSchemaSyncControls(luna::ScriptEntry& script)
     return changed;
 }
 
-bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_value)
+luna::AssetType parseAssetTypeFilter(std::string_view asset_type)
+{
+    if (asset_type.empty() || equalsIgnoreCase(asset_type, "Any") || equalsIgnoreCase(asset_type, "None")) {
+        return luna::AssetType::None;
+    }
+
+    constexpr luna::AssetType kAssetTypes[] = {
+        luna::AssetType::Texture,
+        luna::AssetType::Mesh,
+        luna::AssetType::Material,
+        luna::AssetType::Model,
+        luna::AssetType::Scene,
+        luna::AssetType::Script,
+    };
+
+    for (const luna::AssetType type : kAssetTypes) {
+        if (equalsIgnoreCase(asset_type, luna::AssetUtils::AssetTypeToString(type))) {
+            return type;
+        }
+    }
+
+    return luna::AssetType::None;
+}
+
+bool entityMatchesFilter(luna::Entity entity, std::string_view entity_filter)
+{
+    if (entity_filter.empty() || equalsIgnoreCase(entity_filter, "Any")) {
+        return true;
+    }
+    if (!entity) {
+        return false;
+    }
+
+    if (equalsIgnoreCase(entity_filter, "Camera") || equalsIgnoreCase(entity_filter, "CameraComponent")) {
+        return entity.hasComponent<luna::CameraComponent>();
+    }
+    if (equalsIgnoreCase(entity_filter, "Light") || equalsIgnoreCase(entity_filter, "LightComponent")) {
+        return entity.hasComponent<luna::LightComponent>();
+    }
+    if (equalsIgnoreCase(entity_filter, "Mesh") || equalsIgnoreCase(entity_filter, "MeshComponent")) {
+        return entity.hasComponent<luna::MeshComponent>();
+    }
+    if (equalsIgnoreCase(entity_filter, "Script") || equalsIgnoreCase(entity_filter, "ScriptComponent")) {
+        return entity.hasComponent<luna::ScriptComponent>();
+    }
+
+    return true;
+}
+
+float clampedNumericValue(float value, const luna::ScriptPropertyMetadata& metadata)
+{
+    if (metadata.hasMinValue) {
+        value = (std::max)(value, metadata.minValue);
+    }
+    if (metadata.hasMaxValue) {
+        value = (std::min)(value, metadata.maxValue);
+    }
+    return value;
+}
+
+int clampedNumericValue(int value, const luna::ScriptPropertyMetadata& metadata)
+{
+    if (metadata.hasMinValue) {
+        value = (std::max)(value, static_cast<int>(std::ceil(metadata.minValue)));
+    }
+    if (metadata.hasMaxValue) {
+        value = (std::min)(value, static_cast<int>(std::floor(metadata.maxValue)));
+    }
+    return value;
+}
+
+int intStepFromMetadata(const luna::ScriptPropertyMetadata& metadata)
+{
+    if (!metadata.hasStepValue || metadata.stepValue <= 0.0f) {
+        return 1;
+    }
+
+    return (std::max)(1, static_cast<int>(std::round(metadata.stepValue)));
+}
+
+float floatStepFromMetadata(const luna::ScriptPropertyMetadata& metadata, float fallback)
+{
+    return metadata.hasStepValue && metadata.stepValue > 0.0f ? metadata.stepValue : fallback;
+}
+
+bool drawIntOptionEditor(luna::ScriptProperty& property)
+{
+    const luna::ScriptPropertyOption* selected_option = nullptr;
+    for (const luna::ScriptPropertyOption& option : property.metadata.options) {
+        if (option.intValue == property.intValue) {
+            selected_option = &option;
+            break;
+        }
+    }
+
+    const std::string fallback = std::to_string(property.intValue);
+    const char* preview = selected_option != nullptr && !selected_option->label.empty()
+                              ? selected_option->label.c_str()
+                              : fallback.c_str();
+
+    return luna::editor::ui::drawCombo("Value", preview, [&]() {
+        bool changed = false;
+        for (const luna::ScriptPropertyOption& option : property.metadata.options) {
+            const std::string label = option.label.empty() ? std::to_string(option.intValue) : option.label;
+            const bool selected = property.intValue == option.intValue;
+            if (ImGui::Selectable(label.c_str(), selected)) {
+                if (property.intValue != option.intValue) {
+                    property.intValue = option.intValue;
+                    changed = true;
+                }
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        return changed;
+    });
+}
+
+bool drawStringOptionEditor(luna::ScriptProperty& property)
+{
+    const luna::ScriptPropertyOption* selected_option = nullptr;
+    for (const luna::ScriptPropertyOption& option : property.metadata.options) {
+        if (option.stringValue == property.stringValue) {
+            selected_option = &option;
+            break;
+        }
+    }
+
+    const char* preview = selected_option != nullptr && !selected_option->label.empty()
+                              ? selected_option->label.c_str()
+                              : property.stringValue.c_str();
+
+    return luna::editor::ui::drawCombo("Value", preview, [&]() {
+        bool changed = false;
+        for (const luna::ScriptPropertyOption& option : property.metadata.options) {
+            const std::string label = option.label.empty() ? option.stringValue : option.label;
+            const bool selected = property.stringValue == option.stringValue;
+            if (ImGui::Selectable(label.c_str(), selected)) {
+                if (property.stringValue != option.stringValue) {
+                    property.stringValue = option.stringValue;
+                    changed = true;
+                }
+            }
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        return changed;
+    });
+}
+
+bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_value, std::string_view entity_filter)
 {
     bool changed = false;
 
@@ -418,7 +618,9 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
             changed = true;
         }
         if (ImGui::BeginPopupContextItem("EntityReferenceContext")) {
-            if (ImGui::MenuItem("Use Self", nullptr, false, static_cast<bool>(owner_entity))) {
+            const bool can_use_self =
+                static_cast<bool>(owner_entity) && entityMatchesFilter(owner_entity, entity_filter);
+            if (ImGui::MenuItem("Use Self", nullptr, false, can_use_self)) {
                 use_self_requested = true;
             }
             if (ImGui::MenuItem("Clear", nullptr, false, entity_value.isValid())) {
@@ -430,8 +632,14 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
         if (ImGui::BeginDragDropTarget()) {
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kEntityDragPayload);
                 payload != nullptr && payload->Data != nullptr && payload->DataSize == sizeof(uint64_t)) {
-                entity_value = luna::UUID(*static_cast<const uint64_t*>(payload->Data));
-                changed = true;
+                const luna::UUID candidate_id{*static_cast<const uint64_t*>(payload->Data)};
+                if (owner_entity && owner_entity.getEntityManager() != nullptr) {
+                    const luna::Entity candidate = owner_entity.getEntityManager()->findEntityByUUID(candidate_id);
+                    if (entityMatchesFilter(candidate, entity_filter)) {
+                        entity_value = candidate_id;
+                        changed = true;
+                    }
+                }
             }
             ImGui::EndDragDropTarget();
         }
@@ -462,6 +670,12 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Referenced entity does not exist in this scene.");
         return changed;
     }
+    if (!entityMatchesFilter(target_entity, entity_filter)) {
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f),
+                           "Referenced entity does not match required filter '%s'.",
+                           std::string(entity_filter).c_str());
+        return changed;
+    }
 
     ImGui::TextDisabled("Resolved Entity: %s", target_entity.getName().c_str());
     return changed;
@@ -470,37 +684,102 @@ bool drawEntityReferenceEditor(luna::Entity owner_entity, luna::UUID& entity_val
 bool drawScriptPropertyValueEditor(luna::Entity owner_entity, luna::ScriptProperty& property)
 {
     bool changed = false;
+    const luna::ScriptPropertyMetadata& metadata = property.metadata;
 
     switch (property.type) {
         case luna::ScriptPropertyType::Bool:
             changed |= luna::editor::ui::drawBool("Value", property.boolValue);
             break;
         case luna::ScriptPropertyType::Int:
-            changed |= luna::editor::ui::drawInt("Value", property.intValue);
+            if (!metadata.options.empty()) {
+                changed |= drawIntOptionEditor(property);
+            } else {
+                changed |= luna::editor::ui::drawInt("Value", property.intValue, intStepFromMetadata(metadata));
+                if (changed) {
+                    property.intValue = clampedNumericValue(property.intValue, metadata);
+                }
+            }
             break;
         case luna::ScriptPropertyType::Float:
-            changed |= luna::editor::ui::drawFloat("Value", property.floatValue, 0.05f);
+            changed |= luna::editor::ui::drawFloat("Value",
+                                                   property.floatValue,
+                                                   floatStepFromMetadata(metadata, 0.05f),
+                                                   metadata.hasMinValue && metadata.hasMaxValue ? metadata.minValue
+                                                                                                : 0.0f,
+                                                   metadata.hasMinValue && metadata.hasMaxValue ? metadata.maxValue
+                                                                                                : 0.0f);
+            if (changed) {
+                property.floatValue = clampedNumericValue(property.floatValue, metadata);
+            }
             break;
         case luna::ScriptPropertyType::String:
-            changed |= luna::editor::ui::drawTextMultiline("Value", property.stringValue);
+            if (!metadata.options.empty()) {
+                changed |= drawStringOptionEditor(property);
+            } else {
+                changed |= luna::editor::ui::drawTextMultiline("Value", property.stringValue);
+            }
             break;
         case luna::ScriptPropertyType::Vec3:
-            changed |= luna::editor::ui::drawVec3Control("Value", property.vec3Value, 0.0f, 0.05f);
+            changed |= luna::editor::ui::drawVec3Control(
+                "Value", property.vec3Value, 0.0f, floatStepFromMetadata(metadata, 0.05f));
+            if (changed) {
+                property.vec3Value.x = clampedNumericValue(property.vec3Value.x, metadata);
+                property.vec3Value.y = clampedNumericValue(property.vec3Value.y, metadata);
+                property.vec3Value.z = clampedNumericValue(property.vec3Value.z, metadata);
+            }
             break;
         case luna::ScriptPropertyType::Entity:
-            changed |= drawEntityReferenceEditor(owner_entity, property.entityValue);
+            changed |= drawEntityReferenceEditor(owner_entity, property.entityValue, metadata.entityFilter);
             break;
         case luna::ScriptPropertyType::Asset:
-            changed |= luna::editor::ui::drawAssetHandleSelector("Asset", property.assetValue);
+            {
+                std::optional<std::string> rejected_selection_message;
+                const luna::AssetType required_type = parseAssetTypeFilter(metadata.assetType);
+                auto accepts_asset_handle = [&](luna::AssetHandle handle) {
+                    if (required_type == luna::AssetType::None || !handle.isValid()) {
+                        rejected_selection_message.reset();
+                        return true;
+                    }
+                    if (!luna::AssetDatabase::exists(handle)) {
+                        rejected_selection_message = "Referenced asset does not exist.";
+                        return false;
+                    }
+
+                    const luna::AssetMetadata& asset_metadata = luna::AssetDatabase::getAssetMetadata(handle);
+                    if (asset_metadata.Type != required_type) {
+                        rejected_selection_message =
+                            "Selected asset must be " + std::string(luna::AssetUtils::AssetTypeToString(required_type)) +
+                            ".";
+                        return false;
+                    }
+
+                    rejected_selection_message.reset();
+                    return true;
+                };
+
+                changed |= luna::editor::ui::drawAssetHandleSelector(
+                    "Asset", property.assetValue, {}, accepts_asset_handle);
+                if (rejected_selection_message.has_value()) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f),
+                                       "%s",
+                                       rejected_selection_message->c_str());
+                }
+            }
             if (!property.assetValue.isValid()) {
                 ImGui::TextDisabled("Resolved Asset: None");
             } else if (!luna::AssetDatabase::exists(property.assetValue)) {
                 ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "Referenced asset does not exist.");
             } else {
-                const auto& metadata = luna::AssetDatabase::getAssetMetadata(property.assetValue);
+                const auto& asset_metadata = luna::AssetDatabase::getAssetMetadata(property.assetValue);
                 ImGui::TextDisabled("Resolved Asset: %s",
                                     luna::editor::ui::assetDisplayLabel(property.assetValue).c_str());
-                ImGui::TextDisabled("Asset Type: %s", luna::AssetUtils::AssetTypeToString(metadata.Type));
+                ImGui::TextDisabled("Asset Type: %s", luna::AssetUtils::AssetTypeToString(asset_metadata.Type));
+                const luna::AssetType required_type = parseAssetTypeFilter(property.metadata.assetType);
+                if (required_type != luna::AssetType::None && asset_metadata.Type != required_type) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f),
+                                       "Referenced asset does not match required type '%s'.",
+                                       luna::AssetUtils::AssetTypeToString(required_type));
+                }
             }
             break;
     }
@@ -516,8 +795,18 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
     auto& property = script.properties[property_index];
     bool changed = false;
 
-    std::string property_label = property.name.empty() ? "<unnamed>" : property.name;
+    const bool has_metadata = hasScriptPropertyMetadata(property.metadata);
+    std::string property_label = !property.metadata.displayName.empty()
+                                     ? property.metadata.displayName
+                                     : (property.name.empty() ? "<unnamed>" : property.name);
+    if (!property.metadata.category.empty()) {
+        property_label = property.metadata.category + " / " + property_label;
+    }
     property_label += " (";
+    if (!property.metadata.displayName.empty() && !equalsIgnoreCase(property.metadata.displayName, property.name)) {
+        property_label += property.name;
+        property_label += ", ";
+    }
     property_label += scriptPropertyTypeToString(property.type);
     property_label += ")";
 
@@ -533,6 +822,7 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
 
     if (open) {
         bool name_deactivated = false;
+        const std::string name_before_edit = property.name;
         if (luna::editor::ui::drawTextInput("Name", property.name, 256, {}, &name_deactivated)) {
             changed = true;
         }
@@ -541,6 +831,9 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
             if (property.name != normalized_name) {
                 property.name = normalized_name;
                 changed = true;
+            }
+            if (property.name != name_before_edit) {
+                clearScriptPropertyMetadata(property);
             }
         }
 
@@ -563,6 +856,7 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
                     if (property.type != type) {
                         property.type = type;
                         resetScriptPropertyValue(property);
+                        clearScriptPropertyMetadata(property);
                         type_changed = true;
                     }
                 }
@@ -572,6 +866,13 @@ bool drawScriptPropertyEditor(luna::Entity owner_entity,
             }
             return type_changed;
         });
+
+        if (has_metadata && !property.metadata.description.empty()) {
+            ImGui::TextWrapped("%s", property.metadata.description.c_str());
+        }
+        if (has_metadata && !property.metadata.category.empty()) {
+            luna::editor::ui::drawTextValue("Category", property.metadata.category);
+        }
 
         changed |= drawScriptPropertyValueEditor(owner_entity, property);
 

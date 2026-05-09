@@ -14,10 +14,17 @@
 
 namespace {
 
+struct ParsedLuaPropertyOption {
+    std::string label;
+    int32_t int_value{0};
+    std::string string_value;
+};
+
 struct ParsedLuaPropertySchema {
     std::string name;
     std::string display_name;
     std::string description;
+    std::string category;
     LunaScriptPropertyType type{LunaScriptPropertyType_Float};
     bool bool_value{false};
     int32_t int_value{0};
@@ -26,6 +33,15 @@ struct ParsedLuaPropertySchema {
     LunaScriptVec3 vec3_value{};
     uint64_t entity_value{0};
     uint64_t asset_value{0};
+    bool has_min_value{false};
+    bool has_max_value{false};
+    bool has_step_value{false};
+    float min_value{0.0f};
+    float max_value{0.0f};
+    float step_value{0.0f};
+    std::string asset_type;
+    std::string entity_filter;
+    std::vector<ParsedLuaPropertyOption> options;
 };
 
 std::string toLower(std::string value)
@@ -167,6 +183,133 @@ std::string readOptionalString(const sol::table& table, std::string_view key)
     return value.is<std::string>() ? value.as<std::string>() : std::string{};
 }
 
+bool readOptionalNumber(const sol::table& table, std::string_view key, float& out_value)
+{
+    sol::object value = table[std::string(key)];
+    if (!(value.is<float>() || value.is<double>() || value.is<int>())) {
+        return false;
+    }
+
+    out_value = value.as<float>();
+    return true;
+}
+
+std::string formatOptionLabel(const sol::object& value)
+{
+    if (value.is<std::string>()) {
+        return value.as<std::string>();
+    }
+    if (value.is<int>()) {
+        return std::to_string(value.as<int>());
+    }
+    if (value.is<float>() || value.is<double>()) {
+        return std::to_string(value.as<float>());
+    }
+    if (value.is<bool>()) {
+        return value.as<bool>() ? "true" : "false";
+    }
+
+    return {};
+}
+
+bool readOptionValue(LunaScriptPropertyType property_type,
+                     const sol::object& value,
+                     ParsedLuaPropertyOption& out_option)
+{
+    switch (property_type) {
+        case LunaScriptPropertyType_Int:
+            if (value.is<int>()) {
+                out_option.int_value = value.as<int>();
+                return true;
+            }
+            if (value.is<float>() || value.is<double>()) {
+                out_option.int_value = static_cast<int32_t>(value.as<float>());
+                return true;
+            }
+            return false;
+        case LunaScriptPropertyType_String:
+            if (value.is<std::string>()) {
+                out_option.string_value = value.as<std::string>();
+                return true;
+            }
+            return false;
+        default:
+            return false;
+    }
+}
+
+std::string readOptionLabel(const sol::table& option_table)
+{
+    std::string label = readOptionalString(option_table, "label");
+    if (label.empty()) {
+        label = readOptionalString(option_table, "name");
+    }
+    if (label.empty()) {
+        label = readOptionalString(option_table, "display_name");
+    }
+    if (label.empty()) {
+        label = readOptionalString(option_table, "displayName");
+    }
+    return label;
+}
+
+void appendParsedOption(LunaScriptPropertyType property_type,
+                        const sol::object& label_object,
+                        const sol::object& value_object,
+                        std::vector<ParsedLuaPropertyOption>& options)
+{
+    ParsedLuaPropertyOption option{};
+    if (!readOptionValue(property_type, value_object, option)) {
+        return;
+    }
+
+    option.label = label_object.is<int>() ? formatOptionLabel(value_object) : formatOptionLabel(label_object);
+    if (option.label.empty()) {
+        option.label = property_type == LunaScriptPropertyType_String ? option.string_value : std::to_string(option.int_value);
+    }
+    options.push_back(std::move(option));
+}
+
+void readOptions(const sol::table& property_table, ParsedLuaPropertySchema& property)
+{
+    sol::object options_object = property_table["options"];
+    if (!options_object.is<sol::table>()) {
+        return;
+    }
+
+    const sol::table options_table = options_object.as<sol::table>();
+    for (const auto& pair : options_table) {
+        if (pair.second.is<sol::table>()) {
+            const sol::table option_table = pair.second.as<sol::table>();
+            sol::object value_object = option_table["value"];
+            if (!value_object.valid() || value_object == sol::nil) {
+                value_object = option_table[1];
+            }
+            if (!value_object.valid() || value_object == sol::nil) {
+                continue;
+            }
+
+            ParsedLuaPropertyOption option{};
+            if (!readOptionValue(property.type, value_object, option)) {
+                continue;
+            }
+
+            option.label = readOptionLabel(option_table);
+            if (option.label.empty()) {
+                option.label = formatOptionLabel(value_object);
+            }
+            if (option.label.empty()) {
+                option.label =
+                    property.type == LunaScriptPropertyType_String ? option.string_value : std::to_string(option.int_value);
+            }
+            property.options.push_back(std::move(option));
+            continue;
+        }
+
+        appendParsedOption(property.type, pair.first, pair.second, property.options);
+    }
+}
+
 sol::table resolvePrototypeTable(sol::state& lua_state,
                                  const LunaScriptSchemaRequest& request,
                                  const sol::environment& environment,
@@ -205,12 +348,28 @@ bool parsePropertySchema(const std::string& property_name,
         out_property.display_name = readOptionalString(property_table, "displayName");
     }
     out_property.description = readOptionalString(property_table, "description");
+    out_property.category = readOptionalString(property_table, "category");
+    if (out_property.category.empty()) {
+        out_property.category = readOptionalString(property_table, "group");
+    }
 
     if (!readPropertyType(property_table, out_property.type)) {
         return false;
     }
 
     readDefaultValue(out_property, property_table["default"]);
+    out_property.has_min_value = readOptionalNumber(property_table, "min", out_property.min_value);
+    out_property.has_max_value = readOptionalNumber(property_table, "max", out_property.max_value);
+    out_property.has_step_value = readOptionalNumber(property_table, "step", out_property.step_value);
+    out_property.asset_type = readOptionalString(property_table, "asset_type");
+    if (out_property.asset_type.empty()) {
+        out_property.asset_type = readOptionalString(property_table, "assetType");
+    }
+    out_property.entity_filter = readOptionalString(property_table, "entity_filter");
+    if (out_property.entity_filter.empty()) {
+        out_property.entity_filter = readOptionalString(property_table, "entityFilter");
+    }
+    readOptions(property_table, out_property);
     return true;
 }
 
@@ -231,8 +390,19 @@ std::vector<ParsedLuaPropertySchema> parsePropertiesTable(const sol::table& prop
     return properties;
 }
 
-LunaScriptPropertySchemaDesc toDesc(const ParsedLuaPropertySchema& property)
+LunaScriptPropertySchemaDesc toDesc(const ParsedLuaPropertySchema& property,
+                                    std::vector<LunaScriptPropertyOptionDesc>& option_descs)
 {
+    option_descs.clear();
+    option_descs.reserve(property.options.size());
+    for (const ParsedLuaPropertyOption& option : property.options) {
+        LunaScriptPropertyOptionDesc desc{};
+        desc.label = option.label.c_str();
+        desc.int_value = option.int_value;
+        desc.string_value = option.string_value.c_str();
+        option_descs.push_back(desc);
+    }
+
     LunaScriptPropertySchemaDesc desc{};
     desc.name = property.name.c_str();
     desc.display_name = property.display_name.c_str();
@@ -245,6 +415,23 @@ LunaScriptPropertySchemaDesc toDesc(const ParsedLuaPropertySchema& property)
     desc.default_vec3_value = property.vec3_value;
     desc.default_entity_value = property.entity_value;
     desc.default_asset_value = property.asset_value;
+    desc.category = property.category.c_str();
+    if (property.has_min_value) {
+        desc.flags |= static_cast<uint32_t>(LunaScriptPropertySchemaFlag_HasMin);
+    }
+    if (property.has_max_value) {
+        desc.flags |= static_cast<uint32_t>(LunaScriptPropertySchemaFlag_HasMax);
+    }
+    if (property.has_step_value) {
+        desc.flags |= static_cast<uint32_t>(LunaScriptPropertySchemaFlag_HasStep);
+    }
+    desc.min_value = property.min_value;
+    desc.max_value = property.max_value;
+    desc.step_value = property.step_value;
+    desc.asset_type = property.asset_type.c_str();
+    desc.entity_filter = property.entity_filter.c_str();
+    desc.options = option_descs.data();
+    desc.option_count = option_descs.size();
     return desc;
 }
 
@@ -298,8 +485,9 @@ int enumerateLuaPropertySchema(const LunaScriptHostApi* host_api,
     }
 
     std::vector<ParsedLuaPropertySchema> properties = parsePropertiesTable(properties_object.as<sol::table>());
+    std::vector<LunaScriptPropertyOptionDesc> option_descs;
     for (const ParsedLuaPropertySchema& property : properties) {
-        const LunaScriptPropertySchemaDesc desc = toDesc(property);
+        const LunaScriptPropertySchemaDesc desc = toDesc(property, option_descs);
         if (enumerate_fn(user_data, &desc) == 0) {
             return 0;
         }

@@ -181,6 +181,114 @@ luna::ScriptPropertyType readScriptPropertyType(const YAML::Node& node, luna::Sc
     return fallback;
 }
 
+bool hasScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
+{
+    return !metadata.displayName.empty() ||
+           !metadata.description.empty() ||
+           !metadata.category.empty() ||
+           metadata.hasMinValue ||
+           metadata.hasMaxValue ||
+           metadata.hasStepValue ||
+           !metadata.assetType.empty() ||
+           !metadata.entityFilter.empty() ||
+           !metadata.options.empty();
+}
+
+void emitScriptPropertyMetadata(YAML::Emitter& out, const luna::ScriptPropertyMetadata& metadata)
+{
+    if (!hasScriptPropertyMetadata(metadata)) {
+        return;
+    }
+
+    out << YAML::Key << "Metadata" << YAML::Value << YAML::BeginMap;
+    if (!metadata.displayName.empty()) {
+        out << YAML::Key << "DisplayName" << YAML::Value << metadata.displayName;
+    }
+    if (!metadata.description.empty()) {
+        out << YAML::Key << "Description" << YAML::Value << metadata.description;
+    }
+    if (!metadata.category.empty()) {
+        out << YAML::Key << "Category" << YAML::Value << metadata.category;
+    }
+    if (metadata.hasMinValue) {
+        out << YAML::Key << "Min" << YAML::Value << metadata.minValue;
+    }
+    if (metadata.hasMaxValue) {
+        out << YAML::Key << "Max" << YAML::Value << metadata.maxValue;
+    }
+    if (metadata.hasStepValue) {
+        out << YAML::Key << "Step" << YAML::Value << metadata.stepValue;
+    }
+    if (!metadata.assetType.empty()) {
+        out << YAML::Key << "AssetType" << YAML::Value << metadata.assetType;
+    }
+    if (!metadata.entityFilter.empty()) {
+        out << YAML::Key << "EntityFilter" << YAML::Value << metadata.entityFilter;
+    }
+    if (!metadata.options.empty()) {
+        out << YAML::Key << "Options" << YAML::Value << YAML::BeginSeq;
+        for (const luna::ScriptPropertyOption& option : metadata.options) {
+            out << YAML::BeginMap;
+            out << YAML::Key << "Label" << YAML::Value << option.label;
+            out << YAML::Key << "IntValue" << YAML::Value << option.intValue;
+            out << YAML::Key << "StringValue" << YAML::Value << option.stringValue;
+            out << YAML::EndMap;
+        }
+        out << YAML::EndSeq;
+    }
+    out << YAML::EndMap;
+}
+
+void readScriptPropertyMetadata(const YAML::Node& node, luna::ScriptPropertyMetadata& metadata)
+{
+    if (!node) {
+        return;
+    }
+
+    if (node["DisplayName"]) {
+        metadata.displayName = node["DisplayName"].as<std::string>();
+    }
+    if (node["Description"]) {
+        metadata.description = node["Description"].as<std::string>();
+    }
+    if (node["Category"]) {
+        metadata.category = node["Category"].as<std::string>();
+    }
+    if (node["Min"]) {
+        metadata.hasMinValue = true;
+        metadata.minValue = node["Min"].as<float>();
+    }
+    if (node["Max"]) {
+        metadata.hasMaxValue = true;
+        metadata.maxValue = node["Max"].as<float>();
+    }
+    if (node["Step"]) {
+        metadata.hasStepValue = true;
+        metadata.stepValue = node["Step"].as<float>();
+    }
+    if (node["AssetType"]) {
+        metadata.assetType = node["AssetType"].as<std::string>();
+    }
+    if (node["EntityFilter"]) {
+        metadata.entityFilter = node["EntityFilter"].as<std::string>();
+    }
+    if (const YAML::Node options_node = node["Options"]; options_node && options_node.IsSequence()) {
+        for (const YAML::Node& option_node : options_node) {
+            luna::ScriptPropertyOption option{};
+            if (option_node["Label"]) {
+                option.label = option_node["Label"].as<std::string>();
+            }
+            if (option_node["IntValue"]) {
+                option.intValue = option_node["IntValue"].as<int>();
+            }
+            if (option_node["StringValue"]) {
+                option.stringValue = option_node["StringValue"].as<std::string>();
+            }
+            metadata.options.push_back(std::move(option));
+        }
+    }
+}
+
 void emitScriptProperty(YAML::Emitter& out, const luna::ScriptProperty& property)
 {
     out << YAML::BeginMap;
@@ -210,6 +318,7 @@ void emitScriptProperty(YAML::Emitter& out, const luna::ScriptProperty& property
             out << static_cast<uint64_t>(property.assetValue);
             break;
     }
+    emitScriptPropertyMetadata(out, property.metadata);
     out << YAML::EndMap;
 }
 
@@ -226,33 +335,32 @@ luna::ScriptProperty readScriptProperty(const YAML::Node& node)
     property.type = readScriptPropertyType(node["Type"], property.type);
 
     const YAML::Node value_node = node["Value"];
-    if (!value_node) {
-        return property;
+    if (value_node) {
+        switch (property.type) {
+            case luna::ScriptPropertyType::Bool:
+                property.boolValue = value_node.as<bool>();
+                break;
+            case luna::ScriptPropertyType::Int:
+                property.intValue = value_node.as<int>();
+                break;
+            case luna::ScriptPropertyType::Float:
+                property.floatValue = value_node.as<float>();
+                break;
+            case luna::ScriptPropertyType::String:
+                property.stringValue = value_node.as<std::string>();
+                break;
+            case luna::ScriptPropertyType::Vec3:
+                property.vec3Value = readVec3(value_node, property.vec3Value);
+                break;
+            case luna::ScriptPropertyType::Entity:
+                property.entityValue = luna::UUID(value_node.as<uint64_t>());
+                break;
+            case luna::ScriptPropertyType::Asset:
+                property.assetValue = luna::AssetHandle(value_node.as<uint64_t>());
+                break;
+        }
     }
-
-    switch (property.type) {
-        case luna::ScriptPropertyType::Bool:
-            property.boolValue = value_node.as<bool>();
-            break;
-        case luna::ScriptPropertyType::Int:
-            property.intValue = value_node.as<int>();
-            break;
-        case luna::ScriptPropertyType::Float:
-            property.floatValue = value_node.as<float>();
-            break;
-        case luna::ScriptPropertyType::String:
-            property.stringValue = value_node.as<std::string>();
-            break;
-        case luna::ScriptPropertyType::Vec3:
-            property.vec3Value = readVec3(value_node, property.vec3Value);
-            break;
-        case luna::ScriptPropertyType::Entity:
-            property.entityValue = luna::UUID(value_node.as<uint64_t>());
-            break;
-        case luna::ScriptPropertyType::Asset:
-            property.assetValue = luna::AssetHandle(value_node.as<uint64_t>());
-            break;
-    }
+    readScriptPropertyMetadata(node["Metadata"], property.metadata);
 
     return property;
 }

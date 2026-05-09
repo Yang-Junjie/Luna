@@ -1,9 +1,13 @@
 #include "Core/Log.h"
+#include "Scene/Components/ScriptComponent.h"
+#include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneSerializer.h"
 
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <utility>
 
 namespace {
 
@@ -108,6 +112,84 @@ Entities: []
                    "legacy enabled field should remain true after environment-map inference");
 }
 
+void testScriptPropertyMetadataRoundTrip(TestContext& context)
+{
+    luna::Scene scene;
+    luna::Entity entity = scene.entityManager().createEntity("Scripted");
+    auto& script_component = entity.addComponent<luna::ScriptComponent>();
+    luna::ScriptEntry script{};
+    script.id = luna::UUID(77);
+    script.typeName = "MetadataSmoke";
+
+    luna::ScriptProperty property{};
+    property.name = "speed";
+    property.type = luna::ScriptPropertyType::Float;
+    property.floatValue = 3.5f;
+    property.metadata.displayName = "Move Speed";
+    property.metadata.description = "Base movement speed.";
+    property.metadata.category = "Movement";
+    property.metadata.hasMinValue = true;
+    property.metadata.hasMaxValue = true;
+    property.metadata.hasStepValue = true;
+    property.metadata.minValue = 0.0f;
+    property.metadata.maxValue = 20.0f;
+    property.metadata.stepValue = 0.25f;
+    property.metadata.assetType = "Texture";
+    property.metadata.entityFilter = "Camera";
+    property.metadata.options.push_back({"Walk", 0, "walk"});
+    property.metadata.options.push_back({"Fly", 1, "fly"});
+    script.properties.push_back(std::move(property));
+    script_component.scripts.push_back(std::move(script));
+
+    const std::string serialized = luna::SceneSerializer::serializeToString(scene);
+    context.expect(serialized.find("Metadata:") != std::string::npos,
+                   "script property metadata should serialize");
+    context.expect(serialized.find("DisplayName: Move Speed") != std::string::npos,
+                   "script property display name should serialize");
+    context.expect(serialized.find("Options:") != std::string::npos,
+                   "script property options should serialize");
+
+    luna::Scene loaded_scene;
+    context.expect(luna::SceneSerializer::deserializeFromString(loaded_scene, serialized, "script metadata scene"),
+                   "scene with script property metadata should deserialize");
+    luna::Entity loaded_entity = loaded_scene.entityManager().findEntityByUUID(entity.getUUID());
+    if (!context.expect(static_cast<bool>(loaded_entity), "script metadata entity should round-trip")) {
+        return;
+    }
+    if (!context.expect(loaded_entity.hasComponent<luna::ScriptComponent>(),
+                        "script metadata component should round-trip")) {
+        return;
+    }
+
+    const luna::ScriptComponent& loaded_script_component = loaded_entity.getComponent<luna::ScriptComponent>();
+    if (!context.expect(!loaded_script_component.scripts.empty(), "script entry should round-trip")) {
+        return;
+    }
+    if (!context.expect(!loaded_script_component.scripts[0].properties.empty(), "script property should round-trip")) {
+        return;
+    }
+
+    const luna::ScriptProperty& loaded_property = loaded_script_component.scripts[0].properties[0];
+    context.expect(loaded_property.metadata.displayName == "Move Speed",
+                   "script property display name should round-trip");
+    context.expect(loaded_property.metadata.category == "Movement", "script property category should round-trip");
+    context.expect(loaded_property.metadata.hasMinValue && loaded_property.metadata.minValue == 0.0f,
+                   "script property min should round-trip");
+    context.expect(loaded_property.metadata.hasMaxValue && loaded_property.metadata.maxValue == 20.0f,
+                   "script property max should round-trip");
+    context.expect(loaded_property.metadata.hasStepValue && loaded_property.metadata.stepValue == 0.25f,
+                   "script property step should round-trip");
+    context.expect(loaded_property.metadata.assetType == "Texture", "script property asset type should round-trip");
+    context.expect(loaded_property.metadata.entityFilter == "Camera", "script property entity filter should round-trip");
+    context.expect(loaded_property.metadata.options.size() == 2, "script property options should round-trip");
+    if (loaded_property.metadata.options.size() == 2) {
+        context.expect(loaded_property.metadata.options[1].label == "Fly",
+                       "script property option label should round-trip");
+        context.expect(loaded_property.metadata.options[1].stringValue == "fly",
+                       "script property option string value should round-trip");
+    }
+}
+
 void testSceneShadowSettingsRoundTrip(TestContext& context)
 {
     luna::Scene scene;
@@ -171,6 +253,7 @@ int main()
     testSceneEnvironmentBackgroundRoundTrip(context);
     testLegacyEnvironmentEnabledMigration(context);
     testLegacyEnvironmentMapInference(context);
+    testScriptPropertyMetadataRoundTrip(context);
     testSceneShadowSettingsRoundTrip(context);
     testLegacyCsmEnabledMigration(context);
 
