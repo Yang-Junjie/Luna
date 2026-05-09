@@ -553,13 +553,12 @@ TransparentOutput sceneTransparentFragmentMain(SceneVertexOutput input)
                                     material.ao);
     }
 
-    color *= gSceneParams.lightColorExposure.a;
     if (gSceneParams.debugOverlayParams.x > 0.5 && input.pickingId != 0)
     {
         color = lerp(color, pickDebugColor(input.pickingId), gSceneParams.debugOverlayParams.y);
     }
     TransparentOutput output;
-    output.color = float4(linearToSrgb(toneMapACES(color)), material.baseColor.a);
+    output.color = float4(max(color, 0.0), material.baseColor.a);
     output.pickingId = input.pickingId;
     return output;
 }

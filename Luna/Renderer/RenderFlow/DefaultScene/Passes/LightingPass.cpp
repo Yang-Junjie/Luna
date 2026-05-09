@@ -1,6 +1,7 @@
 #include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
@@ -38,6 +39,23 @@ constexpr std::array<RenderPassResourceUsage, 12> kLightingPassResources{{
      .flags = RenderFeatureGraphResourceFlags::External},
 }};
 
+RenderGraphTextureDesc makeSceneHdrColorDesc(const SceneRenderContext& scene_context)
+{
+    return RenderGraphTextureDesc{
+        .Name = "SceneHdrColor",
+        .Type = luna::RHI::TextureType::Texture2D,
+        .Width = scene_context.framebuffer_width,
+        .Height = scene_context.framebuffer_height,
+        .Depth = 1,
+        .ArrayLayers = 1,
+        .MipLevels = 1,
+        .Format = render_flow::default_scene_detail::kSceneHdrColorFormat,
+        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
+        .InitialState = luna::RHI::ResourceState::Undefined,
+        .SampleCount = luna::RHI::SampleCount::Count1,
+    };
+}
+
 } // namespace
 
 LightingPass::LightingPass(PassSharedState& state) : m_state(&state) {}
@@ -55,8 +73,11 @@ std::span<const RenderPassResourceUsage> LightingPass::resourceUsages() const no
 void LightingPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
-    blackboard::publishSceneColorStage(
-        context.blackboard(), blackboard::SceneColorStage::Lit, scene_context.color_target);
+    const RenderGraphTextureHandle scene_hdr_color = context.graph().CreateTexture(makeSceneHdrColorDesc(scene_context));
+    if (!scene_hdr_color.isValid()) {
+        return;
+    }
+    blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::Lit, scene_hdr_color);
     const GBufferTextures gbuffer{
         .base_color = readBlackboardTexture(context.blackboard(), blackboard::GBufferBaseColor, name()),
         .normal_metallic = readBlackboardTexture(context.blackboard(), blackboard::GBufferNormalMetallic, name()),
@@ -73,7 +94,8 @@ void LightingPass::setup(RenderPassContext& context)
 
     context.graph().AddRasterPass(
         name(),
-        [gbuffer, shadow_map, pick_texture, extension_inputs, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
+        [gbuffer, shadow_map, pick_texture, extension_inputs, scene_context, scene_hdr_color](
+            RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(gbuffer.base_color);
             pass_builder.ReadTexture(gbuffer.normal_metallic);
             pass_builder.ReadTexture(gbuffer.world_position_roughness);
@@ -82,7 +104,7 @@ void LightingPass::setup(RenderPassContext& context)
             pass_builder.ReadTexture(shadow_map);
             pass_builder.ReadTexture(pick_texture);
             readLightingExtensionInputTextures(pass_builder, extension_inputs);
-            pass_builder.WriteColor(scene_context.color_target,
+            pass_builder.WriteColor(scene_hdr_color,
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(scene_context.clear_color.r,

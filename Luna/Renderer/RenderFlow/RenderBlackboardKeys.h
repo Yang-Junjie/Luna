@@ -11,8 +11,8 @@ class RenderPassBlackboard;
 
 namespace luna::render_flow::blackboard {
 
-// Legacy external scene color target. During the staged migration this remains the physical editor/runtime
-// color target, while the semantic stage keys below describe which pass owns each logical version.
+// Current scene color stage. Before post processing this points at the HDR scene color chain; after the final pass it
+// points back at the physical editor/runtime output target.
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneColor{"Scene.Color"};
 
 // Scene color stage keys:
@@ -20,12 +20,14 @@ inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneColor{"Scene.C
 // - SceneSkyCompositedColor: Opaque lit color after sky/background composition.
 // - SceneTemporalResolvedColor: Color after temporal AA/history resolve.
 // - SceneTransparentCompositedColor: Color after transparent geometry composition.
-// - SceneFinalColor: Final scene color handed back to the renderer output path.
+// - SceneBloomCompositedColor: HDR color after bloom composition.
+// - SceneFinalColor: Tone mapped final scene color handed back to the renderer output path.
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneLitColor{"Scene.LitColor"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneSkyCompositedColor{"Scene.SkyCompositedColor"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneTemporalResolvedColor{"Scene.TemporalResolvedColor"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneTransparentCompositedColor{
     "Scene.TransparentCompositedColor"};
+inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneBloomCompositedColor{"Scene.BloomCompositedColor"};
 inline constexpr RenderResourceKey<RenderGraphTextureHandle> SceneFinalColor{"Scene.FinalColor"};
 
 enum class SceneColorStage : uint8_t {
@@ -33,6 +35,7 @@ enum class SceneColorStage : uint8_t {
     SkyComposited,
     TemporalResolved,
     TransparentComposited,
+    BloomComposited,
     Final,
 };
 

@@ -55,6 +55,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/Features/FeatureProbe.cpp
     Renderer/RenderFlow/Features/RenderFeatureModules.h
     Renderer/RenderFlow/Features/RenderFeatureModules.cpp
+    Renderer/RenderFlow/Features/BloomFeature.h
+    Renderer/RenderFlow/Features/BloomFeature.cpp
     Renderer/RenderFlow/Features/EditorInfiniteGridFeature.h
     Renderer/RenderFlow/Features/EditorInfiniteGridFeature.cpp
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
@@ -103,6 +105,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Passes/SkyPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.h
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.cpp
     Renderer/RenderWorld/RenderWorld.h
     Renderer/RenderWorld/RenderWorld.cpp
     Renderer/RenderWorld/RenderTypes.h
@@ -120,6 +124,8 @@ set(RENDERER_SOURCE
     Renderer/Shaders/SceneGeometry.slang
     Renderer/Shaders/SceneLighting.slang
     Renderer/Shaders/TransparentComposite.slang
+    Renderer/Shaders/PostProcess.slang
+    Renderer/Shaders/Bloom.slang
     Renderer/Shaders/EditorInfiniteGrid.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang

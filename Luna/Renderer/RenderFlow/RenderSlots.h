@@ -12,6 +12,7 @@ inline constexpr std::string_view GBuffer = "GBuffer";
 inline constexpr std::string_view Lighting = "Lighting";
 inline constexpr std::string_view Sky = "Sky";
 inline constexpr std::string_view Transparent = "Transparent";
+inline constexpr std::string_view PostProcess = "PostProcess";
 
 } // namespace passes
 
@@ -24,6 +25,8 @@ inline constexpr std::string_view BeforeSky = "BeforeSky";
 inline constexpr std::string_view AfterSky = "AfterSky";
 inline constexpr std::string_view BeforeTransparent = "BeforeTransparent";
 inline constexpr std::string_view AfterTransparent = "AfterTransparent";
+inline constexpr std::string_view BeforePostProcess = "BeforePostProcess";
+inline constexpr std::string_view AfterPostProcess = "AfterPostProcess";
 
 } // namespace extension_points
 

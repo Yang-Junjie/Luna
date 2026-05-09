@@ -69,6 +69,30 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
             .Build());
 }
 
+luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
+    createPostProcessLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+{
+    if (!device) {
+        return {};
+    }
+
+    return device->CreateDescriptorSetLayout(
+        luna::RHI::DescriptorSetLayoutBuilder()
+            .AddBinding(default_scene_detail::post_process_binding::SceneColorTexture,
+                        luna::RHI::DescriptorType::SampledImage,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .AddBinding(default_scene_detail::post_process_binding::SceneColorSampler,
+                        luna::RHI::DescriptorType::Sampler,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .AddBinding(default_scene_detail::post_process_binding::SceneParams,
+                        luna::RHI::DescriptorType::UniformBuffer,
+                        1,
+                        luna::RHI::ShaderStage::Fragment)
+            .Build());
+}
+
 ShaderBindingAddressMode bindingAddressModeForBackend(luna::RHI::BackendType backend_type)
 {
     switch (backend_type) {
@@ -104,6 +128,48 @@ ShaderBindingContract makeTransparentCompositeShaderBindingContract()
         .set = 0,
         .binding = default_scene_detail::transparent_composite_binding::ColorSampler,
         .type = luna::RHI::DescriptorType::Sampler,
+        .count = 1,
+        .stages = luna::RHI::ShaderStage::Fragment,
+    });
+    return contract;
+}
+
+ShaderBindingContract makePostProcessShaderBindingContract()
+{
+    ShaderBindingContract contract = makeShaderBindingContract("PostProcess");
+    contract.bindings.push_back(ShaderBindingRequirement{
+        .name = "SceneColorTexture",
+        .shader_name = "gSceneHdrTexture",
+        .set_name = "PostProcess",
+        .logical_set = 0,
+        .logical_binding = default_scene_detail::post_process_binding::SceneColorTexture,
+        .set = 0,
+        .binding = default_scene_detail::post_process_binding::SceneColorTexture,
+        .type = luna::RHI::DescriptorType::SampledImage,
+        .count = 1,
+        .stages = luna::RHI::ShaderStage::Fragment,
+    });
+    contract.bindings.push_back(ShaderBindingRequirement{
+        .name = "SceneColorSampler",
+        .shader_name = "gSceneHdrSampler",
+        .set_name = "PostProcess",
+        .logical_set = 0,
+        .logical_binding = default_scene_detail::post_process_binding::SceneColorSampler,
+        .set = 0,
+        .binding = default_scene_detail::post_process_binding::SceneColorSampler,
+        .type = luna::RHI::DescriptorType::Sampler,
+        .count = 1,
+        .stages = luna::RHI::ShaderStage::Fragment,
+    });
+    contract.bindings.push_back(ShaderBindingRequirement{
+        .name = "SceneParams",
+        .shader_name = "gSceneParams",
+        .set_name = "PostProcess",
+        .logical_set = 0,
+        .logical_binding = default_scene_detail::post_process_binding::SceneParams,
+        .set = 0,
+        .binding = default_scene_detail::post_process_binding::SceneParams,
+        .type = luna::RHI::DescriptorType::UniformBuffer,
         .count = 1,
         .stages = luna::RHI::ShaderStage::Fragment,
     });
@@ -151,6 +217,21 @@ luna::RHI::Ref<luna::RHI::Sampler> createTransparentCompositeSampler(const luna:
                                      .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
                                      .SetAnisotropy(false)
                                      .SetName("SceneTransparentCompositeSampler")
+                                     .Build());
+}
+
+luna::RHI::Ref<luna::RHI::Sampler> createPostProcessSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+{
+    if (!device) {
+        return {};
+    }
+
+    return device->CreateSampler(luna::RHI::SamplerBuilder()
+                                     .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
+                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
+                                     .SetAnisotropy(false)
+                                     .SetName("ScenePostProcessSampler")
                                      .Build());
 }
 
@@ -470,11 +551,12 @@ bool PipelineState::hasCompleteState(const SceneRenderContext& context) const no
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
            m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.sky_pipeline &&
            m_state.transparent_pipeline && m_state.transparent_composite_pipeline &&
+           m_state.post_process_pipeline &&
            m_state.material_layout && m_state.descriptor_pool && m_state.gbuffer_descriptor_set &&
-           m_state.transparent_composite_descriptor_set && m_state.scene_descriptor_set &&
+           m_state.transparent_composite_descriptor_set && m_state.post_process_descriptor_set && m_state.scene_descriptor_set &&
            m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
-           m_state.gbuffer_sampler && m_state.transparent_composite_sampler && m_state.environment_source_sampler &&
-           m_state.shadow_sampler;
+           m_state.gbuffer_sampler && m_state.transparent_composite_sampler && m_state.post_process_sampler &&
+           m_state.environment_source_sampler && m_state.shadow_sampler;
 }
 
 void PipelineState::rebuild(const SceneRenderContext& context, const SceneShaderPaths& shader_paths)
@@ -561,12 +643,23 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                           shader_paths.transparent_composite_path,
                                           "transparentCompositeFragmentMain",
                                           luna::RHI::ShaderStage::Fragment);
+    m_state.post_process_vertex_shader = renderer_detail::loadShaderModule(m_state.device,
+                                                                            context.compiler,
+                                                                            shader_paths.post_process_path,
+                                                                            "postProcessVertexMain",
+                                                                            luna::RHI::ShaderStage::Vertex);
+    m_state.post_process_fragment_shader = renderer_detail::loadShaderModule(m_state.device,
+                                                                              context.compiler,
+                                                                              shader_paths.post_process_path,
+                                                                              "postProcessFragmentMain",
+                                                                              luna::RHI::ShaderStage::Fragment);
 
     if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
         !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
         !m_state.lighting_fragment_shader || !m_state.debug_view_fragment_shader || !m_state.sky_fragment_shader ||
         !m_state.transparent_fragment_shader || !m_state.transparent_composite_vertex_shader ||
-        !m_state.transparent_composite_fragment_shader) {
+        !m_state.transparent_composite_fragment_shader || !m_state.post_process_vertex_shader ||
+        !m_state.post_process_fragment_shader) {
         LUNA_RENDERER_ERROR("Failed to load scene render flow shaders");
         return;
     }
@@ -582,6 +675,7 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
     const ShaderBindingContract transparent_composite_contract =
         makeTransparentCompositeShaderBindingContract();
+    const ShaderBindingContract post_process_contract = makePostProcessShaderBindingContract();
 
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
                                  geometry_contract,
@@ -627,14 +721,24 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                     transparent_composite_contract,
                                                     shader_paths.transparent_composite_path,
                                                     "transparentCompositeFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.post_process_vertex_shader,
+                                                    post_process_contract,
+                                                    shader_paths.post_process_path,
+                                                    "postProcessVertexMain");
+    validateAndLogRenderFeatureShaderModuleBindings(m_state.post_process_fragment_shader,
+                                                    post_process_contract,
+                                                    shader_paths.post_process_path,
+                                                    "postProcessFragmentMain");
 
     m_state.material_layout = createMaterialLayout(m_state.device);
     m_state.gbuffer_layout = createGBufferLayout(m_state.device);
     m_state.scene_layout = createSceneLayout(m_state.device);
     m_state.transparent_composite_layout = createTransparentCompositeLayout(m_state.device);
+    m_state.post_process_layout = createPostProcessLayout(m_state.device);
     m_state.descriptor_pool = createDescriptorPool(m_state.device);
     m_state.gbuffer_sampler = createGBufferSampler(m_state.device);
     m_state.transparent_composite_sampler = createTransparentCompositeSampler(m_state.device);
+    m_state.post_process_sampler = createPostProcessSampler(m_state.device);
     m_state.environment_source_sampler = createEnvironmentSampler(m_state.device);
     m_state.shadow_sampler = createShadowSampler(m_state.device);
     m_state.default_ambient_occlusion_texture =
@@ -652,6 +756,9 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     if (m_state.descriptor_pool && m_state.transparent_composite_layout) {
         m_state.transparent_composite_descriptor_set =
             m_state.descriptor_pool->AllocateDescriptorSet(m_state.transparent_composite_layout);
+    }
+    if (m_state.descriptor_pool && m_state.post_process_layout) {
+        m_state.post_process_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.post_process_layout);
     }
     if (m_state.descriptor_pool && m_state.scene_layout) {
         m_state.scene_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.scene_layout);
@@ -686,6 +793,11 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
             ? m_state.device->CreatePipelineLayout(
                   luna::RHI::PipelineLayoutBuilder().AddSetLayout(m_state.transparent_composite_layout).Build())
             : nullptr;
+    m_state.post_process_pipeline_layout =
+        m_state.device && m_state.post_process_layout
+            ? m_state.device->CreatePipelineLayout(
+                  luna::RHI::PipelineLayoutBuilder().AddSetLayout(m_state.post_process_layout).Build())
+            : nullptr;
 
     m_state.geometry_pipeline = createGeometryPipeline(m_state.device,
                                                        m_state.geometry_pipeline_layout,
@@ -695,7 +807,7 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         m_state.device, m_state.shadow_pipeline_layout, m_state.shadow_vertex_shader, m_state.shadow_fragment_shader);
     m_state.lighting_pipeline = createLightingPipeline(m_state.device,
                                                        m_state.lighting_pipeline_layout,
-                                                       context.color_format,
+                                                       render_flow::default_scene_detail::kSceneHdrColorFormat,
                                                        m_state.lighting_vertex_shader,
                                                        m_state.lighting_fragment_shader);
     m_state.debug_view_pipeline = createLightingPipeline(m_state.device,
@@ -705,20 +817,25 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                                          m_state.debug_view_fragment_shader);
     m_state.sky_pipeline = createLightingPipeline(m_state.device,
                                                   m_state.lighting_pipeline_layout,
-                                                  context.color_format,
+                                                  render_flow::default_scene_detail::kSceneHdrColorFormat,
                                                   m_state.lighting_vertex_shader,
                                                   m_state.sky_fragment_shader);
     m_state.transparent_pipeline = createTransparentPipeline(m_state.device,
                                                              m_state.transparent_pipeline_layout,
-                                                             context.color_format,
+                                                             render_flow::default_scene_detail::kSceneHdrColorFormat,
                                                              m_state.transparent_vertex_shader,
                                                              m_state.transparent_fragment_shader);
     m_state.transparent_composite_pipeline =
         createTransparentCompositePipeline(m_state.device,
                                            m_state.transparent_composite_pipeline_layout,
-                                           context.color_format,
+                                           render_flow::default_scene_detail::kSceneHdrColorFormat,
                                            m_state.transparent_composite_vertex_shader,
                                            m_state.transparent_composite_fragment_shader);
+    m_state.post_process_pipeline = createLightingPipeline(m_state.device,
+                                                           m_state.post_process_pipeline_layout,
+                                                           context.color_format,
+                                                           m_state.post_process_vertex_shader,
+                                                           m_state.post_process_fragment_shader);
     m_state.surface_format = context.color_format;
 
     LUNA_RENDERER_INFO("Created scene render flow graphics pipelines for color format {} ({})",
@@ -1127,6 +1244,46 @@ void PipelineState::updateTransparentCompositeResources(
     m_state.transparent_composite_bindings_valid = true;
 }
 
+void PipelineState::updatePostProcessResources(const luna::RHI::Ref<luna::RHI::Texture>& scene_color)
+{
+    if (!m_state.post_process_descriptor_set || !m_state.post_process_sampler || !m_state.scene_params_buffer ||
+        !scene_color) {
+        LUNA_RENDERER_WARN("Cannot update post process resources: descriptor_set={} sampler={} scene_params={} color={}",
+                           static_cast<bool>(m_state.post_process_descriptor_set),
+                           static_cast<bool>(m_state.post_process_sampler),
+                           static_cast<bool>(m_state.scene_params_buffer),
+                           static_cast<bool>(scene_color));
+        return;
+    }
+
+    if (m_state.post_process_bindings_valid && m_state.bound_post_process_scene_color_texture == scene_color) {
+        return;
+    }
+
+    m_state.post_process_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        .Binding = default_scene_detail::post_process_binding::SceneColorTexture,
+        .TextureView = scene_color->GetDefaultView(),
+        .Layout = luna::RHI::ResourceState::ShaderRead,
+        .Type = luna::RHI::DescriptorType::SampledImage,
+    });
+    m_state.post_process_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        .Binding = default_scene_detail::post_process_binding::SceneColorSampler,
+        .Sampler = m_state.post_process_sampler,
+    });
+    m_state.post_process_descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        .Binding = default_scene_detail::post_process_binding::SceneParams,
+        .Buffer = m_state.scene_params_buffer,
+        .Offset = 0,
+        .Stride = sizeof(render_flow::default_scene_detail::SceneGpuParams),
+        .Size = sizeof(render_flow::default_scene_detail::SceneGpuParams),
+        .Type = luna::RHI::DescriptorType::UniformBuffer,
+    });
+    m_state.post_process_descriptor_set->Update();
+
+    m_state.bound_post_process_scene_color_texture = scene_color;
+    m_state.post_process_bindings_valid = true;
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& PipelineState::device() const noexcept
 {
     return m_state.device;
@@ -1202,6 +1359,15 @@ SkyPassResources PipelineState::skyPassResources() const noexcept
         .gbuffer_descriptor_set = m_state.gbuffer_descriptor_set,
         .scene_descriptor_set = m_state.lighting_scene_descriptor_set,
         .gbuffer_sampler = m_state.gbuffer_sampler,
+    };
+}
+
+PostProcessPassResources PipelineState::postProcessPassResources() const noexcept
+{
+    return PostProcessPassResources{
+        .pipeline = m_state.post_process_pipeline,
+        .descriptor_set = m_state.post_process_descriptor_set,
+        .sampler = m_state.post_process_sampler,
     };
 }
 

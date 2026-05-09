@@ -2,6 +2,7 @@
 
 #include "Core/Log.h"
 #include "Renderer/Material.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
@@ -17,7 +18,7 @@
 namespace luna::render_flow::default_scene {
 namespace {
 
-constexpr std::array<RenderPassResourceUsage, 6> kTransparentPassResources{{
+constexpr std::array<RenderPassResourceUsage, 5> kTransparentPassResources{{
     {.name = blackboard::SceneSkyCompositedColor.value(),
      .access = RenderPassResourceAccess::Read,
      .flags = RenderFeatureGraphResourceFlags::External},
@@ -25,9 +26,6 @@ constexpr std::array<RenderPassResourceUsage, 6> kTransparentPassResources{{
      .access = RenderPassResourceAccess::Read,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::SceneTransparentCompositedColor.value(),
-     .access = RenderPassResourceAccess::ReadWrite,
-     .flags = RenderFeatureGraphResourceFlags::External},
-    {.name = blackboard::SceneFinalColor.value(),
      .access = RenderPassResourceAccess::ReadWrite,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::Pick.value(), .access = RenderPassResourceAccess::ReadWrite},
@@ -46,7 +44,7 @@ RenderGraphTextureDesc makeTransparentColorDesc(const SceneRenderContext& scene_
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
-        .Format = scene_context.color_format,
+        .Format = render_flow::default_scene_detail::kSceneHdrColorFormat,
         .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
         .InitialState = luna::RHI::ResourceState::Undefined,
         .SampleCount = luna::RHI::SampleCount::Count1,
@@ -70,10 +68,12 @@ std::span<const RenderPassResourceUsage> TransparentPass::resourceUsages() const
 void TransparentPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
-    blackboard::publishSceneColorStage(
-        context.blackboard(), blackboard::SceneColorStage::TransparentComposited, scene_context.color_target);
-    blackboard::publishSceneColorStage(
-        context.blackboard(), blackboard::SceneColorStage::Final, scene_context.color_target);
+    const RenderGraphTextureHandle scene_color =
+        readBlackboardTexture(context.blackboard(), blackboard::SceneTemporalResolvedColor, name());
+    if (!scene_color.isValid()) {
+        return;
+    }
+    blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::TransparentComposited, scene_color);
     if (m_state->drawQueue().drawCommands(luna::RenderPhase::Transparent).empty()) {
         return;
     }
@@ -103,9 +103,9 @@ void TransparentPass::setup(RenderPassContext& context)
 
     context.graph().AddRasterPass(
         "SceneTransparentComposite",
-        [scene_context, transparent_color](RenderGraphRasterPassBuilder& pass_builder) {
+        [scene_color, transparent_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(transparent_color);
-            pass_builder.WriteColor(scene_context.color_target,
+            pass_builder.WriteColor(scene_color,
                                     luna::RHI::AttachmentLoadOp::Load,
                                     luna::RHI::AttachmentStoreOp::Store);
         },

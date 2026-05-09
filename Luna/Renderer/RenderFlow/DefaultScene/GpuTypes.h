@@ -87,4 +87,10 @@ inline constexpr uint32_t ColorTexture = 0;
 inline constexpr uint32_t ColorSampler = 1;
 } // namespace transparent_composite_binding
 
+namespace post_process_binding {
+inline constexpr uint32_t SceneColorTexture = 0;
+inline constexpr uint32_t SceneColorSampler = 1;
+inline constexpr uint32_t SceneParams = 2;
+} // namespace post_process_binding
+
 } // namespace luna::render_flow::default_scene_detail

@@ -61,6 +61,7 @@ public:
                                  const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions);
     void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
     void updateTransparentCompositeResources(const luna::RHI::Ref<luna::RHI::Texture>& transparent_color);
+    void updatePostProcessResources(const luna::RHI::Ref<luna::RHI::Texture>& scene_color);
 
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
     [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
@@ -72,6 +73,7 @@ public:
     [[nodiscard]] LightingPassResources lightingPassResources() const noexcept;
     [[nodiscard]] DebugViewPassResources debugViewPassResources() const noexcept;
     [[nodiscard]] SkyPassResources skyPassResources() const noexcept;
+    [[nodiscard]] PostProcessPassResources postProcessPassResources() const noexcept;
     [[nodiscard]] const SceneShaderPaths& shaderPaths() const noexcept;
 
 private:

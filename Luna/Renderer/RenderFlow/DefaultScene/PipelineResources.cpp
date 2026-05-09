@@ -15,6 +15,7 @@ SceneShaderPaths defaultShaderPaths()
     const std::filesystem::path lighting_shader_path = shader_root / "SceneLighting.slang";
     const std::filesystem::path transparent_composite_shader_path = shader_root / "TransparentComposite.slang";
     const std::filesystem::path environment_ibl_shader_path = shader_root / "EnvironmentIBL.slang";
+    const std::filesystem::path post_process_shader_path = shader_root / "PostProcess.slang";
     return SceneShaderPaths{
         .geometry_vertex_path = geometry_shader_path,
         .geometry_fragment_path = geometry_shader_path,
@@ -23,6 +24,7 @@ SceneShaderPaths defaultShaderPaths()
         .lighting_vertex_path = lighting_shader_path,
         .lighting_fragment_path = lighting_shader_path,
         .transparent_composite_path = transparent_composite_shader_path,
+        .post_process_path = post_process_shader_path,
         .environment_ibl_path = environment_ibl_shader_path,
     };
 }
@@ -115,6 +117,11 @@ void PipelineResources::updateTransparentCompositeResources(
     m_pipeline_state.updateTransparentCompositeResources(transparent_color);
 }
 
+void PipelineResources::updatePostProcessResources(const luna::RHI::Ref<luna::RHI::Texture>& scene_color)
+{
+    m_pipeline_state.updatePostProcessResources(scene_color);
+}
+
 const luna::RHI::Ref<luna::RHI::Device>& PipelineResources::device() const noexcept
 {
     return m_pipeline_state.device();
@@ -163,6 +170,11 @@ DebugViewPassResources PipelineResources::debugViewPassResources() const noexcep
 SkyPassResources PipelineResources::skyPassResources() const noexcept
 {
     return m_pipeline_state.skyPassResources();
+}
+
+PostProcessPassResources PipelineResources::postProcessPassResources() const noexcept
+{
+    return m_pipeline_state.postProcessPassResources();
 }
 
 const SceneShaderPaths& PipelineResources::shaderPaths() const noexcept

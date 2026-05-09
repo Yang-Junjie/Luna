@@ -59,12 +59,12 @@ constexpr std::array<RenderFeatureGraphResource, 3> kGraphInputs{{
 }};
 
 constexpr std::array<RenderFeatureGraphResource, 1> kGraphOutputs{{
-    {.name = blackboard::SceneSkyCompositedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
+    {.name = blackboard::SceneFinalColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
 }};
 
 constexpr std::array<RenderPassResourceUsage, 4> kPassResources{{
-    {.name = blackboard::SceneSkyCompositedColor.value(),
-     .access = RenderPassResourceAccess::Write,
+    {.name = blackboard::SceneFinalColor.value(),
+     .access = RenderPassResourceAccess::ReadWrite,
      .flags = RenderFeatureGraphResourceFlags::External},
     {.name = blackboard::GBufferBaseColor.value(), .access = RenderPassResourceAccess::Read},
     {.name = blackboard::GBufferNormalMetallic.value(), .access = RenderPassResourceAccess::Read},
@@ -312,8 +312,11 @@ public:
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
         m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
-        m_state.pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format);
+        m_state.pipeline = createPipeline(device,
+                                          m_state.pipeline_layout,
+                                          m_state.vertex_shader,
+                                          m_state.fragment_shader,
+                                          context.color_format);
         m_state.sampler = createSampler(device);
         m_state.params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
                                                          .SetSize(sizeof(GridGpuParams))
@@ -515,7 +518,7 @@ public:
         }
 
         const SceneRenderContext& scene_context = context.sceneContext();
-        const auto scene_color = context.blackboard().get(blackboard::SceneSkyCompositedColor);
+        const auto scene_color = context.blackboard().get(blackboard::SceneFinalColor);
         const auto gbuffer_base_color = context.blackboard().get(blackboard::GBufferBaseColor);
         const auto gbuffer_normal_metallic = context.blackboard().get(blackboard::GBufferNormalMetallic);
         const auto gbuffer_world_position_roughness = context.blackboard().get(blackboard::GBufferWorldPositionRoughness);
@@ -530,7 +533,7 @@ public:
         }
 
         const bool resources_ready = m_resources != nullptr && m_resources->ensure(scene_context);
-        blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::SkyComposited, *scene_color);
+        blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::Final, *scene_color);
 
         context.graph().AddRasterPass(
             name(),
@@ -698,15 +701,12 @@ bool EditorInfiniteGridFeature::registerPasses(RenderFlowBuilder& builder)
 {
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
-    const bool registered = builder.insertFeaturePassBetween(kFeatureName,
-                                                            extension_slots::AfterSky,
-                                                            extension_slots::BeforeTransparent,
-                                                            "EditorInfiniteGrid",
-                                                            std::make_unique<EditorInfiniteGridPass>(*m_resources, m_options));
+    const bool registered = builder.insertFeaturePassAfter(kFeatureName,
+                                                          extension_slots::AfterPostProcess,
+                                                          "EditorInfiniteGrid",
+                                                          std::make_unique<EditorInfiniteGridPass>(*m_resources, m_options));
     if (registered) {
-        LUNA_RENDERER_INFO("Registered EditorInfiniteGrid between '{}' and '{}'",
-                           extension_slots::AfterSky,
-                           extension_slots::BeforeTransparent);
+        LUNA_RENDERER_INFO("Registered EditorInfiniteGrid after '{}'", extension_slots::AfterPostProcess);
     }
     return registered;
 }

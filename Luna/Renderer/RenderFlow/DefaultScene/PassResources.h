@@ -67,4 +67,15 @@ struct TransparentCompositePassResources {
     }
 };
 
+struct PostProcessPassResources {
+    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
+    luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
+    luna::RHI::Ref<luna::RHI::Sampler> sampler;
+
+    [[nodiscard]] bool isValid() const
+    {
+        return pipeline && descriptor_set && sampler;
+    }
+};
+
 } // namespace luna::render_flow::default_scene

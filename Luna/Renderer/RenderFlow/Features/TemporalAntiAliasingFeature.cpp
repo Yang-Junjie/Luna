@@ -1,6 +1,7 @@
 #include "Renderer/RenderFlow/Features/TemporalAntiAliasingFeature.h"
 
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
@@ -263,7 +264,7 @@ RenderGraphTextureDesc makeTemporalColorDesc(const SceneRenderContext& scene_con
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
-        .Format = scene_context.color_format,
+        .Format = default_scene_detail::kSceneHdrColorFormat,
         .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
         .InitialState = luna::RHI::ResourceState::Undefined,
         .SampleCount = luna::RHI::SampleCount::Count1,
@@ -275,7 +276,7 @@ PersistentTexture2DDesc makeTemporalHistoryDesc(const SceneRenderContext& scene_
     return PersistentTexture2DDesc{
         .width = scene_context.framebuffer_width,
         .height = scene_context.framebuffer_height,
-        .format = scene_context.color_format,
+        .format = default_scene_detail::kSceneHdrColorFormat,
         .usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
         .initial_state = luna::RHI::ResourceState::Undefined,
         .sample_count = luna::RHI::SampleCount::Count1,
@@ -340,12 +341,17 @@ public:
         m_state.descriptor_pool = createDescriptorPool(device);
         m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
         m_state.pipeline = createPipeline(
-            device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format, 2);
+            device,
+            m_state.pipeline_layout,
+            m_state.vertex_shader,
+            m_state.fragment_shader,
+            default_scene_detail::kSceneHdrColorFormat,
+            2);
         m_state.copy_pipeline = createPipeline(device,
                                                m_state.pipeline_layout,
                                                m_state.vertex_shader,
                                                m_state.copy_fragment_shader,
-                                               context.color_format,
+                                               default_scene_detail::kSceneHdrColorFormat,
                                                1);
         m_state.sampler = createSampler(device);
         m_state.resolve_params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
@@ -664,8 +670,6 @@ public:
     void setup(RenderPassContext& context) override
     {
         const SceneRenderContext& scene_context = context.sceneContext();
-        blackboard::publishSceneColorStage(
-            context.blackboard(), blackboard::SceneColorStage::TemporalResolved, scene_context.color_target);
         const auto scene_color = context.blackboard().get(blackboard::SceneSkyCompositedColor);
         const auto depth = context.blackboard().get(blackboard::Depth);
         const auto velocity = context.blackboard().get(blackboard::Velocity);
@@ -700,6 +704,8 @@ public:
         if (history_write.isValid()) {
             context.blackboard().set(kHistoryWrite, history_write);
         }
+        blackboard::publishSceneColorStage(
+            context.blackboard(), blackboard::SceneColorStage::TemporalResolved, temporal_color);
 
         context.graph().AddRasterPass(
             name(),
@@ -754,35 +760,6 @@ public:
                                             scene_context.framebuffer_height,
                                             history_read.isValid());
                 m_resources->draw(pass_context);
-            });
-
-        context.graph().AddRasterPass(
-            "TemporalAntiAliasingApply",
-            [temporal_color, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
-                pass_builder.ReadTexture(temporal_color);
-                pass_builder.WriteColor(scene_context.color_target,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
-            },
-            [this, temporal_color, scene_context](RenderGraphRasterPassContext& pass_context) {
-                if (m_resources == nullptr || !m_resources->isComplete()) {
-                    pass_context.beginRendering();
-                    pass_context.endRendering();
-                    return;
-                }
-
-                const auto& temporal_texture = pass_context.getTexture(temporal_color);
-                if (!temporal_texture) {
-                    pass_context.beginRendering();
-                    pass_context.endRendering();
-                    return;
-                }
-
-                m_resources->updateCopyBindings(temporal_texture,
-                                                scene_context.framebuffer_width,
-                                                scene_context.framebuffer_height);
-                m_resources->drawCopy(pass_context);
             });
     }
 

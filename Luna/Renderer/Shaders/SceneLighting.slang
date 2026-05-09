@@ -786,8 +786,7 @@ float4 sceneLightingFragmentMain(SceneLightingVertexOutput input) : SV_Target
                                     input.uv);
     }
 
-    color *= gSceneParams.lightColorExposure.a;
-    const float3 finalColor = applyPickDebugVisualization(linearToSrgb(toneMapACES(color)), pickingId, input.uv);
+    const float3 finalColor = applyPickDebugVisualization(max(color, 0.0), pickingId, input.uv);
     return float4(finalColor, baseColorAlpha.a);
 }
 
@@ -808,11 +807,10 @@ float4 sceneSkyFragmentMain(SceneLightingVertexOutput input) : SV_Target
     {
         const float3 skyDirection = reconstructViewDirection(input.uv);
         backgroundColor = sampleEnvironmentSky(skyDirection, 0.0);
-        backgroundColor *= gSceneParams.lightColorExposure.a * max(gSceneParams.iblFactors.w, 0.0);
-        backgroundColor = linearToSrgb(toneMapACES(backgroundColor));
+        backgroundColor *= max(gSceneParams.iblFactors.w, 0.0);
     }
     const float3 finalColor =
-        applyPickDebugVisualization(backgroundColor, pickingId, input.uv);
+        applyPickDebugVisualization(max(backgroundColor, 0.0), pickingId, input.uv);
     return float4(finalColor, 1.0);
 }
 

@@ -40,9 +40,12 @@ std::span<const RenderPassResourceUsage> SkyPass::resourceUsages() const noexcep
 
 void SkyPass::setup(RenderPassContext& context)
 {
-    const SceneRenderContext& scene_context = context.sceneContext();
-    blackboard::publishSceneColorStage(
-        context.blackboard(), blackboard::SceneColorStage::SkyComposited, scene_context.color_target);
+    const RenderGraphTextureHandle scene_color =
+        readBlackboardTexture(context.blackboard(), blackboard::SceneLitColor, name());
+    if (!scene_color.isValid()) {
+        return;
+    }
+    blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::SkyComposited, scene_color);
     const RenderGraphTextureHandle base_color =
         readBlackboardTexture(context.blackboard(), blackboard::GBufferBaseColor, name());
     const RenderGraphTextureHandle normal_metallic =
@@ -52,11 +55,11 @@ void SkyPass::setup(RenderPassContext& context)
 
     context.graph().AddRasterPass(
         name(),
-        [base_color, normal_metallic, pick_texture, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
+        [base_color, normal_metallic, pick_texture, scene_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(base_color);
             pass_builder.ReadTexture(normal_metallic);
             pass_builder.ReadTexture(pick_texture);
-            pass_builder.WriteColor(scene_context.color_target,
+            pass_builder.WriteColor(scene_color,
                                     luna::RHI::AttachmentLoadOp::Load,
                                     luna::RHI::AttachmentStoreOp::Store);
         },
