@@ -5,6 +5,7 @@
 // orientation, and matrix generation.
 
 #include <glm/mat4x4.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 
 namespace luna {
@@ -37,6 +38,7 @@ public:
     void translateLocal(const glm::vec3& delta);
 
     void setOrientationEuler(const glm::vec3& euler_radians);
+    void setOrientation(const glm::quat& orientation);
     void setYawPitchRoll(float yaw_radians, float pitch_radians, float roll_radians = 0.0f);
     glm::vec3 getOrientationEuler() const;
 
@@ -63,6 +65,7 @@ private:
     OrthographicSettings m_orthographic{};
     glm::vec3 m_position{0.0f, 0.0f, 0.0f};
     glm::vec3 m_euler_radians{0.0f, 0.0f, 0.0f};
+    glm::quat m_orientation{1.0f, 0.0f, 0.0f, 0.0f};
 };
 
 } // namespace luna

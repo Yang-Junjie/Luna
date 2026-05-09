@@ -90,16 +90,26 @@ Entities:
       MeshHandle: 17196472838577284151
       SubmeshMaterials:
         - 8706604916645388531
+    ScriptComponent:
+      Enabled: true
+      Scripts:
+        - ID: 13432648062158499531
+          Enabled: true
+          ScriptAsset: 3036130797873598393
+          TypeName: ""
+          ExecutionOrder: 0
+          Properties:
+            []
   - IDComponent:
       ID: 8795389863366798160
     TagComponent:
       Tag: Camera
     TransformComponent:
-      Translation: [-0.541266, -3.940267, 6.217166]
+      Translation: [0, 1.65, 0]
       Rotation: [0, -0, 0]
       Scale: [1, 1, 1]
     RelationshipComponent:
-      ParentHandle: 0
+      ParentHandle: 1328937352711242201
       Children:
         []
     CameraComponent:
@@ -112,6 +122,61 @@ Entities:
       OrthographicSize: 10
       OrthographicNear: -100
       OrthographicFar: 100
+  - IDComponent:
+      ID: 1328937352711242201
+    TagComponent:
+      Tag: Player
+    TransformComponent:
+      Translation: [-0.541266, -5.590267, 6.217166]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        - 8795389863366798160
+    MeshComponent:
+      MeshHandle: 0
+      SubmeshMaterials:
+        []
+    ScriptComponent:
+      Enabled: true
+      Scripts:
+        - ID: 1328937352711242202
+          Enabled: true
+          ScriptAsset: 4417345162052210501
+          TypeName: ""
+          ExecutionOrder: 0
+          Properties:
+            - Name: camera
+              Type: Entity
+              Value: 8795389863366798160
+            - Name: enabled
+              Type: Bool
+              Value: true
+            - Name: require_mouse_button
+              Type: Bool
+              Value: true
+            - Name: capture_button
+              Type: Int
+              Value: 2
+            - Name: move_speed
+              Type: Float
+              Value: 5
+            - Name: sprint_multiplier
+              Type: Float
+              Value: 2
+            - Name: mouse_sensitivity
+              Type: Float
+              Value: 0.0025
+            - Name: max_mouse_delta
+              Type: Float
+              Value: 240
+            - Name: min_pitch
+              Type: Float
+              Value: -1.553343
+            - Name: max_pitch
+              Type: Float
+              Value: 1.553343
   - IDComponent:
       ID: 6422384645588011490
     TagComponent:

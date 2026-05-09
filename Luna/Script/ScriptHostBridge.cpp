@@ -6,6 +6,7 @@ void initializeScriptHostApiBridge(LunaScriptHostApi& host_api)
 {
     registerScriptSceneHostApi(host_api);
     registerScriptEntityHostApi(host_api);
+    registerScriptCameraHostApi(host_api);
     registerScriptInputHostApi(host_api);
 }
 

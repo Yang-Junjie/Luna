@@ -1,3 +1,4 @@
+#include "Core/Input.h"
 #include "Core/Log.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
@@ -37,6 +38,7 @@ GLFWwindow* GLFWWindow::getActiveNativeWindow()
 
 void GLFWWindow::onUpdate()
 {
+    Input::resetFrameState();
     glfwPollEvents();
 }
 
@@ -222,6 +224,7 @@ void GLFWWindow::init(const WindowProps& props)
 
     glfwSetScrollCallback(m_window, [](GLFWwindow* window, double x_offset, double y_offset) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+        Input::recordMouseScrolled(static_cast<float>(x_offset), static_cast<float>(y_offset));
         if (!data.m_event_callback) {
             return;
         }
@@ -232,6 +235,7 @@ void GLFWWindow::init(const WindowProps& props)
 
     glfwSetCursorPosCallback(m_window, [](GLFWwindow* window, double x_pos, double y_pos) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+        Input::recordMouseMoved(static_cast<float>(x_pos), static_cast<float>(y_pos));
         if (!data.m_event_callback) {
             return;
         }

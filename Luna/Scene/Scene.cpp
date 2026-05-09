@@ -4,9 +4,45 @@
 #include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene.h"
 
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+
 #include <memory>
 #include <vector>
 #include <utility>
+
+namespace {
+
+bool hasValidParent(const luna::EntityManager& entity_manager,
+                    const entt::registry& registry,
+                    entt::entity entity_handle)
+{
+    if (!registry.all_of<luna::RelationshipComponent>(entity_handle)) {
+        return false;
+    }
+
+    const luna::UUID parent_id = registry.get<luna::RelationshipComponent>(entity_handle).parentHandle;
+    return parent_id.isValid() && entity_manager.findEntityHandleByUUID(parent_id).has_value();
+}
+
+bool decomposeCameraTransform(const glm::mat4& transform, glm::vec3& out_translation, glm::quat& out_orientation)
+{
+    glm::vec3 scale{};
+    glm::vec3 skew{};
+    glm::vec4 perspective{};
+    glm::quat orientation{};
+    glm::vec3 translation{};
+
+    if (!glm::decompose(transform, scale, orientation, translation, skew, perspective)) {
+        return false;
+    }
+
+    out_translation = translation;
+    out_orientation = glm::normalize(orientation);
+    return true;
+}
+
+} // namespace
 
 namespace luna {
 
@@ -132,10 +168,23 @@ bool Scene::findPrimaryRuntimeCamera(Camera& camera) const
             continue;
         }
 
-        const TransformComponent world_transform = m_entity_manager.getWorldSpaceTransform(entity_handle);
+        const TransformComponent& local_transform = view.get<TransformComponent>(entity_handle);
+        const bool has_parent = hasValidParent(m_entity_manager, registry, entity_handle);
+
         camera = camera_component.createCamera();
-        camera.setPosition(world_transform.translation);
-        camera.setOrientationEuler(world_transform.rotation);
+        if (has_parent) {
+            glm::vec3 world_translation{};
+            glm::quat world_orientation{};
+            if (decomposeCameraTransform(
+                    m_entity_manager.getWorldSpaceTransformMatrix(entity_handle), world_translation, world_orientation)) {
+                camera.setPosition(world_translation);
+                camera.setOrientation(world_orientation);
+                return true;
+            }
+        }
+
+        camera.setPosition(local_transform.translation);
+        camera.setOrientationEuler(local_transform.rotation);
         return true;
     }
 

@@ -51,11 +51,18 @@ void Camera::translateLocal(const glm::vec3& delta)
 void Camera::setOrientationEuler(const glm::vec3& euler_radians)
 {
     m_euler_radians = euler_radians;
+    m_orientation = makeOrientation(euler_radians);
+}
+
+void Camera::setOrientation(const glm::quat& orientation)
+{
+    m_orientation = glm::normalize(orientation);
+    m_euler_radians = glm::eulerAngles(m_orientation);
 }
 
 void Camera::setYawPitchRoll(float yaw_radians, float pitch_radians, float roll_radians)
 {
-    m_euler_radians = glm::vec3(pitch_radians, yaw_radians, roll_radians);
+    setOrientationEuler(glm::vec3(pitch_radians, yaw_radians, roll_radians));
 }
 
 glm::vec3 Camera::getOrientationEuler() const
@@ -80,7 +87,7 @@ void Camera::lookAt(const glm::vec3& target, const glm::vec3& up)
         }
     }
 
-    m_euler_radians = glm::eulerAngles(glm::quatLookAtRH(normalized_direction, normalized_up));
+    setOrientation(glm::quatLookAtRH(normalized_direction, normalized_up));
 }
 
 void Camera::setPerspective(float vertical_fov_radians, float near_clip, float far_clip)
@@ -125,23 +132,23 @@ const Camera::OrthographicSettings& Camera::getOrthographicSettings() const
 
 glm::vec3 Camera::getForwardDirection() const
 {
-    return glm::normalize(makeOrientation(m_euler_radians) * glm::vec3(0.0f, 0.0f, -1.0f));
+    return glm::normalize(m_orientation * glm::vec3(0.0f, 0.0f, -1.0f));
 }
 
 glm::vec3 Camera::getRightDirection() const
 {
-    return glm::normalize(makeOrientation(m_euler_radians) * glm::vec3(1.0f, 0.0f, 0.0f));
+    return glm::normalize(m_orientation * glm::vec3(1.0f, 0.0f, 0.0f));
 }
 
 glm::vec3 Camera::getUpDirection() const
 {
-    return glm::normalize(makeOrientation(m_euler_radians) * glm::vec3(0.0f, 1.0f, 0.0f));
+    return glm::normalize(m_orientation * glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
 glm::mat4 Camera::getViewMatrix() const
 {
     const glm::mat4 camera_translation = glm::translate(glm::mat4(1.0f), m_position);
-    const glm::mat4 camera_rotation = glm::mat4_cast(makeOrientation(m_euler_radians));
+    const glm::mat4 camera_rotation = glm::mat4_cast(m_orientation);
     return glm::inverse(camera_translation * camera_rotation);
 }
 

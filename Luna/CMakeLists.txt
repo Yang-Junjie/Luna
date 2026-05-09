@@ -165,6 +165,7 @@ set(SCRIPT_SOURCE
     Script/ScriptHostBridge.cpp
     Script/ScriptHostBridgeScene.cpp
     Script/ScriptHostBridgeEntity.cpp
+    Script/ScriptHostBridgeCamera.cpp
     Script/ScriptHostBridgeInput.cpp
     Script/ScriptPluginApi.h
     Script/ScriptPluginManager.h

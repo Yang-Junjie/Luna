@@ -1,7 +1,11 @@
 #include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
+#include "Scene/Components/CameraComponent.h"
+#include "Scene/Entity.h"
+#include "Scene/Scene.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Asset/Editor/ScriptLoader.h"
 #include "Script/ScriptPluginDiscovery.h"
@@ -12,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -274,6 +279,12 @@ const char* stateName(luna::ScriptPluginSelectionState state)
     }
 }
 
+bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs, float epsilon = 0.0001f)
+{
+    return std::fabs(lhs.x - rhs.x) <= epsilon && std::fabs(lhs.y - rhs.y) <= epsilon &&
+           std::fabs(lhs.z - rhs.z) <= epsilon;
+}
+
 bool expectState(TestContext& context,
                  const luna::ScriptPluginSelectionResult& result,
                  luna::ScriptPluginSelectionState expected,
@@ -500,6 +511,163 @@ void testOfficialLuaPluginLoadContract(TestContext& context)
     }
 
     context.expect(manager.createRuntime("Lua") != nullptr, "loaded Lua backend should create a runtime");
+}
+
+void testHostCameraAndInputApiContract(TestContext& context)
+{
+    const LunaScriptHostApi& host_api = luna::ScriptPluginManager::instance().hostApi();
+
+    context.expect(host_api.entity_has_camera != nullptr, "host API should expose entity_has_camera");
+    context.expect(host_api.entity_get_camera != nullptr, "host API should expose entity_get_camera");
+    context.expect(host_api.entity_set_camera != nullptr, "host API should expose entity_set_camera");
+    context.expect(host_api.entity_set_camera_primary != nullptr, "host API should expose entity_set_camera_primary");
+    context.expect(host_api.entity_set_perspective_camera != nullptr,
+                   "host API should expose entity_set_perspective_camera");
+    context.expect(host_api.entity_set_orthographic_camera != nullptr,
+                   "host API should expose entity_set_orthographic_camera");
+    context.expect(host_api.input_get_mouse_delta_x != nullptr, "host API should expose input_get_mouse_delta_x");
+    context.expect(host_api.input_get_mouse_delta_y != nullptr, "host API should expose input_get_mouse_delta_y");
+    context.expect(host_api.input_get_mouse_scroll_x != nullptr, "host API should expose input_get_mouse_scroll_x");
+    context.expect(host_api.input_get_mouse_scroll_y != nullptr, "host API should expose input_get_mouse_scroll_y");
+    context.expect(host_api.input_set_cursor_mode != nullptr, "host API should expose input_set_cursor_mode");
+    context.expect(host_api.input_get_cursor_mode != nullptr, "host API should expose input_get_cursor_mode");
+    context.expect(host_api.input_set_mouse_position != nullptr, "host API should expose input_set_mouse_position");
+    context.expect(host_api.input_set_raw_mouse_motion != nullptr, "host API should expose input_set_raw_mouse_motion");
+
+    luna::Scene scene;
+    luna::Entity camera_entity = scene.entityManager().createEntity("Runtime Camera");
+    camera_entity.addComponent<luna::CameraComponent>();
+    camera_entity.getComponent<luna::CameraComponent>().primary = false;
+
+    const uint64_t camera_id = static_cast<uint64_t>(camera_entity.getUUID());
+    context.expect(host_api.entity_has_camera(&scene, camera_id) == 1,
+                   "host camera API should detect a camera component");
+
+    LunaScriptCameraDesc camera_desc{};
+    context.expect(host_api.entity_get_camera(&scene, camera_id, &camera_desc) == 1,
+                   "host camera API should read a camera component");
+    context.expect(camera_desc.primary == 0, "host camera API should read primary state");
+    context.expect(camera_desc.projection_type == LunaScriptCameraProjectionType_Perspective,
+                   "host camera API should read projection type");
+
+    camera_desc.primary = 1;
+    camera_desc.fixed_aspect_ratio = 1;
+    camera_desc.projection_type = LunaScriptCameraProjectionType_Orthographic;
+    camera_desc.orthographic_size = 14.0f;
+    camera_desc.orthographic_near = -25.0f;
+    camera_desc.orthographic_far = 75.0f;
+    context.expect(host_api.entity_set_camera(&scene, camera_id, &camera_desc) == 1,
+                   "host camera API should write a camera component");
+
+    const luna::CameraComponent& written_camera = camera_entity.getComponent<luna::CameraComponent>();
+    context.expect(written_camera.primary, "host camera API should write primary state");
+    context.expect(written_camera.fixedAspectRatio, "host camera API should write fixed-aspect state");
+    context.expect(written_camera.projectionType == luna::Camera::ProjectionType::Orthographic,
+                   "host camera API should write projection type");
+    context.expect(written_camera.orthographicSize == 14.0f, "host camera API should write orthographic size");
+
+    context.expect(host_api.entity_set_perspective_camera(&scene, camera_id, 1.0f, 0.1f, 250.0f) == 1,
+                   "host camera API should switch to perspective projection");
+    const luna::CameraComponent& perspective_camera = camera_entity.getComponent<luna::CameraComponent>();
+    context.expect(perspective_camera.projectionType == luna::Camera::ProjectionType::Perspective,
+                   "host camera API should set perspective projection type");
+    context.expect(perspective_camera.perspectiveVerticalFovRadians == 1.0f,
+                   "host camera API should set perspective FOV");
+    context.expect(perspective_camera.perspectiveNear == 0.1f,
+                   "host camera API should set perspective near clip");
+    context.expect(perspective_camera.perspectiveFar == 250.0f,
+                   "host camera API should set perspective far clip");
+
+    luna::Entity plain_entity = scene.entityManager().createEntity("Plain");
+    context.expect(host_api.entity_has_camera(&scene, static_cast<uint64_t>(plain_entity.getUUID())) == 0,
+                   "host camera API should report missing camera components");
+}
+
+void testLuaRuntimeConstructorCallContract(TestContext& context)
+{
+    luna::ScriptPluginManager& manager = luna::ScriptPluginManager::instance();
+
+    luna::ProjectInfo project;
+    project.Scripting.SelectedPluginId = "luna.official.lua";
+    project.Scripting.SelectedBackendName = "Lua";
+    expectState(context,
+                manager.resolveAndLoadProjectSelection(&project),
+                luna::ScriptPluginSelectionState::Resolved,
+                "official Lua plugin load for constructor call contract");
+
+    constexpr uint64_t kLargeScriptHandle = 11073451620522104979ull;
+    const luna::AssetHandle script_handle{kLargeScriptHandle};
+
+    auto script_asset = std::make_shared<luna::ScriptAsset>();
+    script_asset->language = "Lua";
+    script_asset->source = R"(
+local ConstructorSmoke = {}
+
+function ConstructorSmoke:OnCreate()
+    if type(self.script_asset) ~= "string" then
+        error("large script_asset handles should be exposed as strings")
+    end
+
+    self.entity.rotation = Vec3(0.0, 0.0, 0.0)
+
+    local camera = Camera()
+    camera.primary = true
+    camera.projection_type = CameraProjection.Orthographic
+    camera.orthographic_size = 12.0
+    self.entity:set_camera(camera)
+end
+
+function ConstructorSmoke:OnUpdate()
+    self.entity:translate_world(Vec3(1.0, 2.0, 3.0))
+end
+
+return ConstructorSmoke
+)";
+
+    luna::AssetManager::get().registerMemoryAsset(script_handle, script_asset);
+
+    luna::AssetMetadata metadata = luna::AssetDatabase::getAssetMetadata(script_handle);
+    metadata.Name = "ConstructorSmoke";
+    metadata.FilePath = "Assets/Scripts/ConstructorSmoke.lua";
+    metadata.Type = luna::AssetType::Script;
+    metadata.MemoryOnly = true;
+    luna::AssetDatabase::set(script_handle, metadata);
+
+    luna::Scene scene;
+    scene.setName("LuaConstructorContract");
+    luna::Entity entity = scene.entityManager().createEntity("Scripted Camera");
+    entity.addComponent<luna::CameraComponent>();
+
+    auto& script_component = entity.addComponent<luna::ScriptComponent>();
+    luna::ScriptEntry script_entry{};
+    script_entry.id = luna::UUID{42};
+    script_entry.scriptAsset = script_handle;
+    script_entry.typeName = "ConstructorSmoke";
+    script_component.scripts.push_back(std::move(script_entry));
+
+    std::unique_ptr<luna::IScriptRuntime> runtime = manager.createRuntime("Lua");
+    if (!context.expect(runtime != nullptr, "Lua runtime should be created for constructor call contract")) {
+        return;
+    }
+
+    if (!context.expect(runtime->initialize(), "Lua runtime should initialize for constructor call contract")) {
+        return;
+    }
+
+    runtime->onRuntimeStart(scene);
+    runtime->onUpdate(scene, luna::Timestep{1.0f});
+    runtime->onRuntimeStop(scene);
+    runtime->shutdown();
+
+    context.expect(sameVec3(entity.transform().translation, glm::vec3{1.0f, 2.0f, 3.0f}),
+                   "Vec3(...) should construct values accepted by entity movement APIs");
+
+    const luna::CameraComponent& camera = entity.getComponent<luna::CameraComponent>();
+    context.expect(camera.primary, "Camera() should construct values accepted by set_camera");
+    context.expect(camera.projectionType == luna::Camera::ProjectionType::Orthographic,
+                   "Camera() should preserve projection type");
+    context.expect(std::fabs(camera.orthographicSize - 12.0f) <= 0.0001f,
+                   "Camera() should preserve orthographic size");
 }
 
 void testPluginDllManifestContract(TestContext& context)
@@ -776,6 +944,8 @@ int main()
     testProjectSelectionContract(context);
     testSelectionRejectsAmbiguousBackendAndHostMismatch(context);
     testOfficialLuaPluginLoadContract(context);
+    testHostCameraAndInputApiContract(context);
+    testLuaRuntimeConstructorCallContract(context);
     testPluginDllManifestContract(context);
     testFailedPluginLoadClearsPreviouslyLoadedBackend(context);
     testLuaScriptImportWritesLanguageMetadata(context);

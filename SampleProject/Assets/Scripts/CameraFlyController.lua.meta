@@ -1,0 +1,7 @@
+Asset:
+  Name: CameraFlyController
+  Handle: 11073451620522104979
+  Type: Script
+  FilePath: Assets/Scripts/CameraFlyController.lua
+  Config:
+    Language: Lua

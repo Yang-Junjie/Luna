@@ -528,13 +528,14 @@ void LunaEditorLayer::drawViewport()
 
         ImGui::Image(texture_id, available, uv0, uv1);
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
+        const ImVec2 viewport_max = ImGui::GetItemRectMax();
         const ImVec2 viewport_size = ImGui::GetItemRectSize();
         const bool gizmo_active = !m_runtime_viewport_enabled && drawViewportGizmo(viewport_min, viewport_size);
         if (!gizmo_active) {
             if (!m_runtime_viewport_enabled) {
                 requestViewportPick(
                     ImGui::GetItemRectMin(),
-                    ImGui::GetItemRectMax(),
+                    viewport_max,
                     uv0,
                     uv1,
                     scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}

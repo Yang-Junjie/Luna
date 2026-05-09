@@ -10,6 +10,7 @@ namespace luna {
 
 void registerScriptSceneHostApi(LunaScriptHostApi& host_api);
 void registerScriptEntityHostApi(LunaScriptHostApi& host_api);
+void registerScriptCameraHostApi(LunaScriptHostApi& host_api);
 void registerScriptInputHostApi(LunaScriptHostApi& host_api);
 
 inline Scene* getScriptSceneContext(void* scene_context)

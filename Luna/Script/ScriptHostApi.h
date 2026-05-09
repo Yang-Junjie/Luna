@@ -29,6 +29,11 @@ typedef enum LunaScriptPropertyType {
     LunaScriptPropertyType_Asset = 6,
 } LunaScriptPropertyType;
 
+typedef enum LunaScriptCameraProjectionType {
+    LunaScriptCameraProjectionType_Perspective = 0,
+    LunaScriptCameraProjectionType_Orthographic = 1,
+} LunaScriptCameraProjectionType;
+
 typedef enum LunaScriptHostLogLevel {
     LunaScriptHostLogLevel_Trace = 0,
     LunaScriptHostLogLevel_Info = 1,
@@ -47,6 +52,18 @@ typedef struct LunaScriptPropertyDesc {
     uint64_t entity_value;
     uint64_t asset_value;
 } LunaScriptPropertyDesc;
+
+typedef struct LunaScriptCameraDesc {
+    int32_t primary;
+    int32_t fixed_aspect_ratio;
+    LunaScriptCameraProjectionType projection_type;
+    float perspective_vertical_fov_radians;
+    float perspective_near;
+    float perspective_far;
+    float orthographic_size;
+    float orthographic_near;
+    float orthographic_far;
+} LunaScriptCameraDesc;
 
 typedef struct LunaScriptInstanceDesc {
     uint64_t entity_id;
@@ -92,12 +109,34 @@ typedef struct LunaScriptHostApi {
     int (*entity_set_rotation)(void* scene_context, uint64_t entity_id, const LunaScriptVec3* value);
     int (*entity_get_scale)(void* scene_context, uint64_t entity_id, LunaScriptVec3* out_value);
     int (*entity_set_scale)(void* scene_context, uint64_t entity_id, const LunaScriptVec3* value);
+    int (*entity_has_camera)(void* scene_context, uint64_t entity_id);
+    int (*entity_get_camera)(void* scene_context, uint64_t entity_id, LunaScriptCameraDesc* out_camera);
+    int (*entity_set_camera)(void* scene_context, uint64_t entity_id, const LunaScriptCameraDesc* camera);
+    int (*entity_set_camera_primary)(void* scene_context, uint64_t entity_id, int32_t primary);
+    int (*entity_set_perspective_camera)(void* scene_context,
+                                         uint64_t entity_id,
+                                         float vertical_fov_radians,
+                                         float near_clip,
+                                         float far_clip);
+    int (*entity_set_orthographic_camera)(void* scene_context,
+                                          uint64_t entity_id,
+                                          float vertical_size,
+                                          float near_clip,
+                                          float far_clip);
 
     // Input
     int (*input_is_key_pressed)(int32_t key_code);
     int (*input_is_mouse_button_pressed)(int32_t button_code);
     float (*input_get_mouse_x)();
     float (*input_get_mouse_y)();
+    float (*input_get_mouse_delta_x)();
+    float (*input_get_mouse_delta_y)();
+    float (*input_get_mouse_scroll_x)();
+    float (*input_get_mouse_scroll_y)();
+    void (*input_set_cursor_mode)(int32_t cursor_mode);
+    int32_t (*input_get_cursor_mode)();
+    void (*input_set_mouse_position)(float x, float y);
+    void (*input_set_raw_mouse_motion)(int32_t enabled);
 } LunaScriptHostApi;
 
 #if defined(__cplusplus)

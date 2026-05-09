@@ -249,6 +249,7 @@ LunaScriptPropertySchemaDesc toDesc(const ParsedLuaPropertySchema& property)
 void bindSchemaTypes(sol::state& lua_state)
 {
     lua_state.new_usertype<glm::vec3>("Vec3",
+                                      sol::call_constructor,
                                       sol::constructors<glm::vec3(), glm::vec3(float, float, float)>(),
                                       "x",
                                       &glm::vec3::x,
@@ -256,6 +257,66 @@ void bindSchemaTypes(sol::state& lua_state)
                                       &glm::vec3::y,
                                       "z",
                                       &glm::vec3::z);
+
+    sol::table key_code = lua_state.create_named_table("KeyCode");
+    key_code["None"] = 0;
+    key_code["LeftShift"] = 1;
+    key_code["RightShift"] = 2;
+    key_code["LeftControl"] = 3;
+    key_code["RightControl"] = 4;
+    key_code["LeftAlt"] = 5;
+    key_code["RightAlt"] = 6;
+    key_code["Space"] = 7;
+    key_code["Enter"] = 8;
+    key_code["Delete"] = 9;
+    key_code["Escape"] = 10;
+    key_code["Up"] = 11;
+    key_code["Down"] = 12;
+    key_code["Left"] = 13;
+    key_code["Right"] = 14;
+    key_code["A"] = 65;
+    key_code["B"] = 66;
+    key_code["C"] = 67;
+    key_code["D"] = 68;
+    key_code["E"] = 69;
+    key_code["F"] = 70;
+    key_code["G"] = 71;
+    key_code["H"] = 72;
+    key_code["I"] = 73;
+    key_code["J"] = 74;
+    key_code["K"] = 75;
+    key_code["L"] = 76;
+    key_code["M"] = 77;
+    key_code["N"] = 78;
+    key_code["O"] = 79;
+    key_code["P"] = 80;
+    key_code["Q"] = 81;
+    key_code["R"] = 82;
+    key_code["S"] = 83;
+    key_code["T"] = 84;
+    key_code["U"] = 85;
+    key_code["V"] = 86;
+    key_code["W"] = 87;
+    key_code["X"] = 88;
+    key_code["Y"] = 89;
+    key_code["Z"] = 90;
+
+    sol::table mouse_code = lua_state.create_named_table("MouseCode");
+    mouse_code["None"] = 0;
+    mouse_code["Left"] = 1;
+    mouse_code["Right"] = 2;
+    mouse_code["Middle"] = 3;
+    mouse_code["XButton1"] = 4;
+    mouse_code["XButton2"] = 5;
+
+    sol::table cursor_mode = lua_state.create_named_table("CursorMode");
+    cursor_mode["Normal"] = 0;
+    cursor_mode["Hidden"] = 1;
+    cursor_mode["Locked"] = 2;
+
+    sol::table camera_projection = lua_state.create_named_table("CameraProjection");
+    camera_projection["Perspective"] = 0;
+    camera_projection["Orthographic"] = 1;
 }
 
 } // namespace

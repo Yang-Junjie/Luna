@@ -1,0 +1,7 @@
+Asset:
+  Name: PlayerController
+  Handle: 4417345162052210501
+  Type: Script
+  FilePath: Assets/Scripts/PlayerController.lua
+  Config:
+    Language: Lua
