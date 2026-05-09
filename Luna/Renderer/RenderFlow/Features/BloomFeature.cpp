@@ -47,6 +47,8 @@ namespace {
 inline constexpr std::string_view kFeatureName = "Bloom";
 inline constexpr uint32_t kMaxBloomMipCount = 6;
 inline constexpr uint32_t kBloomDescriptorSetCount = kMaxBloomMipCount * 2 + 2;
+inline constexpr uint32_t kBloomDebugDescriptorSetIndex = kBloomDescriptorSetCount - 2;
+inline constexpr uint32_t kBloomCompositeDescriptorSetIndex = kBloomDescriptorSetCount - 1;
 
 constexpr std::array<RenderFeatureGraphResource, 1> kGraphInputs{{
     {.name = blackboard::SceneTransparentCompositedColor.value(), .flags = RenderFeatureGraphResourceFlags::External},
@@ -68,6 +70,7 @@ constexpr std::array<RenderPassResourceUsage, 2> kBloomPassResources{{
 struct BloomGpuParams {
     glm::vec4 target_size;
     glm::vec4 filter_params;
+    glm::vec4 debug_params;
 };
 
 namespace bloom_binding {
@@ -107,6 +110,55 @@ constexpr std::array<RenderFeatureDescriptorBinding, 4> kBloomBindings{{
 bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
 {
     return handle.has_value() && handle->isValid();
+}
+
+bool isBloomDebugView(RenderDebugViewMode mode) noexcept
+{
+    switch (mode) {
+        case RenderDebugViewMode::BloomInput:
+        case RenderDebugViewMode::BloomPrefilter:
+        case RenderDebugViewMode::BloomMip0:
+        case RenderDebugViewMode::BloomMip1:
+        case RenderDebugViewMode::BloomMip2:
+        case RenderDebugViewMode::BloomMip3:
+        case RenderDebugViewMode::BloomMip4:
+        case RenderDebugViewMode::BloomMip5:
+        case RenderDebugViewMode::BloomComposite:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool requiresBloomDebugPipeline(const SceneRenderContext& context) noexcept
+{
+    return isBloomDebugView(context.debug_view_mode) && context.debug_target.isValid() &&
+           context.debug_format != luna::RHI::Format::UNDEFINED;
+}
+
+std::optional<uint32_t> bloomDebugMipIndex(RenderDebugViewMode mode) noexcept
+{
+    switch (mode) {
+        case RenderDebugViewMode::BloomMip0:
+            return 0u;
+        case RenderDebugViewMode::BloomMip1:
+            return 1u;
+        case RenderDebugViewMode::BloomMip2:
+            return 2u;
+        case RenderDebugViewMode::BloomMip3:
+            return 3u;
+        case RenderDebugViewMode::BloomMip4:
+            return 4u;
+        case RenderDebugViewMode::BloomMip5:
+            return 5u;
+        default:
+            return std::nullopt;
+    }
+}
+
+float bloomDebugPreviewExposure(RenderDebugViewMode mode) noexcept
+{
+    return (mode == RenderDebugViewMode::BloomInput || mode == RenderDebugViewMode::BloomComposite) ? 1.0f : 4.0f;
 }
 
 std::filesystem::path shaderPath()
@@ -199,9 +251,10 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
                    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
                    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
                    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
+                   luna::RHI::Format color_format,
                    bool additive_blend)
 {
-    if (!device || !layout || !vertex_shader || !fragment_shader) {
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED) {
         return {};
     }
 
@@ -217,7 +270,7 @@ luna::RHI::Ref<luna::RHI::GraphicsPipeline>
     } else {
         builder.AddColorAttachmentDefault(false);
     }
-    builder.AddColorFormat(default_scene_detail::kSceneHdrColorFormat);
+    builder.AddColorFormat(color_format);
     return device->CreateGraphicsPipeline(builder.Build());
 }
 
@@ -314,7 +367,8 @@ public:
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision = m_resource_set.prepareGpuResourceBuild(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision =
+            m_resource_set.prepareGpuResourceBuild(context, isComplete(context));
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -326,6 +380,7 @@ public:
         const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
+        const bool debug_required = requiresBloomDebugPipeline(context);
         m_state.vertex_shader = renderer_detail::loadShaderModule(
             device, context.compiler, path, "bloomVertexMain", luna::RHI::ShaderStage::Vertex);
         m_state.prefilter_shader = renderer_detail::loadShaderModule(
@@ -336,28 +391,69 @@ public:
             device, context.compiler, path, "bloomUpsampleFragmentMain", luna::RHI::ShaderStage::Fragment);
         m_state.composite_shader = renderer_detail::loadShaderModule(
             device, context.compiler, path, "bloomCompositeFragmentMain", luna::RHI::ShaderStage::Fragment);
+        if (debug_required) {
+            m_state.debug_shader = renderer_detail::loadShaderModule(
+                device, context.compiler, path, "bloomDebugFragmentMain", luna::RHI::ShaderStage::Fragment);
+        }
 
         const ShaderBindingContract contract = makeBloomShaderBindingContract();
-        const std::array<RenderFeatureShaderBindingCheck, 5> binding_checks{{
-            {.shader = m_state.vertex_shader, .entry_point = "bloomVertexMain"},
-            {.shader = m_state.prefilter_shader, .entry_point = "bloomPrefilterFragmentMain"},
-            {.shader = m_state.downsample_shader, .entry_point = "bloomDownsampleFragmentMain"},
-            {.shader = m_state.upsample_shader, .entry_point = "bloomUpsampleFragmentMain"},
-            {.shader = m_state.composite_shader, .entry_point = "bloomCompositeFragmentMain"},
-        }};
-        m_resource_set.validateShaderBindingContract(binding_checks, contract, path);
+        if (debug_required) {
+            const std::array<RenderFeatureShaderBindingCheck, 6> binding_checks{{
+                {.shader = m_state.vertex_shader, .entry_point = "bloomVertexMain"},
+                {.shader = m_state.prefilter_shader, .entry_point = "bloomPrefilterFragmentMain"},
+                {.shader = m_state.downsample_shader, .entry_point = "bloomDownsampleFragmentMain"},
+                {.shader = m_state.upsample_shader, .entry_point = "bloomUpsampleFragmentMain"},
+                {.shader = m_state.composite_shader, .entry_point = "bloomCompositeFragmentMain"},
+                {.shader = m_state.debug_shader, .entry_point = "bloomDebugFragmentMain"},
+            }};
+            m_resource_set.validateShaderBindingContract(binding_checks, contract, path);
+        } else {
+            const std::array<RenderFeatureShaderBindingCheck, 5> binding_checks{{
+                {.shader = m_state.vertex_shader, .entry_point = "bloomVertexMain"},
+                {.shader = m_state.prefilter_shader, .entry_point = "bloomPrefilterFragmentMain"},
+                {.shader = m_state.downsample_shader, .entry_point = "bloomDownsampleFragmentMain"},
+                {.shader = m_state.upsample_shader, .entry_point = "bloomUpsampleFragmentMain"},
+                {.shader = m_state.composite_shader, .entry_point = "bloomCompositeFragmentMain"},
+            }};
+            m_resource_set.validateShaderBindingContract(binding_checks, contract, path);
+        }
 
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
         m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
-        m_state.prefilter_pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.prefilter_shader, false);
-        m_state.downsample_pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.downsample_shader, false);
-        m_state.upsample_pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.upsample_shader, true);
-        m_state.composite_pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.composite_shader, false);
+        m_state.prefilter_pipeline = createPipeline(device,
+                                                    m_state.pipeline_layout,
+                                                    m_state.vertex_shader,
+                                                    m_state.prefilter_shader,
+                                                    default_scene_detail::kSceneHdrColorFormat,
+                                                    false);
+        m_state.downsample_pipeline = createPipeline(device,
+                                                     m_state.pipeline_layout,
+                                                     m_state.vertex_shader,
+                                                     m_state.downsample_shader,
+                                                     default_scene_detail::kSceneHdrColorFormat,
+                                                     false);
+        m_state.upsample_pipeline = createPipeline(device,
+                                                   m_state.pipeline_layout,
+                                                   m_state.vertex_shader,
+                                                   m_state.upsample_shader,
+                                                   default_scene_detail::kSceneHdrColorFormat,
+                                                   true);
+        m_state.composite_pipeline = createPipeline(device,
+                                                    m_state.pipeline_layout,
+                                                    m_state.vertex_shader,
+                                                    m_state.composite_shader,
+                                                    default_scene_detail::kSceneHdrColorFormat,
+                                                    false);
+        if (debug_required) {
+            m_state.debug_pipeline = createPipeline(device,
+                                                    m_state.pipeline_layout,
+                                                    m_state.vertex_shader,
+                                                    m_state.debug_shader,
+                                                    context.debug_format,
+                                                    false);
+            m_state.debug_format = context.debug_format;
+        }
         m_state.sampler = createSampler(device);
         for (uint32_t index = 0; index < m_state.params_buffers.size(); ++index) {
             m_state.params_buffers[index] =
@@ -375,10 +471,15 @@ public:
             }
         }
 
-        return m_resource_set.logGpuResourceBuildResult(resourceStatus());
+        return m_resource_set.logGpuResourceBuildResult(resourceStatus(context));
     }
 
-    [[nodiscard]] bool isComplete() const noexcept
+    [[nodiscard]] bool isComplete(const SceneRenderContext& context) const noexcept
+    {
+        return hasCoreResources() && hasDebugResources(context);
+    }
+
+    [[nodiscard]] bool hasCoreResources() const noexcept
     {
         return m_resource_set.hasGpuContext() && m_state.vertex_shader && m_state.prefilter_shader &&
                m_state.downsample_shader && m_state.upsample_shader && m_state.composite_shader && m_state.layout &&
@@ -387,20 +488,27 @@ public:
                m_state.sampler && allParamsBuffersReady() && allDescriptorSetsReady();
     }
 
+    [[nodiscard]] bool hasDebugResources(const SceneRenderContext& context) const noexcept
+    {
+        return !requiresBloomDebugPipeline(context) ||
+               (m_state.debug_shader && m_state.debug_pipeline && m_state.debug_format == context.debug_format);
+    }
+
     void updateBindings(uint32_t descriptor_set_index,
                         const luna::RHI::Ref<luna::RHI::Texture>& source,
                         const luna::RHI::Ref<luna::RHI::Texture>& bloom,
                         uint32_t width,
                         uint32_t height,
-                        const Options& options)
+                        const Options& options,
+                        RenderDebugViewMode debug_view_mode = RenderDebugViewMode::None)
     {
-        if (!isComplete() || descriptor_set_index >= m_state.descriptor_sets.size() ||
+        if (!hasCoreResources() || descriptor_set_index >= m_state.descriptor_sets.size() ||
             descriptor_set_index >= m_state.params_buffers.size() || !source || width == 0 || height == 0) {
             return;
         }
 
         const luna::RHI::Ref<luna::RHI::Texture>& bloom_texture = bloom ? bloom : source;
-        updateParams(descriptor_set_index, width, height, options);
+        updateParams(descriptor_set_index, width, height, options, debug_view_mode);
         auto& descriptor_set = m_state.descriptor_sets[descriptor_set_index];
         descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
             .Binding = bloom_binding::SourceTexture,
@@ -433,7 +541,7 @@ public:
               const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
               uint32_t descriptor_set_index) const
     {
-        if (!isComplete() || !pipeline || descriptor_set_index >= m_state.descriptor_sets.size()) {
+        if (!hasCoreResources() || !pipeline || descriptor_set_index >= m_state.descriptor_sets.size()) {
             clearBloomPass(pass_context);
             return;
         }
@@ -475,11 +583,16 @@ public:
         return m_state.composite_pipeline;
     }
 
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& debugPipeline() const noexcept
+    {
+        return m_state.debug_pipeline;
+    }
+
     [[nodiscard]] RenderFeatureDiagnostics diagnostics() const
     {
         RenderFeatureDiagnostics result;
         m_resource_set.writeBindingContractDiagnostics(result);
-        m_resource_set.writePipelineResourceDiagnostics(result, isComplete(), resourceStatus());
+        m_resource_set.writePipelineResourceDiagnostics(result, hasCoreResources(), resourceStatus());
         return result;
     }
 
@@ -499,7 +612,11 @@ private:
         });
     }
 
-    void updateParams(uint32_t descriptor_set_index, uint32_t width, uint32_t height, const Options& options)
+    void updateParams(uint32_t descriptor_set_index,
+                      uint32_t width,
+                      uint32_t height,
+                      const Options& options,
+                      RenderDebugViewMode debug_view_mode)
     {
         if (descriptor_set_index >= m_state.params_buffers.size() || !m_state.params_buffers[descriptor_set_index]) {
             return;
@@ -513,6 +630,13 @@ private:
                                        std::clamp(options.soft_knee, 0.0f, 1.0f),
                                        std::max(options.intensity, 0.0f),
                                        std::clamp(options.radius, 0.01f, 4.0f)),
+            .debug_params = glm::vec4(static_cast<float>(debug_view_mode),
+                                      bloomDebugPreviewExposure(debug_view_mode),
+                                      (debug_view_mode == RenderDebugViewMode::BloomInput ||
+                                       debug_view_mode == RenderDebugViewMode::BloomComposite)
+                                          ? 1.0f
+                                          : 0.0f,
+                                      0.0f),
         };
         if (void* mapped = m_state.params_buffers[descriptor_set_index]->Map()) {
             std::memcpy(mapped, &params, sizeof(params));
@@ -529,7 +653,9 @@ private:
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> downsample_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> upsample_pipeline;
         luna::RHI::Ref<luna::RHI::GraphicsPipeline> composite_pipeline;
+        luna::RHI::Ref<luna::RHI::GraphicsPipeline> debug_pipeline;
         luna::RHI::Ref<luna::RHI::Sampler> sampler;
+        luna::RHI::Format debug_format{luna::RHI::Format::UNDEFINED};
         std::array<luna::RHI::Ref<luna::RHI::Buffer>, kBloomDescriptorSetCount> params_buffers;
         std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, kBloomDescriptorSetCount> descriptor_sets;
         luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
@@ -537,16 +663,19 @@ private:
         luna::RHI::Ref<luna::RHI::ShaderModule> downsample_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> upsample_shader;
         luna::RHI::Ref<luna::RHI::ShaderModule> composite_shader;
+        luna::RHI::Ref<luna::RHI::ShaderModule> debug_shader;
     };
 
-    [[nodiscard]] std::array<RenderFeatureResourceStatus, 15> resourceStatus() const noexcept
+    [[nodiscard]] std::array<RenderFeatureResourceStatus, 17> resourceStatus() const noexcept
     {
+        const bool debug_requested = m_state.debug_format != luna::RHI::Format::UNDEFINED;
         return {{
             {"vertex_shader", static_cast<bool>(m_state.vertex_shader)},
             {"prefilter_shader", static_cast<bool>(m_state.prefilter_shader)},
             {"downsample_shader", static_cast<bool>(m_state.downsample_shader)},
             {"upsample_shader", static_cast<bool>(m_state.upsample_shader)},
             {"composite_shader", static_cast<bool>(m_state.composite_shader)},
+            {"debug_shader", !debug_requested || static_cast<bool>(m_state.debug_shader)},
             {"layout", static_cast<bool>(m_state.layout)},
             {"descriptor_pool", static_cast<bool>(m_state.descriptor_pool)},
             {"pipeline_layout", static_cast<bool>(m_state.pipeline_layout)},
@@ -554,10 +683,22 @@ private:
             {"downsample_pipeline", static_cast<bool>(m_state.downsample_pipeline)},
             {"upsample_pipeline", static_cast<bool>(m_state.upsample_pipeline)},
             {"composite_pipeline", static_cast<bool>(m_state.composite_pipeline)},
+            {"debug_pipeline", !debug_requested || static_cast<bool>(m_state.debug_pipeline)},
             {"sampler", static_cast<bool>(m_state.sampler)},
             {"params_buffers", allParamsBuffersReady()},
             {"descriptor_sets", allDescriptorSetsReady()},
         }};
+    }
+
+    [[nodiscard]] std::array<RenderFeatureResourceStatus, 17>
+        resourceStatus(const SceneRenderContext& context) const noexcept
+    {
+        auto status = resourceStatus();
+        if (!requiresBloomDebugPipeline(context)) {
+            status[5].ready = true;
+            status[13].ready = true;
+        }
+        return status;
     }
 
     State m_state{};
@@ -621,14 +762,29 @@ public:
         }
         blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::BloomComposited, output);
 
+        if (scene_context.debug_view_mode == RenderDebugViewMode::BloomInput) {
+            addDebugPass(context, "BloomDebugInput", *source, options);
+        }
+
         addPrefilterPass(context, *source, bloom_levels[0], options);
+        if (scene_context.debug_view_mode == RenderDebugViewMode::BloomPrefilter) {
+            addDebugPass(context, "BloomDebugPrefilter", bloom_levels[0], options);
+        }
         for (uint32_t mip_index = 1; mip_index < mip_count; ++mip_index) {
             addDownsamplePass(context, bloom_levels[mip_index - 1], bloom_levels[mip_index], options, mip_index);
         }
         for (uint32_t mip_index = mip_count - 1; mip_index > 0; --mip_index) {
             addUpsamplePass(context, bloom_levels[mip_index], bloom_levels[mip_index - 1], options, mip_index - 1);
         }
+        if (const std::optional<uint32_t> debug_mip_index = bloomDebugMipIndex(scene_context.debug_view_mode);
+            debug_mip_index.has_value() && *debug_mip_index < mip_count) {
+            addDebugPass(
+                context, "BloomDebugMip" + std::to_string(*debug_mip_index), bloom_levels[*debug_mip_index], options);
+        }
         addCompositePass(context, *source, bloom_levels[0], output, options);
+        if (scene_context.debug_view_mode == RenderDebugViewMode::BloomComposite) {
+            addDebugPass(context, "BloomDebugComposite", output, options);
+        }
     }
 
 private:
@@ -730,7 +886,6 @@ private:
                           RenderGraphTextureHandle destination,
                           BloomFeature::Options options)
     {
-        constexpr uint32_t kCompositeDescriptorSetIndex = kBloomDescriptorSetCount - 1;
         context.graph().AddRasterPass(
             "BloomComposite",
             [source, bloom, destination](RenderGraphRasterPassBuilder& pass_builder) {
@@ -748,13 +903,50 @@ private:
                     clearBloomPass(pass_context);
                     return;
                 }
-                m_resources->updateBindings(kCompositeDescriptorSetIndex,
+                m_resources->updateBindings(kBloomCompositeDescriptorSetIndex,
                                             source_texture,
                                             bloom_texture,
                                             pass_context.framebufferWidth(),
                                             pass_context.framebufferHeight(),
                                             options);
-                m_resources->draw(pass_context, m_resources->compositePipeline(), kCompositeDescriptorSetIndex);
+                m_resources->draw(pass_context, m_resources->compositePipeline(), kBloomCompositeDescriptorSetIndex);
+            });
+    }
+
+    void addDebugPass(RenderPassContext& context,
+                      std::string pass_name,
+                      RenderGraphTextureHandle source,
+                      BloomFeature::Options options)
+    {
+        const SceneRenderContext scene_context = context.sceneContext();
+        if (!requiresBloomDebugPipeline(scene_context)) {
+            return;
+        }
+
+        context.graph().AddRasterPass(
+            pass_name,
+            [source, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
+                pass_builder.ReadTexture(source);
+                pass_builder.WriteColor(scene_context.debug_target,
+                                        luna::RHI::AttachmentLoadOp::Clear,
+                                        luna::RHI::AttachmentStoreOp::Store,
+                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+            },
+            [this, source, options, debug_view_mode = scene_context.debug_view_mode](
+                RenderGraphRasterPassContext& pass_context) {
+                const auto& source_texture = pass_context.getTexture(source);
+                if (!source_texture || m_resources == nullptr) {
+                    clearBloomPass(pass_context);
+                    return;
+                }
+                m_resources->updateBindings(kBloomDebugDescriptorSetIndex,
+                                            source_texture,
+                                            source_texture,
+                                            pass_context.framebufferWidth(),
+                                            pass_context.framebufferHeight(),
+                                            options,
+                                            debug_view_mode);
+                m_resources->draw(pass_context, m_resources->debugPipeline(), kBloomDebugDescriptorSetIndex);
             });
     }
 

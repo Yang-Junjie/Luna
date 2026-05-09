@@ -7,6 +7,7 @@ struct BloomParams
 {
     float4 targetSize;
     float4 filterParams;
+    float4 debugParams;
 };
 
 [[vk::binding(0, 0)]]
@@ -42,6 +43,21 @@ float3 sampleSource(float2 uv)
 float3 sampleBloom(float2 uv)
 {
     return max(gBloomTexture.SampleLevel(gBloomSampler, saturate(uv), 0.0).rgb, float3(0.0));
+}
+
+float3 linearToSrgb(float3 color)
+{
+    return pow(saturate(color), 1.0 / 2.2);
+}
+
+float3 toneMapACES(float3 color)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return saturate((color * (a * color + b)) / (color * (c * color + d) + e));
 }
 
 float3 filterBloomThreshold(float3 color)
@@ -129,4 +145,14 @@ float4 bloomCompositeFragmentMain(BloomVertexOutput input) : SV_Target
     const float2 uv = screenUvFromPosition(input.position);
     const float intensity = max(gBloomParams.filterParams.z, 0.0);
     return float4(sampleSource(uv) + sampleBloom(uv) * intensity, 1.0);
+}
+
+[shader("fragment")]
+float4 bloomDebugFragmentMain(BloomVertexOutput input) : SV_Target
+{
+    const float2 uv = screenUvFromPosition(input.position);
+    const bool hdrScenePreview = gBloomParams.debugParams.z > 0.5;
+    const float previewExposure = hdrScenePreview ? 1.0 : max(gBloomParams.debugParams.y, 1.0e-4);
+    const float3 color = min(sampleSource(uv) * previewExposure, float3(65504.0));
+    return float4(linearToSrgb(toneMapACES(color)), 1.0);
 }

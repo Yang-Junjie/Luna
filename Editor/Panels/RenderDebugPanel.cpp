@@ -15,7 +15,7 @@ struct DebugModeItem {
     const char* label;
 };
 
-constexpr std::array<DebugModeItem, 10> kDebugModes{{
+constexpr std::array<DebugModeItem, 19> kDebugModes{{
     {RenderDebugViewMode::None, "None"},
     {RenderDebugViewMode::Velocity, "Velocity"},
     {RenderDebugViewMode::HistoryValidity, "History Validity"},
@@ -26,6 +26,15 @@ constexpr std::array<DebugModeItem, 10> kDebugModes{{
     {RenderDebugViewMode::Roughness, "Roughness"},
     {RenderDebugViewMode::DirectLighting, "Direct Lighting"},
     {RenderDebugViewMode::SpecularIbl, "Specular IBL"},
+    {RenderDebugViewMode::BloomInput, "Bloom Input HDR"},
+    {RenderDebugViewMode::BloomPrefilter, "Bloom Prefilter"},
+    {RenderDebugViewMode::BloomMip0, "Bloom Mip 0"},
+    {RenderDebugViewMode::BloomMip1, "Bloom Mip 1"},
+    {RenderDebugViewMode::BloomMip2, "Bloom Mip 2"},
+    {RenderDebugViewMode::BloomMip3, "Bloom Mip 3"},
+    {RenderDebugViewMode::BloomMip4, "Bloom Mip 4"},
+    {RenderDebugViewMode::BloomMip5, "Bloom Mip 5"},
+    {RenderDebugViewMode::BloomComposite, "Bloom Composite HDR"},
 }};
 
 int modeIndex(RenderDebugViewMode mode)

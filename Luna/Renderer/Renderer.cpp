@@ -67,6 +67,24 @@ const char* renderDebugViewModeToString(RenderDebugViewMode mode)
             return "DirectLighting";
         case RenderDebugViewMode::SpecularIbl:
             return "SpecularIBL";
+        case RenderDebugViewMode::BloomInput:
+            return "BloomInput";
+        case RenderDebugViewMode::BloomPrefilter:
+            return "BloomPrefilter";
+        case RenderDebugViewMode::BloomMip0:
+            return "BloomMip0";
+        case RenderDebugViewMode::BloomMip1:
+            return "BloomMip1";
+        case RenderDebugViewMode::BloomMip2:
+            return "BloomMip2";
+        case RenderDebugViewMode::BloomMip3:
+            return "BloomMip3";
+        case RenderDebugViewMode::BloomMip4:
+            return "BloomMip4";
+        case RenderDebugViewMode::BloomMip5:
+            return "BloomMip5";
+        case RenderDebugViewMode::BloomComposite:
+            return "BloomComposite";
         default:
             return "Unknown";
     }
@@ -1699,7 +1717,6 @@ void Renderer::waitForGpuIdle() noexcept
 }
 
 } // namespace luna
-
 
 
 

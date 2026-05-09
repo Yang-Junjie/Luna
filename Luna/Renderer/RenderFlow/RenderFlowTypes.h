@@ -27,6 +27,15 @@ enum class RenderDebugViewMode : uint8_t {
     Roughness,
     DirectLighting,
     SpecularIbl,
+    BloomInput,
+    BloomPrefilter,
+    BloomMip0,
+    BloomMip1,
+    BloomMip2,
+    BloomMip3,
+    BloomMip4,
+    BloomMip5,
+    BloomComposite,
 };
 
 struct SceneShaderPaths {
