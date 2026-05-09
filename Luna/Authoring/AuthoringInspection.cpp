@@ -101,6 +101,8 @@ AuthoringEntityInspection inspectAuthoringEntity(Entity entity, std::string ref)
         inspection.has_mesh = true;
         const MeshComponent& mesh = entity.getComponent<MeshComponent>();
         inspection.mesh.mesh_handle = mesh.meshHandle;
+        inspection.mesh.first_submesh = mesh.firstSubmesh;
+        inspection.mesh.submesh_count = mesh.submeshCount;
         inspection.mesh.submesh_materials = mesh.submeshMaterials;
     }
     if (entity.hasComponent<ScriptComponent>()) {

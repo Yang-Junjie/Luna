@@ -226,6 +226,12 @@ Json jsonEntityInspection(const AuthoringEntityInspection& entity)
     if (entity.has_mesh) {
         Json mesh = Json::object();
         mesh["meshHandle"] = jsonUuidOrNull(entity.mesh.mesh_handle);
+        if (entity.mesh.first_submesh != 0) {
+            mesh["firstSubmesh"] = entity.mesh.first_submesh;
+        }
+        if (entity.mesh.submesh_count != UINT32_MAX) {
+            mesh["submeshCount"] = entity.mesh.submesh_count;
+        }
         mesh["submeshMaterials"] = jsonAssetArray(entity.mesh.submesh_materials);
         result["mesh"] = std::move(mesh);
     }

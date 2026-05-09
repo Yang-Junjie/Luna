@@ -37,7 +37,9 @@ namespace luna {
 
 EntityManager::EntityManager(Scene* scene)
     : m_scene(scene)
-{}
+{
+    clear();
+}
 
 Entity EntityManager::createEntity(const std::string& name)
 {

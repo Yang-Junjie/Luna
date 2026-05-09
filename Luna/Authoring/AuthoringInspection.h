@@ -51,6 +51,8 @@ struct AuthoringLightInspection {
 
 struct AuthoringMeshInspection {
     AssetHandle mesh_handle{0};
+    uint32_t first_submesh{0};
+    uint32_t submesh_count{UINT32_MAX};
     std::vector<AssetHandle> submesh_materials;
 };
 

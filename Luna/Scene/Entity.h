@@ -32,8 +32,7 @@ public:
 
     template <typename T> bool hasComponent() const
     {
-        return m_entity_manager != nullptr && m_entity_handle != entt::null &&
-               m_entity_manager->registry().template all_of<T>(m_entity_handle);
+        return m_entity_manager != nullptr && m_entity_manager->registry().template all_of<T>(m_entity_handle);
     }
 
     template <typename T> void removeComponent()

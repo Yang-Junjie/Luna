@@ -28,17 +28,19 @@ std::vector<std::shared_ptr<Material>>
                             Scene::AssetLoadBehavior asset_load_behavior)
 {
     const auto& sub_meshes = mesh.getSubMeshes();
-    std::vector<std::shared_ptr<Material>> submesh_materials(sub_meshes.size());
+    const size_t active_submesh_count = mesh_component.resolveSubmeshCount(sub_meshes.size());
+    std::vector<std::shared_ptr<Material>> submesh_materials(active_submesh_count);
 
-    for (size_t submesh_index = 0; submesh_index < sub_meshes.size(); ++submesh_index) {
-        const AssetHandle material_handle = mesh_component.getSubmeshMaterial(static_cast<uint32_t>(submesh_index));
+    for (size_t local_submesh_index = 0; local_submesh_index < active_submesh_count; ++local_submesh_index) {
+        const AssetHandle material_handle =
+            mesh_component.getSubmeshMaterial(static_cast<uint32_t>(local_submesh_index));
         if (!material_handle.isValid()) {
             continue;
         }
 
-        submesh_materials[submesh_index] = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking
-                                               ? asset_manager.requestAssetAs<Material>(material_handle)
-                                               : asset_manager.loadAssetAs<Material>(material_handle);
+        submesh_materials[local_submesh_index] = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking
+                                                     ? asset_manager.requestAssetAs<Material>(material_handle)
+                                                     : asset_manager.loadAssetAs<Material>(material_handle);
     }
 
     return submesh_materials;
@@ -210,10 +212,12 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
         });
 
         const auto& sub_meshes = mesh->getSubMeshes();
-        for (uint32_t submesh_index = 0; submesh_index < sub_meshes.size(); ++submesh_index) {
+        const size_t active_submesh_count = mesh_component.resolveSubmeshCount(sub_meshes.size());
+        for (uint32_t local_submesh_index = 0; local_submesh_index < active_submesh_count; ++local_submesh_index) {
+            const uint32_t submesh_index = mesh_component.firstSubmesh + local_submesh_index;
             std::shared_ptr<Material> material;
-            if (submesh_index < submesh_materials.size()) {
-                material = submesh_materials[submesh_index];
+            if (local_submesh_index < submesh_materials.size()) {
+                material = submesh_materials[local_submesh_index];
             }
 
             render_world.addDrawPacket(RenderDrawPacket{

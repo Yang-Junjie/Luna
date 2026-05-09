@@ -14,6 +14,7 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
@@ -21,8 +22,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include <glm/geometric.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <ufbx.h>
@@ -44,7 +50,26 @@ struct GeneratedMaterial {
     std::filesystem::path FilePath;
 };
 
+struct GeneratedMeshInfo {
+    uint32_t FirstSubmesh = 0;
+    uint32_t SubmeshCount = 0;
+    std::vector<AssetHandle> SubmeshMaterials;
+};
+
+struct GeneratedNode {
+    std::string Name;
+    int32_t Parent = -1;
+    glm::vec3 Translation{0.0f, 0.0f, 0.0f};
+    glm::vec3 Rotation{0.0f, 0.0f, 0.0f};
+    glm::vec3 Scale{1.0f, 1.0f, 1.0f};
+    AssetHandle MeshHandle{0};
+    uint32_t FirstSubmesh = 0;
+    uint32_t SubmeshCount = UINT32_MAX;
+    std::vector<AssetHandle> SubmeshMaterials;
+};
+
 using FbxScenePtr = std::unique_ptr<ufbx_scene, decltype(&ufbx_free_scene)>;
+using MeshInfoMap = std::unordered_map<const ufbx_mesh*, GeneratedMeshInfo>;
 
 std::string toString(ufbx_string value)
 {
@@ -117,6 +142,73 @@ void emitVec3(YAML::Emitter& out, const glm::vec3& value)
 void emitHandle(YAML::Emitter& out, AssetHandle handle)
 {
     out << static_cast<uint64_t>(handle);
+}
+
+AssetHandle readHandle(const YAML::Node& node)
+{
+    if (!node || !node.IsScalar()) {
+        return AssetHandle(0);
+    }
+
+    return AssetHandle(node.as<uint64_t>());
+}
+
+glm::vec3 toVec3(const ufbx_vec3& value)
+{
+    return {static_cast<float>(value.x), static_cast<float>(value.y), static_cast<float>(value.z)};
+}
+
+glm::quat toQuat(const ufbx_quat& value)
+{
+    return glm::quat(static_cast<float>(value.w),
+                     static_cast<float>(value.x),
+                     static_cast<float>(value.y),
+                     static_cast<float>(value.z));
+}
+
+glm::vec3 toEulerRadians(const ufbx_quat& value)
+{
+    return glm::eulerAngles(glm::normalize(toQuat(value)));
+}
+
+GeneratedNode makeGeneratedNode(std::string name, int32_t parent, const ufbx_transform& transform)
+{
+    GeneratedNode node;
+    node.Name = std::move(name);
+    node.Parent = parent;
+    node.Translation = toVec3(transform.translation);
+    node.Rotation = toEulerRadians(transform.rotation);
+    node.Scale = toVec3(transform.scale);
+    return node;
+}
+
+bool isIdentityTransform(const ufbx_transform& transform)
+{
+    constexpr float kEpsilon = 0.00001f;
+    const auto near_zero = [](double value) {
+        return std::abs(value) < kEpsilon;
+    };
+    const auto near_one = [](double value) {
+        return std::abs(value - 1.0) < kEpsilon;
+    };
+
+    return near_zero(transform.translation.x) && near_zero(transform.translation.y) &&
+           near_zero(transform.translation.z) && near_zero(transform.rotation.x) &&
+           near_zero(transform.rotation.y) && near_zero(transform.rotation.z) &&
+           std::abs(std::abs(transform.rotation.w) - 1.0) < kEpsilon && near_one(transform.scale.x) &&
+           near_one(transform.scale.y) && near_one(transform.scale.z);
+}
+
+void attachMeshInfo(GeneratedNode& node, const GeneratedMeshInfo& mesh_info, AssetHandle mesh_handle)
+{
+    if (mesh_info.SubmeshCount == 0) {
+        return;
+    }
+
+    node.MeshHandle = mesh_handle;
+    node.FirstSubmesh = mesh_info.FirstSubmesh;
+    node.SubmeshCount = mesh_info.SubmeshCount;
+    node.SubmeshMaterials = mesh_info.SubmeshMaterials;
 }
 
 FbxScenePtr loadFbxForCompanionGeneration(const std::filesystem::path& fbx_path)
@@ -503,16 +595,22 @@ AssetHandle materialHandleForMeshPart(const ufbx_scene& scene,
     return generated_materials[material_index].Handle;
 }
 
-std::vector<AssetHandle> buildSubmeshMaterialBindings(const ufbx_scene& scene,
-                                                      const std::vector<GeneratedMaterial>& generated_materials)
+std::vector<GeneratedMeshInfo> buildMeshInfos(const ufbx_scene& scene,
+                                              const std::vector<GeneratedMaterial>& generated_materials,
+                                              MeshInfoMap& mesh_info_by_mesh)
 {
-    std::vector<AssetHandle> submesh_materials;
+    std::vector<GeneratedMeshInfo> mesh_infos;
+    mesh_infos.reserve(scene.meshes.count);
 
+    uint32_t next_submesh = 0;
     for (size_t mesh_index = 0; mesh_index < scene.meshes.count; ++mesh_index) {
         const ufbx_mesh* mesh = scene.meshes.data[mesh_index];
         if (mesh == nullptr || !mesh->vertex_position.exists || mesh->num_triangles == 0) {
             continue;
         }
+
+        GeneratedMeshInfo mesh_info;
+        mesh_info.FirstSubmesh = next_submesh;
 
         bool emitted_material_part = false;
         for (size_t part_index = 0; part_index < mesh->material_parts.count; ++part_index) {
@@ -521,7 +619,7 @@ std::vector<AssetHandle> buildSubmeshMaterialBindings(const ufbx_scene& scene,
                 continue;
             }
 
-            submesh_materials.push_back(
+            mesh_info.SubmeshMaterials.push_back(
                 materialHandleForMeshPart(scene, *mesh, mesh_part.index, generated_materials));
             emitted_material_part = true;
         }
@@ -534,19 +632,158 @@ std::vector<AssetHandle> buildSubmeshMaterialBindings(const ufbx_scene& scene,
                     material_handle = generated_materials[material_index].Handle;
                 }
             }
-            submesh_materials.push_back(material_handle);
+            mesh_info.SubmeshMaterials.push_back(material_handle);
+        }
+
+        mesh_info.SubmeshCount = static_cast<uint32_t>(mesh_info.SubmeshMaterials.size());
+        next_submesh += mesh_info.SubmeshCount;
+        mesh_info_by_mesh[mesh] = mesh_info;
+        mesh_infos.push_back(std::move(mesh_info));
+    }
+
+    return mesh_infos;
+}
+
+std::vector<GeneratedNode> buildGeneratedNodes(const ufbx_scene& scene,
+                                               const std::filesystem::path& fbx_path,
+                                               AssetHandle mesh_handle,
+                                               const MeshInfoMap& mesh_info_by_mesh)
+{
+    std::vector<GeneratedNode> nodes;
+    if (scene.root_node == nullptr) {
+        return nodes;
+    }
+
+    std::vector<const ufbx_node*> root_nodes;
+    for (size_t child_index = 0; child_index < scene.root_node->children.count; ++child_index) {
+        root_nodes.push_back(scene.root_node->children.data[child_index]);
+    }
+
+    if (root_nodes.empty()) {
+        for (size_t node_index = 0; node_index < scene.nodes.count; ++node_index) {
+            const ufbx_node* node = scene.nodes.data[node_index];
+            if (node != nullptr && node->parent == nullptr) {
+                root_nodes.push_back(node);
+            }
         }
     }
 
-    return submesh_materials;
+    if (root_nodes.empty()) {
+        for (size_t node_index = 0; node_index < scene.nodes.count; ++node_index) {
+            const ufbx_node* node = scene.nodes.data[node_index];
+            if (node != nullptr) {
+                root_nodes.push_back(node);
+            }
+        }
+    }
+
+    std::unordered_set<const ufbx_node*> visited;
+    auto append_node = [&](auto&& self, const ufbx_node* node, int32_t parent_index) -> void {
+        if (node == nullptr || visited.contains(node)) {
+            return;
+        }
+        visited.insert(node);
+
+        std::string node_name = sanitizeFileStem(fbx_path.stem().string()) + "_Node_" +
+                                std::to_string(node->typed_id);
+        const std::string node_label = toString(node->name);
+        if (!node_label.empty()) {
+            node_name = node_label;
+        }
+
+        nodes.push_back(makeGeneratedNode(node_name, parent_index, node->local_transform));
+        const int32_t current_index = static_cast<int32_t>(nodes.size() - 1);
+
+        if (const auto mesh_it = mesh_info_by_mesh.find(node->mesh); mesh_it != mesh_info_by_mesh.end()) {
+            if (!isIdentityTransform(node->geometry_transform)) {
+                nodes.push_back(makeGeneratedNode(node_name + "_Geometry", current_index, node->geometry_transform));
+                attachMeshInfo(nodes.back(), mesh_it->second, mesh_handle);
+            } else {
+                attachMeshInfo(nodes.back(), mesh_it->second, mesh_handle);
+            }
+        }
+
+        for (size_t child_index = 0; child_index < node->children.count; ++child_index) {
+            self(self, node->children.data[child_index], current_index);
+        }
+    };
+
+    for (const ufbx_node* root_node : root_nodes) {
+        append_node(append_node, root_node, -1);
+    }
+
+    if (nodes.empty()) {
+        GeneratedNode fallback_node;
+        fallback_node.Name = sanitizeFileStem(fbx_path.stem().string());
+        fallback_node.MeshHandle = mesh_handle;
+        fallback_node.FirstSubmesh = 0;
+        fallback_node.SubmeshCount = 0;
+        for (size_t mesh_index = 0; mesh_index < scene.meshes.count; ++mesh_index) {
+            const ufbx_mesh* mesh = scene.meshes.data[mesh_index];
+            if (mesh == nullptr) {
+                continue;
+            }
+            if (const auto mesh_it = mesh_info_by_mesh.find(mesh); mesh_it != mesh_info_by_mesh.end()) {
+                fallback_node.SubmeshMaterials.insert(fallback_node.SubmeshMaterials.end(),
+                                                      mesh_it->second.SubmeshMaterials.begin(),
+                                                      mesh_it->second.SubmeshMaterials.end());
+                fallback_node.SubmeshCount += mesh_it->second.SubmeshCount;
+            }
+        }
+        nodes.push_back(std::move(fallback_node));
+    }
+
+    return nodes;
+}
+
+bool isLegacyGeneratedModelFile(const std::filesystem::path& model_path, const AssetMetadata& mesh_metadata)
+{
+    if (!std::filesystem::exists(model_path)) {
+        return false;
+    }
+
+    try {
+        const YAML::Node data = YAML::LoadFile(model_path.string());
+        const YAML::Node model_node = data["Model"] ? data["Model"] : data;
+        if (!model_node || !model_node["SourceMesh"]) {
+            return false;
+        }
+
+        if (readHandle(model_node["SourceMesh"]) != mesh_metadata.Handle) {
+            return false;
+        }
+
+        const YAML::Node nodes = model_node["Nodes"];
+        if (!nodes || !nodes.IsSequence() || nodes.size() != 1) {
+            return false;
+        }
+
+        const YAML::Node node = nodes[0];
+        if (!node) {
+            return false;
+        }
+
+        const AssetHandle node_mesh_handle = node["Mesh"] ? readHandle(node["Mesh"]) : readHandle(node["MeshHandle"]);
+        if (node_mesh_handle != mesh_metadata.Handle) {
+            return false;
+        }
+
+        if (node["FirstSubmesh"] || node["SubmeshCount"]) {
+            return false;
+        }
+
+        return true;
+    } catch (const YAML::Exception&) {
+        return false;
+    }
 }
 
 bool writeModelFile(const std::filesystem::path& model_path,
                     const AssetMetadata& mesh_metadata,
                     const std::vector<GeneratedMaterial>& generated_materials,
-                    const std::vector<AssetHandle>& submesh_materials)
+                    const std::vector<GeneratedNode>& nodes)
 {
-    if (model_path.empty() || !mesh_metadata.Handle.isValid()) {
+    if (model_path.empty() || !mesh_metadata.Handle.isValid() || nodes.empty()) {
         return false;
     }
 
@@ -576,23 +813,29 @@ bool writeModelFile(const std::filesystem::path& model_path,
     out << YAML::EndSeq;
 
     out << YAML::Key << "Nodes" << YAML::Value << YAML::BeginSeq;
-    out << YAML::BeginMap;
-    out << YAML::Key << "Name" << YAML::Value << model_path.stem().string();
-    out << YAML::Key << "Parent" << YAML::Value << -1;
-    out << YAML::Key << "Translation" << YAML::Value;
-    emitVec3(out, glm::vec3(0.0f));
-    out << YAML::Key << "Rotation" << YAML::Value;
-    emitVec3(out, glm::vec3(0.0f));
-    out << YAML::Key << "Scale" << YAML::Value;
-    emitVec3(out, glm::vec3(1.0f));
-    out << YAML::Key << "Mesh" << YAML::Value;
-    emitHandle(out, mesh_metadata.Handle);
-    out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::Flow << YAML::BeginSeq;
-    for (const AssetHandle material_handle : submesh_materials) {
-        emitHandle(out, material_handle);
+    for (const GeneratedNode& node : nodes) {
+        out << YAML::BeginMap;
+        out << YAML::Key << "Name" << YAML::Value << node.Name;
+        out << YAML::Key << "Parent" << YAML::Value << node.Parent;
+        out << YAML::Key << "Translation" << YAML::Value;
+        emitVec3(out, node.Translation);
+        out << YAML::Key << "Rotation" << YAML::Value;
+        emitVec3(out, node.Rotation);
+        out << YAML::Key << "Scale" << YAML::Value;
+        emitVec3(out, node.Scale);
+        if (node.MeshHandle.isValid()) {
+            out << YAML::Key << "Mesh" << YAML::Value;
+            emitHandle(out, node.MeshHandle);
+            out << YAML::Key << "FirstSubmesh" << YAML::Value << node.FirstSubmesh;
+            out << YAML::Key << "SubmeshCount" << YAML::Value << node.SubmeshCount;
+            out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::Flow << YAML::BeginSeq;
+            for (const AssetHandle material_handle : node.SubmeshMaterials) {
+                emitHandle(out, material_handle);
+            }
+            out << YAML::EndSeq;
+        }
+        out << YAML::EndMap;
     }
-    out << YAML::EndSeq;
-    out << YAML::EndMap;
     out << YAML::EndSeq;
 
     out << YAML::EndMap;
@@ -664,11 +907,12 @@ FbxModelAssetGenerator::GenerateResult
     const std::filesystem::path model_path = fbx_path.parent_path() / (fbx_path.stem().string() + ".lmodel");
     const std::vector<GeneratedMaterial> generated_materials =
         ensureGeneratedMaterials(*scene, fbx_path, result);
-    const std::vector<AssetHandle> submesh_materials =
-        buildSubmeshMaterialBindings(*scene, generated_materials);
+    MeshInfoMap mesh_info_by_mesh;
+    (void) buildMeshInfos(*scene, generated_materials, mesh_info_by_mesh);
+    const std::vector<GeneratedNode> nodes = buildGeneratedNodes(*scene, fbx_path, mesh_metadata.Handle, mesh_info_by_mesh);
 
-    if (!std::filesystem::exists(model_path)) {
-        if (writeModelFile(model_path, mesh_metadata, generated_materials, submesh_materials)) {
+    if (!std::filesystem::exists(model_path) || isLegacyGeneratedModelFile(model_path, mesh_metadata)) {
+        if (writeModelFile(model_path, mesh_metadata, generated_materials, nodes)) {
             result.CreatedModelFile = true;
         } else {
             LUNA_CORE_WARN("Failed to write generated model asset '{}'", model_path.string());

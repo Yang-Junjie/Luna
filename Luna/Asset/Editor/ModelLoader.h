@@ -110,6 +110,13 @@ inline ModelNode readNode(const YAML::Node& node, const std::string& fallback_na
         model_node.MeshHandle = readHandle(node["MeshHandle"]);
     }
 
+    if (node["FirstSubmesh"]) {
+        model_node.FirstSubmesh = node["FirstSubmesh"].as<uint32_t>();
+    }
+    if (node["SubmeshCount"]) {
+        model_node.SubmeshCount = node["SubmeshCount"].as<uint32_t>();
+    }
+
     model_node.SubmeshMaterials = readHandleSequence(node["SubmeshMaterials"]);
     return model_node;
 }

@@ -23,38 +23,6 @@ Shadows:
   CsmCascadeSize: 2048
 Entities:
   - IDComponent:
-      ID: 14702620125449447707
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [-6.6599393, -1.8735173, -7.3132215]
-      Rotation: [0, -0, 0]
-      Scale: [1, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1001
-      SubmeshMaterials:
-        - 2001
-  - IDComponent:
-      ID: 15137094438280049332
-    TagComponent:
-      Tag: Cube
-    TransformComponent:
-      Translation: [-7.2446747, -1.8724238, -6.7512374]
-      Rotation: [0, -0, 0]
-      Scale: [0.2671559, 1, 1]
-    RelationshipComponent:
-      ParentHandle: 0
-      Children:
-        []
-    MeshComponent:
-      MeshHandle: 1001
-      SubmeshMaterials:
-        - 2001
-  - IDComponent:
       ID: 1575925757346616929
     TagComponent:
       Tag: Plane
@@ -277,3 +245,35 @@ Entities:
       MeshHandle: 1002
       SubmeshMaterials:
         - 2003
+  - IDComponent:
+      ID: 15137094438280049332
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-7.2446747, -1.8724238, -6.7512374]
+      Rotation: [0, -0, 0]
+      Scale: [0.2671559, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 14702620125449447707
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [-6.6599393, -1.8735173, -7.3132215]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001

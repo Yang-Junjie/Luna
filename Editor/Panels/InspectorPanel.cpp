@@ -30,7 +30,7 @@ void syncMeshMaterialSlots(luna::MeshComponent& mesh_component)
         return;
     }
 
-    mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+    mesh_component.resizeSubmeshMaterials(mesh_component.resolveSubmeshCount(mesh->getSubMeshes().size()));
 }
 
 void assignDefaultMaterialSlots(luna::MeshComponent& mesh_component)
@@ -460,6 +460,7 @@ void InspectorPanel::onImGuiRender()
             changed |= editor::ui::drawAssetHandleSelector("Mesh Asset", mesh_component.meshHandle, {AssetType::Mesh});
 
             if (mesh_component.meshHandle != previous_mesh_handle) {
+                mesh_component.resetSubmeshRange();
                 mesh_component.clearAllSubmeshMaterials();
                 syncMeshMaterialSlots(mesh_component);
                 assignDefaultMaterialSlots(mesh_component);
@@ -472,7 +473,10 @@ void InspectorPanel::onImGuiRender()
             const bool mesh_loaded = mesh && mesh->isValid();
 
             if (mesh_loaded) {
-                editor::ui::drawTextValue("Submeshes", std::to_string(mesh->getSubMeshes().size()));
+                const size_t active_submesh_count = mesh_component.resolveSubmeshCount(mesh->getSubMeshes().size());
+                editor::ui::drawTextValue("Submeshes",
+                                          std::to_string(active_submesh_count) + " / " +
+                                              std::to_string(mesh->getSubMeshes().size()));
             } else {
                 if (mesh_component.meshHandle.isValid() && AssetManager::get().isAssetLoading(mesh_component.meshHandle)) {
                     ImGui::TextDisabled("Mesh asset is loading...");
@@ -502,7 +506,7 @@ void InspectorPanel::onImGuiRender()
             }
             if (sync_material_slots && mesh_loaded) {
                 const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
-                mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+                mesh_component.resizeSubmeshMaterials(mesh_component.resolveSubmeshCount(mesh->getSubMeshes().size()));
                 changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
             }
             if (mesh_component.getSubmeshMaterialCount() == 0) {

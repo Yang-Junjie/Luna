@@ -142,6 +142,8 @@ bool sameLightComponent(const luna::LightComponent& lhs, const luna::LightCompon
 bool sameMeshComponent(const luna::MeshComponent& lhs, const luna::MeshComponent& rhs)
 {
     return lhs.meshHandle == rhs.meshHandle &&
+           lhs.firstSubmesh == rhs.firstSubmesh &&
+           lhs.submeshCount == rhs.submeshCount &&
            lhs.submeshMaterials == rhs.submeshMaterials;
 }
 
@@ -811,6 +813,9 @@ Entity AuthoringSession::createEntityFromModelAsset(AssetHandle model_handle, En
             (void) applyMeshAssetToEntity(node_entity, model_node.MeshHandle);
             if (node_entity.hasComponent<MeshComponent>()) {
                 auto& mesh_component = node_entity.getComponent<MeshComponent>();
+                mesh_component.setSubmeshRange(model_node.FirstSubmesh, model_node.SubmeshCount);
+                mesh_component.clearAllSubmeshMaterials();
+                mesh_component.resizeSubmeshMaterials(model_node.SubmeshMaterials.size());
                 for (uint32_t material_index = 0; material_index < model_node.SubmeshMaterials.size();
                      ++material_index) {
                     const AssetHandle material_handle = model_node.SubmeshMaterials[material_index];
@@ -906,6 +911,7 @@ bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_ha
     const bool changed_mesh = mesh_component.meshHandle != mesh_handle;
     mesh_component.meshHandle = mesh_handle;
     if (changed_mesh) {
+        mesh_component.resetSubmeshRange();
         mesh_component.clearAllSubmeshMaterials();
         changed = true;
     }
@@ -913,7 +919,8 @@ bool AuthoringSession::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_ha
     const auto mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
     if (mesh && mesh->isValid()) {
         const size_t previous_slot_count = mesh_component.getSubmeshMaterialCount();
-        mesh_component.resizeSubmeshMaterials(mesh->getSubMeshes().size());
+        const size_t active_submesh_count = mesh_component.resolveSubmeshCount(mesh->getSubMeshes().size());
+        mesh_component.resizeSubmeshMaterials(active_submesh_count);
         changed |= mesh_component.getSubmeshMaterialCount() != previous_slot_count;
         for (uint32_t submesh_index = 0; submesh_index < mesh_component.getSubmeshMaterialCount(); ++submesh_index) {
             if (!mesh_component.getSubmeshMaterial(submesh_index).isValid()) {

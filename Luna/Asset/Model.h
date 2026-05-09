@@ -22,6 +22,8 @@ struct ModelNode {
     glm::vec3 Scale{1.0f, 1.0f, 1.0f};
 
     AssetHandle MeshHandle{0};
+    uint32_t FirstSubmesh{0};
+    uint32_t SubmeshCount{UINT32_MAX};
     std::vector<AssetHandle> SubmeshMaterials;
 };
 

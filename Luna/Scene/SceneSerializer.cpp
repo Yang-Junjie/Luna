@@ -606,6 +606,12 @@ bool emitSceneYaml(const luna::Scene& scene, YAML::Emitter& out, std::string_vie
             const auto& mesh_component = registry.get<const luna::MeshComponent>(entity_handle);
             out << YAML::Key << "MeshComponent" << YAML::Value << YAML::BeginMap;
             out << YAML::Key << "MeshHandle" << YAML::Value << static_cast<uint64_t>(mesh_component.meshHandle);
+            if (mesh_component.firstSubmesh != 0) {
+                out << YAML::Key << "FirstSubmesh" << YAML::Value << mesh_component.firstSubmesh;
+            }
+            if (mesh_component.submeshCount != luna::MeshComponent::AllSubmeshes) {
+                out << YAML::Key << "SubmeshCount" << YAML::Value << mesh_component.submeshCount;
+            }
             out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::BeginSeq;
             for (const luna::AssetHandle material_handle : mesh_component.submeshMaterials) {
                 out << static_cast<uint64_t>(material_handle);
@@ -778,6 +784,12 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
 
                     if (mesh_component["MeshHandle"]) {
                         entity_data.mesh.meshHandle = AssetHandle(mesh_component["MeshHandle"].as<uint64_t>());
+                    }
+                    if (mesh_component["FirstSubmesh"]) {
+                        entity_data.mesh.firstSubmesh = mesh_component["FirstSubmesh"].as<uint32_t>();
+                    }
+                    if (mesh_component["SubmeshCount"]) {
+                        entity_data.mesh.submeshCount = mesh_component["SubmeshCount"].as<uint32_t>();
                     }
 
                     if (const YAML::Node materials_node = mesh_component["SubmeshMaterials"];

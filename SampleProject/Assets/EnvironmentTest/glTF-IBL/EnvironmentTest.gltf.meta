@@ -1,0 +1,8 @@
+Asset:
+  Name: EnvironmentTest
+  Handle: 8766168467652532819
+  Type: Mesh
+  FilePath: Assets/EnvironmentTest/glTF-IBL/EnvironmentTest.gltf
+  Config:
+    GenerateTangents: true
+    Triangulate: true

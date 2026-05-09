@@ -1,13 +1,21 @@
+#include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
+#include "Asset/Editor/ModelLoader.h"
+#include "Asset/Model.h"
 #include "Authoring/AuthoringSession.h"
 #include "Core/Log.h"
+#include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -327,6 +335,171 @@ void testAuthoringSessionHistory(TestContext& context)
                    "rollback should not add a new undo step");
 }
 
+void testModelHierarchyRoundTrip(TestContext& context)
+{
+    TempDirectory temp("ModelHierarchy");
+    const std::filesystem::path model_path = temp.path() / "Models" / "Hierarchy.lmodel";
+    std::filesystem::create_directories(model_path.parent_path());
+
+    std::ofstream stream(model_path, std::ios::out | std::ios::trunc);
+    context.expect(stream.is_open(), "hierarchy fixture should open for writing");
+    if (!stream.is_open()) {
+        return;
+    }
+
+    stream << R"(Model:
+  Name: HierarchyModel
+  Source: Models/Hierarchy.gltf
+  SourceMesh: 9001
+  Materials:
+    - SourceMaterialIndex: 0
+      Handle: 9101
+      FilePath: Materials/0_HierarchyModel_Mat0.lunamat
+    - SourceMaterialIndex: 1
+      Handle: 9102
+      FilePath: Materials/1_HierarchyModel_Mat1.lunamat
+  Nodes:
+    - Name: RootNode
+      Parent: -1
+      Translation: [0.0, 0.0, 0.0]
+      Rotation: [0.0, 0.0, 0.0]
+      Scale: [1.0, 1.0, 1.0]
+      Mesh: 9001
+      FirstSubmesh: 1
+      SubmeshCount: 1
+      SubmeshMaterials: [9102]
+    - Name: ChildNode
+      Parent: 0
+      Translation: [1.0, 0.0, 0.0]
+      Rotation: [0.0, 0.0, 0.0]
+      Scale: [1.0, 1.0, 1.0]
+    - Name: GrandChildNode
+      Parent: 1
+      Translation: [0.0, 1.0, 0.0]
+      Rotation: [0.0, 0.0, 0.0]
+      Scale: [1.0, 1.0, 1.0]
+)";
+    stream.close();
+
+    luna::AssetDatabase::clear();
+    luna::AssetManager::get().clear();
+
+    const luna::AssetHandle mesh_handle(9001);
+    const luna::AssetHandle model_handle(9002);
+
+    std::vector<luna::SubMesh> sub_meshes;
+    for (int submesh_index = 0; submesh_index < 2; ++submesh_index) {
+        luna::SubMesh sub_mesh;
+        sub_mesh.Name = "Submesh_" + std::to_string(submesh_index);
+        sub_mesh.Vertices = {
+            {{0.0f, 0.0f, 0.0f}},
+            {{1.0f, 0.0f, 0.0f}},
+            {{0.0f, 1.0f, 0.0f}},
+        };
+        sub_mesh.Indices = {0, 1, 2};
+        sub_meshes.push_back(std::move(sub_mesh));
+    }
+
+    auto mesh = luna::Mesh::create("HierarchyMesh", std::move(sub_meshes));
+    context.expect(mesh && mesh->isValid(), "test mesh should be valid");
+    if (!mesh || !mesh->isValid()) {
+        luna::AssetDatabase::clear();
+        return;
+    }
+
+    auto model = luna::ModelLoader::loadFromFile(model_path, "HierarchyModel");
+    context.expect(model && model->isValid(), "hierarchy model should load");
+    if (!model || !model->isValid()) {
+        luna::AssetDatabase::clear();
+        return;
+    }
+
+    luna::AssetManager::get().registerMemoryAsset(mesh_handle, mesh);
+    luna::AssetManager::get().registerMemoryAsset(model_handle, model);
+
+    context.expect(luna::AssetDatabase::exists(mesh_handle), "test mesh should be registered in asset database");
+    context.expect(luna::AssetDatabase::exists(model_handle), "test model should be registered in asset database");
+    context.expect(luna::AssetDatabase::getAssetMetadata(mesh_handle).Type == luna::AssetType::Mesh,
+                   "test mesh metadata should be typed as mesh");
+    context.expect(luna::AssetDatabase::getAssetMetadata(model_handle).Type == luna::AssetType::Model,
+                   "test model metadata should be typed as model");
+    context.expect(static_cast<bool>(luna::AssetManager::get().loadAssetAs<luna::Mesh>(mesh_handle)),
+                   "test mesh should be registered in asset manager");
+    context.expect(static_cast<bool>(luna::AssetManager::get().loadAssetAs<luna::Model>(model_handle)),
+                   "test model should be registered in asset manager");
+
+    const auto& nodes = model->getNodes();
+    context.expect(nodes.size() == 3, "model loader should preserve all nodes");
+    if (nodes.size() == 3) {
+        context.expect(nodes[0].Children.size() == 1 && nodes[0].Children[0] == 1,
+                       "root node should keep its child relation");
+        context.expect(nodes[1].Children.size() == 1 && nodes[1].Children[0] == 2,
+                       "child node should keep its grandchild relation");
+        context.expect(nodes[0].FirstSubmesh == 1 && nodes[0].SubmeshCount == 1,
+                       "root node should preserve submesh range");
+        context.expect(nodes[0].SubmeshMaterials.size() == 1 && nodes[0].SubmeshMaterials[0] == luna::AssetHandle(9102),
+                       "root node should preserve submesh materials");
+    }
+
+    luna::Scene probe_scene;
+    luna::authoring::AuthoringSession probe_session(probe_scene);
+    (void) probe_session.createScene();
+    const luna::Entity session_probe = probe_session.createEntity("Probe");
+    context.expect(session_probe, "plain entity creation should work in a bootstrapped session");
+
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    (void) session.createScene();
+    const luna::Entity root = session.createEntityFromModelAsset(model_handle);
+    context.expect(root, "model asset import should create a root entity");
+    context.expect(scene.entityManager().entityCount() >= 5,
+                   "model import should add the model hierarchy to the bootstrapped scene");
+    context.expect(root.getChildCount() == 1, "model root should keep one top-level child");
+
+    if (root && root.getChildCount() == 1) {
+        const luna::Entity root_node = scene.entityManager().findEntityByUUID(root.getChildren().front());
+        context.expect(root_node && root_node.getName() == "RootNode",
+                       "first imported node should keep its source name");
+        if (root_node) {
+            context.expect(root_node.getParentUUID() == root.getUUID(), "first imported node should stay under root");
+            context.expect(root_node.getChildCount() == 1, "root node should keep its child");
+            if (root_node.hasComponent<luna::MeshComponent>()) {
+                const auto& mesh_component = root_node.getComponent<luna::MeshComponent>();
+                context.expect(mesh_component.firstSubmesh == 1,
+                               "imported mesh component should preserve first submesh");
+                context.expect(mesh_component.submeshCount == 1,
+                               "imported mesh component should preserve submesh count");
+                context.expect(mesh_component.getSubmeshMaterialCount() == 1,
+                               "imported mesh component should keep the active material slot count");
+                context.expect(mesh_component.getSubmeshMaterial(0) == luna::AssetHandle(9102),
+                               "imported mesh component should keep the source material binding");
+            }
+
+            const luna::Entity child_node =
+                scene.entityManager().findEntityByUUID(root_node.getChildren().front());
+            context.expect(child_node && child_node.getName() == "ChildNode",
+                           "second imported node should keep its source name");
+            if (child_node) {
+                context.expect(child_node.getParentUUID() == root_node.getUUID(),
+                               "second imported node should stay under the first node");
+                context.expect(child_node.getChildCount() == 1, "child node should keep its child");
+
+                const luna::Entity grand_child_node =
+                    scene.entityManager().findEntityByUUID(child_node.getChildren().front());
+                context.expect(grand_child_node && grand_child_node.getName() == "GrandChildNode",
+                               "third imported node should keep its source name");
+                if (grand_child_node) {
+                    context.expect(grand_child_node.getParentUUID() == child_node.getUUID(),
+                                   "third imported node should stay under the second node");
+                }
+            }
+        }
+    }
+
+    luna::AssetManager::get().clear();
+    luna::AssetDatabase::clear();
+}
+
 } // namespace
 
 int main()
@@ -336,6 +509,7 @@ int main()
     TestContext context;
     testAuthoringSessionSceneLifecycle(context);
     testAuthoringSessionHistory(context);
+    testModelHierarchyRoundTrip(context);
 
     luna::Logger::shutdown();
     return context.result();

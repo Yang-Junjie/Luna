@@ -1,0 +1,7 @@
+Asset:
+  Name: EnvironmentTest
+  Handle: 1639216519850589928
+  Type: Model
+  FilePath: Assets/EnvironmentTest/glTF/EnvironmentTest.lmodel
+  Config:
+    UseModelFileData: true

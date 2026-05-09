@@ -7,10 +7,12 @@ Model:
       Handle: 8227030149829513788
       FilePath: Assets/Model/DamagedHelmet/Materials/0_DamagedHelmet_Material_MR.lunamat
   Nodes:
-    - Name: DamagedHelmet
+    - Name: node_damagedHelmet_-6514
       Parent: -1
       Translation: [0, 0, 0]
-      Rotation: [0, 0, 0]
+      Rotation: [1.5707964, 0, 0]
       Scale: [1, 1, 1]
       Mesh: 17196472838577284151
+      FirstSubmesh: 0
+      SubmeshCount: 1
       SubmeshMaterials: [8227030149829513788]

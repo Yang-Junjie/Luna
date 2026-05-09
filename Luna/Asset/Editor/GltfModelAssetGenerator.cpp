@@ -14,16 +14,21 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <glm/geometric.hpp>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <fastgltf/core.hpp>
+#include <fastgltf/math.hpp>
 #include <fastgltf/types.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 #include <yaml-cpp/yaml.h>
@@ -43,6 +48,51 @@ struct GeneratedMaterial {
     AssetHandle Handle{0};
     std::filesystem::path FilePath;
 };
+
+struct GeneratedMeshInfo {
+    uint32_t FirstSubmesh = 0;
+    uint32_t SubmeshCount = 0;
+    std::vector<AssetHandle> SubmeshMaterials;
+};
+
+struct GeneratedNode {
+    std::string Name;
+    int32_t Parent = -1;
+    glm::vec3 Translation{0.0f, 0.0f, 0.0f};
+    glm::vec3 Rotation{0.0f, 0.0f, 0.0f};
+    glm::vec3 Scale{1.0f, 1.0f, 1.0f};
+    AssetHandle MeshHandle{0};
+    uint32_t FirstSubmesh = 0;
+    uint32_t SubmeshCount = UINT32_MAX;
+    std::vector<AssetHandle> SubmeshMaterials;
+};
+
+glm::vec3 toVec3(const fastgltf::math::fvec3& value)
+{
+    return {static_cast<float>(value.x()), static_cast<float>(value.y()), static_cast<float>(value.z())};
+}
+
+glm::quat toQuat(const fastgltf::math::fquat& value)
+{
+    return glm::quat(static_cast<float>(value.w()),
+                     static_cast<float>(value.x()),
+                     static_cast<float>(value.y()),
+                     static_cast<float>(value.z()));
+}
+
+glm::vec3 toEulerRadians(const fastgltf::math::fquat& value)
+{
+    return glm::eulerAngles(glm::normalize(toQuat(value)));
+}
+
+AssetHandle readHandle(const YAML::Node& node)
+{
+    if (!node || !node.IsScalar()) {
+        return AssetHandle(0);
+    }
+
+    return AssetHandle(node.as<uint64_t>());
+}
 
 std::string sanitizeFileStem(std::string value)
 {
@@ -423,42 +473,245 @@ std::vector<GeneratedMaterial> ensureGeneratedMaterials(const fastgltf::Asset& a
     return generated_materials;
 }
 
-std::vector<AssetHandle> buildSubmeshMaterialBindings(const fastgltf::Asset& asset,
-                                                      const std::vector<GeneratedMaterial>& generated_materials)
+GeneratedMeshInfo buildMeshInfo(const fastgltf::Mesh& mesh, const std::vector<GeneratedMaterial>& generated_materials)
 {
-    std::vector<AssetHandle> submesh_materials;
+    GeneratedMeshInfo mesh_info;
 
+    for (const auto& primitive : mesh.primitives) {
+        if (primitive.type != fastgltf::PrimitiveType::Triangles) {
+            continue;
+        }
+
+        if (primitive.findAttribute("POSITION") == primitive.attributes.end()) {
+            continue;
+        }
+
+        AssetHandle material_handle(0);
+        if (primitive.materialIndex.has_value()) {
+            const size_t material_index = *primitive.materialIndex;
+            if (material_index < generated_materials.size()) {
+                material_handle = generated_materials[material_index].Handle;
+            }
+        }
+
+        mesh_info.SubmeshMaterials.push_back(material_handle);
+    }
+
+    mesh_info.SubmeshCount = static_cast<uint32_t>(mesh_info.SubmeshMaterials.size());
+    return mesh_info;
+}
+
+std::vector<GeneratedMeshInfo> buildMeshInfos(const fastgltf::Asset& asset,
+                                              const std::vector<GeneratedMaterial>& generated_materials)
+{
+    std::vector<GeneratedMeshInfo> mesh_infos;
+    mesh_infos.reserve(asset.meshes.size());
+
+    uint32_t next_submesh = 0;
     for (const auto& mesh : asset.meshes) {
-        for (const auto& primitive : mesh.primitives) {
-            if (primitive.type != fastgltf::PrimitiveType::Triangles) {
-                continue;
-            }
+        GeneratedMeshInfo mesh_info = buildMeshInfo(mesh, generated_materials);
+        mesh_info.FirstSubmesh = next_submesh;
+        next_submesh += mesh_info.SubmeshCount;
+        mesh_infos.push_back(std::move(mesh_info));
+    }
 
-            if (primitive.findAttribute("POSITION") == primitive.attributes.end()) {
-                continue;
-            }
+    return mesh_infos;
+}
 
-            AssetHandle material_handle(0);
-            if (primitive.materialIndex.has_value()) {
-                const size_t material_index = *primitive.materialIndex;
-                if (material_index < generated_materials.size()) {
-                    material_handle = generated_materials[material_index].Handle;
-                }
-            }
-            submesh_materials.push_back(material_handle);
+GeneratedNode makeGeneratedNode(std::string name,
+                                int32_t parent,
+                                glm::vec3 translation,
+                                glm::vec3 rotation,
+                                glm::vec3 scale)
+{
+    GeneratedNode node;
+    node.Name = std::move(name);
+    node.Parent = parent;
+    node.Translation = translation;
+    node.Rotation = rotation;
+    node.Scale = scale;
+    return node;
+}
+
+GeneratedNode makeGeneratedNode(const std::string& name, int32_t parent, const fastgltf::Node& node)
+{
+    GeneratedNode generated_node = makeGeneratedNode(name, parent, glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f));
+
+    if (const auto* trs = std::get_if<fastgltf::TRS>(&node.transform)) {
+        generated_node.Translation = toVec3(trs->translation);
+        generated_node.Rotation = toEulerRadians(trs->rotation);
+        generated_node.Scale = toVec3(trs->scale);
+    } else if (const auto* matrix = std::get_if<fastgltf::math::fmat4x4>(&node.transform)) {
+        fastgltf::math::fvec3 translation{};
+        fastgltf::math::fvec3 scale{};
+        fastgltf::math::fquat rotation{};
+        fastgltf::math::decomposeTransformMatrix(*matrix, scale, rotation, translation);
+        generated_node.Translation = toVec3(translation);
+        generated_node.Rotation = toEulerRadians(rotation);
+        generated_node.Scale = toVec3(scale);
+    }
+
+    return generated_node;
+}
+
+void attachMeshInfo(GeneratedNode& node, const GeneratedMeshInfo& mesh_info, const AssetHandle mesh_handle)
+{
+    if (mesh_info.SubmeshCount == 0) {
+        return;
+    }
+
+    node.MeshHandle = mesh_handle;
+    node.FirstSubmesh = mesh_info.FirstSubmesh;
+    node.SubmeshCount = mesh_info.SubmeshCount;
+    node.SubmeshMaterials = mesh_info.SubmeshMaterials;
+}
+
+std::vector<GeneratedNode> buildGeneratedNodes(const fastgltf::Asset& asset,
+                                               const std::filesystem::path& gltf_path,
+                                               const AssetHandle mesh_handle,
+                                               const std::vector<GeneratedMeshInfo>& mesh_infos)
+{
+    std::vector<GeneratedNode> nodes;
+    if (asset.nodes.empty()) {
+        GeneratedNode fallback_node;
+        fallback_node.Name = sanitizeFileStem(gltf_path.stem().string());
+        fallback_node.MeshHandle = mesh_handle;
+        fallback_node.FirstSubmesh = 0;
+        fallback_node.SubmeshCount = 0;
+        for (const auto& mesh_info : mesh_infos) {
+            fallback_node.SubmeshMaterials.insert(fallback_node.SubmeshMaterials.end(),
+                                                  mesh_info.SubmeshMaterials.begin(),
+                                                  mesh_info.SubmeshMaterials.end());
+            fallback_node.SubmeshCount += mesh_info.SubmeshCount;
+        }
+        nodes.push_back(std::move(fallback_node));
+        return nodes;
+    }
+
+    std::unordered_set<size_t> child_nodes;
+    for (const auto& node : asset.nodes) {
+        for (const size_t child_index : node.children) {
+            child_nodes.insert(child_index);
         }
     }
 
-    return submesh_materials;
+    std::vector<size_t> root_node_indices;
+    if (!asset.scenes.empty()) {
+        size_t scene_index = asset.defaultScene.has_value() ? *asset.defaultScene : 0;
+        if (scene_index < asset.scenes.size()) {
+            const auto& scene = asset.scenes[scene_index];
+            root_node_indices.assign(scene.nodeIndices.begin(), scene.nodeIndices.end());
+        }
+    }
+
+    if (root_node_indices.empty()) {
+        for (size_t node_index = 0; node_index < asset.nodes.size(); ++node_index) {
+            if (!child_nodes.contains(node_index)) {
+                root_node_indices.push_back(node_index);
+            }
+        }
+    }
+
+    if (root_node_indices.empty()) {
+        for (size_t node_index = 0; node_index < asset.nodes.size(); ++node_index) {
+            root_node_indices.push_back(node_index);
+        }
+    }
+
+    std::unordered_set<size_t> visited;
+    auto append_node = [&](auto&& self, size_t node_index, int32_t parent_index) -> void {
+        if (node_index >= asset.nodes.size() || visited.contains(node_index)) {
+            return;
+        }
+        visited.insert(node_index);
+
+        const fastgltf::Node& source_node = asset.nodes[node_index];
+        std::string node_name = source_node.name.empty() ? sanitizeFileStem(gltf_path.stem().string()) + "_Node_" +
+                                                               std::to_string(node_index)
+                                                         : std::string(source_node.name);
+
+        nodes.push_back(makeGeneratedNode(node_name, parent_index, source_node));
+        const int32_t current_index = static_cast<int32_t>(nodes.size() - 1);
+
+        if (source_node.meshIndex.has_value() && *source_node.meshIndex < mesh_infos.size()) {
+            attachMeshInfo(nodes.back(), mesh_infos[*source_node.meshIndex], mesh_handle);
+        }
+
+        for (const size_t child_index : source_node.children) {
+            self(self, child_index, current_index);
+        }
+    };
+
+    for (const size_t root_node_index : root_node_indices) {
+        append_node(append_node, root_node_index, -1);
+    }
+
+    if (nodes.empty()) {
+        GeneratedNode fallback_node;
+        fallback_node.Name = sanitizeFileStem(gltf_path.stem().string());
+        fallback_node.MeshHandle = mesh_handle;
+        fallback_node.FirstSubmesh = 0;
+        fallback_node.SubmeshCount = 0;
+        for (const auto& mesh_info : mesh_infos) {
+            fallback_node.SubmeshMaterials.insert(fallback_node.SubmeshMaterials.end(),
+                                                  mesh_info.SubmeshMaterials.begin(),
+                                                  mesh_info.SubmeshMaterials.end());
+            fallback_node.SubmeshCount += mesh_info.SubmeshCount;
+        }
+        nodes.push_back(std::move(fallback_node));
+    }
+
+    return nodes;
+}
+
+bool isLegacyGeneratedModelFile(const std::filesystem::path& model_path, const AssetMetadata& mesh_metadata)
+{
+    if (!std::filesystem::exists(model_path)) {
+        return false;
+    }
+
+    try {
+        const YAML::Node data = YAML::LoadFile(model_path.string());
+        const YAML::Node model_node = data["Model"] ? data["Model"] : data;
+        if (!model_node || !model_node["SourceMesh"]) {
+            return false;
+        }
+
+        if (readHandle(model_node["SourceMesh"]) != mesh_metadata.Handle) {
+            return false;
+        }
+
+        const YAML::Node nodes = model_node["Nodes"];
+        if (!nodes || !nodes.IsSequence() || nodes.size() != 1) {
+            return false;
+        }
+
+        const YAML::Node node = nodes[0];
+        if (!node) {
+            return false;
+        }
+
+        const AssetHandle node_mesh_handle = node["Mesh"] ? readHandle(node["Mesh"]) : readHandle(node["MeshHandle"]);
+        if (node_mesh_handle != mesh_metadata.Handle) {
+            return false;
+        }
+
+        if (node["FirstSubmesh"] || node["SubmeshCount"]) {
+            return false;
+        }
+
+        return true;
+    } catch (const YAML::Exception&) {
+        return false;
+    }
 }
 
 bool writeModelFile(const std::filesystem::path& model_path,
-                    const std::filesystem::path& source_gltf_path,
                     const AssetMetadata& mesh_metadata,
                     const std::vector<GeneratedMaterial>& generated_materials,
-                    const std::vector<AssetHandle>& submesh_materials)
+                    const std::vector<GeneratedNode>& nodes)
 {
-    if (model_path.empty() || !mesh_metadata.Handle.isValid()) {
+    if (model_path.empty() || !mesh_metadata.Handle.isValid() || nodes.empty()) {
         return false;
     }
 
@@ -488,23 +741,29 @@ bool writeModelFile(const std::filesystem::path& model_path,
     out << YAML::EndSeq;
 
     out << YAML::Key << "Nodes" << YAML::Value << YAML::BeginSeq;
-    out << YAML::BeginMap;
-    out << YAML::Key << "Name" << YAML::Value << model_path.stem().string();
-    out << YAML::Key << "Parent" << YAML::Value << -1;
-    out << YAML::Key << "Translation" << YAML::Value;
-    emitVec3(out, glm::vec3(0.0f));
-    out << YAML::Key << "Rotation" << YAML::Value;
-    emitVec3(out, glm::vec3(0.0f));
-    out << YAML::Key << "Scale" << YAML::Value;
-    emitVec3(out, glm::vec3(1.0f));
-    out << YAML::Key << "Mesh" << YAML::Value;
-    emitHandle(out, mesh_metadata.Handle);
-    out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::Flow << YAML::BeginSeq;
-    for (const AssetHandle material_handle : submesh_materials) {
-        emitHandle(out, material_handle);
+    for (const GeneratedNode& node : nodes) {
+        out << YAML::BeginMap;
+        out << YAML::Key << "Name" << YAML::Value << node.Name;
+        out << YAML::Key << "Parent" << YAML::Value << node.Parent;
+        out << YAML::Key << "Translation" << YAML::Value;
+        emitVec3(out, node.Translation);
+        out << YAML::Key << "Rotation" << YAML::Value;
+        emitVec3(out, node.Rotation);
+        out << YAML::Key << "Scale" << YAML::Value;
+        emitVec3(out, node.Scale);
+        if (node.MeshHandle.isValid()) {
+            out << YAML::Key << "Mesh" << YAML::Value;
+            emitHandle(out, node.MeshHandle);
+            out << YAML::Key << "FirstSubmesh" << YAML::Value << node.FirstSubmesh;
+            out << YAML::Key << "SubmeshCount" << YAML::Value << node.SubmeshCount;
+            out << YAML::Key << "SubmeshMaterials" << YAML::Value << YAML::Flow << YAML::BeginSeq;
+            for (const AssetHandle material_handle : node.SubmeshMaterials) {
+                emitHandle(out, material_handle);
+            }
+            out << YAML::EndSeq;
+        }
+        out << YAML::EndMap;
     }
-    out << YAML::EndSeq;
-    out << YAML::EndMap;
     out << YAML::EndSeq;
 
     out << YAML::EndMap;
@@ -576,11 +835,11 @@ GltfModelAssetGenerator::GenerateResult
     const std::filesystem::path model_path = gltf_path.parent_path() / (gltf_path.stem().string() + ".lmodel");
     const std::vector<GeneratedMaterial> generated_materials =
         ensureGeneratedMaterials(*asset, gltf_path, result);
-    const std::vector<AssetHandle> submesh_materials =
-        buildSubmeshMaterialBindings(*asset, generated_materials);
+    const std::vector<GeneratedMeshInfo> mesh_infos = buildMeshInfos(*asset, generated_materials);
+    const std::vector<GeneratedNode> nodes = buildGeneratedNodes(*asset, gltf_path, mesh_metadata.Handle, mesh_infos);
 
-    if (!std::filesystem::exists(model_path)) {
-        if (writeModelFile(model_path, gltf_path, mesh_metadata, generated_materials, submesh_materials)) {
+    if (!std::filesystem::exists(model_path) || isLegacyGeneratedModelFile(model_path, mesh_metadata)) {
+        if (writeModelFile(model_path, mesh_metadata, generated_materials, nodes)) {
             result.CreatedModelFile = true;
         } else {
             LUNA_CORE_WARN("Failed to write generated model asset '{}'", model_path.string());

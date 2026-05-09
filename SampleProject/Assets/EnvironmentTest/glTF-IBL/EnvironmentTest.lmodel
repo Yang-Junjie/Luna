@@ -1,0 +1,57 @@
+Model:
+  Name: EnvironmentTest
+  Source: Assets/EnvironmentTest/glTF-IBL/EnvironmentTest.gltf
+  SourceMesh: 8766168467652532819
+  Materials:
+    - SourceMaterialIndex: 0
+      Handle: 12566377121231922418
+      FilePath: Assets/EnvironmentTest/glTF-IBL/Materials/0_EnvironmentTest_MetallicSpheresMat.lunamat
+    - SourceMaterialIndex: 1
+      Handle: 6904688103029586083
+      FilePath: Assets/EnvironmentTest/glTF-IBL/Materials/1_EnvironmentTest_DielectricSpheresMat.lunamat
+    - SourceMaterialIndex: 2
+      Handle: 4309227010076739354
+      FilePath: Assets/EnvironmentTest/glTF-IBL/Materials/2_EnvironmentTest_DielectricSpheresMat.lunamat
+  Nodes:
+    - Name: render_camera_n3d
+      Parent: -1
+      Translation: [-0.7599077, 7.7087607, 27.743376]
+      Rotation: [-0.15445532, -0.009661309, -2.6744581e-05]
+      Scale: [1, 1, 1]
+    - Name: ground_plane_n3d
+      Parent: -1
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    - Name: ENV_Spheres
+      Parent: -1
+      Translation: [-0.5564079, 4.774585, -1.0962677]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+    - Name: Metallic0
+      Parent: 2
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+      Mesh: 8766168467652532819
+      FirstSubmesh: 0
+      SubmeshCount: 1
+      SubmeshMaterials: [12566377121231922418]
+    - Name: Dielectric0
+      Parent: 2
+      Translation: [0, 0, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+      Mesh: 8766168467652532819
+      FirstSubmesh: 1
+      SubmeshCount: 1
+      SubmeshMaterials: [6904688103029586083]
+    - Name: Dielectric0-Black
+      Parent: 2
+      Translation: [0, -1.985868, 0]
+      Rotation: [0, -0, 0]
+      Scale: [1, 1, 1]
+      Mesh: 8766168467652532819
+      FirstSubmesh: 2
+      SubmeshCount: 1
+      SubmeshMaterials: [4309227010076739354]

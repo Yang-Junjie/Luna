@@ -1,0 +1,19 @@
+Material:
+  Name: EnvironmentTest_MetallicSpheresMat
+  Textures:
+    BaseColor: 0
+    Normal: 0
+    MetallicRoughness: 4131038717061836222
+    Emissive: 0
+    Occlusion: 0
+  Surface:
+    BaseColorFactor: [1, 1, 1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 1
+    RoughnessFactor: 1
+    NormalScale: 1
+    OcclusionStrength: 1
+    AlphaCutoff: 0.5
+    DoubleSided: true
+    Unlit: false
+    BlendMode: Opaque
