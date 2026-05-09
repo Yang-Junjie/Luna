@@ -9,7 +9,7 @@ import {
     normalizeAuthoringCapabilities,
     normalizeAuthoringPlan,
     normalizeAuthoringReport,
-} from "./authoringProtocol.ts";
+} from "../client/authoringProtocol.ts";
 
 const [clientPath, legacyHostPath, authoringHostPath] = process.argv.slice(2);
 assert.ok(clientPath, "Expected the TS client path.");

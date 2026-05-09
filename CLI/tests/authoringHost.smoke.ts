@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 
-import { AuthoringHostClient } from "./authoringHostClient.ts";
+import { AuthoringHostClient } from "../client/authoringHostClient.ts";
 
 const hostPath = process.argv[2];
 assert.ok(hostPath, "Missing LunaAuthoringHost path.");

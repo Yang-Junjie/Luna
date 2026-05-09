@@ -133,7 +133,23 @@ Use the report helper APIs for common scene reads:
 - `findEntityByName(report, name)`
 - `findEntitiesByComponent(report, component)`
 
-The interactive TS client also queues typed `PlanCommand` objects and executes them by writing a temporary plan JSON for the C++ `plan` entrypoint.
+The interactive TS client also queues typed `PlanCommand` objects and executes them by writing a temporary plan JSON for the C++ `plan` entrypoint. For longer-lived AI/editor work, `CLI/client/authoringController.ts` now provides a session controller that can open a transaction, run one or more plans, and then commit or roll back while keeping the latest report, repair context, and session snapshot available for the next turn.
+
+`CLI/client/authoringTurn.ts` builds the next layer: one stable authoring turn. A turn reads capabilities and session state, asks a planner for a plan, executes it in an owned transaction, inspects report/repair data, retries retryable failures when configured, and finally commits or rolls back. The current TS CLI exposes this through:
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts turn "create a simple scene with a cube"
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --execute turn "create a simple scene with a cube"
+```
+
+The turn planner can also call an OpenAI-compatible Chat Completions API. DeepSeek is a preset, but the client is not DeepSeek-specific: any provider with `baseURL`, `apiKey`, `model`, and `/chat/completions` semantics can be used.
+
+```powershell
+$env:DEEPSEEK_API_KEY="..."
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-provider deepseek --ai-thinking --ai-reasoning-effort high --execute turn "create a simple scene with a cube"
+
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-base-url https://example.compatible.provider/v1 --ai-api-key-env LUNA_AI_API_KEY --ai-model provider-model --execute turn "create a simple scene"
+```
 
 ## Capabilities
 

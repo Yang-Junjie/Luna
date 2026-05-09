@@ -4,10 +4,13 @@
   "scripts": {
     "luna": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts",
     "interactive": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts interactive",
-    "protocol-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types authoringProtocol.smoke.ts ../../Tests/Fixtures/Authoring/create_cube_scene.plan.json ../../Tests/Fixtures/Authoring/invalid_unknown_command.plan.json",
-    "interactive-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types interactive.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe",
-    "compose-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types compose.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe",
-    "host-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types authoringHost.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
+    "protocol-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringProtocol.smoke.ts ../../Tests/Fixtures/Authoring/create_cube_scene.plan.json ../../Tests/Fixtures/Authoring/invalid_unknown_command.plan.json",
+    "interactive-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/interactive.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe ../../build/CLI/LunaAuthoringHost.exe",
+    "compose-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/compose.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe ../../build/CLI/LunaAuthoringHost.exe",
+    "controller-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringController.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
+    "turn-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringTurn.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
+    "ai-planner-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringAiPlanner.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
+    "host-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringHost.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
     "smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts plan examples/smoke.plan.json"
   }
 }

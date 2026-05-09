@@ -118,7 +118,7 @@ if(BUILD_TESTING)
                 "${LUNA_NODE_EXECUTABLE}"
                 --disable-warning=ExperimentalWarning
                 --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/client/authoringProtocol.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringProtocol.smoke.ts"
                 "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/create_cube_scene.plan.json"
                 "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/invalid_unknown_command.plan.json"
         )
@@ -157,7 +157,7 @@ if(BUILD_TESTING)
                 "${LUNA_NODE_EXECUTABLE}"
                 --disable-warning=ExperimentalWarning
                 --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/client/interactive.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/interactive.smoke.ts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
                 "$<TARGET_FILE:LunaCLI>"
                 "$<TARGET_FILE:LunaAuthoringHost>"
@@ -169,10 +169,42 @@ if(BUILD_TESTING)
                 "${LUNA_NODE_EXECUTABLE}"
                 --disable-warning=ExperimentalWarning
                 --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/client/compose.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/compose.smoke.ts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
                 "$<TARGET_FILE:LunaCLI>"
                 "$<TARGET_FILE:LunaAuthoringHost>"
+        )
+
+        add_test(
+            NAME CliTsAuthoringControllerSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringController.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+        )
+
+        add_test(
+            NAME CliTsAuthoringTurnSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringTurn.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+        )
+
+        add_test(
+            NAME CliTsAuthoringAiPlannerSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringAiPlanner.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
         )
 
         add_test(
@@ -181,7 +213,7 @@ if(BUILD_TESTING)
                 "${LUNA_NODE_EXECUTABLE}"
                 --disable-warning=ExperimentalWarning
                 --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/client/authoringHost.smoke.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringHost.smoke.ts"
                 "$<TARGET_FILE:LunaAuthoringHost>"
         )
     endif()

@@ -9,9 +9,17 @@ import { stdin as input, stdout as output } from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { AuthoringHostClient } from "./authoringHostClient.ts";
+import { AuthoringSessionController } from "./authoringController.ts";
+import { createOpenAiCompatibleAuthoringPlanner } from "./authoringAiPlanner.ts";
+import { OpenAiCompatibleClient } from "./openAiCompatibleProvider.ts";
+import {
+    AuthoringTurn,
+    buildAuthoringTurnTransactionName,
+    type AuthoringTurnPlanner,
+    type AuthoringTurnResult,
+} from "./authoringTurn.ts";
 import {
     AuthoringPlanBuilder,
-    buildAuthoringRepairContext,
     parseAuthoringCommandTokens,
     readAuthoringPlanJson,
     requireFiniteNumber,
@@ -28,6 +36,16 @@ type ClientOptions = {
     host?: string;
     authoringHost?: string;
     project?: string;
+    planner: "local" | "ai";
+    aiProvider?: string;
+    aiBaseURL?: string;
+    aiApiKey?: string;
+    aiApiKeyEnv?: string;
+    aiModel?: string;
+    aiReasoningEffort?: string;
+    aiThinking: boolean;
+    aiTemperature?: number;
+    aiTimeoutMs?: number;
     jsonOutput: boolean;
     dryRun: boolean;
     execute: boolean;
@@ -43,6 +61,19 @@ type ComposeResult = {
     repair: AuthoringRepairContext;
 };
 
+type TurnRequest = {
+    intent: string;
+    execute: boolean;
+    maxAttempts: number;
+    printPlanOnly: boolean;
+    planner?: "local" | "ai";
+};
+
+type TurnResult = AuthoringTurnResult & {
+    mode: "dry-run" | "execute";
+    plan: AuthoringPlan;
+};
+
 function printUsage(): void {
     console.log(`Luna TS CLI
 
@@ -51,15 +82,18 @@ Usage:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] plan <plan.json>
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] capabilities
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] compose "<intent>"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] [--ai] [--ai-provider deepseek] turn "<intent>" [--max-attempts <n>]
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--json] [--dry-run] interactive
 
 Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts run new primitive CubeBox Cube save build/CLI/Smoke/TsScene
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts plan CLI/client/examples/smoke.plan.json
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts compose "create a simple scene with a cube, camera, and light"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts turn "create a simple scene with a cube, camera, and light"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-provider deepseek turn "create a simple scene with a cube"
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts interactive
 
-The TypeScript client uses LunaCLI for legacy command execution and LunaAuthoringHost for stateful authoring flows.`);
+The TypeScript client uses LunaCLI for legacy command execution and LunaAuthoringHost through a session controller for stateful authoring flows.`);
 }
 
 function takeOptionValue(args: string[], index: number, option: string): string {
@@ -71,7 +105,14 @@ function takeOptionValue(args: string[], index: number, option: string): string 
 }
 
 function parseClientOptions(args: string[]): ClientOptions {
-    const options: ClientOptions = { jsonOutput: false, dryRun: false, execute: false, passthrough: [] };
+    const options: ClientOptions = {
+        planner: "local",
+        aiThinking: false,
+        jsonOutput: false,
+        dryRun: false,
+        execute: false,
+        passthrough: [],
+    };
 
     for (let index = 0; index < args.length;) {
         const arg = args[index];
@@ -105,6 +146,106 @@ function parseClientOptions(args: string[]): ClientOptions {
             index += 1;
             continue;
         }
+        if (arg === "--planner") {
+            options.planner = parsePlannerName(takeOptionValue(args, index, arg));
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--planner=")) {
+            options.planner = parsePlannerName(arg.slice("--planner=".length));
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai") {
+            options.planner = "ai";
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-provider") {
+            options.aiProvider = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-provider=")) {
+            options.aiProvider = arg.slice("--ai-provider=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-base-url") {
+            options.aiBaseURL = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-base-url=")) {
+            options.aiBaseURL = arg.slice("--ai-base-url=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-api-key") {
+            options.aiApiKey = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-api-key=")) {
+            options.aiApiKey = arg.slice("--ai-api-key=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-api-key-env") {
+            options.aiApiKeyEnv = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-api-key-env=")) {
+            options.aiApiKeyEnv = arg.slice("--ai-api-key-env=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-model") {
+            options.aiModel = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-model=")) {
+            options.aiModel = arg.slice("--ai-model=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-reasoning-effort") {
+            options.aiReasoningEffort = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-reasoning-effort=")) {
+            options.aiReasoningEffort = arg.slice("--ai-reasoning-effort=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-thinking") {
+            options.aiThinking = true;
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-temperature") {
+            options.aiTemperature = parseFiniteOption(takeOptionValue(args, index, arg), arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-temperature=")) {
+            options.aiTemperature = parseFiniteOption(arg.slice("--ai-temperature=".length), "--ai-temperature");
+            index += 1;
+            continue;
+        }
+        if (arg === "--ai-timeout-ms") {
+            options.aiTimeoutMs = parsePositiveIntegerOption(takeOptionValue(args, index, arg), arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--ai-timeout-ms=")) {
+            options.aiTimeoutMs = parsePositiveIntegerOption(arg.slice("--ai-timeout-ms=".length), "--ai-timeout-ms");
+            index += 1;
+            continue;
+        }
         if (arg === "--dry-run") {
             options.dryRun = true;
             index += 1;
@@ -126,6 +267,25 @@ function parseClientOptions(args: string[]): ClientOptions {
     }
 
     return options;
+}
+
+function parsePlannerName(value: string): "local" | "ai" {
+    if (value === "local" || value === "ai") {
+        return value;
+    }
+    throw new Error("Planner must be 'local' or 'ai'.");
+}
+
+function parseFiniteOption(value: string, option: string): number {
+    return requireFiniteNumber(Number(value), option);
+}
+
+function parsePositiveIntegerOption(value: string, option: string): number {
+    const parsed = requireFiniteNumber(Number(value), option);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(`Option '${option}' must be a positive integer.`);
+    }
+    return parsed;
 }
 
 function findDefaultLegacyHost(): string {
@@ -189,12 +349,86 @@ async function withAuthoringHostClient<T>(
     }
 }
 
+function buildComposeTransactionName(intent: string): string {
+    const normalized = intent.trim().replace(/\s+/g, " ");
+    return normalized.length === 0 ? "Compose Session" : `Compose: ${normalized.slice(0, 64)}`;
+}
+
 async function readCapabilitiesFromAuthoringHost(host: string): Promise<AuthoringCapabilitiesDocument> {
     return await withAuthoringHostClient(host, async (client) => client.capabilities());
 }
 
 function printCapabilities(capabilities: AuthoringCapabilitiesDocument): void {
     console.log(JSON.stringify(capabilities, null, 2));
+}
+
+function createOpenAiCompatibleClient(options: ClientOptions): OpenAiCompatibleClient {
+    const provider = (options.aiProvider ?? process.env.LUNA_AI_PROVIDER ?? "deepseek").toLowerCase();
+    const defaultBaseURL = provider === "deepseek"
+        ? "https://api.deepseek.com"
+        : provider === "openai"
+            ? "https://api.openai.com/v1"
+            : undefined;
+    const defaultApiKeyEnv = provider === "deepseek"
+        ? "DEEPSEEK_API_KEY"
+        : provider === "openai"
+            ? "OPENAI_API_KEY"
+            : "LUNA_AI_API_KEY";
+    const defaultModel = provider === "deepseek" ? "deepseek-v4-pro" : undefined;
+
+    const baseURL = firstNonEmpty(options.aiBaseURL, process.env.LUNA_AI_BASE_URL, defaultBaseURL);
+    if (baseURL == null) {
+        throw new Error("AI base URL is required. Pass --ai-base-url or set LUNA_AI_BASE_URL.");
+    }
+
+    const apiKeyEnv = firstNonEmpty(options.aiApiKeyEnv, process.env.LUNA_AI_API_KEY_ENV, defaultApiKeyEnv);
+    const apiKey = firstNonEmpty(options.aiApiKey, process.env.LUNA_AI_API_KEY, apiKeyEnv == null ? undefined : process.env[apiKeyEnv]);
+    if (apiKey == null) {
+        throw new Error(`AI API key is required. Pass --ai-api-key or set ${apiKeyEnv ?? "LUNA_AI_API_KEY"}.`);
+    }
+
+    const model = firstNonEmpty(
+        options.aiModel,
+        process.env.LUNA_AI_MODEL,
+        provider === "openai" ? process.env.OPENAI_MODEL : undefined,
+        defaultModel,
+    );
+    if (model == null) {
+        throw new Error("AI model is required. Pass --ai-model or set LUNA_AI_MODEL.");
+    }
+
+    const timeoutMs = options.aiTimeoutMs ??
+        (process.env.LUNA_AI_TIMEOUT_MS == null
+            ? undefined
+            : parsePositiveIntegerOption(process.env.LUNA_AI_TIMEOUT_MS, "LUNA_AI_TIMEOUT_MS"));
+    const extraRequestFields: Record<string, unknown> = {};
+    const reasoningEffort = firstNonEmpty(options.aiReasoningEffort, process.env.LUNA_AI_REASONING_EFFORT);
+    if (reasoningEffort != null) {
+        extraRequestFields.reasoning_effort = reasoningEffort;
+    }
+    if (options.aiThinking || parseEnvBoolean(process.env.LUNA_AI_THINKING)) {
+        extraRequestFields.thinking = { type: "enabled" };
+    }
+
+    return new OpenAiCompatibleClient({
+        baseURL,
+        apiKey,
+        model,
+        timeoutMs,
+        extraRequestFields,
+    });
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+    return values.find((value) => value != null && value.trim().length > 0);
+}
+
+function parseEnvBoolean(value: string | undefined): boolean {
+    if (value == null) {
+        return false;
+    }
+    const normalized = value.trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "enabled";
 }
 
 function requireCapability(capabilities: AuthoringCapabilitiesDocument, op: string): void {
@@ -287,20 +521,203 @@ function printPlan(plan: AuthoringPlan): void {
     console.log(writeAuthoringPlanJson(plan).trimEnd());
 }
 
-async function runComposeWithAuthoringClient(
-    client: AuthoringHostClient,
+async function runComposeWithAuthoringController(
+    controller: AuthoringSessionController,
     intent: string,
     plan: AuthoringPlan,
     execute: boolean,
 ): Promise<ComposeResult> {
-    const result = await client.executePlan(plan);
+    const begin = await controller.beginTransaction(buildComposeTransactionName(intent));
+    if (!begin.ok) {
+        throw new Error(`Could not open authoring transaction for compose intent '${intent}'.`);
+    }
+
+    try {
+        const result = await controller.executePlan(plan);
+        if (execute) {
+            if (result.ok) {
+                await controller.commitTransaction();
+            } else {
+                await controller.rollbackTransaction();
+            }
+        } else {
+            await controller.rollbackTransaction();
+        }
+
+        return {
+            ok: result.ok,
+            mode: execute ? "execute" : "dry-run",
+            intent,
+            plan,
+            report: result.report,
+            repair: result.repair,
+        };
+    } catch (error) {
+        try {
+            await controller.rollbackTransaction();
+        } catch {
+            // Best-effort cleanup only.
+        }
+        throw error;
+    }
+}
+
+function parseTurnRequest(args: string[], globalExecute: boolean): TurnRequest {
+    let execute = globalExecute;
+    let printPlanOnly = false;
+    let maxAttempts = 1;
+    let planner: "local" | "ai" | undefined;
+    const intentParts: string[] = [];
+
+    for (let index = 0; index < args.length; ++index) {
+        const arg = args[index];
+        if (arg === "--ai") {
+            planner = "ai";
+            continue;
+        }
+        if (arg === "--planner") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --planner.");
+            }
+            planner = parsePlannerName(value);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--planner=")) {
+            planner = parsePlannerName(arg.slice("--planner=".length));
+            continue;
+        }
+        if (arg === "--execute") {
+            execute = true;
+            continue;
+        }
+        if (arg === "--dry-run") {
+            execute = false;
+            continue;
+        }
+        if (arg === "--plan-only") {
+            printPlanOnly = true;
+            continue;
+        }
+        if (arg === "--max-attempts") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --max-attempts.");
+            }
+            maxAttempts = parsePositiveIntegerOption(value, "--max-attempts");
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--max-attempts=")) {
+            maxAttempts = parsePositiveIntegerOption(arg.slice("--max-attempts=".length), "--max-attempts");
+            continue;
+        }
+        intentParts.push(arg);
+    }
+
+    const intent = intentParts.join(" ").trim();
+    if (intent.length === 0) {
+        throw new Error("Missing turn intent.");
+    }
+
+    return { intent, execute, maxAttempts, printPlanOnly, planner };
+}
+
+function createLocalTurnPlanner(intent: string, project?: string): AuthoringTurnPlanner {
+    return async ({ capabilities }) => composeLocalPlan(intent, capabilities, project);
+}
+
+function createTurnPlanner(intent: string, project: string | undefined, request: TurnRequest, options: ClientOptions): AuthoringTurnPlanner {
+    const planner = request.planner ?? options.planner;
+    if (planner === "ai") {
+        return createOpenAiCompatibleAuthoringPlanner({
+            client: createOpenAiCompatibleClient(options),
+            temperature: options.aiTemperature ??
+                (process.env.LUNA_AI_TEMPERATURE == null
+                    ? undefined
+                    : parseFiniteOption(process.env.LUNA_AI_TEMPERATURE, "LUNA_AI_TEMPERATURE")),
+        });
+    }
+
+    return createLocalTurnPlanner(intent, project);
+}
+
+function finalTurnPlan(result: AuthoringTurnResult): AuthoringPlan {
+    const attempt = result.attempts.at(-1);
+    if (attempt == null) {
+        throw new Error("Authoring turn did not produce a plan.");
+    }
+    return attempt.plan;
+}
+
+async function runTurnWithAuthoringController(
+    controller: AuthoringSessionController,
+    intent: string,
+    request: TurnRequest,
+    options: ClientOptions,
+    project?: string,
+): Promise<TurnResult> {
+    const planner = createTurnPlanner(intent, project, request, options);
+    const transactionName = buildAuthoringTurnTransactionName(intent);
+
+    if (request.printPlanOnly) {
+        const state = await controller.state();
+        const plan = await planner({
+            intent,
+            project,
+            attempt: 1,
+            maxAttempts: request.maxAttempts,
+            capabilities: state.capabilities,
+            session: state.session,
+        });
+        printPlan(plan);
+        return {
+            ok: true,
+            committed: false,
+            mode: request.execute ? "execute" : "dry-run",
+            intent,
+            project,
+            transactionName,
+            maxAttempts: request.maxAttempts,
+            capabilities: state.capabilities,
+            sessionBefore: state.session,
+            sessionAfter: state.session,
+            attempts: [],
+            report: {
+                protocol: state.capabilities.protocol,
+                ok: true,
+                scene: state.session.scene,
+                entities: [],
+                savedScenes: [],
+                inspections: [],
+                verifications: [],
+                diagnostics: [],
+                errors: [],
+            },
+            repair: {
+                ok: true,
+                diagnostics: [],
+                errors: [],
+                retryable: false,
+            },
+            events: [],
+            plan,
+        };
+    }
+
+    const turn = new AuthoringTurn(controller, { transactionName });
+    const result = await turn.run(intent, planner, {
+        project,
+        transactionName,
+        maxAttempts: request.maxAttempts,
+        commitOnSuccess: request.execute,
+    });
+
     return {
-        ok: result.ok,
-        mode: execute ? "execute" : "dry-run",
-        intent,
-        plan,
-        report: result.report,
-        repair: buildAuthoringRepairContext(result.report),
+        ...result,
+        mode: request.execute ? "execute" : "dry-run",
+        plan: finalTurnPlan(result),
     };
 }
 
@@ -777,15 +1194,27 @@ async function main(): Promise<number> {
         const request = parseComposeRequest(options.passthrough.slice(1), options.execute);
         const authoringHost = resolveAuthoringHost();
         return await withAuthoringHostClient(authoringHost, async (client) => {
-            const capabilities = await client.capabilities();
+            const controller = new AuthoringSessionController(client);
+            const capabilities = await controller.capabilities();
             const plan = composeLocalPlan(request.intent, capabilities, project);
             if (request.printPlanOnly) {
                 printPlan(plan);
                 return 0;
             }
 
-            const result = await runComposeWithAuthoringClient(client, request.intent, plan, request.execute);
+            const result = await runComposeWithAuthoringController(controller, request.intent, plan, request.execute);
             console.log(JSON.stringify(result, null, 2));
+            return result.ok ? 0 : 1;
+        });
+    } else if (command === "turn") {
+        const request = parseTurnRequest(options.passthrough.slice(1), options.execute);
+        const authoringHost = resolveAuthoringHost();
+        return await withAuthoringHostClient(authoringHost, async (client) => {
+            const controller = new AuthoringSessionController(client);
+            const result = await runTurnWithAuthoringController(controller, request.intent, request, options, project);
+            if (!request.printPlanOnly) {
+                console.log(JSON.stringify(result, null, 2));
+            }
             return result.ok ? 0 : 1;
         });
     } else if (command === "interactive") {
@@ -793,7 +1222,7 @@ async function main(): Promise<number> {
         const authoringHost = resolveAuthoringHost();
         return await runInteractive(interactiveLegacyHost, authoringHost, project, options.jsonOutput, options.dryRun);
     } else {
-        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', or 'interactive'.`);
+        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', 'turn', or 'interactive'.`);
     }
 
     if (project != null) {

@@ -19,7 +19,7 @@ import {
     normalizeAuthoringPlan,
     readAuthoringPlanJson,
     writeAuthoringPlanJson,
-} from "./authoringProtocol.ts";
+} from "../client/authoringProtocol.ts";
 
 const [validFixturePath, invalidFixturePath] = process.argv.slice(2);
 assert.ok(validFixturePath, "Expected a valid authoring fixture path.");
