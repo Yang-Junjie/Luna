@@ -45,6 +45,8 @@ public:
     [[nodiscard]] bool redo();
     [[nodiscard]] bool canUndo() const noexcept;
     [[nodiscard]] bool canRedo() const noexcept;
+    [[nodiscard]] size_t undoDepth() const noexcept;
+    [[nodiscard]] size_t redoDepth() const noexcept;
     void clearHistory();
 
     void resetScene();

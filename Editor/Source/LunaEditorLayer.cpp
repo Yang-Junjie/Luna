@@ -1,7 +1,6 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
-#include "Authoring/AuthoringSession.h"
 #include "Core/Log.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
@@ -150,7 +149,6 @@ namespace luna {
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application),
-      m_scene(std::make_unique<Scene>()),
       m_scene_hierarchy_panel(std::make_unique<SceneHierarchyPanel>(*this)),
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
       m_asset_loading_panel(std::make_unique<AssetLoadingPanel>()),
@@ -162,9 +160,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this)),
       m_backend_capabilities_panel(std::make_unique<BackendCapabilitiesPanel>())
-{
-    m_authoring_session.bindScene(*m_scene);
-}
+{}
 
 LunaEditorLayer::~LunaEditorLayer() = default;
 
@@ -174,7 +170,7 @@ void LunaEditorLayer::onAttach()
         return;
     }
 
-    m_scene->setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
+    m_editor_runtime.scene().setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
@@ -263,7 +259,7 @@ void LunaEditorLayer::onImGuiRender()
     ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
     ImGui::Separator();
     ImGui::Text("Scene File: %s", m_asset_label.c_str());
-    ImGui::Text("Entities: %zu", m_scene->entityManager().entityCount());
+    ImGui::Text("Entities: %zu", m_editor_runtime.scene().entityManager().entityCount());
     ImGui::Separator();
 
     const auto viewport_extent = renderer.getSceneOutputSize();
@@ -439,13 +435,13 @@ void LunaEditorLayer::onImGuiMenuBar()
     }
 
     if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !m_runtime_viewport_enabled && m_authoring_session.canUndo())) {
+        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !m_runtime_viewport_enabled && m_editor_runtime.canUndo())) {
             undo();
         }
         if (ImGui::MenuItem("Redo",
                             "Ctrl+Y",
                             false,
-                            !m_runtime_viewport_enabled && m_authoring_session.canRedo())) {
+                            !m_runtime_viewport_enabled && m_editor_runtime.canRedo())) {
             redo();
         }
         ImGui::EndMenu();
@@ -554,7 +550,7 @@ void LunaEditorLayer::drawViewport()
 void LunaEditorLayer::updateGizmoShortcuts()
 {
     if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput ||
-        !m_selected_entity_id.isValid()) {
+        !m_editor_runtime.selectedEntityId().isValid()) {
         return;
     }
 
@@ -577,7 +573,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     Entity selected_entity = getSelectedEntity();
     if (!selected_entity || !selected_entity.isValid() || !selected_entity.hasComponent<TransformComponent>()) {
         if (m_gizmo_transform_transaction_active) {
-            (void) m_authoring_session.commitTransaction();
+            (void) m_editor_runtime.commitTransaction();
             m_gizmo_transform_transaction_active = false;
             processAuthoringEvents();
         }
@@ -593,7 +589,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     glm::mat4 view = camera.getViewMatrix();
     glm::mat4 projection = camera.getProjectionMatrix(aspect_ratio);
     projection[1][1] *= -1.0f;
-    glm::mat4 transform = m_scene->entityManager().getWorldSpaceTransformMatrix(selected_entity);
+    glm::mat4 transform = m_editor_runtime.scene().entityManager().getWorldSpaceTransformMatrix(selected_entity);
 
     ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
     ImGuizmo::SetDrawlist();
@@ -610,12 +606,12 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     const bool gizmo_using = ImGuizmo::IsUsing();
     if (gizmo_using) {
         if (!m_gizmo_transform_transaction_active) {
-            m_gizmo_transform_transaction_active = m_authoring_session.beginTransaction("Transform Entity");
+            m_gizmo_transform_transaction_active = m_editor_runtime.beginTransaction("Transform Entity");
         }
-        m_scene->entityManager().setWorldSpaceTransform(selected_entity, transform);
-        m_authoring_session.markSceneDirty();
+        m_editor_runtime.scene().entityManager().setWorldSpaceTransform(selected_entity, transform);
+        m_editor_runtime.markSceneDirty();
     } else if (m_gizmo_transform_transaction_active) {
-        (void) m_authoring_session.commitTransaction();
+        (void) m_editor_runtime.commitTransaction();
         m_gizmo_transform_transaction_active = false;
         processAuthoringEvents();
     }
@@ -724,7 +720,7 @@ const std::string& LunaEditorLayer::getAssetLabel() const
 
 Scene& LunaEditorLayer::getScene()
 {
-    return *m_scene;
+    return m_editor_runtime.scene();
 }
 
 Scene& LunaEditorLayer::getInspectionScene()
@@ -739,31 +735,27 @@ bool LunaEditorLayer::isRuntimeViewportEnabled() const noexcept
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
 {
-    return m_selected_entity_id;
+    return m_editor_runtime.selectedEntityId();
 }
 
 Entity LunaEditorLayer::getSelectedEntity()
 {
-    if (!m_selected_entity_id.isValid()) {
-        return {};
-    }
-
-    return getInspectionScene().entityManager().findEntityByUUID(m_selected_entity_id);
+    return m_editor_runtime.selectedEntity(getInspectionScene());
 }
 
 void LunaEditorLayer::setSelectedEntity(Entity entity)
 {
-    m_selected_entity_id = entity ? entity.getUUID() : UUID(0);
+    m_editor_runtime.setSelectedEntity(entity);
 }
 
 void LunaEditorLayer::setSelectedEntityId(UUID entity_id)
 {
-    m_selected_entity_id = entity_id;
+    m_editor_runtime.setSelectedEntityId(entity_id);
 }
 
 void LunaEditorLayer::markSceneDirty()
 {
-    m_authoring_session.markSceneDirty();
+    m_editor_runtime.markSceneDirty();
     processAuthoringEvents();
 }
 
@@ -800,117 +792,106 @@ bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path
 
 Entity LunaEditorLayer::createEntity(const std::string& name, Entity parent)
 {
-    Entity entity = m_authoring_session.createEntity(name, parent);
+    Entity entity = m_editor_runtime.createEntity(name, parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Entity parent)
 {
-    Entity root = m_authoring_session.createEntityFromModelAsset(model_handle, parent);
+    Entity root = m_editor_runtime.createEntityFromModelAsset(model_handle, parent);
     if (!root) {
         return {};
     }
 
-    setSelectedEntity(root);
     processAuthoringEvents();
     return root;
 }
 
 Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent)
 {
-    Entity entity = m_authoring_session.createEntityFromMeshAsset(mesh_handle, parent);
+    Entity entity = m_editor_runtime.createEntityFromMeshAsset(mesh_handle, parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity parent)
 {
-    Entity entity = m_authoring_session.createPrimitiveEntity(mesh_handle, parent);
+    Entity entity = m_editor_runtime.createPrimitiveEntity(mesh_handle, parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createCameraEntity(Entity parent)
 {
-    Entity entity = m_authoring_session.createCameraEntity(parent);
+    Entity entity = m_editor_runtime.createCameraEntity(parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 {
-    Entity entity = m_authoring_session.createDirectionalLightEntity(parent);
+    Entity entity = m_editor_runtime.createDirectionalLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 {
-    Entity entity = m_authoring_session.createPointLightEntity(parent);
+    Entity entity = m_editor_runtime.createPointLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
 {
-    Entity entity = m_authoring_session.createSpotLightEntity(parent);
+    Entity entity = m_editor_runtime.createSpotLightEntity(parent);
     if (!entity) {
         return {};
     }
 
-    setSelectedEntity(entity);
     processAuthoringEvents();
     return entity;
 }
 
 bool LunaEditorLayer::destroyEntity(Entity entity)
 {
-    const bool destroyed = m_authoring_session.destroyEntity(entity);
+    const bool destroyed = m_editor_runtime.destroyEntity(entity);
     if (!destroyed) {
         return false;
     }
 
-    if (m_selected_entity_id.isValid() && !m_scene->entityManager().containsEntity(m_selected_entity_id)) {
-        m_selected_entity_id = UUID(0);
-    }
     processAuthoringEvents();
     return true;
 }
 
 bool LunaEditorLayer::reparentEntity(Entity entity, Entity parent, bool preserve_world_transform)
 {
-    const bool changed = m_authoring_session.reparentEntity(entity, parent, preserve_world_transform);
+    const bool changed = m_editor_runtime.reparentEntity(entity, parent, preserve_world_transform);
     if (changed) {
         processAuthoringEvents();
     }
@@ -919,7 +900,7 @@ bool LunaEditorLayer::reparentEntity(Entity entity, Entity parent, bool preserve
 
 bool LunaEditorLayer::addComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
 {
-    const bool changed = m_authoring_session.addComponent(entity, component_kind);
+    const bool changed = m_editor_runtime.addComponent(entity, component_kind);
     if (changed) {
         processAuthoringEvents();
     }
@@ -928,7 +909,7 @@ bool LunaEditorLayer::addComponent(Entity entity, authoring::AuthoringComponentK
 
 bool LunaEditorLayer::removeComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
 {
-    const bool changed = m_authoring_session.removeComponent(entity, component_kind);
+    const bool changed = m_editor_runtime.removeComponent(entity, component_kind);
     if (changed) {
         processAuthoringEvents();
     }
@@ -937,14 +918,14 @@ bool LunaEditorLayer::removeComponent(Entity entity, authoring::AuthoringCompone
 
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
-    if (m_authoring_session.applyMeshAssetToEntity(entity, mesh_handle)) {
+    if (m_editor_runtime.applyMeshAssetToEntity(entity, mesh_handle)) {
         processAuthoringEvents();
     }
 }
 
 bool LunaEditorLayer::setEntityName(Entity entity, std::string name)
 {
-    const bool changed = m_authoring_session.setEntityName(entity, std::move(name));
+    const bool changed = m_editor_runtime.setEntityName(entity, std::move(name));
     if (changed) {
         processAuthoringEvents();
     }
@@ -953,7 +934,7 @@ bool LunaEditorLayer::setEntityName(Entity entity, std::string name)
 
 bool LunaEditorLayer::setEntityTransform(Entity entity, const TransformComponent& transform)
 {
-    const bool changed = m_authoring_session.setEntityTransform(entity, transform);
+    const bool changed = m_editor_runtime.setEntityTransform(entity, transform);
     if (changed) {
         processAuthoringEvents();
     }
@@ -962,7 +943,7 @@ bool LunaEditorLayer::setEntityTransform(Entity entity, const TransformComponent
 
 bool LunaEditorLayer::setCameraComponent(Entity entity, const CameraComponent& camera_component)
 {
-    const bool changed = m_authoring_session.setCameraComponent(entity, camera_component);
+    const bool changed = m_editor_runtime.setCameraComponent(entity, camera_component);
     if (changed) {
         processAuthoringEvents();
     }
@@ -971,7 +952,7 @@ bool LunaEditorLayer::setCameraComponent(Entity entity, const CameraComponent& c
 
 bool LunaEditorLayer::setLightComponent(Entity entity, const LightComponent& light_component)
 {
-    const bool changed = m_authoring_session.setLightComponent(entity, light_component);
+    const bool changed = m_editor_runtime.setLightComponent(entity, light_component);
     if (changed) {
         processAuthoringEvents();
     }
@@ -980,7 +961,7 @@ bool LunaEditorLayer::setLightComponent(Entity entity, const LightComponent& lig
 
 bool LunaEditorLayer::setMeshComponent(Entity entity, const MeshComponent& mesh_component)
 {
-    const bool changed = m_authoring_session.setMeshComponent(entity, mesh_component);
+    const bool changed = m_editor_runtime.setMeshComponent(entity, mesh_component);
     if (changed) {
         processAuthoringEvents();
     }
@@ -989,7 +970,7 @@ bool LunaEditorLayer::setMeshComponent(Entity entity, const MeshComponent& mesh_
 
 bool LunaEditorLayer::setScriptComponent(Entity entity, const ScriptComponent& script_component)
 {
-    const bool changed = m_authoring_session.setScriptComponent(entity, script_component);
+    const bool changed = m_editor_runtime.setScriptComponent(entity, script_component);
     if (changed) {
         processAuthoringEvents();
     }
@@ -998,7 +979,7 @@ bool LunaEditorLayer::setScriptComponent(Entity entity, const ScriptComponent& s
 
 bool LunaEditorLayer::setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings)
 {
-    const bool changed = m_authoring_session.setSceneEnvironmentSettings(settings);
+    const bool changed = m_editor_runtime.setSceneEnvironmentSettings(settings);
     if (changed) {
         processAuthoringEvents();
     }
@@ -1007,7 +988,7 @@ bool LunaEditorLayer::setSceneEnvironmentSettings(const SceneEnvironmentSettings
 
 bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings)
 {
-    const bool changed = m_authoring_session.setSceneShadowSettings(settings);
+    const bool changed = m_editor_runtime.setSceneShadowSettings(settings);
     if (changed) {
         processAuthoringEvents();
     }
@@ -1093,9 +1074,8 @@ void LunaEditorLayer::resetEditorState()
 {
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
-    m_authoring_session.resetScene();
+    m_editor_runtime.resetScene();
     m_scene_setting_panel->syncFromScene();
-    m_selected_entity_id = UUID(0);
     m_asset_label = "No scene loaded";
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
@@ -1109,7 +1089,7 @@ void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
     }
 
     if (m_gizmo_transform_transaction_active) {
-        (void) m_authoring_session.commitTransaction();
+        (void) m_editor_runtime.commitTransaction();
         m_gizmo_transform_transaction_active = false;
         processAuthoringEvents();
     }
@@ -1124,7 +1104,7 @@ void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
 
 void LunaEditorLayer::beginRuntimeViewport()
 {
-    const std::string runtime_scene_snapshot = SceneSerializer::serializeToString(*m_scene);
+    const std::string runtime_scene_snapshot = SceneSerializer::serializeToString(m_editor_runtime.scene());
     if (runtime_scene_snapshot.empty()) {
         LUNA_EDITOR_WARN("Failed to serialize current editor scene for runtime viewport");
         m_runtime_viewport_enabled = false;
@@ -1141,7 +1121,7 @@ void LunaEditorLayer::beginRuntimeViewport()
         return;
     }
 
-    m_runtime_scene->setAssetLoadBehavior(m_scene->getAssetLoadBehavior());
+    m_runtime_scene->setAssetLoadBehavior(m_editor_runtime.scene().getAssetLoadBehavior());
     m_runtime_scene_runtime = std::make_unique<SceneRuntime>(*m_runtime_scene);
     const auto project_info = ProjectManager::instance().getProjectInfo();
     m_runtime_scene_runtime->setScriptRuntime(
@@ -1179,12 +1159,12 @@ void LunaEditorLayer::endRuntimeViewport()
 
 Scene& LunaEditorLayer::activeRenderScene()
 {
-    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : *m_scene;
+    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : m_editor_runtime.scene();
 }
 
 void LunaEditorLayer::processAuthoringEvents()
 {
-    const std::vector<authoring::AuthoringEvent> events = m_authoring_session.consumeEvents();
+    const std::vector<authoring::AuthoringEvent> events = m_editor_runtime.consumeAuthoringEvents();
     if (events.empty()) {
         return;
     }
@@ -1221,9 +1201,8 @@ void LunaEditorLayer::processAuthoringEvents()
         }
     }
 
-    if (validate_selection && m_selected_entity_id.isValid() &&
-        !m_scene->entityManager().containsEntity(m_selected_entity_id)) {
-        m_selected_entity_id = UUID(0);
+    if (validate_selection) {
+        m_editor_runtime.validateSelection();
     }
 
     if (sync_scene_settings && m_scene_setting_panel) {
@@ -1239,12 +1218,12 @@ void LunaEditorLayer::createScene()
 {
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
-    m_selected_entity_id = UUID(0);
+    m_editor_runtime.clearSelection();
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
     syncEditorGridFeatureState();
 
-    const auto bootstrap = m_authoring_session.createScene();
+    const auto bootstrap = m_editor_runtime.createScene();
     if (bootstrap.directional_light) {
         setSelectedEntity(bootstrap.directional_light);
     } else if (bootstrap.camera) {
@@ -1297,11 +1276,11 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
         if (std::filesystem::exists(start_scene_path)) {
             if (!openScene(start_scene_path, false)) {
                 createScene();
-                m_authoring_session.setSceneFilePath(start_scene_path);
+                m_editor_runtime.setSceneFilePath(start_scene_path);
                 updateSceneLabel();
             }
         } else {
-            m_authoring_session.setSceneFilePath(start_scene_path);
+            m_editor_runtime.setSceneFilePath(start_scene_path);
             updateSceneLabel();
             LUNA_EDITOR_WARN("Configured StartScene '{}' does not exist. Saving will create it at that location.",
                              start_scene_path.string());
@@ -1314,7 +1293,7 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
 
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
-                     m_scene->entityManager().entityCount());
+                     m_editor_runtime.scene().entityManager().entityCount());
     m_content_browser_panel->requestRefresh();
     return true;
 }
@@ -1340,12 +1319,11 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
 
-    if (!m_authoring_session.openScene(normalized_scene_path)) {
+    if (!m_editor_runtime.openScene(normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to open scene '{}'", normalized_scene_path.string());
         return false;
     }
 
-    m_selected_entity_id = UUID(0);
     processAuthoringEvents();
 
     if (update_project_start_scene) {
@@ -1353,17 +1331,19 @@ bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bo
     }
 
     LUNA_EDITOR_INFO(
-        "Opened scene '{}' with {} entities", normalized_scene_path.string(), m_scene->entityManager().entityCount());
+        "Opened scene '{}' with {} entities",
+        normalized_scene_path.string(),
+        m_editor_runtime.scene().entityManager().entityCount());
     return true;
 }
 
 bool LunaEditorLayer::saveScene()
 {
-    if (m_authoring_session.sceneFilePath().empty()) {
+    if (m_editor_runtime.sceneFilePath().empty()) {
         return saveSceneAs();
     }
 
-    return saveSceneAs(m_authoring_session.sceneFilePath());
+    return saveSceneAs(m_editor_runtime.sceneFilePath());
 }
 
 bool LunaEditorLayer::saveSceneAs()
@@ -1384,7 +1364,7 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
         return false;
     }
 
-    if (!m_authoring_session.saveSceneAs(normalized_scene_path)) {
+    if (!m_editor_runtime.saveSceneAs(normalized_scene_path)) {
         LUNA_EDITOR_WARN("Failed to save scene '{}'", normalized_scene_path.string());
         return false;
     }
@@ -1393,13 +1373,13 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
     syncProjectStartScene(normalized_scene_path);
     m_content_browser_panel->requestRefresh();
 
-    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_scene->getName(), normalized_scene_path.string());
+    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_editor_runtime.scene().getName(), normalized_scene_path.string());
     return true;
 }
 
 bool LunaEditorLayer::undo()
 {
-    if (m_runtime_viewport_enabled || !m_authoring_session.undo()) {
+    if (m_runtime_viewport_enabled || !m_editor_runtime.undo()) {
         return false;
     }
 
@@ -1409,7 +1389,7 @@ bool LunaEditorLayer::undo()
 
 bool LunaEditorLayer::redo()
 {
-    if (m_runtime_viewport_enabled || !m_authoring_session.redo()) {
+    if (m_runtime_viewport_enabled || !m_editor_runtime.redo()) {
         return false;
     }
 
@@ -1419,8 +1399,8 @@ bool LunaEditorLayer::redo()
 
 std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
 {
-    if (!m_authoring_session.sceneFilePath().empty()) {
-        const std::filesystem::path parent_path = m_authoring_session.sceneFilePath().parent_path();
+    if (!m_editor_runtime.sceneFilePath().empty()) {
+        const std::filesystem::path parent_path = m_editor_runtime.sceneFilePath().parent_path();
         if (!parent_path.empty() && std::filesystem::exists(parent_path)) {
             return parent_path;
         }
@@ -1448,18 +1428,19 @@ std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
 
 void LunaEditorLayer::updateSceneLabel()
 {
-    const char* dirty_suffix = m_authoring_session.isSceneDirty() ? " *" : "";
-    if (!m_authoring_session.sceneFilePath().empty()) {
-        if (const auto relative_path = makeScenePathRelativeToProject(m_authoring_session.sceneFilePath())) {
+    const char* dirty_suffix = m_editor_runtime.isSceneDirty() ? " *" : "";
+    if (!m_editor_runtime.sceneFilePath().empty()) {
+        if (const auto relative_path = makeScenePathRelativeToProject(m_editor_runtime.sceneFilePath())) {
             m_asset_label = relative_path->generic_string() + dirty_suffix;
             return;
         }
 
-        m_asset_label = m_authoring_session.sceneFilePath().lexically_normal().string() + dirty_suffix;
+        m_asset_label = m_editor_runtime.sceneFilePath().lexically_normal().string() + dirty_suffix;
         return;
     }
 
-    const std::string scene_name = m_scene->getName().empty() ? "Untitled" : m_scene->getName();
+    const std::string scene_name =
+        m_editor_runtime.scene().getName().empty() ? "Untitled" : m_editor_runtime.scene().getName();
     m_asset_label = scene_name + SceneSerializer::FileExtension + std::string(" (unsaved)");
 }
 

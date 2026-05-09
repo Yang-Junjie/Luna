@@ -3,9 +3,10 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
-const [clientPath, hostPath] = process.argv.slice(2);
+const [clientPath, legacyHostPath, authoringHostPath] = process.argv.slice(2);
 assert.ok(clientPath, "Expected the TS client path.");
-assert.ok(hostPath, "Expected the LunaCLI host path.");
+assert.ok(legacyHostPath, "Expected the LunaCLI host path.");
+assert.ok(authoringHostPath, "Expected the LunaAuthoringHost path.");
 
 const input = [
     "new",
@@ -25,7 +26,9 @@ const result = spawnSync(
         "--experimental-strip-types",
         clientPath,
         "--host",
-        hostPath,
+        legacyHostPath,
+        "--authoring-host",
+        authoringHostPath,
         "--json",
         "interactive",
     ],

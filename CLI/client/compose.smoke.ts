@@ -11,9 +11,10 @@ import {
     normalizeAuthoringReport,
 } from "./authoringProtocol.ts";
 
-const [clientPath, hostPath] = process.argv.slice(2);
+const [clientPath, legacyHostPath, authoringHostPath] = process.argv.slice(2);
 assert.ok(clientPath, "Expected the TS client path.");
-assert.ok(hostPath, "Expected the LunaCLI host path.");
+assert.ok(legacyHostPath, "Expected the LunaCLI host path.");
+assert.ok(authoringHostPath, "Expected the LunaAuthoringHost path.");
 
 const capabilities = spawnSync(
     process.execPath,
@@ -21,8 +22,8 @@ const capabilities = spawnSync(
         "--disable-warning=ExperimentalWarning",
         "--experimental-strip-types",
         clientPath,
-        "--host",
-        hostPath,
+        "--authoring-host",
+        authoringHostPath,
         "capabilities",
     ],
     { encoding: "utf8" },
@@ -53,7 +54,9 @@ const composed = spawnSync(
         "--experimental-strip-types",
         clientPath,
         "--host",
-        hostPath,
+        legacyHostPath,
+        "--authoring-host",
+        authoringHostPath,
         "--json",
         "compose",
         "create a simple scene with a cube, floor, camera, and light",
@@ -86,7 +89,9 @@ const executed = spawnSync(
         "--experimental-strip-types",
         clientPath,
         "--host",
-        hostPath,
+        legacyHostPath,
+        "--authoring-host",
+        authoringHostPath,
         "--json",
         "compose",
         "create a simple scene with a cube",
@@ -109,7 +114,9 @@ const planOnly = spawnSync(
         "--experimental-strip-types",
         clientPath,
         "--host",
-        hostPath,
+        legacyHostPath,
+        "--authoring-host",
+        authoringHostPath,
         "compose",
         "create a sphere scene",
         "--plan-only",

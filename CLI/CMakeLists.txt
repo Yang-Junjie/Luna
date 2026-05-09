@@ -3,14 +3,32 @@ add_executable(
     LunaCLI.cpp
 )
 
+add_executable(
+    LunaAuthoringHost
+    LunaAuthoringHost.cpp
+)
+
 target_link_libraries(
     LunaCLI
     PRIVATE
         LunaCore
 )
 
+target_link_libraries(
+    LunaAuthoringHost
+    PRIVATE
+        LunaCore
+        nlohmann_json::nlohmann_json
+)
+
 set_target_properties(
     LunaCLI
+    PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
+set_target_properties(
+    LunaAuthoringHost
     PROPERTIES
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
@@ -142,6 +160,7 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/interactive.smoke.ts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
                 "$<TARGET_FILE:LunaCLI>"
+                "$<TARGET_FILE:LunaAuthoringHost>"
         )
 
         add_test(
@@ -153,6 +172,17 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/compose.smoke.ts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
                 "$<TARGET_FILE:LunaCLI>"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+        )
+
+        add_test(
+            NAME AuthoringHostStdioSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/authoringHost.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
         )
     endif()
 endif()

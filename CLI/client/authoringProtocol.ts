@@ -577,13 +577,16 @@ function nullableInteger(value: unknown, field: string): number | null {
     return requireNonNegativeInteger(value, field);
 }
 
-function normalizeSceneSnapshot(input: unknown): AuthoringSceneSnapshot {
-    const record = requireObjectRecord(input, "scene");
+export function normalizeAuthoringSceneSnapshot(
+    input: unknown,
+    field = "scene",
+): AuthoringSceneSnapshot {
+    const record = requireObjectRecord(input, field);
     return {
-        name: requireString(record.name, "scene.name"),
-        path: nullableString(record.path, "scene.path"),
-        entityCount: requireNonNegativeInteger(record.entityCount, "scene.entityCount"),
-        dirty: requireBoolean(record.dirty, "scene.dirty"),
+        name: requireString(record.name, `${field}.name`),
+        path: nullableString(record.path, `${field}.path`),
+        entityCount: requireNonNegativeInteger(record.entityCount, `${field}.entityCount`),
+        dirty: requireBoolean(record.dirty, `${field}.dirty`),
     };
 }
 
@@ -743,7 +746,7 @@ export function normalizeAuthoringReport(input: unknown): AuthoringReport {
     return {
         protocol: { name: AUTHORING_PROTOCOL_NAME, version: AUTHORING_PROTOCOL_VERSION },
         ok: requireBoolean(record.ok, "ok"),
-        scene: normalizeSceneSnapshot(record.scene),
+        scene: normalizeAuthoringSceneSnapshot(record.scene),
         entities: entities.map((entity, index) => normalizeEntityBinding(entity, index)),
         savedScenes: requireStringArray(record.savedScenes, "savedScenes"),
         inspections: inspections.map((inspection, index) => normalizeInspection(inspection, index)),

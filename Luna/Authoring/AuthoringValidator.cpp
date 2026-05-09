@@ -210,6 +210,24 @@ EntityFacts factsFromSceneEntity(const Scene& scene, UUID uuid)
     return facts;
 }
 
+void seedKnownAliases(ValidationState& state, const AuthoringSession& session, const AuthoringAliasMap& aliases)
+{
+    if (!session.hasScene()) {
+        return;
+    }
+
+    for (const auto& [alias, entity_id] : aliases) {
+        if (alias.empty()) {
+            continue;
+        }
+
+        const EntityFacts facts = factsFromSceneEntity(session.scene(), entity_id);
+        if (facts.components != 0) {
+            state.aliases.emplace(alias, facts);
+        }
+    }
+}
+
 std::optional<uint16_t> componentBitByName(std::string_view component_name)
 {
     const std::string normalized_name = toLower(std::string(component_name));
@@ -727,6 +745,9 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
     ValidationState state;
     state.entity_count = session.scene().entityManager().entityCount();
     state.scene_saved_known = !session.sceneFilePath().empty() && !session.isSceneDirty();
+    if (options.known_aliases != nullptr) {
+        seedKnownAliases(state, session, *options.known_aliases);
+    }
 
     for (size_t command_index = 0; command_index < plan.commands.size(); ++command_index) {
         const AuthoringCommand& command = plan.commands[command_index];

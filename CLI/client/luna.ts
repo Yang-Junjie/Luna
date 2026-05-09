@@ -8,11 +8,10 @@ import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { AuthoringHostClient } from "./authoringHostClient.ts";
 import {
     AuthoringPlanBuilder,
     buildAuthoringRepairContext,
-    normalizeAuthoringCapabilities,
-    normalizeAuthoringReport,
     parseAuthoringCommandTokens,
     readAuthoringPlanJson,
     requireFiniteNumber,
@@ -27,18 +26,12 @@ import {
 
 type ClientOptions = {
     host?: string;
+    authoringHost?: string;
     project?: string;
     jsonOutput: boolean;
     dryRun: boolean;
     execute: boolean;
     passthrough: string[];
-};
-
-type HostJsonResult = {
-    status: number;
-    report: AuthoringReport;
-    stdout: string;
-    stderr: string;
 };
 
 type ComposeResult = {
@@ -56,9 +49,9 @@ function printUsage(): void {
 Usage:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] run <commands...>
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] plan <plan.json>
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] capabilities
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--execute] compose "<intent>"
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--json] [--dry-run] interactive
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] capabilities
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] compose "<intent>"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--json] [--dry-run] interactive
 
 Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts run new primitive CubeBox Cube save build/CLI/Smoke/TsScene
@@ -66,7 +59,7 @@ Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts compose "create a simple scene with a cube, camera, and light"
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts interactive
 
-The TypeScript client delegates execution to the C++ LunaCLI host.`);
+The TypeScript client uses LunaCLI for legacy command execution and LunaAuthoringHost for stateful authoring flows.`);
 }
 
 function takeOptionValue(args: string[], index: number, option: string): string {
@@ -89,6 +82,16 @@ function parseClientOptions(args: string[]): ClientOptions {
         }
         if (arg.startsWith("--host=")) {
             options.host = arg.slice("--host=".length);
+            index += 1;
+            continue;
+        }
+        if (arg === "--authoring-host") {
+            options.authoringHost = takeOptionValue(args, index, arg);
+            index += 2;
+            continue;
+        }
+        if (arg.startsWith("--authoring-host=")) {
+            options.authoringHost = arg.slice("--authoring-host=".length);
             index += 1;
             continue;
         }
@@ -125,7 +128,7 @@ function parseClientOptions(args: string[]): ClientOptions {
     return options;
 }
 
-function findDefaultHost(): string {
+function findDefaultLegacyHost(): string {
     const scriptDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(scriptDir, "..", "..");
     const candidates = [
@@ -144,6 +147,25 @@ function findDefaultHost(): string {
     throw new Error("Could not find LunaCLI host. Build it first or pass --host <path>.");
 }
 
+function findDefaultAuthoringHost(): string {
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = resolve(scriptDir, "..", "..");
+    const candidates = [
+        resolve(repoRoot, "build", "CLI", "LunaAuthoringHost.exe"),
+        resolve(repoRoot, "build", "CLI", "LunaAuthoringHost"),
+        resolve(process.cwd(), "build", "CLI", "LunaAuthoringHost.exe"),
+        resolve(process.cwd(), "build", "CLI", "LunaAuthoringHost"),
+    ];
+
+    for (const candidate of candidates) {
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    throw new Error("Could not find LunaAuthoringHost. Build it first or pass --authoring-host <path>.");
+}
+
 function runHost(host: string, args: string[], dryRun: boolean): number {
     const result = spawnSync(host, dryRun ? ["--dry-run", ...args] : args, { stdio: "inherit" });
     if (typeof result.status === "number") {
@@ -155,33 +177,20 @@ function runHost(host: string, args: string[], dryRun: boolean): number {
     return 1;
 }
 
-function runHostJson(host: string, args: string[], dryRun: boolean): HostJsonResult {
-    const result = spawnSync(host, dryRun ? ["--dry-run", ...args] : args, { encoding: "utf8" });
-    if (result.error != null) {
-        throw result.error;
-    }
-    const stdout = result.stdout ?? "";
-    const stderr = result.stderr ?? "";
-    let report: AuthoringReport;
+async function withAuthoringHostClient<T>(
+    host: string,
+    fn: (client: AuthoringHostClient) => Promise<T>,
+): Promise<T> {
+    const client = new AuthoringHostClient(host);
     try {
-        report = normalizeAuthoringReport(JSON.parse(stdout) as unknown);
-    } catch (error) {
-        throw new Error(`Host did not return a valid authoring report: ${error instanceof Error ? error.message : String(error)}\n${stderr}`);
+        return await fn(client);
+    } finally {
+        await client.close();
     }
-    return {
-        status: typeof result.status === "number" ? result.status : 1,
-        report,
-        stdout,
-        stderr,
-    };
 }
 
-function readCapabilitiesFromHost(host: string): AuthoringCapabilitiesDocument {
-    const result = spawnSync(host, ["capabilities", "--json"], { encoding: "utf8" });
-    if (result.status !== 0) {
-        throw new Error(result.stderr.trim() || `Host exited with status ${result.status}.`);
-    }
-    return normalizeAuthoringCapabilities(JSON.parse(result.stdout) as unknown);
+async function readCapabilitiesFromAuthoringHost(host: string): Promise<AuthoringCapabilitiesDocument> {
+    return await withAuthoringHostClient(host, async (client) => client.capabilities());
 }
 
 function printCapabilities(capabilities: AuthoringCapabilitiesDocument): void {
@@ -278,36 +287,20 @@ function printPlan(plan: AuthoringPlan): void {
     console.log(writeAuthoringPlanJson(plan).trimEnd());
 }
 
-function runAuthoringPlanJson(host: string, plan: AuthoringPlan, dryRun: boolean): HostJsonResult {
-    if (plan.commands.length === 0) {
-        throw new Error("No authoring commands.");
-    }
-
-    const tempDir = mkdtempSync(join(tmpdir(), "luna-authoring-"));
-    const planPath = join(tempDir, "plan.json");
-    writeFileSync(planPath, writeAuthoringPlanJson(plan), "utf8");
-
-    try {
-        return runHostJson(host, ["--json", "plan", planPath], dryRun);
-    } finally {
-        try {
-            unlinkSync(planPath);
-            rmdirSync(tempDir);
-        } catch {
-            // Best-effort cleanup only.
-        }
-    }
-}
-
-function runCompose(host: string, intent: string, plan: AuthoringPlan, execute: boolean): ComposeResult {
-    const hostResult = runAuthoringPlanJson(host, plan, !execute);
+async function runComposeWithAuthoringClient(
+    client: AuthoringHostClient,
+    intent: string,
+    plan: AuthoringPlan,
+    execute: boolean,
+): Promise<ComposeResult> {
+    const result = await client.executePlan(plan);
     return {
-        ok: hostResult.report.ok && hostResult.status === 0,
+        ok: result.ok,
         mode: execute ? "execute" : "dry-run",
         intent,
         plan,
-        report: hostResult.report,
-        repair: buildAuthoringRepairContext(hostResult.report),
+        report: result.report,
+        repair: buildAuthoringRepairContext(result.report),
     };
 }
 
@@ -346,7 +339,7 @@ function parseComposeRequest(args: string[], globalExecute: boolean): ComposeReq
     return { intent, execute, printPlanOnly };
 }
 
-function runAuthoringPlan(
+function runLegacyAuthoringPlan(
     host: string,
     commands: PlanCommand[],
     project: string | undefined,
@@ -376,6 +369,62 @@ function runAuthoringPlan(
             // Best-effort cleanup only.
         }
     }
+}
+
+function printReportSummary(report: AuthoringReport): void {
+    console.log(`Scene: ${report.scene.name}`);
+    console.log(`Scene File: ${report.scene.path ?? "<unsaved>"}`);
+    console.log(`Entities: ${report.scene.entityCount}`);
+    console.log(`Dirty: ${report.scene.dirty ? "true" : "false"}`);
+}
+
+function printExecutionResult(report: AuthoringReport, jsonOutput: boolean, dryRun: boolean, ok: boolean): void {
+    if (jsonOutput) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+    }
+
+    printWarnings(report);
+    if (ok) {
+        if (dryRun) {
+            console.log("Dry run: valid");
+        } else {
+            printEntityBindings(report);
+            printReportSummary(report);
+        }
+        return;
+    }
+
+    for (const error of report.errors) {
+        console.error(error);
+    }
+}
+
+async function executeQueuedPlan(
+    context: InteractiveContext,
+    commands: PlanCommand[],
+): Promise<number> {
+    if (commands.length === 0) {
+        throw new Error("No queued authoring commands.");
+    }
+
+    if (context.authoringClient != null && !context.dryRun) {
+        const result = await context.authoringClient.executePlan({ project: context.project, commands });
+        printExecutionResult(result.report, context.jsonOutput, false, result.ok);
+        return result.ok ? 0 : 1;
+    }
+
+    if (context.legacyHost == null) {
+        throw new Error("Legacy authoring host is required for dry-run interactive execution.");
+    }
+
+    return runLegacyAuthoringPlan(
+        context.legacyHost,
+        commands,
+        context.project,
+        context.jsonOutput,
+        context.dryRun,
+    );
 }
 
 function splitCommandLine(line: string): string[] {
@@ -549,13 +598,7 @@ async function runInteractiveMenu(
         }
         case "7":
             {
-                const status = runAuthoringPlan(
-                    context.host,
-                    context.queuedCommands,
-                    context.project,
-                    context.jsonOutput,
-                    context.dryRun,
-                );
+                const status = await executeQueuedPlan(context, context.queuedCommands);
                 if (status !== 0) {
                     throw new Error(`Host exited with status ${status}.`);
                 }
@@ -573,7 +616,8 @@ async function runInteractiveMenu(
 }
 
 type InteractiveContext = {
-    host: string;
+    legacyHost?: string;
+    authoringClient?: AuthoringHostClient;
     project?: string;
     jsonOutput: boolean;
     queuedCommands: PlanCommand[];
@@ -614,23 +658,11 @@ async function handleInteractiveLine(
         return null;
     }
     if (command === "run" || command === "execute") {
-        const status = runAuthoringPlan(
-            context.host,
-            context.queuedCommands,
-            context.project,
-            context.jsonOutput,
-            context.dryRun,
-        );
+        const status = await executeQueuedPlan(context, context.queuedCommands);
         return status === 0 ? null : status;
     }
     if (command === "preview") {
-        const status = runAuthoringPlan(
-            context.host,
-            [...context.queuedCommands, { op: "summary" }],
-            context.project,
-            context.jsonOutput,
-            context.dryRun,
-        );
+        const status = await executeQueuedPlan(context, [...context.queuedCommands, { op: "summary" }]);
         return status === 0 ? null : status;
     }
 
@@ -639,61 +671,70 @@ async function handleInteractiveLine(
 }
 
 async function runInteractive(
-    host: string,
+    legacyHost: string | undefined,
+    authoringHost: string,
     project: string | undefined,
     jsonOutput: boolean,
     dryRun: boolean,
 ): Promise<number> {
+    const authoringClient = dryRun ? undefined : new AuthoringHostClient(authoringHost);
     const context: InteractiveContext = {
-        host,
+        legacyHost,
+        authoringClient,
         project,
         jsonOutput,
         queuedCommands: [],
         dryRun,
     };
 
-    if (!input.isTTY) {
-        const lines = readFileSync(0, "utf8").split(/\r?\n/);
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.length === 0) {
-                continue;
-            }
-
-            try {
-                const status = await handleInteractiveLine(trimmed, context);
-                if (status != null) {
-                    return status;
-                }
-            } catch (error) {
-                console.error(error instanceof Error ? error.message : String(error));
-                return 1;
-            }
-        }
-        return 0;
-    }
-
-    const rl = createInterface({ input, output });
-
-    console.log("Luna interactive TS client. Type 'help' for commands.");
     try {
-        while (true) {
-            const line = (await rl.question("luna> ")).trim();
-            if (line.length === 0) {
-                continue;
-            }
-
-            try {
-                const status = await handleInteractiveLine(line, context, rl);
-                if (status != null) {
-                    return status;
+        if (!input.isTTY) {
+            const lines = readFileSync(0, "utf8").split(/\r?\n/);
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.length === 0) {
+                    continue;
                 }
-            } catch (error) {
-                console.error(error instanceof Error ? error.message : String(error));
+
+                try {
+                    const status = await handleInteractiveLine(trimmed, context);
+                    if (status != null) {
+                        return status;
+                    }
+                } catch (error) {
+                    console.error(error instanceof Error ? error.message : String(error));
+                    return 1;
+                }
             }
+            return 0;
+        }
+
+        const rl = createInterface({ input, output });
+
+        console.log("Luna interactive TS client. Type 'help' for commands.");
+        try {
+            while (true) {
+                const line = (await rl.question("luna> ")).trim();
+                if (line.length === 0) {
+                    continue;
+                }
+
+                try {
+                    const status = await handleInteractiveLine(line, context, rl);
+                    if (status != null) {
+                        return status;
+                    }
+                } catch (error) {
+                    console.error(error instanceof Error ? error.message : String(error));
+                }
+            }
+        } finally {
+            rl.close();
         }
     } finally {
-        rl.close();
+        if (authoringClient != null) {
+            await authoringClient.close();
+        }
     }
 }
 
@@ -705,13 +746,19 @@ async function main(): Promise<number> {
         return command == null ? 1 : 0;
     }
 
-    const host = options.host == null ? findDefaultHost() : resolve(options.host);
+    const resolveLegacyHost = (): string =>
+        options.host == null ? findDefaultLegacyHost() : resolve(options.host);
+    const resolveAuthoringHost = (): string =>
+        options.authoringHost == null ? findDefaultAuthoringHost() : resolve(options.authoringHost);
+    let legacyHost: string | undefined;
     let hostArgs: string[];
     let project = options.project;
 
     if (command === "run") {
+        legacyHost = resolveLegacyHost();
         hostArgs = options.passthrough.slice(1);
     } else if (command === "plan") {
+        legacyHost = resolveLegacyHost();
         const planPath = options.passthrough[1];
         if (planPath == null) {
             throw new Error("Missing plan path.");
@@ -723,22 +770,28 @@ async function main(): Promise<number> {
         if (options.passthrough.length !== 1) {
             throw new Error("Command 'capabilities' does not accept arguments.");
         }
-        printCapabilities(readCapabilitiesFromHost(host));
+        const authoringHost = resolveAuthoringHost();
+        printCapabilities(await readCapabilitiesFromAuthoringHost(authoringHost));
         return 0;
     } else if (command === "compose") {
         const request = parseComposeRequest(options.passthrough.slice(1), options.execute);
-        const capabilities = readCapabilitiesFromHost(host);
-        const plan = composeLocalPlan(request.intent, capabilities, project);
-        if (request.printPlanOnly) {
-            printPlan(plan);
-            return 0;
-        }
+        const authoringHost = resolveAuthoringHost();
+        return await withAuthoringHostClient(authoringHost, async (client) => {
+            const capabilities = await client.capabilities();
+            const plan = composeLocalPlan(request.intent, capabilities, project);
+            if (request.printPlanOnly) {
+                printPlan(plan);
+                return 0;
+            }
 
-        const result = runCompose(host, request.intent, plan, request.execute);
-        console.log(JSON.stringify(result, null, 2));
-        return result.ok ? 0 : 1;
+            const result = await runComposeWithAuthoringClient(client, request.intent, plan, request.execute);
+            console.log(JSON.stringify(result, null, 2));
+            return result.ok ? 0 : 1;
+        });
     } else if (command === "interactive") {
-        return await runInteractive(host, project, options.jsonOutput, options.dryRun);
+        const interactiveLegacyHost = options.dryRun ? resolveLegacyHost() : undefined;
+        const authoringHost = resolveAuthoringHost();
+        return await runInteractive(interactiveLegacyHost, authoringHost, project, options.jsonOutput, options.dryRun);
     } else {
         throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', or 'interactive'.`);
     }
@@ -750,7 +803,10 @@ async function main(): Promise<number> {
         hostArgs = ["--json", ...hostArgs];
     }
 
-    return runHost(host, hostArgs, options.dryRun);
+    if (legacyHost == null) {
+        throw new Error("Legacy LunaCLI host is required for this command.");
+    }
+    return runHost(legacyHost, hostArgs, options.dryRun);
 }
 
 try {

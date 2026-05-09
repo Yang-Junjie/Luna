@@ -379,7 +379,9 @@ AuthoringExecutor::AuthoringExecutor(AuthoringSession& session)
 
 bool AuthoringExecutor::validate(const AuthoringPlan& plan, AuthoringReport& report) const
 {
-    return validateAuthoringPlan(plan, m_session, report);
+    AuthoringValidationOptions options;
+    options.known_aliases = &m_aliases;
+    return validateAuthoringPlan(plan, m_session, report, options);
 }
 
 void AuthoringExecutor::clearAliases()

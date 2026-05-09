@@ -7,6 +7,7 @@
     "protocol-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types authoringProtocol.smoke.ts ../../Tests/Fixtures/Authoring/create_cube_scene.plan.json ../../Tests/Fixtures/Authoring/invalid_unknown_command.plan.json",
     "interactive-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types interactive.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe",
     "compose-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types compose.smoke.ts luna.ts ../../build/CLI/LunaCLI.exe",
+    "host-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types authoringHost.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
     "smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts plan examples/smoke.plan.json"
   }
 }

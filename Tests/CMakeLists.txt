@@ -19,6 +19,11 @@ add_executable(
 )
 
 add_executable(
+    AuthoringHostTests
+    AuthoringHostTests.cpp
+)
+
+add_executable(
     AuthoringProtocolTests
     AuthoringProtocolTests.cpp
 )
@@ -104,6 +109,12 @@ target_link_libraries(
 )
 
 target_link_libraries(
+    AuthoringHostTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
     AuthoringProtocolTests
     PRIVATE
         LunaCore
@@ -129,6 +140,12 @@ target_compile_features(
 
 target_compile_features(
     AuthoringExecutorTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    AuthoringHostTests
     PRIVATE
         cxx_std_20
 )
@@ -176,6 +193,11 @@ add_test(
 add_test(
     NAME AuthoringExecutorTests
     COMMAND AuthoringExecutorTests
+)
+
+add_test(
+    NAME AuthoringHostTests
+    COMMAND AuthoringHostTests
 )
 
 add_test(

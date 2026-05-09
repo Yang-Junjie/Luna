@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Core/Layer.h"
-#include "Authoring/AuthoringSession.h"
 #include "EditorCamera.h"
 #include "EditorContext.h"
+#include "EditorRuntime.h"
+#include "Core/Layer.h"
 #include "Events/Event.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
@@ -145,11 +145,9 @@ private:
 private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
-    std::unique_ptr<Scene> m_scene;
-    authoring::AuthoringSession m_authoring_session;
+    EditorRuntime m_editor_runtime;
     std::unique_ptr<Scene> m_runtime_scene;
     std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
-    UUID m_selected_entity_id{0};
     std::string m_asset_label{"No scene loaded"};
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};

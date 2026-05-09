@@ -13,6 +13,8 @@ add_executable(
     Source/EditorCamera.cpp
     Source/EditorContext.h
     Source/EditorAssetDragDrop.h
+    Source/EditorRuntime.h
+    Source/EditorRuntime.cpp
     Source/EditorStyle.h
     Source/EditorStyle.cpp
     Source/EditorUI.h

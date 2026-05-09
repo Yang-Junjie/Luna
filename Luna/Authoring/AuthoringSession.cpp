@@ -384,6 +384,16 @@ bool AuthoringSession::canRedo() const noexcept
     return m_history.canRedo();
 }
 
+size_t AuthoringSession::undoDepth() const noexcept
+{
+    return m_history.undoDepth();
+}
+
+size_t AuthoringSession::redoDepth() const noexcept
+{
+    return m_history.redoDepth();
+}
+
 void AuthoringSession::clearHistory()
 {
     m_history.clear();
