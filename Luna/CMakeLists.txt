@@ -200,8 +200,11 @@ set(AUTHORING_SOURCE
     Authoring/AuthoringInspection.h
     Authoring/AuthoringInspection.cpp
     Authoring/AuthoringVerification.h
+    Authoring/AuthoringJsonTypes.h
     Authoring/AuthoringJson.h
     Authoring/AuthoringJson.cpp
+    Authoring/AuthoringHostJson.h
+    Authoring/AuthoringHostJson.cpp
     Authoring/AuthoringPlanJson.h
     Authoring/AuthoringPlanJson.cpp
     Authoring/AuthoringProtocol.h
@@ -361,7 +364,7 @@ target_link_libraries(LunaCore
 )
 
 target_link_libraries(LunaCore
-        PRIVATE
+        PUBLIC
         nlohmann_json::nlohmann_json
 )
 

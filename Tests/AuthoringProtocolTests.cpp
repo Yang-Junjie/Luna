@@ -1,4 +1,5 @@
 #include "Authoring/AuthoringCapabilities.h"
+#include "Authoring/AuthoringHostJson.h"
 #include "Authoring/AuthoringJson.h"
 #include "Authoring/AuthoringPlanJson.h"
 #include "Authoring/AuthoringProtocol.h"
@@ -285,6 +286,37 @@ std::set<std::string> capabilityOps(const std::vector<luna::authoring::Authoring
         ops.insert(capability.op);
     }
     return ops;
+}
+
+std::set<std::string> schemaHostWireMethodNames(const YAML::Node& wire_schema)
+{
+    std::set<std::string> names;
+    const YAML::Node method_names = wire_schema["$defs"]["method"]["properties"]["name"]["enum"];
+    if (!method_names.IsSequence()) {
+        return names;
+    }
+
+    for (const YAML::Node method_name : method_names) {
+        if (method_name.IsScalar()) {
+            names.insert(method_name.as<std::string>());
+        }
+    }
+    return names;
+}
+
+std::set<std::string> manifestHostWireMethodNames(const luna::authoring::Json& manifest)
+{
+    std::set<std::string> names;
+    if (!manifest.contains("methods") || !manifest["methods"].is_array()) {
+        return names;
+    }
+
+    for (const auto& method : manifest["methods"]) {
+        if (method.contains("name") && method["name"].is_string()) {
+            names.insert(method["name"].get<std::string>());
+        }
+    }
+    return names;
 }
 
 void testAuthoringPlanJsonRoundTrip(TestContext& context)
@@ -695,6 +727,7 @@ void testAuthoringJsonSchemasParse(TestContext& context)
              "authoring-plan.schema.json",
              "authoring-report.schema.json",
              "authoring-capabilities.schema.json",
+             "authoring-host-wire.schema.json",
          }) {
         const std::filesystem::path path = authoringSchemaPath(filename);
         try {
@@ -775,38 +808,32 @@ void testAuthoringCapabilities(TestContext& context)
 
 void testAuthoringCapabilitiesJson(TestContext& context)
 {
+    const luna::authoring::Json root = luna::authoring::defaultAuthoringCapabilitiesJson();
+
     std::ostringstream stream;
-    luna::authoring::writeDefaultAuthoringCapabilitiesJson(stream);
+    stream << root.dump(2, ' ', false, luna::authoring::Json::error_handler_t::replace) << '\n';
     expectGoldenText(context,
                      stream.str(),
                      authoringFixturePath("Golden/authoring-capabilities.golden.json"),
                      "capabilities JSON should match the golden snapshot");
 
-    YAML::Node root;
-    try {
-        root = YAML::Load(stream.str());
-    } catch (const YAML::Exception& error) {
-        context.expect(false, std::string("capabilities JSON should parse: ") + error.what());
-        return;
-    }
-
-    context.expect(root["protocol"]["name"].as<std::string>() == std::string(luna::authoring::kAuthoringProtocolName),
+    context.expect(root["protocol"]["name"].get<std::string>() == std::string(luna::authoring::kAuthoringProtocolName),
                    "capabilities JSON should include protocol name");
-    context.expect(root["protocol"]["version"].as<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
+    context.expect(root["protocol"]["version"].get<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
                    "capabilities JSON should include protocol version");
-    context.expect(root["capabilities"].IsSequence() && root["capabilities"].size() == 21,
+    context.expect(root["capabilities"].is_array() && root["capabilities"].size() == 21,
                    "capabilities JSON should include current capability count");
 
     bool found_primitive = false;
-    for (const YAML::Node capability : root["capabilities"]) {
-        if (capability["op"].as<std::string>() == "primitive") {
+    for (const auto& capability : root["capabilities"]) {
+        if (capability["op"].get<std::string>() == "primitive") {
             found_primitive = true;
-            context.expect(capability["parameters"]["mesh"]["enum"].IsSequence() &&
-                               capability["parameters"]["mesh"]["enum"].size() == 5,
-                           "primitive capability JSON should include mesh enum");
-            context.expect(capability["effects"].IsSequence() && capability["effects"].size() == 1 &&
-                               capability["effects"][0].as<std::string>() == "mutatesScene",
-                           "primitive capability JSON should include effects");
+            context.expect(capability["parameters"]["mesh"]["enum"].is_array() &&
+                                capability["parameters"]["mesh"]["enum"].size() == 5,
+                            "primitive capability JSON should include mesh enum");
+            context.expect(capability["effects"].is_array() && capability["effects"].size() == 1 &&
+                                capability["effects"][0].get<std::string>() == "mutatesScene",
+                            "primitive capability JSON should include effects");
         }
     }
     context.expect(found_primitive, "capabilities JSON should include primitive capability");
@@ -862,6 +889,102 @@ void testAuthoringProtocolDiscoveryContract(TestContext& context)
     for (const auto& [op, count] : op_counts) {
         context.expect(count == 1, "capability ops should be unique");
     }
+}
+
+void testAuthoringHostWireContract(TestContext& context)
+{
+    YAML::Node wire_schema;
+    try {
+        wire_schema = YAML::LoadFile(authoringSchemaPath("authoring-host-wire.schema.json").string());
+    } catch (const YAML::Exception& error) {
+        context.expect(false, std::string("authoring host wire schema should parse: ") + error.what());
+        return;
+    }
+
+    const luna::authoring::Json manifest = luna::authoring::authoringHostWireManifestJson();
+    const std::set<std::string> schema_methods = schemaHostWireMethodNames(wire_schema);
+    const std::set<std::string> manifest_methods = manifestHostWireMethodNames(manifest);
+    std::vector<std::string> schema_method_order;
+    if (wire_schema["$defs"]["method"]["properties"]["name"]["enum"].IsSequence()) {
+        for (const YAML::Node method_name : wire_schema["$defs"]["method"]["properties"]["name"]["enum"]) {
+            if (method_name.IsScalar()) {
+                schema_method_order.push_back(method_name.as<std::string>());
+            }
+        }
+    }
+    std::vector<std::string> manifest_method_order;
+    if (manifest.contains("methods") && manifest["methods"].is_array()) {
+        for (const auto& method : manifest["methods"]) {
+            if (method.contains("name") && method["name"].is_string()) {
+                manifest_method_order.push_back(method["name"].get<std::string>());
+            }
+        }
+    }
+
+    const std::vector<std::string> expected_methods{
+        "capabilities",
+        "session",
+        "executePlan",
+        "beginTransaction",
+        "commitTransaction",
+        "rollbackTransaction",
+        "snapshot",
+        "undo",
+        "redo",
+        "events",
+        "clearAliases",
+        "clearHistory",
+        "shutdown",
+    };
+
+    context.expect(wire_schema["$schema"].as<std::string>() == "https://json-schema.org/draft/2020-12/schema",
+                   "host wire schema should declare draft 2020-12");
+    context.expect(wire_schema["$id"].as<std::string>() == "https://luna.local/schemas/authoring-host-wire.schema.json",
+                   "host wire schema should declare a stable schema id");
+    context.expect(wire_schema["$defs"]["protocol"]["properties"]["name"]["const"].as<std::string>() ==
+                       "luna.authoring.host",
+                   "host wire schema should declare the host protocol name");
+    context.expect(wire_schema["$defs"]["protocol"]["properties"]["version"]["const"].as<uint32_t>() == 1,
+                   "host wire schema should declare the host protocol version");
+    context.expect(wire_schema["properties"]["transport"]["const"].as<std::string>() == "stdio-jsonrpc",
+                   "host wire schema should declare stdio JSON-RPC transport");
+    context.expect(wire_schema["properties"]["framing"]["const"].as<std::string>() == "newline-delimited",
+                   "host wire schema should declare newline framing");
+    context.expect(wire_schema["properties"]["rpcVersion"]["const"].as<std::string>() == "2.0",
+                   "host wire schema should declare JSON-RPC 2.0");
+    context.expect(schema_methods.size() == 13, "host wire schema should list the current method count");
+    context.expect(schema_methods == manifest_methods,
+                   "host wire schema method names should match the C++ manifest");
+    context.expect(schema_method_order == expected_methods,
+                   "host wire schema should preserve a stable method order");
+    context.expect(manifest["protocol"]["name"].get<std::string>() == "luna.authoring.host",
+                   "host wire manifest should declare the host protocol name");
+    context.expect(manifest["protocol"]["version"].get<uint32_t>() == 1,
+                   "host wire manifest should declare the host protocol version");
+    context.expect(manifest["transport"].get<std::string>() == "stdio-jsonrpc",
+                   "host wire manifest should declare stdio JSON-RPC transport");
+    context.expect(manifest["framing"].get<std::string>() == "newline-delimited",
+                   "host wire manifest should declare newline framing");
+    context.expect(manifest["rpcVersion"].get<std::string>() == "2.0",
+                   "host wire manifest should declare JSON-RPC version 2.0");
+    context.expect(manifest["methods"].is_array() && manifest["methods"].size() == 13,
+                   "host wire manifest should expose all supported methods");
+
+    if (manifest["methods"].is_array()) {
+        context.expect(manifest["methods"].size() == expected_methods.size(),
+                       "host wire manifest should preserve the expected method order");
+        for (size_t index = 0; index < manifest["methods"].size() && index < expected_methods.size(); ++index) {
+            const auto& method = manifest["methods"][index];
+            context.expect(method["name"].get<std::string>() == expected_methods[index],
+                           "host wire manifest should preserve a stable method order");
+            context.expect(method["requestShape"].is_string() && !method["requestShape"].get<std::string>().empty(),
+                           "host wire manifest should describe each request shape");
+            context.expect(method["resultShape"].is_string() && !method["resultShape"].get<std::string>().empty(),
+                           "host wire manifest should describe each result shape");
+        }
+    }
+    context.expect(manifest_method_order == expected_methods,
+                   "host wire manifest should preserve a stable method order");
 }
 
 void testAuthoringPlanJsonFixtures(TestContext& context)
@@ -993,57 +1116,51 @@ void testAuthoringReportJson(TestContext& context)
                                                    .message = "Entity does not have a Transform component.",
                                                });
 
+    const luna::authoring::Json root = luna::authoring::authoringReportJson(report, false);
+
     std::ostringstream stream;
-    luna::authoring::writeAuthoringReportJson(stream, report, false);
+    stream << root.dump(2, ' ', false, luna::authoring::Json::error_handler_t::replace) << '\n';
     expectGoldenText(context,
                      stream.str(),
                      authoringFixturePath("Golden/authoring-report.error.golden.json"),
                      "report JSON should match the golden snapshot");
 
-    YAML::Node root;
-    try {
-        root = YAML::Load(stream.str());
-    } catch (const YAML::Exception& error) {
-        context.expect(false, std::string("report JSON should parse: ") + error.what());
-        return;
-    }
-
-    context.expect(root["protocol"]["name"].as<std::string>() == std::string(luna::authoring::kAuthoringProtocolName),
+    context.expect(root["protocol"]["name"].get<std::string>() == std::string(luna::authoring::kAuthoringProtocolName),
                    "report JSON should include protocol name");
-    context.expect(root["protocol"]["version"].as<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
+    context.expect(root["protocol"]["version"].get<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
                    "report JSON should include protocol version");
-    context.expect(!root["ok"].as<bool>(), "report JSON should include ok flag");
-    context.expect(root["scene"]["entityCount"].as<size_t>() == 3,
+    context.expect(!root["ok"].get<bool>(), "report JSON should include ok flag");
+    context.expect(root["scene"]["entityCount"].get<size_t>() == 3,
                    "report JSON should include scene entity count");
-    context.expect(root["entities"].IsSequence() && root["entities"].size() == 1,
+    context.expect(root["entities"].is_array() && root["entities"].size() == 1,
                    "report JSON should include entity bindings");
-    context.expect(root["verifications"].IsSequence() && root["verifications"].size() == 1,
+    context.expect(root["verifications"].is_array() && root["verifications"].size() == 1,
                    "report JSON should include verifications");
-    context.expect(root["diagnostics"].IsSequence() && root["diagnostics"].size() == 1,
+    context.expect(root["diagnostics"].is_array() && root["diagnostics"].size() == 1,
                    "report JSON should include diagnostics");
-    if (root["diagnostics"].IsSequence() && root["diagnostics"].size() == 1) {
-        const YAML::Node diagnostic = root["diagnostics"][0];
-        context.expect(diagnostic["code"].as<std::string>() == "MissingComponent",
+    if (root["diagnostics"].is_array() && root["diagnostics"].size() == 1) {
+        const auto diagnostic = root["diagnostics"][0];
+        context.expect(diagnostic["code"].get<std::string>() == "MissingComponent",
                        "diagnostic JSON should include stable code");
-        context.expect(diagnostic["phase"].as<std::string>() == "execute",
+        context.expect(diagnostic["phase"].get<std::string>() == "execute",
                        "diagnostic JSON should include phase");
-        context.expect(diagnostic["severity"].as<std::string>() == "error",
+        context.expect(diagnostic["severity"].get<std::string>() == "error",
                        "diagnostic JSON should include severity");
-        context.expect(diagnostic["commandIndex"].as<size_t>() == 2,
+        context.expect(diagnostic["commandIndex"].get<size_t>() == 2,
                        "diagnostic JSON should include command index");
-        context.expect(diagnostic["entityRef"].as<std::string>() == "Box",
+        context.expect(diagnostic["entityRef"].get<std::string>() == "Box",
                        "diagnostic JSON should include entity ref");
-        context.expect(diagnostic["component"].as<std::string>() == "Transform",
+        context.expect(diagnostic["component"].get<std::string>() == "Transform",
                        "diagnostic JSON should include component");
-        context.expect(diagnostic["recoverable"].as<bool>(), "diagnostic JSON should include recoverable flag");
-        context.expect(diagnostic["expected"].as<std::string>() == "Transform component",
+        context.expect(diagnostic["recoverable"].get<bool>(), "diagnostic JSON should include recoverable flag");
+        context.expect(diagnostic["expected"].get<std::string>() == "Transform component",
                        "diagnostic JSON should include expected field");
-        context.expect(diagnostic["actual"].as<std::string>() == "missing Transform component",
+        context.expect(diagnostic["actual"].get<std::string>() == "missing Transform component",
                        "diagnostic JSON should include actual field");
-        context.expect(diagnostic["suggestedCommand"].as<std::string>() == "transform Box ...",
+        context.expect(diagnostic["suggestedCommand"].get<std::string>() == "transform Box ...",
                        "diagnostic JSON should include suggested command");
     }
-    context.expect(root["errors"].IsSequence() && root["errors"].size() == 1,
+    context.expect(root["errors"].is_array() && root["errors"].size() == 1,
                    "diagnostic errors should still be mirrored into errors array");
 }
 
@@ -1065,6 +1182,7 @@ int main()
     testAuthoringCapabilities(context);
     testAuthoringCapabilitiesJson(context);
     testAuthoringProtocolDiscoveryContract(context);
+    testAuthoringHostWireContract(context);
     testAuthoringPlanJsonFixtures(context);
     testAuthoringPlanJsonInvalidFixtures(context);
     testAuthoringReportJson(context);

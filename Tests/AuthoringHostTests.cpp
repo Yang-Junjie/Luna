@@ -1,6 +1,7 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Authoring/AuthoringHost.h"
+#include "Authoring/AuthoringHostJson.h"
 #include "Authoring/AuthoringSession.h"
 #include "Core/Log.h"
 #include "Scene/Components.h"
@@ -205,6 +206,46 @@ void testHostCapabilities(TestContext& context)
                    "host capabilities should include snapshot");
 }
 
+void testHostWireJson(TestContext& context)
+{
+    luna::Scene scene;
+    luna::authoring::AuthoringSession session(scene);
+    luna::authoring::AuthoringHost host(session);
+
+    (void) session.createScene();
+
+    const luna::authoring::Json session_json = luna::authoring::authoringHostSessionStateJson(host.sessionState());
+    context.expect(session_json["hasScene"].get<bool>(), "session json should report a bound scene");
+    context.expect(session_json["scene"]["entityCount"].get<size_t>() == 2,
+                   "session json should expose the current scene entity count");
+    context.expect(!session_json["hasOpenTransaction"].get<bool>(),
+                   "session json should report closed transactions by default");
+    context.expect(!session_json["canUndo"].get<bool>(), "session json should report undo state");
+
+    context.expect(luna::authoring::authoringEventTypeName(luna::authoring::AuthoringEventType::SceneReset) ==
+                       "sceneReset",
+                   "scene reset event should have a stable wire name");
+
+    const auto events = host.consumeEvents();
+    const luna::authoring::Json events_json = luna::authoring::authoringEventsJson(events);
+    context.expect(events_json.is_array(), "events json should serialize as an array");
+    context.expect(events_json.size() >= 3, "bootstrap scene should emit multiple events");
+
+    bool saw_scene_reset = false;
+    bool saw_scene_created = false;
+    for (const auto& event : events_json) {
+        if (event["type"] == "sceneReset") {
+            saw_scene_reset = true;
+        }
+        if (event["type"] == "sceneCreated") {
+            saw_scene_created = true;
+        }
+    }
+
+    context.expect(saw_scene_reset, "events json should include scene reset");
+    context.expect(saw_scene_created, "events json should include scene created");
+}
+
 } // namespace
 
 int main()
@@ -218,6 +259,7 @@ int main()
     testHostUndoRedoAndEvents(context);
     testHostSessionTransactions(context);
     testHostCapabilities(context);
+    testHostWireJson(context);
 
     luna::AssetManager::get().clear();
     luna::AssetDatabase::clear();

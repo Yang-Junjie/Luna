@@ -2,24 +2,22 @@
 #include "Asset/AssetManager.h"
 #include "Authoring/AuthoringCapabilities.h"
 #include "Authoring/AuthoringHost.h"
+#include "Authoring/AuthoringHostJson.h"
 #include "Authoring/AuthoringJson.h"
 #include "Authoring/AuthoringPlanJson.h"
 #include "Authoring/AuthoringSession.h"
 #include "Core/Log.h"
 #include "Scene/Scene.h"
 
-#include <nlohmann/json.hpp>
-
 #include <exception>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace {
 
-using Json = nlohmann::ordered_json;
+using Json = luna::authoring::Json;
 
 constexpr int kParseError = -32700;
 constexpr int kInvalidRequest = -32600;
@@ -34,108 +32,17 @@ struct HostState {
     bool running{true};
 };
 
-const char* eventTypeName(luna::authoring::AuthoringEventType type) noexcept
-{
-    using EventType = luna::authoring::AuthoringEventType;
-    switch (type) {
-        case EventType::SceneReset:
-            return "sceneReset";
-        case EventType::SceneCreated:
-            return "sceneCreated";
-        case EventType::SceneLoaded:
-            return "sceneLoaded";
-        case EventType::SceneSaved:
-            return "sceneSaved";
-        case EventType::SceneDirtyChanged:
-            return "sceneDirtyChanged";
-        case EventType::SceneSettingsChanged:
-            return "sceneSettingsChanged";
-        case EventType::HistoryChanged:
-            return "historyChanged";
-        case EventType::EntityCreated:
-            return "entityCreated";
-        case EventType::EntityModified:
-            return "entityModified";
-        case EventType::EntityDestroyed:
-            return "entityDestroyed";
-        case EventType::EntityReparented:
-            return "entityReparented";
-        case EventType::ComponentAdded:
-            return "componentAdded";
-        case EventType::ComponentRemoved:
-            return "componentRemoved";
-    }
-
-    return "unknown";
-}
-
-Json sceneSnapshotJson(const luna::authoring::AuthoringSceneSnapshot& snapshot)
-{
-    Json result = Json::object();
-    result["name"] = snapshot.name;
-    result["path"] = snapshot.path.empty() ? Json(nullptr) : Json(snapshot.path.string());
-    result["entityCount"] = snapshot.entity_count;
-    result["dirty"] = snapshot.dirty;
-    return result;
-}
-
-Json eventJson(const luna::authoring::AuthoringEvent& event)
-{
-    Json result = Json::object();
-    result["type"] = eventTypeName(event.type);
-    result["entity"] = event.entity_id.isValid() ? Json(event.entity_id.toString()) : Json(nullptr);
-    result["path"] = event.path.empty() ? Json(nullptr) : Json(event.path.string());
-    result["message"] = event.message;
-    return result;
-}
-
-Json eventsJson(std::vector<luna::authoring::AuthoringEvent> events)
-{
-    Json result = Json::array();
-    for (const luna::authoring::AuthoringEvent& event : events) {
-        result.push_back(eventJson(event));
-    }
-    return result;
-}
-
-Json sessionStateJson(const luna::authoring::AuthoringHostSessionState& state)
-{
-    Json result = Json::object();
-    result["hasScene"] = state.has_scene;
-    result["scene"] = sceneSnapshotJson(state.scene);
-    result["hasOpenTransaction"] = state.has_open_transaction;
-    result["canUndo"] = state.can_undo;
-    result["canRedo"] = state.can_redo;
-    result["undoDepth"] = state.undo_depth;
-    result["redoDepth"] = state.redo_depth;
-    return result;
-}
-
-Json authoringReportJson(const luna::authoring::AuthoringReport& report, bool ok)
-{
-    std::ostringstream stream;
-    luna::authoring::writeAuthoringReportJson(stream, report, ok);
-    return Json::parse(stream.str());
-}
-
-Json capabilitiesJson()
-{
-    std::ostringstream stream;
-    luna::authoring::writeDefaultAuthoringCapabilitiesJson(stream);
-    return Json::parse(stream.str());
-}
-
 Json sessionJson(HostState& state)
 {
-    return sessionStateJson(state.host.sessionState());
+    return luna::authoring::authoringHostSessionStateJson(state.host.sessionState());
 }
 
 Json transactionResultJson(HostState& state, bool ok)
 {
     Json result = Json::object();
     result["ok"] = ok;
-    result["scene"] = sceneSnapshotJson(state.host.captureSceneSnapshot());
-    result["events"] = eventsJson(state.host.consumeEvents());
+    result["scene"] = luna::authoring::authoringSceneSnapshotJson(state.host.captureSceneSnapshot());
+    result["events"] = luna::authoring::authoringEventsJson(state.host.consumeEvents());
     return result;
 }
 
@@ -196,8 +103,8 @@ Json executePlan(HostState& state, const luna::authoring::AuthoringPlan& plan)
 
     Json result = Json::object();
     result["ok"] = ok;
-    result["report"] = authoringReportJson(report, ok);
-    result["events"] = eventsJson(state.host.consumeEvents());
+    result["report"] = luna::authoring::authoringReportJson(report, ok);
+    result["events"] = luna::authoring::authoringEventsJson(state.host.consumeEvents());
     return result;
 }
 
@@ -229,8 +136,8 @@ Json handleUndo(HostState& state, const Json& id)
     const bool changed = state.host.undo();
     Json result = Json::object();
     result["ok"] = changed;
-    result["scene"] = sceneSnapshotJson(state.host.captureSceneSnapshot());
-    result["events"] = eventsJson(state.host.consumeEvents());
+    result["scene"] = luna::authoring::authoringSceneSnapshotJson(state.host.captureSceneSnapshot());
+    result["events"] = luna::authoring::authoringEventsJson(state.host.consumeEvents());
     return makeResponse(id, std::move(result));
 }
 
@@ -239,8 +146,8 @@ Json handleRedo(HostState& state, const Json& id)
     const bool changed = state.host.redo();
     Json result = Json::object();
     result["ok"] = changed;
-    result["scene"] = sceneSnapshotJson(state.host.captureSceneSnapshot());
-    result["events"] = eventsJson(state.host.consumeEvents());
+    result["scene"] = luna::authoring::authoringSceneSnapshotJson(state.host.captureSceneSnapshot());
+    result["events"] = luna::authoring::authoringEventsJson(state.host.consumeEvents());
     return makeResponse(id, std::move(result));
 }
 
@@ -301,7 +208,7 @@ Json dispatchRequest(HostState& state, const Json& request)
     const Json params = request.contains("params") ? request.at("params") : Json::object();
 
     if (method == "capabilities") {
-        return makeResponse(id, capabilitiesJson());
+        return makeResponse(id, luna::authoring::defaultAuthoringCapabilitiesJson());
     }
     if (method == "executePlan") {
         return handleExecutePlan(state, params, id);
@@ -329,7 +236,7 @@ Json dispatchRequest(HostState& state, const Json& request)
     }
     if (method == "events") {
         Json result = Json::object();
-        result["events"] = eventsJson(state.host.consumeEvents());
+        result["events"] = luna::authoring::authoringEventsJson(state.host.consumeEvents());
         return makeResponse(id, std::move(result));
     }
     if (method == "clearAliases") {

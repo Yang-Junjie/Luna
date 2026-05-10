@@ -45,6 +45,36 @@ Editor actions, AI plans, and future MCP tools share the same `AuthoringSession`
 
 The current implementation uses scene-level snapshots for correctness and broad coverage. High-frequency editor interactions, such as viewport gizmo transforms, should use an explicit transaction so a drag gesture becomes one undo step.
 
+## Authoring Host Wire
+
+`LunaAuthoringHost` exposes the same authoring session to CLI clients, future TS editor shells, and AI tooling over newline-delimited JSON-RPC 2.0 on stdio.
+
+- Each request is one JSON object per line on stdin.
+- Each response is one JSON object per line on stdout.
+- `jsonrpc` must be `"2.0"`.
+- The TS client uses numeric request ids, and host responses should echo them as numbers.
+- stderr is reserved for diagnostics and host logging.
+
+The wire contract is intentionally smaller than the authoring protocol itself. It only exposes session, execution, undo/redo, and host lifecycle entrypoints:
+
+- `capabilities` -> `AuthoringCapabilitiesDocument`
+- `session` -> `AuthoringHostSessionState`
+- `executePlan` -> `{ ok, report, events }`
+  - `params.plan` carries an `AuthoringPlan`
+  - the host also accepts a legacy bare plan object for compatibility
+- `beginTransaction` -> `{ ok, session }`
+- `commitTransaction` -> `{ ok, scene, events }`
+- `rollbackTransaction` -> `{ ok, scene, events }`
+- `snapshot` -> `{ ok, report, events }`
+- `undo` -> `{ ok, scene, events }`
+- `redo` -> `{ ok, scene, events }`
+- `events` -> `{ events }`
+- `clearAliases` -> `{ ok }`
+- `clearHistory` -> `{ ok, session }`
+- `shutdown` -> `{ ok }`
+
+`events` returns and clears the pending host event queue. `snapshot` is the stable read path for editor refreshes and AI inspection, because it reuses the same report shape as `executePlan`.
+
 ## CLI Commands
 
 Global options:
@@ -118,6 +148,7 @@ Machine-readable JSON Schema files are kept in `Docs/Schemas`:
 - `authoring-plan.schema.json`
 - `authoring-report.schema.json`
 - `authoring-capabilities.schema.json`
+- `authoring-host-wire.schema.json`
 
 Golden plan fixtures are kept in `Tests/Fixtures/Authoring` and are covered by `AuthoringProtocolTests`. These fixtures are the compatibility samples for CLI, editor, AI, and future MCP integrations.
 

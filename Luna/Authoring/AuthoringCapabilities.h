@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Authoring/AuthoringJsonTypes.h"
 #include "Authoring/AuthoringProtocol.h"
 
 #include <iosfwd>
@@ -41,6 +42,9 @@ struct AuthoringCapability {
 };
 
 [[nodiscard]] std::vector<AuthoringCapability> defaultAuthoringCapabilities();
+
+[[nodiscard]] Json authoringCapabilitiesJson(const std::vector<AuthoringCapability>& capabilities);
+[[nodiscard]] Json defaultAuthoringCapabilitiesJson();
 
 void writeAuthoringCapabilitiesJson(std::ostream& out,
                                     const std::vector<AuthoringCapability>& capabilities);

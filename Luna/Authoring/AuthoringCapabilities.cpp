@@ -93,7 +93,7 @@ Json jsonExamples(const std::vector<AuthoringCapabilityExample>& examples)
     return result;
 }
 
-Json jsonCapability(const AuthoringCapability& capability)
+Json authoringCapabilityJson(const AuthoringCapability& capability)
 {
     Json result = Json::object();
     result["op"] = capability.op;
@@ -356,7 +356,7 @@ std::vector<AuthoringCapability> defaultAuthoringCapabilities()
     };
 }
 
-void writeAuthoringCapabilitiesJson(std::ostream& out, const std::vector<AuthoringCapability>& capabilities)
+Json authoringCapabilitiesJson(const std::vector<AuthoringCapability>& capabilities)
 {
     Json protocol = Json::object();
     protocol["name"] = kAuthoringProtocolName;
@@ -364,14 +364,23 @@ void writeAuthoringCapabilitiesJson(std::ostream& out, const std::vector<Authori
 
     Json capability_list = Json::array();
     for (const AuthoringCapability& capability : capabilities) {
-        capability_list.push_back(jsonCapability(capability));
+        capability_list.push_back(authoringCapabilityJson(capability));
     }
 
     Json root = Json::object();
     root["protocol"] = std::move(protocol);
     root["capabilities"] = std::move(capability_list);
+    return root;
+}
 
-    out << root.dump(2, ' ', false, Json::error_handler_t::replace) << '\n';
+Json defaultAuthoringCapabilitiesJson()
+{
+    return authoringCapabilitiesJson(defaultAuthoringCapabilities());
+}
+
+void writeAuthoringCapabilitiesJson(std::ostream& out, const std::vector<AuthoringCapability>& capabilities)
+{
+    out << authoringCapabilitiesJson(capabilities).dump(2, ' ', false, Json::error_handler_t::replace) << '\n';
 }
 
 void writeDefaultAuthoringCapabilitiesJson(std::ostream& out)

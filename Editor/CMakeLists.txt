@@ -1,3 +1,21 @@
+add_library(
+    LunaEditorProtocol
+    INTERFACE
+)
+
+target_include_directories(
+    LunaEditorProtocol
+    INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(
+    LunaEditorProtocol
+    INTERFACE
+        LunaCore
+        nlohmann_json::nlohmann_json
+)
+
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
@@ -19,6 +37,8 @@ add_executable(
     Source/EditorStyle.cpp
     Source/EditorUI.h
     Source/EditorUI.cpp
+    Source/Viewport/EditorViewportSession.h
+    Source/Viewport/EditorViewportSession.cpp
     Source/Panels/InspectorPanel.h
     Source/Panels/InspectorPanel.cpp
     Source/LunaEditorApp.h
@@ -45,6 +65,7 @@ add_executable(
 target_include_directories(
     LunaEditor
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
         ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo
 )
@@ -52,11 +73,36 @@ target_include_directories(
 target_link_libraries(
     LunaEditor
     PRIVATE
+        LunaEditorProtocol
         LunaCore
 )
 
 set_target_properties(
     LunaEditor
+    PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
+add_executable(
+    LunaEditorViewHost
+    Source/Viewport/EditorViewportHost.cpp
+)
+
+target_include_directories(
+    LunaEditorViewHost
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_link_libraries(
+    LunaEditorViewHost
+    PRIVATE
+        LunaCore
+        nlohmann_json::nlohmann_json
+)
+
+set_target_properties(
+    LunaEditorViewHost
     PROPERTIES
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )

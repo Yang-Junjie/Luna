@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luna.local/schemas/authoring-host-wire.schema.json",
+  "title": "Luna Authoring Host Wire Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "transport",
+    "framing",
+    "rpcVersion",
+    "methods"
+  ],
+  "properties": {
+    "protocol": {
+      "$ref": "#/$defs/protocol"
+    },
+    "transport": {
+      "type": "string",
+      "const": "stdio-jsonrpc"
+    },
+    "framing": {
+      "type": "string",
+      "const": "newline-delimited"
+    },
+    "rpcVersion": {
+      "type": "string",
+      "const": "2.0"
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/method"
+      }
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "const": "luna.authoring.host"
+        },
+        "version": {
+          "const": 1
+        }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "requestShape",
+        "resultShape"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "capabilities",
+            "session",
+            "executePlan",
+            "beginTransaction",
+            "commitTransaction",
+            "rollbackTransaction",
+            "snapshot",
+            "undo",
+            "redo",
+            "events",
+            "clearAliases",
+            "clearHistory",
+            "shutdown"
+          ]
+        },
+        "requestShape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resultShape": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

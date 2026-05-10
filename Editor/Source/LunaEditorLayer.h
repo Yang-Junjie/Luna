@@ -8,6 +8,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneRuntime.h"
+#include "Viewport/EditorViewportSession.h"
 #include "Script/ScriptPluginManifest.h"
 
 #include <cstdint>
@@ -167,6 +168,7 @@ private:
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
+    EditorViewportSession m_viewport_session;
     std::vector<ScriptPluginCandidate> m_script_plugin_candidates;
     std::string m_script_plugin_status;
 

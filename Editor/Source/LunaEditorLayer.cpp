@@ -48,7 +48,6 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
-constexpr const char* kEditorGridFeatureName = "EditorInfiniteGrid";
 constexpr const char* kEditorGridToggleLabel = "Show Editor Grid";
 constexpr float kUiScaleChangeThreshold = 0.01f;
 
@@ -63,6 +62,26 @@ const char* gizmoOperationToString(luna::GizmoOperation operation)
             return "Scale";
     }
     return "Unknown";
+}
+
+luna::editor::EditorTransformTool toEditorTransformTool(luna::GizmoOperation operation)
+{
+    switch (operation) {
+        case luna::GizmoOperation::Translate:
+            return luna::editor::EditorTransformTool::Translate;
+        case luna::GizmoOperation::Rotate:
+            return luna::editor::EditorTransformTool::Rotate;
+        case luna::GizmoOperation::Scale:
+            return luna::editor::EditorTransformTool::Scale;
+    }
+
+    return luna::editor::EditorTransformTool::Translate;
+}
+
+luna::editor::EditorTransformSpace toEditorTransformSpace(luna::GizmoMode mode)
+{
+    return mode == luna::GizmoMode::World ? luna::editor::EditorTransformSpace::World
+                                          : luna::editor::EditorTransformSpace::Local;
 }
 
 ImGuizmo::OPERATION toImGuizmoOperation(luna::GizmoOperation operation)
@@ -174,11 +193,11 @@ void LunaEditorLayer::onAttach()
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
-        m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::OffscreenTexture);
+        m_viewport_session.configureRenderer(m_application->getRenderer(), true);
         syncEditorGridFeatureState();
         syncPickDebugVisualizationState();
     } else {
-        m_application->getRenderer().setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
+        m_viewport_session.configureRenderer(m_application->getRenderer(), false);
         syncEditorGridFeatureState();
         LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'",
                          luna::RHI::BackendTypeToString(
@@ -195,10 +214,8 @@ void LunaEditorLayer::onDetach()
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
     endRuntimeViewport();
+    m_viewport_session.resetRenderer(m_application->getRenderer());
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
-    m_application->getRenderer().setRenderDebugViewMode(RenderDebugViewMode::None);
-    m_application->getRenderer().setScenePickDebugVisualizationEnabled(false);
-    m_application->getRenderer().setDefaultRenderFeatureEnabled(kEditorGridFeatureName, false);
 }
 
 void LunaEditorLayer::onUpdate(Timestep dt)
@@ -512,13 +529,25 @@ void LunaEditorLayer::drawViewport()
         std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
     const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * viewport_scale_x, 0.0f));
     const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * viewport_scale_y, 0.0f));
-    renderer.setSceneOutputSize(viewport_width, viewport_height);
-    m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+    const bool input_enabled = !m_runtime_viewport_enabled &&
+                               (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
+                               !ImGuizmo::IsUsing();
+    const auto& viewport_state = m_viewport_session.sync(renderer,
+                                                         m_editor_camera,
+                                                         viewport_width,
+                                                         viewport_height,
+                                                         m_viewport_focused,
+                                                         m_viewport_hovered,
+                                                         input_enabled,
+                                                         m_editor_camera.isMouseCaptured(),
+                                                         m_runtime_viewport_enabled,
+                                                         toEditorTransformTool(m_gizmo_operation),
+                                                         toEditorTransformSpace(m_gizmo_mode));
 
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
-        const bool flip_uv_y = renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip;
+        const bool flip_uv_y = viewport_state.render_plane.descriptor.y_flip;
         const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
         const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
 
@@ -627,7 +656,7 @@ void LunaEditorLayer::consumePendingScenePick()
         return;
     }
 
-    const std::optional<uint32_t> picked_id = m_application->getRenderer().consumeScenePickResult();
+    const std::optional<uint32_t> picked_id = m_viewport_session.consumeScenePickResult(m_application->getRenderer());
     if (!picked_id.has_value()) {
         return;
     }
@@ -653,7 +682,7 @@ void LunaEditorLayer::syncPickDebugVisualizationState() const
         return;
     }
 
-    m_application->getRenderer().setScenePickDebugVisualizationEnabled(m_show_pick_debug_visualization);
+    m_viewport_session.setPickDebugVisualization(m_application->getRenderer(), m_show_pick_debug_visualization);
 }
 
 void LunaEditorLayer::syncEditorGridFeatureState() const
@@ -662,11 +691,7 @@ void LunaEditorLayer::syncEditorGridFeatureState() const
         return;
     }
 
-    auto& renderer = m_application->getRenderer();
-    const bool editor_grid_enabled =
-        m_show_editor_grid && !m_runtime_viewport_enabled &&
-        renderer.getSceneOutputMode() == Renderer::SceneOutputMode::OffscreenTexture;
-    renderer.setDefaultRenderFeatureEnabled(kEditorGridFeatureName, editor_grid_enabled);
+    m_viewport_session.setEditorGrid(m_application->getRenderer(), m_show_editor_grid, m_runtime_viewport_enabled);
 }
 
 void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
@@ -703,14 +728,8 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const uint32_t color_pixel_y = (std::min) (
         static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
 
-    // The final scene color is produced by a fullscreen lighting pass before ImGui samples it.
-    // Some backends need the displayed color-space Y converted back to the raw pick attachment Y.
-    const bool pick_y_matches_display_y =
-        m_application->getRenderer().getCapabilities().conventions.scene_pick_y_matches_display_y;
-    const uint32_t pick_pixel_y =
-        pick_y_matches_display_y ? color_pixel_y : (texture_extent.height - 1) - color_pixel_y;
-
-    m_application->getRenderer().requestScenePick((std::min) (pixel_x, texture_extent.width - 1), pick_pixel_y);
+    (void) m_viewport_session.requestScenePick(
+        m_application->getRenderer(), (std::min) (pixel_x, texture_extent.width - 1), color_pixel_y);
 }
 
 const std::string& LunaEditorLayer::getAssetLabel() const

@@ -1,4 +1,9 @@
 add_executable(
+    EditorProtocolTests
+    EditorProtocolTests.cpp
+)
+
+add_executable(
     ScriptPluginContractTests
     ScriptPluginContractTests.cpp
 )
@@ -27,6 +32,15 @@ add_executable(
     AuthoringProtocolTests
     AuthoringProtocolTests.cpp
 )
+
+function(luna_set_test_properties test_name timeout labels)
+    set_tests_properties(
+        ${test_name}
+        PROPERTIES
+            TIMEOUT ${timeout}
+            LABELS "${labels}"
+    )
+endfunction()
 
 set(LUNA_TEST_SCRIPT_PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ScriptPluginTestPlugins")
 set(LUNA_TEST_SCRIPT_PLUGIN_TARGETS)
@@ -85,6 +99,12 @@ add_luna_test_script_plugin(LunaTestScriptPluginExtensionMismatch LUNA_TEST_SCRI
 add_luna_test_script_plugin(LunaTestScriptPluginEmptyExtensions LUNA_TEST_SCRIPT_PLUGIN_EMPTY_EXTENSIONS)
 
 target_link_libraries(
+    EditorProtocolTests
+    PRIVATE
+        LunaEditorProtocol
+)
+
+target_link_libraries(
     ScriptPluginContractTests
     PRIVATE
         LunaCore
@@ -118,6 +138,12 @@ target_link_libraries(
     AuthoringProtocolTests
     PRIVATE
         LunaCore
+)
+
+target_compile_features(
+    EditorProtocolTests
+    PRIVATE
+        cxx_std_20
 )
 
 target_compile_features(
@@ -169,6 +195,12 @@ target_compile_definitions(
         LUNA_AUTHORING_SCHEMA_DIR="${PROJECT_SOURCE_DIR}/Docs/Schemas"
 )
 
+target_compile_definitions(
+    EditorProtocolTests
+    PRIVATE
+        LUNA_EDITOR_SCHEMA_DIR="${PROJECT_SOURCE_DIR}/Docs/Schemas"
+)
+
 if(TARGET LunaScriptLuaPlugin)
     add_dependencies(ScriptPluginContractTests LunaScriptLuaPlugin)
 endif()
@@ -176,31 +208,43 @@ endif()
 add_dependencies(ScriptPluginContractTests ${LUNA_TEST_SCRIPT_PLUGIN_TARGETS})
 
 add_test(
+    NAME EditorProtocolTests
+    COMMAND EditorProtocolTests
+)
+luna_set_test_properties(EditorProtocolTests 20 "quick;unit;editor;view;protocol")
+
+add_test(
     NAME ScriptPluginContractTests
     COMMAND ScriptPluginContractTests
 )
+luna_set_test_properties(ScriptPluginContractTests 20 "quick;unit;core;plugin")
 
 add_test(
     NAME SceneSerializerTests
     COMMAND SceneSerializerTests
 )
+luna_set_test_properties(SceneSerializerTests 20 "quick;unit;core;scene")
 
 add_test(
     NAME AuthoringSessionTests
     COMMAND AuthoringSessionTests
 )
+luna_set_test_properties(AuthoringSessionTests 20 "quick;unit;authoring")
 
 add_test(
     NAME AuthoringExecutorTests
     COMMAND AuthoringExecutorTests
 )
+luna_set_test_properties(AuthoringExecutorTests 20 "quick;unit;authoring")
 
 add_test(
     NAME AuthoringHostTests
     COMMAND AuthoringHostTests
 )
+luna_set_test_properties(AuthoringHostTests 20 "quick;unit;authoring")
 
 add_test(
     NAME AuthoringProtocolTests
     COMMAND AuthoringProtocolTests
 )
+luna_set_test_properties(AuthoringProtocolTests 20 "quick;unit;authoring;protocol")

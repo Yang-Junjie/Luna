@@ -33,6 +33,15 @@ set_target_properties(
         VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+function(luna_set_test_properties test_name timeout labels)
+    set_tests_properties(
+        ${test_name}
+        PROPERTIES
+            TIMEOUT ${timeout}
+            LABELS "${labels}"
+    )
+endfunction()
+
 if(BUILD_TESTING)
     add_test(
         NAME CliSmokeTest
@@ -45,6 +54,7 @@ if(BUILD_TESTING)
             transform KeyLight 0 4 2 -35 0 0 1 1 1
             save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliSmoke"
     )
+    luna_set_test_properties(CliSmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliJsonSmokeTest
@@ -56,6 +66,7 @@ if(BUILD_TESTING)
             transform JsonCube 0 0 0 0 0 0 1 1 1
             save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliJsonSmoke"
     )
+    luna_set_test_properties(CliJsonSmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliDryRunSmokeTest
@@ -67,6 +78,7 @@ if(BUILD_TESTING)
             primitive DryRunCube Cube
             save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliDryRunSmoke"
     )
+    luna_set_test_properties(CliDryRunSmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliPlanSmokeTest
@@ -74,6 +86,7 @@ if(BUILD_TESTING)
             LunaCLI
             plan "${CMAKE_CURRENT_SOURCE_DIR}/client/examples/smoke.plan.json"
     )
+    luna_set_test_properties(CliPlanSmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliInspectSmokeTest
@@ -87,6 +100,7 @@ if(BUILD_TESTING)
             inspect hierarchy
             snapshot
     )
+    luna_set_test_properties(CliInspectSmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliVerifySmokeTest
@@ -101,6 +115,7 @@ if(BUILD_TESTING)
             save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliVerifySmoke"
             verify saved
     )
+    luna_set_test_properties(CliVerifySmokeTest 30 "quick;smoke;cli;authoring")
 
     add_test(
         NAME CliCapabilitiesSmokeTest
@@ -109,6 +124,7 @@ if(BUILD_TESTING)
             capabilities
             --json
     )
+    luna_set_test_properties(CliCapabilitiesSmokeTest 30 "quick;smoke;cli;authoring")
 
     find_program(LUNA_NODE_EXECUTABLE node)
     if(LUNA_NODE_EXECUTABLE)
@@ -122,6 +138,28 @@ if(BUILD_TESTING)
                 "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/create_cube_scene.plan.json"
                 "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/invalid_unknown_command.plan.json"
         )
+        luna_set_test_properties(CliTsAuthoringProtocolSmokeTest 30 "quick;smoke;cli;ts;authoring;protocol")
+
+        add_test(
+            NAME CliTsEditorShellSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/editorShell.smoke.ts"
+        )
+        luna_set_test_properties(CliTsEditorShellSmokeTest 30 "quick;smoke;cli;ts;editor;protocol")
+
+        add_test(
+            NAME CliTsEditorViewBridgeSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/editorViewBridge.smoke.ts"
+                "$<TARGET_FILE:LunaEditorViewHost>"
+        )
+        luna_set_test_properties(CliTsEditorViewBridgeSmokeTest 45 "quick;smoke;cli;ts;editor;view;protocol")
 
         add_test(
             NAME CliTsClientSmokeTest
@@ -137,6 +175,7 @@ if(BUILD_TESTING)
                 transform TsCube 2 1 0 0 30 0 1 1 1
                 save "${CMAKE_CURRENT_BINARY_DIR}/Smoke/CliTsClientSmoke"
         )
+        luna_set_test_properties(CliTsClientSmokeTest 45 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsClientPlanFixtureSmokeTest
@@ -150,6 +189,7 @@ if(BUILD_TESTING)
                 plan
                 "${PROJECT_SOURCE_DIR}/Tests/Fixtures/Authoring/create_cube_scene.plan.json"
         )
+        luna_set_test_properties(CliTsClientPlanFixtureSmokeTest 45 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsInteractivePlanSmokeTest
@@ -162,6 +202,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaCLI>"
                 "$<TARGET_FILE:LunaAuthoringHost>"
         )
+        luna_set_test_properties(CliTsInteractivePlanSmokeTest 60 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsComposeSmokeTest
@@ -174,6 +215,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaCLI>"
                 "$<TARGET_FILE:LunaAuthoringHost>"
         )
+        luna_set_test_properties(CliTsComposeSmokeTest 60 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsAuthoringControllerSmokeTest
@@ -184,6 +226,7 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringController.smoke.ts"
                 "$<TARGET_FILE:LunaAuthoringHost>"
         )
+        luna_set_test_properties(CliTsAuthoringControllerSmokeTest 45 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsAuthoringTurnSmokeTest
@@ -195,6 +238,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaAuthoringHost>"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
         )
+        luna_set_test_properties(CliTsAuthoringTurnSmokeTest 60 "quick;smoke;cli;ts;authoring")
 
         add_test(
             NAME CliTsAuthoringAiPlannerSmokeTest
@@ -206,6 +250,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaAuthoringHost>"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
         )
+        luna_set_test_properties(CliTsAuthoringAiPlannerSmokeTest 180 "ai;cli;ts;authoring")
 
         add_test(
             NAME CliTsChatSmokeTest
@@ -217,6 +262,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaAuthoringHost>"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
         )
+        luna_set_test_properties(CliTsChatSmokeTest 180 "ai;cli;ts;authoring")
 
         add_test(
             NAME CliTsChatDotEnvSmokeTest
@@ -228,6 +274,7 @@ if(BUILD_TESTING)
                 "$<TARGET_FILE:LunaAuthoringHost>"
                 "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
         )
+        luna_set_test_properties(CliTsChatDotEnvSmokeTest 180 "ai;cli;ts;authoring")
 
         add_test(
             NAME CliTsAiEvalSmokeTest
@@ -245,6 +292,7 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/chinese-intent-basic.json"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/undo-redo-session.json"
         )
+        luna_set_test_properties(CliTsAiEvalSmokeTest 600 "ai;long;cli;ts;authoring")
 
         add_test(
             NAME AuthoringHostStdioSmokeTest
@@ -255,5 +303,6 @@ if(BUILD_TESTING)
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/authoringHost.smoke.ts"
                 "$<TARGET_FILE:LunaAuthoringHost>"
         )
+        luna_set_test_properties(AuthoringHostStdioSmokeTest 45 "quick;smoke;cli;ts;authoring")
     endif()
 endif()

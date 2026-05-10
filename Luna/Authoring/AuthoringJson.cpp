@@ -1,3 +1,4 @@
+#include "AuthoringHostJson.h"
 #include "AuthoringJson.h"
 
 #include <nlohmann/json.hpp>
@@ -345,22 +346,16 @@ Json jsonErrors(const std::vector<std::string>& errors)
     return result;
 }
 
-Json jsonAuthoringReport(const AuthoringReport& report, bool ok)
+Json buildAuthoringReportJson(const AuthoringReport& report, bool ok)
 {
     Json protocol = Json::object();
     protocol["name"] = report.protocol.name;
     protocol["version"] = report.protocol.version;
 
-    Json scene = Json::object();
-    scene["name"] = report.scene.name;
-    scene["path"] = jsonNullablePath(report.scene.path);
-    scene["entityCount"] = report.scene.entity_count;
-    scene["dirty"] = report.scene.dirty;
-
     Json result = Json::object();
     result["protocol"] = std::move(protocol);
     result["ok"] = ok;
-    result["scene"] = std::move(scene);
+    result["scene"] = authoringSceneSnapshotJson(report.scene);
     result["entities"] = jsonEntityBindings(report.entities);
     result["savedScenes"] = jsonPathArray(report.saved_scenes);
     result["inspections"] = jsonInspections(report.inspections);
@@ -371,6 +366,11 @@ Json jsonAuthoringReport(const AuthoringReport& report, bool ok)
 }
 
 } // namespace
+
+Json authoringReportJson(const AuthoringReport& report, bool ok)
+{
+    return buildAuthoringReportJson(report, ok);
+}
 
 std::string escapeAuthoringJsonString(std::string_view value)
 {
@@ -385,7 +385,7 @@ std::string escapeAuthoringJsonString(std::string_view value)
 
 void writeAuthoringReportJson(std::ostream& out, const AuthoringReport& report, bool ok)
 {
-    out << jsonAuthoringReport(report, ok).dump(2, ' ', false, Json::error_handler_t::replace) << '\n';
+    out << authoringReportJson(report, ok).dump(2, ' ', false, Json::error_handler_t::replace) << '\n';
 }
 
 } // namespace luna::authoring
