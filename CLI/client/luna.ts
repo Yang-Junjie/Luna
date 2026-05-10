@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -10,6 +10,20 @@ import { fileURLToPath } from "node:url";
 
 import { AuthoringHostClient } from "./authoringHostClient.ts";
 import { AuthoringSessionController } from "./authoringController.ts";
+import {
+    AuthoringChatTranscript,
+    renderAuthoringChatTurnSummary,
+    renderAuthoringSessionState,
+} from "./authoringChat.ts";
+import {
+    createAuthoringEvalRunDirectory,
+    readAuthoringEvalSpec,
+    renderAuthoringEvalSummary,
+    runAuthoringEval,
+    type AuthoringEvalResult,
+    writeAuthoringEvalResult,
+} from "./authoringEval.ts";
+import { loadLunaEnvironment } from "./dotenv.ts";
 import { createOpenAiCompatibleAuthoringPlanner } from "./authoringAiPlanner.ts";
 import { OpenAiCompatibleClient } from "./openAiCompatibleProvider.ts";
 import {
@@ -69,6 +83,57 @@ type TurnRequest = {
     planner?: "local" | "ai";
 };
 
+type ChatRequest = {
+    execute: boolean;
+    maxAttempts: number;
+    planner?: "local" | "ai";
+};
+
+type EvalRequest = {
+    specPath: string;
+    execute?: boolean;
+    maxAttempts?: number;
+    planner?: "local" | "ai";
+    out?: string;
+    outDir?: string;
+};
+
+type EvalSuiteRequest = {
+    specPaths: string[];
+    execute?: boolean;
+    maxAttempts?: number;
+    planner?: "local" | "ai";
+    out?: string;
+    outDir?: string;
+};
+
+type EvalSuiteResult = {
+    protocol: {
+        name: "luna.authoring.eval-suite";
+        version: 1;
+    };
+    ok: boolean;
+    name: string;
+    startedAt: string;
+    completedAt: string;
+    runDir: string;
+    resultPath?: string;
+    mode: "execute" | "rollback";
+    evals: EvalSuiteEntry[];
+};
+
+type EvalSuiteEntry = {
+    name: string;
+    specPath: string;
+    ok: boolean;
+    resultPath?: string;
+    turnCount: number;
+    failedTurns: Array<{
+        id: string;
+        failures: string[];
+    }>;
+};
+
 type TurnResult = AuthoringTurnResult & {
     mode: "dry-run" | "execute";
     plan: AuthoringPlan;
@@ -82,7 +147,10 @@ Usage:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--host <path>] [--project <path>] [--json] [--dry-run] plan <plan.json>
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] capabilities
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] compose "<intent>"
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] [--ai] [--ai-provider deepseek] turn "<intent>" [--max-attempts <n>]
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--execute] [--ai] [--ai-provider deepseek] [--ai-timeout-ms <ms>] turn "<intent>" [--max-attempts <n>]
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--ai] [--ai-timeout-ms <ms>] chat|session
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--ai] eval <eval.json> [--out-dir <dir>] [--max-attempts <n>]
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--project <path>] [--ai] eval-suite [eval.json ...] [--out-dir <dir>] [--max-attempts <n>]
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts [--authoring-host <path>] [--json] [--dry-run] interactive
 
 Examples:
@@ -90,7 +158,11 @@ Examples:
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts plan CLI/client/examples/smoke.plan.json
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts compose "create a simple scene with a cube, camera, and light"
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts turn "create a simple scene with a cube, camera, and light"
-  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-provider deepseek turn "create a simple scene with a cube"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-provider deepseek --ai-timeout-ms 300000 turn "create a simple scene with a cube"
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai chat
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai session
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai eval CLI/tests/ai-evals/basic-scene.json
+  node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai eval-suite
   node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts interactive
 
 The TypeScript client uses LunaCLI for legacy command execution and LunaAuthoringHost through a session controller for stateful authoring flows.`);
@@ -624,6 +696,215 @@ function parseTurnRequest(args: string[], globalExecute: boolean): TurnRequest {
     return { intent, execute, maxAttempts, printPlanOnly, planner };
 }
 
+function parseChatRequest(args: string[]): ChatRequest {
+    let execute = true;
+    let maxAttempts = 1;
+    let planner: "local" | "ai" | undefined;
+
+    for (let index = 0; index < args.length; ++index) {
+        const arg = args[index];
+        if (arg === "--ai") {
+            planner = "ai";
+            continue;
+        }
+        if (arg === "--planner") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --planner.");
+            }
+            planner = parsePlannerName(value);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--planner=")) {
+            planner = parsePlannerName(arg.slice("--planner=".length));
+            continue;
+        }
+        if (arg === "--execute") {
+            execute = true;
+            continue;
+        }
+        if (arg === "--dry-run") {
+            execute = false;
+            continue;
+        }
+        if (arg === "--max-attempts") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --max-attempts.");
+            }
+            maxAttempts = parsePositiveIntegerOption(value, "--max-attempts");
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--max-attempts=")) {
+            maxAttempts = parsePositiveIntegerOption(arg.slice("--max-attempts=".length), "--max-attempts");
+            continue;
+        }
+
+        throw new Error(`Command 'chat' does not accept positional argument '${arg}'.`);
+    }
+
+    return { execute, maxAttempts, planner };
+}
+
+function parseEvalRequest(args: string[], options: ClientOptions): EvalRequest {
+    let execute = options.execute ? true : options.dryRun ? false : undefined;
+    let maxAttempts: number | undefined;
+    let planner: "local" | "ai" | undefined;
+    let out: string | undefined;
+    let outDir: string | undefined;
+    let specPath: string | undefined;
+
+    for (let index = 0; index < args.length; ++index) {
+        const arg = args[index];
+        if (arg === "--ai") {
+            planner = "ai";
+            continue;
+        }
+        if (arg === "--planner") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --planner.");
+            }
+            planner = parsePlannerName(value);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--planner=")) {
+            planner = parsePlannerName(arg.slice("--planner=".length));
+            continue;
+        }
+        if (arg === "--execute") {
+            execute = true;
+            continue;
+        }
+        if (arg === "--dry-run") {
+            execute = false;
+            continue;
+        }
+        if (arg === "--max-attempts") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --max-attempts.");
+            }
+            maxAttempts = parsePositiveIntegerOption(value, "--max-attempts");
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--max-attempts=")) {
+            maxAttempts = parsePositiveIntegerOption(arg.slice("--max-attempts=".length), "--max-attempts");
+            continue;
+        }
+        if (arg === "--out") {
+            out = takeOptionValue(args, index, arg);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--out=")) {
+            out = arg.slice("--out=".length);
+            continue;
+        }
+        if (arg === "--out-dir") {
+            outDir = takeOptionValue(args, index, arg);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--out-dir=")) {
+            outDir = arg.slice("--out-dir=".length);
+            continue;
+        }
+        if (arg.startsWith("--")) {
+            throw new Error(`Unknown eval option '${arg}'.`);
+        }
+        if (specPath != null) {
+            throw new Error(`Command 'eval' only accepts one eval spec path.`);
+        }
+        specPath = arg;
+    }
+
+    if (specPath == null) {
+        throw new Error("Missing eval spec path.");
+    }
+
+    return { specPath, execute, maxAttempts, planner, out, outDir };
+}
+
+function parseEvalSuiteRequest(args: string[], options: ClientOptions): EvalSuiteRequest {
+    let execute = options.execute ? true : options.dryRun ? false : undefined;
+    let maxAttempts: number | undefined;
+    let planner: "local" | "ai" | undefined;
+    let out: string | undefined;
+    let outDir: string | undefined;
+    const specPaths: string[] = [];
+
+    for (let index = 0; index < args.length; ++index) {
+        const arg = args[index];
+        if (arg === "--ai") {
+            planner = "ai";
+            continue;
+        }
+        if (arg === "--planner") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --planner.");
+            }
+            planner = parsePlannerName(value);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--planner=")) {
+            planner = parsePlannerName(arg.slice("--planner=".length));
+            continue;
+        }
+        if (arg === "--execute") {
+            execute = true;
+            continue;
+        }
+        if (arg === "--dry-run") {
+            execute = false;
+            continue;
+        }
+        if (arg === "--max-attempts") {
+            const value = args[index + 1];
+            if (value == null || value.startsWith("--")) {
+                throw new Error("Missing value for --max-attempts.");
+            }
+            maxAttempts = parsePositiveIntegerOption(value, "--max-attempts");
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--max-attempts=")) {
+            maxAttempts = parsePositiveIntegerOption(arg.slice("--max-attempts=".length), "--max-attempts");
+            continue;
+        }
+        if (arg === "--out") {
+            out = takeOptionValue(args, index, arg);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--out=")) {
+            out = arg.slice("--out=".length);
+            continue;
+        }
+        if (arg === "--out-dir") {
+            outDir = takeOptionValue(args, index, arg);
+            ++index;
+            continue;
+        }
+        if (arg.startsWith("--out-dir=")) {
+            outDir = arg.slice("--out-dir=".length);
+            continue;
+        }
+        if (arg.startsWith("--")) {
+            throw new Error(`Unknown eval-suite option '${arg}'.`);
+        }
+        specPaths.push(arg);
+    }
+
+    return { specPaths, execute, maxAttempts, planner, out, outDir };
+}
+
 function createLocalTurnPlanner(intent: string, project?: string): AuthoringTurnPlanner {
     return async ({ capabilities }) => composeLocalPlan(intent, capabilities, project);
 }
@@ -719,6 +1000,175 @@ async function runTurnWithAuthoringController(
         mode: request.execute ? "execute" : "dry-run",
         plan: finalTurnPlan(result),
     };
+}
+
+async function runEvalWithAuthoringController(
+    controller: AuthoringSessionController,
+    request: EvalRequest,
+    options: ClientOptions,
+    project?: string,
+): Promise<number> {
+    const result = await executeEvalWithAuthoringController(controller, request, options, project);
+    if (options.jsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
+    } else {
+        console.log(renderAuthoringEvalSummary(result).trimEnd());
+    }
+    return result.ok ? 0 : 1;
+}
+
+async function executeEvalWithAuthoringController(
+    controller: AuthoringSessionController,
+    request: EvalRequest,
+    options: ClientOptions,
+    project?: string,
+): Promise<AuthoringEvalResult> {
+    const spec = readAuthoringEvalSpec(resolve(request.specPath));
+    const outputRoot = resolve(request.outDir ?? join("logs", "ai-evals"));
+    const runDir = createAuthoringEvalRunDirectory(outputRoot, spec.name);
+    const resultPath = resolve(request.out ?? join(runDir, "result.json"));
+    const result = await runAuthoringEval({
+        controller,
+        spec,
+        project,
+        runDir,
+        resultPath,
+        execute: request.execute,
+        maxAttempts: request.maxAttempts,
+        createPlanner: (intent) => createTurnPlanner(
+            intent,
+            project,
+            {
+                intent,
+                execute: request.execute ?? spec.execute ?? true,
+                maxAttempts: request.maxAttempts ?? spec.maxAttempts ?? 1,
+                printPlanOnly: false,
+                planner: request.planner,
+            },
+            options,
+        ),
+    });
+
+    writeAuthoringEvalResult(resultPath, result);
+    return result;
+}
+
+async function runEvalSuite(
+    authoringHost: string,
+    request: EvalSuiteRequest,
+    options: ClientOptions,
+    project?: string,
+): Promise<number> {
+    const result = await executeEvalSuite(authoringHost, request, options, project);
+    if (options.jsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
+    } else {
+        console.log(renderEvalSuiteSummary(result).trimEnd());
+    }
+    return result.ok ? 0 : 1;
+}
+
+async function executeEvalSuite(
+    authoringHost: string,
+    request: EvalSuiteRequest,
+    options: ClientOptions,
+    project?: string,
+): Promise<EvalSuiteResult> {
+    const startedAt = new Date().toISOString();
+    const specPaths = resolveEvalSuiteSpecPaths(request.specPaths);
+    const outputRoot = resolve(request.outDir ?? join("logs", "ai-evals", "suites"));
+    const runDir = createAuthoringEvalRunDirectory(outputRoot, "suite");
+    const resultPath = resolve(request.out ?? join(runDir, "suite.json"));
+    const entries: EvalSuiteEntry[] = [];
+
+    for (const specPath of specPaths) {
+        const evalRequest: EvalRequest = {
+            specPath,
+            execute: request.execute,
+            maxAttempts: request.maxAttempts,
+            planner: request.planner,
+            outDir: runDir,
+        };
+        const result = await withAuthoringHostClient(authoringHost, async (client) => {
+            const controller = new AuthoringSessionController(client);
+            return await executeEvalWithAuthoringController(controller, evalRequest, options, project);
+        });
+        entries.push(toEvalSuiteEntry(specPath, result));
+    }
+
+    const completedAt = new Date().toISOString();
+    const result: EvalSuiteResult = {
+        protocol: { name: "luna.authoring.eval-suite", version: 1 },
+        ok: entries.every((entry) => entry.ok),
+        name: "authoring-eval-suite",
+        startedAt,
+        completedAt,
+        runDir,
+        resultPath,
+        mode: (request.execute ?? true) ? "execute" : "rollback",
+        evals: entries,
+    };
+    mkdirSync(dirname(resultPath), { recursive: true });
+    writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    return result;
+}
+
+function resolveEvalSuiteSpecPaths(paths: string[]): string[] {
+    if (paths.length > 0) {
+        return paths.map((path) => resolve(path));
+    }
+
+    const scriptDir = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = resolve(scriptDir, "..", "..");
+    const evalDir = resolve(repoRoot, "CLI", "tests", "ai-evals");
+    const specs = readdirSync(evalDir)
+        .filter((name) => name.endsWith(".json"))
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => resolve(evalDir, name));
+    if (specs.length === 0) {
+        throw new Error(`No eval specs found in ${evalDir}.`);
+    }
+    return specs;
+}
+
+function toEvalSuiteEntry(specPath: string, result: AuthoringEvalResult): EvalSuiteEntry {
+    return {
+        name: result.name,
+        specPath,
+        ok: result.ok,
+        resultPath: result.resultPath,
+        turnCount: result.turns.length,
+        failedTurns: result.turns
+            .filter((turn) => !turn.ok)
+            .map((turn) => ({
+                id: turn.id,
+                failures: [...turn.failures],
+            })),
+    };
+}
+
+function renderEvalSuiteSummary(result: EvalSuiteResult): string {
+    const passed = result.evals.filter((entry) => entry.ok).length;
+    const lines = [
+        `Authoring eval suite: ${result.ok ? "PASS" : "FAIL"}`,
+        `Mode: ${result.mode}`,
+        `Passed: ${passed}/${result.evals.length}`,
+        `Run: ${result.runDir}`,
+    ];
+    if (result.resultPath != null) {
+        lines.push(`Result: ${result.resultPath}`);
+    }
+
+    for (const entry of result.evals) {
+        lines.push(`- ${entry.name}: ${entry.ok ? "PASS" : "FAIL"} (${entry.turnCount} turns)`);
+        if (entry.resultPath != null) {
+            lines.push(`  result: ${entry.resultPath}`);
+        }
+        for (const failedTurn of entry.failedTurns) {
+            lines.push(`  ${failedTurn.id}: ${failedTurn.failures.join("; ")}`);
+        }
+    }
+    return `${lines.join("\n")}\n`;
 }
 
 type ComposeRequest = {
@@ -1155,7 +1605,234 @@ async function runInteractive(
     }
 }
 
+async function runChat(
+    authoringHost: string,
+    project: string | undefined,
+    jsonOutput: boolean,
+    request: ChatRequest,
+    options: ClientOptions,
+): Promise<number> {
+    return await withAuthoringHostClient(authoringHost, async (client) => {
+        const controller = new AuthoringSessionController(client);
+        const transcript = new AuthoringChatTranscript({ limit: 24 });
+        const turn = new AuthoringTurn(controller);
+        const rl = createInterface({ input, output });
+
+        console.log("Luna chat session. Type '/help' for commands.");
+        try {
+            while (true) {
+                let line: string;
+                try {
+                    line = (await rl.question("chat> ")).trim();
+                } catch (error) {
+                    if (isReadlineClosedError(error)) {
+                        return 0;
+                    }
+                    throw error;
+                }
+                if (line.length === 0) {
+                    continue;
+                }
+
+                try {
+                    const status = await handleChatLine({
+                        line,
+                        controller,
+                        transcript,
+                        turn,
+                        project,
+                        jsonOutput,
+                        request,
+                        options,
+                    });
+                    if (status != null) {
+                        return status;
+                    }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    console.error(message);
+                    transcript.appendAssistant(JSON.stringify({
+                        control: "error",
+                        message,
+                    }));
+                }
+            }
+        } finally {
+            rl.close();
+        }
+    });
+}
+
+function isReadlineClosedError(error: unknown): boolean {
+    return error instanceof Error && error.message === "readline was closed";
+}
+
+type ChatLineContext = {
+    line: string;
+    controller: AuthoringSessionController;
+    transcript: AuthoringChatTranscript;
+    turn: AuthoringTurn;
+    project?: string;
+    jsonOutput: boolean;
+    request: ChatRequest;
+    options: ClientOptions;
+};
+
+async function handleChatLine(context: ChatLineContext): Promise<number | null> {
+    const command = normalizeChatCommand(context.line);
+    if (command === "exit" || command === "quit") {
+        return 0;
+    }
+    if (command === "help") {
+        printChatHelp();
+        return null;
+    }
+    if (command === "history") {
+        printChatHistory(context.transcript, context.jsonOutput);
+        return null;
+    }
+    if (command === "state") {
+        printChatSessionState(await context.controller.session());
+        return null;
+    }
+    if (command === "snapshot") {
+        const snapshot = await context.controller.snapshot();
+        printChatSnapshot(snapshot.report, snapshot.session, context.jsonOutput);
+        return null;
+    }
+    if (command === "undo") {
+        const result = await context.controller.undo();
+        printChatSessionState(result.session);
+        return null;
+    }
+    if (command === "redo") {
+        const result = await context.controller.redo();
+        printChatSessionState(result.session);
+        return null;
+    }
+    if (command === "clear") {
+        context.transcript.clear();
+        console.log("Conversation cleared.");
+        return null;
+    }
+    if (command === "clear-history") {
+        const result = await context.controller.clearHistory();
+        printChatSessionState(result.session);
+        return null;
+    }
+
+    const conversation = context.transcript.messages();
+    const planner = createTurnPlanner(context.line, context.project, context.request, context.options);
+    try {
+        const result = await context.turn.run(context.line, planner, {
+            project: context.project,
+            transactionName: buildAuthoringTurnTransactionName(context.line),
+            maxAttempts: context.request.maxAttempts,
+            commitOnSuccess: context.request.execute,
+            conversation,
+        });
+
+        context.transcript.appendUser(context.line);
+        context.transcript.appendAssistant(renderAuthoringChatTurnSummary(result));
+        printChatTurnResult(result, context.jsonOutput);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        context.transcript.appendUser(context.line);
+        context.transcript.appendAssistant(JSON.stringify({
+            intent: context.line,
+            ok: false,
+            error: message,
+        }));
+        console.error(message);
+    }
+    return null;
+}
+
+function normalizeChatCommand(line: string): string {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("/")) {
+        return trimmed.slice(1).trim().toLowerCase();
+    }
+
+    const normalized = trimmed.toLowerCase();
+    switch (normalized) {
+        case "exit":
+        case "quit":
+        case "help":
+        case "history":
+        case "state":
+        case "snapshot":
+        case "undo":
+        case "redo":
+        case "clear":
+        case "clear-history":
+            return normalized;
+        default:
+            return "";
+    }
+}
+
+function printChatHelp(): void {
+    console.log(`Chat commands:
+  /help           Show this help
+  /history        Show the remembered conversation
+  /state          Show the current session state
+  /snapshot       Refresh and print the current report
+  /undo           Undo the last committed authoring transaction
+  /redo           Redo the last undone authoring transaction
+  /clear          Clear conversation memory only
+  /clear-history  Clear authoring undo/redo history
+  /exit           Leave the chat
+
+Any other line is sent to the authoring planner as a user instruction.`);
+}
+
+function printChatHistory(transcript: AuthoringChatTranscript, jsonOutput: boolean): void {
+    const messages = transcript.messages();
+    if (jsonOutput) {
+        console.log(JSON.stringify(messages, null, 2));
+        return;
+    }
+
+    if (messages.length === 0) {
+        console.log("No conversation history.");
+        return;
+    }
+
+    for (const [index, message] of messages.entries()) {
+        console.log(`${index + 1}. ${message.role}: ${message.content}`);
+    }
+}
+
+function printChatSessionState(session: Awaited<ReturnType<AuthoringSessionController["session"]>>): void {
+    console.log(renderAuthoringSessionState(session));
+}
+
+function printChatSnapshot(
+    report: AuthoringReport,
+    session: Awaited<ReturnType<AuthoringSessionController["session"]>>,
+    jsonOutput: boolean,
+): void {
+    if (jsonOutput) {
+        console.log(JSON.stringify({ session, report }, null, 2));
+        return;
+    }
+
+    console.log(renderAuthoringSessionState(session));
+    printReportSummary(report);
+}
+
+function printChatTurnResult(result: AuthoringTurnResult, jsonOutput: boolean): void {
+    if (jsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+    }
+
+    console.log(renderAuthoringChatTurnSummary(result));
+}
+
 async function main(): Promise<number> {
+    loadLunaEnvironment();
     const options = parseClientOptions(process.argv.slice(2));
     const command = options.passthrough[0];
     if (command == null || command === "--help" || command === "-h" || command === "help") {
@@ -1217,12 +1894,27 @@ async function main(): Promise<number> {
             }
             return result.ok ? 0 : 1;
         });
+    } else if (command === "chat" || command === "session") {
+        const request = parseChatRequest(options.passthrough.slice(1));
+        const authoringHost = resolveAuthoringHost();
+        return await runChat(authoringHost, project, options.jsonOutput, request, options);
+    } else if (command === "eval") {
+        const request = parseEvalRequest(options.passthrough.slice(1), options);
+        const authoringHost = resolveAuthoringHost();
+        return await withAuthoringHostClient(authoringHost, async (client) => {
+            const controller = new AuthoringSessionController(client);
+            return await runEvalWithAuthoringController(controller, request, options, project);
+        });
+    } else if (command === "eval-suite") {
+        const request = parseEvalSuiteRequest(options.passthrough.slice(1), options);
+        const authoringHost = resolveAuthoringHost();
+        return await runEvalSuite(authoringHost, request, options, project);
     } else if (command === "interactive") {
         const interactiveLegacyHost = options.dryRun ? resolveLegacyHost() : undefined;
         const authoringHost = resolveAuthoringHost();
         return await runInteractive(interactiveLegacyHost, authoringHost, project, options.jsonOutput, options.dryRun);
     } else {
-        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', 'turn', or 'interactive'.`);
+        throw new Error(`Unknown TS client command '${command}'. Use 'run', 'plan', 'capabilities', 'compose', 'turn', 'chat', 'session', 'eval', 'eval-suite', or 'interactive'.`);
     }
 
     if (project != null) {

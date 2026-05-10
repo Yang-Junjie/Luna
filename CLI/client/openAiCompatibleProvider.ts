@@ -33,7 +33,7 @@ export class OpenAiCompatibleClient {
         this.#baseURL = requireNonEmpty(options.baseURL, "baseURL").replace(/\/+$/, "");
         this.#apiKey = requireNonEmpty(options.apiKey, "apiKey");
         this.#model = requireNonEmpty(options.model, "model");
-        this.#timeoutMs = options.timeoutMs ?? 60000;
+        this.#timeoutMs = options.timeoutMs ?? 300000;
         this.#extraRequestFields = { ...(options.extraRequestFields ?? {}) };
     }
 
@@ -80,7 +80,8 @@ export class OpenAiCompatibleClient {
             };
         } catch (error) {
             if (error instanceof Error && error.name === "AbortError") {
-                throw new Error("OpenAI-compatible provider request timed out.");
+                throw new Error(`OpenAI-compatible provider request timed out after ${this.#timeoutMs}ms. ` +
+                    "Increase --ai-timeout-ms or LUNA_AI_TIMEOUT_MS for slower models.");
             }
             throw error;
         } finally {

@@ -1,0 +1,79 @@
+{
+  "name": "undo-redo-session",
+  "description": "The authoring session should preserve undo/redo behavior across AI-authored turns.",
+  "execute": true,
+  "maxAttempts": 2,
+  "turns": [
+    {
+      "id": "create-cube",
+      "intent": "Create a new scene with one cube. Include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "canUndo": true,
+        "canRedo": false,
+        "undoDepth": 1,
+        "redoDepth": 0,
+        "componentCounts": {
+          "Mesh": 1
+        },
+        "planOps": [
+          "new",
+          "primitive",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "add-sphere",
+      "intent": "Add one sphere to the current scene. Do not create a new scene. Include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "canUndo": true,
+        "canRedo": false,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "componentCounts": {
+          "Mesh": 2
+        },
+        "planOps": [
+          "primitive",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "undo-sphere",
+      "control": "undo",
+      "expect": {
+        "ok": true,
+        "noDiagnostics": true,
+        "canUndo": true,
+        "canRedo": true,
+        "undoDepth": 1,
+        "redoDepth": 1,
+        "componentCounts": {
+          "Mesh": 1
+        }
+      }
+    },
+    {
+      "id": "redo-sphere",
+      "control": "redo",
+      "expect": {
+        "ok": true,
+        "noDiagnostics": true,
+        "canUndo": true,
+        "canRedo": false,
+        "undoDepth": 2,
+        "redoDepth": 0,
+        "componentCounts": {
+          "Mesh": 2
+        }
+      }
+    }
+  ]
+}

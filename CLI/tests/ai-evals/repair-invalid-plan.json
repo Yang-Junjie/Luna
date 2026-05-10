@@ -1,0 +1,50 @@
+{
+  "name": "repair-invalid-plan",
+  "description": "The model should use repair diagnostics from a failed attempt and produce a valid replacement plan.",
+  "execute": true,
+  "maxAttempts": 2,
+  "turns": [
+    {
+      "id": "repair-missing-entity",
+      "intent": "Repair the failed previous attempt by creating a new scene containing one cube. Use the diagnostics to avoid the missing entity problem. Include a final snapshot.",
+      "firstAttemptPlan": {
+        "commands": [
+          {
+            "op": "new"
+          },
+          {
+            "op": "transform",
+            "entity": "MissingCube",
+            "translation": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "op": "snapshot"
+          }
+        ]
+      },
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "attemptCount": 2,
+        "failedAttemptsAtLeast": 1,
+        "diagnosticCodes": [
+          "UnknownEntity"
+        ],
+        "entityCountAtLeast": 3,
+        "componentCounts": {
+          "Mesh": 1
+        },
+        "planOps": [
+          "new",
+          "primitive",
+          "snapshot"
+        ]
+      }
+    }
+  ]
+}

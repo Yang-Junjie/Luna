@@ -14,12 +14,18 @@ export type AuthoringTurnPlannerContext = {
     maxAttempts: number;
     capabilities: AuthoringCapabilitiesDocument;
     session: AuthoringHostSessionState;
+    conversation?: AuthoringConversationMessage[];
     previousAttempt?: AuthoringTurnAttempt;
 };
 
 export type AuthoringTurnPlanner = (
     context: AuthoringTurnPlannerContext,
 ) => Promise<AuthoringPlan> | AuthoringPlan;
+
+export type AuthoringConversationMessage = {
+    role: "system" | "user" | "assistant";
+    content: string;
+};
 
 export type AuthoringTurnAttempt = {
     attempt: number;
@@ -55,6 +61,7 @@ export type AuthoringTurnOptions = {
     transactionName?: string;
     maxAttempts?: number;
     commitOnSuccess?: boolean;
+    conversation?: AuthoringConversationMessage[];
 };
 
 export function buildAuthoringTurnTransactionName(intent: string): string {
@@ -95,13 +102,14 @@ export class AuthoringTurn {
 
             const attemptContext: AuthoringTurnPlannerContext = {
                 intent,
-                project: options.project,
-                attempt,
-                maxAttempts,
-                capabilities: state.capabilities,
-                session: beginResult.session,
-                previousAttempt: attempts.at(-1),
-            };
+            project: options.project,
+            attempt,
+            maxAttempts,
+            capabilities: state.capabilities,
+            session: beginResult.session,
+            conversation: options.conversation,
+            previousAttempt: attempts.at(-1),
+        };
 
             let plan: AuthoringPlan;
             let execution: Awaited<ReturnType<AuthoringSessionController["executePlan"]>>;

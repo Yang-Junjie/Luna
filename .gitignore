@@ -17,3 +17,4 @@ imgui.ini
 devdocs/
 Plugins/**/Binaries/
 Plugins/**/Intermediate/
+.env

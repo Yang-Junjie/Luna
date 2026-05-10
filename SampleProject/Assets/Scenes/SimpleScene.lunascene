@@ -1,0 +1,98 @@
+Scene: SimpleScene
+Environment:
+  Enabled: true
+  BackgroundMode: ProceduralSky
+  BackgroundColor: [0.1, 0.1, 0.12]
+  IblEnabled: true
+  EnvironmentMapHandle: 0
+  Intensity: 1
+  SkyIntensity: 1
+  DiffuseIntensity: 1
+  SpecularIntensity: 1
+  ProceduralSunDirection: [0.51214755, 0.7682213, 0.38411066]
+  ProceduralSunIntensity: 20
+  ProceduralSunAngularRadius: 0.02
+  ProceduralSkyColorZenith: [0.15, 0.3, 0.6]
+  ProceduralSkyColorHorizon: [0.6, 0.5, 0.4]
+  ProceduralGroundColor: [0.1, 0.08, 0.06]
+  ProceduralSkyExposure: 1.5
+Shadows:
+  Mode: CascadedShadowMaps
+  PcfShadowDistance: 40
+  PcfMapSize: 4096
+  CsmCascadeSize: 2048
+Entities:
+  - IDComponent:
+      ID: 17907103226569475653
+    TagComponent:
+      Tag: Directional Light
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [-1.5707964, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    LightComponent:
+      Type: Directional
+      Enabled: true
+      Color: [1, 1, 1]
+      Intensity: 1
+      Range: 10
+      InnerConeAngle: 20
+      OuterConeAngle: 35
+  - IDComponent:
+      ID: 9992734341222539530
+    TagComponent:
+      Tag: Camera
+    TransformComponent:
+      Translation: [0, 3, 5]
+      Rotation: [0, 3.1415927, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    CameraComponent:
+      Primary: true
+      FixedAspectRatio: false
+      ProjectionType: Perspective
+      PerspectiveFOV: 60.000004
+      PerspectiveNear: 0.1
+      PerspectiveFar: 1000
+      OrthographicSize: 10
+      OrthographicNear: -100
+      OrthographicFar: 100
+  - IDComponent:
+      ID: 13043395417491248949
+    TagComponent:
+      Tag: Cube
+    TransformComponent:
+      Translation: [0, 0.5, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1001
+      SubmeshMaterials:
+        - 2001
+  - IDComponent:
+      ID: 1527006773235150822
+    TagComponent:
+      Tag: Plane
+    TransformComponent:
+      Translation: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [10, 1, 10]
+    RelationshipComponent:
+      ParentHandle: 0
+      Children:
+        []
+    MeshComponent:
+      MeshHandle: 1003
+      SubmeshMaterials:
+        - 2001

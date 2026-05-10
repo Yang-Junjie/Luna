@@ -145,11 +145,79 @@ node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client
 The turn planner can also call an OpenAI-compatible Chat Completions API. DeepSeek is a preset, but the client is not DeepSeek-specific: any provider with `baseURL`, `apiKey`, `model`, and `/chat/completions` semantics can be used.
 
 ```powershell
-$env:DEEPSEEK_API_KEY="..."
+DEEPSEEK_API_KEY=...
 node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-provider deepseek --ai-thinking --ai-reasoning-effort high --execute turn "create a simple scene with a cube"
 
 node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai --ai-base-url https://example.compatible.provider/v1 --ai-api-key-env LUNA_AI_API_KEY --ai-model provider-model --execute turn "create a simple scene"
 ```
+
+The client loads `.env` files automatically from the repo root, `CLI/.env`, `CLI/client/.env`, and the current working directory. Put `DEEPSEEK_API_KEY=...` in one of those files instead of exporting it manually.
+Long-running models can take longer than the default request budget. Override it with `--ai-timeout-ms <ms>` or `LUNA_AI_TIMEOUT_MS` when you want a longer turn.
+
+The TS client also has a persistent chat/session loop for long-running AI work. It keeps a rolling conversation transcript, reuses the same authoring session, and exposes control commands for state inspection and undo/redo:
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai chat
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai session
+```
+
+Chat control commands:
+
+- `/help`
+- `/history`
+- `/state`
+- `/snapshot`
+- `/undo`
+- `/redo`
+- `/clear`
+- `/clear-history`
+- `/exit`
+
+## AI Authoring Evals
+
+The TS client can run AI authoring regression specs through the same `AuthoringTurn` session path used by `turn` and `chat`. Eval specs live under `CLI/tests/ai-evals` and describe user intents plus machine-checkable expectations for the generated plan and final scene snapshot.
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai eval CLI/tests/ai-evals/basic-scene.json
+```
+
+By default, eval runs write a JSON result under `logs/ai-evals/<eval-name>-<timestamp>/result.json`. The directory is ignored by git. Use `--json` to print the full result to stdout, `--out <path>` to choose the result file, or `--out-dir <dir>` to choose the run directory root.
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --json --ai eval CLI/tests/ai-evals/basic-scene.json --out-dir logs/ai-evals
+```
+
+Run the whole baseline set with `eval-suite`. When no spec paths are provided, the client discovers all `CLI/tests/ai-evals/*.json` files. Each eval gets an independent AuthoringHost session and writes its own `result.json`; the suite also writes a compact `suite.json` summary.
+
+```powershell
+node --disable-warning=ExperimentalWarning --experimental-strip-types CLI/client/luna.ts --ai eval-suite --out-dir logs/ai-evals/live
+```
+
+Eval intents can use `{{outputDir}}` or `{{runDir}}`; both expand to that eval run's output directory using forward slashes so models can put generated scene files in a safe ignored location.
+
+The current eval expectation checks include:
+
+- `ok` and `committed`
+- `canUndo`, `canRedo`, `undoDepth`, and `redoDepth`
+- `attemptCount`, `failedAttemptsAtLeast`, and `diagnosticCodes`
+- `noDiagnostics`
+- `entityCountAtLeast`
+- `componentCounts`
+- `entities`, including optional transform checks
+- `planOps`, `planAnyOps`, and `planOpCounts`
+- `savedSceneCountAtLeast`
+
+The baseline eval set currently covers:
+
+- `basic-scene.json`
+- `multi-turn-scene.json`
+- `repair-invalid-plan.json`
+- `save-open-persistence.json`
+- `chinese-intent-basic.json`
+- `undo-redo-session.json`
+
+Eval turns normally send an `intent` to the planner. A turn may also use `"control": "undo"`, `"redo"`, `"snapshot"`, or `"clear-history"` to test session behavior around AI-authored transactions.
+For repair testing, a turn can provide `firstAttemptPlan`; the eval runner executes that plan as attempt 1 and calls the real planner on later attempts with the resulting diagnostics.
 
 ## Capabilities
 

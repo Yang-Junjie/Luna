@@ -1,0 +1,56 @@
+{
+  "name": "save-open-persistence",
+  "description": "The model should save a scene and later open it through the same Authoring Protocol.",
+  "execute": true,
+  "maxAttempts": 2,
+  "turns": [
+    {
+      "id": "create-and-save",
+      "intent": "Create a new scene with one cube, one camera, and one light. Save it to {{outputDir}}/persist-scene and include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "componentCounts": {
+          "Mesh": 1,
+          "Camera": 1,
+          "Light": 1
+        },
+        "planOps": [
+          "new",
+          "primitive",
+          "camera",
+          "save",
+          "snapshot"
+        ],
+        "planAnyOps": [
+          [
+            "directional-light",
+            "point-light",
+            "spot-light"
+          ]
+        ],
+        "savedSceneCountAtLeast": 1
+      }
+    },
+    {
+      "id": "open-saved-scene",
+      "intent": "Open the saved scene at {{outputDir}}/persist-scene.lunascene and include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "entityCountAtLeast": 3,
+        "componentCounts": {
+          "Mesh": 1,
+          "Camera": 1,
+          "Light": 1
+        },
+        "planOps": [
+          "open",
+          "snapshot"
+        ]
+      }
+    }
+  ]
+}

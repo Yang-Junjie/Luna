@@ -10,6 +10,10 @@
     "controller-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringController.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
     "turn-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringTurn.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
     "ai-planner-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringAiPlanner.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
+    "chat-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/chat.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
+    "chat-dotenv-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/chat.env.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts",
+    "ai-eval-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/aiEval.smoke.ts ../../build/CLI/LunaAuthoringHost.exe luna.ts ../tests/ai-evals/basic-scene.json ../tests/ai-evals/multi-turn-scene.json ../tests/ai-evals/repair-invalid-plan.json ../tests/ai-evals/save-open-persistence.json ../tests/ai-evals/chinese-intent-basic.json ../tests/ai-evals/undo-redo-session.json",
+    "ai-eval-suite": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts --ai eval-suite",
     "host-smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types ../tests/authoringHost.smoke.ts ../../build/CLI/LunaAuthoringHost.exe",
     "smoke": "node --disable-warning=ExperimentalWarning --experimental-strip-types luna.ts plan examples/smoke.plan.json"
   }

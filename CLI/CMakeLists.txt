@@ -208,6 +208,45 @@ if(BUILD_TESTING)
         )
 
         add_test(
+            NAME CliTsChatSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/chat.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+        )
+
+        add_test(
+            NAME CliTsChatDotEnvSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/chat.env.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+        )
+
+        add_test(
+            NAME CliTsAiEvalSmokeTest
+            COMMAND
+                "${LUNA_NODE_EXECUTABLE}"
+                --disable-warning=ExperimentalWarning
+                --experimental-strip-types
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/aiEval.smoke.ts"
+                "$<TARGET_FILE:LunaAuthoringHost>"
+                "${CMAKE_CURRENT_SOURCE_DIR}/client/luna.ts"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/basic-scene.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/multi-turn-scene.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/repair-invalid-plan.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/save-open-persistence.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/chinese-intent-basic.json"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/ai-evals/undo-redo-session.json"
+        )
+
+        add_test(
             NAME AuthoringHostStdioSmokeTest
             COMMAND
                 "${LUNA_NODE_EXECUTABLE}"

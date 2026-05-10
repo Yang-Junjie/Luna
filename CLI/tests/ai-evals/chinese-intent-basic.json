@@ -1,0 +1,41 @@
+{
+  "name": "chinese-intent-basic",
+  "description": "The model should understand a Chinese authoring request and produce a valid AuthoringPlan.",
+  "execute": true,
+  "maxAttempts": 2,
+  "turns": [
+    {
+      "id": "create-basic-scene-from-chinese",
+      "intent": "创建一个最简单的场景：地面、立方体、相机、灯光。保存到 {{outputDir}}/chinese-basic-scene，最后检查并输出 snapshot。",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "entityCountAtLeast": 4,
+        "componentCounts": {
+          "Mesh": 2,
+          "Camera": 1,
+          "Light": 1
+        },
+        "planOps": [
+          "new",
+          "primitive",
+          "camera",
+          "save",
+          "snapshot"
+        ],
+        "planAnyOps": [
+          [
+            "directional-light",
+            "point-light",
+            "spot-light"
+          ]
+        ],
+        "planOpCounts": {
+          "primitive": 2
+        },
+        "savedSceneCountAtLeast": 1
+      }
+    }
+  ]
+}

@@ -3,10 +3,20 @@
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 
 const [hostPath, clientPath] = process.argv.slice(2);
 assert.ok(hostPath, "Missing LunaAuthoringHost path.");
 assert.ok(clientPath, "Missing TS client path.");
+
+const resolvedHostPath = resolve(hostPath);
+const resolvedClientPath = resolve(clientPath);
+
+const tempDir = mkdtempSync(join(tmpdir(), "luna-chat-env-"));
+writeFileSync(join(tempDir, ".env"), "DEEPSEEK_API_KEY=mock-key\n", "utf8");
+assert.ok(existsSync(join(tempDir, ".env")));
 
 let requestCount = 0;
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
@@ -26,38 +36,24 @@ try {
     const result = await runClient([
         "--disable-warning=ExperimentalWarning",
         "--experimental-strip-types",
-        clientPath,
+        resolvedClientPath,
         "--authoring-host",
-        hostPath,
+        resolvedHostPath,
         "--ai",
         "--ai-base-url",
         baseURL,
-        "--ai-api-key",
-        "mock-key",
         "--ai-model",
         "mock-model",
-        "--ai-thinking",
-        "--ai-reasoning-effort",
-        "high",
-        "turn",
-        "create a simple scene with one cube",
-        "--execute",
+        "chat",
+    ], tempDir, [
+        "create a cube",
+        "exit",
     ]);
 
     assert.equal(result.status, 0, result.stderr);
     assert.equal(requestCount, 1);
-    const output = JSON.parse(result.stdout) as {
-        ok: boolean;
-        committed: boolean;
-        attempts: Array<{ plan: { commands: Array<Record<string, unknown>> } }>;
-        report: { ok: boolean; scene: { entityCount: number } };
-    };
-    assert.equal(output.ok, true);
-    assert.equal(output.committed, true);
-    assert.equal(output.report.ok, true);
-    assert.equal(output.report.scene.entityCount, 3);
-    assert.equal(output.attempts[0]?.plan.commands[0]?.op, "new");
-    assert.ok(output.attempts[0]?.plan.commands.some((command) => command.op === "primitive" && command.alias === "AICube"));
+    assert.match(result.stdout, /"intent":"create a cube"/);
+    assert.match(result.stdout, /"entityCount":3/);
 } finally {
     await close(server);
 }
@@ -83,20 +79,17 @@ async function handleMockRequest(request: IncomingMessage, response: ServerRespo
     const body = JSON.parse(await readRequestBody(request)) as {
         model: string;
         stream: boolean;
-        reasoning_effort?: string;
-        thinking?: { type?: string };
         messages: Array<{ role: string; content: string }>;
     };
     assert.equal(body.model, "mock-model");
     assert.equal(body.stream, false);
-    assert.equal(body.reasoning_effort, "high");
-    assert.equal(body.thinking?.type, "enabled");
     assert.equal(body.messages[0]?.role, "system");
     assert.equal(body.messages[1]?.role, "user");
+    assert.match(body.messages[1]?.content ?? "", /"intent":"create a cube"/);
 
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(JSON.stringify({
-        id: "mock-chatcmpl",
+        id: "mock-chatcmpl-1",
         object: "chat.completion",
         choices: [
             {
@@ -104,23 +97,9 @@ async function handleMockRequest(request: IncomingMessage, response: ServerRespo
                 message: {
                     role: "assistant",
                     content: JSON.stringify({
-                        intent: "create a simple scene with one cube",
-                        ok: true,
                         commands: [
-                            {
-                                op: "primitive",
-                                alias: "AICube",
-                                mesh: "Cube",
-                                requiresConfirmation: false,
-                            },
-                            {
-                                op: "transform",
-                                entity: "AICube",
-                                translation: { value: "0 0 0" },
-                                rotationDeg: ["0", "45", "0"],
-                                scale: { 0: 1, 1: 1, 2: 1 },
-                            },
-                            { op: "inspect", target: "hierarchy" },
+                            { op: "new" },
+                            { op: "primitive", alias: "EnvCube", mesh: "Cube" },
                             { op: "snapshot" },
                         ],
                     }),
@@ -131,30 +110,80 @@ async function handleMockRequest(request: IncomingMessage, response: ServerRespo
     }));
 }
 
-function runClient(args: string[]): Promise<{ status: number; stdout: string; stderr: string }> {
-    return new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, args, {
-            stdio: ["ignore", "pipe", "pipe"],
-        });
+async function runClient(
+    args: string[],
+    cwd: string,
+    inputLines: string[],
+): Promise<{ status: number; stdout: string; stderr: string }> {
+    const child = spawn(process.execPath, args, {
+        cwd,
+        stdio: ["pipe", "pipe", "pipe"],
+    });
 
-        let stdout = "";
-        let stderr = "";
-        child.stdout.setEncoding("utf8");
-        child.stderr.setEncoding("utf8");
-        child.stdout.on("data", (chunk) => {
-            stdout += chunk;
-        });
-        child.stderr.on("data", (chunk) => {
-            stderr += chunk;
-        });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+    });
+
+    const closePromise = new Promise<number>((resolve, reject) => {
         child.once("error", reject);
         child.once("close", (status) => {
-            resolve({
-                status: status ?? 1,
-                stdout,
-                stderr,
-            });
+            resolve(status ?? 1);
         });
+    });
+
+    try {
+        await driveChat(child, () => stdout, () => stderr, inputLines);
+    } catch (error) {
+        child.kill();
+        throw error;
+    }
+
+    const status = await closePromise;
+    return { status, stdout, stderr };
+}
+
+async function driveChat(
+    child: ReturnType<typeof spawn>,
+    readStdout: () => string,
+    readStderr: () => string,
+    inputLines: string[],
+): Promise<void> {
+    await waitForText(readStdout, readStderr, "chat> ");
+    for (const line of inputLines) {
+        child.stdin.write(`${line}\n`);
+        await waitForText(readStdout, readStderr, line === "exit" ? "chat> " : "\"entityCount\":3");
+    }
+    child.stdin.end();
+}
+
+async function waitForText(
+    readStdout: () => string,
+    readStderr: () => string,
+    marker: string,
+    timeoutMs = 10000,
+): Promise<void> {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+        if (readStdout().includes(marker)) {
+            return;
+        }
+        await delay(25);
+    }
+    throw new Error(
+        `Timed out waiting for '${marker}'. stdout=${JSON.stringify(readStdout())} stderr=${JSON.stringify(readStderr())}`,
+    );
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
     });
 }
 

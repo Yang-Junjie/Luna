@@ -1,0 +1,92 @@
+{
+  "name": "multi-turn-scene",
+  "description": "The model should keep authoring context across several turns and modify an existing scene instead of starting over.",
+  "execute": true,
+  "maxAttempts": 2,
+  "turns": [
+    {
+      "id": "create-starting-scene",
+      "intent": "Start a new scene with one cube, one camera, and one light. Include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "entityCountAtLeast": 3,
+        "componentCounts": {
+          "Mesh": 1,
+          "Camera": 1,
+          "Light": 1
+        },
+        "planOps": [
+          "new",
+          "primitive",
+          "camera",
+          "snapshot"
+        ],
+        "planAnyOps": [
+          [
+            "directional-light",
+            "point-light",
+            "spot-light"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "add-sphere-and-light",
+      "intent": "Add one sphere and one point light to the current scene. Do not create a new scene. Include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "entityCountAtLeast": 5,
+        "componentCounts": {
+          "Mesh": 2,
+          "Light": 2
+        },
+        "planOps": [
+          "primitive",
+          "point-light",
+          "snapshot"
+        ]
+      }
+    },
+    {
+      "id": "move-existing-cube",
+      "intent": "Move the existing cube to translation 2 1 0 and keep the sphere. Include a final snapshot.",
+      "expect": {
+        "ok": true,
+        "committed": true,
+        "noDiagnostics": true,
+        "componentCounts": {
+          "Mesh": 2
+        },
+        "entities": [
+          {
+            "name": "Cube",
+            "components": [
+              "Transform",
+              "Mesh"
+            ],
+            "translation": [
+              2,
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Sphere",
+            "components": [
+              "Transform",
+              "Mesh"
+            ]
+          }
+        ],
+        "planOps": [
+          "transform",
+          "snapshot"
+        ]
+      }
+    }
+  ]
+}
