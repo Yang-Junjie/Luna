@@ -141,27 +141,6 @@ if(BUILD_TESTING)
         luna_set_test_properties(CliTsAuthoringProtocolSmokeTest 30 "quick;smoke;cli;ts;authoring;protocol")
 
         add_test(
-            NAME CliTsEditorShellSmokeTest
-            COMMAND
-                "${LUNA_NODE_EXECUTABLE}"
-                --disable-warning=ExperimentalWarning
-                --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/tests/editorShell.smoke.ts"
-        )
-        luna_set_test_properties(CliTsEditorShellSmokeTest 30 "quick;smoke;cli;ts;editor;protocol")
-
-        add_test(
-            NAME CliTsEditorViewBridgeSmokeTest
-            COMMAND
-                "${LUNA_NODE_EXECUTABLE}"
-                --disable-warning=ExperimentalWarning
-                --experimental-strip-types
-                "${CMAKE_CURRENT_SOURCE_DIR}/tests/editorViewBridge.smoke.ts"
-                "$<TARGET_FILE:LunaEditorViewHost>"
-        )
-        luna_set_test_properties(CliTsEditorViewBridgeSmokeTest 45 "quick;smoke;cli;ts;editor;view;protocol")
-
-        add_test(
             NAME CliTsClientSmokeTest
             COMMAND
                 "${LUNA_NODE_EXECUTABLE}"

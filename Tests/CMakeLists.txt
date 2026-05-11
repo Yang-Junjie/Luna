@@ -1,9 +1,4 @@
 add_executable(
-    EditorProtocolTests
-    EditorProtocolTests.cpp
-)
-
-add_executable(
     ScriptPluginContractTests
     ScriptPluginContractTests.cpp
 )
@@ -99,12 +94,6 @@ add_luna_test_script_plugin(LunaTestScriptPluginExtensionMismatch LUNA_TEST_SCRI
 add_luna_test_script_plugin(LunaTestScriptPluginEmptyExtensions LUNA_TEST_SCRIPT_PLUGIN_EMPTY_EXTENSIONS)
 
 target_link_libraries(
-    EditorProtocolTests
-    PRIVATE
-        LunaEditorProtocol
-)
-
-target_link_libraries(
     ScriptPluginContractTests
     PRIVATE
         LunaCore
@@ -138,12 +127,6 @@ target_link_libraries(
     AuthoringProtocolTests
     PRIVATE
         LunaCore
-)
-
-target_compile_features(
-    EditorProtocolTests
-    PRIVATE
-        cxx_std_20
 )
 
 target_compile_features(
@@ -195,23 +178,11 @@ target_compile_definitions(
         LUNA_AUTHORING_SCHEMA_DIR="${PROJECT_SOURCE_DIR}/Docs/Schemas"
 )
 
-target_compile_definitions(
-    EditorProtocolTests
-    PRIVATE
-        LUNA_EDITOR_SCHEMA_DIR="${PROJECT_SOURCE_DIR}/Docs/Schemas"
-)
-
 if(TARGET LunaScriptLuaPlugin)
     add_dependencies(ScriptPluginContractTests LunaScriptLuaPlugin)
 endif()
 
 add_dependencies(ScriptPluginContractTests ${LUNA_TEST_SCRIPT_PLUGIN_TARGETS})
-
-add_test(
-    NAME EditorProtocolTests
-    COMMAND EditorProtocolTests
-)
-luna_set_test_properties(EditorProtocolTests 20 "quick;unit;editor;view;protocol")
 
 add_test(
     NAME ScriptPluginContractTests

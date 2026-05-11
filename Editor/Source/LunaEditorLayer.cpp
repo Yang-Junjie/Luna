@@ -64,26 +64,6 @@ const char* gizmoOperationToString(luna::GizmoOperation operation)
     return "Unknown";
 }
 
-luna::editor::EditorTransformTool toEditorTransformTool(luna::GizmoOperation operation)
-{
-    switch (operation) {
-        case luna::GizmoOperation::Translate:
-            return luna::editor::EditorTransformTool::Translate;
-        case luna::GizmoOperation::Rotate:
-            return luna::editor::EditorTransformTool::Rotate;
-        case luna::GizmoOperation::Scale:
-            return luna::editor::EditorTransformTool::Scale;
-    }
-
-    return luna::editor::EditorTransformTool::Translate;
-}
-
-luna::editor::EditorTransformSpace toEditorTransformSpace(luna::GizmoMode mode)
-{
-    return mode == luna::GizmoMode::World ? luna::editor::EditorTransformSpace::World
-                                          : luna::editor::EditorTransformSpace::Local;
-}
-
 ImGuizmo::OPERATION toImGuizmoOperation(luna::GizmoOperation operation)
 {
     switch (operation) {
@@ -529,25 +509,12 @@ void LunaEditorLayer::drawViewport()
         std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
     const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * viewport_scale_x, 0.0f));
     const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * viewport_scale_y, 0.0f));
-    const bool input_enabled = !m_runtime_viewport_enabled &&
-                               (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
-                               !ImGuizmo::IsUsing();
-    const auto& viewport_state = m_viewport_session.sync(renderer,
-                                                         m_editor_camera,
-                                                         viewport_width,
-                                                         viewport_height,
-                                                         m_viewport_focused,
-                                                         m_viewport_hovered,
-                                                         input_enabled,
-                                                         m_editor_camera.isMouseCaptured(),
-                                                         m_runtime_viewport_enabled,
-                                                         toEditorTransformTool(m_gizmo_operation),
-                                                         toEditorTransformSpace(m_gizmo_mode));
+    const auto& viewport_state = m_viewport_session.sync(renderer, m_editor_camera, viewport_width, viewport_height);
 
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
-        const bool flip_uv_y = viewport_state.render_plane.descriptor.y_flip;
+        const bool flip_uv_y = viewport_state.y_flip;
         const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
         const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
 
