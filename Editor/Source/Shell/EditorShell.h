@@ -12,6 +12,7 @@ class LunaEditorLayer;
 
 namespace editor {
 
+class AssetService;
 class Plugin;
 class RuntimeViewportService;
 class Ui;
@@ -20,6 +21,7 @@ class CommandService;
 class HistoryService;
 class MenuService;
 class ScriptPluginService;
+class ScriptService;
 class RenderingService;
 class SceneService;
 class SelectionService;
@@ -31,11 +33,13 @@ public:
     ~EditorShell() override;
 
     Ui& ui() override;
+    AssetService& assets() override;
     WindowService& windows() override;
     CommandService& commands() override;
     HistoryService& history() override;
     MenuService& menus() override;
     ScriptPluginService& scriptPlugins() override;
+    ScriptService& scripts() override;
     RenderingService& rendering() override;
     SceneService& scene() override;
     SelectionService& selection() override;

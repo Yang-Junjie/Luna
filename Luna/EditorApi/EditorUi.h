@@ -8,6 +8,13 @@
 
 namespace luna::editor {
 
+enum class ButtonVariant {
+    Default,
+    Primary,
+    Danger,
+    Subtle,
+};
+
 class Ui {
 public:
     virtual ~Ui() = default;
@@ -23,6 +30,7 @@ public:
     virtual void textWrapped(std::string_view value) = 0;
     virtual void bulletText(std::string_view value) = 0;
     virtual void separator() = 0;
+    virtual void separatorText(std::string_view label) = 0;
     virtual void sameLine() = 0;
     virtual void spacing() = 0;
     virtual void indent(float width = 0.0f) = 0;
@@ -33,7 +41,13 @@ public:
     [[nodiscard]] virtual Vec2 contentRegionAvail() const noexcept = 0;
     [[nodiscard]] virtual Vec2 windowFramebufferScale() const noexcept = 0;
 
-    virtual bool button(std::string_view label, Vec2 size = {}) = 0;
+    virtual bool button(std::string_view label,
+                        Vec2 size = {},
+                        ButtonVariant variant = ButtonVariant::Default) = 0;
+    bool button(std::string_view label, ButtonVariant variant)
+    {
+        return button(label, Vec2{}, variant);
+    }
     virtual bool checkbox(std::string_view label, bool& value) = 0;
     virtual bool colorEdit3(std::string_view label, Vec3& value) = 0;
     virtual bool sliderInt(std::string_view label, int& value, int min_value, int max_value) = 0;
@@ -66,14 +80,20 @@ public:
     virtual bool image(const TextureView& texture, Vec2 size) = 0;
     [[nodiscard]] virtual bool isItemHovered() const noexcept = 0;
     [[nodiscard]] virtual bool isItemClicked(MouseButton button = MouseButton::Left) const noexcept = 0;
+    [[nodiscard]] virtual bool isItemDeactivatedAfterEdit() const noexcept = 0;
     virtual void setTooltip(std::string_view value) = 0;
     virtual bool invisibleButton(std::string_view id, Vec2 size) = 0;
 
     virtual bool treeNodeEx(std::string_view id, std::string_view label, TreeNodeFlags flags) = 0;
+    virtual bool beginSection(std::string_view id, std::string_view label, bool default_open = true) = 0;
+    virtual void endSection() = 0;
     virtual bool beginMenu(std::string_view label, bool enabled = true) = 0;
     virtual void endMenu() = 0;
     virtual bool menuItem(std::string_view label, bool selected = false, bool enabled = true) = 0;
+    virtual void openPopup(std::string_view id) = 0;
+    virtual bool beginPopup(std::string_view id) = 0;
     virtual bool beginPopupContextItem(std::string_view id = {}, MouseButton button = MouseButton::Right) = 0;
+    virtual void closeCurrentPopup() = 0;
     virtual void endPopup() = 0;
 
     virtual bool beginDragDropSource() = 0;

@@ -1,20 +1,28 @@
 #include "Shell/EditorShell.h"
 
+#include "Asset/AssetDatabase.h"
+#include "Asset/AssetManager.h"
+#include "Asset/BuiltinAssets.h"
 #include "EditorApi/EditorApi.h"
 #include "Core/Log.h"
 #include "EditorAssetDragDrop.h"
 #include "EditorStyle.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
+#include "Renderer/Mesh.h"
 #include "Scene/Scene.h"
+#include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
 
+#include <glm/trigonometric.hpp>
 #include <imgui.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstring>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -28,6 +36,37 @@ namespace {
 std::string toString(std::string_view value)
 {
     return std::string(value.data(), value.size());
+}
+
+ImVec4 withAlpha(ImVec4 color, float alpha)
+{
+    color.w = alpha;
+    return color;
+}
+
+bool pushButtonVariant(luna::editor::ButtonVariant variant)
+{
+    switch (variant) {
+        case luna::editor::ButtonVariant::Primary:
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.15f, 0.31f, 0.35f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.18f, 0.40f, 0.45f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.11f, 0.26f, 0.30f, 1.0f});
+            return true;
+        case luna::editor::ButtonVariant::Danger:
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.32f, 0.16f, 0.17f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.46f, 0.20f, 0.22f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.26f, 0.12f, 0.14f, 1.0f});
+            return true;
+        case luna::editor::ButtonVariant::Subtle:
+            ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_Button), 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            return true;
+        case luna::editor::ButtonVariant::Default:
+            break;
+    }
+
+    return false;
 }
 
 std::vector<std::string> splitMenuPath(std::string_view path)
@@ -89,6 +128,23 @@ bool containsStringView(std::initializer_list<std::string_view> values, std::str
         }
     }
     return false;
+}
+
+bool equalsIgnoreCase(std::string_view lhs, std::string_view rhs)
+{
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+
+    for (size_t index = 0; index < lhs.size(); ++index) {
+        const unsigned char left = static_cast<unsigned char>(lhs[index]);
+        const unsigned char right = static_cast<unsigned char>(rhs[index]);
+        if (std::tolower(left) != std::tolower(right)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 ImGuiWindowFlags toImGuiWindowFlags(luna::editor::WindowFlags flags)
@@ -157,6 +213,12 @@ ImGuiTreeNodeFlags toImGuiTreeNodeFlags(luna::editor::TreeNodeFlags flags)
     if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::Selected)) {
         imgui_flags |= ImGuiTreeNodeFlags_Selected;
     }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::DefaultOpen)) {
+        imgui_flags |= ImGuiTreeNodeFlags_DefaultOpen;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::FramePadding)) {
+        imgui_flags |= ImGuiTreeNodeFlags_FramePadding;
+    }
     return imgui_flags;
 }
 
@@ -189,6 +251,393 @@ std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffe
     const std::size_t copy_size = (std::min)(value.size(), buffer.size() - 1);
     std::copy_n(value.data(), copy_size, buffer.data());
     return buffer;
+}
+
+luna::editor::Vec3 toEditorVec3(const glm::vec3& value)
+{
+    return luna::editor::Vec3{.x = value.x, .y = value.y, .z = value.z};
+}
+
+glm::vec3 toEngineVec3(const luna::editor::Vec3& value)
+{
+    return glm::vec3{value.x, value.y, value.z};
+}
+
+luna::editor::SceneTransform toEditorSceneTransform(const luna::TransformComponent& transform)
+{
+    return luna::editor::SceneTransform{
+        .translation = toEditorVec3(transform.translation),
+        .rotation_degrees = toEditorVec3(glm::degrees(transform.rotation)),
+        .scale = toEditorVec3(transform.scale),
+    };
+}
+
+luna::TransformComponent toEngineTransform(const luna::editor::SceneTransform& transform)
+{
+    luna::TransformComponent result{};
+    result.translation = toEngineVec3(transform.translation);
+    result.setRotationEuler(glm::radians(toEngineVec3(transform.rotation_degrees)));
+    result.scale = toEngineVec3(transform.scale);
+    return result;
+}
+
+luna::editor::SceneCameraProjection toEditorCameraProjection(luna::Camera::ProjectionType projection) noexcept
+{
+    switch (projection) {
+        case luna::Camera::ProjectionType::Perspective:
+            return luna::editor::SceneCameraProjection::Perspective;
+        case luna::Camera::ProjectionType::Orthographic:
+            return luna::editor::SceneCameraProjection::Orthographic;
+    }
+
+    return luna::editor::SceneCameraProjection::Perspective;
+}
+
+luna::Camera::ProjectionType toEngineCameraProjection(luna::editor::SceneCameraProjection projection) noexcept
+{
+    switch (projection) {
+        case luna::editor::SceneCameraProjection::Perspective:
+            return luna::Camera::ProjectionType::Perspective;
+        case luna::editor::SceneCameraProjection::Orthographic:
+            return luna::Camera::ProjectionType::Orthographic;
+    }
+
+    return luna::Camera::ProjectionType::Perspective;
+}
+
+luna::editor::SceneCameraComponent toEditorCameraComponent(const luna::CameraComponent& camera_component)
+{
+    return luna::editor::SceneCameraComponent{
+        .primary = camera_component.primary,
+        .fixed_aspect_ratio = camera_component.fixedAspectRatio,
+        .projection = toEditorCameraProjection(camera_component.projectionType),
+        .perspective_vertical_fov_degrees = glm::degrees(camera_component.perspectiveVerticalFovRadians),
+        .perspective_near = camera_component.perspectiveNear,
+        .perspective_far = camera_component.perspectiveFar,
+        .orthographic_size = camera_component.orthographicSize,
+        .orthographic_near = camera_component.orthographicNear,
+        .orthographic_far = camera_component.orthographicFar,
+    };
+}
+
+luna::CameraComponent toEngineCameraComponent(const luna::editor::SceneCameraComponent& camera_component)
+{
+    luna::CameraComponent result{};
+    result.primary = camera_component.primary;
+    result.fixedAspectRatio = camera_component.fixed_aspect_ratio;
+    result.projectionType = toEngineCameraProjection(camera_component.projection);
+    result.perspectiveVerticalFovRadians = glm::radians(camera_component.perspective_vertical_fov_degrees);
+    result.perspectiveNear = camera_component.perspective_near;
+    result.perspectiveFar = camera_component.perspective_far;
+    result.orthographicSize = camera_component.orthographic_size;
+    result.orthographicNear = camera_component.orthographic_near;
+    result.orthographicFar = camera_component.orthographic_far;
+    return result;
+}
+
+luna::editor::SceneLightType toEditorLightType(luna::LightComponent::Type type) noexcept
+{
+    switch (type) {
+        case luna::LightComponent::Type::Directional:
+            return luna::editor::SceneLightType::Directional;
+        case luna::LightComponent::Type::Point:
+            return luna::editor::SceneLightType::Point;
+        case luna::LightComponent::Type::Spot:
+            return luna::editor::SceneLightType::Spot;
+    }
+
+    return luna::editor::SceneLightType::Directional;
+}
+
+luna::LightComponent::Type toEngineLightType(luna::editor::SceneLightType type) noexcept
+{
+    switch (type) {
+        case luna::editor::SceneLightType::Directional:
+            return luna::LightComponent::Type::Directional;
+        case luna::editor::SceneLightType::Point:
+            return luna::LightComponent::Type::Point;
+        case luna::editor::SceneLightType::Spot:
+            return luna::LightComponent::Type::Spot;
+    }
+
+    return luna::LightComponent::Type::Directional;
+}
+
+luna::editor::SceneLightComponent toEditorLightComponent(const luna::LightComponent& light_component)
+{
+    return luna::editor::SceneLightComponent{
+        .type = toEditorLightType(light_component.type),
+        .enabled = light_component.enabled,
+        .color = toEditorVec3(light_component.color),
+        .intensity = light_component.intensity,
+        .range = light_component.range,
+        .inner_cone_angle_degrees = glm::degrees(light_component.innerConeAngleRadians),
+        .outer_cone_angle_degrees = glm::degrees(light_component.outerConeAngleRadians),
+    };
+}
+
+luna::LightComponent toEngineLightComponent(const luna::editor::SceneLightComponent& light_component)
+{
+    luna::LightComponent result{};
+    result.type = toEngineLightType(light_component.type);
+    result.enabled = light_component.enabled;
+    result.color = toEngineVec3(light_component.color);
+    result.intensity = light_component.intensity;
+    result.range = light_component.range;
+    result.innerConeAngleRadians = glm::radians(light_component.inner_cone_angle_degrees);
+    result.outerConeAngleRadians = glm::radians(light_component.outer_cone_angle_degrees);
+    return result;
+}
+
+luna::editor::SceneMeshComponent toEditorMeshComponent(const luna::MeshComponent& mesh_component)
+{
+    return luna::editor::SceneMeshComponent{
+        .mesh_handle = mesh_component.meshHandle,
+        .first_submesh = mesh_component.firstSubmesh,
+        .submesh_count = mesh_component.submeshCount,
+        .submesh_materials = mesh_component.submeshMaterials,
+    };
+}
+
+luna::MeshComponent toEngineMeshComponent(const luna::editor::SceneMeshComponent& mesh_component)
+{
+    luna::MeshComponent result{};
+    result.meshHandle = mesh_component.mesh_handle;
+    result.firstSubmesh = mesh_component.first_submesh;
+    result.submeshCount = mesh_component.submesh_count;
+    result.submeshMaterials = mesh_component.submesh_materials;
+    return result;
+}
+
+luna::editor::SceneScriptPropertyType toEditorScriptPropertyType(luna::ScriptPropertyType type) noexcept
+{
+    switch (type) {
+        case luna::ScriptPropertyType::Bool:
+            return luna::editor::SceneScriptPropertyType::Bool;
+        case luna::ScriptPropertyType::Int:
+            return luna::editor::SceneScriptPropertyType::Int;
+        case luna::ScriptPropertyType::Float:
+            return luna::editor::SceneScriptPropertyType::Float;
+        case luna::ScriptPropertyType::String:
+            return luna::editor::SceneScriptPropertyType::String;
+        case luna::ScriptPropertyType::Vec3:
+            return luna::editor::SceneScriptPropertyType::Vec3;
+        case luna::ScriptPropertyType::Entity:
+            return luna::editor::SceneScriptPropertyType::Entity;
+        case luna::ScriptPropertyType::Asset:
+            return luna::editor::SceneScriptPropertyType::Asset;
+    }
+
+    return luna::editor::SceneScriptPropertyType::Float;
+}
+
+luna::ScriptPropertyType toEngineScriptPropertyType(luna::editor::SceneScriptPropertyType type) noexcept
+{
+    switch (type) {
+        case luna::editor::SceneScriptPropertyType::Bool:
+            return luna::ScriptPropertyType::Bool;
+        case luna::editor::SceneScriptPropertyType::Int:
+            return luna::ScriptPropertyType::Int;
+        case luna::editor::SceneScriptPropertyType::Float:
+            return luna::ScriptPropertyType::Float;
+        case luna::editor::SceneScriptPropertyType::String:
+            return luna::ScriptPropertyType::String;
+        case luna::editor::SceneScriptPropertyType::Vec3:
+            return luna::ScriptPropertyType::Vec3;
+        case luna::editor::SceneScriptPropertyType::Entity:
+            return luna::ScriptPropertyType::Entity;
+        case luna::editor::SceneScriptPropertyType::Asset:
+            return luna::ScriptPropertyType::Asset;
+    }
+
+    return luna::ScriptPropertyType::Float;
+}
+
+luna::editor::SceneScriptPropertyMetadata
+toEditorScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
+{
+    luna::editor::SceneScriptPropertyMetadata result{
+        .display_name = metadata.displayName,
+        .description = metadata.description,
+        .category = metadata.category,
+        .has_min_value = metadata.hasMinValue,
+        .has_max_value = metadata.hasMaxValue,
+        .has_step_value = metadata.hasStepValue,
+        .min_value = metadata.minValue,
+        .max_value = metadata.maxValue,
+        .step_value = metadata.stepValue,
+        .asset_type = metadata.assetType,
+        .entity_filter = metadata.entityFilter,
+    };
+    result.options.reserve(metadata.options.size());
+    for (const luna::ScriptPropertyOption& option : metadata.options) {
+        result.options.push_back(luna::editor::SceneScriptPropertyOption{
+            .label = option.label,
+            .int_value = option.intValue,
+            .string_value = option.stringValue,
+        });
+    }
+    return result;
+}
+
+luna::ScriptPropertyMetadata
+toEngineScriptPropertyMetadata(const luna::editor::SceneScriptPropertyMetadata& metadata)
+{
+    luna::ScriptPropertyMetadata result{
+        .displayName = metadata.display_name,
+        .description = metadata.description,
+        .category = metadata.category,
+        .hasMinValue = metadata.has_min_value,
+        .hasMaxValue = metadata.has_max_value,
+        .hasStepValue = metadata.has_step_value,
+        .minValue = metadata.min_value,
+        .maxValue = metadata.max_value,
+        .stepValue = metadata.step_value,
+        .assetType = metadata.asset_type,
+        .entityFilter = metadata.entity_filter,
+    };
+    result.options.reserve(metadata.options.size());
+    for (const luna::editor::SceneScriptPropertyOption& option : metadata.options) {
+        result.options.push_back(luna::ScriptPropertyOption{
+            .label = option.label,
+            .intValue = option.int_value,
+            .stringValue = option.string_value,
+        });
+    }
+    return result;
+}
+
+luna::editor::SceneScriptProperty toEditorScriptProperty(const luna::ScriptProperty& property)
+{
+    return luna::editor::SceneScriptProperty{
+        .name = property.name,
+        .type = toEditorScriptPropertyType(property.type),
+        .bool_value = property.boolValue,
+        .int_value = property.intValue,
+        .float_value = property.floatValue,
+        .string_value = property.stringValue,
+        .vec3_value = toEditorVec3(property.vec3Value),
+        .entity_value = property.entityValue,
+        .asset_value = property.assetValue,
+        .metadata = toEditorScriptPropertyMetadata(property.metadata),
+    };
+}
+
+luna::ScriptProperty toEngineScriptProperty(const luna::editor::SceneScriptProperty& property)
+{
+    luna::ScriptProperty result{
+        .name = property.name,
+        .type = toEngineScriptPropertyType(property.type),
+        .boolValue = property.bool_value,
+        .intValue = property.int_value,
+        .floatValue = property.float_value,
+        .stringValue = property.string_value,
+        .vec3Value = toEngineVec3(property.vec3_value),
+        .entityValue = property.entity_value,
+        .assetValue = property.asset_value,
+        .metadata = toEngineScriptPropertyMetadata(property.metadata),
+    };
+    return result;
+}
+
+luna::editor::SceneScriptComponent toEditorScriptComponent(const luna::ScriptComponent& script_component)
+{
+    luna::editor::SceneScriptComponent result{
+        .enabled = script_component.enabled,
+    };
+    result.scripts.reserve(script_component.scripts.size());
+    for (const luna::ScriptEntry& script : script_component.scripts) {
+        luna::editor::SceneScriptEntry entry{
+            .id = script.id,
+            .enabled = script.enabled,
+            .script_asset = script.scriptAsset,
+            .type_name = script.typeName,
+            .execution_order = script.executionOrder,
+        };
+        entry.properties.reserve(script.properties.size());
+        for (const luna::ScriptProperty& property : script.properties) {
+            entry.properties.push_back(toEditorScriptProperty(property));
+        }
+        result.scripts.push_back(std::move(entry));
+    }
+    return result;
+}
+
+luna::ScriptComponent toEngineScriptComponent(const luna::editor::SceneScriptComponent& script_component)
+{
+    luna::ScriptComponent result{
+        .enabled = script_component.enabled,
+    };
+    result.scripts.reserve(script_component.scripts.size());
+    for (const luna::editor::SceneScriptEntry& script : script_component.scripts) {
+        luna::ScriptEntry entry{
+            .id = script.id,
+            .enabled = script.enabled,
+            .scriptAsset = script.script_asset,
+            .typeName = script.type_name,
+            .executionOrder = script.execution_order,
+        };
+        entry.properties.reserve(script.properties.size());
+        for (const luna::editor::SceneScriptProperty& property : script.properties) {
+            entry.properties.push_back(toEngineScriptProperty(property));
+        }
+        result.scripts.push_back(std::move(entry));
+    }
+    return result;
+}
+
+void copySceneScriptPropertyValue(luna::editor::SceneScriptProperty& destination,
+                                  const luna::editor::SceneScriptProperty& source)
+{
+    destination.bool_value = source.bool_value;
+    destination.int_value = source.int_value;
+    destination.float_value = source.float_value;
+    destination.string_value = source.string_value;
+    destination.vec3_value = source.vec3_value;
+    destination.entity_value = source.entity_value;
+    destination.asset_value = source.asset_value;
+}
+
+const luna::editor::SceneScriptProperty*
+findMatchingScriptProperty(const luna::editor::SceneScriptEntry& script,
+                           std::string_view name,
+                           luna::editor::SceneScriptPropertyType type)
+{
+    for (const luna::editor::SceneScriptProperty& property : script.properties) {
+        if (property.type == type && equalsIgnoreCase(property.name, name)) {
+            return &property;
+        }
+    }
+
+    return nullptr;
+}
+
+std::string scriptAssetLanguage(const luna::AssetMetadata& metadata)
+{
+    return metadata.GetConfig<std::string>("Language", "");
+}
+
+bool toAuthoringComponentKind(luna::editor::SceneComponentKind component_kind,
+                              luna::authoring::AuthoringComponentKind& out_component_kind) noexcept
+{
+    switch (component_kind) {
+        case luna::editor::SceneComponentKind::Camera:
+            out_component_kind = luna::authoring::AuthoringComponentKind::Camera;
+            return true;
+        case luna::editor::SceneComponentKind::Light:
+            out_component_kind = luna::authoring::AuthoringComponentKind::Light;
+            return true;
+        case luna::editor::SceneComponentKind::Mesh:
+            out_component_kind = luna::authoring::AuthoringComponentKind::Mesh;
+            return true;
+        case luna::editor::SceneComponentKind::Script:
+            out_component_kind = luna::authoring::AuthoringComponentKind::Script;
+            return true;
+        case luna::editor::SceneComponentKind::Transform:
+            break;
+    }
+
+    return false;
 }
 
 } // namespace
@@ -231,6 +680,12 @@ public:
     void separator() override
     {
         ImGui::Separator();
+    }
+
+    void separatorText(std::string_view label) override
+    {
+        const std::string label_string = toString(label);
+        ImGui::SeparatorText(label_string.c_str());
     }
 
     void sameLine() override
@@ -281,10 +736,15 @@ public:
         return Vec2{.x = scale.x, .y = scale.y};
     }
 
-    bool button(std::string_view label, Vec2 size) override
+    bool button(std::string_view label, Vec2 size, ButtonVariant variant) override
     {
         const std::string label_string = toString(label);
-        return ImGui::Button(label_string.c_str(), ImVec2{size.x, size.y});
+        const bool pushed_colors = pushButtonVariant(variant);
+        const bool pressed = ImGui::Button(label_string.c_str(), ImVec2{size.x, size.y});
+        if (pushed_colors) {
+            ImGui::PopStyleColor(3);
+        }
+        return pressed;
     }
 
     bool checkbox(std::string_view label, bool& value) override
@@ -440,6 +900,11 @@ public:
         return ImGui::IsItemClicked(toImGuiMouseButton(button));
     }
 
+    bool isItemDeactivatedAfterEdit() const noexcept override
+    {
+        return ImGui::IsItemDeactivatedAfterEdit();
+    }
+
     void setTooltip(std::string_view value) override
     {
         ImGui::SetTooltip("%.*s", static_cast<int>(value.size()), value.data());
@@ -455,6 +920,42 @@ public:
     {
         const std::string scoped_label = toString(label) + "###" + toString(id);
         return ImGui::TreeNodeEx(scoped_label.c_str(), toImGuiTreeNodeFlags(flags));
+    }
+
+    bool beginSection(std::string_view id, std::string_view label, bool default_open) override
+    {
+        const std::string id_string = toString(id);
+        const std::string label_string = toString(label);
+        ImGuiTreeNodeFlags flags =
+            ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_AllowOverlap;
+        if (default_open) {
+            flags |= ImGuiTreeNodeFlags_DefaultOpen;
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{scaleEditorUi(2.0f), scaleEditorUi(2.0f)});
+        ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive));
+        const bool open = ImGui::TreeNodeEx(id_string.c_str(), flags, "%s", label_string.c_str());
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar();
+
+        const ImVec2 item_min = ImGui::GetItemRectMin();
+        const ImVec2 item_max = ImGui::GetItemRectMax();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const float accent_width = scaleEditorUi(3.0f);
+        draw_list->AddRectFilled(item_min,
+                                 ImVec2{item_min.x + accent_width, item_max.y},
+                                 ImGui::GetColorU32(withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), 0.72f)));
+        draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
+                           ImVec2{item_max.x, item_max.y - 1.0f},
+                           ImGui::GetColorU32(ImGuiCol_Border));
+        return open;
+    }
+
+    void endSection() override
+    {
+        ImGui::TreePop();
     }
 
     bool beginMenu(std::string_view label, bool enabled) override
@@ -474,6 +975,18 @@ public:
         return ImGui::MenuItem(label_string.c_str(), nullptr, selected, enabled);
     }
 
+    void openPopup(std::string_view id) override
+    {
+        const std::string id_string = toString(id);
+        ImGui::OpenPopup(id_string.c_str());
+    }
+
+    bool beginPopup(std::string_view id) override
+    {
+        const std::string id_string = toString(id);
+        return ImGui::BeginPopup(id_string.c_str());
+    }
+
     bool beginPopupContextItem(std::string_view id, MouseButton button) override
     {
         const std::string id_string = toString(id);
@@ -486,6 +999,11 @@ public:
             flags = ImGuiPopupFlags_MouseButtonMiddle;
         }
         return ImGui::BeginPopupContextItem(id_string.empty() ? nullptr : id_string.c_str(), flags);
+    }
+
+    void closeCurrentPopup() override
+    {
+        ImGui::CloseCurrentPopup();
     }
 
     void endPopup() override
@@ -617,6 +1135,119 @@ public:
     }
 };
 
+class EditorAssetService final : public AssetService {
+public:
+    AssetInfo describeAsset(AssetHandle handle) const override
+    {
+        if (!handle.isValid()) {
+            return AssetInfo{
+                .handle = handle,
+                .label = "None",
+                .detail = "No asset assigned",
+            };
+        }
+
+        if (BuiltinAssets::isBuiltinAsset(handle)) {
+            const AssetType type = BuiltinAssets::isBuiltinMesh(handle) ? AssetType::Mesh
+                                  : BuiltinAssets::isBuiltinMaterial(handle) ? AssetType::Material
+                                                                             : AssetType::None;
+            return AssetInfo{
+                .handle = handle,
+                .type = type,
+                .label = BuiltinAssets::getDisplayName(handle),
+                .detail = std::string("Builtin ") + AssetUtils::AssetTypeToString(type),
+                .exists = true,
+                .builtin = true,
+            };
+        }
+
+        if (!AssetDatabase::exists(handle)) {
+            return AssetInfo{
+                .handle = handle,
+                .label = "Missing asset",
+                .detail = "Referenced asset is not in the database",
+            };
+        }
+
+        const AssetMetadata& metadata = AssetDatabase::getAssetMetadata(handle);
+        std::string label = metadata.Name;
+        if (label.empty() && !metadata.FilePath.empty()) {
+            label = metadata.FilePath.generic_string();
+        }
+        if (label.empty()) {
+            label = "Unnamed Asset";
+        }
+
+        return AssetInfo{
+            .handle = handle,
+            .type = metadata.Type,
+            .label = std::move(label),
+            .detail = AssetUtils::AssetTypeToString(metadata.Type),
+            .exists = true,
+            .builtin = metadata.MemoryOnly && BuiltinAssets::isBuiltinAsset(handle),
+            .loading = AssetManager::get().isAssetLoading(handle),
+        };
+    }
+
+    std::vector<AssetInfo> builtinAssets(AssetType type) const override
+    {
+        std::vector<AssetInfo> assets;
+        if (type == AssetType::Mesh) {
+            const auto& builtin_meshes = BuiltinAssets::getBuiltinMeshes();
+            assets.reserve(builtin_meshes.size());
+            for (const BuiltinMeshDescriptor& mesh : builtin_meshes) {
+                assets.push_back(describeAsset(mesh.Handle));
+            }
+        } else if (type == AssetType::Material) {
+            const auto& builtin_materials = BuiltinAssets::getBuiltinMaterials();
+            assets.reserve(builtin_materials.size());
+            for (const BuiltinMaterialDescriptor& material : builtin_materials) {
+                assets.push_back(describeAsset(material.Handle));
+            }
+        }
+        return assets;
+    }
+
+    bool isAssetLoading(AssetHandle handle) const override
+    {
+        return handle.isValid() && AssetManager::get().isAssetLoading(handle);
+    }
+
+    bool acceptsAssetType(AssetType type, const AssetType* accepted_types, std::size_t accepted_type_count) const override
+    {
+        if (accepted_type_count == 0u) {
+            return true;
+        }
+
+        for (std::size_t index = 0; index < accepted_type_count; ++index) {
+            if (accepted_types != nullptr && accepted_types[index] == type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::optional<std::size_t> meshSubmeshCount(AssetHandle mesh_handle) const override
+    {
+        if (!mesh_handle.isValid()) {
+            return std::nullopt;
+        }
+
+        const AssetInfo info = describeAsset(mesh_handle);
+        if (info.type != AssetType::Mesh || !info.exists) {
+            return std::nullopt;
+        }
+
+        const std::shared_ptr<Mesh> mesh = AssetManager::get().requestAssetAs<Mesh>(mesh_handle);
+        if (!mesh || !mesh->isValid()) {
+            return std::nullopt;
+        }
+
+        return mesh->getSubMeshes().size();
+    }
+};
+
 class EditorSceneService final : public SceneService {
 public:
     explicit EditorSceneService(LunaEditorLayer& editor_layer)
@@ -670,6 +1301,68 @@ public:
     bool entityExists(EntityId entity_id) const noexcept override
     {
         return findEntity(entity_id).isValid();
+    }
+
+    std::optional<SceneEntityDetails> entityDetails(EntityId entity_id) const override
+    {
+        Entity entity = findEntity(entity_id);
+        if (!entity) {
+            return std::nullopt;
+        }
+
+        SceneEntityDetails details{
+            .id = entity.getUUID(),
+            .parent_id = entity.getParentUUID(),
+            .name = entity.hasComponent<TagComponent>() ? entity.getComponent<TagComponent>().tag
+                                                        : std::string("Unnamed Entity"),
+            .components =
+                SceneEntityComponents{
+                    .transform = entity.hasComponent<TransformComponent>(),
+                    .camera = entity.hasComponent<CameraComponent>(),
+                    .light = entity.hasComponent<LightComponent>(),
+                    .mesh = entity.hasComponent<MeshComponent>(),
+                    .script = entity.hasComponent<ScriptComponent>(),
+                },
+        };
+
+        if (Entity parent = entity.getParent()) {
+            details.parent_id = parent.getUUID();
+            details.parent_name = parent.getName();
+        }
+
+        if (details.components.transform) {
+            details.transform = toEditorSceneTransform(entity.getComponent<TransformComponent>());
+        }
+        if (details.components.camera) {
+            details.camera = toEditorCameraComponent(entity.getComponent<CameraComponent>());
+        }
+        if (details.components.light) {
+            details.light = toEditorLightComponent(entity.getComponent<LightComponent>());
+        }
+        if (details.components.mesh) {
+            details.mesh = toEditorMeshComponent(entity.getComponent<MeshComponent>());
+        }
+        if (details.components.script) {
+            details.script = toEditorScriptComponent(entity.getComponent<ScriptComponent>());
+        }
+
+        EntityManager* entity_manager = entity.getEntityManager();
+        if (entity_manager != nullptr) {
+            details.children.reserve(entity.getChildren().size());
+            for (const UUID child_id : entity.getChildren()) {
+                Entity child = entity_manager->findEntityByUUID(child_id);
+                if (!child) {
+                    continue;
+                }
+
+                details.children.push_back(SceneEntityReference{
+                    .id = child.getUUID(),
+                    .name = child.getName(),
+                });
+            }
+        }
+
+        return details;
     }
 
     bool isEntityDescendantOf(EntityId entity_id, EntityId potential_ancestor_id) const override
@@ -799,6 +1492,128 @@ public:
         }
 
         return m_editor_layer->reparentEntity(entity, new_parent, preserve_world_transform);
+    }
+
+    bool setEntityName(EntityId entity_id, std::string name) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->setEntityName(entity, std::move(name));
+    }
+
+    bool setEntityTransform(EntityId entity_id, const SceneTransform& transform) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && entity.hasComponent<TransformComponent>() &&
+               m_editor_layer->setEntityTransform(entity, toEngineTransform(transform));
+    }
+
+    bool setCameraComponent(EntityId entity_id, const SceneCameraComponent& camera_component) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->setCameraComponent(entity, toEngineCameraComponent(camera_component));
+    }
+
+    bool setLightComponent(EntityId entity_id, const SceneLightComponent& light_component) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->setLightComponent(entity, toEngineLightComponent(light_component));
+    }
+
+    bool setMeshComponent(EntityId entity_id, const SceneMeshComponent& mesh_component) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->setMeshComponent(entity, toEngineMeshComponent(mesh_component));
+    }
+
+    bool setScriptComponent(EntityId entity_id, const SceneScriptComponent& script_component) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->setScriptComponent(entity, toEngineScriptComponent(script_component));
+    }
+
+    bool setScriptProperty(EntityId entity_id,
+                           std::size_t script_index,
+                           std::size_t property_index,
+                           const SceneScriptProperty& property) override
+    {
+        if (m_editor_layer == nullptr) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        if (!entity || !entity.hasComponent<ScriptComponent>()) {
+            return false;
+        }
+
+        ScriptComponent& script_component = entity.getComponent<ScriptComponent>();
+        if (script_index >= script_component.scripts.size() ||
+            property_index >= script_component.scripts[script_index].properties.size()) {
+            return false;
+        }
+
+        if (canEditScene()) {
+            ScriptComponent updated_component = script_component;
+            updated_component.scripts[script_index].properties[property_index] = toEngineScriptProperty(property);
+            return m_editor_layer->setScriptComponent(entity, updated_component);
+        }
+
+        script_component.scripts[script_index].properties[property_index] = toEngineScriptProperty(property);
+        m_editor_layer->patchRuntimeScriptProperty(entity_id, script_index, property_index);
+        return true;
+    }
+
+    bool addComponent(EntityId entity_id, SceneComponentKind component_kind) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        authoring::AuthoringComponentKind authoring_component_kind{};
+        if (!toAuthoringComponentKind(component_kind, authoring_component_kind)) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->addComponent(entity, authoring_component_kind);
+    }
+
+    bool removeComponent(EntityId entity_id, SceneComponentKind component_kind) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        authoring::AuthoringComponentKind authoring_component_kind{};
+        if (!toAuthoringComponentKind(component_kind, authoring_component_kind)) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        return entity && m_editor_layer->removeComponent(entity, authoring_component_kind);
     }
 
     bool applyMeshAssetToEntity(EntityId entity_id, AssetHandle mesh_handle) override
@@ -1511,6 +2326,165 @@ private:
     std::string m_script_plugin_status;
 };
 
+class EditorScriptService final : public ScriptService {
+public:
+    ScriptLanguageStatus projectScriptLanguage() const override
+    {
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        const ScriptPluginSelectionResult selection =
+            ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+        if (!selection.isResolved()) {
+            return ScriptLanguageStatus{
+                .message = selection.StatusMessage.empty() ? std::string("No usable script plugin is selected.")
+                                                           : selection.StatusMessage,
+            };
+        }
+
+        std::string language;
+        if (const ScriptBackendDescriptor* backend = ScriptPluginManager::instance().findBackend(selection.BackendName);
+            backend != nullptr) {
+            language = backend->language;
+        }
+        if (language.empty() && selection.Candidate != nullptr) {
+            language = selection.Candidate->Manifest.Language;
+        }
+
+        if (language.empty()) {
+            return ScriptLanguageStatus{
+                .message = "Selected script plugin does not declare a script language.",
+            };
+        }
+
+        return ScriptLanguageStatus{
+            .available = true,
+            .language = std::move(language),
+        };
+    }
+
+    ScriptAssetValidation validateScriptAsset(AssetHandle script_asset) const override
+    {
+        if (!script_asset.isValid()) {
+            return ScriptAssetValidation{
+                .accepted = true,
+            };
+        }
+
+        if (!AssetDatabase::exists(script_asset)) {
+            return ScriptAssetValidation{
+                .message = "Script asset does not exist.",
+            };
+        }
+
+        const AssetMetadata& metadata = AssetDatabase::getAssetMetadata(script_asset);
+        if (metadata.Type != AssetType::Script) {
+            return ScriptAssetValidation{
+                .message = "Selected asset is not a Script asset.",
+            };
+        }
+
+        const ScriptLanguageStatus language_status = projectScriptLanguage();
+        if (!language_status.available) {
+            return ScriptAssetValidation{
+                .message = language_status.message.empty() ? std::string("No usable script plugin is selected.")
+                                                           : language_status.message,
+            };
+        }
+
+        const std::string metadata_language = scriptAssetLanguage(metadata);
+        if (metadata_language.empty()) {
+            return ScriptAssetValidation{
+                .message = "Script asset metadata does not declare a script language.",
+            };
+        }
+
+        if (!equalsIgnoreCase(metadata_language, language_status.language)) {
+            return ScriptAssetValidation{
+                .language = metadata_language,
+                .message = "Script asset language '" + metadata_language +
+                           "' does not match selected project script language '" + language_status.language + "'.",
+            };
+        }
+
+        return ScriptAssetValidation{
+            .accepted = true,
+            .language = metadata_language,
+        };
+    }
+
+    ScriptSchemaSyncResult syncScriptProperties(const SceneScriptEntry& script) const override
+    {
+        if (!script.script_asset.isValid()) {
+            return ScriptSchemaSyncResult{
+                .message = "Select a script asset before syncing properties.",
+            };
+        }
+
+        const ScriptAssetValidation validation = validateScriptAsset(script.script_asset);
+        if (!validation.accepted) {
+            return ScriptSchemaSyncResult{
+                .message = validation.message,
+            };
+        }
+
+        if (!AssetDatabase::exists(script.script_asset)) {
+            return ScriptSchemaSyncResult{
+                .message = "Script asset does not exist.",
+            };
+        }
+
+        const AssetMetadata& metadata = AssetDatabase::getAssetMetadata(script.script_asset);
+        const std::shared_ptr<ScriptAsset> script_asset = AssetManager::get().loadAssetAs<ScriptAsset>(script.script_asset);
+        if (!script_asset) {
+            return ScriptSchemaSyncResult{
+                .message = "Failed to load script asset.",
+            };
+        }
+
+        ScriptSchemaRequest request{};
+        request.assetName = !metadata.Name.empty() ? metadata.Name : metadata.FilePath.filename().string();
+        request.typeName = script.type_name;
+        request.language = script_asset->language;
+        request.source = script_asset->source;
+
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        const std::vector<ScriptPropertySchema> schemas =
+            ScriptPluginManager::instance().getPropertySchemaForProject(project_info ? &*project_info : nullptr, request);
+        if (schemas.empty()) {
+            return ScriptSchemaSyncResult{
+                .message = "The selected script did not expose a Properties schema.",
+            };
+        }
+
+        ScriptSchemaSyncResult result{
+            .success = true,
+        };
+        result.properties.reserve(schemas.size());
+        for (const ScriptPropertySchema& schema : schemas) {
+            if (schema.name.empty()) {
+                continue;
+            }
+
+            SceneScriptProperty property = toEditorScriptProperty(schema.defaultValue);
+            property.name = schema.name;
+            property.type = toEditorScriptPropertyType(schema.type);
+            property.metadata = toEditorScriptPropertyMetadata(schema.metadata);
+
+            if (const SceneScriptProperty* existing = findMatchingScriptProperty(script, schema.name, property.type)) {
+                copySceneScriptPropertyValue(property, *existing);
+            }
+
+            result.properties.push_back(std::move(property));
+        }
+
+        if (result.properties.empty()) {
+            result.success = false;
+            result.message = "The selected script did not expose any usable Properties.";
+        }
+
+        return result;
+    }
+};
+
 class EditorWindowService final : public WindowService {
 public:
     EditorWindowService(Host& host, Ui& ui)
@@ -1638,6 +2612,7 @@ private:
 struct EditorShell::Impl {
     Impl(EditorShell& shell, LunaEditorLayer& editor_layer)
         : ui(),
+          asset_service(),
           scene_service(editor_layer),
           selection_service(editor_layer),
           rendering_service(editor_layer),
@@ -1647,10 +2622,12 @@ struct EditorShell::Impl {
           command_service(shell),
           menu_service(command_service),
           script_plugin_service(),
+          script_service(),
           window_service(shell, ui)
     {}
 
     EditorUi ui;
+    EditorAssetService asset_service;
     EditorSceneService scene_service;
     EditorSelectionService selection_service;
     EditorRenderingService rendering_service;
@@ -1660,6 +2637,7 @@ struct EditorShell::Impl {
     EditorCommandService command_service;
     EditorMenuService menu_service;
     EditorScriptPluginService script_plugin_service;
+    EditorScriptService script_service;
     EditorWindowService window_service;
     std::vector<std::unique_ptr<Plugin>> plugins;
 };
@@ -1676,6 +2654,11 @@ EditorShell::~EditorShell()
 Ui& EditorShell::ui()
 {
     return m_impl->ui;
+}
+
+AssetService& EditorShell::assets()
+{
+    return m_impl->asset_service;
 }
 
 WindowService& EditorShell::windows()
@@ -1701,6 +2684,11 @@ MenuService& EditorShell::menus()
 ScriptPluginService& EditorShell::scriptPlugins()
 {
     return m_impl->script_plugin_service;
+}
+
+ScriptService& EditorShell::scripts()
+{
+    return m_impl->script_service;
 }
 
 RenderingService& EditorShell::rendering()

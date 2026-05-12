@@ -13,6 +13,8 @@ add_executable(
     Source/Plugins/CoreCommandsPlugin.cpp
     Source/Plugins/EditorApiSamplePlugin.h
     Source/Plugins/EditorApiSamplePlugin.cpp
+    Source/Plugins/InspectorPlugin.h
+    Source/Plugins/InspectorPlugin.cpp
     Source/Plugins/RenderDebugPlugin.h
     Source/Plugins/RenderDebugPlugin.cpp
     Source/Plugins/RenderFeaturesPlugin.h

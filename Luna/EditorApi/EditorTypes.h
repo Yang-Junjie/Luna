@@ -11,6 +11,7 @@ namespace luna::editor {
 
 using EditorId = std::string;
 using EntityId = UUID;
+using ScriptEntryId = UUID;
 using TextureHandle = uintptr_t;
 
 struct Vec2 {
@@ -133,6 +134,8 @@ enum class TreeNodeFlag : uint32_t {
     Leaf = 1u << 3,
     NoTreePushOnOpen = 1u << 4,
     Selected = 1u << 5,
+    DefaultOpen = 1u << 6,
+    FramePadding = 1u << 7,
 };
 
 using TreeNodeFlags = uint32_t;
