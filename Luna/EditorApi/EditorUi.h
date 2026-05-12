@@ -70,6 +70,10 @@ public:
     virtual bool inputText(std::string_view label,
                            std::string& value,
                            std::size_t buffer_size = 256) = 0;
+    virtual bool inputTextWithHint(std::string_view label,
+                                   std::string_view hint,
+                                   std::string& value,
+                                   std::size_t buffer_size = 256) = 0;
     virtual bool colorEdit4(std::string_view label, Vec4& value) = 0;
     virtual bool treeNode(std::string_view label) = 0;
     virtual void treePop() = 0;
@@ -80,6 +84,7 @@ public:
     virtual bool image(const TextureView& texture, Vec2 size) = 0;
     [[nodiscard]] virtual bool isItemHovered() const noexcept = 0;
     [[nodiscard]] virtual bool isItemClicked(MouseButton button = MouseButton::Left) const noexcept = 0;
+    [[nodiscard]] virtual bool isItemDoubleClicked(MouseButton button = MouseButton::Left) const noexcept = 0;
     [[nodiscard]] virtual bool isItemDeactivatedAfterEdit() const noexcept = 0;
     virtual void setTooltip(std::string_view value) = 0;
     virtual bool invisibleButton(std::string_view id, Vec2 size) = 0;

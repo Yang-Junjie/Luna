@@ -1,4 +1,4 @@
-#include "Plugins/ViewportPlugin.h"
+#include "Plugins/Viewport/ViewportPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

@@ -1,4 +1,4 @@
-#include "Plugins/RenderFeaturesPlugin.h"
+#include "Plugins/RenderFeatures/RenderFeaturesPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

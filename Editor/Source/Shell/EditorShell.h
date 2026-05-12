@@ -20,6 +20,7 @@ class WindowService;
 class CommandService;
 class HistoryService;
 class MenuService;
+class PluginAssetService;
 class ProjectService;
 class ScriptPluginService;
 class ScriptService;
@@ -39,6 +40,7 @@ public:
     CommandService& commands() override;
     HistoryService& history() override;
     MenuService& menus() override;
+    PluginAssetService& pluginAssets() override;
     ProjectService& project() override;
     ScriptPluginService& scriptPlugins() override;
     ScriptService& scripts() override;

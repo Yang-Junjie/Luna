@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 
 namespace luna::editor {
@@ -11,6 +12,7 @@ struct PluginDescriptor {
     std::string id;
     std::string display_name;
     std::string version;
+    std::filesystem::path root_path;
 };
 
 class Plugin {

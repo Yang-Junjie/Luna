@@ -1,4 +1,4 @@
-#include "Plugins/RenderDebugPlugin.h"
+#include "Plugins/RenderDebug/RenderDebugPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

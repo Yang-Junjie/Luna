@@ -220,13 +220,19 @@ set(AUTHORING_SOURCE
 
 set(EDITOR_API_SOURCE
     EditorApi/EditorApi.h
+    EditorApi/EditorAssetService.h
     EditorApi/EditorCommandService.h
     EditorApi/EditorHistoryService.h
     EditorApi/EditorHost.h
     EditorApi/EditorMenuService.h
     EditorApi/EditorPlugin.h
+    EditorApi/EditorPluginAssetService.h
+    EditorApi/EditorProjectService.h
     EditorApi/EditorRenderingService.h
+    EditorApi/EditorRuntimeViewportService.h
     EditorApi/EditorSceneService.h
+    EditorApi/EditorScriptPluginService.h
+    EditorApi/EditorScriptService.h
     EditorApi/EditorSelectionService.h
     EditorApi/EditorStandardCommands.h
     EditorApi/EditorTypes.h

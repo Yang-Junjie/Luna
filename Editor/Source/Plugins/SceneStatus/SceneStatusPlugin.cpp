@@ -1,4 +1,4 @@
-#include "Plugins/SceneStatusPlugin.h"
+#include "Plugins/SceneStatus/SceneStatusPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

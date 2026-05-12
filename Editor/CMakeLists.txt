@@ -1,36 +1,36 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    Source/Panels/ContentBrowserPanel.h
-    Source/Panels/ContentBrowserPanel.cpp
-    Source/Plugins/AssetLoadingPlugin.h
-    Source/Plugins/AssetLoadingPlugin.cpp
-    Source/Plugins/BuiltinMaterialsPlugin.h
-    Source/Plugins/BuiltinMaterialsPlugin.cpp
-    Source/Plugins/BackendCapabilitiesPlugin.h
-    Source/Plugins/BackendCapabilitiesPlugin.cpp
-    Source/Plugins/CoreCommandsPlugin.h
-    Source/Plugins/CoreCommandsPlugin.cpp
-    Source/Plugins/EditorApiSamplePlugin.h
-    Source/Plugins/EditorApiSamplePlugin.cpp
-    Source/Plugins/InspectorPlugin.h
-    Source/Plugins/InspectorPlugin.cpp
-    Source/Plugins/RenderDebugPlugin.h
-    Source/Plugins/RenderDebugPlugin.cpp
-    Source/Plugins/RenderFeaturesPlugin.h
-    Source/Plugins/RenderFeaturesPlugin.cpp
-    Source/Plugins/RenderProfilerPlugin.h
-    Source/Plugins/RenderProfilerPlugin.cpp
-    Source/Plugins/SceneSettingsPlugin.h
-    Source/Plugins/SceneSettingsPlugin.cpp
-    Source/Plugins/SceneHierarchyPlugin.h
-    Source/Plugins/SceneHierarchyPlugin.cpp
-    Source/Plugins/SceneStatusPlugin.h
-    Source/Plugins/SceneStatusPlugin.cpp
-    Source/Plugins/ScriptPluginsPlugin.h
-    Source/Plugins/ScriptPluginsPlugin.cpp
-    Source/Plugins/ViewportPlugin.h
-    Source/Plugins/ViewportPlugin.cpp
+    Source/Plugins/AssetLoading/AssetLoadingPlugin.h
+    Source/Plugins/AssetLoading/AssetLoadingPlugin.cpp
+    Source/Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h
+    Source/Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.cpp
+    Source/Plugins/ContentBrowser/ContentBrowserPlugin.h
+    Source/Plugins/ContentBrowser/ContentBrowserPlugin.cpp
+    Source/Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h
+    Source/Plugins/BackendCapabilities/BackendCapabilitiesPlugin.cpp
+    Source/Plugins/CoreCommands/CoreCommandsPlugin.h
+    Source/Plugins/CoreCommands/CoreCommandsPlugin.cpp
+    Source/Plugins/EditorApiSample/EditorApiSamplePlugin.h
+    Source/Plugins/EditorApiSample/EditorApiSamplePlugin.cpp
+    Source/Plugins/Inspector/InspectorPlugin.h
+    Source/Plugins/Inspector/InspectorPlugin.cpp
+    Source/Plugins/RenderDebug/RenderDebugPlugin.h
+    Source/Plugins/RenderDebug/RenderDebugPlugin.cpp
+    Source/Plugins/RenderFeatures/RenderFeaturesPlugin.h
+    Source/Plugins/RenderFeatures/RenderFeaturesPlugin.cpp
+    Source/Plugins/RenderProfiler/RenderProfilerPlugin.h
+    Source/Plugins/RenderProfiler/RenderProfilerPlugin.cpp
+    Source/Plugins/SceneSettings/SceneSettingsPlugin.h
+    Source/Plugins/SceneSettings/SceneSettingsPlugin.cpp
+    Source/Plugins/SceneHierarchy/SceneHierarchyPlugin.h
+    Source/Plugins/SceneHierarchy/SceneHierarchyPlugin.cpp
+    Source/Plugins/SceneStatus/SceneStatusPlugin.h
+    Source/Plugins/SceneStatus/SceneStatusPlugin.cpp
+    Source/Plugins/ScriptPlugins/ScriptPluginsPlugin.h
+    Source/Plugins/ScriptPlugins/ScriptPluginsPlugin.cpp
+    Source/Plugins/Viewport/ViewportPlugin.h
+    Source/Plugins/Viewport/ViewportPlugin.cpp
     Source/EditorCamera.h
     Source/EditorCamera.cpp
     Source/EditorContext.h

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -184,6 +185,7 @@ public:
     virtual std::string sceneLabel() const = 0;
     virtual size_t entityCount() const = 0;
     virtual bool canEditScene() const noexcept = 0;
+    virtual bool openSceneFile(const std::filesystem::path& scene_file_path) = 0;
     virtual std::vector<SceneEntityInfo> entityHierarchy() const = 0;
     virtual bool entityExists(EntityId entity_id) const noexcept = 0;
     virtual std::optional<SceneEntityDetails> entityDetails(EntityId entity_id) const = 0;

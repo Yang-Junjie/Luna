@@ -1,4 +1,4 @@
-#include "Plugins/InspectorPlugin.h"
+#include "Plugins/Inspector/InspectorPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

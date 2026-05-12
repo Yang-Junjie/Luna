@@ -1,4 +1,4 @@
-#include "Plugins/BackendCapabilitiesPlugin.h"
+#include "Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

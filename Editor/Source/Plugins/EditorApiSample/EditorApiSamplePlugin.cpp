@@ -1,4 +1,4 @@
-#include "Plugins/EditorApiSamplePlugin.h"
+#include "Plugins/EditorApiSample/EditorApiSamplePlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

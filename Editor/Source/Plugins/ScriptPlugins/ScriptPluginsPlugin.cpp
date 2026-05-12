@@ -1,4 +1,4 @@
-#include "Plugins/ScriptPluginsPlugin.h"
+#include "Plugins/ScriptPlugins/ScriptPluginsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

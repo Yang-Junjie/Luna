@@ -1,4 +1,4 @@
-#include "Plugins/CoreCommandsPlugin.h"
+#include "Plugins/CoreCommands/CoreCommandsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

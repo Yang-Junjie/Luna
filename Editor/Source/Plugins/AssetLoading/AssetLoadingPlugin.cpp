@@ -1,4 +1,4 @@
-#include "Plugins/AssetLoadingPlugin.h"
+#include "Plugins/AssetLoading/AssetLoadingPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 #include "Asset/AssetManager.h"

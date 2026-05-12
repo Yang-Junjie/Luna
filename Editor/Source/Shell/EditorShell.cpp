@@ -1,30 +1,43 @@
-#include "Shell/EditorShell.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
-#include "EditorApi/EditorApi.h"
+#include "Asset/Editor/ImageLoader.h"
+#include "Asset/Editor/ImporterManager.h"
+#include "Core/Application.h"
 #include "Core/Log.h"
+#include "EditorApi/EditorApi.h"
 #include "EditorAssetDragDrop.h"
 #include "EditorStyle.h"
+#include "Imgui/ImGuiContext.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Scene.h"
 #include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
+#include "Shell/EditorShell.h"
 
-#include <glm/trigonometric.hpp>
-#include <imgui.h>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <Device.h>
+#include <Queue.h>
 
-#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstring>
+
+#include <algorithm>
+#include <array>
+#include <filesystem>
+#include <fstream>
+#include <glm/trigonometric.hpp>
+#include <imgui.h>
 #include <initializer_list>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -90,7 +103,7 @@ std::vector<std::string> splitMenuPath(std::string_view path)
 std::string joinMenuPath(const std::vector<std::string>& parts, size_t count)
 {
     std::string result;
-    const size_t part_count = (std::min)(count, parts.size());
+    const size_t part_count = (std::min) (count, parts.size());
     for (size_t index = 0; index < part_count; ++index) {
         if (!result.empty()) {
             result += '/';
@@ -244,11 +257,20 @@ ImTextureID toImGuiTextureId(luna::editor::TextureHandle texture_id) noexcept
     }
 }
 
+luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexcept
+{
+    if constexpr (std::is_pointer_v<ImTextureID>) {
+        return reinterpret_cast<luna::editor::TextureHandle>(texture_id);
+    } else {
+        return static_cast<luna::editor::TextureHandle>(texture_id);
+    }
+}
+
 std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffer_size)
 {
-    const std::size_t size = (std::max)(buffer_size, value.size() + 1);
+    const std::size_t size = (std::max) (buffer_size, value.size() + 1);
     std::vector<char> buffer(size, '\0');
-    const std::size_t copy_size = (std::min)(value.size(), buffer.size() - 1);
+    const std::size_t copy_size = (std::min) (value.size(), buffer.size() - 1);
     std::copy_n(value.data(), copy_size, buffer.data());
     return buffer;
 }
@@ -453,8 +475,7 @@ luna::ScriptPropertyType toEngineScriptPropertyType(luna::editor::SceneScriptPro
     return luna::ScriptPropertyType::Float;
 }
 
-luna::editor::SceneScriptPropertyMetadata
-toEditorScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
+luna::editor::SceneScriptPropertyMetadata toEditorScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
 {
     luna::editor::SceneScriptPropertyMetadata result{
         .display_name = metadata.displayName,
@@ -480,8 +501,7 @@ toEditorScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
     return result;
 }
 
-luna::ScriptPropertyMetadata
-toEngineScriptPropertyMetadata(const luna::editor::SceneScriptPropertyMetadata& metadata)
+luna::ScriptPropertyMetadata toEngineScriptPropertyMetadata(const luna::editor::SceneScriptPropertyMetadata& metadata)
 {
     luna::ScriptPropertyMetadata result{
         .displayName = metadata.display_name,
@@ -598,10 +618,9 @@ void copySceneScriptPropertyValue(luna::editor::SceneScriptProperty& destination
     destination.asset_value = source.asset_value;
 }
 
-const luna::editor::SceneScriptProperty*
-findMatchingScriptProperty(const luna::editor::SceneScriptEntry& script,
-                           std::string_view name,
-                           luna::editor::SceneScriptPropertyType type)
+const luna::editor::SceneScriptProperty* findMatchingScriptProperty(const luna::editor::SceneScriptEntry& script,
+                                                                    std::string_view name,
+                                                                    luna::editor::SceneScriptPropertyType type)
 {
     for (const luna::editor::SceneScriptProperty& property : script.properties) {
         if (property.type == type && equalsIgnoreCase(property.name, name)) {
@@ -770,11 +789,8 @@ public:
         return ImGui::SliderInt(label_string.c_str(), &value, min_value, max_value);
     }
 
-    bool sliderFloat(std::string_view label,
-                     float& value,
-                     float min_value,
-                     float max_value,
-                     std::string_view format) override
+    bool sliderFloat(
+        std::string_view label, float& value, float min_value, float max_value, std::string_view format) override
     {
         const std::string label_string = toString(label);
         const std::string format_string = toString(format);
@@ -822,6 +838,22 @@ public:
         const std::string label_string = toString(label);
         std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
         const bool changed = ImGui::InputText(label_string.c_str(), buffer.data(), buffer.size());
+        if (changed) {
+            value = buffer.data();
+        }
+        return changed;
+    }
+
+    bool inputTextWithHint(std::string_view label,
+                           std::string_view hint,
+                           std::string& value,
+                           std::size_t buffer_size) override
+    {
+        const std::string label_string = toString(label);
+        const std::string hint_string = toString(hint);
+        std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
+        const bool changed = ImGui::InputTextWithHint(
+            label_string.c_str(), hint_string.c_str(), buffer.data(), buffer.size());
         if (changed) {
             value = buffer.data();
         }
@@ -898,6 +930,11 @@ public:
     bool isItemClicked(MouseButton button) const noexcept override
     {
         return ImGui::IsItemClicked(toImGuiMouseButton(button));
+    }
+
+    bool isItemDoubleClicked(MouseButton button) const noexcept override
+    {
+        return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(toImGuiMouseButton(button));
     }
 
     bool isItemDeactivatedAfterEdit() const noexcept override
@@ -1058,7 +1095,8 @@ public:
             return false;
         }
 
-        luna::editor::AssetDragDropData asset_payload = *static_cast<const luna::editor::AssetDragDropData*>(payload->Data);
+        luna::editor::AssetDragDropData asset_payload =
+            *static_cast<const luna::editor::AssetDragDropData*>(payload->Data);
         const AssetType asset_type = luna::editor::getAssetType(asset_payload);
         bool accepted = accepted_type_count == 0u;
         for (std::size_t index = 0; index < accepted_type_count && !accepted; ++index) {
@@ -1111,12 +1149,10 @@ public:
     void tableSetupColumn(std::string_view label, TableColumnFlags flags, float init_width_or_weight) override
     {
         const std::string label_string = toString(label);
-        const float scaled_init_width_or_weight =
-            hasTableColumnFlag(flags, TableColumnFlag::WidthFixed) ? scaleEditorUi(init_width_or_weight)
-                                                                   : init_width_or_weight;
-        ImGui::TableSetupColumn(label_string.c_str(),
-                                toImGuiTableColumnFlags(flags),
-                                scaled_init_width_or_weight);
+        const float scaled_init_width_or_weight = hasTableColumnFlag(flags, TableColumnFlag::WidthFixed)
+                                                      ? scaleEditorUi(init_width_or_weight)
+                                                      : init_width_or_weight;
+        ImGui::TableSetupColumn(label_string.c_str(), toImGuiTableColumnFlags(flags), scaled_init_width_or_weight);
     }
 
     void tableHeadersRow() override
@@ -1137,8 +1173,16 @@ public:
 
 class EditorAssetService final : public AssetService {
 public:
+    explicit EditorAssetService(Host& host)
+        : m_host(&host)
+    {}
+
     AssetInfo describeAsset(AssetHandle handle) const override
     {
+        if (const std::optional<AssetInfo> info = assetInfo(handle)) {
+            return *info;
+        }
+
         if (!handle.isValid()) {
             return AssetInfo{
                 .handle = handle,
@@ -1147,10 +1191,23 @@ public:
             };
         }
 
+        return AssetInfo{
+            .handle = handle,
+            .label = "Missing asset",
+            .detail = "Referenced asset is not in the database",
+        };
+    }
+
+    std::optional<AssetInfo> assetInfo(AssetHandle handle) const override
+    {
+        if (!handle.isValid()) {
+            return std::nullopt;
+        }
+
         if (BuiltinAssets::isBuiltinAsset(handle)) {
-            const AssetType type = BuiltinAssets::isBuiltinMesh(handle) ? AssetType::Mesh
-                                  : BuiltinAssets::isBuiltinMaterial(handle) ? AssetType::Material
-                                                                             : AssetType::None;
+            const AssetType type = BuiltinAssets::isBuiltinMesh(handle)       ? AssetType::Mesh
+                                   : BuiltinAssets::isBuiltinMaterial(handle) ? AssetType::Material
+                                                                              : AssetType::None;
             return AssetInfo{
                 .handle = handle,
                 .type = type,
@@ -1158,35 +1215,65 @@ public:
                 .detail = std::string("Builtin ") + AssetUtils::AssetTypeToString(type),
                 .exists = true,
                 .builtin = true,
+                .memory_only = true,
             };
         }
 
         if (!AssetDatabase::exists(handle)) {
-            return AssetInfo{
-                .handle = handle,
-                .label = "Missing asset",
-                .detail = "Referenced asset is not in the database",
+            return std::nullopt;
+        }
+
+        return makeAssetInfo(AssetDatabase::getAssetMetadata(handle));
+    }
+
+    std::optional<AssetInfo> assetInfoByPath(const std::filesystem::path& path) const override
+    {
+        const AssetHandle handle = findAssetHandleByPath(path);
+        return handle.isValid() ? assetInfo(handle) : std::nullopt;
+    }
+
+    std::vector<AssetInfo> listAssets(AssetType type_filter, bool include_builtin) const override
+    {
+        std::vector<AssetInfo> assets;
+        const auto& database = AssetDatabase::getDatabase();
+        assets.reserve(database.size());
+
+        std::unordered_set<AssetHandle> seen_handles;
+        seen_handles.reserve(database.size());
+        for (const auto& [handle, metadata] : database) {
+            if (type_filter != AssetType::None && metadata.Type != type_filter) {
+                continue;
+            }
+
+            assets.push_back(makeAssetInfo(metadata));
+            seen_handles.insert(handle);
+        }
+
+        if (include_builtin) {
+            const auto append_builtin_assets = [&](AssetType type) {
+                for (AssetInfo builtin_asset : builtinAssets(type)) {
+                    if (type_filter != AssetType::None && builtin_asset.type != type_filter) {
+                        continue;
+                    }
+                    if (seen_handles.insert(builtin_asset.handle).second) {
+                        assets.push_back(std::move(builtin_asset));
+                    }
+                }
             };
+            append_builtin_assets(AssetType::Mesh);
+            append_builtin_assets(AssetType::Material);
         }
 
-        const AssetMetadata& metadata = AssetDatabase::getAssetMetadata(handle);
-        std::string label = metadata.Name;
-        if (label.empty() && !metadata.FilePath.empty()) {
-            label = metadata.FilePath.generic_string();
-        }
-        if (label.empty()) {
-            label = "Unnamed Asset";
-        }
-
-        return AssetInfo{
-            .handle = handle,
-            .type = metadata.Type,
-            .label = std::move(label),
-            .detail = AssetUtils::AssetTypeToString(metadata.Type),
-            .exists = true,
-            .builtin = metadata.MemoryOnly && BuiltinAssets::isBuiltinAsset(handle),
-            .loading = AssetManager::get().isAssetLoading(handle),
-        };
+        std::sort(assets.begin(), assets.end(), [](const AssetInfo& lhs, const AssetInfo& rhs) {
+            if (lhs.type != rhs.type) {
+                return static_cast<int>(lhs.type) < static_cast<int>(rhs.type);
+            }
+            if (lhs.label != rhs.label) {
+                return lhs.label < rhs.label;
+            }
+            return lhs.project_path.generic_string() < rhs.project_path.generic_string();
+        });
+        return assets;
     }
 
     std::vector<AssetInfo> builtinAssets(AssetType type) const override
@@ -1208,12 +1295,139 @@ public:
         return assets;
     }
 
+    bool assetExists(AssetHandle handle) const override
+    {
+        return handle.isValid() && (BuiltinAssets::isBuiltinAsset(handle) || AssetDatabase::exists(handle));
+    }
+
+    bool assetPathExists(const std::filesystem::path& path) const override
+    {
+        const std::optional<std::filesystem::path> resolved_path = resolveProjectAssetPath(path);
+        if (!resolved_path) {
+            return false;
+        }
+
+        std::error_code ec;
+        return std::filesystem::exists(*resolved_path, ec) && !ec;
+    }
+
+    AssetHandle findAssetHandleByPath(const std::filesystem::path& path) const override
+    {
+        const std::optional<std::filesystem::path> project_relative_path = makeProjectRelativeAssetPath(path);
+        if (!project_relative_path) {
+            return AssetHandle(0);
+        }
+        return AssetDatabase::findHandleByFilePath(*project_relative_path);
+    }
+
+    std::optional<std::filesystem::path> assetsRootPath() const override
+    {
+        const ProjectService* project_service = projectService();
+        if (project_service == nullptr) {
+            return std::nullopt;
+        }
+
+        const std::optional<std::filesystem::path> project_root = project_service->projectRootPath();
+        const std::optional<ProjectInfo> project_info = project_service->projectInfo();
+        if (!project_root || !project_info) {
+            return std::nullopt;
+        }
+
+        return (*project_root / project_info->AssetsPath).lexically_normal();
+    }
+
+    std::optional<std::filesystem::path>
+        resolveProjectAssetPath(const std::filesystem::path& project_relative_path) const override
+    {
+        const ProjectService* project_service = projectService();
+        if (project_service == nullptr) {
+            return std::nullopt;
+        }
+
+        const std::optional<std::filesystem::path> project_root = project_service->projectRootPath();
+        if (!project_root) {
+            return std::nullopt;
+        }
+
+        const std::optional<std::filesystem::path> normalized_relative_path =
+            makeProjectRelativeAssetPath(project_relative_path);
+        if (!normalized_relative_path) {
+            return std::nullopt;
+        }
+
+        return (*project_root / *normalized_relative_path).lexically_normal();
+    }
+
+    std::optional<std::filesystem::path> makeProjectRelativeAssetPath(const std::filesystem::path& path) const override
+    {
+        if (path.empty()) {
+            return std::nullopt;
+        }
+
+        std::filesystem::path normalized_path = path.lexically_normal();
+        if (normalized_path.is_absolute()) {
+            const ProjectService* project_service = projectService();
+            if (project_service == nullptr) {
+                return std::nullopt;
+            }
+
+            const std::optional<std::filesystem::path> project_root = project_service->projectRootPath();
+            if (!project_root) {
+                return std::nullopt;
+            }
+
+            std::error_code ec;
+            normalized_path = std::filesystem::relative(normalized_path, *project_root, ec).lexically_normal();
+            if (ec) {
+                return std::nullopt;
+            }
+        }
+
+        if (normalized_path.empty() || normalized_path.is_absolute()) {
+            return std::nullopt;
+        }
+
+        const std::string normalized_string = normalized_path.generic_string();
+        if (normalized_string == "." || normalized_string == ".." || normalized_string.starts_with("../")) {
+            return std::nullopt;
+        }
+
+        return normalized_path;
+    }
+
+    AssetRefreshResult refreshAssets() override
+    {
+        const ProjectService* project_service = projectService();
+        AssetRefreshResult result{
+            .project_loaded = project_service != nullptr && project_service->hasProjectLoaded(),
+            .revision = m_asset_revision,
+        };
+        if (!result.project_loaded) {
+            result.message = "Cannot sync assets because no project is currently loaded.";
+            LUNA_EDITOR_WARN("{}", result.message);
+            return result;
+        }
+
+        const ImporterManager::ImportStats stats = ImporterManager::syncProjectAssets();
+        ++m_asset_revision;
+        result = makeRefreshResult(stats, m_asset_revision);
+        logAssetRefreshStats(stats);
+        return result;
+    }
+
+    uint64_t assetRevision() const noexcept override
+    {
+        return m_asset_revision;
+    }
+
     bool isAssetLoading(AssetHandle handle) const override
     {
         return handle.isValid() && AssetManager::get().isAssetLoading(handle);
     }
 
-    bool acceptsAssetType(AssetType type, const AssetType* accepted_types, std::size_t accepted_type_count) const override
+    bool acceptsAssetType(AssetType type,
+                          const AssetType* accepted_types,
+                          std::size_t accepted_type_count) const override
     {
         if (accepted_type_count == 0u) {
             return true;
@@ -1246,6 +1460,111 @@ public:
 
         return mesh->getSubMeshes().size();
     }
+
+    bool beginAssetDragDropSource(AssetHandle handle, std::string_view label = {}) override
+    {
+        const std::optional<AssetInfo> info = assetInfo(handle);
+        if (!info || !info->exists || info->type == AssetType::None) {
+            return false;
+        }
+
+        AssetMetadata metadata;
+        metadata.Handle = info->handle;
+        metadata.Type = info->type;
+        metadata.Name = info->label;
+        metadata.FilePath = info->project_path;
+        metadata.MemoryOnly = info->memory_only;
+
+        const std::string label_string = toString(label);
+        return luna::editor::beginAssetDragDropSource(metadata, label_string.empty() ? nullptr : label_string.c_str());
+    }
+
+private:
+    AssetInfo makeAssetInfo(const AssetMetadata& metadata) const
+    {
+        std::string label = metadata.Name;
+        if (label.empty() && !metadata.FilePath.empty()) {
+            label = metadata.FilePath.generic_string();
+        }
+        if (label.empty()) {
+            label = "Unnamed Asset";
+        }
+
+        return AssetInfo{
+            .handle = metadata.Handle,
+            .type = metadata.Type,
+            .label = std::move(label),
+            .detail = AssetUtils::AssetTypeToString(metadata.Type),
+            .exists = true,
+            .builtin = metadata.MemoryOnly && BuiltinAssets::isBuiltinAsset(metadata.Handle),
+            .loading = AssetManager::get().isAssetLoading(metadata.Handle),
+            .memory_only = metadata.MemoryOnly,
+            .project_path = metadata.FilePath.lexically_normal(),
+            .absolute_path = resolveProjectAssetPath(metadata.FilePath).value_or(std::filesystem::path{}),
+        };
+    }
+
+    static AssetRefreshResult makeRefreshResult(const ImporterManager::ImportStats& stats, uint64_t revision)
+    {
+        AssetRefreshResult result{
+            .success = stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0,
+            .project_loaded = true,
+            .revision = revision,
+            .message = stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0
+                           ? "Asset sync completed."
+                           : "Asset sync completed with errors.",
+            .discovered_assets = stats.discoveredAssets,
+            .imported_missing_assets = stats.importedMissingAssets,
+            .loaded_existing_metadata = stats.loadedExistingMetadata,
+            .rebuilt_metadata = stats.rebuiltMetadata,
+            .unsupported_files_skipped = stats.unsupportedFilesSkipped,
+            .failed_assets = stats.failedAssets,
+            .missing_metadata_after_sync = stats.missingMetadataAfterSync,
+            .script_files_skipped_no_plugin = stats.scriptFilesSkippedNoPlugin,
+            .script_files_skipped_unsupported_language = stats.scriptFilesSkippedUnsupportedLanguage,
+            .generated_model_files = stats.generatedModelFiles,
+            .generated_model_metadata = stats.generatedModelMetadata,
+            .generated_material_files = stats.generatedMaterialFiles,
+            .generated_material_metadata = stats.generatedMaterialMetadata,
+            .generated_texture_metadata = stats.generatedTextureMetadata,
+            .failed_generated_model_assets = stats.failedGeneratedModelAssets,
+        };
+        return result;
+    }
+
+    static void logAssetRefreshStats(const ImporterManager::ImportStats& stats)
+    {
+        LUNA_EDITOR_INFO(
+            "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
+            "script_skipped_no_plugin={}, script_skipped_unsupported_language={}, failed={}, missing_after_sync={}, "
+            "generated_models={}, generated_model_meta={}, generated_materials={}, generated_material_meta={}, "
+            "generated_texture_meta={}, generated_model_failures={}",
+            stats.discoveredAssets,
+            stats.importedMissingAssets,
+            stats.loadedExistingMetadata,
+            stats.rebuiltMetadata,
+            stats.unsupportedFilesSkipped,
+            stats.scriptFilesSkippedNoPlugin,
+            stats.scriptFilesSkippedUnsupportedLanguage,
+            stats.failedAssets,
+            stats.missingMetadataAfterSync,
+            stats.generatedModelFiles,
+            stats.generatedModelMetadata,
+            stats.generatedMaterialFiles,
+            stats.generatedMaterialMetadata,
+            stats.generatedTextureMetadata,
+            stats.failedGeneratedModelAssets);
+    }
+
+private:
+    const ProjectService* projectService() const
+    {
+        return m_host != nullptr ? &m_host->project() : nullptr;
+    }
+
+private:
+    Host* m_host{nullptr};
+    uint64_t m_asset_revision{0};
 };
 
 class EditorSceneService final : public SceneService {
@@ -1267,6 +1586,11 @@ public:
     bool canEditScene() const noexcept override
     {
         return m_editor_layer != nullptr && !m_editor_layer->isRuntimeViewportEnabled();
+    }
+
+    bool openSceneFile(const std::filesystem::path& scene_file_path) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->openSceneFile(scene_file_path);
     }
 
     std::vector<SceneEntityInfo> entityHierarchy() const override
@@ -1388,7 +1712,8 @@ public:
 
     SceneEnvironmentSettings sceneEnvironmentSettings() const override
     {
-        return m_editor_layer != nullptr ? m_editor_layer->getScene().environmentSettings() : SceneEnvironmentSettings{};
+        return m_editor_layer != nullptr ? m_editor_layer->getScene().environmentSettings()
+                                         : SceneEnvironmentSettings{};
     }
 
     SceneShadowSettings sceneShadowSettings() const override
@@ -1424,8 +1749,7 @@ public:
         Entity entity;
         switch (request.kind) {
             case SceneEntityCreateKind::Empty:
-                entity = m_editor_layer->createEntity(request.name.empty() ? std::string("Empty Entity")
-                                                                           : request.name,
+                entity = m_editor_layer->createEntity(request.name.empty() ? std::string("Empty Entity") : request.name,
                                                       parent);
                 break;
             case SceneEntityCreateKind::Camera:
@@ -1730,8 +2054,7 @@ public:
                                          : std::vector<RenderFeatureInfo>{};
     }
 
-    std::vector<RenderFeatureParameterInfo>
-    defaultRenderFeatureParameters(std::string_view feature_name) const override
+    std::vector<RenderFeatureParameterInfo> defaultRenderFeatureParameters(std::string_view feature_name) const override
     {
         return m_editor_layer != nullptr ? m_editor_layer->getDefaultRenderFeatureParameters(feature_name)
                                          : std::vector<RenderFeatureParameterInfo>{};
@@ -2190,6 +2513,338 @@ private:
     std::vector<MenuItemDescriptor> m_items;
 };
 
+class EditorPluginAssetService final : public PluginAssetService {
+public:
+    void registerPlugin(const PluginDescriptor& descriptor)
+    {
+        if (descriptor.id.empty()) {
+            return;
+        }
+
+        std::filesystem::path root_path = descriptor.root_path;
+        if (root_path.empty()) {
+            root_path = defaultBuiltinPluginRoot(descriptor.id);
+        }
+        if (root_path.empty()) {
+            return;
+        }
+
+        m_plugins[descriptor.id] = PluginEntry{
+            .root_path = root_path.lexically_normal(),
+        };
+    }
+
+    void unregisterPlugin(std::string_view plugin_id)
+    {
+        const std::string id = toString(plugin_id);
+        m_plugins.erase(id);
+
+        for (auto it = m_textures.begin(); it != m_textures.end();) {
+            if (it->second.plugin_id == id) {
+                it = m_textures.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::optional<std::filesystem::path> pluginRootPath(std::string_view plugin_id) const override
+    {
+        const auto it = m_plugins.find(toString(plugin_id));
+        if (it == m_plugins.end()) {
+            return std::nullopt;
+        }
+        return it->second.root_path;
+    }
+
+    std::optional<std::filesystem::path> assetRootPath(std::string_view plugin_id) const override
+    {
+        const auto root_path = pluginRootPath(plugin_id);
+        if (!root_path) {
+            return std::nullopt;
+        }
+        return (*root_path / "assets").lexically_normal();
+    }
+
+    std::optional<std::filesystem::path>
+        resolvePath(std::string_view plugin_id, const std::filesystem::path& relative_asset_path) const override
+    {
+        const auto asset_root = assetRootPath(plugin_id);
+        if (!asset_root) {
+            return std::nullopt;
+        }
+
+        const auto safe_relative_path = normalizeRelativeAssetPath(relative_asset_path);
+        if (!safe_relative_path) {
+            return std::nullopt;
+        }
+
+        return (*asset_root / *safe_relative_path).lexically_normal();
+    }
+
+    bool exists(std::string_view plugin_id, const std::filesystem::path& relative_asset_path) const override
+    {
+        const auto resolved_path = resolvePath(plugin_id, relative_asset_path);
+        if (!resolved_path) {
+            return false;
+        }
+
+        std::error_code ec;
+        return std::filesystem::exists(*resolved_path, ec) && !ec;
+    }
+
+    std::optional<std::string> readText(std::string_view plugin_id,
+                                        const std::filesystem::path& relative_asset_path) const override
+    {
+        const auto resolved_path = resolvePath(plugin_id, relative_asset_path);
+        if (!resolved_path) {
+            return std::nullopt;
+        }
+
+        std::ifstream stream(*resolved_path, std::ios::binary);
+        if (!stream) {
+            return std::nullopt;
+        }
+
+        return std::string(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+    }
+
+    PluginAssetBytes readBytes(std::string_view plugin_id,
+                               const std::filesystem::path& relative_asset_path) const override
+    {
+        const auto resolved_path = resolvePath(plugin_id, relative_asset_path);
+        if (!resolved_path) {
+            return {};
+        }
+
+        std::ifstream stream(*resolved_path, std::ios::binary | std::ios::ate);
+        if (!stream) {
+            return {};
+        }
+
+        const std::streamsize size = stream.tellg();
+        if (size <= 0) {
+            return {};
+        }
+
+        PluginAssetBytes result{};
+        result.data.resize(static_cast<std::size_t>(size));
+        stream.seekg(0, std::ios::beg);
+        if (!stream.read(reinterpret_cast<char*>(result.data.data()), size)) {
+            return {};
+        }
+        return result;
+    }
+
+    TextureView texture(std::string_view plugin_id, const std::filesystem::path& relative_asset_path) override
+    {
+        const std::string plugin_id_string = toString(plugin_id);
+        const auto safe_relative_path = normalizeRelativeAssetPath(relative_asset_path);
+        if (!safe_relative_path) {
+            return {};
+        }
+
+        const std::string cache_key = plugin_id_string + ":" + safe_relative_path->generic_string();
+        if (const auto it = m_textures.find(cache_key); it != m_textures.end()) {
+            return it->second.view;
+        }
+
+        const auto resolved_path = resolvePath(plugin_id, *safe_relative_path);
+        if (!resolved_path) {
+            return {};
+        }
+
+        const ImageData image = ImageLoader::LoadImageFromFile(resolved_path->string());
+        if (!image.isValid()) {
+            LUNA_EDITOR_WARN("Plugin asset '{}' failed to load texture '{}'",
+                             plugin_id_string,
+                             resolved_path->string());
+            return {};
+        }
+
+        const RHI::Ref<RHI::Texture> texture =
+            uploadPluginTexture(image, plugin_id_string + "/" + safe_relative_path->generic_string());
+        if (!texture) {
+            return {};
+        }
+
+        const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(texture);
+        if (texture_id == 0) {
+            return {};
+        }
+
+        PluginTexture plugin_texture{
+            .plugin_id = plugin_id_string,
+            .texture = texture,
+            .view =
+                TextureView{
+                    .id = toEditorTextureHandle(texture_id),
+                    .size = UVec2{.x = image.Width, .y = image.Height},
+                },
+        };
+        const TextureView view = plugin_texture.view;
+        m_textures.emplace(cache_key, std::move(plugin_texture));
+        return view;
+    }
+
+private:
+    struct PluginEntry {
+        std::filesystem::path root_path;
+    };
+
+    struct PluginTexture {
+        std::string plugin_id;
+        RHI::Ref<RHI::Texture> texture;
+        TextureView view{};
+    };
+
+    static std::optional<std::filesystem::path> normalizeRelativeAssetPath(const std::filesystem::path& path)
+    {
+        if (path.empty() || path.is_absolute()) {
+            return std::nullopt;
+        }
+
+        const std::filesystem::path normalized_path = path.lexically_normal();
+        const std::string normalized_string = normalized_path.generic_string();
+        if (normalized_string.empty() || normalized_string == "." || normalized_string == ".." ||
+            normalized_string.starts_with("../")) {
+            return std::nullopt;
+        }
+
+        return normalized_path;
+    }
+
+    static std::filesystem::path defaultBuiltinPluginRoot(std::string_view plugin_id)
+    {
+        const std::filesystem::path plugin_root = std::filesystem::path(LUNA_PROJECT_ROOT) / "Editor" / "Source" /
+                                                  "Plugins";
+        const std::string id = toString(plugin_id);
+        const std::unordered_map<std::string, const char*> roots{
+            {"luna.editor.asset-loading", "AssetLoading"},
+            {"luna.editor.backend-capabilities", "BackendCapabilities"},
+            {"luna.editor.builtin-materials", "BuiltinMaterials"},
+            {"luna.editor.content-browser", "ContentBrowser"},
+            {"luna.editor.core-commands", "CoreCommands"},
+            {"luna.editor.api-sample", "EditorApiSample"},
+            {"luna.editor.inspector", "Inspector"},
+            {"luna.editor.render-debug", "RenderDebug"},
+            {"luna.editor.render-features", "RenderFeatures"},
+            {"luna.editor.render-profiler", "RenderProfiler"},
+            {"luna.editor.scene-hierarchy", "SceneHierarchy"},
+            {"luna.editor.scene-settings", "SceneSettings"},
+            {"luna.editor.scene-status", "SceneStatus"},
+            {"luna.editor.script-plugins", "ScriptPlugins"},
+            {"luna.editor.viewport", "Viewport"},
+        };
+
+        const auto it = roots.find(id);
+        return it != roots.end() ? (plugin_root / it->second).lexically_normal() : std::filesystem::path{};
+    }
+
+    static RHI::Ref<RHI::Texture> uploadPluginTexture(const ImageData& image, std::string_view debug_name)
+    {
+        auto& renderer = Application::get().getRenderer();
+        const auto& device = renderer.getDevice();
+        const auto& graphics_queue = renderer.getGraphicsQueue();
+        if (!device || !graphics_queue) {
+            return {};
+        }
+
+        constexpr uint32_t kTextureDataPitchAlignment = 256u;
+
+        const uint64_t texel_count = static_cast<uint64_t>(image.Width) * static_cast<uint64_t>(image.Height);
+        if (texel_count == 0 || image.ByteData.empty() || image.ByteData.size() % texel_count != 0) {
+            return {};
+        }
+
+        const uint32_t bytes_per_pixel = static_cast<uint32_t>(image.ByteData.size() / texel_count);
+        const uint32_t bytes_per_row = image.Width * bytes_per_pixel;
+        const uint32_t aligned_bytes_per_row = static_cast<uint32_t>(
+            ((bytes_per_row + kTextureDataPitchAlignment - 1u) / kTextureDataPitchAlignment) *
+            kTextureDataPitchAlignment);
+        const uint64_t upload_size = static_cast<uint64_t>(aligned_bytes_per_row) *
+                                     static_cast<uint64_t>(image.Height);
+
+        const std::string debug_name_string = toString(debug_name);
+        const auto staging_buffer = device->CreateBuffer(RHI::BufferBuilder()
+                                                             .SetSize(upload_size)
+                                                             .SetUsage(RHI::BufferUsageFlags::TransferSrc)
+                                                             .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
+                                                             .SetName(debug_name_string + "_Upload")
+                                                             .Build());
+        if (!staging_buffer) {
+            return {};
+        }
+
+        void* mapped = staging_buffer->Map();
+        if (mapped == nullptr) {
+            return {};
+        }
+
+        auto* destination = static_cast<uint8_t*>(mapped);
+        const auto* source = image.ByteData.data();
+        for (uint32_t row = 0; row < image.Height; ++row) {
+            std::memcpy(destination + static_cast<uint64_t>(row) * aligned_bytes_per_row,
+                        source + static_cast<uint64_t>(row) * bytes_per_row,
+                        bytes_per_row);
+        }
+        staging_buffer->Flush(0, upload_size);
+        staging_buffer->Unmap();
+
+        const auto texture = device->CreateTexture(RHI::TextureBuilder()
+                                                       .SetSize(image.Width, image.Height)
+                                                       .SetFormat(image.ImageFormat)
+                                                       .SetUsage(RHI::TextureUsageFlags::Sampled |
+                                                                 RHI::TextureUsageFlags::TransferDst)
+                                                       .SetInitialState(RHI::ResourceState::Undefined)
+                                                       .SetName(debug_name_string)
+                                                       .Build());
+        if (!texture) {
+            return {};
+        }
+
+        const auto upload_commands = device->CreateCommandBufferEncoder();
+        if (!upload_commands) {
+            return {};
+        }
+
+        const RHI::BufferImageCopy copy_region{
+            .BufferOffset = 0,
+            .BufferRowLength = bytes_per_pixel > 0 ? aligned_bytes_per_row / bytes_per_pixel : image.Width,
+            .BufferImageHeight = 0,
+            .ImageSubresource =
+                {
+                    .AspectMask = RHI::ImageAspectFlags::Color,
+                    .MipLevel = 0,
+                    .BaseArrayLayer = 0,
+                    .LayerCount = 1,
+                },
+            .ImageOffsetX = 0,
+            .ImageOffsetY = 0,
+            .ImageOffsetZ = 0,
+            .ImageExtentWidth = image.Width,
+            .ImageExtentHeight = image.Height,
+            .ImageExtentDepth = 1,
+        };
+        const std::array<RHI::BufferImageCopy, 1> copy_regions{copy_region};
+
+        upload_commands->Begin();
+        upload_commands->TransitionImage(texture, RHI::ImageTransition::UndefinedToTransferDst);
+        upload_commands->CopyBufferToImage(staging_buffer, texture, RHI::ResourceState::CopyDest, copy_regions);
+        upload_commands->TransitionImage(texture, RHI::ImageTransition::TransferDstToShaderRead);
+        upload_commands->End();
+
+        graphics_queue->Submit(upload_commands);
+        graphics_queue->WaitIdle();
+        upload_commands->ReturnToPool();
+        return texture;
+    }
+
+private:
+    std::unordered_map<std::string, PluginEntry> m_plugins;
+    std::unordered_map<std::string, PluginTexture> m_textures;
+};
+
 class EditorProjectService final : public ProjectService {
 public:
     bool hasProjectLoaded() const override
@@ -2315,8 +2970,8 @@ private:
 
         ProjectInfo updated_project_info = *project_info;
         const std::string selected_plugin_id = candidate != nullptr ? candidate->Manifest.PluginId : std::string{};
-        const std::string selected_backend_name = candidate != nullptr ? candidate->Manifest.BackendName
-                                                                        : std::string{};
+        const std::string selected_backend_name =
+            candidate != nullptr ? candidate->Manifest.BackendName : std::string{};
 
         if (updated_project_info.Scripting.SelectedPluginId == selected_plugin_id &&
             updated_project_info.Scripting.SelectedBackendName == selected_backend_name) {
@@ -2337,9 +2992,8 @@ private:
 
         if (log_changes) {
             if (candidate != nullptr) {
-                LUNA_EDITOR_INFO("Selected script plugin '{}' ({})",
-                                 candidate->Manifest.PluginId,
-                                 candidate->Manifest.BackendName);
+                LUNA_EDITOR_INFO(
+                    "Selected script plugin '{}' ({})", candidate->Manifest.PluginId, candidate->Manifest.BackendName);
             } else {
                 LUNA_EDITOR_INFO("Cleared project script plugin selection");
             }
@@ -2465,7 +3119,8 @@ public:
         }
 
         const AssetMetadata& metadata = AssetDatabase::getAssetMetadata(script.script_asset);
-        const std::shared_ptr<ScriptAsset> script_asset = AssetManager::get().loadAssetAs<ScriptAsset>(script.script_asset);
+        const std::shared_ptr<ScriptAsset> script_asset =
+            AssetManager::get().loadAssetAs<ScriptAsset>(script.script_asset);
         if (!script_asset) {
             return ScriptSchemaSyncResult{
                 .message = "Failed to load script asset.",
@@ -2479,8 +3134,8 @@ public:
         request.source = script_asset->source;
 
         const auto project_info = m_project_service != nullptr ? m_project_service->projectInfo() : std::nullopt;
-        const std::vector<ScriptPropertySchema> schemas =
-            ScriptPluginManager::instance().getPropertySchemaForProject(project_info ? &*project_info : nullptr, request);
+        const std::vector<ScriptPropertySchema> schemas = ScriptPluginManager::instance().getPropertySchemaForProject(
+            project_info ? &*project_info : nullptr, request);
         if (schemas.empty()) {
             return ScriptSchemaSyncResult{
                 .message = "The selected script did not expose a Properties schema.",
@@ -2647,7 +3302,7 @@ private:
 struct EditorShell::Impl {
     Impl(EditorShell& shell, LunaEditorLayer& editor_layer)
         : ui(),
-          asset_service(),
+          asset_service(shell),
           project_service(),
           scene_service(editor_layer),
           selection_service(editor_layer),
@@ -2657,6 +3312,7 @@ struct EditorShell::Impl {
           history_service(editor_layer),
           command_service(shell),
           menu_service(command_service),
+          plugin_asset_service(),
           script_plugin_service(project_service),
           script_service(project_service),
           window_service(shell, ui)
@@ -2673,6 +3329,7 @@ struct EditorShell::Impl {
     EditorHistoryService history_service;
     EditorCommandService command_service;
     EditorMenuService menu_service;
+    EditorPluginAssetService plugin_asset_service;
     EditorScriptPluginService script_plugin_service;
     EditorScriptService script_service;
     EditorWindowService window_service;
@@ -2723,6 +3380,11 @@ MenuService& EditorShell::menus()
     return m_impl->menu_service;
 }
 
+PluginAssetService& EditorShell::pluginAssets()
+{
+    return m_impl->plugin_asset_service;
+}
+
 ScriptPluginService& EditorShell::scriptPlugins()
 {
     return m_impl->script_plugin_service;
@@ -2770,9 +3432,11 @@ bool EditorShell::loadPlugin(std::unique_ptr<Plugin> plugin)
         return false;
     }
 
+    m_impl->plugin_asset_service.registerPlugin(descriptor);
     if (!plugin->onLoad(*this)) {
         LUNA_EDITOR_WARN("Editor plugin '{}' failed to load", descriptor.id);
         plugin->onUnload(*this);
+        m_impl->plugin_asset_service.unregisterPlugin(descriptor.id);
         return false;
     }
 
@@ -2785,7 +3449,9 @@ void EditorShell::unloadPlugins()
 {
     for (auto it = m_impl->plugins.rbegin(); it != m_impl->plugins.rend(); ++it) {
         if (*it) {
+            const PluginDescriptor descriptor = (*it)->descriptor();
             (*it)->onUnload(*this);
+            m_impl->plugin_asset_service.unregisterPlugin(descriptor.id);
         }
     }
     m_impl->plugins.clear();

@@ -1,4 +1,4 @@
-#include "Plugins/SceneHierarchyPlugin.h"
+#include "Plugins/SceneHierarchy/SceneHierarchyPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

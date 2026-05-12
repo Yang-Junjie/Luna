@@ -1,7 +1,7 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
-#include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorUi.h"
@@ -13,21 +13,21 @@
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
-#include "Panels/ContentBrowserPanel.h"
-#include "Plugins/BuiltinMaterialsPlugin.h"
-#include "Plugins/AssetLoadingPlugin.h"
-#include "Plugins/BackendCapabilitiesPlugin.h"
-#include "Plugins/CoreCommandsPlugin.h"
-#include "Plugins/EditorApiSamplePlugin.h"
-#include "Plugins/InspectorPlugin.h"
-#include "Plugins/ScriptPluginsPlugin.h"
-#include "Plugins/SceneHierarchyPlugin.h"
-#include "Plugins/RenderDebugPlugin.h"
-#include "Plugins/RenderFeaturesPlugin.h"
-#include "Plugins/RenderProfilerPlugin.h"
-#include "Plugins/SceneSettingsPlugin.h"
-#include "Plugins/SceneStatusPlugin.h"
-#include "Plugins/ViewportPlugin.h"
+#include "Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h"
+#include "Plugins/AssetLoading/AssetLoadingPlugin.h"
+#include "Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h"
+#include "Plugins/ContentBrowser/ContentBrowserPlugin.h"
+#include "Plugins/CoreCommands/CoreCommandsPlugin.h"
+#include "Plugins/EditorApiSample/EditorApiSamplePlugin.h"
+#include "Plugins/Inspector/InspectorPlugin.h"
+#include "Plugins/ScriptPlugins/ScriptPluginsPlugin.h"
+#include "Plugins/SceneHierarchy/SceneHierarchyPlugin.h"
+#include "Plugins/RenderDebug/RenderDebugPlugin.h"
+#include "Plugins/RenderFeatures/RenderFeaturesPlugin.h"
+#include "Plugins/RenderProfiler/RenderProfilerPlugin.h"
+#include "Plugins/SceneSettings/SceneSettingsPlugin.h"
+#include "Plugins/SceneStatus/SceneStatusPlugin.h"
+#include "Plugins/Viewport/ViewportPlugin.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
@@ -145,30 +145,6 @@ ImGuizmo::OPERATION toImGuizmoOperation(luna::GizmoOperation operation)
 ImGuizmo::MODE toImGuizmoMode(luna::GizmoMode mode)
 {
     return mode == luna::GizmoMode::World ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
-}
-
-void logEditorAssetSyncStats(const luna::ImporterManager::ImportStats& stats)
-{
-    LUNA_EDITOR_INFO(
-        "Project asset sync: discovered={}, imported_missing={}, loaded_existing={}, rebuilt={}, unsupported={}, "
-        "script_skipped_no_plugin={}, script_skipped_unsupported_language={}, failed={}, missing_after_sync={}, "
-        "generated_models={}, generated_model_meta={}, generated_materials={}, generated_material_meta={}, "
-        "generated_texture_meta={}, generated_model_failures={}",
-        stats.discoveredAssets,
-        stats.importedMissingAssets,
-        stats.loadedExistingMetadata,
-        stats.rebuiltMetadata,
-        stats.unsupportedFilesSkipped,
-        stats.scriptFilesSkippedNoPlugin,
-        stats.scriptFilesSkippedUnsupportedLanguage,
-        stats.failedAssets,
-        stats.missingMetadataAfterSync,
-        stats.generatedModelFiles,
-        stats.generatedModelMetadata,
-        stats.generatedMaterialFiles,
-        stats.generatedMaterialMetadata,
-        stats.generatedTextureMetadata,
-        stats.failedGeneratedModelAssets);
 }
 
 std::filesystem::path projectDialogDefaultPath()
@@ -572,11 +548,11 @@ namespace luna {
 
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
-      m_application(&application),
-      m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this))
+      m_application(&application)
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
+    m_editor_shell->loadPlugin(editor::createContentBrowserPlugin());
     m_editor_shell->loadPlugin(editor::createViewportPlugin());
     m_editor_shell->loadPlugin(editor::createSceneHierarchyPlugin());
     m_editor_shell->loadPlugin(editor::createInspectorPlugin());
@@ -682,7 +658,6 @@ void LunaEditorLayer::onImGuiRender()
 
     drawDockSpace();
 
-    m_content_browser_panel->onImGuiRender();
     m_viewport_focused = false;
     m_viewport_hovered = false;
     if (m_editor_shell) {
@@ -1908,10 +1883,13 @@ bool LunaEditorLayer::syncProjectAssets()
         return false;
     }
 
-    const ImporterManager::ImportStats stats = ImporterManager::syncProjectAssets();
-    logEditorAssetSyncStats(stats);
-    m_content_browser_panel->requestRefresh();
-    return stats.failedAssets == 0 && stats.missingMetadataAfterSync == 0;
+    if (!m_editor_shell) {
+        LUNA_EDITOR_WARN("Cannot sync assets because the editor shell is not available");
+        return false;
+    }
+
+    const editor::AssetRefreshResult result = m_editor_shell->assets().refreshAssets();
+    return result.success;
 }
 
 bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path)
@@ -1962,7 +1940,6 @@ bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
                      m_editor_runtime.scene().entityManager().entityCount());
-    m_content_browser_panel->requestRefresh();
     return true;
 }
 
@@ -2039,7 +2016,6 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
 
     processAuthoringEvents();
     syncProjectStartScene(normalized_scene_path);
-    m_content_browser_panel->requestRefresh();
 
     LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_editor_runtime.scene().getName(), normalized_scene_path.string());
     return true;

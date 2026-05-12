@@ -1,4 +1,4 @@
-#include "Plugins/BuiltinMaterialsPlugin.h"
+#include "Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 

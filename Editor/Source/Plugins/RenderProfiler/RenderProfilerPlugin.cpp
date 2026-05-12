@@ -1,4 +1,4 @@
-#include "Plugins/RenderProfilerPlugin.h"
+#include "Plugins/RenderProfiler/RenderProfilerPlugin.h"
 
 #include "EditorApi/EditorApi.h"
 
