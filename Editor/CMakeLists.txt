@@ -21,6 +21,8 @@ add_executable(
     Source/Plugins/RenderProfilerPlugin.cpp
     Source/Plugins/SceneSettingsPlugin.h
     Source/Plugins/SceneSettingsPlugin.cpp
+    Source/Plugins/SceneHierarchyPlugin.h
+    Source/Plugins/SceneHierarchyPlugin.cpp
     Source/Plugins/SceneStatusPlugin.h
     Source/Plugins/SceneStatusPlugin.cpp
     Source/Plugins/ScriptPluginsPlugin.h
@@ -49,8 +51,6 @@ add_executable(
     Source/LunaEditorLayer.cpp
     Source/ScriptComponentInspector.h
     Source/ScriptComponentInspector.cpp
-    Source/Panels/SceneHierarchyPanel.h
-    Source/Panels/SceneHierarchyPanel.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
 )
 

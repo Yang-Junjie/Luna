@@ -2,6 +2,7 @@
 
 #include "EditorApi/EditorApi.h"
 #include "Core/Log.h"
+#include "EditorAssetDragDrop.h"
 #include "EditorStyle.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
@@ -12,11 +13,13 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <initializer_list>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -131,6 +134,43 @@ ImGuiTableColumnFlags toImGuiTableColumnFlags(luna::editor::TableColumnFlags fla
         imgui_flags |= ImGuiTableColumnFlags_WidthStretch;
     }
     return imgui_flags;
+}
+
+ImGuiTreeNodeFlags toImGuiTreeNodeFlags(luna::editor::TreeNodeFlags flags)
+{
+    ImGuiTreeNodeFlags imgui_flags = ImGuiTreeNodeFlags_None;
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::OpenOnArrow)) {
+        imgui_flags |= ImGuiTreeNodeFlags_OpenOnArrow;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::OpenOnDoubleClick)) {
+        imgui_flags |= ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::SpanAvailWidth)) {
+        imgui_flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::Leaf)) {
+        imgui_flags |= ImGuiTreeNodeFlags_Leaf;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::NoTreePushOnOpen)) {
+        imgui_flags |= ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    }
+    if (luna::editor::hasTreeNodeFlag(flags, luna::editor::TreeNodeFlag::Selected)) {
+        imgui_flags |= ImGuiTreeNodeFlags_Selected;
+    }
+    return imgui_flags;
+}
+
+ImGuiMouseButton toImGuiMouseButton(luna::editor::MouseButton button)
+{
+    switch (button) {
+        case luna::editor::MouseButton::Left:
+            return ImGuiMouseButton_Left;
+        case luna::editor::MouseButton::Right:
+            return ImGuiMouseButton_Right;
+        case luna::editor::MouseButton::Middle:
+            return ImGuiMouseButton_Middle;
+    }
+    return ImGuiMouseButton_Left;
 }
 
 ImTextureID toImGuiTextureId(luna::editor::TextureHandle texture_id) noexcept
@@ -395,9 +435,131 @@ public:
         return ImGui::IsItemHovered();
     }
 
+    bool isItemClicked(MouseButton button) const noexcept override
+    {
+        return ImGui::IsItemClicked(toImGuiMouseButton(button));
+    }
+
     void setTooltip(std::string_view value) override
     {
         ImGui::SetTooltip("%.*s", static_cast<int>(value.size()), value.data());
+    }
+
+    bool invisibleButton(std::string_view id, Vec2 size) override
+    {
+        const std::string id_string = toString(id);
+        return ImGui::InvisibleButton(id_string.c_str(), ImVec2{size.x, size.y});
+    }
+
+    bool treeNodeEx(std::string_view id, std::string_view label, TreeNodeFlags flags) override
+    {
+        const std::string scoped_label = toString(label) + "###" + toString(id);
+        return ImGui::TreeNodeEx(scoped_label.c_str(), toImGuiTreeNodeFlags(flags));
+    }
+
+    bool beginMenu(std::string_view label, bool enabled) override
+    {
+        const std::string label_string = toString(label);
+        return ImGui::BeginMenu(label_string.c_str(), enabled);
+    }
+
+    void endMenu() override
+    {
+        ImGui::EndMenu();
+    }
+
+    bool menuItem(std::string_view label, bool selected, bool enabled) override
+    {
+        const std::string label_string = toString(label);
+        return ImGui::MenuItem(label_string.c_str(), nullptr, selected, enabled);
+    }
+
+    bool beginPopupContextItem(std::string_view id, MouseButton button) override
+    {
+        const std::string id_string = toString(id);
+        ImGuiPopupFlags flags = ImGuiPopupFlags_None;
+        if (button == MouseButton::Right) {
+            flags = ImGuiPopupFlags_MouseButtonRight;
+        } else if (button == MouseButton::Left) {
+            flags = ImGuiPopupFlags_MouseButtonLeft;
+        } else {
+            flags = ImGuiPopupFlags_MouseButtonMiddle;
+        }
+        return ImGui::BeginPopupContextItem(id_string.empty() ? nullptr : id_string.c_str(), flags);
+    }
+
+    void endPopup() override
+    {
+        ImGui::EndPopup();
+    }
+
+    bool beginDragDropSource() override
+    {
+        return ImGui::BeginDragDropSource();
+    }
+
+    bool setDragDropPayload(std::string_view type, const void* data, std::size_t size) override
+    {
+        const std::string type_string = toString(type);
+        return ImGui::SetDragDropPayload(type_string.c_str(), data, size);
+    }
+
+    void endDragDropSource() override
+    {
+        ImGui::EndDragDropSource();
+    }
+
+    bool beginDragDropTarget() override
+    {
+        return ImGui::BeginDragDropTarget();
+    }
+
+    bool acceptDragDropPayload(std::string_view type, void* out_data, std::size_t size) override
+    {
+        if (out_data == nullptr || size == 0u) {
+            return false;
+        }
+
+        const std::string type_string = toString(type);
+        const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(type_string.c_str());
+        if (payload == nullptr || payload->Data == nullptr || payload->DataSize != static_cast<int>(size)) {
+            return false;
+        }
+
+        std::memcpy(out_data, payload->Data, size);
+        return true;
+    }
+
+    bool acceptAssetDragDropPayload(AssetDropPayload& out_payload,
+                                    const AssetType* accepted_types,
+                                    std::size_t accepted_type_count) override
+    {
+        const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(luna::editor::kAssetDragDropPayload);
+        if (payload == nullptr || payload->Data == nullptr ||
+            payload->DataSize != static_cast<int>(sizeof(luna::editor::AssetDragDropData))) {
+            return false;
+        }
+
+        luna::editor::AssetDragDropData asset_payload = *static_cast<const luna::editor::AssetDragDropData*>(payload->Data);
+        const AssetType asset_type = luna::editor::getAssetType(asset_payload);
+        bool accepted = accepted_type_count == 0u;
+        for (std::size_t index = 0; index < accepted_type_count && !accepted; ++index) {
+            accepted = accepted_types != nullptr && accepted_types[index] == asset_type;
+        }
+        if (!accepted) {
+            return false;
+        }
+
+        out_payload = AssetDropPayload{
+            .handle = luna::editor::getAssetHandle(asset_payload),
+            .type = asset_type,
+        };
+        return out_payload.valid();
+    }
+
+    void endDragDropTarget() override
+    {
+        ImGui::EndDragDropTarget();
     }
 
     float scale(float value) const noexcept override
@@ -476,6 +638,61 @@ public:
         return m_editor_layer != nullptr && !m_editor_layer->isRuntimeViewportEnabled();
     }
 
+    std::vector<SceneEntityInfo> entityHierarchy() const override
+    {
+        if (m_editor_layer == nullptr) {
+            return {};
+        }
+
+        EntityManager& entity_manager = m_editor_layer->getInspectionScene().entityManager();
+        auto view = entity_manager.registry().view<TagComponent, RelationshipComponent>();
+        std::vector<SceneEntityInfo> entities;
+        entities.reserve(view.size_hint());
+
+        for (const auto entity_handle : view) {
+            Entity entity(entity_handle, &entity_manager);
+            if (!entity) {
+                continue;
+            }
+
+            entities.push_back(SceneEntityInfo{
+                .id = entity.getUUID(),
+                .parent_id = entity.getParentUUID(),
+                .name = entity.hasComponent<TagComponent>() ? entity.getComponent<TagComponent>().tag
+                                                            : std::string("Unnamed Entity"),
+                .child_ids = entity.getChildren(),
+            });
+        }
+
+        return entities;
+    }
+
+    bool entityExists(EntityId entity_id) const noexcept override
+    {
+        return findEntity(entity_id).isValid();
+    }
+
+    bool isEntityDescendantOf(EntityId entity_id, EntityId potential_ancestor_id) const override
+    {
+        Entity entity = findEntity(entity_id);
+        Entity potential_ancestor = findEntity(potential_ancestor_id);
+        if (!entity || !potential_ancestor) {
+            return false;
+        }
+
+        std::unordered_set<UUID> visited_entities;
+        for (Entity current = entity.getParent(); current; current = current.getParent()) {
+            if (!visited_entities.insert(current.getUUID()).second) {
+                return false;
+            }
+            if (current == potential_ancestor) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     SceneEnvironmentSettings sceneEnvironmentSettings() const override
     {
         return m_editor_layer != nullptr ? m_editor_layer->getScene().environmentSettings() : SceneEnvironmentSettings{};
@@ -498,12 +715,115 @@ public:
 
     EntityId createEntity(std::string name) override
     {
+        return createEntity(SceneEntityCreateRequest{
+            .kind = SceneEntityCreateKind::Empty,
+            .name = std::move(name),
+        });
+    }
+
+    EntityId createEntity(const SceneEntityCreateRequest& request) override
+    {
         if (m_editor_layer == nullptr || !canEditScene()) {
             return EntityId(0);
         }
 
-        Entity entity = m_editor_layer->createEntity(std::move(name));
+        Entity parent = findEntity(request.parent_id);
+        Entity entity;
+        switch (request.kind) {
+            case SceneEntityCreateKind::Empty:
+                entity = m_editor_layer->createEntity(request.name.empty() ? std::string("Empty Entity")
+                                                                           : request.name,
+                                                      parent);
+                break;
+            case SceneEntityCreateKind::Camera:
+                entity = m_editor_layer->createCameraEntity(parent);
+                break;
+            case SceneEntityCreateKind::DirectionalLight:
+                entity = m_editor_layer->createDirectionalLightEntity(parent);
+                break;
+            case SceneEntityCreateKind::PointLight:
+                entity = m_editor_layer->createPointLightEntity(parent);
+                break;
+            case SceneEntityCreateKind::SpotLight:
+                entity = m_editor_layer->createSpotLightEntity(parent);
+                break;
+            case SceneEntityCreateKind::PrimitiveMesh:
+                entity = m_editor_layer->createPrimitiveEntity(request.asset_handle, parent);
+                break;
+            case SceneEntityCreateKind::MeshAsset:
+                entity = m_editor_layer->createEntityFromMeshAsset(request.asset_handle, parent);
+                break;
+            case SceneEntityCreateKind::ModelAsset:
+                entity = m_editor_layer->createEntityFromModelAsset(request.asset_handle, parent);
+                break;
+        }
+
         return entity ? entity.getUUID() : EntityId(0);
+    }
+
+    bool destroyEntity(EntityId entity_id) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        if (!entity) {
+            return false;
+        }
+
+        const EntityId selected_entity_id = m_editor_layer->getSelectedEntityId();
+        const bool clear_selection =
+            selected_entity_id.isValid() &&
+            (selected_entity_id == entity_id || isEntityDescendantOf(selected_entity_id, entity_id));
+        const bool destroyed = m_editor_layer->destroyEntity(entity);
+        if (destroyed && clear_selection) {
+            m_editor_layer->setSelectedEntityId(EntityId(0));
+        }
+        return destroyed;
+    }
+
+    bool reparentEntity(EntityId entity_id, EntityId new_parent_id, bool preserve_world_transform) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        Entity new_parent = findEntity(new_parent_id);
+        if (!entity || (new_parent_id.isValid() && !new_parent)) {
+            return false;
+        }
+        if (new_parent && (entity == new_parent || isEntityDescendantOf(new_parent_id, entity_id))) {
+            return false;
+        }
+
+        return m_editor_layer->reparentEntity(entity, new_parent, preserve_world_transform);
+    }
+
+    bool applyMeshAssetToEntity(EntityId entity_id, AssetHandle mesh_handle) override
+    {
+        if (m_editor_layer == nullptr || !canEditScene() || !mesh_handle.isValid()) {
+            return false;
+        }
+
+        Entity entity = findEntity(entity_id);
+        if (!entity) {
+            return false;
+        }
+
+        m_editor_layer->applyMeshAssetToEntity(entity, mesh_handle);
+        return true;
+    }
+
+private:
+    Entity findEntity(EntityId entity_id) const noexcept
+    {
+        if (m_editor_layer == nullptr || !entity_id.isValid()) {
+            return {};
+        }
+
+        return m_editor_layer->getInspectionScene().entityManager().findEntityByUUID(entity_id);
     }
 
 private:

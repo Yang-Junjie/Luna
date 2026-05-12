@@ -4,10 +4,7 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <string>
-#include <string_view>
-#include <system_error>
 
 namespace {
 
@@ -151,23 +148,47 @@ uint32_t sanitizeShadowMapSize(int size, uint32_t fallback)
                                            kMaxShadowMapSize));
 }
 
-bool parseAssetHandleText(const std::string& text, luna::AssetHandle& handle)
+std::string environmentMapButtonLabel(luna::AssetHandle handle)
 {
-    if (text.empty()) {
-        handle = luna::AssetHandle(0);
-        return true;
+    if (!handle.isValid()) {
+        return "No Environment Map##EnvironmentMapDropTarget";
     }
 
-    uint64_t value = 0;
-    const char* begin = text.data();
-    const char* end = begin + text.size();
-    const std::from_chars_result result = std::from_chars(begin, end, value);
-    if (result.ec != std::errc{} || result.ptr != end) {
-        return false;
+    return "Environment Map: " + handle.toString() + "##EnvironmentMapDropTarget";
+}
+
+bool drawEnvironmentMapSelector(luna::editor::Ui& ui, luna::AssetHandle& handle)
+{
+    bool changed = false;
+
+    ui.text("Environment Map");
+    const bool button_clicked =
+        ui.button(environmentMapButtonLabel(handle), luna::editor::Vec2{.x = -1.0f, .y = ui.scale(42.0f)});
+    (void) button_clicked;
+
+    const bool hovered = ui.isItemHovered();
+    if (ui.beginDragDropTarget()) {
+        luna::editor::AssetDropPayload payload{};
+        if (ui.acceptAssetDragDropPayload(payload, {luna::AssetType::Texture}) && handle != payload.handle) {
+            handle = payload.handle;
+            changed = true;
+        }
+        ui.endDragDropTarget();
     }
 
-    handle = luna::AssetHandle(value);
-    return true;
+    if (ui.beginPopupContextItem("EnvironmentMapContext")) {
+        if (ui.menuItem("Clear", false, handle.isValid())) {
+            handle = luna::AssetHandle(0);
+            changed = true;
+        }
+        ui.endPopup();
+    }
+
+    if (hovered) {
+        ui.setTooltip("Drop a texture asset here. Right-click to clear.");
+    }
+
+    return changed;
 }
 
 } // namespace
@@ -208,7 +229,6 @@ private:
     void syncEnvironmentDraft(const SceneEnvironmentSettings& scene_environment)
     {
         m_environment_draft = normalizeEnvironmentSettings(scene_environment);
-        m_environment_handle_text = m_environment_draft.environmentMapHandle.toString();
         m_environment_draft_dirty = false;
         m_has_environment_draft = true;
     }
@@ -262,9 +282,7 @@ private:
 
         if (m_environment_draft.backgroundMode == SceneBackgroundMode::EnvironmentMap ||
             m_environment_draft.backgroundMode == SceneBackgroundMode::SolidColor) {
-            ui.inputText("Environment Map Handle", m_environment_handle_text);
-            (void) parseAssetHandleText(m_environment_handle_text, m_environment_draft.environmentMapHandle);
-            ui.textDisabled("Enter a numeric asset handle.");
+            (void) drawEnvironmentMapSelector(ui, m_environment_draft.environmentMapHandle);
         }
 
         ui.dragFloat("Intensity", m_environment_draft.intensity, 0.01f, 0.0f, 100.0f, "%.2f");
@@ -398,7 +416,6 @@ private:
 private:
     SceneEnvironmentSettings m_environment_draft{};
     SceneShadowSettings m_shadow_draft{};
-    std::string m_environment_handle_text;
     bool m_environment_draft_dirty{false};
     bool m_shadow_draft_dirty{false};
     bool m_has_environment_draft{false};

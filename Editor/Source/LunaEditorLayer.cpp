@@ -15,13 +15,13 @@
 #include "LunaEditorLayer.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
-#include "Panels/SceneHierarchyPanel.h"
 #include "Plugins/BuiltinMaterialsPlugin.h"
 #include "Plugins/AssetLoadingPlugin.h"
 #include "Plugins/BackendCapabilitiesPlugin.h"
 #include "Plugins/CoreCommandsPlugin.h"
 #include "Plugins/EditorApiSamplePlugin.h"
 #include "Plugins/ScriptPluginsPlugin.h"
+#include "Plugins/SceneHierarchyPlugin.h"
 #include "Plugins/RenderDebugPlugin.h"
 #include "Plugins/RenderFeaturesPlugin.h"
 #include "Plugins/RenderProfilerPlugin.h"
@@ -573,13 +573,13 @@ namespace luna {
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application),
-      m_scene_hierarchy_panel(std::make_unique<SceneHierarchyPanel>(*this)),
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
       m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this))
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
     m_editor_shell->loadPlugin(editor::createViewportPlugin());
+    m_editor_shell->loadPlugin(editor::createSceneHierarchyPlugin());
     m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
     m_editor_shell->loadPlugin(editor::createSceneSettingsPlugin());
     m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
@@ -682,7 +682,6 @@ void LunaEditorLayer::onImGuiRender()
 
     drawDockSpace();
 
-    m_scene_hierarchy_panel->onImGuiRender();
     m_inspector_panel->onImGuiRender();
     m_content_browser_panel->onImGuiRender();
     m_viewport_focused = false;

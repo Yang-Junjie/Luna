@@ -34,7 +34,6 @@ namespace luna {
 class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
-class SceneHierarchyPanel;
 
 namespace editor {
 class BuiltinMaterialsPlugin;
@@ -206,7 +205,6 @@ private:
     EditorViewportSession m_viewport_session;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
 
-    std::unique_ptr<SceneHierarchyPanel> m_scene_hierarchy_panel;
     std::unique_ptr<InspectorPanel> m_inspector_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
     editor::BuiltinMaterialsPlugin* m_builtin_materials_plugin{nullptr};

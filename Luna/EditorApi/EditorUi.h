@@ -3,6 +3,7 @@
 #include "EditorApi/EditorTypes.h"
 
 #include <cstddef>
+#include <initializer_list>
 #include <string_view>
 
 namespace luna::editor {
@@ -64,7 +65,31 @@ public:
     virtual void setItemDefaultFocus() = 0;
     virtual bool image(const TextureView& texture, Vec2 size) = 0;
     [[nodiscard]] virtual bool isItemHovered() const noexcept = 0;
+    [[nodiscard]] virtual bool isItemClicked(MouseButton button = MouseButton::Left) const noexcept = 0;
     virtual void setTooltip(std::string_view value) = 0;
+    virtual bool invisibleButton(std::string_view id, Vec2 size) = 0;
+
+    virtual bool treeNodeEx(std::string_view id, std::string_view label, TreeNodeFlags flags) = 0;
+    virtual bool beginMenu(std::string_view label, bool enabled = true) = 0;
+    virtual void endMenu() = 0;
+    virtual bool menuItem(std::string_view label, bool selected = false, bool enabled = true) = 0;
+    virtual bool beginPopupContextItem(std::string_view id = {}, MouseButton button = MouseButton::Right) = 0;
+    virtual void endPopup() = 0;
+
+    virtual bool beginDragDropSource() = 0;
+    virtual bool setDragDropPayload(std::string_view type, const void* data, std::size_t size) = 0;
+    virtual void endDragDropSource() = 0;
+    virtual bool beginDragDropTarget() = 0;
+    virtual bool acceptDragDropPayload(std::string_view type, void* out_data, std::size_t size) = 0;
+    virtual bool acceptAssetDragDropPayload(AssetDropPayload& out_payload,
+                                            const AssetType* accepted_types,
+                                            std::size_t accepted_type_count) = 0;
+    virtual void endDragDropTarget() = 0;
+
+    bool acceptAssetDragDropPayload(AssetDropPayload& out_payload, std::initializer_list<AssetType> accepted_types)
+    {
+        return acceptAssetDragDropPayload(out_payload, accepted_types.begin(), accepted_types.size());
+    }
 
     [[nodiscard]] virtual float scale(float value) const noexcept = 0;
     [[nodiscard]] virtual Vec2 scaled(Vec2 value) const noexcept = 0;

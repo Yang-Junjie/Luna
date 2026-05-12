@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Asset/Asset.h"
+#include "Asset/AssetTypes.h"
 #include "Core/UUID.h"
 
 #include <cstdint>
@@ -42,6 +44,16 @@ struct TextureView {
     [[nodiscard]] bool valid() const noexcept
     {
         return id != 0 && size.x > 0 && size.y > 0;
+    }
+};
+
+struct AssetDropPayload {
+    AssetHandle handle{0};
+    AssetType type{AssetType::None};
+
+    [[nodiscard]] bool valid() const noexcept
+    {
+        return handle.isValid() && type != AssetType::None;
     }
 };
 
@@ -112,5 +124,38 @@ using TableColumnFlags = uint32_t;
 {
     return (flags & static_cast<TableColumnFlags>(flag)) != 0u;
 }
+
+enum class TreeNodeFlag : uint32_t {
+    None = 0,
+    OpenOnArrow = 1u << 0,
+    OpenOnDoubleClick = 1u << 1,
+    SpanAvailWidth = 1u << 2,
+    Leaf = 1u << 3,
+    NoTreePushOnOpen = 1u << 4,
+    Selected = 1u << 5,
+};
+
+using TreeNodeFlags = uint32_t;
+
+[[nodiscard]] constexpr TreeNodeFlags operator|(TreeNodeFlag lhs, TreeNodeFlag rhs) noexcept
+{
+    return static_cast<TreeNodeFlags>(lhs) | static_cast<TreeNodeFlags>(rhs);
+}
+
+[[nodiscard]] constexpr TreeNodeFlags operator|(TreeNodeFlags lhs, TreeNodeFlag rhs) noexcept
+{
+    return lhs | static_cast<TreeNodeFlags>(rhs);
+}
+
+[[nodiscard]] constexpr bool hasTreeNodeFlag(TreeNodeFlags flags, TreeNodeFlag flag) noexcept
+{
+    return (flags & static_cast<TreeNodeFlags>(flag)) != 0u;
+}
+
+enum class MouseButton : uint8_t {
+    Left,
+    Right,
+    Middle,
+};
 
 } // namespace luna::editor
