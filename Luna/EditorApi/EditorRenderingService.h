@@ -72,6 +72,33 @@ struct RenderGraphProfileSnapshot {
     std::vector<RenderGraphPassProfile> passes;
 };
 
+enum class RenderDebugViewMode : uint8_t {
+    None,
+    Velocity,
+    HistoryValidity,
+    ShadowCascades,
+    BaseColor,
+    Normal,
+    Metallic,
+    Roughness,
+    DirectLighting,
+    SpecularIbl,
+    BloomInput,
+    BloomPrefilter,
+    BloomMip0,
+    BloomMip1,
+    BloomMip2,
+    BloomMip3,
+    BloomMip4,
+    BloomMip5,
+    BloomComposite,
+};
+
+struct RenderDebugViewModeInfo {
+    RenderDebugViewMode mode{RenderDebugViewMode::None};
+    std::string label;
+};
+
 enum class RenderFeatureGraphResourceKind : uint8_t {
     Texture,
     Buffer,
@@ -209,6 +236,12 @@ public:
     virtual bool setDefaultRenderFeatureParameter(std::string_view feature_name,
                                                   std::string_view parameter_name,
                                                   const RenderFeatureParameterValue& value) = 0;
+    virtual std::vector<RenderDebugViewModeInfo> renderDebugViewModes() const = 0;
+    virtual RenderDebugViewMode renderDebugViewMode() const noexcept = 0;
+    virtual void setRenderDebugViewMode(RenderDebugViewMode mode) = 0;
+    virtual float renderDebugVelocityScale() const noexcept = 0;
+    virtual void setRenderDebugVelocityScale(float scale) = 0;
+    virtual TextureView renderDebugTextureView() const = 0;
     virtual float frameTimeMilliseconds() const noexcept = 0;
     virtual float framesPerSecond() const noexcept = 0;
     virtual UVec2 sceneOutputSize() const noexcept = 0;

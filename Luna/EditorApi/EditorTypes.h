@@ -9,6 +9,7 @@ namespace luna::editor {
 
 using EditorId = std::string;
 using EntityId = UUID;
+using TextureHandle = uintptr_t;
 
 struct Vec2 {
     float x{0.0f};
@@ -33,10 +34,22 @@ struct Vec4 {
     float w{1.0f};
 };
 
+struct TextureView {
+    TextureHandle id{0};
+    UVec2 size{};
+    bool y_flip{false};
+
+    [[nodiscard]] bool valid() const noexcept
+    {
+        return id != 0 && size.x > 0 && size.y > 0;
+    }
+};
+
 enum class WindowFlag : uint32_t {
     None = 0,
     NoSavedSettings = 1u << 0,
     NoDocking = 1u << 1,
+    NoPadding = 1u << 2,
 };
 
 using WindowFlags = uint32_t;

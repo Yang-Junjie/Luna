@@ -56,12 +56,12 @@ public:
                     return true;
                 },
                 .is_checked = [](luna::editor::Host& host) {
-                    return host.viewport().isRuntimeViewportRequested();
+                    return host.runtimeViewport().isRuntimeViewportRequested();
                 },
                 .execute =
                     [](luna::editor::Host& host) {
-                        const bool requested = host.viewport().isRuntimeViewportRequested();
-                        host.viewport().setRuntimeViewportRequested(!requested);
+                        const bool requested = host.runtimeViewport().isRuntimeViewportRequested();
+                        host.runtimeViewport().setRuntimeViewportRequested(!requested);
                     },
             });
 

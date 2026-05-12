@@ -7,14 +7,21 @@
 
 namespace luna::editor {
 
+class Ui;
+
+struct ViewportPresentation {
+    TextureView scene_texture;
+    UVec2 framebuffer_size{};
+    bool presentable{false};
+};
+
 class ViewportService {
 public:
     virtual ~ViewportService() = default;
 
-    virtual bool isRuntimeViewportEnabled() const noexcept = 0;
-    virtual bool isRuntimeViewportRequested() const noexcept = 0;
-    virtual void setRuntimeViewportRequested(bool enabled) = 0;
-    virtual size_t runtimeEntityCount() const noexcept = 0;
+    virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
+    virtual TextureView sceneTextureView() const = 0;
+    virtual void drawDefaultSceneViewport(Ui& ui) = 0;
 
     virtual Vec3 editorCameraPosition() const noexcept = 0;
     virtual std::string gizmoOperationName() const = 0;

@@ -13,6 +13,7 @@ class LunaEditorLayer;
 namespace editor {
 
 class Plugin;
+class RuntimeViewportService;
 class Ui;
 class WindowService;
 class CommandService;
@@ -36,6 +37,7 @@ public:
     RenderingService& rendering() override;
     SceneService& scene() override;
     SelectionService& selection() override;
+    RuntimeViewportService& runtimeViewport() override;
     ViewportService& viewport() override;
 
     bool loadPlugin(std::unique_ptr<Plugin> plugin);

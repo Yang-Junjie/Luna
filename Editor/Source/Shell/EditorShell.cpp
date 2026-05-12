@@ -13,6 +13,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -130,6 +131,15 @@ ImGuiTableColumnFlags toImGuiTableColumnFlags(luna::editor::TableColumnFlags fla
     return imgui_flags;
 }
 
+ImTextureID toImGuiTextureId(luna::editor::TextureHandle texture_id) noexcept
+{
+    if constexpr (std::is_pointer_v<ImTextureID>) {
+        return reinterpret_cast<ImTextureID>(texture_id);
+    } else {
+        return static_cast<ImTextureID>(texture_id);
+    }
+}
+
 } // namespace
 
 namespace luna::editor {
@@ -207,6 +217,19 @@ public:
         ImGui::SetNextItemWidth(width > 0.0f ? scaleEditorUi(width) : width);
     }
 
+    Vec2 contentRegionAvail() const noexcept override
+    {
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        return Vec2{.x = available.x, .y = available.y};
+    }
+
+    Vec2 windowFramebufferScale() const noexcept override
+    {
+        const ImGuiViewport* viewport = ImGui::GetWindowViewport();
+        const ImVec2 scale = viewport != nullptr ? viewport->FramebufferScale : ImGui::GetIO().DisplayFramebufferScale;
+        return Vec2{.x = scale.x, .y = scale.y};
+    }
+
     bool button(std::string_view label, Vec2 size) override
     {
         const std::string label_string = toString(label);
@@ -223,6 +246,17 @@ public:
     {
         const std::string label_string = toString(label);
         return ImGui::SliderInt(label_string.c_str(), &value, min_value, max_value);
+    }
+
+    bool sliderFloat(std::string_view label,
+                     float& value,
+                     float min_value,
+                     float max_value,
+                     std::string_view format) override
+    {
+        const std::string label_string = toString(label);
+        const std::string format_string = toString(format);
+        return ImGui::SliderFloat(label_string.c_str(), &value, min_value, max_value, format_string.c_str());
     }
 
     bool dragInt(std::string_view label, int& value, float speed, int min_value, int max_value) override
@@ -263,6 +297,46 @@ public:
     void treePop() override
     {
         ImGui::TreePop();
+    }
+
+    bool beginCombo(std::string_view label, std::string_view preview_value) override
+    {
+        const std::string label_string = toString(label);
+        const std::string preview_string = toString(preview_value);
+        return ImGui::BeginCombo(label_string.c_str(), preview_string.c_str());
+    }
+
+    void endCombo() override
+    {
+        ImGui::EndCombo();
+    }
+
+    bool selectable(std::string_view label, bool selected) override
+    {
+        const std::string label_string = toString(label);
+        return ImGui::Selectable(label_string.c_str(), selected);
+    }
+
+    void setItemDefaultFocus() override
+    {
+        ImGui::SetItemDefaultFocus();
+    }
+
+    bool image(const TextureView& texture, Vec2 size) override
+    {
+        if (!texture.valid() || size.x <= 0.0f || size.y <= 0.0f) {
+            return false;
+        }
+
+        const ImTextureID texture_id = toImGuiTextureId(texture.id);
+        if (texture_id == 0) {
+            return false;
+        }
+
+        const ImVec2 uv0(0.0f, texture.y_flip ? 1.0f : 0.0f);
+        const ImVec2 uv1(1.0f, texture.y_flip ? 0.0f : 1.0f);
+        ImGui::Image(texture_id, ImVec2{size.x, size.y}, uv0, uv1);
+        return true;
     }
 
     bool isItemHovered() const noexcept override
@@ -346,14 +420,9 @@ public:
         return m_editor_layer != nullptr ? m_editor_layer->getScene().entityManager().entityCount() : 0u;
     }
 
-    bool isRuntimeViewportEnabled() const noexcept override
-    {
-        return m_editor_layer != nullptr && m_editor_layer->isRuntimeViewportEnabled();
-    }
-
     bool canEditScene() const noexcept override
     {
-        return !isRuntimeViewportEnabled();
+        return m_editor_layer != nullptr && !m_editor_layer->isRuntimeViewportEnabled();
     }
 
     EntityId createEntity(std::string name) override
@@ -475,6 +544,41 @@ public:
                m_editor_layer->setDefaultRenderFeatureParameter(feature_name, parameter_name, value);
     }
 
+    std::vector<RenderDebugViewModeInfo> renderDebugViewModes() const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getRenderDebugViewModes()
+                                         : std::vector<RenderDebugViewModeInfo>{};
+    }
+
+    RenderDebugViewMode renderDebugViewMode() const noexcept override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getRenderDebugViewMode() : RenderDebugViewMode::None;
+    }
+
+    void setRenderDebugViewMode(RenderDebugViewMode mode) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->setRenderDebugViewMode(mode);
+        }
+    }
+
+    float renderDebugVelocityScale() const noexcept override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getRenderDebugVelocityScale() : 0.0f;
+    }
+
+    void setRenderDebugVelocityScale(float scale) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->setRenderDebugVelocityScale(scale);
+        }
+    }
+
+    TextureView renderDebugTextureView() const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getRenderDebugTextureView() : TextureView{};
+    }
+
     float frameTimeMilliseconds() const noexcept override
     {
         return m_editor_layer != nullptr ? m_editor_layer->getFrameTimeMilliseconds() : 0.0f;
@@ -507,26 +611,22 @@ public:
         : m_editor_layer(&editor_layer)
     {}
 
-    bool isRuntimeViewportEnabled() const noexcept override
+    ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) override
     {
-        return m_editor_layer != nullptr && m_editor_layer->isRuntimeViewportEnabled();
+        return m_editor_layer != nullptr ? m_editor_layer->syncSceneViewport(framebuffer_size.x, framebuffer_size.y)
+                                         : ViewportPresentation{};
     }
 
-    bool isRuntimeViewportRequested() const noexcept override
+    TextureView sceneTextureView() const override
     {
-        return m_editor_layer != nullptr && m_editor_layer->isRuntimeViewportRequested();
+        return m_editor_layer != nullptr ? m_editor_layer->getSceneTextureView() : TextureView{};
     }
 
-    void setRuntimeViewportRequested(bool enabled) override
+    void drawDefaultSceneViewport(Ui& ui) override
     {
         if (m_editor_layer != nullptr) {
-            m_editor_layer->setRuntimeViewportRequested(enabled);
+            m_editor_layer->drawDefaultSceneViewport(ui);
         }
-    }
-
-    size_t runtimeEntityCount() const noexcept override
-    {
-        return m_editor_layer != nullptr ? m_editor_layer->getRuntimeEntityCount() : 0u;
     }
 
     Vec3 editorCameraPosition() const noexcept override
@@ -575,6 +675,38 @@ public:
         if (m_editor_layer != nullptr) {
             m_editor_layer->setEditorGridEnabled(enabled);
         }
+    }
+
+private:
+    LunaEditorLayer* m_editor_layer{nullptr};
+};
+
+class EditorRuntimeViewportService final : public RuntimeViewportService {
+public:
+    explicit EditorRuntimeViewportService(LunaEditorLayer& editor_layer)
+        : m_editor_layer(&editor_layer)
+    {}
+
+    bool isRuntimeViewportEnabled() const noexcept override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->isRuntimeViewportEnabled();
+    }
+
+    bool isRuntimeViewportRequested() const noexcept override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->isRuntimeViewportRequested();
+    }
+
+    void setRuntimeViewportRequested(bool enabled) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->setRuntimeViewportRequested(enabled);
+        }
+    }
+
+    size_t runtimeEntityCount() const noexcept override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getRuntimeEntityCount() : 0u;
     }
 
 private:
@@ -939,10 +1071,18 @@ public:
                 const Vec2 default_size = m_ui->scaled(descriptor.default_size);
                 ImGui::SetNextWindowSize(ImVec2{default_size.x, default_size.y}, ImGuiCond_FirstUseEver);
             }
+
+            const bool no_padding = hasWindowFlag(descriptor.flags, WindowFlag::NoPadding);
+            if (no_padding) {
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+            }
             if (m_ui->beginWindow(descriptor.id, descriptor.title, &it->second.open, descriptor.flags)) {
                 descriptor.draw(context);
             }
             m_ui->endWindow();
+            if (no_padding) {
+                ImGui::PopStyleVar();
+            }
         }
     }
 
@@ -975,6 +1115,7 @@ struct EditorShell::Impl {
           selection_service(editor_layer),
           rendering_service(editor_layer),
           viewport_service(editor_layer),
+          runtime_viewport_service(editor_layer),
           history_service(editor_layer),
           command_service(shell),
           menu_service(command_service),
@@ -986,6 +1127,7 @@ struct EditorShell::Impl {
     EditorSelectionService selection_service;
     EditorRenderingService rendering_service;
     EditorViewportService viewport_service;
+    EditorRuntimeViewportService runtime_viewport_service;
     EditorHistoryService history_service;
     EditorCommandService command_service;
     EditorMenuService menu_service;
@@ -1040,6 +1182,11 @@ SceneService& EditorShell::scene()
 SelectionService& EditorShell::selection()
 {
     return m_impl->selection_service;
+}
+
+RuntimeViewportService& EditorShell::runtimeViewport()
+{
+    return m_impl->runtime_viewport_service;
 }
 
 ViewportService& EditorShell::viewport()

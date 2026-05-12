@@ -60,9 +60,9 @@ public:
                     ui.text("Viewport: " + std::to_string(viewport_size.x) + " x " +
                             std::to_string(viewport_size.y));
                     ui.text(std::string("Viewport Mode: ") +
-                            (host.viewport().isRuntimeViewportEnabled() ? "Runtime" : "Editor"));
-                    if (host.viewport().isRuntimeViewportEnabled()) {
-                        ui.text("Runtime Entities: " + std::to_string(host.viewport().runtimeEntityCount()));
+                            (host.runtimeViewport().isRuntimeViewportEnabled() ? "Runtime" : "Editor"));
+                    if (host.runtimeViewport().isRuntimeViewportEnabled()) {
+                        ui.text("Runtime Entities: " + std::to_string(host.runtimeViewport().runtimeEntityCount()));
                     }
 
                     ui.text("Editor Camera: " + formatVec3(camera_position, 2));

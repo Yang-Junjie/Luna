@@ -8,6 +8,7 @@ class MenuService;
 class RenderingService;
 class SceneService;
 class SelectionService;
+class RuntimeViewportService;
 class Ui;
 class ViewportService;
 class WindowService;
@@ -24,6 +25,7 @@ public:
     virtual RenderingService& rendering() = 0;
     virtual SceneService& scene() = 0;
     virtual SelectionService& selection() = 0;
+    virtual RuntimeViewportService& runtimeViewport() = 0;
     virtual ViewportService& viewport() = 0;
 };
 

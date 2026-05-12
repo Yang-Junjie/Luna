@@ -4,6 +4,7 @@
 #include "Core/Log.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorStandardCommands.h"
+#include "EditorApi/EditorUi.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
 #include "EditorStyle.h"
@@ -13,7 +14,6 @@
 #include "Panels/BuiltinMaterialsPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
-#include "Panels/RenderDebugPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/SceneSettingPanel.h"
 #include "Panels/ScriptPluginsPanel.h"
@@ -21,9 +21,11 @@
 #include "Plugins/BackendCapabilitiesPlugin.h"
 #include "Plugins/CoreCommandsPlugin.h"
 #include "Plugins/EditorApiSamplePlugin.h"
+#include "Plugins/RenderDebugPlugin.h"
 #include "Plugins/RenderFeaturesPlugin.h"
 #include "Plugins/RenderProfilerPlugin.h"
 #include "Plugins/SceneStatusPlugin.h"
+#include "Plugins/ViewportPlugin.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
@@ -50,6 +52,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -59,9 +62,56 @@ constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunapro
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr float kUiScaleChangeThreshold = 0.01f;
 
+struct RenderDebugModeItem {
+    luna::RenderDebugViewMode engine_mode;
+    luna::editor::RenderDebugViewMode editor_mode;
+    const char* label;
+};
+
+constexpr std::array<RenderDebugModeItem, 19> kRenderDebugModes{{
+    {luna::RenderDebugViewMode::None, luna::editor::RenderDebugViewMode::None, "None"},
+    {luna::RenderDebugViewMode::Velocity, luna::editor::RenderDebugViewMode::Velocity, "Velocity"},
+    {luna::RenderDebugViewMode::HistoryValidity,
+     luna::editor::RenderDebugViewMode::HistoryValidity,
+     "History Validity"},
+    {luna::RenderDebugViewMode::ShadowCascades,
+     luna::editor::RenderDebugViewMode::ShadowCascades,
+     "Shadow Cascades"},
+    {luna::RenderDebugViewMode::BaseColor, luna::editor::RenderDebugViewMode::BaseColor, "Base Color"},
+    {luna::RenderDebugViewMode::Normal, luna::editor::RenderDebugViewMode::Normal, "Normal"},
+    {luna::RenderDebugViewMode::Metallic, luna::editor::RenderDebugViewMode::Metallic, "Metallic"},
+    {luna::RenderDebugViewMode::Roughness, luna::editor::RenderDebugViewMode::Roughness, "Roughness"},
+    {luna::RenderDebugViewMode::DirectLighting,
+     luna::editor::RenderDebugViewMode::DirectLighting,
+     "Direct Lighting"},
+    {luna::RenderDebugViewMode::SpecularIbl, luna::editor::RenderDebugViewMode::SpecularIbl, "Specular IBL"},
+    {luna::RenderDebugViewMode::BloomInput, luna::editor::RenderDebugViewMode::BloomInput, "Bloom Input HDR"},
+    {luna::RenderDebugViewMode::BloomPrefilter,
+     luna::editor::RenderDebugViewMode::BloomPrefilter,
+     "Bloom Prefilter"},
+    {luna::RenderDebugViewMode::BloomMip0, luna::editor::RenderDebugViewMode::BloomMip0, "Bloom Mip 0"},
+    {luna::RenderDebugViewMode::BloomMip1, luna::editor::RenderDebugViewMode::BloomMip1, "Bloom Mip 1"},
+    {luna::RenderDebugViewMode::BloomMip2, luna::editor::RenderDebugViewMode::BloomMip2, "Bloom Mip 2"},
+    {luna::RenderDebugViewMode::BloomMip3, luna::editor::RenderDebugViewMode::BloomMip3, "Bloom Mip 3"},
+    {luna::RenderDebugViewMode::BloomMip4, luna::editor::RenderDebugViewMode::BloomMip4, "Bloom Mip 4"},
+    {luna::RenderDebugViewMode::BloomMip5, luna::editor::RenderDebugViewMode::BloomMip5, "Bloom Mip 5"},
+    {luna::RenderDebugViewMode::BloomComposite,
+     luna::editor::RenderDebugViewMode::BloomComposite,
+     "Bloom Composite HDR"},
+}};
+
 std::string toOwnedString(std::string_view value)
 {
     return std::string(value.data(), value.size());
+}
+
+luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexcept
+{
+    if constexpr (std::is_pointer_v<ImTextureID>) {
+        return reinterpret_cast<luna::editor::TextureHandle>(texture_id);
+    } else {
+        return static_cast<luna::editor::TextureHandle>(texture_id);
+    }
 }
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
@@ -494,6 +544,26 @@ luna::editor::RenderFeatureParameterInfo toEditorRenderFeatureParameterInfo(
     };
 }
 
+luna::editor::RenderDebugViewMode toEditorRenderDebugViewMode(luna::RenderDebugViewMode mode) noexcept
+{
+    for (const RenderDebugModeItem& item : kRenderDebugModes) {
+        if (item.engine_mode == mode) {
+            return item.editor_mode;
+        }
+    }
+    return luna::editor::RenderDebugViewMode::None;
+}
+
+luna::RenderDebugViewMode toEngineRenderDebugViewMode(luna::editor::RenderDebugViewMode mode) noexcept
+{
+    for (const RenderDebugModeItem& item : kRenderDebugModes) {
+        if (item.editor_mode == mode) {
+            return item.engine_mode;
+        }
+    }
+    return luna::RenderDebugViewMode::None;
+}
+
 } // namespace
 
 namespace luna {
@@ -505,15 +575,16 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
       m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
       m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
-      m_render_debug_panel(std::make_unique<RenderDebugPanel>()),
       m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this))
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
+    m_editor_shell->loadPlugin(editor::createViewportPlugin());
     m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
     m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
     m_editor_shell->loadPlugin(editor::createBackendCapabilitiesPlugin());
+    m_editor_shell->loadPlugin(editor::createRenderDebugPlugin());
     m_editor_shell->loadPlugin(editor::createRenderFeaturesPlugin());
     m_editor_shell->loadPlugin(editor::createRenderProfilerPlugin());
     m_editor_shell->loadPlugin(editor::createEditorApiSamplePlugin());
@@ -605,8 +676,6 @@ void LunaEditorLayer::onImGuiRender()
 
     drawDockSpace();
 
-    auto& renderer = m_application->getRenderer();
-
     m_scene_hierarchy_panel->onImGuiRender();
     m_inspector_panel->onImGuiRender();
     if (m_show_scene_setting_panel) {
@@ -614,12 +683,12 @@ void LunaEditorLayer::onImGuiRender()
     }
     m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel->onImGuiRender();
-    m_render_debug_panel->onImGuiRender(m_show_render_debug_panel, renderer);
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
+    m_viewport_focused = false;
+    m_viewport_hovered = false;
     if (m_editor_shell) {
         m_editor_shell->drawWindows();
     }
-    drawViewport();
 }
 
 void LunaEditorLayer::syncEditorUiScale()
@@ -758,7 +827,6 @@ void LunaEditorLayer::onImGuiMenuBar()
 
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
-        ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
         ImGui::MenuItem("Scene Settings", nullptr, &m_show_scene_setting_panel);
         ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
         if (m_editor_shell) {
@@ -793,7 +861,7 @@ void LunaEditorLayer::updateEditorShortcuts()
     }
 }
 
-void LunaEditorLayer::drawViewport()
+void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
 {
     if (m_application == nullptr) {
         return;
@@ -801,17 +869,12 @@ void LunaEditorLayer::drawViewport()
 
     auto& renderer = m_application->getRenderer();
 
-    ImGui::SetNextWindowSize(editor::scaleEditorUi(960.0f, 640.0f), ImGuiCond_FirstUseEver);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::Begin("Viewport");
     m_viewport_focused = ImGui::IsWindowFocused();
     m_viewport_hovered = ImGui::IsWindowHovered();
     updateGizmoShortcuts();
 
-    const ImVec2 available = ImGui::GetContentRegionAvail();
-    const ImGuiViewport* viewport = ImGui::GetWindowViewport();
-    const ImVec2 framebuffer_scale =
-        viewport != nullptr ? viewport->FramebufferScale : ImGui::GetIO().DisplayFramebufferScale;
+    const editor::Vec2 available = ui.contentRegionAvail();
+    const editor::Vec2 framebuffer_scale = ui.windowFramebufferScale();
     const float viewport_scale_x =
         std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
     const float viewport_scale_y =
@@ -827,7 +890,7 @@ void LunaEditorLayer::drawViewport()
         const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
         const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
 
-        ImGui::Image(texture_id, available, uv0, uv1);
+        ImGui::Image(texture_id, ImVec2{available.x, available.y}, uv0, uv1);
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
         const ImVec2 viewport_max = ImGui::GetItemRectMax();
         const ImVec2 viewport_size = ImGui::GetItemRectSize();
@@ -845,11 +908,8 @@ void LunaEditorLayer::drawViewport()
         }
     } else if (available.x > 0.0f && available.y > 0.0f) {
         ImGui::SetCursorPos(editor::scaleEditorUi(16.0f, 16.0f));
-        ImGui::TextUnformatted("Viewport texture will appear after the first rendered frame.");
+        ui.text("Viewport texture will appear after the first rendered frame.");
     }
-
-    ImGui::End();
-    ImGui::PopStyleVar();
 }
 
 void LunaEditorLayer::updateGizmoShortcuts()
@@ -1165,6 +1225,67 @@ bool LunaEditorLayer::setDefaultRenderFeatureParameter(std::string_view feature_
     return m_application->getRenderer().setDefaultRenderFeatureParameter(feature_name, parameter_name, engine_value);
 }
 
+std::vector<editor::RenderDebugViewModeInfo> LunaEditorLayer::getRenderDebugViewModes() const
+{
+    std::vector<editor::RenderDebugViewModeInfo> result;
+    result.reserve(kRenderDebugModes.size());
+    for (const RenderDebugModeItem& item : kRenderDebugModes) {
+        result.push_back(editor::RenderDebugViewModeInfo{
+            .mode = item.editor_mode,
+            .label = item.label,
+        });
+    }
+    return result;
+}
+
+editor::RenderDebugViewMode LunaEditorLayer::getRenderDebugViewMode() const noexcept
+{
+    if (m_application == nullptr) {
+        return editor::RenderDebugViewMode::None;
+    }
+
+    return toEditorRenderDebugViewMode(m_application->getRenderer().getRenderDebugViewMode());
+}
+
+void LunaEditorLayer::setRenderDebugViewMode(editor::RenderDebugViewMode mode)
+{
+    if (m_application != nullptr) {
+        m_application->getRenderer().setRenderDebugViewMode(toEngineRenderDebugViewMode(mode));
+    }
+}
+
+float LunaEditorLayer::getRenderDebugVelocityScale() const noexcept
+{
+    return m_application != nullptr ? m_application->getRenderer().getRenderDebugVelocityScale() : 0.0f;
+}
+
+void LunaEditorLayer::setRenderDebugVelocityScale(float scale)
+{
+    if (m_application != nullptr) {
+        m_application->getRenderer().setRenderDebugVelocityScale(scale);
+    }
+}
+
+editor::TextureView LunaEditorLayer::getRenderDebugTextureView() const
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    const auto& renderer = m_application->getRenderer();
+    const auto& debug_texture = renderer.getRenderDebugOutputTexture();
+    if (!debug_texture) {
+        return {};
+    }
+
+    const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(debug_texture);
+    return editor::TextureView{
+        .id = toEditorTextureHandle(texture_id),
+        .size = editor::UVec2{.x = debug_texture->GetWidth(), .y = debug_texture->GetHeight()},
+        .y_flip = renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip,
+    };
+}
+
 float LunaEditorLayer::getFrameTimeMilliseconds() const noexcept
 {
     return Application::get().getTimestep().getSeconds() * 1000.0f;
@@ -1268,6 +1389,43 @@ bool LunaEditorLayer::isRuntimeViewportRequested() const noexcept
 void LunaEditorLayer::setRuntimeViewportRequested(bool enabled)
 {
     m_runtime_viewport_requested = enabled;
+}
+
+editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height)
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    const EditorViewportSyncState& state =
+        m_viewport_session.sync(m_application->getRenderer(), m_editor_camera, framebuffer_width, framebuffer_height);
+    editor::TextureView texture = getSceneTextureView();
+    return editor::ViewportPresentation{
+        .scene_texture = texture,
+        .framebuffer_size = editor::UVec2{.x = state.width, .y = state.height},
+        .presentable = state.presentable && texture.valid(),
+    };
+}
+
+editor::TextureView LunaEditorLayer::getSceneTextureView() const
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    const auto& renderer = m_application->getRenderer();
+    const auto& scene_texture = renderer.getSceneOutputTexture();
+    if (!scene_texture) {
+        return {};
+    }
+
+    const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
+    const EditorViewportSyncState& state = m_viewport_session.state();
+    return editor::TextureView{
+        .id = toEditorTextureHandle(texture_id),
+        .size = editor::UVec2{.x = scene_texture->GetWidth(), .y = scene_texture->GetHeight()},
+        .y_flip = state.y_flip,
+    };
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept

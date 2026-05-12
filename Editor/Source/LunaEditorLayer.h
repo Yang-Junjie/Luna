@@ -4,6 +4,7 @@
 #include "EditorContext.h"
 #include "EditorRuntime.h"
 #include "EditorApi/EditorRenderingService.h"
+#include "EditorApi/EditorViewportService.h"
 #include "Core/Layer.h"
 #include "Events/Event.h"
 #include "Scene/Entity.h"
@@ -34,13 +35,13 @@ class BuiltinMaterialsPanel;
 class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
-class RenderDebugPanel;
 class SceneHierarchyPanel;
 class SceneSettingPanel;
 class ScriptPluginsPanel;
 
 namespace editor {
 class EditorShell;
+class Ui;
 }
 
 enum class GizmoOperation : uint8_t {
@@ -94,11 +95,20 @@ public:
     bool setDefaultRenderFeatureParameter(std::string_view feature_name,
                                           std::string_view parameter_name,
                                           const editor::RenderFeatureParameterValue& value);
+    std::vector<editor::RenderDebugViewModeInfo> getRenderDebugViewModes() const;
+    editor::RenderDebugViewMode getRenderDebugViewMode() const noexcept;
+    void setRenderDebugViewMode(editor::RenderDebugViewMode mode);
+    float getRenderDebugVelocityScale() const noexcept;
+    void setRenderDebugVelocityScale(float scale);
+    editor::TextureView getRenderDebugTextureView() const;
     Scene& getScene() override;
     Scene& getInspectionScene() override;
     bool isRuntimeViewportEnabled() const noexcept override;
     bool isRuntimeViewportRequested() const noexcept;
     void setRuntimeViewportRequested(bool enabled);
+    editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
+    editor::TextureView getSceneTextureView() const;
+    void drawDefaultSceneViewport(editor::Ui& ui);
     UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() override;
     void setSelectedEntity(Entity entity) override;
@@ -152,7 +162,6 @@ private:
     void drawDockSpace();
     void onImGuiMenuBar();
     void updateEditorShortcuts();
-    void drawViewport();
     void updateGizmoShortcuts();
     bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size);
     void resetEditorState();
@@ -196,7 +205,6 @@ private:
     bool m_show_builtin_materials_panel{false};
     float m_editor_ui_scale{0.0f};
 
-    bool m_show_render_debug_panel{false};
     bool m_show_scene_setting_panel{true};
     bool m_show_script_plugins_panel{true};
     bool m_runtime_viewport_enabled{false};
@@ -212,7 +220,6 @@ private:
     std::unique_ptr<InspectorPanel> m_inspector_panel;
     std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
-    std::unique_ptr<RenderDebugPanel> m_render_debug_panel;
     std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
     std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
 };
