@@ -2,23 +2,28 @@
 #include "Asset/AssetManager.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Core/Log.h"
+#include "EditorApi/EditorCommandService.h"
+#include "EditorApi/EditorStandardCommands.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
 #include "EditorStyle.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
-#include "Panels/AssetLoadingPanel.h"
-#include "Panels/BackendCapabilitiesPanel.h"
 #include "Panels/BuiltinMaterialsPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/RenderDebugPanel.h"
 #include "Panels/RenderFeaturesPanel.h"
-#include "Panels/RenderProfilerPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/SceneSettingPanel.h"
 #include "Panels/ScriptPluginsPanel.h"
+#include "Plugins/AssetLoadingPlugin.h"
+#include "Plugins/BackendCapabilitiesPlugin.h"
+#include "Plugins/CoreCommandsPlugin.h"
+#include "Plugins/EditorApiSamplePlugin.h"
+#include "Plugins/RenderProfilerPlugin.h"
+#include "Plugins/SceneStatusPlugin.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
@@ -26,12 +31,16 @@
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
+#include "Renderer/RenderProfileExporter.h"
+#include "Shell/EditorShell.h"
 
 #include <Backend.h>
+#include <Instance.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <exception>
 #include <filesystem>
 #include <glm/gtc/type_ptr.hpp>
 #include <ImGuizmo.h>
@@ -47,8 +56,6 @@ namespace {
 
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
-constexpr const char* kPickDebugToggleLabel = "Show Picking Debug";
-constexpr const char* kEditorGridToggleLabel = "Show Editor Grid";
 constexpr float kUiScaleChangeThreshold = 0.01f;
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
@@ -141,6 +148,105 @@ std::optional<std::filesystem::path> makeScenePathRelativeToProject(const std::f
     return relative_path;
 }
 
+std::optional<luna::RHI::BackendType> tryGetDefaultBackend()
+{
+    try {
+        return luna::RHI::Instance::GetDefaultBackend();
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+std::string backendStatusText(luna::RHI::BackendType backend,
+                              luna::RHI::BackendType current_backend,
+                              std::optional<luna::RHI::BackendType> default_backend)
+{
+    std::string status;
+    if (backend == current_backend) {
+        status = "Current";
+    }
+    if (default_backend && backend == *default_backend) {
+        if (!status.empty()) {
+            status += ", ";
+        }
+        status += "Default";
+    }
+    return status.empty() ? "Available" : status;
+}
+
+const char* renderGraphPassTypeToString(luna::RenderGraphPassType type)
+{
+    switch (type) {
+        case luna::RenderGraphPassType::Raster:
+            return "Raster";
+        case luna::RenderGraphPassType::Compute:
+            return "Compute";
+        default:
+            return "Unknown";
+    }
+}
+
+luna::editor::RenderGraphProfileSnapshot toEditorRenderGraphProfile(
+    const luna::RenderGraphProfileSnapshot& profile)
+{
+    luna::editor::RenderGraphProfileSnapshot result{};
+    result.frame_index = profile.FrameIndex;
+    result.total_cpu_time_ms = profile.TotalCpuTimeMs;
+    result.total_gpu_time_ms = profile.TotalGpuTimeMs;
+    result.gpu_timing_supported = profile.GpuTimingSupported;
+    result.gpu_timing_pending = profile.GpuTimingPending;
+    result.texture_count = profile.TextureCount;
+    result.final_barrier_count = profile.FinalBarrierCount;
+    result.passes.reserve(profile.Passes.size());
+    for (const auto& pass : profile.Passes) {
+        result.passes.push_back(luna::editor::RenderGraphPassProfile{
+            .name = pass.Name,
+            .type = renderGraphPassTypeToString(pass.Type),
+            .cpu_time_ms = pass.CpuTimeMs,
+            .gpu_time_ms = pass.GpuTimeMs,
+            .has_gpu_time = pass.HasGpuTime,
+            .framebuffer_width = pass.FramebufferWidth,
+            .framebuffer_height = pass.FramebufferHeight,
+            .read_texture_count = pass.ReadTextureCount,
+            .write_texture_count = pass.WriteTextureCount,
+            .color_attachment_count = pass.ColorAttachmentCount,
+            .has_depth_attachment = pass.HasDepthAttachment,
+            .pre_barrier_count = pass.PreBarrierCount,
+        });
+    }
+    return result;
+}
+
+luna::RenderGraphProfileSnapshot toEngineRenderGraphProfile(const luna::editor::RenderGraphProfileSnapshot& profile)
+{
+    luna::RenderGraphProfileSnapshot result{};
+    result.FrameIndex = profile.frame_index;
+    result.TotalCpuTimeMs = profile.total_cpu_time_ms;
+    result.TotalGpuTimeMs = profile.total_gpu_time_ms;
+    result.GpuTimingSupported = profile.gpu_timing_supported;
+    result.GpuTimingPending = profile.gpu_timing_pending;
+    result.TextureCount = profile.texture_count;
+    result.FinalBarrierCount = profile.final_barrier_count;
+    result.Passes.reserve(profile.passes.size());
+    for (const auto& pass : profile.passes) {
+        result.Passes.push_back(luna::RenderGraphPassProfile{
+            .Name = pass.name,
+            .Type = pass.type == "Compute" ? luna::RenderGraphPassType::Compute : luna::RenderGraphPassType::Raster,
+            .CpuTimeMs = pass.cpu_time_ms,
+            .GpuTimeMs = pass.gpu_time_ms,
+            .HasGpuTime = pass.has_gpu_time,
+            .FramebufferWidth = pass.framebuffer_width,
+            .FramebufferHeight = pass.framebuffer_height,
+            .ReadTextureCount = pass.read_texture_count,
+            .WriteTextureCount = pass.write_texture_count,
+            .ColorAttachmentCount = pass.color_attachment_count,
+            .HasDepthAttachment = pass.has_depth_attachment,
+            .PreBarrierCount = pass.pre_barrier_count,
+        });
+    }
+    return result;
+}
+
 } // namespace
 
 namespace luna {
@@ -150,16 +256,21 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_application(&application),
       m_scene_hierarchy_panel(std::make_unique<SceneHierarchyPanel>(*this)),
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
-      m_asset_loading_panel(std::make_unique<AssetLoadingPanel>()),
       m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
       m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
       m_render_debug_panel(std::make_unique<RenderDebugPanel>()),
       m_render_features_panel(std::make_unique<RenderFeaturesPanel>()),
-      m_render_profiler_panel(std::make_unique<RenderProfilerPanel>()),
       m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
-      m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this)),
-      m_backend_capabilities_panel(std::make_unique<BackendCapabilitiesPanel>())
-{}
+      m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this))
+{
+    m_editor_shell = std::make_unique<editor::EditorShell>(*this);
+    m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
+    m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
+    m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
+    m_editor_shell->loadPlugin(editor::createBackendCapabilitiesPlugin());
+    m_editor_shell->loadPlugin(editor::createRenderProfilerPlugin());
+    m_editor_shell->loadPlugin(editor::createEditorApiSamplePlugin());
+}
 
 LunaEditorLayer::~LunaEditorLayer() = default;
 
@@ -202,6 +313,9 @@ void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
     processAuthoringEvents();
+    if (m_editor_shell) {
+        m_editor_shell->update(dt.getSeconds());
+    }
     consumePendingScenePick();
     setRuntimeViewportEnabled(m_runtime_viewport_requested);
 
@@ -244,48 +358,13 @@ void LunaEditorLayer::onImGuiRender()
 
     drawDockSpace();
 
-    auto& application = *m_application;
-    auto& renderer = application.getRenderer();
-    const luna::RHI::BackendType active_backend = renderer.getCapabilities().backend_type;
-    const float delta_seconds = Application::get().getTimestep().getSeconds();
-    const float fps = 1.0f / (std::max) (delta_seconds, 0.0001f);
-
-    ImGui::SetNextWindowSize(editor::scaleEditorUi(420.0f, 0.0f), ImGuiCond_FirstUseEver);
-    ImGui::Begin("Scene");
-    ImGui::Text("Backend: Luna RHI / %s", luna::RHI::BackendTypeToString(active_backend));
-    ImGui::Text("Frame: %.2f ms  |  %.1f FPS", delta_seconds * 1000.0f, fps);
-    ImGui::Separator();
-    ImGui::Text("Scene File: %s", m_asset_label.c_str());
-    ImGui::Text("Entities: %zu", m_editor_runtime.scene().entityManager().entityCount());
-    ImGui::Separator();
-
-    const auto viewport_extent = renderer.getSceneOutputSize();
-    ImGui::Text("Viewport: %u x %u", viewport_extent.width, viewport_extent.height);
-    ImGui::Text("Viewport Mode: %s", m_runtime_viewport_enabled ? "Runtime" : "Editor");
-    if (m_runtime_viewport_enabled && m_runtime_scene) {
-        ImGui::Text("Runtime Entities: %zu", m_runtime_scene->entityManager().entityCount());
-    }
-    const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
-    ImGui::Text("Editor Camera: %.2f, %.2f, %.2f", camera_position.x, camera_position.y, camera_position.z);
-    ImGui::Text("Gizmo: %s / %s", gizmoOperationToString(m_gizmo_operation), m_gizmo_mode == GizmoMode::World ? "World" : "Local");
-    ImGui::TextUnformatted("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
-    if (ImGui::Checkbox(kPickDebugToggleLabel, &m_show_pick_debug_visualization)) {
-        syncPickDebugVisualizationState();
-    }
-    if (ImGui::Checkbox(kEditorGridToggleLabel, &m_show_editor_grid)) {
-        syncEditorGridFeatureState();
-    }
-    ImGui::TextUnformatted("Highlights pickable pixels and shows the requested pick marker.");
-    ImGui::TextUnformatted(
-        "Scene rendering now targets a persistent offscreen texture and is presented in the Viewport panel.");
-    ImGui::End();
+    auto& renderer = m_application->getRenderer();
 
     m_scene_hierarchy_panel->onImGuiRender();
     m_inspector_panel->onImGuiRender();
     if (m_show_scene_setting_panel) {
         m_scene_setting_panel->onImGuiRender();
     }
-    m_asset_loading_panel->onImGuiRender();
     m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel->onImGuiRender();
     m_render_debug_panel->onImGuiRender(m_show_render_debug_panel, renderer);
@@ -305,15 +384,10 @@ void LunaEditorLayer::onImGuiRender()
                                                        feature_name, parameter_name, value);
                                                });
     }
-    m_render_profiler_panel->onImGuiRender(m_show_render_profiler_panel,
-                                           renderer.getLastRenderGraphProfile(),
-                                           luna::RHI::BackendTypeToString(active_backend),
-                                           renderer.isRenderGraphProfilingEnabled(),
-                                           [&renderer](bool enabled) {
-                                               renderer.setRenderGraphProfilingEnabled(enabled);
-                                           });
-    m_backend_capabilities_panel->onImGuiRender(m_show_backend_capabilities_panel, renderer);
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
+    if (m_editor_shell) {
+        m_editor_shell->drawWindows();
+    }
     drawViewport();
 }
 
@@ -413,6 +487,9 @@ void LunaEditorLayer::onImGuiMenuBar()
         if (ImGui::MenuItem("Refresh Script Plugins", nullptr, false, project_loaded)) {
             refreshProjectScriptPlugins();
         }
+        if (m_editor_shell) {
+            m_editor_shell->drawMenuItems("Project");
+        }
         ImGui::EndMenu();
     }
 
@@ -428,24 +505,23 @@ void LunaEditorLayer::onImGuiMenuBar()
         if (ImGui::MenuItem("Save Scene")) {
             saveScene();
         }
+        if (m_editor_shell) {
+            m_editor_shell->drawMenuItems("Scene");
+        }
         ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Edit")) {
-        if (ImGui::MenuItem("Undo", "Ctrl+Z", false, !m_runtime_viewport_enabled && m_editor_runtime.canUndo())) {
-            undo();
-        }
-        if (ImGui::MenuItem("Redo",
-                            "Ctrl+Y",
-                            false,
-                            !m_runtime_viewport_enabled && m_editor_runtime.canRedo())) {
-            redo();
+        if (m_editor_shell) {
+            m_editor_shell->drawMenuItems("Edit");
         }
         ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Viewport")) {
-        ImGui::MenuItem("Runtime Viewport", nullptr, &m_runtime_viewport_requested);
+        if (m_editor_shell) {
+            m_editor_shell->drawMenuItems("Viewport");
+        }
         ImGui::EndMenu();
     }
 
@@ -453,34 +529,37 @@ void LunaEditorLayer::onImGuiMenuBar()
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
         ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
         ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
-        ImGui::MenuItem("Render Profiler", nullptr, &m_show_render_profiler_panel);
         ImGui::MenuItem("Scene Settings", nullptr, &m_show_scene_setting_panel);
         ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
-        ImGui::MenuItem("Backend Capabilities", nullptr, &m_show_backend_capabilities_panel);
+        if (m_editor_shell) {
+            ImGui::Separator();
+            m_editor_shell->drawWindowMenuItems();
+            m_editor_shell->drawMenuItems("Window");
+        }
         ImGui::EndMenu();
+    }
+
+    if (m_editor_shell) {
+        m_editor_shell->drawMenuBarItems({"Project", "Scene", "Edit", "Viewport", "Window"});
     }
 }
 
 void LunaEditorLayer::updateEditorShortcuts()
 {
-    if (m_runtime_viewport_enabled) {
-        return;
-    }
-
     const ImGuiIO& io = ImGui::GetIO();
-    if (io.WantTextInput || !io.KeyCtrl) {
+    if (io.WantTextInput || !io.KeyCtrl || !m_editor_shell) {
         return;
     }
 
     const bool redo_shortcut = ImGui::IsKeyPressed(ImGuiKey_Y, false) ||
                                (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false));
     if (redo_shortcut) {
-        redo();
+        (void) m_editor_shell->commands().execute(editor::commands::kRedo);
         return;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
-        undo();
+        (void) m_editor_shell->commands().execute(editor::commands::kUndo);
     }
 }
 
@@ -704,6 +783,189 @@ const std::string& LunaEditorLayer::getAssetLabel() const
     return m_asset_label;
 }
 
+std::string LunaEditorLayer::getRenderingBackendName() const
+{
+    if (m_application == nullptr) {
+        return "Unknown";
+    }
+
+    return luna::RHI::BackendTypeToString(m_application->getRenderer().getCapabilities().backend_type);
+}
+
+editor::RenderingBackendCapabilities LunaEditorLayer::getRenderingBackendCapabilities() const
+{
+    editor::RenderingBackendCapabilities result{};
+    if (m_application == nullptr) {
+        result.active_backend_name = "Unknown";
+        return result;
+    }
+
+    const auto& renderer_capabilities = m_application->getRenderer().getCapabilities();
+    const luna::RHI::BackendType current_backend = renderer_capabilities.backend_type;
+    const std::vector<luna::RHI::BackendType> compiled_backends = luna::RHI::Instance::GetCompiledBackends();
+    const std::optional<luna::RHI::BackendType> default_backend = tryGetDefaultBackend();
+
+    result.active_backend_name = luna::RHI::BackendTypeToString(current_backend);
+    result.compiled_backend_names = luna::RHI::DescribeBackendTypes(compiled_backends);
+    result.compiled_backends.reserve(compiled_backends.size());
+    for (const luna::RHI::BackendType backend : compiled_backends) {
+        result.compiled_backends.push_back(editor::RenderingBackendEntry{
+            .name = luna::RHI::BackendTypeToString(backend),
+            .status = backendStatusText(backend, current_backend, default_backend),
+            .current = backend == current_backend,
+            .default_backend = default_backend && backend == *default_backend,
+        });
+    }
+
+    result.supports_default_render_flow = renderer_capabilities.supports_default_render_flow;
+    result.supports_imgui = renderer_capabilities.supports_imgui;
+    result.supports_scene_pick_readback = renderer_capabilities.supports_scene_pick_readback;
+    result.supports_gpu_timestamp = renderer_capabilities.supports_gpu_timestamp;
+    result.gpu_timestamp_uses_disjoint_query = renderer_capabilities.gpu_timestamp_uses_disjoint_query;
+    result.supports_graphics_pipeline = renderer_capabilities.supports_graphics_pipeline;
+    result.supports_compute_pipeline = renderer_capabilities.supports_compute_pipeline;
+    result.supports_sampled_texture = renderer_capabilities.supports_sampled_texture;
+    result.supports_storage_texture = renderer_capabilities.supports_storage_texture;
+    result.supports_color_attachment = renderer_capabilities.supports_color_attachment;
+    result.supports_depth_attachment = renderer_capabilities.supports_depth_attachment;
+    result.supports_uniform_buffer = renderer_capabilities.supports_uniform_buffer;
+    result.supports_storage_buffer = renderer_capabilities.supports_storage_buffer;
+    result.supports_sampler = renderer_capabilities.supports_sampler;
+
+    result.conventions.requires_projection_y_flip =
+        renderer_capabilities.conventions.requires_projection_y_flip;
+    result.conventions.imgui_clip_top_y_is_negative_one =
+        renderer_capabilities.conventions.imgui_clip_top_y_is_negative_one;
+    result.conventions.imgui_render_target_requires_uv_y_flip =
+        renderer_capabilities.conventions.imgui_render_target_requires_uv_y_flip;
+    result.conventions.scene_pick_y_matches_display_y =
+        renderer_capabilities.conventions.scene_pick_y_matches_display_y;
+
+    return result;
+}
+
+editor::RenderGraphProfileSnapshot LunaEditorLayer::getRenderGraphProfileSnapshot() const
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    return toEditorRenderGraphProfile(m_application->getRenderer().getLastRenderGraphProfile());
+}
+
+bool LunaEditorLayer::isRenderGraphProfilingEnabled() const noexcept
+{
+    return m_application != nullptr && m_application->getRenderer().isRenderGraphProfilingEnabled();
+}
+
+void LunaEditorLayer::setRenderGraphProfilingEnabled(bool enabled)
+{
+    if (m_application != nullptr) {
+        m_application->getRenderer().setRenderGraphProfilingEnabled(enabled);
+    }
+}
+
+std::filesystem::path LunaEditorLayer::defaultRenderProfileExportPath(std::string_view backend_name) const
+{
+    const std::string backend_label =
+        backend_name.empty() ? getRenderingBackendName() : std::string(backend_name);
+    return luna::makeDefaultRenderProfileExportPath(backend_label);
+}
+
+bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(
+    const editor::RenderGraphProfileSnapshot& profile,
+    const std::filesystem::path& output_path,
+    std::string* error_message) const
+{
+    const luna::RenderGraphProfileSnapshot engine_profile = toEngineRenderGraphProfile(profile);
+    const RenderProfileExportOptions options{
+        .trace_name = "Luna RenderGraph",
+        .backend_name = getRenderingBackendName(),
+        .frame_index = profile.frame_index,
+    };
+    return luna::exportRenderGraphProfileChromeTraceJson(engine_profile, output_path, options, error_message);
+}
+
+float LunaEditorLayer::getFrameTimeMilliseconds() const noexcept
+{
+    return Application::get().getTimestep().getSeconds() * 1000.0f;
+}
+
+float LunaEditorLayer::getFramesPerSecond() const noexcept
+{
+    const float delta_seconds = Application::get().getTimestep().getSeconds();
+    return 1.0f / (std::max)(delta_seconds, 0.0001f);
+}
+
+uint32_t LunaEditorLayer::getSceneOutputWidth() const noexcept
+{
+    if (m_application == nullptr) {
+        return 0;
+    }
+
+    return m_application->getRenderer().getSceneOutputSize().width;
+}
+
+uint32_t LunaEditorLayer::getSceneOutputHeight() const noexcept
+{
+    if (m_application == nullptr) {
+        return 0;
+    }
+
+    return m_application->getRenderer().getSceneOutputSize().height;
+}
+
+size_t LunaEditorLayer::getRuntimeEntityCount() const noexcept
+{
+    return m_runtime_scene != nullptr ? m_runtime_scene->entityManager().entityCount() : 0u;
+}
+
+std::array<float, 3> LunaEditorLayer::getEditorCameraPosition() const noexcept
+{
+    const glm::vec3 camera_position = m_editor_camera.getCamera().getPosition();
+    return {camera_position.x, camera_position.y, camera_position.z};
+}
+
+std::string LunaEditorLayer::getGizmoOperationName() const
+{
+    return gizmoOperationToString(m_gizmo_operation);
+}
+
+std::string LunaEditorLayer::getGizmoModeName() const
+{
+    return m_gizmo_mode == GizmoMode::World ? "World" : "Local";
+}
+
+bool LunaEditorLayer::isPickDebugVisualizationEnabled() const noexcept
+{
+    return m_show_pick_debug_visualization;
+}
+
+void LunaEditorLayer::setPickDebugVisualizationEnabled(bool enabled)
+{
+    if (m_show_pick_debug_visualization == enabled) {
+        return;
+    }
+
+    m_show_pick_debug_visualization = enabled;
+    syncPickDebugVisualizationState();
+}
+
+bool LunaEditorLayer::isEditorGridEnabled() const noexcept
+{
+    return m_show_editor_grid;
+}
+
+void LunaEditorLayer::setEditorGridEnabled(bool enabled)
+{
+    if (m_show_editor_grid == enabled) {
+        return;
+    }
+
+    m_show_editor_grid = enabled;
+    syncEditorGridFeatureState();
+}
+
 Scene& LunaEditorLayer::getScene()
 {
     return m_editor_runtime.scene();
@@ -717,6 +979,16 @@ Scene& LunaEditorLayer::getInspectionScene()
 bool LunaEditorLayer::isRuntimeViewportEnabled() const noexcept
 {
     return m_runtime_viewport_enabled;
+}
+
+bool LunaEditorLayer::isRuntimeViewportRequested() const noexcept
+{
+    return m_runtime_viewport_requested;
+}
+
+void LunaEditorLayer::setRuntimeViewportRequested(bool enabled)
+{
+    m_runtime_viewport_requested = enabled;
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
@@ -1361,6 +1633,26 @@ bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
 
     LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_editor_runtime.scene().getName(), normalized_scene_path.string());
     return true;
+}
+
+bool LunaEditorLayer::canUndo() const noexcept
+{
+    return !m_runtime_viewport_enabled && m_editor_runtime.canUndo();
+}
+
+bool LunaEditorLayer::canRedo() const noexcept
+{
+    return !m_runtime_viewport_enabled && m_editor_runtime.canRedo();
+}
+
+bool LunaEditorLayer::undoEditorCommand()
+{
+    return undo();
+}
+
+bool LunaEditorLayer::redoEditorCommand()
+{
+    return redo();
 }
 
 bool LunaEditorLayer::undo()

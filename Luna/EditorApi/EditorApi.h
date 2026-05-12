@@ -1,0 +1,15 @@
+#pragma once
+
+#include "EditorApi/EditorCommandService.h"
+#include "EditorApi/EditorHistoryService.h"
+#include "EditorApi/EditorHost.h"
+#include "EditorApi/EditorMenuService.h"
+#include "EditorApi/EditorPlugin.h"
+#include "EditorApi/EditorRenderingService.h"
+#include "EditorApi/EditorSceneService.h"
+#include "EditorApi/EditorSelectionService.h"
+#include "EditorApi/EditorStandardCommands.h"
+#include "EditorApi/EditorTypes.h"
+#include "EditorApi/EditorUi.h"
+#include "EditorApi/EditorViewportService.h"
+#include "EditorApi/EditorWindowService.h"

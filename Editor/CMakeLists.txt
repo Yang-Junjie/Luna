@@ -1,14 +1,22 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    Source/Panels/AssetLoadingPanel.h
-    Source/Panels/AssetLoadingPanel.cpp
-    Source/Panels/BackendCapabilitiesPanel.h
-    Source/Panels/BackendCapabilitiesPanel.cpp
     Source/Panels/BuiltinMaterialsPanel.h
     Source/Panels/BuiltinMaterialsPanel.cpp
     Source/Panels/ContentBrowserPanel.h
     Source/Panels/ContentBrowserPanel.cpp
+    Source/Plugins/AssetLoadingPlugin.h
+    Source/Plugins/AssetLoadingPlugin.cpp
+    Source/Plugins/BackendCapabilitiesPlugin.h
+    Source/Plugins/BackendCapabilitiesPlugin.cpp
+    Source/Plugins/CoreCommandsPlugin.h
+    Source/Plugins/CoreCommandsPlugin.cpp
+    Source/Plugins/EditorApiSamplePlugin.h
+    Source/Plugins/EditorApiSamplePlugin.cpp
+    Source/Plugins/RenderProfilerPlugin.h
+    Source/Plugins/RenderProfilerPlugin.cpp
+    Source/Plugins/SceneStatusPlugin.h
+    Source/Plugins/SceneStatusPlugin.cpp
     Source/EditorCamera.h
     Source/EditorCamera.cpp
     Source/EditorContext.h
@@ -19,6 +27,8 @@ add_executable(
     Source/EditorStyle.cpp
     Source/EditorUI.h
     Source/EditorUI.cpp
+    Source/Shell/EditorShell.h
+    Source/Shell/EditorShell.cpp
     Source/Viewport/EditorViewportSession.h
     Source/Viewport/EditorViewportSession.cpp
     Source/Panels/InspectorPanel.h
@@ -31,8 +41,6 @@ add_executable(
     Source/Panels/RenderDebugPanel.cpp
     Source/Panels/RenderFeaturesPanel.h
     Source/Panels/RenderFeaturesPanel.cpp
-    Source/Panels/RenderProfilerPanel.h
-    Source/Panels/RenderProfilerPanel.cpp
     Source/ScriptComponentInspector.h
     Source/ScriptComponentInspector.cpp
     Source/Panels/SceneSettingPanel.h

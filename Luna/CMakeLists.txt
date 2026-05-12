@@ -218,6 +218,22 @@ set(AUTHORING_SOURCE
     Authoring/AuthoringExecutor.h
     Authoring/AuthoringExecutor.cpp)
 
+set(EDITOR_API_SOURCE
+    EditorApi/EditorApi.h
+    EditorApi/EditorCommandService.h
+    EditorApi/EditorHistoryService.h
+    EditorApi/EditorHost.h
+    EditorApi/EditorMenuService.h
+    EditorApi/EditorPlugin.h
+    EditorApi/EditorRenderingService.h
+    EditorApi/EditorSceneService.h
+    EditorApi/EditorSelectionService.h
+    EditorApi/EditorStandardCommands.h
+    EditorApi/EditorTypes.h
+    EditorApi/EditorUi.h
+    EditorApi/EditorViewportService.h
+    EditorApi/EditorWindowService.h)
+
 set(PLATFORM_SOURCE
     Platform/Common/FileDialogs.h
     Platform/Common/NativeWindowHandle.h)
@@ -320,6 +336,7 @@ add_library(
 
     ${PROJECT_SOURCE}
     ${AUTHORING_SOURCE}
+    ${EDITOR_API_SOURCE}
 
     ${ASSET_SOURCE}
 

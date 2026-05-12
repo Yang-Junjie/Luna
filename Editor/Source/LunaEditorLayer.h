@@ -3,6 +3,7 @@
 #include "EditorCamera.h"
 #include "EditorContext.h"
 #include "EditorRuntime.h"
+#include "EditorApi/EditorRenderingService.h"
 #include "Core/Layer.h"
 #include "Events/Event.h"
 #include "Scene/Entity.h"
@@ -11,11 +12,14 @@
 #include "Viewport/EditorViewportSession.h"
 #include "Script/ScriptPluginManifest.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct ImVec2;
@@ -26,18 +30,19 @@ struct Extent2D;
 
 namespace luna {
 
-class AssetLoadingPanel;
-class BackendCapabilitiesPanel;
 class BuiltinMaterialsPanel;
 class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
 class RenderDebugPanel;
 class RenderFeaturesPanel;
-class RenderProfilerPanel;
 class SceneHierarchyPanel;
 class SceneSettingPanel;
 class ScriptPluginsPanel;
+
+namespace editor {
+class EditorShell;
+}
 
 enum class GizmoOperation : uint8_t {
     Translate,
@@ -62,9 +67,32 @@ public:
     void onImGuiRender() override;
 
     const std::string& getAssetLabel() const;
+    std::string getRenderingBackendName() const;
+    editor::RenderingBackendCapabilities getRenderingBackendCapabilities() const;
+    float getFrameTimeMilliseconds() const noexcept;
+    float getFramesPerSecond() const noexcept;
+    uint32_t getSceneOutputWidth() const noexcept;
+    uint32_t getSceneOutputHeight() const noexcept;
+    size_t getRuntimeEntityCount() const noexcept;
+    std::array<float, 3> getEditorCameraPosition() const noexcept;
+    std::string getGizmoOperationName() const;
+    std::string getGizmoModeName() const;
+    bool isPickDebugVisualizationEnabled() const noexcept;
+    void setPickDebugVisualizationEnabled(bool enabled);
+    bool isEditorGridEnabled() const noexcept;
+    void setEditorGridEnabled(bool enabled);
+    editor::RenderGraphProfileSnapshot getRenderGraphProfileSnapshot() const;
+    bool isRenderGraphProfilingEnabled() const noexcept;
+    void setRenderGraphProfilingEnabled(bool enabled);
+    std::filesystem::path defaultRenderProfileExportPath(std::string_view backend_name = {}) const;
+    bool exportRenderGraphProfileChromeTraceJson(const editor::RenderGraphProfileSnapshot& profile,
+                                                 const std::filesystem::path& output_path,
+                                                 std::string* error_message = nullptr) const;
     Scene& getScene() override;
     Scene& getInspectionScene() override;
     bool isRuntimeViewportEnabled() const noexcept override;
+    bool isRuntimeViewportRequested() const noexcept;
+    void setRuntimeViewportRequested(bool enabled);
     UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() override;
     void setSelectedEntity(Entity entity) override;
@@ -100,6 +128,10 @@ public:
     const std::string& getScriptPluginStatus() const override;
     const ScriptPluginCandidate* getSelectedScriptPluginCandidate() const override;
     bool selectScriptPlugin(const ScriptPluginCandidate* candidate) override;
+    bool canUndo() const noexcept;
+    bool canRedo() const noexcept;
+    bool undoEditorCommand();
+    bool redoEditorCommand();
 
 private:
     void consumePendingScenePick();
@@ -160,10 +192,8 @@ private:
 
     bool m_show_render_debug_panel{false};
     bool m_show_render_features_panel{false};
-    bool m_show_render_profiler_panel{false};
     bool m_show_scene_setting_panel{true};
     bool m_show_script_plugins_panel{true};
-    bool m_show_backend_capabilities_panel{false};
     bool m_runtime_viewport_enabled{false};
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
@@ -171,18 +201,16 @@ private:
     EditorViewportSession m_viewport_session;
     std::vector<ScriptPluginCandidate> m_script_plugin_candidates;
     std::string m_script_plugin_status;
+    std::unique_ptr<editor::EditorShell> m_editor_shell;
 
     std::unique_ptr<SceneHierarchyPanel> m_scene_hierarchy_panel;
     std::unique_ptr<InspectorPanel> m_inspector_panel;
-    std::unique_ptr<AssetLoadingPanel> m_asset_loading_panel;
     std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
     std::unique_ptr<RenderDebugPanel> m_render_debug_panel;
     std::unique_ptr<RenderFeaturesPanel> m_render_features_panel;
-    std::unique_ptr<RenderProfilerPanel> m_render_profiler_panel;
     std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
     std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
-    std::unique_ptr<BackendCapabilitiesPanel> m_backend_capabilities_panel;
 };
 
 } // namespace luna
