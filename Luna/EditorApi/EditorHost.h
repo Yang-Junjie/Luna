@@ -5,6 +5,7 @@ namespace luna::editor {
 class CommandService;
 class HistoryService;
 class MenuService;
+class ScriptPluginService;
 class RenderingService;
 class SceneService;
 class SelectionService;
@@ -22,6 +23,7 @@ public:
     virtual CommandService& commands() = 0;
     virtual HistoryService& history() = 0;
     virtual MenuService& menus() = 0;
+    virtual ScriptPluginService& scriptPlugins() = 0;
     virtual RenderingService& rendering() = 0;
     virtual SceneService& scene() = 0;
     virtual SelectionService& selection() = 0;

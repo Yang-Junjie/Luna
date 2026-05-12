@@ -1,12 +1,12 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    Source/Panels/BuiltinMaterialsPanel.h
-    Source/Panels/BuiltinMaterialsPanel.cpp
     Source/Panels/ContentBrowserPanel.h
     Source/Panels/ContentBrowserPanel.cpp
     Source/Plugins/AssetLoadingPlugin.h
     Source/Plugins/AssetLoadingPlugin.cpp
+    Source/Plugins/BuiltinMaterialsPlugin.h
+    Source/Plugins/BuiltinMaterialsPlugin.cpp
     Source/Plugins/BackendCapabilitiesPlugin.h
     Source/Plugins/BackendCapabilitiesPlugin.cpp
     Source/Plugins/CoreCommandsPlugin.h
@@ -23,6 +23,8 @@ add_executable(
     Source/Plugins/SceneSettingsPlugin.cpp
     Source/Plugins/SceneStatusPlugin.h
     Source/Plugins/SceneStatusPlugin.cpp
+    Source/Plugins/ScriptPluginsPlugin.h
+    Source/Plugins/ScriptPluginsPlugin.cpp
     Source/Plugins/ViewportPlugin.h
     Source/Plugins/ViewportPlugin.cpp
     Source/EditorCamera.h
@@ -47,8 +49,6 @@ add_executable(
     Source/LunaEditorLayer.cpp
     Source/ScriptComponentInspector.h
     Source/ScriptComponentInspector.cpp
-    Source/Panels/ScriptPluginsPanel.h
-    Source/Panels/ScriptPluginsPanel.cpp
     Source/Panels/SceneHierarchyPanel.h
     Source/Panels/SceneHierarchyPanel.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp

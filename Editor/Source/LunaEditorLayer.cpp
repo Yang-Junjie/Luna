@@ -5,21 +5,23 @@
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorUi.h"
+#include "EditorApi/EditorScriptPluginService.h"
+#include "EditorApi/EditorWindowService.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
 #include "EditorStyle.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
-#include "Panels/BuiltinMaterialsPanel.h"
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
-#include "Panels/ScriptPluginsPanel.h"
+#include "Plugins/BuiltinMaterialsPlugin.h"
 #include "Plugins/AssetLoadingPlugin.h"
 #include "Plugins/BackendCapabilitiesPlugin.h"
 #include "Plugins/CoreCommandsPlugin.h"
 #include "Plugins/EditorApiSamplePlugin.h"
+#include "Plugins/ScriptPluginsPlugin.h"
 #include "Plugins/RenderDebugPlugin.h"
 #include "Plugins/RenderFeaturesPlugin.h"
 #include "Plugins/RenderProfilerPlugin.h"
@@ -573,9 +575,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_application(&application),
       m_scene_hierarchy_panel(std::make_unique<SceneHierarchyPanel>(*this)),
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
-      m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
-      m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
-      m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this))
+      m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this))
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
@@ -587,6 +587,12 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     m_editor_shell->loadPlugin(editor::createRenderDebugPlugin());
     m_editor_shell->loadPlugin(editor::createRenderFeaturesPlugin());
     m_editor_shell->loadPlugin(editor::createRenderProfilerPlugin());
+    auto builtin_materials_plugin = editor::createBuiltinMaterialsPlugin();
+    m_builtin_materials_plugin = builtin_materials_plugin.get();
+    if (!m_editor_shell->loadPlugin(std::move(builtin_materials_plugin))) {
+        m_builtin_materials_plugin = nullptr;
+    }
+    m_editor_shell->loadPlugin(editor::createScriptPluginsPlugin());
     m_editor_shell->loadPlugin(editor::createEditorApiSamplePlugin());
 }
 
@@ -678,9 +684,7 @@ void LunaEditorLayer::onImGuiRender()
 
     m_scene_hierarchy_panel->onImGuiRender();
     m_inspector_panel->onImGuiRender();
-    m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel->onImGuiRender();
-    m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
     m_viewport_focused = false;
     m_viewport_hovered = false;
     if (m_editor_shell) {
@@ -823,8 +827,6 @@ void LunaEditorLayer::onImGuiMenuBar()
     }
 
     if (ImGui::BeginMenu("Window")) {
-        ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
-        ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
         if (m_editor_shell) {
             ImGui::Separator();
             m_editor_shell->drawWindowMenuItems();
@@ -1688,10 +1690,12 @@ bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings
 
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
 {
-    if (material_handle.isValid()) {
-        m_builtin_materials_panel->focusMaterial(material_handle);
+    if (m_builtin_materials_plugin != nullptr && material_handle.isValid()) {
+        m_builtin_materials_plugin->focusMaterial(material_handle);
     }
-    m_show_builtin_materials_panel = true;
+    if (m_editor_shell) {
+        m_editor_shell->windows().setWindowOpen("luna.editor.builtin-materials.window", true);
+    }
 }
 
 bool LunaEditorLayer::hasProjectLoaded() const
@@ -1702,63 +1706,34 @@ bool LunaEditorLayer::hasProjectLoaded() const
 
 void LunaEditorLayer::refreshProjectScriptPlugins()
 {
-    refreshScriptPluginCandidates();
-
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    const ScriptPluginSelectionResult selection =
-        ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
-
-    if (!selection.StatusMessage.empty()) {
-        m_script_plugin_status = selection.StatusMessage;
-    } else {
-        m_script_plugin_status.clear();
-    }
-
-    if (selection.isResolved() && selection.Candidate != nullptr) {
-        const ProjectInfo& current_project_info = *project_info;
-        const std::string selected_plugin_id = selection.Candidate->Manifest.PluginId;
-        const std::string selected_backend_name = selection.BackendName;
-        if (current_project_info.Scripting.SelectedPluginId != selected_plugin_id ||
-            current_project_info.Scripting.SelectedBackendName != selected_backend_name) {
-            setProjectScriptPluginSelection(selection.Candidate, false);
-        }
+    if (m_editor_shell) {
+        m_editor_shell->scriptPlugins().refreshProjectScriptPlugins();
     }
 }
 
 const std::vector<ScriptPluginCandidate>& LunaEditorLayer::getDiscoveredScriptPlugins() const
 {
-    return m_script_plugin_candidates;
+    static const std::vector<ScriptPluginCandidate> kEmptyCandidates;
+    return m_editor_shell ? m_editor_shell->scriptPlugins().getDiscoveredScriptPlugins() : kEmptyCandidates;
 }
 
 const std::string& LunaEditorLayer::getScriptPluginStatus() const
 {
-    return m_script_plugin_status;
+    static const std::string kEmptyStatus;
+    return m_editor_shell ? m_editor_shell->scriptPlugins().getScriptPluginStatus() : kEmptyStatus;
 }
 
 const ScriptPluginCandidate* LunaEditorLayer::getSelectedScriptPluginCandidate() const
 {
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (!project_info) {
-        return nullptr;
-    }
-
-    const ScriptPluginSelectionResult selection =
-        ScriptPluginManager::instance().resolveProjectSelection(&*project_info);
-    return selection.Candidate;
+    return m_editor_shell ? m_editor_shell->scriptPlugins().getSelectedScriptPluginCandidate() : nullptr;
 }
 
 bool LunaEditorLayer::selectScriptPlugin(const ScriptPluginCandidate* candidate)
 {
-    if (!setProjectScriptPluginSelection(candidate)) {
-        return false;
+    if (m_editor_shell) {
+        return m_editor_shell->scriptPlugins().selectScriptPlugin(candidate);
     }
-
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    const ScriptPluginSelectionResult selection =
-        ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
-    m_script_plugin_status = selection.StatusMessage;
-
-    return true;
+    return false;
 }
 
 void LunaEditorLayer::resetEditorState()
@@ -2174,98 +2149,6 @@ void LunaEditorLayer::syncProjectStartScene(const std::filesystem::path& scene_f
     } else {
         LUNA_EDITOR_WARN("Failed to persist updated StartScene '{}'", relative_scene_path->generic_string());
     }
-}
-
-void LunaEditorLayer::refreshScriptPluginCandidates()
-{
-    const auto project_root = ProjectManager::instance().getProjectRootPath();
-    ScriptPluginManager::instance().refreshDiscoveredPlugins(project_root);
-    m_script_plugin_candidates = ScriptPluginManager::instance().getDiscoveredPlugins();
-
-    if (!project_root) {
-        m_script_plugin_status.clear();
-        return;
-    }
-
-    if (m_script_plugin_candidates.empty()) {
-        m_script_plugin_status = "No script plugins discovered.";
-    } else if (m_script_plugin_candidates.size() == 1) {
-        const auto& candidate = m_script_plugin_candidates.front();
-        m_script_plugin_status = "Discovered 1 script plugin: " + candidate.Manifest.DisplayName + ".";
-    } else {
-        m_script_plugin_status =
-            "Discovered " + std::to_string(m_script_plugin_candidates.size()) + " script plugins. Select one.";
-    }
-}
-
-void LunaEditorLayer::resolveProjectScriptPluginSelection(bool persist_changes)
-{
-    if (!hasProjectLoaded()) {
-        m_script_plugin_candidates.clear();
-        m_script_plugin_status.clear();
-        return;
-    }
-
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (!project_info) {
-        return;
-    }
-
-    const ScriptPluginSelectionResult selection =
-        ScriptPluginManager::instance().resolveProjectSelection(&*project_info);
-    if (!selection.StatusMessage.empty()) {
-        m_script_plugin_status = selection.StatusMessage;
-    } else {
-        m_script_plugin_status.clear();
-    }
-
-    if (persist_changes && selection.isResolved() && selection.Candidate != nullptr) {
-        if (project_info->Scripting.SelectedPluginId != selection.Candidate->Manifest.PluginId ||
-            project_info->Scripting.SelectedBackendName != selection.BackendName) {
-            setProjectScriptPluginSelection(selection.Candidate, false);
-        }
-    }
-}
-
-bool LunaEditorLayer::setProjectScriptPluginSelection(const ScriptPluginCandidate* candidate, bool log_changes)
-{
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (!project_info) {
-        return false;
-    }
-
-    ProjectInfo updated_project_info = *project_info;
-    const std::string selected_plugin_id = candidate != nullptr ? candidate->Manifest.PluginId : std::string{};
-    const std::string selected_backend_name = candidate != nullptr ? candidate->Manifest.BackendName : std::string{};
-
-    if (updated_project_info.Scripting.SelectedPluginId == selected_plugin_id &&
-        updated_project_info.Scripting.SelectedBackendName == selected_backend_name) {
-        return true;
-    }
-
-    updated_project_info.Scripting.SelectedPluginId = selected_plugin_id;
-    updated_project_info.Scripting.SelectedBackendName = selected_backend_name;
-    ProjectManager::instance().setProjectInfo(updated_project_info);
-
-    if (!ProjectManager::instance().saveProject()) {
-        if (log_changes) {
-            LUNA_EDITOR_WARN("Failed to persist selected script plugin '{}'",
-                             candidate != nullptr ? candidate->Manifest.PluginId : std::string("<none>"));
-        }
-        return false;
-    }
-
-    if (log_changes) {
-        if (candidate != nullptr) {
-            LUNA_EDITOR_INFO("Selected script plugin '{}' ({})",
-                             candidate->Manifest.PluginId,
-                             candidate->Manifest.BackendName);
-        } else {
-            LUNA_EDITOR_INFO("Cleared project script plugin selection");
-        }
-    }
-
-    return true;
 }
 
 } // namespace luna

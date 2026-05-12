@@ -19,6 +19,7 @@ class WindowService;
 class CommandService;
 class HistoryService;
 class MenuService;
+class ScriptPluginService;
 class RenderingService;
 class SceneService;
 class SelectionService;
@@ -34,6 +35,7 @@ public:
     CommandService& commands() override;
     HistoryService& history() override;
     MenuService& menus() override;
+    ScriptPluginService& scriptPlugins() override;
     RenderingService& rendering() override;
     SceneService& scene() override;
     SelectionService& selection() override;

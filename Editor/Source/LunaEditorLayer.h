@@ -31,14 +31,13 @@ struct Extent2D;
 
 namespace luna {
 
-class BuiltinMaterialsPanel;
 class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
 class SceneHierarchyPanel;
-class ScriptPluginsPanel;
 
 namespace editor {
+class BuiltinMaterialsPlugin;
 class EditorShell;
 class Ui;
 }
@@ -185,9 +184,6 @@ private:
     std::filesystem::path sceneDialogDefaultPath() const;
     void updateSceneLabel();
     void syncProjectStartScene(const std::filesystem::path& scene_file_path);
-    void refreshScriptPluginCandidates();
-    void resolveProjectScriptPluginSelection(bool persist_changes);
-    bool setProjectScriptPluginSelection(const ScriptPluginCandidate* candidate, bool log_changes = true);
 
 private:
     LunaEditorApplication* m_application{nullptr};
@@ -201,24 +197,19 @@ private:
     bool m_viewport_hovered{false};
     bool m_show_editor_grid{true};
     bool m_gizmo_transform_transaction_active{false};
-    bool m_show_builtin_materials_panel{false};
     float m_editor_ui_scale{0.0f};
 
-    bool m_show_script_plugins_panel{true};
     bool m_runtime_viewport_enabled{false};
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
     EditorViewportSession m_viewport_session;
-    std::vector<ScriptPluginCandidate> m_script_plugin_candidates;
-    std::string m_script_plugin_status;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
 
     std::unique_ptr<SceneHierarchyPanel> m_scene_hierarchy_panel;
     std::unique_ptr<InspectorPanel> m_inspector_panel;
-    std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
-    std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
+    editor::BuiltinMaterialsPlugin* m_builtin_materials_plugin{nullptr};
 };
 
 } // namespace luna

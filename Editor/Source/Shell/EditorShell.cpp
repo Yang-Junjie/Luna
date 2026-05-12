@@ -4,7 +4,9 @@
 #include "Core/Log.h"
 #include "EditorStyle.h"
 #include "LunaEditorLayer.h"
+#include "Project/ProjectManager.h"
 #include "Scene/Scene.h"
+#include "Script/ScriptPluginManager.h"
 
 #include <imgui.h>
 
@@ -1053,6 +1055,142 @@ private:
     std::vector<MenuItemDescriptor> m_items;
 };
 
+class EditorScriptPluginService final : public ScriptPluginService {
+public:
+    bool hasProjectLoaded() const override
+    {
+        return ProjectManager::instance().getProjectRootPath().has_value() &&
+               ProjectManager::instance().getProjectInfo().has_value();
+    }
+
+    void refreshProjectScriptPlugins() override
+    {
+        refreshScriptPluginCandidates();
+
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        const ScriptPluginSelectionResult selection =
+            ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+
+        if (!selection.StatusMessage.empty()) {
+            m_script_plugin_status = selection.StatusMessage;
+        } else {
+            m_script_plugin_status.clear();
+        }
+
+        if (selection.isResolved() && selection.Candidate != nullptr && project_info) {
+            if (project_info->Scripting.SelectedPluginId != selection.Candidate->Manifest.PluginId ||
+                project_info->Scripting.SelectedBackendName != selection.BackendName) {
+                setProjectScriptPluginSelection(selection.Candidate, false);
+            }
+        }
+    }
+
+    const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const override
+    {
+        return m_script_plugin_candidates;
+    }
+
+    const std::string& getScriptPluginStatus() const override
+    {
+        return m_script_plugin_status;
+    }
+
+    const ScriptPluginCandidate* getSelectedScriptPluginCandidate() const override
+    {
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        if (!project_info) {
+            return nullptr;
+        }
+
+        const ScriptPluginSelectionResult selection =
+            ScriptPluginManager::instance().resolveProjectSelection(&*project_info);
+        return selection.Candidate;
+    }
+
+    bool selectScriptPlugin(const ScriptPluginCandidate* candidate) override
+    {
+        if (!setProjectScriptPluginSelection(candidate)) {
+            return false;
+        }
+
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        const ScriptPluginSelectionResult selection =
+            ScriptPluginManager::instance().resolveProjectSelection(project_info ? &*project_info : nullptr);
+        m_script_plugin_status = selection.StatusMessage;
+
+        return true;
+    }
+
+private:
+    void refreshScriptPluginCandidates()
+    {
+        const auto project_root = ProjectManager::instance().getProjectRootPath();
+        ScriptPluginManager::instance().refreshDiscoveredPlugins(project_root);
+        m_script_plugin_candidates = ScriptPluginManager::instance().getDiscoveredPlugins();
+
+        if (!project_root) {
+            m_script_plugin_status.clear();
+            return;
+        }
+
+        if (m_script_plugin_candidates.empty()) {
+            m_script_plugin_status = "No script plugins discovered.";
+        } else if (m_script_plugin_candidates.size() == 1) {
+            const auto& candidate = m_script_plugin_candidates.front();
+            m_script_plugin_status = "Discovered 1 script plugin: " + candidate.Manifest.DisplayName + ".";
+        } else {
+            m_script_plugin_status =
+                "Discovered " + std::to_string(m_script_plugin_candidates.size()) + " script plugins. Select one.";
+        }
+    }
+
+    bool setProjectScriptPluginSelection(const ScriptPluginCandidate* candidate, bool log_changes = true)
+    {
+        const auto project_info = ProjectManager::instance().getProjectInfo();
+        if (!project_info) {
+            return false;
+        }
+
+        ProjectInfo updated_project_info = *project_info;
+        const std::string selected_plugin_id = candidate != nullptr ? candidate->Manifest.PluginId : std::string{};
+        const std::string selected_backend_name = candidate != nullptr ? candidate->Manifest.BackendName
+                                                                        : std::string{};
+
+        if (updated_project_info.Scripting.SelectedPluginId == selected_plugin_id &&
+            updated_project_info.Scripting.SelectedBackendName == selected_backend_name) {
+            return true;
+        }
+
+        updated_project_info.Scripting.SelectedPluginId = selected_plugin_id;
+        updated_project_info.Scripting.SelectedBackendName = selected_backend_name;
+        ProjectManager::instance().setProjectInfo(updated_project_info);
+
+        if (!ProjectManager::instance().saveProject()) {
+            if (log_changes) {
+                LUNA_EDITOR_WARN("Failed to persist selected script plugin '{}'",
+                                 candidate != nullptr ? candidate->Manifest.PluginId : std::string("<none>"));
+            }
+            return false;
+        }
+
+        if (log_changes) {
+            if (candidate != nullptr) {
+                LUNA_EDITOR_INFO("Selected script plugin '{}' ({})",
+                                 candidate->Manifest.PluginId,
+                                 candidate->Manifest.BackendName);
+            } else {
+                LUNA_EDITOR_INFO("Cleared project script plugin selection");
+            }
+        }
+
+        return true;
+    }
+
+private:
+    std::vector<ScriptPluginCandidate> m_script_plugin_candidates;
+    std::string m_script_plugin_status;
+};
+
 class EditorWindowService final : public WindowService {
 public:
     EditorWindowService(Host& host, Ui& ui)
@@ -1188,6 +1326,7 @@ struct EditorShell::Impl {
           history_service(editor_layer),
           command_service(shell),
           menu_service(command_service),
+          script_plugin_service(),
           window_service(shell, ui)
     {}
 
@@ -1200,6 +1339,7 @@ struct EditorShell::Impl {
     EditorHistoryService history_service;
     EditorCommandService command_service;
     EditorMenuService menu_service;
+    EditorScriptPluginService script_plugin_service;
     EditorWindowService window_service;
     std::vector<std::unique_ptr<Plugin>> plugins;
 };
@@ -1236,6 +1376,11 @@ HistoryService& EditorShell::history()
 MenuService& EditorShell::menus()
 {
     return m_impl->menu_service;
+}
+
+ScriptPluginService& EditorShell::scriptPlugins()
+{
+    return m_impl->script_plugin_service;
 }
 
 RenderingService& EditorShell::rendering()
