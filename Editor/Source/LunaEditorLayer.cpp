@@ -14,7 +14,6 @@
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/RenderDebugPanel.h"
-#include "Panels/RenderFeaturesPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
 #include "Panels/SceneSettingPanel.h"
 #include "Panels/ScriptPluginsPanel.h"
@@ -22,6 +21,7 @@
 #include "Plugins/BackendCapabilitiesPlugin.h"
 #include "Plugins/CoreCommandsPlugin.h"
 #include "Plugins/EditorApiSamplePlugin.h"
+#include "Plugins/RenderFeaturesPlugin.h"
 #include "Plugins/RenderProfilerPlugin.h"
 #include "Plugins/SceneStatusPlugin.h"
 #include "Platform/Common/FileDialogs.h"
@@ -31,6 +31,7 @@
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 #include "Script/ScriptPluginManager.h"
+#include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderProfileExporter.h"
 #include "Shell/EditorShell.h"
 
@@ -57,6 +58,11 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr float kUiScaleChangeThreshold = 0.01f;
+
+std::string toOwnedString(std::string_view value)
+{
+    return std::string(value.data(), value.size());
+}
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
 {
@@ -247,6 +253,247 @@ luna::RenderGraphProfileSnapshot toEngineRenderGraphProfile(const luna::editor::
     return result;
 }
 
+luna::editor::RenderFeatureGraphResourceKind toEditorRenderFeatureGraphResourceKind(
+    luna::render_flow::RenderFeatureGraphResourceKind kind)
+{
+    switch (kind) {
+        case luna::render_flow::RenderFeatureGraphResourceKind::Texture:
+            return luna::editor::RenderFeatureGraphResourceKind::Texture;
+        case luna::render_flow::RenderFeatureGraphResourceKind::Buffer:
+            return luna::editor::RenderFeatureGraphResourceKind::Buffer;
+    }
+    return luna::editor::RenderFeatureGraphResourceKind::Texture;
+}
+
+luna::editor::RenderFeatureGraphResourceFlags toEditorRenderFeatureGraphResourceFlags(
+    luna::render_flow::RenderFeatureGraphResourceFlags flags)
+{
+    using EditorFlags = luna::editor::RenderFeatureGraphResourceFlags;
+    using EngineFlags = luna::render_flow::RenderFeatureGraphResourceFlags;
+
+    EditorFlags result = EditorFlags::None;
+    if (flags & EngineFlags::Optional) {
+        result |= EditorFlags::Optional;
+    }
+    if (flags & EngineFlags::External) {
+        result |= EditorFlags::External;
+    }
+    return result;
+}
+
+luna::editor::RenderFeatureGraphResource toEditorRenderFeatureGraphResource(
+    const luna::render_flow::RenderFeatureGraphResource& resource)
+{
+    return luna::editor::RenderFeatureGraphResource{
+        .name = toOwnedString(resource.name),
+        .kind = toEditorRenderFeatureGraphResourceKind(resource.kind),
+        .flags = toEditorRenderFeatureGraphResourceFlags(resource.flags),
+    };
+}
+
+luna::editor::RenderPassResourceAccess toEditorRenderPassResourceAccess(
+    luna::render_flow::RenderPassResourceAccess access)
+{
+    switch (access) {
+        case luna::render_flow::RenderPassResourceAccess::Read:
+            return luna::editor::RenderPassResourceAccess::Read;
+        case luna::render_flow::RenderPassResourceAccess::Write:
+            return luna::editor::RenderPassResourceAccess::Write;
+        case luna::render_flow::RenderPassResourceAccess::ReadWrite:
+            return luna::editor::RenderPassResourceAccess::ReadWrite;
+    }
+    return luna::editor::RenderPassResourceAccess::Read;
+}
+
+luna::editor::RenderPassResourceUsage toEditorRenderPassResourceUsage(
+    const luna::render_flow::RenderPassResourceUsage& resource)
+{
+    return luna::editor::RenderPassResourceUsage{
+        .name = toOwnedString(resource.name),
+        .kind = toEditorRenderFeatureGraphResourceKind(resource.kind),
+        .access = toEditorRenderPassResourceAccess(resource.access),
+        .flags = toEditorRenderFeatureGraphResourceFlags(resource.flags),
+    };
+}
+
+std::vector<luna::editor::RenderFeatureGraphResource> toEditorRenderFeatureGraphResources(
+    const std::vector<luna::render_flow::RenderFeatureGraphResource>& resources)
+{
+    std::vector<luna::editor::RenderFeatureGraphResource> result;
+    result.reserve(resources.size());
+    for (const auto& resource : resources) {
+        result.push_back(toEditorRenderFeatureGraphResource(resource));
+    }
+    return result;
+}
+
+std::vector<luna::editor::RenderPassResourceUsage> toEditorRenderPassResourceUsages(
+    const std::vector<luna::render_flow::RenderPassResourceUsage>& resources)
+{
+    std::vector<luna::editor::RenderPassResourceUsage> result;
+    result.reserve(resources.size());
+    for (const auto& resource : resources) {
+        result.push_back(toEditorRenderPassResourceUsage(resource));
+    }
+    return result;
+}
+
+luna::editor::RenderFeaturePassInfo toEditorRenderFeaturePassInfo(
+    const luna::render_flow::RenderFeaturePassInfo& pass)
+{
+    return luna::editor::RenderFeaturePassInfo{
+        .name = pass.name,
+        .resources = toEditorRenderPassResourceUsages(pass.resources),
+    };
+}
+
+std::vector<luna::editor::RenderFeaturePassInfo> toEditorRenderFeaturePassInfos(
+    const std::vector<luna::render_flow::RenderFeaturePassInfo>& passes)
+{
+    std::vector<luna::editor::RenderFeaturePassInfo> result;
+    result.reserve(passes.size());
+    for (const auto& pass : passes) {
+        result.push_back(toEditorRenderFeaturePassInfo(pass));
+    }
+    return result;
+}
+
+luna::editor::RenderFeatureStatusEntry toEditorRenderFeatureStatusEntry(
+    const luna::render_flow::RenderFeatureStatusEntry& entry)
+{
+    return luna::editor::RenderFeatureStatusEntry{
+        .name = entry.name,
+        .ready = entry.ready,
+    };
+}
+
+std::vector<luna::editor::RenderFeatureStatusEntry> toEditorRenderFeatureStatusEntries(
+    const std::vector<luna::render_flow::RenderFeatureStatusEntry>& entries)
+{
+    std::vector<luna::editor::RenderFeatureStatusEntry> result;
+    result.reserve(entries.size());
+    for (const auto& entry : entries) {
+        result.push_back(toEditorRenderFeatureStatusEntry(entry));
+    }
+    return result;
+}
+
+luna::editor::RenderFeatureDiagnostics toEditorRenderFeatureDiagnostics(
+    const luna::render_flow::RenderFeatureDiagnostics& diagnostics)
+{
+    return luna::editor::RenderFeatureDiagnostics{
+        .binding_contract_valid = diagnostics.binding_contract_valid,
+        .binding_contract_summary = diagnostics.binding_contract_summary,
+        .pipeline_resources_valid = diagnostics.pipeline_resources_valid,
+        .pipeline_resources_summary = diagnostics.pipeline_resources_summary,
+        .pipeline_resources = toEditorRenderFeatureStatusEntries(diagnostics.pipeline_resources),
+        .persistent_resources_valid = diagnostics.persistent_resources_valid,
+        .persistent_resources_summary = diagnostics.persistent_resources_summary,
+        .persistent_resources = toEditorRenderFeatureStatusEntries(diagnostics.persistent_resources),
+        .history_resources_valid = diagnostics.history_resources_valid,
+        .history_resources_summary = diagnostics.history_resources_summary,
+        .history_resources = toEditorRenderFeatureStatusEntries(diagnostics.history_resources),
+    };
+}
+
+luna::editor::RenderFeatureInfo toEditorRenderFeatureInfo(const luna::render_flow::RenderFeatureInfo& feature)
+{
+    return luna::editor::RenderFeatureInfo{
+        .name = toOwnedString(feature.name),
+        .display_name = toOwnedString(feature.display_name),
+        .category = toOwnedString(feature.category),
+        .enabled = feature.enabled,
+        .runtime_toggleable = feature.runtime_toggleable,
+        .supported = feature.supported,
+        .active = feature.active,
+        .support_summary = feature.support_summary,
+        .graph_contract_valid = feature.graph_contract_valid,
+        .graph_contract_summary = feature.graph_contract_summary,
+        .pass_contract_valid = feature.pass_contract_valid,
+        .pass_contract_summary = feature.pass_contract_summary,
+        .graph_inputs = toEditorRenderFeatureGraphResources(feature.graph_inputs),
+        .graph_outputs = toEditorRenderFeatureGraphResources(feature.graph_outputs),
+        .passes = toEditorRenderFeaturePassInfos(feature.passes),
+        .diagnostics = toEditorRenderFeatureDiagnostics(feature.diagnostics),
+    };
+}
+
+luna::editor::RenderFeatureParameterType toEditorRenderFeatureParameterType(
+    luna::render_flow::RenderFeatureParameterType type)
+{
+    switch (type) {
+        case luna::render_flow::RenderFeatureParameterType::Bool:
+            return luna::editor::RenderFeatureParameterType::Bool;
+        case luna::render_flow::RenderFeatureParameterType::Int:
+            return luna::editor::RenderFeatureParameterType::Int;
+        case luna::render_flow::RenderFeatureParameterType::Float:
+            return luna::editor::RenderFeatureParameterType::Float;
+        case luna::render_flow::RenderFeatureParameterType::Color:
+            return luna::editor::RenderFeatureParameterType::Color;
+    }
+    return luna::editor::RenderFeatureParameterType::Float;
+}
+
+luna::render_flow::RenderFeatureParameterType toEngineRenderFeatureParameterType(
+    luna::editor::RenderFeatureParameterType type)
+{
+    switch (type) {
+        case luna::editor::RenderFeatureParameterType::Bool:
+            return luna::render_flow::RenderFeatureParameterType::Bool;
+        case luna::editor::RenderFeatureParameterType::Int:
+            return luna::render_flow::RenderFeatureParameterType::Int;
+        case luna::editor::RenderFeatureParameterType::Float:
+            return luna::render_flow::RenderFeatureParameterType::Float;
+        case luna::editor::RenderFeatureParameterType::Color:
+            return luna::render_flow::RenderFeatureParameterType::Color;
+    }
+    return luna::render_flow::RenderFeatureParameterType::Float;
+}
+
+luna::editor::RenderFeatureParameterValue toEditorRenderFeatureParameterValue(
+    const luna::render_flow::RenderFeatureParameterValue& value)
+{
+    return luna::editor::RenderFeatureParameterValue{
+        .type = toEditorRenderFeatureParameterType(value.type),
+        .bool_value = value.bool_value,
+        .int_value = value.int_value,
+        .float_value = value.float_value,
+        .color_value =
+            luna::editor::Vec4{.x = value.color_value.x,
+                               .y = value.color_value.y,
+                               .z = value.color_value.z,
+                               .w = value.color_value.w},
+    };
+}
+
+luna::render_flow::RenderFeatureParameterValue toEngineRenderFeatureParameterValue(
+    const luna::editor::RenderFeatureParameterValue& value)
+{
+    luna::render_flow::RenderFeatureParameterValue result{};
+    result.type = toEngineRenderFeatureParameterType(value.type);
+    result.bool_value = value.bool_value;
+    result.int_value = value.int_value;
+    result.float_value = value.float_value;
+    result.color_value =
+        glm::vec4{value.color_value.x, value.color_value.y, value.color_value.z, value.color_value.w};
+    return result;
+}
+
+luna::editor::RenderFeatureParameterInfo toEditorRenderFeatureParameterInfo(
+    const luna::render_flow::RenderFeatureParameterInfo& parameter)
+{
+    return luna::editor::RenderFeatureParameterInfo{
+        .name = toOwnedString(parameter.name),
+        .display_name = toOwnedString(parameter.display_name),
+        .type = toEditorRenderFeatureParameterType(parameter.type),
+        .value = toEditorRenderFeatureParameterValue(parameter.value),
+        .min = toEditorRenderFeatureParameterValue(parameter.min),
+        .max = toEditorRenderFeatureParameterValue(parameter.max),
+        .step = parameter.step,
+        .read_only = parameter.read_only,
+    };
+}
+
 } // namespace
 
 namespace luna {
@@ -259,7 +506,6 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
       m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
       m_render_debug_panel(std::make_unique<RenderDebugPanel>()),
-      m_render_features_panel(std::make_unique<RenderFeaturesPanel>()),
       m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this))
 {
@@ -268,6 +514,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
     m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
     m_editor_shell->loadPlugin(editor::createBackendCapabilitiesPlugin());
+    m_editor_shell->loadPlugin(editor::createRenderFeaturesPlugin());
     m_editor_shell->loadPlugin(editor::createRenderProfilerPlugin());
     m_editor_shell->loadPlugin(editor::createEditorApiSamplePlugin());
 }
@@ -368,22 +615,6 @@ void LunaEditorLayer::onImGuiRender()
     m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel->onImGuiRender();
     m_render_debug_panel->onImGuiRender(m_show_render_debug_panel, renderer);
-    if (m_show_render_features_panel) {
-        m_render_features_panel->onImGuiRender(m_show_render_features_panel,
-                                               renderer.getDefaultRenderFeatureInfos(),
-                                               [&renderer](std::string_view feature_name) {
-                                                   return renderer.getDefaultRenderFeatureParameters(feature_name);
-                                               },
-                                               [&renderer](std::string_view feature_name, bool enabled) {
-                                                   return renderer.setDefaultRenderFeatureEnabled(feature_name, enabled);
-                                               },
-                                               [&renderer](std::string_view feature_name,
-                                                           std::string_view parameter_name,
-                                                           const render_flow::RenderFeatureParameterValue& value) {
-                                                   return renderer.setDefaultRenderFeatureParameter(
-                                                       feature_name, parameter_name, value);
-                                               });
-    }
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
     if (m_editor_shell) {
         m_editor_shell->drawWindows();
@@ -528,7 +759,6 @@ void LunaEditorLayer::onImGuiMenuBar()
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
         ImGui::MenuItem("Render Debug", nullptr, &m_show_render_debug_panel);
-        ImGui::MenuItem("Render Features", nullptr, &m_show_render_features_panel);
         ImGui::MenuItem("Scene Settings", nullptr, &m_show_scene_setting_panel);
         ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
         if (m_editor_shell) {
@@ -884,6 +1114,55 @@ bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(
         .frame_index = profile.frame_index,
     };
     return luna::exportRenderGraphProfileChromeTraceJson(engine_profile, output_path, options, error_message);
+}
+
+std::vector<editor::RenderFeatureInfo> LunaEditorLayer::getDefaultRenderFeatureInfos() const
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    const auto engine_features = m_application->getRenderer().getDefaultRenderFeatureInfos();
+    std::vector<editor::RenderFeatureInfo> result;
+    result.reserve(engine_features.size());
+    for (const auto& feature : engine_features) {
+        result.push_back(toEditorRenderFeatureInfo(feature));
+    }
+    return result;
+}
+
+std::vector<editor::RenderFeatureParameterInfo>
+LunaEditorLayer::getDefaultRenderFeatureParameters(std::string_view feature_name) const
+{
+    if (m_application == nullptr) {
+        return {};
+    }
+
+    const auto engine_parameters = m_application->getRenderer().getDefaultRenderFeatureParameters(feature_name);
+    std::vector<editor::RenderFeatureParameterInfo> result;
+    result.reserve(engine_parameters.size());
+    for (const auto& parameter : engine_parameters) {
+        result.push_back(toEditorRenderFeatureParameterInfo(parameter));
+    }
+    return result;
+}
+
+bool LunaEditorLayer::setDefaultRenderFeatureEnabled(std::string_view feature_name, bool enabled)
+{
+    return m_application != nullptr &&
+           m_application->getRenderer().setDefaultRenderFeatureEnabled(feature_name, enabled);
+}
+
+bool LunaEditorLayer::setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                                       std::string_view parameter_name,
+                                                       const editor::RenderFeatureParameterValue& value)
+{
+    if (m_application == nullptr) {
+        return false;
+    }
+
+    const render_flow::RenderFeatureParameterValue engine_value = toEngineRenderFeatureParameterValue(value);
+    return m_application->getRenderer().setDefaultRenderFeatureParameter(feature_name, parameter_name, engine_value);
 }
 
 float LunaEditorLayer::getFrameTimeMilliseconds() const noexcept

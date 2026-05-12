@@ -13,6 +13,8 @@ add_executable(
     Source/Plugins/CoreCommandsPlugin.cpp
     Source/Plugins/EditorApiSamplePlugin.h
     Source/Plugins/EditorApiSamplePlugin.cpp
+    Source/Plugins/RenderFeaturesPlugin.h
+    Source/Plugins/RenderFeaturesPlugin.cpp
     Source/Plugins/RenderProfilerPlugin.h
     Source/Plugins/RenderProfilerPlugin.cpp
     Source/Plugins/SceneStatusPlugin.h
@@ -39,8 +41,6 @@ add_executable(
     Source/LunaEditorLayer.cpp
     Source/Panels/RenderDebugPanel.h
     Source/Panels/RenderDebugPanel.cpp
-    Source/Panels/RenderFeaturesPanel.h
-    Source/Panels/RenderFeaturesPanel.cpp
     Source/ScriptComponentInspector.h
     Source/ScriptComponentInspector.cpp
     Source/Panels/SceneSettingPanel.h

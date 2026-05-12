@@ -72,6 +72,123 @@ struct RenderGraphProfileSnapshot {
     std::vector<RenderGraphPassProfile> passes;
 };
 
+enum class RenderFeatureGraphResourceKind : uint8_t {
+    Texture,
+    Buffer,
+};
+
+enum class RenderFeatureGraphResourceFlags : uint32_t {
+    None = 0,
+    Optional = 1 << 0,
+    External = 1 << 1,
+};
+
+[[nodiscard]] inline RenderFeatureGraphResourceFlags operator|(RenderFeatureGraphResourceFlags lhs,
+                                                               RenderFeatureGraphResourceFlags rhs) noexcept
+{
+    return static_cast<RenderFeatureGraphResourceFlags>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+inline RenderFeatureGraphResourceFlags& operator|=(RenderFeatureGraphResourceFlags& lhs,
+                                                   RenderFeatureGraphResourceFlags rhs) noexcept
+{
+    lhs = lhs | rhs;
+    return lhs;
+}
+
+[[nodiscard]] inline bool operator&(RenderFeatureGraphResourceFlags lhs, RenderFeatureGraphResourceFlags rhs) noexcept
+{
+    return (static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs)) != 0;
+}
+
+struct RenderFeatureGraphResource {
+    std::string name;
+    RenderFeatureGraphResourceKind kind{RenderFeatureGraphResourceKind::Texture};
+    RenderFeatureGraphResourceFlags flags{RenderFeatureGraphResourceFlags::None};
+};
+
+enum class RenderPassResourceAccess : uint8_t {
+    Read,
+    Write,
+    ReadWrite,
+};
+
+struct RenderPassResourceUsage {
+    std::string name;
+    RenderFeatureGraphResourceKind kind{RenderFeatureGraphResourceKind::Texture};
+    RenderPassResourceAccess access{RenderPassResourceAccess::Read};
+    RenderFeatureGraphResourceFlags flags{RenderFeatureGraphResourceFlags::None};
+};
+
+struct RenderFeaturePassInfo {
+    std::string name;
+    std::vector<RenderPassResourceUsage> resources;
+};
+
+struct RenderFeatureStatusEntry {
+    std::string name;
+    bool ready{false};
+};
+
+struct RenderFeatureDiagnostics {
+    bool binding_contract_valid{true};
+    std::string binding_contract_summary;
+    bool pipeline_resources_valid{true};
+    std::string pipeline_resources_summary;
+    std::vector<RenderFeatureStatusEntry> pipeline_resources;
+    bool persistent_resources_valid{true};
+    std::string persistent_resources_summary;
+    std::vector<RenderFeatureStatusEntry> persistent_resources;
+    bool history_resources_valid{true};
+    std::string history_resources_summary;
+    std::vector<RenderFeatureStatusEntry> history_resources;
+};
+
+struct RenderFeatureInfo {
+    std::string name;
+    std::string display_name;
+    std::string category;
+    bool enabled{true};
+    bool runtime_toggleable{false};
+    bool supported{true};
+    bool active{true};
+    std::string support_summary;
+    bool graph_contract_valid{true};
+    std::string graph_contract_summary;
+    bool pass_contract_valid{true};
+    std::string pass_contract_summary;
+    std::vector<RenderFeatureGraphResource> graph_inputs;
+    std::vector<RenderFeatureGraphResource> graph_outputs;
+    std::vector<RenderFeaturePassInfo> passes;
+    RenderFeatureDiagnostics diagnostics;
+};
+
+enum class RenderFeatureParameterType : uint8_t {
+    Bool,
+    Int,
+    Float,
+    Color,
+};
+
+struct RenderFeatureParameterValue {
+    RenderFeatureParameterType type{RenderFeatureParameterType::Float};
+    bool bool_value{false};
+    int32_t int_value{0};
+    float float_value{0.0f};
+    Vec4 color_value{1.0f, 1.0f, 1.0f, 1.0f};
+};
+
+struct RenderFeatureParameterInfo {
+    std::string name;
+    std::string display_name;
+    RenderFeatureParameterType type{RenderFeatureParameterType::Float};
+    RenderFeatureParameterValue value{};
+    RenderFeatureParameterValue min{};
+    RenderFeatureParameterValue max{};
+    float step{0.01f};
+    bool read_only{false};
+};
+
 class RenderingService {
 public:
     virtual ~RenderingService() = default;
@@ -85,6 +202,13 @@ public:
     virtual bool exportRenderGraphProfileChromeTraceJson(const RenderGraphProfileSnapshot& profile,
                                                          const std::filesystem::path& output_path,
                                                          std::string* error_message = nullptr) const = 0;
+    virtual std::vector<RenderFeatureInfo> defaultRenderFeatureInfos() const = 0;
+    virtual std::vector<RenderFeatureParameterInfo>
+        defaultRenderFeatureParameters(std::string_view feature_name) const = 0;
+    virtual bool setDefaultRenderFeatureEnabled(std::string_view feature_name, bool enabled) = 0;
+    virtual bool setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                                  std::string_view parameter_name,
+                                                  const RenderFeatureParameterValue& value) = 0;
     virtual float frameTimeMilliseconds() const noexcept = 0;
     virtual float framesPerSecond() const noexcept = 0;
     virtual UVec2 sceneOutputSize() const noexcept = 0;

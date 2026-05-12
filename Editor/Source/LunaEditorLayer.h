@@ -35,7 +35,6 @@ class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
 class RenderDebugPanel;
-class RenderFeaturesPanel;
 class SceneHierarchyPanel;
 class SceneSettingPanel;
 class ScriptPluginsPanel;
@@ -88,6 +87,13 @@ public:
     bool exportRenderGraphProfileChromeTraceJson(const editor::RenderGraphProfileSnapshot& profile,
                                                  const std::filesystem::path& output_path,
                                                  std::string* error_message = nullptr) const;
+    std::vector<editor::RenderFeatureInfo> getDefaultRenderFeatureInfos() const;
+    std::vector<editor::RenderFeatureParameterInfo>
+        getDefaultRenderFeatureParameters(std::string_view feature_name) const;
+    bool setDefaultRenderFeatureEnabled(std::string_view feature_name, bool enabled);
+    bool setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                          std::string_view parameter_name,
+                                          const editor::RenderFeatureParameterValue& value);
     Scene& getScene() override;
     Scene& getInspectionScene() override;
     bool isRuntimeViewportEnabled() const noexcept override;
@@ -191,7 +197,6 @@ private:
     float m_editor_ui_scale{0.0f};
 
     bool m_show_render_debug_panel{false};
-    bool m_show_render_features_panel{false};
     bool m_show_scene_setting_panel{true};
     bool m_show_script_plugins_panel{true};
     bool m_runtime_viewport_enabled{false};
@@ -208,7 +213,6 @@ private:
     std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
     std::unique_ptr<RenderDebugPanel> m_render_debug_panel;
-    std::unique_ptr<RenderFeaturesPanel> m_render_features_panel;
     std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
     std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
 };

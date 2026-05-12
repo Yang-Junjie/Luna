@@ -18,13 +18,36 @@ public:
 
     virtual void text(std::string_view value) = 0;
     virtual void textDisabled(std::string_view value) = 0;
+    virtual void textWrapped(std::string_view value) = 0;
+    virtual void bulletText(std::string_view value) = 0;
     virtual void separator() = 0;
     virtual void sameLine() = 0;
     virtual void spacing() = 0;
+    virtual void indent(float width = 0.0f) = 0;
+    virtual void unindent(float width = 0.0f) = 0;
+    virtual void beginDisabled() = 0;
+    virtual void endDisabled() = 0;
+    virtual void setNextItemWidth(float width) = 0;
 
     virtual bool button(std::string_view label, Vec2 size = {}) = 0;
     virtual bool checkbox(std::string_view label, bool& value) = 0;
     virtual bool sliderInt(std::string_view label, int& value, int min_value, int max_value) = 0;
+    virtual bool dragInt(std::string_view label,
+                         int& value,
+                         float speed = 1.0f,
+                         int min_value = 0,
+                         int max_value = 0) = 0;
+    virtual bool dragFloat(std::string_view label,
+                           float& value,
+                           float speed = 1.0f,
+                           float min_value = 0.0f,
+                           float max_value = 0.0f,
+                           std::string_view format = "%.3f") = 0;
+    virtual bool colorEdit4(std::string_view label, Vec4& value) = 0;
+    virtual bool treeNode(std::string_view label) = 0;
+    virtual void treePop() = 0;
+    [[nodiscard]] virtual bool isItemHovered() const noexcept = 0;
+    virtual void setTooltip(std::string_view value) = 0;
 
     [[nodiscard]] virtual float scale(float value) const noexcept = 0;
     [[nodiscard]] virtual Vec2 scaled(Vec2 value) const noexcept = 0;

@@ -157,6 +157,16 @@ public:
         ImGui::TextDisabled("%.*s", static_cast<int>(value.size()), value.data());
     }
 
+    void textWrapped(std::string_view value) override
+    {
+        ImGui::TextWrapped("%.*s", static_cast<int>(value.size()), value.data());
+    }
+
+    void bulletText(std::string_view value) override
+    {
+        ImGui::BulletText("%.*s", static_cast<int>(value.size()), value.data());
+    }
+
     void separator() override
     {
         ImGui::Separator();
@@ -170,6 +180,31 @@ public:
     void spacing() override
     {
         ImGui::Spacing();
+    }
+
+    void indent(float width) override
+    {
+        ImGui::Indent(width > 0.0f ? scaleEditorUi(width) : width);
+    }
+
+    void unindent(float width) override
+    {
+        ImGui::Unindent(width > 0.0f ? scaleEditorUi(width) : width);
+    }
+
+    void beginDisabled() override
+    {
+        ImGui::BeginDisabled();
+    }
+
+    void endDisabled() override
+    {
+        ImGui::EndDisabled();
+    }
+
+    void setNextItemWidth(float width) override
+    {
+        ImGui::SetNextItemWidth(width > 0.0f ? scaleEditorUi(width) : width);
     }
 
     bool button(std::string_view label, Vec2 size) override
@@ -188,6 +223,56 @@ public:
     {
         const std::string label_string = toString(label);
         return ImGui::SliderInt(label_string.c_str(), &value, min_value, max_value);
+    }
+
+    bool dragInt(std::string_view label, int& value, float speed, int min_value, int max_value) override
+    {
+        const std::string label_string = toString(label);
+        return ImGui::DragInt(label_string.c_str(), &value, speed, min_value, max_value);
+    }
+
+    bool dragFloat(std::string_view label,
+                   float& value,
+                   float speed,
+                   float min_value,
+                   float max_value,
+                   std::string_view format) override
+    {
+        const std::string label_string = toString(label);
+        const std::string format_string = toString(format);
+        return ImGui::DragFloat(label_string.c_str(), &value, speed, min_value, max_value, format_string.c_str());
+    }
+
+    bool colorEdit4(std::string_view label, Vec4& value) override
+    {
+        const std::string label_string = toString(label);
+        float color[4]{value.x, value.y, value.z, value.w};
+        const bool changed = ImGui::ColorEdit4(label_string.c_str(), color);
+        if (changed) {
+            value = Vec4{.x = color[0], .y = color[1], .z = color[2], .w = color[3]};
+        }
+        return changed;
+    }
+
+    bool treeNode(std::string_view label) override
+    {
+        const std::string label_string = toString(label);
+        return ImGui::TreeNode(label_string.c_str());
+    }
+
+    void treePop() override
+    {
+        ImGui::TreePop();
+    }
+
+    bool isItemHovered() const noexcept override
+    {
+        return ImGui::IsItemHovered();
+    }
+
+    void setTooltip(std::string_view value) override
+    {
+        ImGui::SetTooltip("%.*s", static_cast<int>(value.size()), value.data());
     }
 
     float scale(float value) const noexcept override
@@ -362,6 +447,32 @@ public:
         return m_editor_layer != nullptr
                    ? m_editor_layer->exportRenderGraphProfileChromeTraceJson(profile, output_path, error_message)
                    : false;
+    }
+
+    std::vector<RenderFeatureInfo> defaultRenderFeatureInfos() const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getDefaultRenderFeatureInfos()
+                                         : std::vector<RenderFeatureInfo>{};
+    }
+
+    std::vector<RenderFeatureParameterInfo>
+    defaultRenderFeatureParameters(std::string_view feature_name) const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getDefaultRenderFeatureParameters(feature_name)
+                                         : std::vector<RenderFeatureParameterInfo>{};
+    }
+
+    bool setDefaultRenderFeatureEnabled(std::string_view feature_name, bool enabled) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->setDefaultRenderFeatureEnabled(feature_name, enabled);
+    }
+
+    bool setDefaultRenderFeatureParameter(std::string_view feature_name,
+                                          std::string_view parameter_name,
+                                          const RenderFeatureParameterValue& value) override
+    {
+        return m_editor_layer != nullptr &&
+               m_editor_layer->setDefaultRenderFeatureParameter(feature_name, parameter_name, value);
     }
 
     float frameTimeMilliseconds() const noexcept override
