@@ -19,6 +19,8 @@ add_executable(
     Source/Plugins/RenderFeaturesPlugin.cpp
     Source/Plugins/RenderProfilerPlugin.h
     Source/Plugins/RenderProfilerPlugin.cpp
+    Source/Plugins/SceneSettingsPlugin.h
+    Source/Plugins/SceneSettingsPlugin.cpp
     Source/Plugins/SceneStatusPlugin.h
     Source/Plugins/SceneStatusPlugin.cpp
     Source/Plugins/ViewportPlugin.h
@@ -45,8 +47,6 @@ add_executable(
     Source/LunaEditorLayer.cpp
     Source/ScriptComponentInspector.h
     Source/ScriptComponentInspector.cpp
-    Source/Panels/SceneSettingPanel.h
-    Source/Panels/SceneSettingPanel.cpp
     Source/Panels/ScriptPluginsPanel.h
     Source/Panels/ScriptPluginsPanel.cpp
     Source/Panels/SceneHierarchyPanel.h

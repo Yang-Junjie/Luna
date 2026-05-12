@@ -140,6 +140,15 @@ ImTextureID toImGuiTextureId(luna::editor::TextureHandle texture_id) noexcept
     }
 }
 
+std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffer_size)
+{
+    const std::size_t size = (std::max)(buffer_size, value.size() + 1);
+    std::vector<char> buffer(size, '\0');
+    const std::size_t copy_size = (std::min)(value.size(), buffer.size() - 1);
+    std::copy_n(value.data(), copy_size, buffer.data());
+    return buffer;
+}
+
 } // namespace
 
 namespace luna::editor {
@@ -242,6 +251,17 @@ public:
         return ImGui::Checkbox(label_string.c_str(), &value);
     }
 
+    bool colorEdit3(std::string_view label, Vec3& value) override
+    {
+        const std::string label_string = toString(label);
+        float color[3]{value.x, value.y, value.z};
+        const bool changed = ImGui::ColorEdit3(label_string.c_str(), color);
+        if (changed) {
+            value = Vec3{.x = color[0], .y = color[1], .z = color[2]};
+        }
+        return changed;
+    }
+
     bool sliderInt(std::string_view label, int& value, int min_value, int max_value) override
     {
         const std::string label_string = toString(label);
@@ -275,6 +295,35 @@ public:
         const std::string label_string = toString(label);
         const std::string format_string = toString(format);
         return ImGui::DragFloat(label_string.c_str(), &value, speed, min_value, max_value, format_string.c_str());
+    }
+
+    bool dragFloat3(std::string_view label,
+                    Vec3& value,
+                    float speed,
+                    float min_value,
+                    float max_value,
+                    std::string_view format) override
+    {
+        const std::string label_string = toString(label);
+        const std::string format_string = toString(format);
+        float vector[3]{value.x, value.y, value.z};
+        const bool changed =
+            ImGui::DragFloat3(label_string.c_str(), vector, speed, min_value, max_value, format_string.c_str());
+        if (changed) {
+            value = Vec3{.x = vector[0], .y = vector[1], .z = vector[2]};
+        }
+        return changed;
+    }
+
+    bool inputText(std::string_view label, std::string& value, std::size_t buffer_size) override
+    {
+        const std::string label_string = toString(label);
+        std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
+        const bool changed = ImGui::InputText(label_string.c_str(), buffer.data(), buffer.size());
+        if (changed) {
+            value = buffer.data();
+        }
+        return changed;
     }
 
     bool colorEdit4(std::string_view label, Vec4& value) override
@@ -423,6 +472,26 @@ public:
     bool canEditScene() const noexcept override
     {
         return m_editor_layer != nullptr && !m_editor_layer->isRuntimeViewportEnabled();
+    }
+
+    SceneEnvironmentSettings sceneEnvironmentSettings() const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getScene().environmentSettings() : SceneEnvironmentSettings{};
+    }
+
+    SceneShadowSettings sceneShadowSettings() const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getScene().shadowSettings() : SceneShadowSettings{};
+    }
+
+    bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->setSceneEnvironmentSettings(settings);
+    }
+
+    bool setSceneShadowSettings(const SceneShadowSettings& settings) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->setSceneShadowSettings(settings);
     }
 
     EntityId createEntity(std::string name) override

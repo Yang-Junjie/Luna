@@ -2,6 +2,7 @@
 
 #include "EditorApi/EditorTypes.h"
 
+#include <cstddef>
 #include <string_view>
 
 namespace luna::editor {
@@ -33,9 +34,16 @@ public:
 
     virtual bool button(std::string_view label, Vec2 size = {}) = 0;
     virtual bool checkbox(std::string_view label, bool& value) = 0;
+    virtual bool colorEdit3(std::string_view label, Vec3& value) = 0;
     virtual bool sliderInt(std::string_view label, int& value, int min_value, int max_value) = 0;
     virtual bool sliderFloat(
         std::string_view label, float& value, float min_value, float max_value, std::string_view format = "%.3f") = 0;
+    virtual bool dragFloat3(std::string_view label,
+                            Vec3& value,
+                            float speed = 1.0f,
+                            float min_value = 0.0f,
+                            float max_value = 0.0f,
+                            std::string_view format = "%.3f") = 0;
     virtual bool
         dragInt(std::string_view label, int& value, float speed = 1.0f, int min_value = 0, int max_value = 0) = 0;
     virtual bool dragFloat(std::string_view label,
@@ -44,6 +52,9 @@ public:
                            float min_value = 0.0f,
                            float max_value = 0.0f,
                            std::string_view format = "%.3f") = 0;
+    virtual bool inputText(std::string_view label,
+                           std::string& value,
+                           std::size_t buffer_size = 256) = 0;
     virtual bool colorEdit4(std::string_view label, Vec4& value) = 0;
     virtual bool treeNode(std::string_view label) = 0;
     virtual void treePop() = 0;

@@ -15,7 +15,6 @@
 #include "Panels/ContentBrowserPanel.h"
 #include "Panels/InspectorPanel.h"
 #include "Panels/SceneHierarchyPanel.h"
-#include "Panels/SceneSettingPanel.h"
 #include "Panels/ScriptPluginsPanel.h"
 #include "Plugins/AssetLoadingPlugin.h"
 #include "Plugins/BackendCapabilitiesPlugin.h"
@@ -24,6 +23,7 @@
 #include "Plugins/RenderDebugPlugin.h"
 #include "Plugins/RenderFeaturesPlugin.h"
 #include "Plugins/RenderProfilerPlugin.h"
+#include "Plugins/SceneSettingsPlugin.h"
 #include "Plugins/SceneStatusPlugin.h"
 #include "Plugins/ViewportPlugin.h"
 #include "Platform/Common/FileDialogs.h"
@@ -575,13 +575,13 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_inspector_panel(std::make_unique<InspectorPanel>(*this)),
       m_builtin_materials_panel(std::make_unique<BuiltinMaterialsPanel>()),
       m_content_browser_panel(std::make_unique<ContentBrowserPanel>(*this)),
-      m_scene_setting_panel(std::make_unique<SceneSettingPanel>(*this)),
       m_script_plugins_panel(std::make_unique<ScriptPluginsPanel>(*this))
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
     m_editor_shell->loadPlugin(editor::createViewportPlugin());
     m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
+    m_editor_shell->loadPlugin(editor::createSceneSettingsPlugin());
     m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
     m_editor_shell->loadPlugin(editor::createBackendCapabilitiesPlugin());
     m_editor_shell->loadPlugin(editor::createRenderDebugPlugin());
@@ -678,9 +678,6 @@ void LunaEditorLayer::onImGuiRender()
 
     m_scene_hierarchy_panel->onImGuiRender();
     m_inspector_panel->onImGuiRender();
-    if (m_show_scene_setting_panel) {
-        m_scene_setting_panel->onImGuiRender();
-    }
     m_builtin_materials_panel->onImGuiRender(m_show_builtin_materials_panel);
     m_content_browser_panel->onImGuiRender();
     m_script_plugins_panel->onImGuiRender(m_show_script_plugins_panel);
@@ -827,7 +824,6 @@ void LunaEditorLayer::onImGuiMenuBar()
 
     if (ImGui::BeginMenu("Window")) {
         ImGui::MenuItem("Builtin Materials", nullptr, &m_show_builtin_materials_panel);
-        ImGui::MenuItem("Scene Settings", nullptr, &m_show_scene_setting_panel);
         ImGui::MenuItem("Script Plugins", nullptr, &m_show_script_plugins_panel);
         if (m_editor_shell) {
             ImGui::Separator();
@@ -1770,7 +1766,6 @@ void LunaEditorLayer::resetEditorState()
     endRuntimeViewport();
     m_runtime_viewport_requested = false;
     m_editor_runtime.resetScene();
-    m_scene_setting_panel->syncFromScene();
     m_asset_label = "No scene loaded";
     m_show_pick_debug_visualization = false;
     syncPickDebugVisualizationState();
@@ -1865,7 +1860,6 @@ void LunaEditorLayer::processAuthoringEvents()
     }
 
     bool update_scene_label = false;
-    bool sync_scene_settings = false;
     bool validate_selection = false;
 
     for (const auto& event : events) {
@@ -1875,7 +1869,6 @@ void LunaEditorLayer::processAuthoringEvents()
             case authoring::AuthoringEventType::SceneLoaded:
             case authoring::AuthoringEventType::HistoryChanged:
                 update_scene_label = true;
-                sync_scene_settings = true;
                 validate_selection = true;
                 break;
             case authoring::AuthoringEventType::SceneSaved:
@@ -1891,17 +1884,12 @@ void LunaEditorLayer::processAuthoringEvents()
                 break;
             case authoring::AuthoringEventType::SceneSettingsChanged:
                 update_scene_label = true;
-                sync_scene_settings = true;
                 break;
         }
     }
 
     if (validate_selection) {
         m_editor_runtime.validateSelection();
-    }
-
-    if (sync_scene_settings && m_scene_setting_panel) {
-        m_scene_setting_panel->syncFromScene();
     }
 
     if (update_scene_label) {

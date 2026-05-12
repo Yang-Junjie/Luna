@@ -36,7 +36,6 @@ class ContentBrowserPanel;
 class InspectorPanel;
 class LunaEditorApplication;
 class SceneHierarchyPanel;
-class SceneSettingPanel;
 class ScriptPluginsPanel;
 
 namespace editor {
@@ -205,7 +204,6 @@ private:
     bool m_show_builtin_materials_panel{false};
     float m_editor_ui_scale{0.0f};
 
-    bool m_show_scene_setting_panel{true};
     bool m_show_script_plugins_panel{true};
     bool m_runtime_viewport_enabled{false};
     bool m_runtime_viewport_requested{false};
@@ -220,7 +218,6 @@ private:
     std::unique_ptr<InspectorPanel> m_inspector_panel;
     std::unique_ptr<BuiltinMaterialsPanel> m_builtin_materials_panel;
     std::unique_ptr<ContentBrowserPanel> m_content_browser_panel;
-    std::unique_ptr<SceneSettingPanel> m_scene_setting_panel;
     std::unique_ptr<ScriptPluginsPanel> m_script_plugins_panel;
 };
 
