@@ -134,6 +134,8 @@ public:
     bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) override;
     bool setSceneShadowSettings(const SceneShadowSettings& settings) override;
     void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) override;
+    std::filesystem::path getProjectRootPath() const override;
+    const ProjectInfo* getProjectInfo() const override;
     bool hasProjectLoaded() const override;
     void refreshProjectScriptPlugins() override;
     const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const override;

@@ -7,7 +7,6 @@
 #include "EditorContext.h"
 #include "EditorUI.h"
 #include "Imgui/ImGuiContext.h"
-#include "Project/ProjectManager.h"
 
 #include <cctype>
 #include <cstdint>
@@ -120,20 +119,18 @@ int entrySortRank(BrowserEntryKind kind)
     return kind == BrowserEntryKind::Directory ? 0 : 1;
 }
 
-std::string makeAssetLookupKey(const std::filesystem::path& path)
+std::string makeAssetLookupKey(const std::filesystem::path& path, const std::filesystem::path& project_root)
 {
     if (path.empty()) {
         return {};
     }
 
     std::filesystem::path normalized_path = path.lexically_normal();
-    if (normalized_path.is_absolute()) {
-        if (const auto project_root = luna::ProjectManager::instance().getProjectRootPath()) {
-            std::error_code ec;
-            const std::filesystem::path relative_path = std::filesystem::relative(normalized_path, *project_root, ec);
-            if (!ec && !relative_path.empty() && !relative_path.is_absolute()) {
-                normalized_path = relative_path.lexically_normal();
-            }
+    if (normalized_path.is_absolute() && !project_root.empty()) {
+        std::error_code ec;
+        const std::filesystem::path relative_path = std::filesystem::relative(normalized_path, project_root, ec);
+        if (!ec && !relative_path.empty() && !relative_path.is_absolute()) {
+            normalized_path = relative_path.lexically_normal();
         }
     }
 
@@ -169,7 +166,9 @@ void loadChildDirectories(DirectoryCache& cache)
     cache.ChildDirectoriesLoaded = true;
 }
 
-void loadDirectoryEntries(DirectoryCache& cache, const std::unordered_map<std::string, luna::AssetHandle>& asset_lookup)
+void loadDirectoryEntries(DirectoryCache& cache,
+                          const std::unordered_map<std::string, luna::AssetHandle>& asset_lookup,
+                          const std::filesystem::path& project_root)
 {
     cache.Entries.clear();
 
@@ -203,7 +202,7 @@ void loadDirectoryEntries(DirectoryCache& cache, const std::unordered_map<std::s
 
         if (isSceneFile(path)) {
             entry.Kind = BrowserEntryKind::SceneFile;
-        } else if (const auto lookup_it = asset_lookup.find(makeAssetLookupKey(path));
+        } else if (const auto lookup_it = asset_lookup.find(makeAssetLookupKey(path, project_root));
                    lookup_it != asset_lookup.end()) {
             entry.Kind = BrowserEntryKind::AssetFile;
             entry.Handle = lookup_it->second;
@@ -418,6 +417,7 @@ struct ContentBrowserPanelState {
     std::unordered_map<std::filesystem::path, DirectoryCache> DirectoryCaches;
     std::unordered_map<std::string, AssetHandle> AssetLookup;
     std::vector<std::size_t> VisibleEntryIndices;
+    std::filesystem::path ProjectRoot;
     std::filesystem::path VisibleEntriesDirectory;
     std::filesystem::path SelectedEntry;
     RHI::Ref<RHI::Texture> DirectoryIconTexture;
@@ -434,14 +434,14 @@ struct ContentBrowserPanelState {
 
 namespace {
 
-std::unordered_map<std::string, luna::AssetHandle> buildAssetLookup()
+std::unordered_map<std::string, luna::AssetHandle> buildAssetLookup(const std::filesystem::path& project_root)
 {
     std::unordered_map<std::string, luna::AssetHandle> lookup;
     const auto& database = luna::AssetDatabase::getDatabase();
     lookup.reserve(database.size());
 
     for (const auto& [handle, metadata] : database) {
-        lookup.emplace(makeAssetLookupKey(metadata.FilePath), handle);
+        lookup.emplace(makeAssetLookupKey(metadata.FilePath, project_root), handle);
     }
 
     return lookup;
@@ -449,7 +449,8 @@ std::unordered_map<std::string, luna::AssetHandle> buildAssetLookup()
 
 DirectoryCache& ensureDirectoryCache(luna::ContentBrowserPanelState& state,
                                      const std::filesystem::path& directory,
-                                     DirectoryScanMode scan_mode)
+                                     DirectoryScanMode scan_mode,
+                                     const std::filesystem::path& project_root)
 {
     const std::filesystem::path normalized_directory = directory.lexically_normal();
     auto [it, inserted] = state.DirectoryCaches.try_emplace(normalized_directory);
@@ -462,15 +463,17 @@ DirectoryCache& ensureDirectoryCache(luna::ContentBrowserPanelState& state,
         loadChildDirectories(cache);
     }
     if (wantsEntries(scan_mode) && !cache.EntriesLoaded) {
-        loadDirectoryEntries(cache, state.AssetLookup);
+        loadDirectoryEntries(cache, state.AssetLookup, project_root);
     }
 
     return cache;
 }
 
-void rebuildVisibleEntries(luna::ContentBrowserPanelState& state, const std::filesystem::path& directory)
+void rebuildVisibleEntries(luna::ContentBrowserPanelState& state,
+                           const std::filesystem::path& directory,
+                           const std::filesystem::path& project_root)
 {
-    DirectoryCache& cache = ensureDirectoryCache(state, directory, DirectoryScanMode::Entries);
+    DirectoryCache& cache = ensureDirectoryCache(state, directory, DirectoryScanMode::Entries, project_root);
     state.VisibleEntryIndices.clear();
     state.VisibleEntryIndices.reserve(cache.Entries.size());
 
@@ -541,7 +544,7 @@ void ContentBrowserPanel::onImGuiRender()
     }
 
     if (m_state->VisibleEntriesDirty || m_state->VisibleEntriesDirectory != m_current_directory.lexically_normal()) {
-        rebuildVisibleEntries(*m_state, m_current_directory);
+        rebuildVisibleEntries(*m_state, m_current_directory, m_state->ProjectRoot);
     }
 
     drawHeader();
@@ -589,12 +592,14 @@ void ContentBrowserPanel::syncProjectDirectories()
         return;
     }
 
-    const auto project_root = ProjectManager::instance().getProjectRootPath();
-    const auto project_info = ProjectManager::instance().getProjectInfo();
+    const auto project_root = m_editor_context != nullptr ? m_editor_context->getProjectRootPath()
+                                                          : std::filesystem::path{};
+    const auto project_info = m_editor_context != nullptr ? m_editor_context->getProjectInfo() : nullptr;
 
-    if (!project_root || !project_info) {
+    if (project_root.empty() || project_info == nullptr) {
         m_assets_root.clear();
         m_current_directory.clear();
+        m_state->ProjectRoot.clear();
         m_search_buffer[0] = '\0';
         m_state->SearchFilter.clear();
         m_state->SearchFilterLower.clear();
@@ -608,8 +613,11 @@ void ContentBrowserPanel::syncProjectDirectories()
         return;
     }
 
-    const std::filesystem::path resolved_assets_root = (*project_root / project_info->AssetsPath).lexically_normal();
-    if (m_assets_root != resolved_assets_root) {
+    const std::filesystem::path previous_project_root = m_state->ProjectRoot;
+    m_state->ProjectRoot = project_root;
+
+    const std::filesystem::path resolved_assets_root = (project_root / project_info->AssetsPath).lexically_normal();
+    if (previous_project_root != project_root || m_assets_root != resolved_assets_root) {
         m_assets_root = resolved_assets_root;
         m_current_directory = resolved_assets_root;
         m_search_buffer[0] = '\0';
@@ -623,7 +631,7 @@ void ContentBrowserPanel::syncProjectDirectories()
 
     if (m_state->RefreshRequested) {
         m_state->DirectoryCaches.clear();
-        m_state->AssetLookup = buildAssetLookup();
+        m_state->AssetLookup = buildAssetLookup(m_state->ProjectRoot);
         m_state->RefreshRequested = false;
         m_state->VisibleEntriesDirty = true;
         m_state->VisibleEntriesDirectory.clear();
@@ -659,7 +667,7 @@ void ContentBrowserPanel::drawHeader()
     if (ImGui::Button("Refresh")) {
         requestRefresh();
         syncProjectDirectories();
-        rebuildVisibleEntries(*m_state, m_current_directory);
+        rebuildVisibleEntries(*m_state, m_current_directory, m_state->ProjectRoot);
     }
 
     ImGui::SameLine();
@@ -680,7 +688,7 @@ void ContentBrowserPanel::drawFolderTree(const std::filesystem::path& directory)
         return;
     }
 
-    DirectoryCache& cache = ensureDirectoryCache(*m_state, directory, DirectoryScanMode::Children);
+    DirectoryCache& cache = ensureDirectoryCache(*m_state, directory, DirectoryScanMode::Children, m_state->ProjectRoot);
     const bool has_children = !cache.ChildDirectories.empty();
     const bool selected = directory == m_current_directory;
     const bool on_current_branch = isSameOrDescendant(directory, m_current_directory);
@@ -717,9 +725,10 @@ void ContentBrowserPanel::drawDirectoryContents()
         return;
     }
 
-    DirectoryCache& directory_cache = ensureDirectoryCache(*m_state, m_current_directory, DirectoryScanMode::Entries);
+    DirectoryCache& directory_cache =
+        ensureDirectoryCache(*m_state, m_current_directory, DirectoryScanMode::Entries, m_state->ProjectRoot);
     if (m_state->VisibleEntriesDirty || m_state->VisibleEntriesDirectory != m_current_directory.lexically_normal()) {
-        rebuildVisibleEntries(*m_state, m_current_directory);
+        rebuildVisibleEntries(*m_state, m_current_directory, m_state->ProjectRoot);
     }
 
     const auto& visible_entries = m_state->VisibleEntryIndices;

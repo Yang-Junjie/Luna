@@ -1696,6 +1696,18 @@ void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
     }
 }
 
+std::filesystem::path LunaEditorLayer::getProjectRootPath() const
+{
+    const auto project_root = ProjectManager::instance().getProjectRootPath();
+    return project_root ? *project_root : std::filesystem::path{};
+}
+
+const ProjectInfo* LunaEditorLayer::getProjectInfo() const
+{
+    const auto project_info = ProjectManager::instance().getProjectInfo();
+    return project_info ? &*project_info : nullptr;
+}
+
 bool LunaEditorLayer::hasProjectLoaded() const
 {
     return ProjectManager::instance().getProjectRootPath().has_value() &&

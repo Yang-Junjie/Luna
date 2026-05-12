@@ -3,6 +3,7 @@
 #include "Authoring/AuthoringTypes.h"
 #include "Asset/Asset.h"
 #include "Core/UUID.h"
+#include "Project/ProjectInfo.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Script/ScriptPluginManifest.h"
@@ -49,6 +50,8 @@ public:
     virtual bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings) = 0;
     virtual bool setSceneShadowSettings(const SceneShadowSettings& settings) = 0;
     virtual void openBuiltinMaterialsPanel(AssetHandle material_handle = AssetHandle(0)) = 0;
+    virtual std::filesystem::path getProjectRootPath() const = 0;
+    virtual const ProjectInfo* getProjectInfo() const = 0;
 
     virtual bool hasProjectLoaded() const = 0;
     virtual void refreshProjectScriptPlugins() = 0;

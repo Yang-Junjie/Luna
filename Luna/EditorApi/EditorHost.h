@@ -6,6 +6,7 @@ class AssetService;
 class CommandService;
 class HistoryService;
 class MenuService;
+class ProjectService;
 class ScriptPluginService;
 class ScriptService;
 class RenderingService;
@@ -26,6 +27,7 @@ public:
     virtual CommandService& commands() = 0;
     virtual HistoryService& history() = 0;
     virtual MenuService& menus() = 0;
+    virtual ProjectService& project() = 0;
     virtual ScriptPluginService& scriptPlugins() = 0;
     virtual ScriptService& scripts() = 0;
     virtual RenderingService& rendering() = 0;

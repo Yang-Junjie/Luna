@@ -62,7 +62,7 @@ public:
                     Ui& ui = context.ui();
                     ScriptPluginService& script_plugins = host.scriptPlugins();
 
-                    if (!script_plugins.hasProjectLoaded()) {
+                    if (!host.project().hasProjectLoaded()) {
                         ui.text("Open a project to configure script plugins.");
                         return;
                     }

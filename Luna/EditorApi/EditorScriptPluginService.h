@@ -11,7 +11,6 @@ class ScriptPluginService {
 public:
     virtual ~ScriptPluginService() = default;
 
-    [[nodiscard]] virtual bool hasProjectLoaded() const = 0;
     virtual void refreshProjectScriptPlugins() = 0;
     [[nodiscard]] virtual const std::vector<ScriptPluginCandidate>& getDiscoveredScriptPlugins() const = 0;
     [[nodiscard]] virtual const std::string& getScriptPluginStatus() const = 0;

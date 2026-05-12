@@ -5,6 +5,7 @@
 #include "EditorApi/EditorHistoryService.h"
 #include "EditorApi/EditorHost.h"
 #include "EditorApi/EditorMenuService.h"
+#include "EditorApi/EditorProjectService.h"
 #include "EditorApi/EditorPlugin.h"
 #include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorScriptService.h"

@@ -45,14 +45,10 @@ add_executable(
     Source/Shell/EditorShell.cpp
     Source/Viewport/EditorViewportSession.h
     Source/Viewport/EditorViewportSession.cpp
-    Source/Panels/InspectorPanel.h
-    Source/Panels/InspectorPanel.cpp
     Source/LunaEditorApp.h
     Source/LunaEditorApp.cpp
     Source/LunaEditorLayer.h
     Source/LunaEditorLayer.cpp
-    Source/ScriptComponentInspector.h
-    Source/ScriptComponentInspector.cpp
     ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
 )
 
