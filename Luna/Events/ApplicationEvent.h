@@ -77,6 +77,56 @@ public:
     }
 };
 
+class WindowFocusEvent : public Event {
+public:
+    WindowFocusEvent() = default;
+
+    static EventType getStaticType()
+    {
+        return EventType::WindowFocus;
+    }
+
+    virtual EventType getEventType() const override
+    {
+        return getStaticType();
+    }
+
+    virtual const char* getName() const override
+    {
+        return "WindowFocus";
+    }
+
+    virtual int getCategoryFlags() const override
+    {
+        return static_cast<int>(EventCategory::EventCategoryApplication);
+    }
+};
+
+class WindowLostFocusEvent : public Event {
+public:
+    WindowLostFocusEvent() = default;
+
+    static EventType getStaticType()
+    {
+        return EventType::WindowLostFocus;
+    }
+
+    virtual EventType getEventType() const override
+    {
+        return getStaticType();
+    }
+
+    virtual const char* getName() const override
+    {
+        return "WindowLostFocus";
+    }
+
+    virtual int getCategoryFlags() const override
+    {
+        return static_cast<int>(EventCategory::EventCategoryApplication);
+    }
+};
+
 class AppTickEvent : public Event {
 public:
     AppTickEvent() = default;

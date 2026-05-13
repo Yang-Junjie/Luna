@@ -537,7 +537,7 @@ bool ImGuiRhiContext::Init(luna::Renderer& renderer)
             return false;
         }
 
-        if (!ImGui_ImplGlfw_InitForOther(renderer.getNativeWindow(), true)) {
+        if (!ImGui_ImplGlfw_InitForOther(renderer.getNativeWindow(), false)) {
             LUNA_IMGUI_ERROR("Failed to initialize ImGui GLFW platform backend");
             clearState();
             return false;

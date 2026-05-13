@@ -267,35 +267,79 @@ private:
         std::unique_ptr<IRenderFlow> render_flow;
     };
 
+    using SceneViewportId = uint64_t;
+    static constexpr SceneViewportId kInvalidSceneViewportId{0};
+
+    struct SceneViewportSlot {
+        SceneViewportId id{kInvalidSceneViewportId};
+        std::unique_ptr<SceneViewportState> state;
+    };
+
+    struct SceneViewportRenderRequest {
+        luna::RenderGraphTextureHandle back_buffer;
+        luna::RHI::Extent2D framebuffer_extent{0, 0};
+        luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
+        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
+        glm::vec4 clear_color{0.0f};
+        uint64_t frame_index{0};
+        bool pick_readback_supported{false};
+        bool pick_readback_slot_available{false};
+    };
+
+    struct SceneViewportRenderResult {
+        luna::RenderGraphTextureHandle color;
+        luna::RenderGraphTextureHandle depth;
+        luna::RenderGraphTextureHandle pick;
+        luna::RenderGraphTextureHandle debug;
+        bool render_to_offscreen{false};
+        bool render_to_swapchain{false};
+        bool output_valid{false};
+        bool issue_pick_readback{false};
+    };
+
     void createSwapchain(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
-    void invalidateRenderFeatureHistory(render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
+    SceneViewportId createSceneViewport();
+    void destroySceneViewport(SceneViewportId id);
+    SceneViewportState* findSceneViewport(SceneViewportId id);
+    const SceneViewportState* findSceneViewport(SceneViewportId id) const;
+    SceneViewportState& defaultSceneViewport();
+    const SceneViewportState& defaultSceneViewport() const;
+    [[nodiscard]] SceneViewportRenderResult renderSceneViewport(SceneViewportState& viewport,
+                                                                luna::RenderGraphBuilder& graph_builder,
+                                                                const SceneViewportRenderRequest& request);
+    void invalidateRenderFeatureHistory(SceneViewportState& viewport,
+                                        render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
     [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(
+        const SceneViewportState& viewport,
         luna::RHI::BackendType backend_type,
         SceneOutputMode scene_output_mode,
         uint64_t frame_index,
         uint32_t framebuffer_width,
         uint32_t framebuffer_height) const;
-    void stageRenderFeatureFrameContext(luna::RHI::BackendType backend_type,
+    void stageRenderFeatureFrameContext(SceneViewportState& viewport,
+                                        luna::RHI::BackendType backend_type,
                                         SceneOutputMode scene_output_mode,
                                         uint32_t framebuffer_width,
                                         uint32_t framebuffer_height) noexcept;
-    void commitStagedRenderFeatureFrameContext() noexcept;
-    bool hasMatchingSceneOutputTargets(uint32_t width, uint32_t height) const;
+    void commitStagedRenderFeatureFrameContext(SceneViewportState& viewport) noexcept;
+    bool hasMatchingSceneOutputTargets(const SceneViewportState& viewport, uint32_t width, uint32_t height) const;
     void releaseFrameCommandBuffers();
     void ensureScenePickReadbackBuffers();
-    void collectCompletedScenePickResult(uint32_t frame_index);
+    void collectCompletedScenePickResult(SceneViewportState& viewport, uint32_t frame_index);
     void ensureGpuTimingResources();
     void collectCompletedGpuTiming(uint32_t frame_index);
     bool storePendingGpuTimingProfile(uint32_t frame_index, const RenderGraphProfileSnapshot& profile);
-    void ensureSceneOutputTargets(uint32_t width, uint32_t height);
-    void releaseSceneOutputTargets();
+    void ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t width, uint32_t height);
+    void releaseSceneOutputTargets(SceneViewportState& viewport);
 
 private:
     WindowContext m_window_context{};
     DeviceContext m_device_context{};
-    SceneViewportState m_scene_viewport{};
+    std::vector<SceneViewportSlot> m_scene_viewports{};
+    SceneViewportId m_default_scene_viewport_id{kInvalidSceneViewportId};
+    SceneViewportId m_next_scene_viewport_id{1};
     FrameResources m_frame_resources{};
     RuntimeState m_runtime{};
     RenderGraphProfileSnapshot m_last_render_graph_profile{};

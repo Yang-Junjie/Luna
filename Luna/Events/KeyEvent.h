@@ -95,14 +95,20 @@ public:
 
 class KeyTypedEvent : public KeyEvent {
 public:
-    KeyTypedEvent(const KeyCode key_code)
-        : KeyEvent(key_code)
+    explicit KeyTypedEvent(unsigned int codepoint)
+        : KeyEvent(KeyCode::None),
+          m_codepoint(codepoint)
     {}
+
+    unsigned int getCodepoint() const
+    {
+        return m_codepoint;
+    }
 
     std::string toString() const override
     {
         std::stringstream ss;
-        ss << "KeyTypedEvent: " << static_cast<int>(m_key_code);
+        ss << "KeyTypedEvent: " << m_codepoint;
         return ss.str();
     }
 
@@ -120,5 +126,8 @@ public:
     {
         return "KeyTyped";
     }
+
+private:
+    unsigned int m_codepoint;
 };
 } // namespace luna

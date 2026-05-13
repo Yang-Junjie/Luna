@@ -32,6 +32,7 @@
 #include <fstream>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <initializer_list>
 #include <iterator>
 #include <optional>
@@ -929,12 +930,22 @@ public:
 
     bool isItemClicked(MouseButton button) const noexcept override
     {
-        return ImGui::IsItemClicked(toImGuiMouseButton(button));
+        const ImGuiID item_id = ImGui::GetItemID();
+        if (item_id == 0 || !ImGui::IsItemHovered()) {
+            return false;
+        }
+
+        return ImGui::IsMouseClicked(toImGuiMouseButton(button), ImGuiInputFlags_None, item_id);
     }
 
     bool isItemDoubleClicked(MouseButton button) const noexcept override
     {
-        return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(toImGuiMouseButton(button));
+        const ImGuiID item_id = ImGui::GetItemID();
+        if (item_id == 0 || !ImGui::IsItemHovered()) {
+            return false;
+        }
+
+        return ImGui::IsMouseDoubleClicked(toImGuiMouseButton(button), item_id);
     }
 
     bool isItemDeactivatedAfterEdit() const noexcept override

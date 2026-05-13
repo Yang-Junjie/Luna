@@ -156,6 +156,21 @@ void GLFWWindow::init(const WindowProps& props)
         }
     });
 
+    glfwSetWindowFocusCallback(m_window, [](GLFWwindow* window, int focused) {
+        auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+        if (!data.m_event_callback) {
+            return;
+        }
+
+        if (focused) {
+            WindowFocusEvent event;
+            data.m_event_callback(event);
+        } else {
+            WindowLostFocusEvent event;
+            data.m_event_callback(event);
+        }
+    });
+
     glfwSetKeyCallback(m_window, [](GLFWwindow* window, int key, int, int action, int) {
         auto& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
         if (!data.m_event_callback) {
@@ -190,12 +205,7 @@ void GLFWWindow::init(const WindowProps& props)
             return;
         }
 
-        const KeyCode luna_key = glfwCharCodeToLunaKeyCode(codepoint);
-        if (luna_key == KeyCode::None) {
-            return;
-        }
-
-        KeyTypedEvent event(luna_key);
+        KeyTypedEvent event(codepoint);
         data.m_event_callback(event);
     });
 
