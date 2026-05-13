@@ -16,6 +16,7 @@ struct NativeSampleState {
     float intensity{0.5f};
     LunaEditorVec3 accent{0.2f, 0.7f, 0.9f};
     char label[96]{"Native sample state"};
+    char asset_note[256]{};
 };
 
 NativeSampleState g_state{};
@@ -102,6 +103,197 @@ void drawNativeSampleWindow(void* window_user_data, const LunaEditorHostApi* hos
         ui.separator_text(ui.api_user_data, "Host API");
     }
 
+    if (host_api->project.project_info != nullptr) {
+        char project_name[128]{};
+        char assets_path[192]{};
+        LunaEditorProjectInfo project_info{};
+        project_info.struct_size = sizeof(LunaEditorProjectInfo);
+        project_info.api_version = LUNA_EDITOR_PROJECT_INFO_API_VERSION;
+        project_info.name = project_name;
+        project_info.name_size = sizeof(project_name);
+        project_info.assets_path = assets_path;
+        project_info.assets_path_size = sizeof(assets_path);
+        if (host_api->project.project_info(host_api->project.api_user_data, &project_info) != 0) {
+            char project_text[256]{};
+            std::snprintf(project_text, sizeof(project_text), "Project: %s (%s)", project_name, assets_path);
+            ui.text(ui.api_user_data, project_text);
+        } else if (host_api->project.has_project_loaded != nullptr &&
+                   host_api->project.has_project_loaded(host_api->project.api_user_data) == 0) {
+            ui.text_disabled(ui.api_user_data, "No project loaded.");
+        }
+    }
+
+    if (host_api->scene.scene_label != nullptr && host_api->scene.entity_count != nullptr) {
+        char scene_label[128]{};
+        host_api->scene.scene_label(host_api->scene.api_user_data, scene_label, sizeof(scene_label));
+        char scene_text[256]{};
+        std::snprintf(scene_text,
+                      sizeof(scene_text),
+                      "Scene: %s (%llu entities)",
+                      scene_label[0] != '\0' ? scene_label : "Untitled",
+                      static_cast<unsigned long long>(host_api->scene.entity_count(host_api->scene.api_user_data)));
+        ui.text(ui.api_user_data, scene_text);
+    }
+
+    if (host_api->selection.selected_entity_id != nullptr) {
+        const uint64_t selected_entity = host_api->selection.selected_entity_id(host_api->selection.api_user_data);
+        char selection_text[96]{};
+        std::snprintf(selection_text,
+                      sizeof(selection_text),
+                      "Selected entity: %llu",
+                      static_cast<unsigned long long>(selected_entity));
+        ui.text(ui.api_user_data, selection_text);
+    }
+
+    if (host_api->viewport.editor_camera_position != nullptr && host_api->viewport.gizmo_operation_name != nullptr &&
+        host_api->viewport.gizmo_mode_name != nullptr) {
+        LunaEditorVec3 camera_position{};
+        host_api->viewport.editor_camera_position(host_api->viewport.api_user_data, &camera_position);
+        char gizmo_operation[32]{};
+        char gizmo_mode[32]{};
+        (void) host_api->viewport.gizmo_operation_name(
+            host_api->viewport.api_user_data, gizmo_operation, sizeof(gizmo_operation));
+        (void) host_api->viewport.gizmo_mode_name(host_api->viewport.api_user_data, gizmo_mode, sizeof(gizmo_mode));
+
+        char viewport_text[256]{};
+        std::snprintf(viewport_text,
+                      sizeof(viewport_text),
+                      "Editor Camera: %.2f, %.2f, %.2f | Gizmo: %s / %s",
+                      camera_position.x,
+                      camera_position.y,
+                      camera_position.z,
+                      gizmo_operation[0] != '\0' ? gizmo_operation : "Unknown",
+                      gizmo_mode[0] != '\0' ? gizmo_mode : "Unknown");
+        ui.text(ui.api_user_data, viewport_text);
+    }
+
+    if (host_api->viewport.scene_texture_view != nullptr) {
+        LunaEditorTextureView texture{};
+        if (host_api->viewport.scene_texture_view(host_api->viewport.api_user_data, &texture) != 0) {
+            char viewport_size_text[128]{};
+            std::snprintf(viewport_size_text,
+                          sizeof(viewport_size_text),
+                          "Scene Texture: %ux%u (%s)",
+                          texture.width,
+                          texture.height,
+                          texture.texture_id != 0u ? "available" : "missing");
+            ui.text(ui.api_user_data, viewport_size_text);
+        }
+    }
+
+    if (host_api->runtime_viewport.is_runtime_viewport_enabled != nullptr &&
+        host_api->runtime_viewport.is_runtime_viewport_requested != nullptr &&
+        host_api->runtime_viewport.runtime_entity_count != nullptr) {
+        const int runtime_enabled =
+            host_api->runtime_viewport.is_runtime_viewport_enabled(host_api->runtime_viewport.api_user_data);
+        const int runtime_requested =
+            host_api->runtime_viewport.is_runtime_viewport_requested(host_api->runtime_viewport.api_user_data);
+        char runtime_text[160]{};
+        std::snprintf(runtime_text,
+                      sizeof(runtime_text),
+                      "Runtime Viewport: %s / requested=%s / entities=%llu",
+                      runtime_enabled != 0 ? "enabled" : "editor",
+                      runtime_requested != 0 ? "true" : "false",
+                      static_cast<unsigned long long>(
+                          host_api->runtime_viewport.runtime_entity_count(host_api->runtime_viewport.api_user_data)));
+        ui.text(ui.api_user_data, runtime_text);
+    }
+
+    if (ui.checkbox != nullptr && host_api->viewport.pick_debug_visualization_enabled != nullptr &&
+        host_api->viewport.set_pick_debug_visualization_enabled != nullptr) {
+        int pick_debug = host_api->viewport.pick_debug_visualization_enabled(host_api->viewport.api_user_data);
+        if (ui.checkbox(ui.api_user_data, "Viewport Pick Debug", &pick_debug) != 0) {
+            host_api->viewport.set_pick_debug_visualization_enabled(
+                host_api->viewport.api_user_data, pick_debug);
+        }
+    }
+
+    if (ui.checkbox != nullptr && host_api->viewport.editor_grid_enabled != nullptr &&
+        host_api->viewport.set_editor_grid_enabled != nullptr) {
+        int editor_grid = host_api->viewport.editor_grid_enabled(host_api->viewport.api_user_data);
+        if (ui.checkbox(ui.api_user_data, "Viewport Grid", &editor_grid) != 0) {
+            host_api->viewport.set_editor_grid_enabled(host_api->viewport.api_user_data, editor_grid);
+        }
+    }
+
+    if (ui.checkbox != nullptr && host_api->runtime_viewport.is_runtime_viewport_requested != nullptr &&
+        host_api->runtime_viewport.set_runtime_viewport_requested != nullptr) {
+        int runtime_requested =
+            host_api->runtime_viewport.is_runtime_viewport_requested(host_api->runtime_viewport.api_user_data);
+        if (ui.checkbox(ui.api_user_data, "Request Runtime Viewport", &runtime_requested) != 0) {
+            host_api->runtime_viewport.set_runtime_viewport_requested(
+                host_api->runtime_viewport.api_user_data, runtime_requested);
+        }
+    }
+
+    if (ui.button != nullptr && host_api->scene.create_entity != nullptr && host_api->selection.select_entity != nullptr) {
+        if (ui.button(ui.api_user_data, "Create Native Entity", nullptr, LunaEditorButtonVariant_Subtle) != 0) {
+            const uint64_t entity_id =
+                host_api->scene.create_entity(host_api->scene.api_user_data, "Native Sample Entity");
+            if (entity_id != 0u) {
+                host_api->selection.select_entity(host_api->selection.api_user_data, entity_id);
+            }
+        }
+    }
+
+    if (host_api->scene.get_camera_component != nullptr && host_api->scene.set_camera_component != nullptr &&
+        host_api->selection.selected_entity_id != nullptr) {
+        const uint64_t selected_entity = host_api->selection.selected_entity_id(host_api->selection.api_user_data);
+        if (selected_entity != 0u) {
+            LunaEditorSceneCameraComponent camera{};
+            camera.struct_size = sizeof(LunaEditorSceneCameraComponent);
+            camera.api_version = LUNA_EDITOR_SCENE_CAMERA_COMPONENT_API_VERSION;
+            const bool has_camera =
+                host_api->scene.get_camera_component(host_api->scene.api_user_data, selected_entity, &camera) != 0;
+            const char* camera_status_text =
+                has_camera ? "Selected entity has a camera component." : "Selected entity has no camera component.";
+            ui.text(ui.api_user_data, camera_status_text);
+            if (ui.button != nullptr &&
+                ui.button(ui.api_user_data, "Ensure Camera Component", nullptr, LunaEditorButtonVariant_Default) != 0) {
+                if (!has_camera) {
+                    camera.primary = 1;
+                    camera.fixed_aspect_ratio = 0;
+                    camera.projection = 0;
+                    camera.perspective_vertical_fov_degrees = 50.0f;
+                    camera.perspective_near = 0.05f;
+                    camera.perspective_far = 500.0f;
+                    camera.orthographic_size = 10.0f;
+                    camera.orthographic_near = -100.0f;
+                    camera.orthographic_far = 100.0f;
+                }
+                (void) host_api->scene.set_camera_component(host_api->scene.api_user_data, selected_entity, &camera);
+            }
+        }
+    }
+
+    if (host_api->plugin_assets.read_text != nullptr && state->asset_note[0] == '\0') {
+        size_t required_size = 0;
+        if (host_api->plugin_assets.read_text(
+                host_api->plugin_assets.api_user_data, "welcome.txt", nullptr, 0, &required_size) != 0 &&
+            required_size > 0) {
+            host_api->plugin_assets.read_text(host_api->plugin_assets.api_user_data,
+                                              "welcome.txt",
+                                              state->asset_note,
+                                              sizeof(state->asset_note),
+                                              &required_size);
+        }
+    }
+    if (state->asset_note[0] != '\0') {
+        ui.text_wrapped(ui.api_user_data, state->asset_note);
+    } else {
+        ui.text_disabled(ui.api_user_data, "Plugin asset welcome.txt was not found.");
+    }
+
+    if (host_api->assets.asset_revision != nullptr) {
+        char revision_text[64]{};
+        std::snprintf(revision_text,
+                      sizeof(revision_text),
+                      "Asset revision: %llu",
+                      static_cast<unsigned long long>(
+                          host_api->assets.asset_revision(host_api->assets.api_user_data)));
+        ui.text(ui.api_user_data, revision_text);
+    }
+
     if (ui.begin_table != nullptr && ui.end_table != nullptr && ui.table_next_row != nullptr &&
         ui.table_next_column != nullptr) {
         const LunaEditorVec2 outer_size{};
@@ -144,8 +336,9 @@ int loadNativeSample(void* plugin_user_data, const LunaEditorHostApi* host_api)
         return 0;
     }
 
-    if (host_api->commands.register_command == nullptr || host_api->windows.register_window == nullptr) {
-        logMessage(host_api, LunaEditorLogLevel_Error, "Native sample requires command and window host APIs.");
+    if (host_api->commands.register_command == nullptr || host_api->windows.register_window == nullptr ||
+        host_api->menus.add_menu_item == nullptr || host_api->plugin_assets.read_text == nullptr) {
+        logMessage(host_api, LunaEditorLogLevel_Error, "Native sample requires command, window, menu, and plugin asset host APIs.");
         return 0;
     }
 
@@ -185,6 +378,21 @@ int loadNativeSample(void* plugin_user_data, const LunaEditorHostApi* host_api)
         return 0;
     }
 
+    LunaEditorMenuItemDescriptor menu_item{};
+    menu_item.struct_size = sizeof(LunaEditorMenuItemDescriptor);
+    menu_item.api_version = LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION;
+    menu_item.menu_path = "Tools/Native Sample";
+    menu_item.command_id = kCommandId;
+    menu_item.label = "Open Native Sample Tool";
+    menu_item.shortcut = "";
+
+    if (host_api->menus.add_menu_item(host_api->menus.api_user_data, &menu_item) == 0) {
+        host_api->windows.unregister_window(host_api->windows.api_user_data, kWindowId);
+        host_api->commands.unregister_command(host_api->commands.api_user_data, kCommandId);
+        logMessage(host_api, LunaEditorLogLevel_Error, "Failed to register native sample menu item.");
+        return 0;
+    }
+
     logMessage(host_api, LunaEditorLogLevel_Info, "Native sample loaded.");
     return 1;
 }
@@ -194,6 +402,9 @@ void unloadNativeSample(void*, const LunaEditorHostApi* host_api)
     if (host_api != nullptr) {
         if (host_api->windows.unregister_window != nullptr) {
             host_api->windows.unregister_window(host_api->windows.api_user_data, kWindowId);
+        }
+        if (host_api->menus.remove_menu_items_for_command != nullptr) {
+            host_api->menus.remove_menu_items_for_command(host_api->menus.api_user_data, kCommandId);
         }
         if (host_api->commands.unregister_command != nullptr) {
             host_api->commands.unregister_command(host_api->commands.api_user_data, kCommandId);

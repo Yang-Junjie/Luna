@@ -1,7 +1,8 @@
 #pragma once
 
 #include "EditorCamera.h"
-#include "EditorContext.h"
+#include "EditorDocumentContext.h"
+#include "EditorDocumentHost.h"
 #include "EditorRuntime.h"
 #include "EditorApi/EditorRenderingService.h"
 #include "EditorApi/EditorViewportService.h"
@@ -10,7 +11,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneRuntime.h"
-#include "Viewport/EditorViewportSession.h"
+#include "Viewport/ViewportInstanceManager.h"
 #include "Script/ScriptPluginManifest.h"
 
 #include <array>
@@ -32,6 +33,7 @@ struct Extent2D;
 namespace luna {
 
 class LunaEditorApplication;
+class ViewportInstance;
 
 namespace editor {
 class EditorPluginManager;
@@ -50,7 +52,7 @@ enum class GizmoMode : uint8_t {
     World,
 };
 
-class LunaEditorLayer final : public Layer, public EditorContext {
+class LunaEditorLayer final : public Layer, public EditorDocumentHost {
 public:
     explicit LunaEditorLayer(LunaEditorApplication& application);
     ~LunaEditorLayer() override;
@@ -166,6 +168,8 @@ private:
     void beginRuntimeViewport();
     void endRuntimeViewport();
     Scene& activeRenderScene();
+    ViewportInstance& activeViewportInstance() noexcept;
+    const ViewportInstance& activeViewportInstance() const noexcept;
     void processAuthoringEvents();
 
     bool syncProjectAssets();
@@ -188,6 +192,12 @@ private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
     EditorRuntime m_editor_runtime;
+    EditorDocumentContext m_authoring_document_context{"luna.document.authoring.scene",
+                                                       EditorDocumentKind::AuthoringScene,
+                                                       true};
+    EditorDocumentContext m_runtime_document_context{"luna.document.runtime.scene",
+                                                     EditorDocumentKind::RuntimeSceneSnapshot,
+                                                     false};
     std::unique_ptr<Scene> m_runtime_scene;
     std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
     std::string m_asset_label{"No scene loaded"};
@@ -202,7 +212,7 @@ private:
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
-    EditorViewportSession m_viewport_session;
+    ViewportInstanceManager m_viewport_instances;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
     std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };

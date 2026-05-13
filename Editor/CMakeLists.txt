@@ -33,7 +33,8 @@ add_executable(
     Source/Plugins/Viewport/ViewportPlugin.cpp
     Source/EditorCamera.h
     Source/EditorCamera.cpp
-    Source/EditorContext.h
+    Source/EditorDocumentContext.h
+    Source/EditorDocumentHost.h
     Source/EditorAssetDragDrop.h
     Source/EditorRuntime.h
     Source/EditorRuntime.cpp
@@ -51,8 +52,10 @@ add_executable(
     Source/Shell/EditorPluginDependencyResolver.cpp
     Source/Shell/EditorPluginManifest.h
     Source/Shell/EditorPluginManifest.cpp
-    Source/Viewport/EditorViewportSession.h
-    Source/Viewport/EditorViewportSession.cpp
+    Source/Viewport/ViewportInstance.h
+    Source/Viewport/ViewportInstance.cpp
+    Source/Viewport/ViewportInstanceManager.h
+    Source/Viewport/ViewportInstanceManager.cpp
     Source/LunaEditorApp.h
     Source/LunaEditorApp.cpp
     Source/LunaEditorLayer.h

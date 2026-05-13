@@ -2436,6 +2436,21 @@ public:
                       m_items.end());
     }
 
+    void removeMenuItemsForOwner(std::string_view owner_id)
+    {
+        if (owner_id.empty()) {
+            return;
+        }
+
+        const std::string owner_key = toString(owner_id);
+        m_items.erase(std::remove_if(m_items.begin(),
+                                     m_items.end(),
+                                     [&](const MenuItemDescriptor& item) {
+                                         return item.owner_id == owner_key;
+                                     }),
+                      m_items.end());
+    }
+
     void drawMenuItems(std::string_view menu_path)
     {
         const std::string normalized_path = normalizeMenuPath(menu_path);
@@ -3477,8 +3492,22 @@ void EditorShell::unloadPlugins()
     m_impl->plugins.clear();
 }
 
+void EditorShell::registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path)
+{
+    m_impl->plugin_asset_service.registerPlugin(PluginDescriptor{
+        .id = toString(plugin_id),
+        .root_path = root_path,
+    });
+}
+
+void EditorShell::unregisterPluginAssetRoot(std::string_view plugin_id)
+{
+    m_impl->plugin_asset_service.unregisterPlugin(plugin_id);
+}
+
 void EditorShell::unregisterNativePluginContributions(std::string_view owner_id)
 {
+    m_impl->menu_service.removeMenuItemsForOwner(owner_id);
     m_impl->command_service.unregisterCommandsForOwner(owner_id);
     m_impl->window_service.unregisterWindowsForOwner(owner_id);
 }

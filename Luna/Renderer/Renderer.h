@@ -259,6 +259,14 @@ private:
         uint64_t pending_scene_output_generation{0};
     };
 
+    struct SceneViewportState {
+        SceneOutputState output{};
+        RenderFeatureHistoryState feature_history{};
+        RenderViewHistory view_history{};
+        RenderWorld world{};
+        std::unique_ptr<IRenderFlow> render_flow;
+    };
+
     void createSwapchain(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
@@ -287,13 +295,9 @@ private:
 private:
     WindowContext m_window_context{};
     DeviceContext m_device_context{};
-    SceneOutputState m_scene_output{};
+    SceneViewportState m_scene_viewport{};
     FrameResources m_frame_resources{};
     RuntimeState m_runtime{};
-    RenderFeatureHistoryState m_render_feature_history{};
-    RenderViewHistory m_render_view_history{};
-    RenderWorld m_render_world{};
-    std::unique_ptr<IRenderFlow> m_render_flow;
     RenderGraphProfileSnapshot m_last_render_graph_profile{};
 };
 

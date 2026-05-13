@@ -1,0 +1,1 @@
+NativeSample loaded this text from its own assets directory through the native editor plugin API.

@@ -15,9 +15,9 @@
 
 namespace luna {
 
-class EditorContext {
+class EditorDocumentHost {
 public:
-    virtual ~EditorContext() = default;
+    virtual ~EditorDocumentHost() = default;
 
     virtual Scene& getScene() = 0;
     virtual Scene& getInspectionScene() = 0;

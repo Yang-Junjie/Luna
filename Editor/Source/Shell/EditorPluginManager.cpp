@@ -1,9 +1,16 @@
 #include "Shell/EditorPluginManager.h"
 
 #include "Core/Log.h"
+#include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorMenuService.h"
+#include "EditorApi/EditorPluginAssetService.h"
+#include "EditorApi/EditorProjectService.h"
+#include "EditorApi/EditorRuntimeViewportService.h"
+#include "EditorApi/EditorSceneService.h"
+#include "EditorApi/EditorSelectionService.h"
 #include "EditorApi/EditorUi.h"
+#include "EditorApi/EditorViewportService.h"
 #include "EditorApi/EditorWindowService.h"
 #include "Plugins/AssetLoading/AssetLoadingPlugin.h"
 #include "Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h"
@@ -27,8 +34,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -206,6 +215,321 @@ TextureView toEditorTextureView(const LunaEditorTextureView& value) noexcept
     };
 }
 
+LunaEditorTextureView toNativeTextureView(TextureView value) noexcept
+{
+    return LunaEditorTextureView{
+        .texture_id = value.id,
+        .width = value.size.x,
+        .height = value.size.y,
+        .y_flip = value.y_flip ? 1 : 0,
+    };
+}
+
+AssetType toEditorAssetType(uint32_t value) noexcept
+{
+    switch (value) {
+        case LunaEditorAssetType_Texture:
+            return AssetType::Texture;
+        case LunaEditorAssetType_Mesh:
+            return AssetType::Mesh;
+        case LunaEditorAssetType_Material:
+            return AssetType::Material;
+        case LunaEditorAssetType_Model:
+            return AssetType::Model;
+        case LunaEditorAssetType_Scene:
+            return AssetType::Scene;
+        case LunaEditorAssetType_Script:
+            return AssetType::Script;
+        case LunaEditorAssetType_None:
+        default:
+            return AssetType::None;
+    }
+}
+
+uint32_t toNativeAssetType(AssetType value) noexcept
+{
+    switch (value) {
+        case AssetType::Texture:
+            return LunaEditorAssetType_Texture;
+        case AssetType::Mesh:
+            return LunaEditorAssetType_Mesh;
+        case AssetType::Material:
+            return LunaEditorAssetType_Material;
+        case AssetType::Model:
+            return LunaEditorAssetType_Model;
+        case AssetType::Scene:
+            return LunaEditorAssetType_Scene;
+        case AssetType::Script:
+            return LunaEditorAssetType_Script;
+        case AssetType::None:
+        default:
+            return LunaEditorAssetType_None;
+    }
+}
+
+SceneEntityCreateKind toEditorSceneEntityCreateKind(uint32_t value) noexcept
+{
+    switch (value) {
+        case LunaEditorSceneEntityCreateKind_Camera:
+            return SceneEntityCreateKind::Camera;
+        case LunaEditorSceneEntityCreateKind_DirectionalLight:
+            return SceneEntityCreateKind::DirectionalLight;
+        case LunaEditorSceneEntityCreateKind_PointLight:
+            return SceneEntityCreateKind::PointLight;
+        case LunaEditorSceneEntityCreateKind_SpotLight:
+            return SceneEntityCreateKind::SpotLight;
+        case LunaEditorSceneEntityCreateKind_PrimitiveMesh:
+            return SceneEntityCreateKind::PrimitiveMesh;
+        case LunaEditorSceneEntityCreateKind_MeshAsset:
+            return SceneEntityCreateKind::MeshAsset;
+        case LunaEditorSceneEntityCreateKind_ModelAsset:
+            return SceneEntityCreateKind::ModelAsset;
+        case LunaEditorSceneEntityCreateKind_Empty:
+        default:
+            return SceneEntityCreateKind::Empty;
+    }
+}
+
+SceneComponentKind toEditorSceneComponentKind(uint32_t value) noexcept
+{
+    switch (value) {
+        case LunaEditorSceneComponentKind_Camera:
+            return SceneComponentKind::Camera;
+        case LunaEditorSceneComponentKind_Light:
+            return SceneComponentKind::Light;
+        case LunaEditorSceneComponentKind_Mesh:
+            return SceneComponentKind::Mesh;
+        case LunaEditorSceneComponentKind_Script:
+            return SceneComponentKind::Script;
+        case LunaEditorSceneComponentKind_Transform:
+        default:
+            return SceneComponentKind::Transform;
+    }
+}
+
+uint32_t toNativeSceneEntityComponentFlags(const SceneEntityComponents& components) noexcept
+{
+    uint32_t flags = LunaEditorSceneEntityComponentFlag_None;
+    if (components.transform) {
+        flags |= LunaEditorSceneEntityComponentFlag_Transform;
+    }
+    if (components.camera) {
+        flags |= LunaEditorSceneEntityComponentFlag_Camera;
+    }
+    if (components.light) {
+        flags |= LunaEditorSceneEntityComponentFlag_Light;
+    }
+    if (components.mesh) {
+        flags |= LunaEditorSceneEntityComponentFlag_Mesh;
+    }
+    if (components.script) {
+        flags |= LunaEditorSceneEntityComponentFlag_Script;
+    }
+    return flags;
+}
+
+LunaEditorSceneTransform toNativeSceneTransform(const SceneTransform& transform) noexcept
+{
+    return LunaEditorSceneTransform{
+        .translation = LunaEditorVec3{
+            .x = transform.translation.x,
+            .y = transform.translation.y,
+            .z = transform.translation.z,
+        },
+        .rotation_degrees = LunaEditorVec3{
+            .x = transform.rotation_degrees.x,
+            .y = transform.rotation_degrees.y,
+            .z = transform.rotation_degrees.z,
+        },
+        .scale = LunaEditorVec3{
+            .x = transform.scale.x,
+            .y = transform.scale.y,
+            .z = transform.scale.z,
+        },
+    };
+}
+
+SceneTransform toEditorSceneTransform(const LunaEditorSceneTransform& transform) noexcept
+{
+    return SceneTransform{
+        .translation = Vec3{
+            .x = transform.translation.x,
+            .y = transform.translation.y,
+            .z = transform.translation.z,
+        },
+        .rotation_degrees = Vec3{
+            .x = transform.rotation_degrees.x,
+            .y = transform.rotation_degrees.y,
+            .z = transform.rotation_degrees.z,
+        },
+        .scale = Vec3{
+            .x = transform.scale.x,
+            .y = transform.scale.y,
+            .z = transform.scale.z,
+        },
+    };
+}
+
+uint32_t toNativeSceneCameraProjection(SceneCameraProjection value) noexcept
+{
+    switch (value) {
+        case SceneCameraProjection::Orthographic:
+            return 1u;
+        case SceneCameraProjection::Perspective:
+        default:
+            return 0u;
+    }
+}
+
+SceneCameraProjection toEditorSceneCameraProjection(uint32_t value) noexcept
+{
+    switch (value) {
+        case 1u:
+            return SceneCameraProjection::Orthographic;
+        case 0u:
+        default:
+            return SceneCameraProjection::Perspective;
+    }
+}
+
+uint32_t toNativeSceneLightType(SceneLightType value) noexcept
+{
+    switch (value) {
+        case SceneLightType::Point:
+            return 1u;
+        case SceneLightType::Spot:
+            return 2u;
+        case SceneLightType::Directional:
+        default:
+            return 0u;
+    }
+}
+
+SceneLightType toEditorSceneLightType(uint32_t value) noexcept
+{
+    switch (value) {
+        case 1u:
+            return SceneLightType::Point;
+        case 2u:
+            return SceneLightType::Spot;
+        case 0u:
+        default:
+            return SceneLightType::Directional;
+    }
+}
+
+bool hasNativeSceneCameraComponentLayout(const LunaEditorSceneCameraComponent* out_component) noexcept
+{
+    return out_component != nullptr && out_component->api_version == 1u &&
+           out_component->struct_size >= sizeof(LunaEditorSceneCameraComponent);
+}
+
+bool hasNativeSceneLightComponentLayout(const LunaEditorSceneLightComponent* out_component) noexcept
+{
+    return out_component != nullptr && out_component->api_version == 1u &&
+           out_component->struct_size >= sizeof(LunaEditorSceneLightComponent);
+}
+
+bool hasNativeSceneMeshComponentLayout(const LunaEditorSceneMeshComponent* out_component) noexcept
+{
+    return out_component != nullptr && out_component->api_version == 1u &&
+           out_component->struct_size >= sizeof(LunaEditorSceneMeshComponent);
+}
+
+LunaEditorSceneCameraComponent toNativeSceneCameraComponent(const SceneCameraComponent& component) noexcept
+{
+    return LunaEditorSceneCameraComponent{
+        .struct_size = sizeof(LunaEditorSceneCameraComponent),
+        .api_version = 1u,
+        .primary = component.primary ? 1 : 0,
+        .fixed_aspect_ratio = component.fixed_aspect_ratio ? 1 : 0,
+        .projection = toNativeSceneCameraProjection(component.projection),
+        .perspective_vertical_fov_degrees = component.perspective_vertical_fov_degrees,
+        .perspective_near = component.perspective_near,
+        .perspective_far = component.perspective_far,
+        .orthographic_size = component.orthographic_size,
+        .orthographic_near = component.orthographic_near,
+        .orthographic_far = component.orthographic_far,
+    };
+}
+
+SceneCameraComponent toEditorSceneCameraComponent(const LunaEditorSceneCameraComponent& component) noexcept
+{
+    return SceneCameraComponent{
+        .primary = component.primary != 0,
+        .fixed_aspect_ratio = component.fixed_aspect_ratio != 0,
+        .projection = toEditorSceneCameraProjection(component.projection),
+        .perspective_vertical_fov_degrees = component.perspective_vertical_fov_degrees,
+        .perspective_near = component.perspective_near,
+        .perspective_far = component.perspective_far,
+        .orthographic_size = component.orthographic_size,
+        .orthographic_near = component.orthographic_near,
+        .orthographic_far = component.orthographic_far,
+    };
+}
+
+LunaEditorSceneLightComponent toNativeSceneLightComponent(const SceneLightComponent& component) noexcept
+{
+    return LunaEditorSceneLightComponent{
+        .struct_size = sizeof(LunaEditorSceneLightComponent),
+        .api_version = 1u,
+        .type = toNativeSceneLightType(component.type),
+        .enabled = component.enabled ? 1 : 0,
+        .color = LunaEditorVec3{.x = component.color.x, .y = component.color.y, .z = component.color.z},
+        .intensity = component.intensity,
+        .range = component.range,
+        .inner_cone_angle_degrees = component.inner_cone_angle_degrees,
+        .outer_cone_angle_degrees = component.outer_cone_angle_degrees,
+    };
+}
+
+SceneLightComponent toEditorSceneLightComponent(const LunaEditorSceneLightComponent& component) noexcept
+{
+    return SceneLightComponent{
+        .type = toEditorSceneLightType(component.type),
+        .enabled = component.enabled != 0,
+        .color = Vec3{.x = component.color.x, .y = component.color.y, .z = component.color.z},
+        .intensity = component.intensity,
+        .range = component.range,
+        .inner_cone_angle_degrees = component.inner_cone_angle_degrees,
+        .outer_cone_angle_degrees = component.outer_cone_angle_degrees,
+    };
+}
+
+bool fillNativeSceneMeshComponent(const SceneMeshComponent& component, LunaEditorSceneMeshComponent* out_component)
+{
+    if (!hasNativeSceneMeshComponentLayout(out_component)) {
+        return false;
+    }
+
+    out_component->mesh_handle = static_cast<uint64_t>(component.mesh_handle);
+    out_component->first_submesh = component.first_submesh;
+    out_component->submesh_count = component.submesh_count;
+    out_component->submesh_material_count = component.submesh_materials.size();
+
+    const size_t copy_count = (std::min)(out_component->submesh_material_capacity, component.submesh_materials.size());
+    if (out_component->submesh_material_handles != nullptr && copy_count > 0u) {
+        for (size_t index = 0; index < copy_count; ++index) {
+            out_component->submesh_material_handles[index] = static_cast<uint64_t>(component.submesh_materials[index]);
+        }
+    }
+    return copy_count == component.submesh_materials.size();
+}
+
+SceneMeshComponent toEditorSceneMeshComponent(const LunaEditorSceneMeshComponent& component)
+{
+    SceneMeshComponent result{};
+    result.mesh_handle = AssetHandle(component.mesh_handle);
+    result.first_submesh = component.first_submesh;
+    result.submesh_count = component.submesh_count;
+    result.submesh_materials.reserve(component.submesh_material_capacity);
+    for (size_t index = 0; index < component.submesh_material_capacity && component.submesh_material_handles != nullptr;
+         ++index) {
+        result.submesh_materials.push_back(AssetHandle(component.submesh_material_handles[index]));
+    }
+    return result;
+}
+
 ButtonVariant toEditorButtonVariant(uint32_t value) noexcept
 {
     switch (value) {
@@ -251,6 +575,48 @@ Ui* nativeUi(void* api_user_data) noexcept
     return shell != nullptr ? &shell->ui() : nullptr;
 }
 
+AssetService* nativeAssets(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->assets() : nullptr;
+}
+
+PluginAssetService* nativePluginAssets(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->pluginAssets() : nullptr;
+}
+
+ProjectService* nativeProject(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->project() : nullptr;
+}
+
+SceneService* nativeScene(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->scene() : nullptr;
+}
+
+SelectionService* nativeSelection(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->selection() : nullptr;
+}
+
+ViewportService* nativeViewport(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->viewport() : nullptr;
+}
+
+RuntimeViewportService* nativeRuntimeViewport(void* api_user_data) noexcept
+{
+    EditorShell* shell = nativeShell(api_user_data);
+    return shell != nullptr ? &shell->runtimeViewport() : nullptr;
+}
+
 const LunaEditorHostApi* nativeHostApi(NativePluginContext* context) noexcept
 {
     return context != nullptr ? context->host_api : nullptr;
@@ -267,6 +633,63 @@ void copyToNativeBuffer(char* buffer, size_t buffer_size, const std::string& val
         std::memcpy(buffer, value.data(), copy_size);
     }
     buffer[copy_size] = '\0';
+}
+
+void copyPathToNativeBuffer(char* buffer, size_t buffer_size, const std::filesystem::path& value)
+{
+    copyToNativeBuffer(buffer, buffer_size, value.generic_string());
+}
+
+bool hasNativeAssetInfoLayout(const LunaEditorAssetInfo* out_info) noexcept
+{
+    return out_info != nullptr && out_info->api_version == LUNA_EDITOR_ASSET_INFO_API_VERSION &&
+           out_info->struct_size >= sizeof(LunaEditorAssetInfo);
+}
+
+bool fillNativeAssetInfo(const AssetInfo& info, LunaEditorAssetInfo* out_info)
+{
+    if (!hasNativeAssetInfoLayout(out_info)) {
+        return false;
+    }
+
+    out_info->handle = static_cast<uint64_t>(info.handle);
+    out_info->type = toNativeAssetType(info.type);
+    out_info->exists = info.exists ? 1 : 0;
+    out_info->builtin = info.builtin ? 1 : 0;
+    out_info->loading = info.loading ? 1 : 0;
+    out_info->memory_only = info.memory_only ? 1 : 0;
+    copyToNativeBuffer(out_info->label, out_info->label_size, info.label);
+    copyToNativeBuffer(out_info->detail, out_info->detail_size, info.detail);
+    copyPathToNativeBuffer(out_info->project_path, out_info->project_path_size, info.project_path);
+    copyPathToNativeBuffer(out_info->absolute_path, out_info->absolute_path_size, info.absolute_path);
+    return true;
+}
+
+bool hasNativeProjectInfoLayout(const LunaEditorProjectInfo* out_info) noexcept
+{
+    return out_info != nullptr && out_info->api_version == LUNA_EDITOR_PROJECT_INFO_API_VERSION &&
+           out_info->struct_size >= sizeof(LunaEditorProjectInfo);
+}
+
+bool hasNativeSceneEntityInfoLayout(const LunaEditorSceneEntityInfo* out_info) noexcept
+{
+    return out_info != nullptr && out_info->api_version == LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION &&
+           out_info->struct_size >= sizeof(LunaEditorSceneEntityInfo);
+}
+
+bool fillNativeSceneEntityInfo(const SceneEntityDetails& details, LunaEditorSceneEntityInfo* out_info)
+{
+    if (!hasNativeSceneEntityInfoLayout(out_info)) {
+        return false;
+    }
+
+    out_info->id = static_cast<uint64_t>(details.id);
+    out_info->parent_id = static_cast<uint64_t>(details.parent_id);
+    out_info->component_flags = toNativeSceneEntityComponentFlags(details.components);
+    out_info->child_count = details.children.size();
+    copyToNativeBuffer(out_info->name, out_info->name_size, details.name);
+    copyToNativeBuffer(out_info->parent_name, out_info->parent_name_size, details.parent_name);
+    return true;
 }
 
 void nativeLog(void* api_user_data, LunaEditorLogLevel level, const char* message)
@@ -950,6 +1373,852 @@ void nativeSetWindowOpen(void* api_user_data, const char* id, int open)
     }
 }
 
+int nativeDescribeAsset(void* api_user_data, uint64_t handle, LunaEditorAssetInfo* out_info)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr && fillNativeAssetInfo(assets->describeAsset(AssetHandle(handle)), out_info) ? 1 : 0;
+}
+
+int nativeAssetInfo(void* api_user_data, uint64_t handle, LunaEditorAssetInfo* out_info)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr) {
+        return 0;
+    }
+
+    const std::optional<AssetInfo> info = assets->assetInfo(AssetHandle(handle));
+    return info && fillNativeAssetInfo(*info, out_info) ? 1 : 0;
+}
+
+int nativeAssetInfoByPath(void* api_user_data, const char* path, LunaEditorAssetInfo* out_info)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || path == nullptr) {
+        return 0;
+    }
+
+    const std::optional<AssetInfo> info = assets->assetInfoByPath(std::filesystem::path(nativeString(path)));
+    return info && fillNativeAssetInfo(*info, out_info) ? 1 : 0;
+}
+
+size_t nativeListAssets(void* api_user_data,
+                        uint32_t type_filter,
+                        int include_builtin,
+                        void* user_data,
+                        LunaEditorEnumerateAssetFn enumerate_fn)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr) {
+        return 0u;
+    }
+
+    const std::vector<AssetInfo> asset_infos = assets->listAssets(toEditorAssetType(type_filter), include_builtin != 0);
+    if (enumerate_fn == nullptr) {
+        return asset_infos.size();
+    }
+
+    size_t enumerated_count = 0u;
+    for (const AssetInfo& info : asset_infos) {
+        char label[256]{};
+        char detail[256]{};
+        char project_path[512]{};
+        char absolute_path[512]{};
+        LunaEditorAssetInfo native_info{
+            .struct_size = sizeof(LunaEditorAssetInfo),
+            .api_version = LUNA_EDITOR_ASSET_INFO_API_VERSION,
+            .label = label,
+            .label_size = sizeof(label),
+            .detail = detail,
+            .detail_size = sizeof(detail),
+            .project_path = project_path,
+            .project_path_size = sizeof(project_path),
+            .absolute_path = absolute_path,
+            .absolute_path_size = sizeof(absolute_path),
+        };
+        if (!fillNativeAssetInfo(info, &native_info)) {
+            continue;
+        }
+        ++enumerated_count;
+        if (enumerate_fn(user_data, &native_info) == 0) {
+            break;
+        }
+    }
+    return enumerated_count;
+}
+
+int nativeAssetExists(void* api_user_data, uint64_t handle)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr && assets->assetExists(AssetHandle(handle)) ? 1 : 0;
+}
+
+int nativeAssetPathExists(void* api_user_data, const char* path)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr && path != nullptr && assets->assetPathExists(std::filesystem::path(nativeString(path))) ? 1 : 0;
+}
+
+uint64_t nativeFindAssetHandleByPath(void* api_user_data, const char* path)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || path == nullptr) {
+        return 0u;
+    }
+    return static_cast<uint64_t>(assets->findAssetHandleByPath(std::filesystem::path(nativeString(path))));
+}
+
+int nativeAssetsRootPath(void* api_user_data, char* out_path, size_t out_path_size)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path = assets->assetsRootPath();
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativeResolveProjectAssetPath(void* api_user_data,
+                                  const char* project_relative_path,
+                                  char* out_path,
+                                  size_t out_path_size)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || project_relative_path == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path =
+        assets->resolveProjectAssetPath(std::filesystem::path(nativeString(project_relative_path)));
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativeMakeProjectRelativeAssetPath(void* api_user_data, const char* path, char* out_path, size_t out_path_size)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || path == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> relative_path =
+        assets->makeProjectRelativeAssetPath(std::filesystem::path(nativeString(path)));
+    if (!relative_path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *relative_path);
+    return 1;
+}
+
+int nativeRefreshAssets(void* api_user_data, LunaEditorAssetRefreshResult* out_result)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || out_result == nullptr ||
+        out_result->api_version != LUNA_EDITOR_ASSET_REFRESH_RESULT_API_VERSION ||
+        out_result->struct_size < sizeof(LunaEditorAssetRefreshResult)) {
+        return 0;
+    }
+
+    const AssetRefreshResult result = assets->refreshAssets();
+    out_result->success = result.success ? 1 : 0;
+    out_result->project_loaded = result.project_loaded ? 1 : 0;
+    out_result->revision = result.revision;
+    copyToNativeBuffer(out_result->message, out_result->message_size, result.message);
+    out_result->discovered_assets = result.discovered_assets;
+    out_result->imported_missing_assets = result.imported_missing_assets;
+    out_result->loaded_existing_metadata = result.loaded_existing_metadata;
+    out_result->rebuilt_metadata = result.rebuilt_metadata;
+    out_result->unsupported_files_skipped = result.unsupported_files_skipped;
+    out_result->failed_assets = result.failed_assets;
+    out_result->missing_metadata_after_sync = result.missing_metadata_after_sync;
+    out_result->script_files_skipped_no_plugin = result.script_files_skipped_no_plugin;
+    out_result->script_files_skipped_unsupported_language = result.script_files_skipped_unsupported_language;
+    out_result->generated_model_files = result.generated_model_files;
+    out_result->generated_model_metadata = result.generated_model_metadata;
+    out_result->generated_material_files = result.generated_material_files;
+    out_result->generated_material_metadata = result.generated_material_metadata;
+    out_result->generated_texture_metadata = result.generated_texture_metadata;
+    out_result->failed_generated_model_assets = result.failed_generated_model_assets;
+    return 1;
+}
+
+uint64_t nativeAssetRevision(void* api_user_data)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr ? assets->assetRevision() : 0u;
+}
+
+int nativeIsAssetLoading(void* api_user_data, uint64_t handle)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr && assets->isAssetLoading(AssetHandle(handle)) ? 1 : 0;
+}
+
+int nativeAcceptsAssetType(void* api_user_data, uint32_t type, const uint32_t* accepted_types, size_t accepted_type_count)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr) {
+        return 0;
+    }
+    if (accepted_type_count > 0u && accepted_types == nullptr) {
+        return 0;
+    }
+
+    std::vector<AssetType> editor_accepted_types;
+    editor_accepted_types.reserve(accepted_type_count);
+    for (size_t index = 0; index < accepted_type_count; ++index) {
+        if (accepted_types != nullptr) {
+            editor_accepted_types.push_back(toEditorAssetType(accepted_types[index]));
+        }
+    }
+    return assets->acceptsAssetType(toEditorAssetType(type),
+                                    editor_accepted_types.data(),
+                                    editor_accepted_types.size())
+               ? 1
+               : 0;
+}
+
+int nativeMeshSubmeshCount(void* api_user_data, uint64_t mesh_handle, size_t* out_count)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    if (assets == nullptr || out_count == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::size_t> count = assets->meshSubmeshCount(AssetHandle(mesh_handle));
+    if (!count) {
+        return 0;
+    }
+    *out_count = *count;
+    return 1;
+}
+
+int nativeBeginAssetDragDropSource(void* api_user_data, uint64_t handle, const char* label)
+{
+    AssetService* assets = nativeAssets(api_user_data);
+    return assets != nullptr && assets->beginAssetDragDropSource(AssetHandle(handle), nativeString(label)) ? 1 : 0;
+}
+
+int nativePluginRootPath(void* api_user_data, char* out_path, size_t out_path_size)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path = plugin_assets->pluginRootPath(context->plugin_id);
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativePluginAssetRootPath(void* api_user_data, char* out_path, size_t out_path_size)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path = plugin_assets->assetRootPath(context->plugin_id);
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativePluginAssetResolvePath(void* api_user_data,
+                                 const char* relative_asset_path,
+                                 char* out_path,
+                                 size_t out_path_size)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr || relative_asset_path == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path =
+        plugin_assets->resolvePath(context->plugin_id, std::filesystem::path(nativeString(relative_asset_path)));
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativePluginAssetExists(void* api_user_data, const char* relative_asset_path)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    return context != nullptr && plugin_assets != nullptr && relative_asset_path != nullptr &&
+                   plugin_assets->exists(context->plugin_id, std::filesystem::path(nativeString(relative_asset_path)))
+               ? 1
+               : 0;
+}
+
+int nativePluginAssetReadText(void* api_user_data,
+                              const char* relative_asset_path,
+                              char* out_text,
+                              size_t out_text_size,
+                              size_t* out_required_size)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr || relative_asset_path == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::string> text =
+        plugin_assets->readText(context->plugin_id, std::filesystem::path(nativeString(relative_asset_path)));
+    if (!text) {
+        return 0;
+    }
+
+    const size_t required_size = text->size() + 1u;
+    if (out_required_size != nullptr) {
+        *out_required_size = required_size;
+    }
+    if (out_text == nullptr || out_text_size == 0u) {
+        return 1;
+    }
+    if (out_text_size < required_size) {
+        copyToNativeBuffer(out_text, out_text_size, *text);
+        return 0;
+    }
+    copyToNativeBuffer(out_text, out_text_size, *text);
+    return 1;
+}
+
+int nativePluginAssetReadBytes(void* api_user_data,
+                               const char* relative_asset_path,
+                               void* out_data,
+                               size_t out_data_size,
+                               size_t* out_required_size)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr || relative_asset_path == nullptr) {
+        return 0;
+    }
+
+    const std::filesystem::path relative_path(nativeString(relative_asset_path));
+    const PluginAssetBytes bytes = plugin_assets->readBytes(context->plugin_id, relative_path);
+    if (bytes.data.empty() && !plugin_assets->exists(context->plugin_id, relative_path)) {
+        return 0;
+    }
+
+    if (out_required_size != nullptr) {
+        *out_required_size = bytes.data.size();
+    }
+    if (out_data == nullptr || out_data_size == 0u) {
+        return 1;
+    }
+    if (out_data_size < bytes.data.size()) {
+        if (!bytes.data.empty()) {
+            std::memcpy(out_data, bytes.data.data(), out_data_size);
+        }
+        return 0;
+    }
+    if (!bytes.data.empty()) {
+        std::memcpy(out_data, bytes.data.data(), bytes.data.size());
+    }
+    return 1;
+}
+
+int nativePluginAssetTexture(void* api_user_data, const char* relative_asset_path, LunaEditorTextureView* out_texture)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    PluginAssetService* plugin_assets = nativePluginAssets(api_user_data);
+    if (context == nullptr || plugin_assets == nullptr || relative_asset_path == nullptr || out_texture == nullptr) {
+        return 0;
+    }
+
+    const TextureView texture =
+        plugin_assets->texture(context->plugin_id, std::filesystem::path(nativeString(relative_asset_path)));
+    if (!texture.valid()) {
+        *out_texture = LunaEditorTextureView{};
+        return 0;
+    }
+    *out_texture = toNativeTextureView(texture);
+    return 1;
+}
+
+int nativeAddMenuItem(void* api_user_data, const LunaEditorMenuItemDescriptor* descriptor)
+{
+    NativePluginContext* context = nativeContext(api_user_data);
+    if (context == nullptr || context->shell == nullptr || descriptor == nullptr) {
+        return 0;
+    }
+    if (descriptor->api_version != LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION ||
+        descriptor->struct_size < sizeof(LunaEditorMenuItemDescriptor) || descriptor->menu_path == nullptr ||
+        descriptor->menu_path[0] == '\0' || descriptor->command_id == nullptr || descriptor->command_id[0] == '\0') {
+        return 0;
+    }
+
+    return context->shell->menus().addMenuItem(MenuItemDescriptor{
+               .menu_path = std::string(nativeString(descriptor->menu_path)),
+               .command_id = std::string(nativeString(descriptor->command_id)),
+               .label = std::string(nativeString(descriptor->label)),
+               .shortcut = std::string(nativeString(descriptor->shortcut)),
+               .owner_id = context->plugin_id,
+           })
+               ? 1
+               : 0;
+}
+
+void nativeRemoveMenuItem(void* api_user_data, const char* menu_path, const char* command_id)
+{
+    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && menu_path != nullptr &&
+                                                           command_id != nullptr) {
+        shell->menus().removeMenuItem(nativeString(menu_path), nativeString(command_id));
+    }
+}
+
+void nativeRemoveMenuItemsForCommand(void* api_user_data, const char* command_id)
+{
+    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && command_id != nullptr) {
+        shell->menus().removeMenuItemsForCommand(nativeString(command_id));
+    }
+}
+
+int nativeHasProjectLoaded(void* api_user_data)
+{
+    ProjectService* project = nativeProject(api_user_data);
+    return project != nullptr && project->hasProjectLoaded() ? 1 : 0;
+}
+
+int nativeProjectRootPath(void* api_user_data, char* out_path, size_t out_path_size)
+{
+    ProjectService* project = nativeProject(api_user_data);
+    if (project == nullptr) {
+        return 0;
+    }
+
+    const std::optional<std::filesystem::path> path = project->projectRootPath();
+    if (!path) {
+        return 0;
+    }
+    copyPathToNativeBuffer(out_path, out_path_size, *path);
+    return 1;
+}
+
+int nativeProjectInfo(void* api_user_data, LunaEditorProjectInfo* out_info)
+{
+    ProjectService* project = nativeProject(api_user_data);
+    if (project == nullptr || !hasNativeProjectInfoLayout(out_info)) {
+        return 0;
+    }
+
+    const std::optional<ProjectInfo> info = project->projectInfo();
+    if (!info) {
+        return 0;
+    }
+
+    copyToNativeBuffer(out_info->name, out_info->name_size, info->Name);
+    copyToNativeBuffer(out_info->version, out_info->version_size, info->Version);
+    copyToNativeBuffer(out_info->author, out_info->author_size, info->Author);
+    copyToNativeBuffer(out_info->description, out_info->description_size, info->Description);
+    copyPathToNativeBuffer(out_info->start_scene, out_info->start_scene_size, info->StartScene);
+    copyPathToNativeBuffer(out_info->assets_path, out_info->assets_path_size, info->AssetsPath);
+    copyToNativeBuffer(out_info->selected_script_plugin_id,
+                       out_info->selected_script_plugin_id_size,
+                       info->Scripting.SelectedPluginId);
+    copyToNativeBuffer(out_info->selected_script_backend_name,
+                       out_info->selected_script_backend_name_size,
+                       info->Scripting.SelectedBackendName);
+    return 1;
+}
+
+int nativeSaveProject(void* api_user_data)
+{
+    ProjectService* project = nativeProject(api_user_data);
+    return project != nullptr && project->saveProject() ? 1 : 0;
+}
+
+int nativeSceneLabel(void* api_user_data, char* out_label, size_t out_label_size)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr) {
+        return 0;
+    }
+
+    copyToNativeBuffer(out_label, out_label_size, scene->sceneLabel());
+    return 1;
+}
+
+size_t nativeSceneEntityCount(void* api_user_data)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr ? scene->entityCount() : 0u;
+}
+
+int nativeCanEditScene(void* api_user_data)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene->canEditScene() ? 1 : 0;
+}
+
+int nativeOpenSceneFile(void* api_user_data, const char* scene_file_path)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene_file_path != nullptr &&
+                   scene->openSceneFile(std::filesystem::path(nativeString(scene_file_path)))
+               ? 1
+               : 0;
+}
+
+size_t nativeEnumerateSceneEntities(void* api_user_data,
+                                    void* user_data,
+                                    LunaEditorEnumerateSceneEntityFn enumerate_fn)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr) {
+        return 0u;
+    }
+
+    const std::vector<SceneEntityInfo> hierarchy = scene->entityHierarchy();
+    if (enumerate_fn == nullptr) {
+        return hierarchy.size();
+    }
+
+    size_t enumerated_count = 0u;
+    for (const SceneEntityInfo& entity : hierarchy) {
+        char name[256]{};
+        char parent_name[256]{};
+        LunaEditorSceneEntityInfo native_info{
+            .struct_size = sizeof(LunaEditorSceneEntityInfo),
+            .api_version = LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION,
+            .id = static_cast<uint64_t>(entity.id),
+            .parent_id = static_cast<uint64_t>(entity.parent_id),
+            .child_count = entity.child_ids.size(),
+            .name = name,
+            .name_size = sizeof(name),
+            .parent_name = parent_name,
+            .parent_name_size = sizeof(parent_name),
+        };
+        copyToNativeBuffer(native_info.name, native_info.name_size, entity.name);
+
+        if (const std::optional<SceneEntityDetails> details = scene->entityDetails(entity.id)) {
+            native_info.component_flags = toNativeSceneEntityComponentFlags(details->components);
+            copyToNativeBuffer(native_info.parent_name, native_info.parent_name_size, details->parent_name);
+        }
+
+        ++enumerated_count;
+        if (enumerate_fn(user_data, &native_info) == 0) {
+            break;
+        }
+    }
+    return enumerated_count;
+}
+
+int nativeEntityExists(void* api_user_data, uint64_t entity_id)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene->entityExists(EntityId(entity_id)) ? 1 : 0;
+}
+
+int nativeEntityInfo(void* api_user_data, uint64_t entity_id, LunaEditorSceneEntityInfo* out_info)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr) {
+        return 0;
+    }
+
+    const std::optional<SceneEntityDetails> details = scene->entityDetails(EntityId(entity_id));
+    return details && fillNativeSceneEntityInfo(*details, out_info) ? 1 : 0;
+}
+
+int nativeIsEntityDescendantOf(void* api_user_data, uint64_t entity_id, uint64_t potential_ancestor_id)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr &&
+                   scene->isEntityDescendantOf(EntityId(entity_id), EntityId(potential_ancestor_id))
+               ? 1
+               : 0;
+}
+
+uint64_t nativeCreateEntity(void* api_user_data, const char* name)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr) {
+        return 0u;
+    }
+    return static_cast<uint64_t>(scene->createEntity(std::string(nativeString(name))));
+}
+
+uint64_t nativeCreateEntityEx(void* api_user_data, const LunaEditorSceneEntityCreateRequest* request)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr || request == nullptr ||
+        request->api_version != LUNA_EDITOR_SCENE_ENTITY_CREATE_REQUEST_API_VERSION ||
+        request->struct_size < sizeof(LunaEditorSceneEntityCreateRequest)) {
+        return 0u;
+    }
+
+    return static_cast<uint64_t>(scene->createEntity(SceneEntityCreateRequest{
+        .kind = toEditorSceneEntityCreateKind(request->kind),
+        .name = std::string(nativeString(request->name)),
+        .parent_id = EntityId(request->parent_id),
+        .asset_handle = AssetHandle(request->asset_handle),
+    }));
+}
+
+int nativeDestroyEntity(void* api_user_data, uint64_t entity_id)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene->destroyEntity(EntityId(entity_id)) ? 1 : 0;
+}
+
+int nativeReparentEntity(void* api_user_data, uint64_t entity_id, uint64_t new_parent_id, int preserve_world_transform)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr &&
+                   scene->reparentEntity(EntityId(entity_id), EntityId(new_parent_id), preserve_world_transform != 0)
+               ? 1
+               : 0;
+}
+
+int nativeSetEntityName(void* api_user_data, uint64_t entity_id, const char* name)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && name != nullptr && scene->setEntityName(EntityId(entity_id), std::string(nativeString(name)))
+               ? 1
+               : 0;
+}
+
+int nativeGetEntityTransform(void* api_user_data, uint64_t entity_id, LunaEditorSceneTransform* out_transform)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr || out_transform == nullptr) {
+        return 0;
+    }
+
+    const std::optional<SceneEntityDetails> details = scene->entityDetails(EntityId(entity_id));
+    if (!details || !details->components.transform) {
+        return 0;
+    }
+    *out_transform = toNativeSceneTransform(details->transform);
+    return 1;
+}
+
+int nativeSetEntityTransform(void* api_user_data, uint64_t entity_id, const LunaEditorSceneTransform* transform)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && transform != nullptr &&
+                   scene->setEntityTransform(EntityId(entity_id), toEditorSceneTransform(*transform))
+               ? 1
+               : 0;
+}
+
+int nativeGetCameraComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneCameraComponent* out_component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr || !hasNativeSceneCameraComponentLayout(out_component)) {
+        return 0;
+    }
+
+    const std::optional<SceneEntityDetails> details = scene->entityDetails(EntityId(entity_id));
+    if (!details || !details->camera) {
+        return 0;
+    }
+
+    *out_component = toNativeSceneCameraComponent(*details->camera);
+    return 1;
+}
+
+int nativeSetCameraComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneCameraComponent* component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && component != nullptr &&
+                   scene->setCameraComponent(EntityId(entity_id), toEditorSceneCameraComponent(*component))
+               ? 1
+               : 0;
+}
+
+int nativeGetLightComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneLightComponent* out_component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr || !hasNativeSceneLightComponentLayout(out_component)) {
+        return 0;
+    }
+
+    const std::optional<SceneEntityDetails> details = scene->entityDetails(EntityId(entity_id));
+    if (!details || !details->light) {
+        return 0;
+    }
+
+    *out_component = toNativeSceneLightComponent(*details->light);
+    return 1;
+}
+
+int nativeSetLightComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneLightComponent* component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && component != nullptr &&
+                   scene->setLightComponent(EntityId(entity_id), toEditorSceneLightComponent(*component))
+               ? 1
+               : 0;
+}
+
+int nativeGetMeshComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneMeshComponent* out_component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    if (scene == nullptr || !hasNativeSceneMeshComponentLayout(out_component)) {
+        return 0;
+    }
+
+    const std::optional<SceneEntityDetails> details = scene->entityDetails(EntityId(entity_id));
+    if (!details || !details->mesh) {
+        return 0;
+    }
+
+    return fillNativeSceneMeshComponent(*details->mesh, out_component) ? 1 : 0;
+}
+
+int nativeSetMeshComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneMeshComponent* component)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && component != nullptr &&
+                   scene->setMeshComponent(EntityId(entity_id), toEditorSceneMeshComponent(*component))
+               ? 1
+               : 0;
+}
+
+int nativeAddComponent(void* api_user_data, uint64_t entity_id, uint32_t component_kind)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene->addComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind)) ? 1 : 0;
+}
+
+int nativeRemoveComponent(void* api_user_data, uint64_t entity_id, uint32_t component_kind)
+{
+    SceneService* scene = nativeScene(api_user_data);
+    return scene != nullptr && scene->removeComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind)) ? 1 : 0;
+}
+
+uint64_t nativeSelectedEntityId(void* api_user_data)
+{
+    SelectionService* selection = nativeSelection(api_user_data);
+    return selection != nullptr ? static_cast<uint64_t>(selection->selectedEntityId()) : 0u;
+}
+
+void nativeSelectEntity(void* api_user_data, uint64_t entity_id)
+{
+    if (SelectionService* selection = nativeSelection(api_user_data)) {
+        selection->selectEntity(EntityId(entity_id));
+    }
+}
+
+void nativeClearSelection(void* api_user_data)
+{
+    if (SelectionService* selection = nativeSelection(api_user_data)) {
+        selection->clearSelection();
+    }
+}
+
+int nativeSceneTextureView(void* api_user_data, LunaEditorTextureView* out_texture)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr || out_texture == nullptr) {
+        return 0;
+    }
+
+    *out_texture = toNativeTextureView(viewport->sceneTextureView());
+    return 1;
+}
+
+void nativeEditorCameraPosition(void* api_user_data, LunaEditorVec3* out_position)
+{
+    if (ViewportService* viewport = nativeViewport(api_user_data); viewport != nullptr && out_position != nullptr) {
+        *out_position = toNativeVec3(viewport->editorCameraPosition());
+    }
+}
+
+int nativeGizmoOperationName(void* api_user_data, char* out_value, size_t out_value_size)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr) {
+        return 0;
+    }
+
+    copyToNativeBuffer(out_value, out_value_size, viewport->gizmoOperationName());
+    return 1;
+}
+
+int nativeGizmoModeName(void* api_user_data, char* out_value, size_t out_value_size)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr) {
+        return 0;
+    }
+
+    copyToNativeBuffer(out_value, out_value_size, viewport->gizmoModeName());
+    return 1;
+}
+
+int nativePickDebugVisualizationEnabled(void* api_user_data)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    return viewport != nullptr && viewport->pickDebugVisualizationEnabled() ? 1 : 0;
+}
+
+void nativeSetPickDebugVisualizationEnabled(void* api_user_data, int enabled)
+{
+    if (ViewportService* viewport = nativeViewport(api_user_data)) {
+        viewport->setPickDebugVisualizationEnabled(enabled != 0);
+    }
+}
+
+int nativeEditorGridEnabled(void* api_user_data)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    return viewport != nullptr && viewport->editorGridEnabled() ? 1 : 0;
+}
+
+void nativeSetEditorGridEnabled(void* api_user_data, int enabled)
+{
+    if (ViewportService* viewport = nativeViewport(api_user_data)) {
+        viewport->setEditorGridEnabled(enabled != 0);
+    }
+}
+
+int nativeIsRuntimeViewportEnabled(void* api_user_data)
+{
+    RuntimeViewportService* runtime_viewport = nativeRuntimeViewport(api_user_data);
+    return runtime_viewport != nullptr && runtime_viewport->isRuntimeViewportEnabled() ? 1 : 0;
+}
+
+int nativeIsRuntimeViewportRequested(void* api_user_data)
+{
+    RuntimeViewportService* runtime_viewport = nativeRuntimeViewport(api_user_data);
+    return runtime_viewport != nullptr && runtime_viewport->isRuntimeViewportRequested() ? 1 : 0;
+}
+
+void nativeSetRuntimeViewportRequested(void* api_user_data, int enabled)
+{
+    if (RuntimeViewportService* runtime_viewport = nativeRuntimeViewport(api_user_data)) {
+        runtime_viewport->setRuntimeViewportRequested(enabled != 0);
+    }
+}
+
+size_t nativeRuntimeEntityCount(void* api_user_data)
+{
+    RuntimeViewportService* runtime_viewport = nativeRuntimeViewport(api_user_data);
+    return runtime_viewport != nullptr ? runtime_viewport->runtimeEntityCount() : 0u;
+}
+
 LunaEditorLogApi makeNativeLogApi(NativePluginContext& context)
 {
     return LunaEditorLogApi{
@@ -1062,6 +2331,147 @@ LunaEditorWindowApi makeNativeWindowApi(NativePluginContext& context)
     };
 }
 
+LunaEditorAssetApi makeNativeAssetApi(NativePluginContext& context)
+{
+    return LunaEditorAssetApi{
+        .struct_size = sizeof(LunaEditorAssetApi),
+        .api_version = LUNA_EDITOR_ASSET_API_VERSION,
+        .api_user_data = &context,
+        .describe_asset = &nativeDescribeAsset,
+        .asset_info = &nativeAssetInfo,
+        .asset_info_by_path = &nativeAssetInfoByPath,
+        .list_assets = &nativeListAssets,
+        .asset_exists = &nativeAssetExists,
+        .asset_path_exists = &nativeAssetPathExists,
+        .find_asset_handle_by_path = &nativeFindAssetHandleByPath,
+        .assets_root_path = &nativeAssetsRootPath,
+        .resolve_project_asset_path = &nativeResolveProjectAssetPath,
+        .make_project_relative_asset_path = &nativeMakeProjectRelativeAssetPath,
+        .refresh_assets = &nativeRefreshAssets,
+        .asset_revision = &nativeAssetRevision,
+        .is_asset_loading = &nativeIsAssetLoading,
+        .accepts_asset_type = &nativeAcceptsAssetType,
+        .mesh_submesh_count = &nativeMeshSubmeshCount,
+        .begin_asset_drag_drop_source = &nativeBeginAssetDragDropSource,
+    };
+}
+
+LunaEditorPluginAssetApi makeNativePluginAssetApi(NativePluginContext& context)
+{
+    return LunaEditorPluginAssetApi{
+        .struct_size = sizeof(LunaEditorPluginAssetApi),
+        .api_version = LUNA_EDITOR_PLUGIN_ASSET_API_VERSION,
+        .api_user_data = &context,
+        .plugin_root_path = &nativePluginRootPath,
+        .asset_root_path = &nativePluginAssetRootPath,
+        .resolve_path = &nativePluginAssetResolvePath,
+        .exists = &nativePluginAssetExists,
+        .read_text = &nativePluginAssetReadText,
+        .read_bytes = &nativePluginAssetReadBytes,
+        .texture = &nativePluginAssetTexture,
+    };
+}
+
+LunaEditorMenuApi makeNativeMenuApi(NativePluginContext& context)
+{
+    return LunaEditorMenuApi{
+        .struct_size = sizeof(LunaEditorMenuApi),
+        .api_version = LUNA_EDITOR_MENU_API_VERSION,
+        .api_user_data = &context,
+        .add_menu_item = &nativeAddMenuItem,
+        .remove_menu_item = &nativeRemoveMenuItem,
+        .remove_menu_items_for_command = &nativeRemoveMenuItemsForCommand,
+    };
+}
+
+LunaEditorProjectApi makeNativeProjectApi(NativePluginContext& context)
+{
+    return LunaEditorProjectApi{
+        .struct_size = sizeof(LunaEditorProjectApi),
+        .api_version = LUNA_EDITOR_PROJECT_API_VERSION,
+        .api_user_data = &context,
+        .has_project_loaded = &nativeHasProjectLoaded,
+        .project_root_path = &nativeProjectRootPath,
+        .project_info = &nativeProjectInfo,
+        .save_project = &nativeSaveProject,
+    };
+}
+
+LunaEditorSceneApi makeNativeSceneApi(NativePluginContext& context)
+{
+    return LunaEditorSceneApi{
+        .struct_size = sizeof(LunaEditorSceneApi),
+        .api_version = LUNA_EDITOR_SCENE_API_VERSION,
+        .api_user_data = &context,
+        .scene_label = &nativeSceneLabel,
+        .entity_count = &nativeSceneEntityCount,
+        .can_edit_scene = &nativeCanEditScene,
+        .open_scene_file = &nativeOpenSceneFile,
+        .enumerate_entities = &nativeEnumerateSceneEntities,
+        .entity_exists = &nativeEntityExists,
+        .entity_info = &nativeEntityInfo,
+        .is_entity_descendant_of = &nativeIsEntityDescendantOf,
+        .create_entity = &nativeCreateEntity,
+        .create_entity_ex = &nativeCreateEntityEx,
+        .destroy_entity = &nativeDestroyEntity,
+        .reparent_entity = &nativeReparentEntity,
+        .set_entity_name = &nativeSetEntityName,
+        .get_entity_transform = &nativeGetEntityTransform,
+        .set_entity_transform = &nativeSetEntityTransform,
+        .get_camera_component = &nativeGetCameraComponent,
+        .set_camera_component = &nativeSetCameraComponent,
+        .get_light_component = &nativeGetLightComponent,
+        .set_light_component = &nativeSetLightComponent,
+        .get_mesh_component = &nativeGetMeshComponent,
+        .set_mesh_component = &nativeSetMeshComponent,
+        .add_component = &nativeAddComponent,
+        .remove_component = &nativeRemoveComponent,
+    };
+}
+
+LunaEditorSelectionApi makeNativeSelectionApi(NativePluginContext& context)
+{
+    return LunaEditorSelectionApi{
+        .struct_size = sizeof(LunaEditorSelectionApi),
+        .api_version = LUNA_EDITOR_SELECTION_API_VERSION,
+        .api_user_data = &context,
+        .selected_entity_id = &nativeSelectedEntityId,
+        .select_entity = &nativeSelectEntity,
+        .clear_selection = &nativeClearSelection,
+    };
+}
+
+LunaEditorViewportApi makeNativeViewportApi(NativePluginContext& context)
+{
+    return LunaEditorViewportApi{
+        .struct_size = sizeof(LunaEditorViewportApi),
+        .api_version = LUNA_EDITOR_VIEWPORT_API_VERSION,
+        .api_user_data = &context,
+        .sync_scene_viewport = nullptr,
+        .scene_texture_view = &nativeSceneTextureView,
+        .editor_camera_position = &nativeEditorCameraPosition,
+        .gizmo_operation_name = &nativeGizmoOperationName,
+        .gizmo_mode_name = &nativeGizmoModeName,
+        .pick_debug_visualization_enabled = &nativePickDebugVisualizationEnabled,
+        .set_pick_debug_visualization_enabled = &nativeSetPickDebugVisualizationEnabled,
+        .editor_grid_enabled = &nativeEditorGridEnabled,
+        .set_editor_grid_enabled = &nativeSetEditorGridEnabled,
+    };
+}
+
+LunaEditorRuntimeViewportApi makeNativeRuntimeViewportApi(NativePluginContext& context)
+{
+    return LunaEditorRuntimeViewportApi{
+        .struct_size = sizeof(LunaEditorRuntimeViewportApi),
+        .api_version = LUNA_EDITOR_RUNTIME_VIEWPORT_API_VERSION,
+        .api_user_data = &context,
+        .is_runtime_viewport_enabled = &nativeIsRuntimeViewportEnabled,
+        .is_runtime_viewport_requested = &nativeIsRuntimeViewportRequested,
+        .set_runtime_viewport_requested = &nativeSetRuntimeViewportRequested,
+        .runtime_entity_count = &nativeRuntimeEntityCount,
+    };
+}
+
 } // namespace
 
 EditorPluginManager::EditorPluginManager(EditorShell& shell)
@@ -1154,6 +2564,7 @@ void EditorPluginManager::unloadAll()
             it->plugin_api.on_unload(it->plugin_api.plugin_user_data, it->host_api.get());
         }
         m_shell.unregisterNativePluginContributions(it->package.id);
+        m_shell.unregisterPluginAssetRoot(it->package.id);
     }
     m_native_plugins.clear();
     m_builtin_materials_plugin = nullptr;
@@ -1250,6 +2661,7 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
     instance.context = std::make_shared<NativePluginContext>();
     instance.context->shell = &m_shell;
     instance.context->plugin_id = package.id;
+    m_shell.registerPluginAssetRoot(package.id, package.root_path);
     instance.host_api = std::make_shared<LunaEditorHostApi>();
     *instance.host_api = LunaEditorHostApi{
         .struct_size = sizeof(LunaEditorHostApi),
@@ -1259,6 +2671,14 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
         .ui = makeNativeUiApi(*instance.context),
         .commands = makeNativeCommandApi(*instance.context),
         .windows = makeNativeWindowApi(*instance.context),
+        .assets = makeNativeAssetApi(*instance.context),
+        .plugin_assets = makeNativePluginAssetApi(*instance.context),
+        .menus = makeNativeMenuApi(*instance.context),
+        .project = makeNativeProjectApi(*instance.context),
+        .scene = makeNativeSceneApi(*instance.context),
+        .selection = makeNativeSelectionApi(*instance.context),
+        .viewport = makeNativeViewportApi(*instance.context),
+        .runtime_viewport = makeNativeRuntimeViewportApi(*instance.context),
     };
     instance.context->host_api = instance.host_api.get();
     instance.plugin_api = LunaEditorPluginApi{
@@ -1268,6 +2688,7 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
 
     if (create_plugin_fn(LUNA_EDITOR_HOST_API_VERSION, instance.host_api.get(), &instance.plugin_api) == 0) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' failed to initialize its plugin API", package.id);
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (instance.plugin_api.struct_size != sizeof(LunaEditorPluginApi)) {
@@ -1275,6 +2696,7 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
                          package.id,
                          instance.plugin_api.struct_size,
                          static_cast<uint32_t>(sizeof(LunaEditorPluginApi)));
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (instance.plugin_api.api_version != LUNA_EDITOR_PLUGIN_API_VERSION) {
@@ -1282,25 +2704,30 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
                          package.id,
                          instance.plugin_api.api_version,
                          static_cast<uint32_t>(LUNA_EDITOR_PLUGIN_API_VERSION));
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (instance.plugin_api.plugin_id == nullptr || instance.plugin_api.plugin_id[0] == '\0') {
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned an empty plugin_id", package.id);
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (package.id != instance.plugin_api.plugin_id) {
         LUNA_EDITOR_WARN("Native editor plugin package id '{}' does not match plugin API id '{}'",
                          package.id,
                          instance.plugin_api.plugin_id);
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (instance.plugin_api.on_load == nullptr || instance.plugin_api.on_unload == nullptr) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' must provide on_load and on_unload callbacks", package.id);
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
     if (instance.plugin_api.on_load(instance.plugin_api.plugin_user_data, instance.host_api.get()) == 0) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' on_load failed", package.id);
         m_shell.unregisterNativePluginContributions(package.id);
+        m_shell.unregisterPluginAssetRoot(package.id);
         return false;
     }
 

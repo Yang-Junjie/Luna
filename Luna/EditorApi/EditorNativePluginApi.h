@@ -9,8 +9,25 @@
 #define LUNA_EDITOR_UI_API_VERSION 1u
 #define LUNA_EDITOR_COMMAND_API_VERSION 1u
 #define LUNA_EDITOR_WINDOW_API_VERSION 1u
+#define LUNA_EDITOR_ASSET_API_VERSION 1u
+#define LUNA_EDITOR_PLUGIN_ASSET_API_VERSION 1u
+#define LUNA_EDITOR_MENU_API_VERSION 1u
+#define LUNA_EDITOR_PROJECT_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_API_VERSION 1u
+#define LUNA_EDITOR_SELECTION_API_VERSION 1u
+#define LUNA_EDITOR_VIEWPORT_API_VERSION 1u
+#define LUNA_EDITOR_RUNTIME_VIEWPORT_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_CAMERA_COMPONENT_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_LIGHT_COMPONENT_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_MESH_COMPONENT_API_VERSION 1u
 #define LUNA_EDITOR_COMMAND_DESCRIPTOR_API_VERSION 1u
 #define LUNA_EDITOR_WINDOW_DESCRIPTOR_API_VERSION 1u
+#define LUNA_EDITOR_ASSET_INFO_API_VERSION 1u
+#define LUNA_EDITOR_ASSET_REFRESH_RESULT_API_VERSION 1u
+#define LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION 1u
+#define LUNA_EDITOR_PROJECT_INFO_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION 1u
+#define LUNA_EDITOR_SCENE_ENTITY_CREATE_REQUEST_API_VERSION 1u
 #define LUNA_EDITOR_CREATE_PLUGIN_SYMBOL "LunaCreateEditorPlugin"
 
 #if defined(_WIN32)
@@ -101,6 +118,44 @@ typedef enum LunaEditorMouseButton {
     LunaEditorMouseButton_Right = 1,
     LunaEditorMouseButton_Middle = 2,
 } LunaEditorMouseButton;
+
+typedef enum LunaEditorAssetType {
+    LunaEditorAssetType_None = 0,
+    LunaEditorAssetType_Texture = 1,
+    LunaEditorAssetType_Mesh = 2,
+    LunaEditorAssetType_Material = 3,
+    LunaEditorAssetType_Model = 4,
+    LunaEditorAssetType_Scene = 5,
+    LunaEditorAssetType_Script = 6,
+} LunaEditorAssetType;
+
+typedef enum LunaEditorSceneEntityCreateKind {
+    LunaEditorSceneEntityCreateKind_Empty = 0,
+    LunaEditorSceneEntityCreateKind_Camera = 1,
+    LunaEditorSceneEntityCreateKind_DirectionalLight = 2,
+    LunaEditorSceneEntityCreateKind_PointLight = 3,
+    LunaEditorSceneEntityCreateKind_SpotLight = 4,
+    LunaEditorSceneEntityCreateKind_PrimitiveMesh = 5,
+    LunaEditorSceneEntityCreateKind_MeshAsset = 6,
+    LunaEditorSceneEntityCreateKind_ModelAsset = 7,
+} LunaEditorSceneEntityCreateKind;
+
+typedef enum LunaEditorSceneComponentKind {
+    LunaEditorSceneComponentKind_Transform = 0,
+    LunaEditorSceneComponentKind_Camera = 1,
+    LunaEditorSceneComponentKind_Light = 2,
+    LunaEditorSceneComponentKind_Mesh = 3,
+    LunaEditorSceneComponentKind_Script = 4,
+} LunaEditorSceneComponentKind;
+
+typedef enum LunaEditorSceneEntityComponentFlag {
+    LunaEditorSceneEntityComponentFlag_None = 0,
+    LunaEditorSceneEntityComponentFlag_Transform = 1u << 0,
+    LunaEditorSceneEntityComponentFlag_Camera = 1u << 1,
+    LunaEditorSceneEntityComponentFlag_Light = 1u << 2,
+    LunaEditorSceneEntityComponentFlag_Mesh = 1u << 3,
+    LunaEditorSceneEntityComponentFlag_Script = 1u << 4,
+} LunaEditorSceneEntityComponentFlag;
 
 struct LunaEditorHostApi;
 
@@ -277,6 +332,301 @@ typedef struct LunaEditorWindowApi {
     void (*set_window_open)(void* api_user_data, const char* id, int open);
 } LunaEditorWindowApi;
 
+typedef struct LunaEditorAssetInfo {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t handle;
+    uint32_t type;
+    int exists;
+    int builtin;
+    int loading;
+    int memory_only;
+    char* label;
+    size_t label_size;
+    char* detail;
+    size_t detail_size;
+    char* project_path;
+    size_t project_path_size;
+    char* absolute_path;
+    size_t absolute_path_size;
+} LunaEditorAssetInfo;
+
+typedef struct LunaEditorAssetRefreshResult {
+    uint32_t struct_size;
+    uint32_t api_version;
+    int success;
+    int project_loaded;
+    uint64_t revision;
+    char* message;
+    size_t message_size;
+    size_t discovered_assets;
+    size_t imported_missing_assets;
+    size_t loaded_existing_metadata;
+    size_t rebuilt_metadata;
+    size_t unsupported_files_skipped;
+    size_t failed_assets;
+    size_t missing_metadata_after_sync;
+    size_t script_files_skipped_no_plugin;
+    size_t script_files_skipped_unsupported_language;
+    size_t generated_model_files;
+    size_t generated_model_metadata;
+    size_t generated_material_files;
+    size_t generated_material_metadata;
+    size_t generated_texture_metadata;
+    size_t failed_generated_model_assets;
+} LunaEditorAssetRefreshResult;
+
+typedef int (*LunaEditorEnumerateAssetFn)(void* user_data, const LunaEditorAssetInfo* asset_info);
+
+typedef struct LunaEditorAssetApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*describe_asset)(void* api_user_data, uint64_t handle, LunaEditorAssetInfo* out_info);
+    int (*asset_info)(void* api_user_data, uint64_t handle, LunaEditorAssetInfo* out_info);
+    int (*asset_info_by_path)(void* api_user_data, const char* path, LunaEditorAssetInfo* out_info);
+    size_t (*list_assets)(void* api_user_data,
+                          uint32_t type_filter,
+                          int include_builtin,
+                          void* user_data,
+                          LunaEditorEnumerateAssetFn enumerate_fn);
+    int (*asset_exists)(void* api_user_data, uint64_t handle);
+    int (*asset_path_exists)(void* api_user_data, const char* path);
+    uint64_t (*find_asset_handle_by_path)(void* api_user_data, const char* path);
+    int (*assets_root_path)(void* api_user_data, char* out_path, size_t out_path_size);
+    int (*resolve_project_asset_path)(void* api_user_data,
+                                      const char* project_relative_path,
+                                      char* out_path,
+                                      size_t out_path_size);
+    int (*make_project_relative_asset_path)(void* api_user_data,
+                                            const char* path,
+                                            char* out_path,
+                                            size_t out_path_size);
+    int (*refresh_assets)(void* api_user_data, LunaEditorAssetRefreshResult* out_result);
+    uint64_t (*asset_revision)(void* api_user_data);
+    int (*is_asset_loading)(void* api_user_data, uint64_t handle);
+    int (*accepts_asset_type)(void* api_user_data,
+                              uint32_t type,
+                              const uint32_t* accepted_types,
+                              size_t accepted_type_count);
+    int (*mesh_submesh_count)(void* api_user_data, uint64_t mesh_handle, size_t* out_count);
+    int (*begin_asset_drag_drop_source)(void* api_user_data, uint64_t handle, const char* label);
+} LunaEditorAssetApi;
+
+typedef struct LunaEditorPluginAssetApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*plugin_root_path)(void* api_user_data, char* out_path, size_t out_path_size);
+    int (*asset_root_path)(void* api_user_data, char* out_path, size_t out_path_size);
+    int (*resolve_path)(void* api_user_data, const char* relative_asset_path, char* out_path, size_t out_path_size);
+    int (*exists)(void* api_user_data, const char* relative_asset_path);
+    int (*read_text)(void* api_user_data,
+                     const char* relative_asset_path,
+                     char* out_text,
+                     size_t out_text_size,
+                     size_t* out_required_size);
+    int (*read_bytes)(void* api_user_data,
+                      const char* relative_asset_path,
+                      void* out_data,
+                      size_t out_data_size,
+                      size_t* out_required_size);
+    int (*texture)(void* api_user_data, const char* relative_asset_path, LunaEditorTextureView* out_texture);
+} LunaEditorPluginAssetApi;
+
+typedef struct LunaEditorMenuItemDescriptor {
+    uint32_t struct_size;
+    uint32_t api_version;
+    const char* menu_path;
+    const char* command_id;
+    const char* label;
+    const char* shortcut;
+} LunaEditorMenuItemDescriptor;
+
+typedef struct LunaEditorMenuApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*add_menu_item)(void* api_user_data, const LunaEditorMenuItemDescriptor* descriptor);
+    void (*remove_menu_item)(void* api_user_data, const char* menu_path, const char* command_id);
+    void (*remove_menu_items_for_command)(void* api_user_data, const char* command_id);
+} LunaEditorMenuApi;
+
+typedef struct LunaEditorProjectInfo {
+    uint32_t struct_size;
+    uint32_t api_version;
+    char* name;
+    size_t name_size;
+    char* version;
+    size_t version_size;
+    char* author;
+    size_t author_size;
+    char* description;
+    size_t description_size;
+    char* start_scene;
+    size_t start_scene_size;
+    char* assets_path;
+    size_t assets_path_size;
+    char* selected_script_plugin_id;
+    size_t selected_script_plugin_id_size;
+    char* selected_script_backend_name;
+    size_t selected_script_backend_name_size;
+} LunaEditorProjectInfo;
+
+typedef struct LunaEditorProjectApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*has_project_loaded)(void* api_user_data);
+    int (*project_root_path)(void* api_user_data, char* out_path, size_t out_path_size);
+    int (*project_info)(void* api_user_data, LunaEditorProjectInfo* out_info);
+    int (*save_project)(void* api_user_data);
+} LunaEditorProjectApi;
+
+typedef struct LunaEditorSceneTransform {
+    LunaEditorVec3 translation;
+    LunaEditorVec3 rotation_degrees;
+    LunaEditorVec3 scale;
+} LunaEditorSceneTransform;
+
+typedef struct LunaEditorSceneCameraComponent {
+    uint32_t struct_size;
+    uint32_t api_version;
+    int primary;
+    int fixed_aspect_ratio;
+    uint32_t projection;
+    float perspective_vertical_fov_degrees;
+    float perspective_near;
+    float perspective_far;
+    float orthographic_size;
+    float orthographic_near;
+    float orthographic_far;
+} LunaEditorSceneCameraComponent;
+
+typedef struct LunaEditorSceneLightComponent {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint32_t type;
+    int enabled;
+    LunaEditorVec3 color;
+    float intensity;
+    float range;
+    float inner_cone_angle_degrees;
+    float outer_cone_angle_degrees;
+} LunaEditorSceneLightComponent;
+
+typedef struct LunaEditorSceneMeshComponent {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t mesh_handle;
+    uint32_t first_submesh;
+    uint32_t submesh_count;
+    uint64_t* submesh_material_handles;
+    size_t submesh_material_capacity;
+    size_t submesh_material_count;
+} LunaEditorSceneMeshComponent;
+
+typedef struct LunaEditorViewportPresentation {
+    uint32_t struct_size;
+    uint32_t api_version;
+    LunaEditorTextureView scene_texture;
+    uint32_t framebuffer_width;
+    uint32_t framebuffer_height;
+    int presentable;
+} LunaEditorViewportPresentation;
+
+typedef struct LunaEditorSceneEntityInfo {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint64_t id;
+    uint64_t parent_id;
+    uint32_t component_flags;
+    size_t child_count;
+    char* name;
+    size_t name_size;
+    char* parent_name;
+    size_t parent_name_size;
+} LunaEditorSceneEntityInfo;
+
+typedef struct LunaEditorSceneEntityCreateRequest {
+    uint32_t struct_size;
+    uint32_t api_version;
+    uint32_t kind;
+    const char* name;
+    uint64_t parent_id;
+    uint64_t asset_handle;
+} LunaEditorSceneEntityCreateRequest;
+
+typedef int (*LunaEditorEnumerateSceneEntityFn)(void* user_data, const LunaEditorSceneEntityInfo* entity_info);
+
+typedef struct LunaEditorSceneApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*scene_label)(void* api_user_data, char* out_label, size_t out_label_size);
+    size_t (*entity_count)(void* api_user_data);
+    int (*can_edit_scene)(void* api_user_data);
+    int (*open_scene_file)(void* api_user_data, const char* scene_file_path);
+    size_t (*enumerate_entities)(void* api_user_data,
+                                 void* user_data,
+                                 LunaEditorEnumerateSceneEntityFn enumerate_fn);
+    int (*entity_exists)(void* api_user_data, uint64_t entity_id);
+    int (*entity_info)(void* api_user_data, uint64_t entity_id, LunaEditorSceneEntityInfo* out_info);
+    int (*is_entity_descendant_of)(void* api_user_data, uint64_t entity_id, uint64_t potential_ancestor_id);
+    uint64_t (*create_entity)(void* api_user_data, const char* name);
+    uint64_t (*create_entity_ex)(void* api_user_data, const LunaEditorSceneEntityCreateRequest* request);
+    int (*destroy_entity)(void* api_user_data, uint64_t entity_id);
+    int (*reparent_entity)(void* api_user_data, uint64_t entity_id, uint64_t new_parent_id, int preserve_world_transform);
+    int (*set_entity_name)(void* api_user_data, uint64_t entity_id, const char* name);
+    int (*get_entity_transform)(void* api_user_data, uint64_t entity_id, LunaEditorSceneTransform* out_transform);
+    int (*set_entity_transform)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneTransform* transform);
+    int (*get_camera_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneCameraComponent* out_component);
+    int (*set_camera_component)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneCameraComponent* component);
+    int (*get_light_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneLightComponent* out_component);
+    int (*set_light_component)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneLightComponent* component);
+    int (*get_mesh_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneMeshComponent* out_component);
+    int (*set_mesh_component)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneMeshComponent* component);
+    int (*add_component)(void* api_user_data, uint64_t entity_id, uint32_t component_kind);
+    int (*remove_component)(void* api_user_data, uint64_t entity_id, uint32_t component_kind);
+} LunaEditorSceneApi;
+
+typedef struct LunaEditorSelectionApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    uint64_t (*selected_entity_id)(void* api_user_data);
+    void (*select_entity)(void* api_user_data, uint64_t entity_id);
+    void (*clear_selection)(void* api_user_data);
+} LunaEditorSelectionApi;
+
+typedef struct LunaEditorViewportApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*sync_scene_viewport)(void* api_user_data,
+                               uint32_t framebuffer_width,
+                               uint32_t framebuffer_height,
+                               LunaEditorViewportPresentation* out_presentation);
+    int (*scene_texture_view)(void* api_user_data, LunaEditorTextureView* out_texture);
+    void (*editor_camera_position)(void* api_user_data, LunaEditorVec3* out_position);
+    int (*gizmo_operation_name)(void* api_user_data, char* out_value, size_t out_value_size);
+    int (*gizmo_mode_name)(void* api_user_data, char* out_value, size_t out_value_size);
+    int (*pick_debug_visualization_enabled)(void* api_user_data);
+    void (*set_pick_debug_visualization_enabled)(void* api_user_data, int enabled);
+    int (*editor_grid_enabled)(void* api_user_data);
+    void (*set_editor_grid_enabled)(void* api_user_data, int enabled);
+} LunaEditorViewportApi;
+
+typedef struct LunaEditorRuntimeViewportApi {
+    uint32_t struct_size;
+    uint32_t api_version;
+    void* api_user_data;
+    int (*is_runtime_viewport_enabled)(void* api_user_data);
+    int (*is_runtime_viewport_requested)(void* api_user_data);
+    void (*set_runtime_viewport_requested)(void* api_user_data, int enabled);
+    size_t (*runtime_entity_count)(void* api_user_data);
+} LunaEditorRuntimeViewportApi;
+
 typedef struct LunaEditorHostApi {
     uint32_t struct_size;
     uint32_t api_version;
@@ -285,6 +635,14 @@ typedef struct LunaEditorHostApi {
     LunaEditorUiApi ui;
     LunaEditorCommandApi commands;
     LunaEditorWindowApi windows;
+    LunaEditorAssetApi assets;
+    LunaEditorPluginAssetApi plugin_assets;
+    LunaEditorMenuApi menus;
+    LunaEditorProjectApi project;
+    LunaEditorSceneApi scene;
+    LunaEditorSelectionApi selection;
+    LunaEditorViewportApi viewport;
+    LunaEditorRuntimeViewportApi runtime_viewport;
 } LunaEditorHostApi;
 
 typedef struct LunaEditorPluginApi {

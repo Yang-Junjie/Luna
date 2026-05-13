@@ -1,4 +1,4 @@
-#include "Viewport/EditorViewportSession.h"
+#include "Viewport/ViewportInstance.h"
 
 #include "EditorCamera.h"
 #include "Renderer/Renderer.h"
@@ -8,13 +8,13 @@
 
 namespace luna {
 
-void EditorViewportSession::configureRenderer(Renderer& renderer, bool imgui_overlay_enabled) const
+void ViewportInstance::configureRenderer(Renderer& renderer, bool imgui_overlay_enabled) const
 {
     renderer.setSceneOutputMode(imgui_overlay_enabled ? Renderer::SceneOutputMode::OffscreenTexture
                                                       : Renderer::SceneOutputMode::Swapchain);
 }
 
-void EditorViewportSession::resetRenderer(Renderer& renderer)
+void ViewportInstance::resetRenderer(Renderer& renderer)
 {
     renderer.setSceneOutputMode(Renderer::SceneOutputMode::Swapchain);
     renderer.setRenderDebugViewMode(RenderDebugViewMode::None);
@@ -23,22 +23,19 @@ void EditorViewportSession::resetRenderer(Renderer& renderer)
     m_state = {};
 }
 
-void EditorViewportSession::setPickDebugVisualization(Renderer& renderer, bool enabled) const
+void ViewportInstance::setPickDebugVisualization(Renderer& renderer, bool enabled) const
 {
     renderer.setScenePickDebugVisualizationEnabled(enabled);
 }
 
-void EditorViewportSession::setEditorGrid(Renderer& renderer, bool enabled, bool runtime_viewport_enabled) const
+void ViewportInstance::setEditorGrid(Renderer& renderer, bool enabled, bool runtime_viewport_enabled) const
 {
     const bool editor_grid_enabled = enabled && !runtime_viewport_enabled &&
                                      renderer.getSceneOutputMode() == Renderer::SceneOutputMode::OffscreenTexture;
     renderer.setDefaultRenderFeatureEnabled("EditorInfiniteGrid", editor_grid_enabled);
 }
 
-const EditorViewportSyncState& EditorViewportSession::sync(Renderer& renderer,
-                                                           EditorCamera& camera,
-                                                           uint32_t width,
-                                                           uint32_t height)
+const ViewportInstanceState& ViewportInstance::sync(Renderer& renderer, EditorCamera& camera, uint32_t width, uint32_t height)
 {
     camera.setViewportSize(static_cast<float>(width), static_cast<float>(height));
     renderer.setSceneOutputSize(width, height);
@@ -56,7 +53,7 @@ const EditorViewportSyncState& EditorViewportSession::sync(Renderer& renderer,
     return m_state;
 }
 
-bool EditorViewportSession::requestScenePick(Renderer& renderer, uint32_t pixel_x, uint32_t pixel_y) const
+bool ViewportInstance::requestScenePick(Renderer& renderer, uint32_t pixel_x, uint32_t pixel_y) const
 {
     const auto& scene_texture = renderer.getSceneOutputTexture();
     if (!scene_texture || renderer.getSceneOutputMode() != Renderer::SceneOutputMode::OffscreenTexture) {
@@ -79,12 +76,12 @@ bool EditorViewportSession::requestScenePick(Renderer& renderer, uint32_t pixel_
     return true;
 }
 
-std::optional<uint32_t> EditorViewportSession::consumeScenePickResult(Renderer& renderer) const
+std::optional<uint32_t> ViewportInstance::consumeScenePickResult(Renderer& renderer) const
 {
     return renderer.consumeScenePickResult();
 }
 
-const EditorViewportSyncState& EditorViewportSession::state() const noexcept
+const ViewportInstanceState& ViewportInstance::state() const noexcept
 {
     return m_state;
 }

@@ -53,6 +53,8 @@ public:
 
     bool loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesystem::path& root_path = {});
     void unloadPlugins();
+    void registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path);
+    void unregisterPluginAssetRoot(std::string_view plugin_id);
     void unregisterNativePluginContributions(std::string_view owner_id);
     void update(float delta_seconds);
     void drawMenuItems(std::string_view menu_path);

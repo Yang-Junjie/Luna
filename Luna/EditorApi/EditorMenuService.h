@@ -10,6 +10,7 @@ struct MenuItemDescriptor {
     std::string command_id;
     std::string label;
     std::string shortcut;
+    std::string owner_id;
 };
 
 class MenuService {
