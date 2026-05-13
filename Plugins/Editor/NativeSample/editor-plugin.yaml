@@ -1,0 +1,18 @@
+EditorPlugin:
+  Id: luna.source.native-sample
+  DisplayName: Native Sample Tool
+  Runtime: Native
+  Version: 0.1.0
+  Enabled: true
+  Entry:
+    Windows:
+      x64: Binaries/Win64/LunaEditorNativeSample.dll
+      arm64: Binaries/Win64/LunaEditorNativeSample.dll
+    Linux:
+      x64: Binaries/Linux/libLunaEditorNativeSample.so
+      arm64: Binaries/Linux/libLunaEditorNativeSample.so
+    macOS:
+      x64: Binaries/macOS/libLunaEditorNativeSample.dylib
+      arm64: Binaries/macOS/libLunaEditorNativeSample.dylib
+  Dependencies:
+    - luna.editor.core-commands

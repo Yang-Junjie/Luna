@@ -225,6 +225,7 @@ set(EDITOR_API_SOURCE
     EditorApi/EditorHistoryService.h
     EditorApi/EditorHost.h
     EditorApi/EditorMenuService.h
+    EditorApi/EditorNativePluginApi.h
     EditorApi/EditorPlugin.h
     EditorApi/EditorPluginAssetService.h
     EditorApi/EditorProjectService.h
@@ -241,6 +242,8 @@ set(EDITOR_API_SOURCE
     EditorApi/EditorWindowService.h)
 
 set(PLATFORM_SOURCE
+    Platform/Common/DynamicLibrary.h
+    Platform/Common/DynamicLibrary.cpp
     Platform/Common/FileDialogs.h
     Platform/Common/NativeWindowHandle.h)
 

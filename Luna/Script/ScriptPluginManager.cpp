@@ -1,6 +1,7 @@
 #include "ScriptPluginManager.h"
 
 #include "Core/Log.h"
+#include "Platform/Common/DynamicLibrary.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "ScriptHostBridge.h"
@@ -16,21 +17,10 @@
 #include <string_view>
 #include <utility>
 
-#if defined(_WIN32)
-#    if !defined(WIN32_LEAN_AND_MEAN)
-#        define WIN32_LEAN_AND_MEAN
-#    endif
-#    if !defined(NOMINMAX)
-#        define NOMINMAX
-#    endif
-#    include <Windows.h>
-#else
-#    include <dlfcn.h>
-#endif
-
 namespace {
 
 using BackendMap = std::unordered_map<std::string, std::unique_ptr<luna::IScriptBackend>>;
+using DynamicLibraryHandle = luna::DynamicLibrary;
 
 std::string normalizeBackendKey(std::string_view value)
 {
@@ -297,141 +287,6 @@ bool validateBackendAgainstManifest(const luna::ScriptPluginCandidate& candidate
 
     return true;
 }
-
-#if defined(_WIN32)
-std::string formatWindowsError(DWORD error)
-{
-    LPSTR buffer = nullptr;
-    const DWORD length = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                                            FORMAT_MESSAGE_IGNORE_INSERTS,
-                                        nullptr,
-                                        error,
-                                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                                        reinterpret_cast<LPSTR>(&buffer),
-                                        0,
-                                        nullptr);
-
-    std::string message = (length > 0 && buffer != nullptr) ? std::string(buffer, length) : "unknown error";
-    if (buffer != nullptr) {
-        LocalFree(buffer);
-    }
-
-    while (!message.empty() &&
-           (message.back() == '\r' || message.back() == '\n' || message.back() == ' ' || message.back() == '.')) {
-        message.pop_back();
-    }
-
-    return message;
-}
-
-class DynamicLibraryHandle {
-public:
-    DynamicLibraryHandle(const DynamicLibraryHandle&) = delete;
-    DynamicLibraryHandle& operator=(const DynamicLibraryHandle&) = delete;
-    DynamicLibraryHandle(DynamicLibraryHandle&&) = delete;
-    DynamicLibraryHandle& operator=(DynamicLibraryHandle&&) = delete;
-
-    static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
-    {
-        const HMODULE module = ::LoadLibraryW(path.c_str());
-        if (module == nullptr) {
-            const DWORD error = ::GetLastError();
-            LUNA_CORE_ERROR("Failed to load script plugin library '{}': {}", path.string(), formatWindowsError(error));
-            return {};
-        }
-
-        return std::shared_ptr<DynamicLibraryHandle>(new DynamicLibraryHandle(module, path));
-    }
-
-    ~DynamicLibraryHandle()
-    {
-        if (m_module != nullptr) {
-            ::FreeLibrary(m_module);
-        }
-    }
-
-    [[nodiscard]] void* findSymbol(const char* name) const
-    {
-        if (m_module == nullptr || name == nullptr) {
-            return nullptr;
-        }
-
-        return reinterpret_cast<void*>(::GetProcAddress(m_module, name));
-    }
-
-    [[nodiscard]] const std::filesystem::path& path() const noexcept
-    {
-        return m_path;
-    }
-
-private:
-    DynamicLibraryHandle(HMODULE module, std::filesystem::path path)
-        : m_module(module),
-          m_path(std::move(path))
-    {}
-
-private:
-    HMODULE m_module{nullptr};
-    std::filesystem::path m_path;
-};
-#else
-class DynamicLibraryHandle {
-public:
-    DynamicLibraryHandle(const DynamicLibraryHandle&) = delete;
-    DynamicLibraryHandle& operator=(const DynamicLibraryHandle&) = delete;
-    DynamicLibraryHandle(DynamicLibraryHandle&&) = delete;
-    DynamicLibraryHandle& operator=(DynamicLibraryHandle&&) = delete;
-
-    static std::shared_ptr<DynamicLibraryHandle> load(const std::filesystem::path& path)
-    {
-        dlerror();
-        void* module = ::dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
-        if (module == nullptr) {
-            const char* error = dlerror();
-            LUNA_CORE_ERROR("Failed to load script plugin library '{}': {}",
-                            path.string(),
-                            error != nullptr ? error : "unknown error");
-            return {};
-        }
-
-        return std::shared_ptr<DynamicLibraryHandle>(new DynamicLibraryHandle(module, path));
-    }
-
-    ~DynamicLibraryHandle()
-    {
-        if (m_module != nullptr) {
-            ::dlclose(m_module);
-        }
-    }
-
-    [[nodiscard]] void* findSymbol(const char* name) const
-    {
-        if (m_module == nullptr || name == nullptr) {
-            return nullptr;
-        }
-
-        dlerror();
-        void* symbol = ::dlsym(m_module, name);
-        const char* error = dlerror();
-        return error == nullptr ? symbol : nullptr;
-    }
-
-    [[nodiscard]] const std::filesystem::path& path() const noexcept
-    {
-        return m_path;
-    }
-
-private:
-    DynamicLibraryHandle(void* module, std::filesystem::path path)
-        : m_module(module),
-          m_path(std::move(path))
-    {}
-
-private:
-    void* m_module{nullptr};
-    std::filesystem::path m_path;
-};
-#endif
 
 class PluginScriptRuntime final : public luna::IScriptRuntime {
 public:

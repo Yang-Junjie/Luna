@@ -1,0 +1,8 @@
+EditorPlugin:
+  Id: luna.editor.scene-status
+  DisplayName: Scene Status
+  Runtime: BuiltinNative
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

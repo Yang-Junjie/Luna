@@ -39,6 +39,7 @@ struct WindowDescriptor {
     bool default_open{false};
     Vec2 default_size{};
     WindowFlags flags{static_cast<WindowFlags>(WindowFlag::None)};
+    std::string owner_id;
     std::function<void(WindowDrawContext&)> draw;
 };
 

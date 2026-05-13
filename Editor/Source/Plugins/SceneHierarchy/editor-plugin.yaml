@@ -1,0 +1,8 @@
+EditorPlugin:
+  Id: luna.editor.scene-hierarchy
+  DisplayName: Scene Hierarchy
+  Runtime: BuiltinNative
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

@@ -13,21 +13,6 @@
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
-#include "Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h"
-#include "Plugins/AssetLoading/AssetLoadingPlugin.h"
-#include "Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h"
-#include "Plugins/ContentBrowser/ContentBrowserPlugin.h"
-#include "Plugins/CoreCommands/CoreCommandsPlugin.h"
-#include "Plugins/EditorApiSample/EditorApiSamplePlugin.h"
-#include "Plugins/Inspector/InspectorPlugin.h"
-#include "Plugins/ScriptPlugins/ScriptPluginsPlugin.h"
-#include "Plugins/SceneHierarchy/SceneHierarchyPlugin.h"
-#include "Plugins/RenderDebug/RenderDebugPlugin.h"
-#include "Plugins/RenderFeatures/RenderFeaturesPlugin.h"
-#include "Plugins/RenderProfiler/RenderProfilerPlugin.h"
-#include "Plugins/SceneSettings/SceneSettingsPlugin.h"
-#include "Plugins/SceneStatus/SceneStatusPlugin.h"
-#include "Plugins/Viewport/ViewportPlugin.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
@@ -37,6 +22,7 @@
 #include "Script/ScriptPluginManager.h"
 #include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderProfileExporter.h"
+#include "Shell/EditorPluginManager.h"
 #include "Shell/EditorShell.h"
 
 #include <Backend.h>
@@ -551,25 +537,11 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_application(&application)
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
-    m_editor_shell->loadPlugin(editor::createCoreCommandsPlugin());
-    m_editor_shell->loadPlugin(editor::createContentBrowserPlugin());
-    m_editor_shell->loadPlugin(editor::createViewportPlugin());
-    m_editor_shell->loadPlugin(editor::createSceneHierarchyPlugin());
-    m_editor_shell->loadPlugin(editor::createInspectorPlugin());
-    m_editor_shell->loadPlugin(editor::createSceneStatusPlugin());
-    m_editor_shell->loadPlugin(editor::createSceneSettingsPlugin());
-    m_editor_shell->loadPlugin(editor::createAssetLoadingPlugin());
-    m_editor_shell->loadPlugin(editor::createBackendCapabilitiesPlugin());
-    m_editor_shell->loadPlugin(editor::createRenderDebugPlugin());
-    m_editor_shell->loadPlugin(editor::createRenderFeaturesPlugin());
-    m_editor_shell->loadPlugin(editor::createRenderProfilerPlugin());
-    auto builtin_materials_plugin = editor::createBuiltinMaterialsPlugin();
-    m_builtin_materials_plugin = builtin_materials_plugin.get();
-    if (!m_editor_shell->loadPlugin(std::move(builtin_materials_plugin))) {
-        m_builtin_materials_plugin = nullptr;
+    m_editor_plugin_manager = std::make_unique<editor::EditorPluginManager>(*m_editor_shell);
+    for (auto& package : editor::createEditorPluginPackages()) {
+        m_editor_plugin_manager->registerPackage(std::move(package));
     }
-    m_editor_shell->loadPlugin(editor::createScriptPluginsPlugin());
-    m_editor_shell->loadPlugin(editor::createEditorApiSamplePlugin());
+    (void) m_editor_plugin_manager->loadRegisteredPackages();
 }
 
 LunaEditorLayer::~LunaEditorLayer() = default;
@@ -1663,8 +1635,8 @@ bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings
 
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
 {
-    if (m_builtin_materials_plugin != nullptr && material_handle.isValid()) {
-        m_builtin_materials_plugin->focusMaterial(material_handle);
+    if (m_editor_plugin_manager != nullptr) {
+        m_editor_plugin_manager->focusBuiltinMaterial(material_handle);
     }
     if (m_editor_shell) {
         m_editor_shell->windows().setWindowOpen("luna.editor.builtin-materials.window", true);

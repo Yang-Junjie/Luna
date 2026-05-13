@@ -1,0 +1,8 @@
+EditorPlugin:
+  Id: luna.source.example-tool
+  DisplayName: Source Example Tool
+  Runtime: BuiltinNative
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

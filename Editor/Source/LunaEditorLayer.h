@@ -34,7 +34,7 @@ namespace luna {
 class LunaEditorApplication;
 
 namespace editor {
-class BuiltinMaterialsPlugin;
+class EditorPluginManager;
 class EditorShell;
 class Ui;
 }
@@ -204,8 +204,7 @@ private:
     GizmoMode m_gizmo_mode{GizmoMode::Local};
     EditorViewportSession m_viewport_session;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
-
-    editor::BuiltinMaterialsPlugin* m_builtin_materials_plugin{nullptr};
+    std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };
 
 } // namespace luna

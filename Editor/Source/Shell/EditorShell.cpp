@@ -2294,6 +2294,30 @@ public:
         return true;
     }
 
+    void unregisterCommandsForOwner(std::string_view owner_id)
+    {
+        if (owner_id.empty()) {
+            return;
+        }
+
+        const std::string owner_key = toString(owner_id);
+        for (auto it = m_commands.begin(); it != m_commands.end();) {
+            if (it->second.owner_id == owner_key) {
+                it = m_commands.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        m_order.erase(std::remove_if(m_order.begin(),
+                                     m_order.end(),
+                                     [&](const std::string& id) {
+                                         return m_commands.find(id) == m_commands.end();
+                                     }),
+                      m_order.end());
+        rebuildOrderMap();
+    }
+
     void unregisterCommand(std::string_view id) override
     {
         const std::string key = toString(id);
@@ -2515,22 +2539,18 @@ private:
 
 class EditorPluginAssetService final : public PluginAssetService {
 public:
-    void registerPlugin(const PluginDescriptor& descriptor)
+    void registerPlugin(PluginDescriptor descriptor)
     {
         if (descriptor.id.empty()) {
             return;
         }
 
-        std::filesystem::path root_path = descriptor.root_path;
-        if (root_path.empty()) {
-            root_path = defaultBuiltinPluginRoot(descriptor.id);
-        }
-        if (root_path.empty()) {
+        if (descriptor.root_path.empty()) {
             return;
         }
 
         m_plugins[descriptor.id] = PluginEntry{
-            .root_path = root_path.lexically_normal(),
+            .root_path = descriptor.root_path.lexically_normal(),
         };
     }
 
@@ -2712,33 +2732,6 @@ private:
         }
 
         return normalized_path;
-    }
-
-    static std::filesystem::path defaultBuiltinPluginRoot(std::string_view plugin_id)
-    {
-        const std::filesystem::path plugin_root = std::filesystem::path(LUNA_PROJECT_ROOT) / "Editor" / "Source" /
-                                                  "Plugins";
-        const std::string id = toString(plugin_id);
-        const std::unordered_map<std::string, const char*> roots{
-            {"luna.editor.asset-loading", "AssetLoading"},
-            {"luna.editor.backend-capabilities", "BackendCapabilities"},
-            {"luna.editor.builtin-materials", "BuiltinMaterials"},
-            {"luna.editor.content-browser", "ContentBrowser"},
-            {"luna.editor.core-commands", "CoreCommands"},
-            {"luna.editor.api-sample", "EditorApiSample"},
-            {"luna.editor.inspector", "Inspector"},
-            {"luna.editor.render-debug", "RenderDebug"},
-            {"luna.editor.render-features", "RenderFeatures"},
-            {"luna.editor.render-profiler", "RenderProfiler"},
-            {"luna.editor.scene-hierarchy", "SceneHierarchy"},
-            {"luna.editor.scene-settings", "SceneSettings"},
-            {"luna.editor.scene-status", "SceneStatus"},
-            {"luna.editor.script-plugins", "ScriptPlugins"},
-            {"luna.editor.viewport", "Viewport"},
-        };
-
-        const auto it = roots.find(id);
-        return it != roots.end() ? (plugin_root / it->second).lexically_normal() : std::filesystem::path{};
     }
 
     static RHI::Ref<RHI::Texture> uploadPluginTexture(const ImageData& image, std::string_view debug_name)
@@ -3202,6 +3195,30 @@ public:
         return true;
     }
 
+    void unregisterWindowsForOwner(std::string_view owner_id)
+    {
+        if (owner_id.empty()) {
+            return;
+        }
+
+        const std::string owner_key = toString(owner_id);
+        for (auto it = m_windows.begin(); it != m_windows.end();) {
+            if (it->second.descriptor.owner_id == owner_key) {
+                it = m_windows.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        m_order.erase(std::remove_if(m_order.begin(),
+                                     m_order.end(),
+                                     [&](const std::string& id) {
+                                         return m_windows.find(id) == m_windows.end();
+                                     }),
+                      m_order.end());
+        rebuildOrderMap();
+    }
+
     void unregisterWindow(std::string_view id) override
     {
         const std::string key = toString(id);
@@ -3420,16 +3437,19 @@ ViewportService& EditorShell::viewport()
     return m_impl->viewport_service;
 }
 
-bool EditorShell::loadPlugin(std::unique_ptr<Plugin> plugin)
+bool EditorShell::loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesystem::path& root_path)
 {
     if (!plugin) {
         return false;
     }
 
-    const PluginDescriptor descriptor = plugin->descriptor();
+    PluginDescriptor descriptor = plugin->descriptor();
     if (descriptor.id.empty()) {
         LUNA_EDITOR_WARN("Ignoring editor plugin with empty id");
         return false;
+    }
+    if (!root_path.empty()) {
+        descriptor.root_path = root_path;
     }
 
     m_impl->plugin_asset_service.registerPlugin(descriptor);
@@ -3455,6 +3475,12 @@ void EditorShell::unloadPlugins()
         }
     }
     m_impl->plugins.clear();
+}
+
+void EditorShell::unregisterNativePluginContributions(std::string_view owner_id)
+{
+    m_impl->command_service.unregisterCommandsForOwner(owner_id);
+    m_impl->window_service.unregisterWindowsForOwner(owner_id);
 }
 
 void EditorShell::update(float delta_seconds)

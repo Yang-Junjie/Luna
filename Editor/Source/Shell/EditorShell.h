@@ -2,6 +2,7 @@
 
 #include "EditorApi/EditorHost.h"
 
+#include <filesystem>
 #include <initializer_list>
 #include <memory>
 #include <string_view>
@@ -50,8 +51,9 @@ public:
     RuntimeViewportService& runtimeViewport() override;
     ViewportService& viewport() override;
 
-    bool loadPlugin(std::unique_ptr<Plugin> plugin);
+    bool loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesystem::path& root_path = {});
     void unloadPlugins();
+    void unregisterNativePluginContributions(std::string_view owner_id);
     void update(float delta_seconds);
     void drawMenuItems(std::string_view menu_path);
     void drawMenuBarItems(std::initializer_list<std::string_view> handled_roots);

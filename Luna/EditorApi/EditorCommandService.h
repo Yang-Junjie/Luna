@@ -13,6 +13,7 @@ struct CommandDescriptor {
     std::string label;
     std::string description;
     std::string shortcut;
+    std::string owner_id;
     std::function<bool(Host&)> can_execute;
     std::function<bool(Host&)> is_checked;
     std::function<void(Host&)> execute;

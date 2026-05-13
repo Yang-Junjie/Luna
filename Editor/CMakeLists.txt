@@ -43,6 +43,14 @@ add_executable(
     Source/EditorUI.cpp
     Source/Shell/EditorShell.h
     Source/Shell/EditorShell.cpp
+    Source/Shell/EditorBuiltinPluginRegistry.h
+    Source/Shell/EditorBuiltinPluginRegistry.cpp
+    Source/Shell/EditorPluginManager.h
+    Source/Shell/EditorPluginManager.cpp
+    Source/Shell/EditorPluginDependencyResolver.h
+    Source/Shell/EditorPluginDependencyResolver.cpp
+    Source/Shell/EditorPluginManifest.h
+    Source/Shell/EditorPluginManifest.cpp
     Source/Viewport/EditorViewportSession.h
     Source/Viewport/EditorViewportSession.cpp
     Source/LunaEditorApp.h

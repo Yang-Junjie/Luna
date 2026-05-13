@@ -1,0 +1,8 @@
+EditorPlugin:
+  Id: luna.editor.builtin-materials
+  DisplayName: Builtin Materials
+  Runtime: BuiltinNative
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

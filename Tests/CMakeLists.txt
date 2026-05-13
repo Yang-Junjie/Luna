@@ -4,6 +4,13 @@ add_executable(
 )
 
 add_executable(
+    NativeEditorPluginContractTests
+    NativeEditorPluginContractTests.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManifest.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginDependencyResolver.cpp
+)
+
+add_executable(
     SceneSerializerTests
     SceneSerializerTests.cpp
 )
@@ -39,6 +46,8 @@ endfunction()
 
 set(LUNA_TEST_SCRIPT_PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ScriptPluginTestPlugins")
 set(LUNA_TEST_SCRIPT_PLUGIN_TARGETS)
+set(LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/EditorPluginTestPlugins")
+set(LUNA_TEST_EDITOR_PLUGIN_TARGETS)
 
 function(add_luna_test_script_plugin target_name)
     add_library(
@@ -93,8 +102,68 @@ add_luna_test_script_plugin(LunaTestScriptPluginLanguageMismatch LUNA_TEST_SCRIP
 add_luna_test_script_plugin(LunaTestScriptPluginExtensionMismatch LUNA_TEST_SCRIPT_PLUGIN_EXTENSION_MISMATCH)
 add_luna_test_script_plugin(LunaTestScriptPluginEmptyExtensions LUNA_TEST_SCRIPT_PLUGIN_EMPTY_EXTENSIONS)
 
+function(add_luna_test_editor_plugin target_name)
+    add_library(
+        ${target_name}
+        SHARED
+        FakeNativeEditorPlugin.cpp
+    )
+
+    target_include_directories(
+        ${target_name}
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/Luna
+    )
+
+    target_compile_features(
+        ${target_name}
+        PRIVATE
+            cxx_std_20
+    )
+
+    if(ARGN)
+        target_compile_definitions(
+            ${target_name}
+            PRIVATE
+                ${ARGN}
+        )
+    endif()
+
+    set_target_properties(
+        ${target_name}
+        PROPERTIES
+            PREFIX ""
+            RUNTIME_OUTPUT_DIRECTORY "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_DEBUG "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY_DEBUG "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+    )
+
+    list(APPEND LUNA_TEST_EDITOR_PLUGIN_TARGETS ${target_name})
+    set(LUNA_TEST_EDITOR_PLUGIN_TARGETS "${LUNA_TEST_EDITOR_PLUGIN_TARGETS}" PARENT_SCOPE)
+endfunction()
+
+add_luna_test_editor_plugin(LunaTestEditorPluginGood)
+add_luna_test_editor_plugin(LunaTestEditorPluginMissingSymbol LUNA_TEST_EDITOR_PLUGIN_MISSING_SYMBOL)
+add_luna_test_editor_plugin(LunaTestEditorPluginApiMismatch LUNA_TEST_EDITOR_PLUGIN_API_MISMATCH)
+add_luna_test_editor_plugin(LunaTestEditorPluginIdMismatch LUNA_TEST_EDITOR_PLUGIN_ID_MISMATCH)
+add_luna_test_editor_plugin(LunaTestEditorPluginMissingCallbacks LUNA_TEST_EDITOR_PLUGIN_MISSING_CALLBACKS)
+add_luna_test_editor_plugin(LunaTestEditorPluginLoadFailure LUNA_TEST_EDITOR_PLUGIN_LOAD_FAILURE)
+
 target_link_libraries(
     ScriptPluginContractTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
+    NativeEditorPluginContractTests
     PRIVATE
         LunaCore
 )
@@ -131,6 +200,12 @@ target_link_libraries(
 
 target_compile_features(
     ScriptPluginContractTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    NativeEditorPluginContractTests
     PRIVATE
         cxx_std_20
 )
@@ -172,6 +247,18 @@ target_compile_definitions(
 )
 
 target_compile_definitions(
+    NativeEditorPluginContractTests
+    PRIVATE
+        LUNA_TEST_EDITOR_PLUGIN_DIR="${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+)
+
+target_include_directories(
+    NativeEditorPluginContractTests
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/Editor/Source
+)
+
+target_compile_definitions(
     AuthoringProtocolTests
     PRIVATE
         LUNA_AUTHORING_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/Fixtures/Authoring"
@@ -183,12 +270,19 @@ if(TARGET LunaScriptLuaPlugin)
 endif()
 
 add_dependencies(ScriptPluginContractTests ${LUNA_TEST_SCRIPT_PLUGIN_TARGETS})
+add_dependencies(NativeEditorPluginContractTests ${LUNA_TEST_EDITOR_PLUGIN_TARGETS})
 
 add_test(
     NAME ScriptPluginContractTests
     COMMAND ScriptPluginContractTests
 )
 luna_set_test_properties(ScriptPluginContractTests 20 "quick;unit;core;plugin")
+
+add_test(
+    NAME NativeEditorPluginContractTests
+    COMMAND NativeEditorPluginContractTests
+)
+luna_set_test_properties(NativeEditorPluginContractTests 20 "quick;unit;editor;plugin")
 
 add_test(
     NAME SceneSerializerTests
