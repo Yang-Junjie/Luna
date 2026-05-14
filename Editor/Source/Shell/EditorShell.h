@@ -29,6 +29,7 @@ class ScriptService;
 class RenderingService;
 class SceneService;
 class SelectionService;
+class ShortcutService;
 class ViewportService;
 
 class EditorShell final : public Host {
@@ -49,6 +50,7 @@ public:
     RenderingService& rendering() override;
     SceneService& scene() override;
     SelectionService& selection() override;
+    ShortcutService& shortcuts() override;
     RuntimeViewportService& runtimeViewport() override;
     ViewportService& viewport() override;
 
@@ -58,6 +60,7 @@ public:
     void cleanupPluginContributions(std::string_view owner_id);
     ViewportId createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name);
     void update(float delta_seconds);
+    bool dispatchShortcuts();
     void drawMenuItems(std::string_view menu_path);
     void drawMenuBarItems(std::initializer_list<std::string_view> handled_roots);
     void drawWindowMenuItems();

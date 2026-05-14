@@ -15,6 +15,7 @@
 #include "EditorApi/EditorRenderingService.h"
 #include "EditorApi/EditorSceneService.h"
 #include "EditorApi/EditorSelectionService.h"
+#include "EditorApi/EditorShortcutService.h"
 #include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorTypes.h"
 #include "EditorApi/EditorUi.h"

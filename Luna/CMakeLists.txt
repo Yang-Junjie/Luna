@@ -235,6 +235,7 @@ set(EDITOR_API_SOURCE
     EditorApi/EditorScriptPluginService.h
     EditorApi/EditorScriptService.h
     EditorApi/EditorSelectionService.h
+    EditorApi/EditorShortcutService.h
     EditorApi/EditorStandardCommands.h
     EditorApi/EditorTypes.h
     EditorApi/EditorUi.h

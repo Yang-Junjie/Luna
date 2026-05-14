@@ -13,6 +13,7 @@ class ScriptService;
 class RenderingService;
 class SceneService;
 class SelectionService;
+class ShortcutService;
 class RuntimeViewportService;
 class Ui;
 class ViewportService;
@@ -35,6 +36,7 @@ public:
     virtual RenderingService& rendering() = 0;
     virtual SceneService& scene() = 0;
     virtual SelectionService& selection() = 0;
+    virtual ShortcutService& shortcuts() = 0;
     virtual RuntimeViewportService& runtimeViewport() = 0;
     virtual ViewportService& viewport() = 0;
 };

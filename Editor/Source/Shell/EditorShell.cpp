@@ -187,6 +187,151 @@ luna::editor::UVec2 framebufferSizeForUi(luna::editor::Ui& ui, luna::editor::Vec
     };
 }
 
+ImGuiKey toShortcutImGuiKey(luna::KeyCode key)
+{
+    switch (key) {
+        case luna::KeyCode::A:
+            return ImGuiKey_A;
+        case luna::KeyCode::B:
+            return ImGuiKey_B;
+        case luna::KeyCode::C:
+            return ImGuiKey_C;
+        case luna::KeyCode::D:
+            return ImGuiKey_D;
+        case luna::KeyCode::E:
+            return ImGuiKey_E;
+        case luna::KeyCode::F:
+            return ImGuiKey_F;
+        case luna::KeyCode::G:
+            return ImGuiKey_G;
+        case luna::KeyCode::H:
+            return ImGuiKey_H;
+        case luna::KeyCode::I:
+            return ImGuiKey_I;
+        case luna::KeyCode::J:
+            return ImGuiKey_J;
+        case luna::KeyCode::K:
+            return ImGuiKey_K;
+        case luna::KeyCode::L:
+            return ImGuiKey_L;
+        case luna::KeyCode::M:
+            return ImGuiKey_M;
+        case luna::KeyCode::N:
+            return ImGuiKey_N;
+        case luna::KeyCode::O:
+            return ImGuiKey_O;
+        case luna::KeyCode::P:
+            return ImGuiKey_P;
+        case luna::KeyCode::Q:
+            return ImGuiKey_Q;
+        case luna::KeyCode::R:
+            return ImGuiKey_R;
+        case luna::KeyCode::S:
+            return ImGuiKey_S;
+        case luna::KeyCode::T:
+            return ImGuiKey_T;
+        case luna::KeyCode::U:
+            return ImGuiKey_U;
+        case luna::KeyCode::V:
+            return ImGuiKey_V;
+        case luna::KeyCode::W:
+            return ImGuiKey_W;
+        case luna::KeyCode::X:
+            return ImGuiKey_X;
+        case luna::KeyCode::Y:
+            return ImGuiKey_Y;
+        case luna::KeyCode::Z:
+            return ImGuiKey_Z;
+        case luna::KeyCode::Space:
+            return ImGuiKey_Space;
+        case luna::KeyCode::Enter:
+            return ImGuiKey_Enter;
+        case luna::KeyCode::Delete:
+            return ImGuiKey_Delete;
+        case luna::KeyCode::Escape:
+            return ImGuiKey_Escape;
+        case luna::KeyCode::Up:
+            return ImGuiKey_UpArrow;
+        case luna::KeyCode::Down:
+            return ImGuiKey_DownArrow;
+        case luna::KeyCode::Left:
+            return ImGuiKey_LeftArrow;
+        case luna::KeyCode::Right:
+            return ImGuiKey_RightArrow;
+        case luna::KeyCode::LeftShift:
+            return ImGuiKey_LeftShift;
+        case luna::KeyCode::RightShift:
+            return ImGuiKey_RightShift;
+        case luna::KeyCode::LeftControl:
+            return ImGuiKey_LeftCtrl;
+        case luna::KeyCode::RightControl:
+            return ImGuiKey_RightCtrl;
+        case luna::KeyCode::LeftAlt:
+            return ImGuiKey_LeftAlt;
+        case luna::KeyCode::RightAlt:
+            return ImGuiKey_RightAlt;
+        case luna::KeyCode::None:
+            return ImGuiKey_None;
+    }
+
+    return ImGuiKey_None;
+}
+
+std::string shortcutKeyText(luna::KeyCode key)
+{
+    switch (key) {
+        case luna::KeyCode::Space:
+            return "Space";
+        case luna::KeyCode::Enter:
+            return "Enter";
+        case luna::KeyCode::Delete:
+            return "Delete";
+        case luna::KeyCode::Escape:
+            return "Escape";
+        case luna::KeyCode::Up:
+            return "Up";
+        case luna::KeyCode::Down:
+            return "Down";
+        case luna::KeyCode::Left:
+            return "Left";
+        case luna::KeyCode::Right:
+            return "Right";
+        case luna::KeyCode::LeftShift:
+            return "Left Shift";
+        case luna::KeyCode::RightShift:
+            return "Right Shift";
+        case luna::KeyCode::LeftControl:
+            return "Left Ctrl";
+        case luna::KeyCode::RightControl:
+            return "Right Ctrl";
+        case luna::KeyCode::LeftAlt:
+            return "Left Alt";
+        case luna::KeyCode::RightAlt:
+            return "Right Alt";
+        case luna::KeyCode::None:
+            return {};
+        default:
+            break;
+    }
+
+    const int key_value = static_cast<int>(key);
+    if (key_value >= static_cast<int>(luna::KeyCode::A) && key_value <= static_cast<int>(luna::KeyCode::Z)) {
+        return std::string(1, static_cast<char>(key_value));
+    }
+
+    return {};
+}
+
+bool shortcutPrimaryUsesSuper(const ImGuiIO& io)
+{
+#if defined(__APPLE__)
+    (void) io;
+    return true;
+#else
+    return io.ConfigMacOSXBehaviors;
+#endif
+}
+
 bool equalsIgnoreCase(std::string_view lhs, std::string_view rhs)
 {
     if (lhs.size() != rhs.size()) {
@@ -2591,10 +2736,200 @@ private:
     std::unordered_map<std::string, size_t> m_order_by_id;
 };
 
+class EditorShortcutService final : public ShortcutService {
+public:
+    EditorShortcutService(EditorCommandService& command_service, std::string& current_owner_id)
+        : m_command_service(&command_service),
+          m_current_owner_id(&current_owner_id)
+    {}
+
+    bool registerShortcut(ShortcutDescriptor descriptor) override
+    {
+        if (descriptor.id.empty() || descriptor.command_id.empty() ||
+            toShortcutImGuiKey(descriptor.chord.key) == ImGuiKey_None) {
+            return false;
+        }
+        if (descriptor.owner_id.empty()) {
+            descriptor.owner_id = currentOwnerId();
+        }
+
+        const std::string id = descriptor.id;
+        const bool inserted = m_order_by_id.find(id) == m_order_by_id.end();
+        m_shortcuts[id] = std::move(descriptor);
+        if (inserted) {
+            m_order_by_id.emplace(id, m_order.size());
+            m_order.push_back(id);
+        }
+        return true;
+    }
+
+    void unregisterShortcut(std::string_view id) override
+    {
+        const std::string key = toString(id);
+        m_shortcuts.erase(key);
+        const auto order_it = m_order_by_id.find(key);
+        if (order_it == m_order_by_id.end()) {
+            return;
+        }
+
+        m_order.erase(m_order.begin() + static_cast<std::ptrdiff_t>(order_it->second));
+        rebuildOrderMap();
+    }
+
+    void unregisterShortcutsForOwner(std::string_view owner_id)
+    {
+        if (owner_id.empty()) {
+            return;
+        }
+
+        const std::string owner_key = toString(owner_id);
+        for (auto it = m_shortcuts.begin(); it != m_shortcuts.end();) {
+            if (it->second.owner_id == owner_key) {
+                it = m_shortcuts.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
+        m_order.erase(std::remove_if(m_order.begin(),
+                                     m_order.end(),
+                                     [&](const std::string& id) {
+                                         return m_shortcuts.find(id) == m_shortcuts.end();
+                                     }),
+                      m_order.end());
+        rebuildOrderMap();
+    }
+
+    std::string shortcutText(std::string_view id) const override
+    {
+        const auto it = m_shortcuts.find(toString(id));
+        return it != m_shortcuts.end() ? shortcutTextForDescriptor(it->second) : std::string{};
+    }
+
+    std::string commandShortcutText(std::string_view command_id) const override
+    {
+        const std::string command_key = toString(command_id);
+        for (auto it = m_order.rbegin(); it != m_order.rend(); ++it) {
+            const auto shortcut_it = m_shortcuts.find(*it);
+            if (shortcut_it != m_shortcuts.end() && shortcut_it->second.command_id == command_key) {
+                return shortcutTextForDescriptor(shortcut_it->second);
+            }
+        }
+        return {};
+    }
+
+    bool dispatchPressedShortcuts()
+    {
+        if (m_command_service == nullptr) {
+            return false;
+        }
+
+        const ImGuiIO& io = ImGui::GetIO();
+        if (io.WantTextInput) {
+            return false;
+        }
+
+        for (auto it = m_order.rbegin(); it != m_order.rend(); ++it) {
+            const auto shortcut_it = m_shortcuts.find(*it);
+            if (shortcut_it == m_shortcuts.end()) {
+                continue;
+            }
+
+            const ShortcutDescriptor& descriptor = shortcut_it->second;
+            if (!isChordPressed(descriptor.chord, io) || !m_command_service->canExecute(descriptor.command_id)) {
+                continue;
+            }
+            return m_command_service->execute(descriptor.command_id);
+        }
+
+        return false;
+    }
+
+private:
+    static std::string shortcutTextForDescriptor(const ShortcutDescriptor& descriptor)
+    {
+        if (!descriptor.display_text.empty()) {
+            return descriptor.display_text;
+        }
+
+        std::string result;
+        const auto append_part = [&](std::string_view part) {
+            if (part.empty()) {
+                return;
+            }
+            if (!result.empty()) {
+                result += "+";
+            }
+            result += part;
+        };
+
+#if defined(__APPLE__)
+        constexpr std::string_view primary_text = "Cmd";
+#else
+        constexpr std::string_view primary_text = "Ctrl";
+#endif
+
+        if (descriptor.chord.primary) {
+            append_part(primary_text);
+        }
+        if (descriptor.chord.ctrl) {
+            append_part("Ctrl");
+        }
+        if (descriptor.chord.shift) {
+            append_part("Shift");
+        }
+        if (descriptor.chord.alt) {
+            append_part("Alt");
+        }
+        if (descriptor.chord.super) {
+            append_part("Super");
+        }
+        append_part(shortcutKeyText(descriptor.chord.key));
+        return result;
+    }
+
+    static bool isChordPressed(const ShortcutChord& chord, const ImGuiIO& io)
+    {
+        const ImGuiKey key = toShortcutImGuiKey(chord.key);
+        if (key == ImGuiKey_None || !ImGui::IsKeyPressed(key, chord.allow_repeat)) {
+            return false;
+        }
+
+        const bool primary_uses_super = shortcutPrimaryUsesSuper(io);
+        const bool require_ctrl = chord.ctrl || (chord.primary && !primary_uses_super);
+        const bool require_super = chord.super || (chord.primary && primary_uses_super);
+        return io.KeyCtrl == require_ctrl && io.KeyShift == chord.shift && io.KeyAlt == chord.alt &&
+               io.KeySuper == require_super;
+    }
+
+    void rebuildOrderMap()
+    {
+        m_order_by_id.clear();
+        for (size_t index = 0; index < m_order.size(); ++index) {
+            m_order_by_id.emplace(m_order[index], index);
+        }
+    }
+
+    std::string currentOwnerId() const
+    {
+        return m_current_owner_id != nullptr ? *m_current_owner_id : std::string{};
+    }
+
+private:
+    EditorCommandService* m_command_service{nullptr};
+    std::string* m_current_owner_id{nullptr};
+    std::unordered_map<std::string, ShortcutDescriptor> m_shortcuts;
+    std::vector<std::string> m_order;
+    std::unordered_map<std::string, size_t> m_order_by_id;
+};
+
 class EditorMenuService final : public MenuService {
 public:
-    EditorMenuService(EditorCommandService& command_service, std::string& current_owner_id)
+    EditorMenuService(EditorCommandService& command_service,
+                      EditorShortcutService& shortcut_service,
+                      std::string& current_owner_id)
         : m_command_service(&command_service),
+          m_shortcut_service(&shortcut_service),
           m_current_owner_id(&current_owner_id)
     {}
 
@@ -2749,6 +3084,9 @@ private:
         if (shortcut.empty() && command != nullptr) {
             shortcut = command->shortcut;
         }
+        if (shortcut.empty() && command != nullptr && m_shortcut_service != nullptr) {
+            shortcut = m_shortcut_service->commandShortcutText(command->id);
+        }
 
         const bool enabled = m_command_service != nullptr && m_command_service->canExecute(item.command_id);
         const bool selected = m_command_service != nullptr && m_command_service->isChecked(item.command_id);
@@ -2760,6 +3098,7 @@ private:
 
 private:
     EditorCommandService* m_command_service{nullptr};
+    EditorShortcutService* m_shortcut_service{nullptr};
     std::string* m_current_owner_id{nullptr};
     std::vector<MenuItemDescriptor> m_items;
 };
@@ -3562,7 +3901,8 @@ struct EditorShell::Impl {
           runtime_viewport_service(editor_layer),
           history_service(editor_layer),
           command_service(shell, current_plugin_owner_id),
-          menu_service(command_service, current_plugin_owner_id),
+          shortcut_service(command_service, current_plugin_owner_id),
+          menu_service(command_service, shortcut_service, current_plugin_owner_id),
           plugin_asset_service(),
           script_plugin_service(project_service),
           script_service(project_service),
@@ -3580,6 +3920,7 @@ struct EditorShell::Impl {
     EditorRuntimeViewportService runtime_viewport_service;
     EditorHistoryService history_service;
     EditorCommandService command_service;
+    EditorShortcutService shortcut_service;
     EditorMenuService menu_service;
     EditorPluginAssetService plugin_asset_service;
     EditorScriptPluginService script_plugin_service;
@@ -3662,6 +4003,11 @@ SelectionService& EditorShell::selection()
     return m_impl->selection_service;
 }
 
+ShortcutService& EditorShell::shortcuts()
+{
+    return m_impl->shortcut_service;
+}
+
 RuntimeViewportService& EditorShell::runtimeViewport()
 {
     return m_impl->runtime_viewport_service;
@@ -3730,6 +4076,7 @@ void EditorShell::cleanupPluginContributions(std::string_view owner_id)
 {
     m_impl->viewport_service.destroyViewportsForOwner(owner_id);
     m_impl->menu_service.removeMenuItemsForOwner(owner_id);
+    m_impl->shortcut_service.unregisterShortcutsForOwner(owner_id);
     m_impl->command_service.unregisterCommandsForOwner(owner_id);
     m_impl->window_service.unregisterWindowsForOwner(owner_id);
     m_impl->plugin_asset_service.unregisterPlugin(owner_id);
@@ -3749,6 +4096,11 @@ void EditorShell::update(float delta_seconds)
             plugin->onUpdate(*this, delta_seconds);
         }
     }
+}
+
+bool EditorShell::dispatchShortcuts()
+{
+    return m_impl->shortcut_service.dispatchPressedShortcuts();
 }
 
 void EditorShell::drawMenuItems(std::string_view menu_path)
@@ -3771,6 +4123,8 @@ void EditorShell::drawWindows()
     m_impl->window_service.drawWindows();
     for (const auto& plugin : m_impl->plugins) {
         if (plugin) {
+            const PluginDescriptor descriptor = plugin->descriptor();
+            EditorPluginOwnerScope owner_scope(m_impl->current_plugin_owner_id, descriptor.id);
             plugin->onDrawUi(*this, m_impl->ui);
         }
     }

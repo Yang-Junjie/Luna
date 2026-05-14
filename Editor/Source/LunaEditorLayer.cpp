@@ -2,8 +2,6 @@
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
-#include "EditorApi/EditorCommandService.h"
-#include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorUi.h"
 #include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorWindowService.h"
@@ -804,20 +802,8 @@ void LunaEditorLayer::onImGuiMenuBar()
 
 void LunaEditorLayer::updateEditorShortcuts()
 {
-    const ImGuiIO& io = ImGui::GetIO();
-    if (io.WantTextInput || !io.KeyCtrl || !m_editor_shell) {
-        return;
-    }
-
-    const bool redo_shortcut = ImGui::IsKeyPressed(ImGuiKey_Y, false) ||
-                               (io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false));
-    if (redo_shortcut) {
-        (void) m_editor_shell->commands().execute(editor::commands::kRedo);
-        return;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
-        (void) m_editor_shell->commands().execute(editor::commands::kUndo);
+    if (m_editor_shell) {
+        (void) m_editor_shell->dispatchShortcuts();
     }
 }
 
