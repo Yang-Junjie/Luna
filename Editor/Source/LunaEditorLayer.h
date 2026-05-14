@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 struct ImVec2;
@@ -106,6 +107,7 @@ public:
     void setRuntimeViewportRequested(bool enabled);
     editor::ViewportId defaultSceneViewportId() const noexcept;
     editor::ViewportId createSceneViewport(std::string_view debug_name = {});
+    editor::ViewportId createSceneViewport(std::string_view debug_name, std::string_view owner_id);
     void destroySceneViewport(editor::ViewportId viewport_id);
     bool isSceneViewportValid(editor::ViewportId viewport_id) const noexcept;
     editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id, editor::UVec2 framebuffer_size);
@@ -116,12 +118,14 @@ public:
     editor::TextureView getSceneTextureView(editor::ViewportId viewport_id) const;
     editor::TextureView getSceneTextureView() const;
     editor::ViewportId createTextureViewport(std::string_view debug_name = {});
+    editor::ViewportId createTextureViewport(std::string_view debug_name, std::string_view owner_id);
     void destroyTextureViewport(editor::ViewportId viewport_id);
     bool isTextureViewportValid(editor::ViewportId viewport_id) const noexcept;
     editor::TextureViewportPresentation syncTextureViewport(editor::ViewportId viewport_id,
                                                             editor::TextureView texture,
                                                             editor::UVec2 framebuffer_size);
     editor::TextureViewportPresentation textureViewportPresentation(editor::ViewportId viewport_id) const;
+    void destroyViewportsForOwner(std::string_view owner_id);
     void drawDefaultSceneViewport(editor::Ui& ui);
     UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() override;
@@ -233,6 +237,7 @@ private:
     SceneViewportInstanceManager m_viewport_instances;
     TextureViewportInstanceManager m_texture_viewport_instances;
     editor::ViewportId m_next_viewport_id{editor::kDefaultViewportId + 1u};
+    std::unordered_map<editor::ViewportId, std::string> m_viewport_owner_by_id;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
     std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };

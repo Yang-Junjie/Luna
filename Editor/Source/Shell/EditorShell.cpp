@@ -30,6 +30,7 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <cmath>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -142,6 +143,48 @@ bool containsStringView(std::initializer_list<std::string_view> values, std::str
         }
     }
     return false;
+}
+
+luna::editor::Vec2 fitTextureViewportDrawSize(const luna::editor::TextureView& texture,
+                                              luna::editor::Vec2 available,
+                                              luna::editor::TextureViewportDrawOptions options)
+{
+    if (!texture.valid() || available.x <= 0.0f || available.y <= 0.0f) {
+        return {};
+    }
+
+    if (!options.preserve_aspect) {
+        return options.fill_available ? available
+                                      : luna::editor::Vec2{
+                                            .x = (std::min)(static_cast<float>(texture.size.x), available.x),
+                                            .y = (std::min)(static_cast<float>(texture.size.y), available.y),
+                                        };
+    }
+
+    const float aspect = texture.size.y > 0u ? static_cast<float>(texture.size.x) / static_cast<float>(texture.size.y)
+                                             : 1.0f;
+    float width = options.fill_available ? available.x : (std::min)(static_cast<float>(texture.size.x), available.x);
+    float height = width / aspect;
+    if (height > available.y) {
+        height = available.y;
+        width = height * aspect;
+    }
+
+    return luna::editor::Vec2{
+        .x = (std::max)(width, 1.0f),
+        .y = (std::max)(height, 1.0f),
+    };
+}
+
+luna::editor::UVec2 framebufferSizeForUi(luna::editor::Ui& ui, luna::editor::Vec2 size)
+{
+    const luna::editor::Vec2 framebuffer_scale = ui.windowFramebufferScale();
+    const float scale_x = std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
+    const float scale_y = std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
+    return luna::editor::UVec2{
+        .x = static_cast<uint32_t>((std::max)(size.x * scale_x, 0.0f)),
+        .y = static_cast<uint32_t>((std::max)(size.y * scale_y, 0.0f)),
+    };
 }
 
 bool equalsIgnoreCase(std::string_view lhs, std::string_view rhs)
@@ -2145,10 +2188,35 @@ private:
     LunaEditorLayer* m_editor_layer{nullptr};
 };
 
+class EditorPluginOwnerScope final {
+public:
+    EditorPluginOwnerScope(std::string& current_owner, std::string_view owner_id)
+        : m_current_owner(&current_owner),
+          m_previous_owner(current_owner)
+    {
+        *m_current_owner = toString(owner_id);
+    }
+
+    EditorPluginOwnerScope(const EditorPluginOwnerScope&) = delete;
+    EditorPluginOwnerScope& operator=(const EditorPluginOwnerScope&) = delete;
+
+    ~EditorPluginOwnerScope()
+    {
+        if (m_current_owner != nullptr) {
+            *m_current_owner = std::move(m_previous_owner);
+        }
+    }
+
+private:
+    std::string* m_current_owner{nullptr};
+    std::string m_previous_owner;
+};
+
 class EditorViewportService final : public ViewportService {
 public:
-    explicit EditorViewportService(LunaEditorLayer& editor_layer)
-        : m_editor_layer(&editor_layer)
+    EditorViewportService(LunaEditorLayer& editor_layer, std::string& current_owner_id)
+        : m_editor_layer(&editor_layer),
+          m_current_owner_id(&current_owner_id)
     {}
 
     ViewportId defaultSceneViewport() const noexcept override
@@ -2158,7 +2226,14 @@ public:
 
     ViewportId createSceneViewport(std::string_view debug_name = {}) override
     {
-        return m_editor_layer != nullptr ? m_editor_layer->createSceneViewport(debug_name) : editor::kInvalidViewportId;
+        return m_editor_layer != nullptr ? m_editor_layer->createSceneViewport(debug_name, currentOwnerId())
+                                         : editor::kInvalidViewportId;
+    }
+
+    ViewportId createSceneViewportForOwner(std::string_view debug_name, std::string_view owner_id)
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->createSceneViewport(debug_name, owner_id)
+                                         : editor::kInvalidViewportId;
     }
 
     void destroySceneViewport(ViewportId viewport_id) override
@@ -2204,8 +2279,21 @@ public:
 
     ViewportId createTextureViewport(std::string_view debug_name = {}) override
     {
-        return m_editor_layer != nullptr ? m_editor_layer->createTextureViewport(debug_name)
+        return m_editor_layer != nullptr ? m_editor_layer->createTextureViewport(debug_name, currentOwnerId())
                                          : editor::kInvalidViewportId;
+    }
+
+    ViewportId createTextureViewportForOwner(std::string_view debug_name, std::string_view owner_id)
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->createTextureViewport(debug_name, owner_id)
+                                         : editor::kInvalidViewportId;
+    }
+
+    void destroyViewportsForOwner(std::string_view owner_id)
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->destroyViewportsForOwner(owner_id);
+        }
     }
 
     void destroyTextureViewport(ViewportId viewport_id) override
@@ -2232,6 +2320,32 @@ public:
     {
         return m_editor_layer != nullptr ? m_editor_layer->textureViewportPresentation(viewport_id)
                                          : TextureViewportPresentation{};
+    }
+
+    TextureViewportDrawResult drawTextureViewport(Ui& ui,
+                                                  ViewportId viewport_id,
+                                                  TextureView texture,
+                                                  TextureViewportDrawOptions options = {}) override
+    {
+        TextureViewportDrawResult result{};
+        const Vec2 available = ui.contentRegionAvail();
+        result.presentation = syncTextureViewport(viewport_id, texture, framebufferSizeForUi(ui, available));
+        if (!result.presentation.presentable || !result.presentation.texture.valid()) {
+            return result;
+        }
+
+        result.drawn_size = fitTextureViewportDrawSize(result.presentation.texture, available, options);
+        if (result.drawn_size.x <= 0.0f || result.drawn_size.y <= 0.0f) {
+            return result;
+        }
+
+        result.drawn = ui.image(result.presentation.texture, result.drawn_size);
+        if (result.drawn) {
+            result.hovered = ui.isItemHovered();
+            result.clicked = ui.isItemClicked(MouseButton::Left);
+            result.double_clicked = ui.isItemDoubleClicked(MouseButton::Left);
+        }
+        return result;
     }
 
     Vec3 editorCameraPosition() const noexcept override
@@ -2283,7 +2397,13 @@ public:
     }
 
 private:
+    std::string_view currentOwnerId() const noexcept
+    {
+        return m_current_owner_id != nullptr ? std::string_view(*m_current_owner_id) : std::string_view{};
+    }
+
     LunaEditorLayer* m_editor_layer{nullptr};
+    std::string* m_current_owner_id{nullptr};
 };
 
 class EditorRuntimeViewportService final : public RuntimeViewportService {
@@ -2350,14 +2470,18 @@ private:
 
 class EditorCommandService final : public CommandService {
 public:
-    explicit EditorCommandService(Host& host)
-        : m_host(&host)
+    EditorCommandService(Host& host, std::string& current_owner_id)
+        : m_host(&host),
+          m_current_owner_id(&current_owner_id)
     {}
 
     bool registerCommand(CommandDescriptor descriptor) override
     {
         if (descriptor.id.empty() || !descriptor.execute) {
             return false;
+        }
+        if (descriptor.owner_id.empty()) {
+            descriptor.owner_id = currentOwnerId();
         }
 
         const std::string id = descriptor.id;
@@ -2454,7 +2578,14 @@ private:
     }
 
 private:
+    std::string currentOwnerId() const
+    {
+        return m_current_owner_id != nullptr ? *m_current_owner_id : std::string{};
+    }
+
+private:
     Host* m_host{nullptr};
+    std::string* m_current_owner_id{nullptr};
     std::unordered_map<std::string, CommandDescriptor> m_commands;
     std::vector<std::string> m_order;
     std::unordered_map<std::string, size_t> m_order_by_id;
@@ -2462,8 +2593,9 @@ private:
 
 class EditorMenuService final : public MenuService {
 public:
-    explicit EditorMenuService(EditorCommandService& command_service)
-        : m_command_service(&command_service)
+    EditorMenuService(EditorCommandService& command_service, std::string& current_owner_id)
+        : m_command_service(&command_service),
+          m_current_owner_id(&current_owner_id)
     {}
 
     bool addMenuItem(MenuItemDescriptor descriptor) override
@@ -2475,6 +2607,9 @@ public:
         descriptor.menu_path = normalizeMenuPath(descriptor.menu_path);
         if (descriptor.menu_path.empty()) {
             return false;
+        }
+        if (descriptor.owner_id.empty() && m_current_owner_id != nullptr) {
+            descriptor.owner_id = *m_current_owner_id;
         }
 
         const auto existing = std::find_if(m_items.begin(), m_items.end(), [&](const MenuItemDescriptor& item) {
@@ -2625,6 +2760,7 @@ private:
 
 private:
     EditorCommandService* m_command_service{nullptr};
+    std::string* m_current_owner_id{nullptr};
     std::vector<MenuItemDescriptor> m_items;
 };
 
@@ -3261,15 +3397,19 @@ private:
 
 class EditorWindowService final : public WindowService {
 public:
-    EditorWindowService(Host& host, Ui& ui)
+    EditorWindowService(Host& host, Ui& ui, std::string& current_owner_id)
         : m_host(&host),
-          m_ui(&ui)
+          m_ui(&ui),
+          m_current_owner_id(&current_owner_id)
     {}
 
     bool registerWindow(WindowDescriptor descriptor) override
     {
         if (descriptor.id.empty() || descriptor.title.empty() || !descriptor.draw) {
             return false;
+        }
+        if (descriptor.owner_id.empty() && m_current_owner_id != nullptr) {
+            descriptor.owner_id = *m_current_owner_id;
         }
 
         const std::string id = descriptor.id;
@@ -3376,6 +3516,7 @@ public:
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
             }
             if (m_ui->beginWindow(descriptor.id, descriptor.title, &it->second.open, descriptor.flags)) {
+                EditorPluginOwnerScope owner_scope(*m_current_owner_id, descriptor.owner_id);
                 descriptor.draw(context);
             }
             m_ui->endWindow();
@@ -3402,6 +3543,7 @@ private:
 private:
     Host* m_host{nullptr};
     Ui* m_ui{nullptr};
+    std::string* m_current_owner_id{nullptr};
     std::unordered_map<std::string, RegisteredWindow> m_windows;
     std::vector<std::string> m_order;
     std::unordered_map<std::string, size_t> m_order_by_id;
@@ -3415,15 +3557,16 @@ struct EditorShell::Impl {
           scene_service(editor_layer),
           selection_service(editor_layer),
           rendering_service(editor_layer),
-          viewport_service(editor_layer),
+          current_plugin_owner_id(),
+          viewport_service(editor_layer, current_plugin_owner_id),
           runtime_viewport_service(editor_layer),
           history_service(editor_layer),
-          command_service(shell),
-          menu_service(command_service),
+          command_service(shell, current_plugin_owner_id),
+          menu_service(command_service, current_plugin_owner_id),
           plugin_asset_service(),
           script_plugin_service(project_service),
           script_service(project_service),
-          window_service(shell, ui)
+          window_service(shell, ui, current_plugin_owner_id)
     {}
 
     EditorUi ui;
@@ -3432,6 +3575,7 @@ struct EditorShell::Impl {
     EditorSceneService scene_service;
     EditorSelectionService selection_service;
     EditorRenderingService rendering_service;
+    std::string current_plugin_owner_id;
     EditorViewportService viewport_service;
     EditorRuntimeViewportService runtime_viewport_service;
     EditorHistoryService history_service;
@@ -3544,11 +3688,14 @@ bool EditorShell::loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesyst
     }
 
     m_impl->plugin_asset_service.registerPlugin(descriptor);
-    if (!plugin->onLoad(*this)) {
-        LUNA_EDITOR_WARN("Editor plugin '{}' failed to load", descriptor.id);
-        plugin->onUnload(*this);
-        m_impl->plugin_asset_service.unregisterPlugin(descriptor.id);
-        return false;
+    {
+        EditorPluginOwnerScope owner_scope(m_impl->current_plugin_owner_id, descriptor.id);
+        if (!plugin->onLoad(*this)) {
+            LUNA_EDITOR_WARN("Editor plugin '{}' failed to load", descriptor.id);
+            plugin->onUnload(*this);
+            cleanupPluginContributions(descriptor.id);
+            return false;
+        }
     }
 
     LUNA_EDITOR_INFO("Loaded editor plugin '{}' ({})", descriptor.id, descriptor.display_name);
@@ -3561,8 +3708,11 @@ void EditorShell::unloadPlugins()
     for (auto it = m_impl->plugins.rbegin(); it != m_impl->plugins.rend(); ++it) {
         if (*it) {
             const PluginDescriptor descriptor = (*it)->descriptor();
-            (*it)->onUnload(*this);
-            m_impl->plugin_asset_service.unregisterPlugin(descriptor.id);
+            {
+                EditorPluginOwnerScope owner_scope(m_impl->current_plugin_owner_id, descriptor.id);
+                (*it)->onUnload(*this);
+            }
+            cleanupPluginContributions(descriptor.id);
         }
     }
     m_impl->plugins.clear();
@@ -3576,22 +3726,26 @@ void EditorShell::registerPluginAssetRoot(std::string_view plugin_id, const std:
     });
 }
 
-void EditorShell::unregisterPluginAssetRoot(std::string_view plugin_id)
+void EditorShell::cleanupPluginContributions(std::string_view owner_id)
 {
-    m_impl->plugin_asset_service.unregisterPlugin(plugin_id);
-}
-
-void EditorShell::unregisterNativePluginContributions(std::string_view owner_id)
-{
+    m_impl->viewport_service.destroyViewportsForOwner(owner_id);
     m_impl->menu_service.removeMenuItemsForOwner(owner_id);
     m_impl->command_service.unregisterCommandsForOwner(owner_id);
     m_impl->window_service.unregisterWindowsForOwner(owner_id);
+    m_impl->plugin_asset_service.unregisterPlugin(owner_id);
+}
+
+ViewportId EditorShell::createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name)
+{
+    return m_impl->viewport_service.createSceneViewportForOwner(debug_name, owner_id);
 }
 
 void EditorShell::update(float delta_seconds)
 {
     for (const auto& plugin : m_impl->plugins) {
         if (plugin) {
+            const PluginDescriptor descriptor = plugin->descriptor();
+            EditorPluginOwnerScope owner_scope(m_impl->current_plugin_owner_id, descriptor.id);
             plugin->onUpdate(*this, delta_seconds);
         }
     }

@@ -2148,8 +2148,12 @@ uint64_t nativeDefaultSceneViewport(void* api_user_data)
 
 uint64_t nativeCreateSceneViewport(void* api_user_data, const char* debug_name)
 {
-    ViewportService* viewport = nativeViewport(api_user_data);
-    return viewport != nullptr ? viewport->createSceneViewport(nativeString(debug_name)) : kInvalidViewportId;
+    auto* context = static_cast<NativePluginContext*>(api_user_data);
+    if (context == nullptr || context->shell == nullptr) {
+        return kInvalidViewportId;
+    }
+
+    return context->shell->createSceneViewportForPlugin(context->plugin_id, nativeString(debug_name));
 }
 
 void nativeDestroySceneViewport(void* api_user_data, uint64_t viewport_id)
@@ -2653,8 +2657,7 @@ void EditorPluginManager::unloadAll()
         if (it->plugin_api.on_unload != nullptr) {
             it->plugin_api.on_unload(it->plugin_api.plugin_user_data, it->host_api.get());
         }
-        m_shell.unregisterNativePluginContributions(it->package.id);
-        m_shell.unregisterPluginAssetRoot(it->package.id);
+        m_shell.cleanupPluginContributions(it->package.id);
     }
     m_native_plugins.clear();
     m_builtin_materials_plugin = nullptr;
@@ -2752,6 +2755,9 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
     instance.context->shell = &m_shell;
     instance.context->plugin_id = package.id;
     m_shell.registerPluginAssetRoot(package.id, package.root_path);
+    const auto cleanup_failed_load = [&]() {
+        m_shell.cleanupPluginContributions(package.id);
+    };
     instance.host_api = std::make_shared<LunaEditorHostApi>();
     *instance.host_api = LunaEditorHostApi{
         .struct_size = sizeof(LunaEditorHostApi),
@@ -2778,7 +2784,7 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
 
     if (create_plugin_fn(LUNA_EDITOR_HOST_API_VERSION, instance.host_api.get(), &instance.plugin_api) == 0) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' failed to initialize its plugin API", package.id);
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.struct_size != sizeof(LunaEditorPluginApi)) {
@@ -2786,7 +2792,7 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
                          package.id,
                          instance.plugin_api.struct_size,
                          static_cast<uint32_t>(sizeof(LunaEditorPluginApi)));
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.api_version != LUNA_EDITOR_PLUGIN_API_VERSION) {
@@ -2794,30 +2800,29 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
                          package.id,
                          instance.plugin_api.api_version,
                          static_cast<uint32_t>(LUNA_EDITOR_PLUGIN_API_VERSION));
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.plugin_id == nullptr || instance.plugin_api.plugin_id[0] == '\0') {
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned an empty plugin_id", package.id);
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (package.id != instance.plugin_api.plugin_id) {
         LUNA_EDITOR_WARN("Native editor plugin package id '{}' does not match plugin API id '{}'",
                          package.id,
                          instance.plugin_api.plugin_id);
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.on_load == nullptr || instance.plugin_api.on_unload == nullptr) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' must provide on_load and on_unload callbacks", package.id);
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.on_load(instance.plugin_api.plugin_user_data, instance.host_api.get()) == 0) {
         LUNA_EDITOR_WARN("Native editor plugin '{}' on_load failed", package.id);
-        m_shell.unregisterNativePluginContributions(package.id);
-        m_shell.unregisterPluginAssetRoot(package.id);
+        cleanup_failed_load();
         return false;
     }
 

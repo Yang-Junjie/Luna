@@ -276,7 +276,9 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
         logError(host_api, "plugin viewport texture failed");
         return 0;
     }
+#if !defined(LUNA_TEST_EDITOR_PLUGIN_LEAK_VIEWPORT)
     host_api->viewport.destroy_scene_viewport(host_api->viewport.api_user_data, plugin_viewport);
+#endif
 
     LunaEditorVec3 camera_position{};
     host_api->viewport.editor_camera_position(host_api->viewport.api_user_data, &camera_position);

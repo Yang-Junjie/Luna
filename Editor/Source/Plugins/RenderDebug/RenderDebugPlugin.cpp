@@ -2,9 +2,7 @@
 
 #include "EditorApi/EditorApi.h"
 
-#include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -22,34 +20,6 @@ int modeIndex(luna::editor::RenderDebugViewMode mode,
         }
     }
     return 0;
-}
-
-luna::editor::Vec2 fitImageSize(const luna::editor::TextureView& texture, luna::editor::Vec2 available)
-{
-    if (!texture.valid() || available.x <= 0.0f || available.y <= 0.0f) {
-        return {};
-    }
-
-    const float aspect = static_cast<float>(texture.size.x) / static_cast<float>(texture.size.y);
-    float image_width = available.x;
-    float image_height = image_width / aspect;
-    if (image_height > available.y) {
-        image_height = available.y;
-        image_width = image_height * aspect;
-    }
-
-    return luna::editor::Vec2{
-        .x = (std::max)(image_width, 1.0f),
-        .y = (std::max)(image_height, 1.0f),
-    };
-}
-
-luna::editor::UVec2 surfaceSize(luna::editor::Vec2 available)
-{
-    return luna::editor::UVec2{
-        .x = static_cast<uint32_t>((std::max)(available.x, 0.0f)),
-        .y = static_cast<uint32_t>((std::max)(available.y, 0.0f)),
-    };
 }
 
 void drawRenderDebugWindow(luna::editor::WindowDrawContext& context, luna::editor::ViewportId texture_viewport)
@@ -101,19 +71,7 @@ void drawRenderDebugWindow(luna::editor::WindowDrawContext& context, luna::edito
         return;
     }
 
-    const luna::editor::Vec2 available = ui.contentRegionAvail();
-    const luna::editor::TextureViewportPresentation preview =
-        host.viewport().syncTextureViewport(texture_viewport, debug_texture, surfaceSize(available));
-    if (!preview.presentable) {
-        return;
-    }
-
-    const luna::editor::Vec2 image_size = fitImageSize(preview.texture, available);
-    if (image_size.x <= 0.0f || image_size.y <= 0.0f) {
-        return;
-    }
-
-    (void) ui.image(preview.texture, image_size);
+    (void) host.viewport().drawTextureViewport(ui, texture_viewport, debug_texture);
 }
 
 class RenderDebugPlugin final : public luna::editor::Plugin {

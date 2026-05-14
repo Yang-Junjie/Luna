@@ -22,6 +22,20 @@ struct TextureViewportPresentation {
     bool presentable{false};
 };
 
+struct TextureViewportDrawOptions {
+    bool preserve_aspect{true};
+    bool fill_available{true};
+};
+
+struct TextureViewportDrawResult {
+    TextureViewportPresentation presentation;
+    Vec2 drawn_size{};
+    bool drawn{false};
+    bool hovered{false};
+    bool clicked{false};
+    bool double_clicked{false};
+};
+
 class ViewportService {
 public:
     virtual ~ViewportService() = default;
@@ -43,6 +57,10 @@ public:
     virtual TextureViewportPresentation
         syncTextureViewport(ViewportId viewport_id, TextureView texture, UVec2 framebuffer_size) = 0;
     virtual TextureViewportPresentation textureViewportPresentation(ViewportId viewport_id) const = 0;
+    virtual TextureViewportDrawResult drawTextureViewport(Ui& ui,
+                                                          ViewportId viewport_id,
+                                                          TextureView texture,
+                                                          TextureViewportDrawOptions options = {}) = 0;
 
     virtual Vec3 editorCameraPosition() const noexcept = 0;
     virtual std::string gizmoOperationName() const = 0;

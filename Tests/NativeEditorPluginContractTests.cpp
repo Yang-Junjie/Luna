@@ -386,6 +386,14 @@ struct TestNativeHost {
                                        return item.owner_id == owner;
                                    }),
                     menus.end());
+
+        for (auto it = scene_viewport_owners.begin(); it != scene_viewport_owners.end();) {
+            if (it->second == owner) {
+                it = scene_viewport_owners.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     bool drawWindow(std::string_view id)
@@ -422,6 +430,7 @@ struct TestNativeHost {
     };
     uint64_t next_viewport_id{2u};
     uint64_t created_viewport_id{0u};
+    std::unordered_map<uint64_t, std::string> scene_viewport_owners;
     LunaEditorVec3 editor_camera_position{1.0f, 2.0f, 3.0f};
     std::string gizmo_operation_name{"Translate"};
     std::string gizmo_mode_name{"Local"};
@@ -1210,6 +1219,7 @@ private:
         }
 
         host->created_viewport_id = host->next_viewport_id++;
+        host->scene_viewport_owners[host->created_viewport_id] = host->owner_id;
         return host->created_viewport_id;
     }
 
@@ -1217,13 +1227,14 @@ private:
     {
         if (TestNativeHost* host = self(api_user_data); host != nullptr && host->created_viewport_id == viewport_id) {
             host->created_viewport_id = 0u;
+            host->scene_viewport_owners.erase(viewport_id);
         }
     }
 
     static int isSceneViewportValid(void* api_user_data, uint64_t viewport_id)
     {
         TestNativeHost* host = self(api_user_data);
-        return host != nullptr && (viewport_id == 1u || viewport_id == host->created_viewport_id) ? 1 : 0;
+        return host != nullptr && (viewport_id == 1u || host->scene_viewport_owners.contains(viewport_id)) ? 1 : 0;
     }
 
     static int syncSceneViewportEx(void* api_user_data,
@@ -1598,11 +1609,30 @@ void testSuccessfulNativePluginLoad(TestContext& context)
                    "native UI button should execute command and create another entity");
     context.expect(result.host->selected_entity_id == 101u,
                    "native UI button command should select the latest created entity");
+    context.expect(result.host->scene_viewport_owners.empty(),
+                   "native plugin explicit viewport destroy should clear viewport owner records");
 
     result.unload();
     context.expect(result.host->commands.empty(), "native plugin unload should clean command contributions");
     context.expect(result.host->windows.empty(), "native plugin unload should clean window contributions");
     context.expect(result.host->menus.empty(), "native plugin unload should clean menu contributions");
+    context.expect(result.host->scene_viewport_owners.empty(), "native plugin unload should clean viewport contributions");
+}
+
+void testNativePluginViewportOwnerCleanup(TestContext& context)
+{
+    NativePluginLoadResult result =
+        loadNativePluginForTest(testPluginBinaryPath("LunaTestEditorPluginLeakViewport"), kExpectedPluginId);
+    expectStatus(context, result, NativeLoadStatus::Loaded, "native editor plugin leaking viewport");
+    if (result.status != NativeLoadStatus::Loaded || !result.host) {
+        return;
+    }
+
+    context.expect(!result.host->scene_viewport_owners.empty(),
+                   "leaky native plugin should leave a viewport contribution before unload");
+    result.unload();
+    context.expect(result.host->scene_viewport_owners.empty(),
+                   "native plugin unload should clean leaked viewport contributions");
 }
 
 void testNativePluginLoadFailures(TestContext& context)
@@ -1693,6 +1723,7 @@ int main()
 
     TestContext context;
     testSuccessfulNativePluginLoad(context);
+    testNativePluginViewportOwnerCleanup(context);
     testNativePluginLoadFailures(context);
     testManifestAndDependencyContract(context);
 

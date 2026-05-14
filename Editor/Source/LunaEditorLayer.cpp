@@ -1372,12 +1372,23 @@ editor::ViewportId LunaEditorLayer::defaultSceneViewportId() const noexcept
 
 editor::ViewportId LunaEditorLayer::createSceneViewport(std::string_view)
 {
+    return createSceneViewport({}, {});
+}
+
+editor::ViewportId LunaEditorLayer::createSceneViewport(std::string_view, std::string_view owner_id)
+{
     if (m_application == nullptr) {
         return editor::kInvalidViewportId;
     }
 
     const editor::ViewportId viewport_id = allocateViewportId();
-    return m_viewport_instances.createViewport(viewport_id) ? viewport_id : editor::kInvalidViewportId;
+    if (!m_viewport_instances.createViewport(viewport_id)) {
+        return editor::kInvalidViewportId;
+    }
+    if (!owner_id.empty()) {
+        m_viewport_owner_by_id[viewport_id] = toOwnedString(owner_id);
+    }
+    return viewport_id;
 }
 
 void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
@@ -1386,7 +1397,9 @@ void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
         return;
     }
 
-    (void) m_viewport_instances.destroyViewport(viewport_id, m_application->getRenderer());
+    if (m_viewport_instances.destroyViewport(viewport_id, m_application->getRenderer())) {
+        m_viewport_owner_by_id.erase(viewport_id);
+    }
 }
 
 bool LunaEditorLayer::isSceneViewportValid(editor::ViewportId viewport_id) const noexcept
@@ -1465,13 +1478,26 @@ editor::TextureView LunaEditorLayer::getSceneTextureView() const
 
 editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view)
 {
+    return createTextureViewport({}, {});
+}
+
+editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view, std::string_view owner_id)
+{
     const editor::ViewportId viewport_id = allocateViewportId();
-    return m_texture_viewport_instances.createViewport(viewport_id) ? viewport_id : editor::kInvalidViewportId;
+    if (!m_texture_viewport_instances.createViewport(viewport_id)) {
+        return editor::kInvalidViewportId;
+    }
+    if (!owner_id.empty()) {
+        m_viewport_owner_by_id[viewport_id] = toOwnedString(owner_id);
+    }
+    return viewport_id;
 }
 
 void LunaEditorLayer::destroyTextureViewport(editor::ViewportId viewport_id)
 {
-    (void) m_texture_viewport_instances.destroyViewport(viewport_id);
+    if (m_texture_viewport_instances.destroyViewport(viewport_id)) {
+        m_viewport_owner_by_id.erase(viewport_id);
+    }
 }
 
 bool LunaEditorLayer::isTextureViewportValid(editor::ViewportId viewport_id) const noexcept
@@ -1496,6 +1522,31 @@ editor::TextureViewportPresentation LunaEditorLayer::textureViewportPresentation
     const TextureViewportInstance* viewport = m_texture_viewport_instances.findViewport(viewport_id);
     return viewport != nullptr ? toEditorTextureViewportPresentation(viewport->presentation())
                                : editor::TextureViewportPresentation{};
+}
+
+void LunaEditorLayer::destroyViewportsForOwner(std::string_view owner_id)
+{
+    if (owner_id.empty()) {
+        return;
+    }
+
+    std::vector<editor::ViewportId> viewports_to_destroy;
+    const std::string owner_key = toOwnedString(owner_id);
+    for (const auto& [viewport_id, viewport_owner] : m_viewport_owner_by_id) {
+        if (viewport_owner == owner_key) {
+            viewports_to_destroy.push_back(viewport_id);
+        }
+    }
+
+    for (const editor::ViewportId viewport_id : viewports_to_destroy) {
+        if (isTextureViewportValid(viewport_id)) {
+            destroyTextureViewport(viewport_id);
+            continue;
+        }
+        if (isSceneViewportValid(viewport_id)) {
+            destroySceneViewport(viewport_id);
+        }
+    }
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
