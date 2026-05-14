@@ -1,36 +1,6 @@
 add_executable(
     LunaEditor
     ${PROJECT_SOURCE_DIR}/Luna/Core/main.cpp
-    Source/Plugins/AssetLoading/AssetLoadingPlugin.h
-    Source/Plugins/AssetLoading/AssetLoadingPlugin.cpp
-    Source/Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h
-    Source/Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.cpp
-    Source/Plugins/ContentBrowser/ContentBrowserPlugin.h
-    Source/Plugins/ContentBrowser/ContentBrowserPlugin.cpp
-    Source/Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h
-    Source/Plugins/BackendCapabilities/BackendCapabilitiesPlugin.cpp
-    Source/Plugins/CoreCommands/CoreCommandsPlugin.h
-    Source/Plugins/CoreCommands/CoreCommandsPlugin.cpp
-    Source/Plugins/EditorApiSample/EditorApiSamplePlugin.h
-    Source/Plugins/EditorApiSample/EditorApiSamplePlugin.cpp
-    Source/Plugins/Inspector/InspectorPlugin.h
-    Source/Plugins/Inspector/InspectorPlugin.cpp
-    Source/Plugins/RenderDebug/RenderDebugPlugin.h
-    Source/Plugins/RenderDebug/RenderDebugPlugin.cpp
-    Source/Plugins/RenderFeatures/RenderFeaturesPlugin.h
-    Source/Plugins/RenderFeatures/RenderFeaturesPlugin.cpp
-    Source/Plugins/RenderProfiler/RenderProfilerPlugin.h
-    Source/Plugins/RenderProfiler/RenderProfilerPlugin.cpp
-    Source/Plugins/SceneSettings/SceneSettingsPlugin.h
-    Source/Plugins/SceneSettings/SceneSettingsPlugin.cpp
-    Source/Plugins/SceneHierarchy/SceneHierarchyPlugin.h
-    Source/Plugins/SceneHierarchy/SceneHierarchyPlugin.cpp
-    Source/Plugins/SceneStatus/SceneStatusPlugin.h
-    Source/Plugins/SceneStatus/SceneStatusPlugin.cpp
-    Source/Plugins/ScriptPlugins/ScriptPluginsPlugin.h
-    Source/Plugins/ScriptPlugins/ScriptPluginsPlugin.cpp
-    Source/Plugins/Viewport/ViewportPlugin.h
-    Source/Plugins/Viewport/ViewportPlugin.cpp
     Source/EditorCamera.h
     Source/EditorCamera.cpp
     Source/EditorDocumentContext.h

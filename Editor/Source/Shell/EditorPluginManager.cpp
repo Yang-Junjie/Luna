@@ -12,21 +12,21 @@
 #include "EditorApi/EditorUi.h"
 #include "EditorApi/EditorViewportService.h"
 #include "EditorApi/EditorWindowService.h"
-#include "Plugins/AssetLoading/AssetLoadingPlugin.h"
-#include "Plugins/BackendCapabilities/BackendCapabilitiesPlugin.h"
-#include "Plugins/BuiltinMaterials/BuiltinMaterialsPlugin.h"
-#include "Plugins/ContentBrowser/ContentBrowserPlugin.h"
-#include "Plugins/CoreCommands/CoreCommandsPlugin.h"
-#include "Plugins/EditorApiSample/EditorApiSamplePlugin.h"
-#include "Plugins/Inspector/InspectorPlugin.h"
-#include "Plugins/RenderDebug/RenderDebugPlugin.h"
-#include "Plugins/RenderFeatures/RenderFeaturesPlugin.h"
-#include "Plugins/RenderProfiler/RenderProfilerPlugin.h"
-#include "Plugins/SceneHierarchy/SceneHierarchyPlugin.h"
-#include "Plugins/SceneSettings/SceneSettingsPlugin.h"
-#include "Plugins/SceneStatus/SceneStatusPlugin.h"
-#include "Plugins/ScriptPlugins/ScriptPluginsPlugin.h"
-#include "Plugins/Viewport/ViewportPlugin.h"
+#include "AssetLoading/Source/AssetLoadingPlugin.h"
+#include "BackendCapabilities/Source/BackendCapabilitiesPlugin.h"
+#include "BuiltinMaterials/Source/BuiltinMaterialsPlugin.h"
+#include "ContentBrowser/Source/ContentBrowserPlugin.h"
+#include "CoreCommands/Source/CoreCommandsPlugin.h"
+#include "EditorApiSample/Source/EditorApiSamplePlugin.h"
+#include "Inspector/Source/InspectorPlugin.h"
+#include "RenderDebug/Source/RenderDebugPlugin.h"
+#include "RenderFeatures/Source/RenderFeaturesPlugin.h"
+#include "RenderProfiler/Source/RenderProfilerPlugin.h"
+#include "SceneHierarchy/Source/SceneHierarchyPlugin.h"
+#include "SceneSettings/Source/SceneSettingsPlugin.h"
+#include "SceneStatus/Source/SceneStatusPlugin.h"
+#include "ScriptPlugins/Source/ScriptPluginsPlugin.h"
+#include "Viewport/Source/ViewportPlugin.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Shell/EditorPluginDependencyResolver.h"
 #include "Shell/EditorPluginManifest.h"
@@ -43,18 +43,34 @@ namespace {
 
 std::filesystem::path officialPluginRoot(std::string_view directory_name)
 {
-    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Editor" / "Source" / "Plugins" / directory_name)
+    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor" / "Official" / directory_name)
         .lexically_normal();
 }
 
 std::filesystem::path officialPluginsRoot()
 {
-    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Editor" / "Source" / "Plugins").lexically_normal();
+    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor" / "Official").lexically_normal();
 }
 
 std::filesystem::path sourceEditorPluginsRoot()
 {
     return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor").lexically_normal();
+}
+
+bool isSameOrNestedPath(const std::filesystem::path& path, const std::filesystem::path& root)
+{
+    const std::filesystem::path normalized_path = path.lexically_normal();
+    const std::filesystem::path normalized_root = root.lexically_normal();
+
+    auto path_it = normalized_path.begin();
+    auto root_it = normalized_root.begin();
+    for (; root_it != normalized_root.end(); ++root_it, ++path_it) {
+        if (path_it == normalized_path.end() || *path_it != *root_it) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 struct BuiltinFactoryEntry {
@@ -2850,6 +2866,13 @@ std::vector<EditorPluginPackage> createEditorPluginPackages()
     appendMissingOfficialFallbackPackages(packages);
 
     std::vector<EditorPluginPackage> source_packages = manifest_loader.loadPackagesFromRoot(sourceEditorPluginsRoot());
+    const std::filesystem::path official_root = officialPluginsRoot();
+    source_packages.erase(std::remove_if(source_packages.begin(),
+                                         source_packages.end(),
+                                         [&](const EditorPluginPackage& package) {
+                                             return isSameOrNestedPath(package.root_path, official_root);
+                                         }),
+                          source_packages.end());
     attachBuiltinFactories(source_packages);
     packages.insert(packages.end(),
                     std::make_move_iterator(source_packages.begin()),
