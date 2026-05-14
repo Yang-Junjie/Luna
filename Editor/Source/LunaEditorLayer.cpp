@@ -103,6 +103,16 @@ luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexce
     }
 }
 
+luna::editor::TextureViewportPresentation toEditorTextureViewportPresentation(
+    const luna::TextureViewportPresentation& presentation)
+{
+    return luna::editor::TextureViewportPresentation{
+        .texture = presentation.texture,
+        .framebuffer_size = presentation.framebuffer_size,
+        .presentable = presentation.presentable,
+    };
+}
+
 const char* gizmoOperationToString(luna::GizmoOperation operation)
 {
     switch (operation) {
@@ -561,11 +571,11 @@ void LunaEditorLayer::onAttach()
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
-        activeViewportInstance().configureRenderer(m_application->getRenderer(), true);
+        activeSceneViewportInstance().configureRenderer(m_application->getRenderer(), true);
         syncEditorGridFeatureState();
         syncPickDebugVisualizationState();
     } else {
-        activeViewportInstance().configureRenderer(m_application->getRenderer(), false);
+        activeSceneViewportInstance().configureRenderer(m_application->getRenderer(), false);
         syncEditorGridFeatureState();
         LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'",
                          luna::RHI::BackendTypeToString(
@@ -583,7 +593,8 @@ void LunaEditorLayer::onDetach()
     m_editor_camera.setInputEnabled(false);
     endRuntimeViewport();
     m_viewport_instances.clearPluginViewports(m_application->getRenderer());
-    activeViewportInstance().resetRenderer(m_application->getRenderer());
+    m_texture_viewport_instances.clearViewports();
+    activeSceneViewportInstance().resetRenderer(m_application->getRenderer());
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
 }
 
@@ -830,7 +841,10 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
         std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
     const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * viewport_scale_x, 0.0f));
     const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * viewport_scale_y, 0.0f));
-    const auto& viewport_state = activeViewportInstance().sync(renderer, m_editor_camera, viewport_width, viewport_height);
+    if (!m_runtime_viewport_enabled) {
+        m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
+    }
+    const auto& viewport_state = activeSceneViewportInstance().sync(renderer, viewport_width, viewport_height);
 
     const auto& scene_texture = renderer.getSceneOutputTexture();
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
@@ -942,7 +956,7 @@ void LunaEditorLayer::consumePendingScenePick()
     }
 
     const std::optional<uint32_t> picked_id =
-        activeViewportInstance().consumeScenePickResult(m_application->getRenderer());
+        activeSceneViewportInstance().consumeScenePickResult(m_application->getRenderer());
     if (!picked_id.has_value()) {
         return;
     }
@@ -968,7 +982,7 @@ void LunaEditorLayer::syncPickDebugVisualizationState() const
         return;
     }
 
-    activeViewportInstance().setPickDebugVisualization(m_application->getRenderer(), m_show_pick_debug_visualization);
+    activeSceneViewportInstance().setPickDebugVisualization(m_application->getRenderer(), m_show_pick_debug_visualization);
 }
 
 void LunaEditorLayer::syncEditorGridFeatureState() const
@@ -977,9 +991,9 @@ void LunaEditorLayer::syncEditorGridFeatureState() const
         return;
     }
 
-    activeViewportInstance().setEditorGrid(m_application->getRenderer(),
-                                           m_show_editor_grid,
-                                           m_runtime_viewport_enabled);
+    activeSceneViewportInstance().setEditorGrid(m_application->getRenderer(),
+                                                m_show_editor_grid,
+                                                m_runtime_viewport_enabled);
 }
 
 void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
@@ -1016,7 +1030,7 @@ void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
     const uint32_t color_pixel_y = (std::min) (
         static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
 
-    (void) activeViewportInstance().requestScenePick(
+    (void) activeSceneViewportInstance().requestScenePick(
         m_application->getRenderer(), (std::min) (pixel_x, texture_extent.width - 1), color_pixel_y);
 }
 
@@ -1362,7 +1376,8 @@ editor::ViewportId LunaEditorLayer::createSceneViewport(std::string_view)
         return editor::kInvalidViewportId;
     }
 
-    return m_viewport_instances.createViewport();
+    const editor::ViewportId viewport_id = allocateViewportId();
+    return m_viewport_instances.createViewport(viewport_id) ? viewport_id : editor::kInvalidViewportId;
 }
 
 void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
@@ -1393,12 +1408,12 @@ editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::Viewport
     }
 
     Renderer& renderer = m_application->getRenderer();
-    ViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
+    SceneViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
     if (viewport == nullptr) {
         return {};
     }
 
-    const ViewportInstanceState& state = viewport->sync(renderer, m_editor_camera, framebuffer_width, framebuffer_height);
+    const SceneViewportInstanceState& state = viewport->sync(renderer, framebuffer_width, framebuffer_height);
     if (viewport_id != defaultSceneViewportId()) {
         RenderWorldExtractor{}.extract(activeRenderScene(),
                                        m_editor_camera.getCamera(),
@@ -1424,7 +1439,7 @@ editor::TextureView LunaEditorLayer::getSceneTextureView(editor::ViewportId view
     }
 
     const auto& renderer = m_application->getRenderer();
-    const ViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
+    const SceneViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
     if (viewport == nullptr) {
         return {};
     }
@@ -1435,7 +1450,7 @@ editor::TextureView LunaEditorLayer::getSceneTextureView(editor::ViewportId view
     }
 
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
-    const ViewportInstanceState& state = viewport->state();
+    const SceneViewportInstanceState& state = viewport->state();
     return editor::TextureView{
         .id = toEditorTextureHandle(texture_id),
         .size = editor::UVec2{.x = scene_texture->GetWidth(), .y = scene_texture->GetHeight()},
@@ -1446,6 +1461,41 @@ editor::TextureView LunaEditorLayer::getSceneTextureView(editor::ViewportId view
 editor::TextureView LunaEditorLayer::getSceneTextureView() const
 {
     return getSceneTextureView(defaultSceneViewportId());
+}
+
+editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view)
+{
+    const editor::ViewportId viewport_id = allocateViewportId();
+    return m_texture_viewport_instances.createViewport(viewport_id) ? viewport_id : editor::kInvalidViewportId;
+}
+
+void LunaEditorLayer::destroyTextureViewport(editor::ViewportId viewport_id)
+{
+    (void) m_texture_viewport_instances.destroyViewport(viewport_id);
+}
+
+bool LunaEditorLayer::isTextureViewportValid(editor::ViewportId viewport_id) const noexcept
+{
+    return m_texture_viewport_instances.isViewportValid(viewport_id);
+}
+
+editor::TextureViewportPresentation LunaEditorLayer::syncTextureViewport(editor::ViewportId viewport_id,
+                                                                         editor::TextureView texture,
+                                                                         editor::UVec2 framebuffer_size)
+{
+    TextureViewportInstance* viewport = m_texture_viewport_instances.findViewport(viewport_id);
+    if (viewport == nullptr) {
+        return {};
+    }
+
+    return toEditorTextureViewportPresentation(viewport->sync(texture, framebuffer_size));
+}
+
+editor::TextureViewportPresentation LunaEditorLayer::textureViewportPresentation(editor::ViewportId viewport_id) const
+{
+    const TextureViewportInstance* viewport = m_texture_viewport_instances.findViewport(viewport_id);
+    return viewport != nullptr ? toEditorTextureViewportPresentation(viewport->presentation())
+                               : editor::TextureViewportPresentation{};
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
@@ -1868,14 +1918,25 @@ Scene& LunaEditorLayer::activeRenderScene()
     return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : m_editor_runtime.scene();
 }
 
-ViewportInstance& LunaEditorLayer::activeViewportInstance() noexcept
+SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() noexcept
 {
     return m_runtime_viewport_enabled ? m_viewport_instances.runtimeViewport() : m_viewport_instances.defaultViewport();
 }
 
-const ViewportInstance& LunaEditorLayer::activeViewportInstance() const noexcept
+const SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() const noexcept
 {
     return m_runtime_viewport_enabled ? m_viewport_instances.runtimeViewport() : m_viewport_instances.defaultViewport();
+}
+
+editor::ViewportId LunaEditorLayer::allocateViewportId() noexcept
+{
+    editor::ViewportId viewport_id = m_next_viewport_id++;
+    while (viewport_id == editor::kInvalidViewportId || viewport_id == editor::kDefaultViewportId ||
+           m_viewport_instances.isViewportValid(viewport_id) ||
+           m_texture_viewport_instances.isViewportValid(viewport_id)) {
+        viewport_id = m_next_viewport_id++;
+    }
+    return viewport_id;
 }
 
 void LunaEditorLayer::processAuthoringEvents()

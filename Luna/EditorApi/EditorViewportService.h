@@ -16,6 +16,12 @@ struct ViewportPresentation {
     bool presentable{false};
 };
 
+struct TextureViewportPresentation {
+    TextureView texture;
+    UVec2 framebuffer_size{};
+    bool presentable{false};
+};
+
 class ViewportService {
 public:
     virtual ~ViewportService() = default;
@@ -30,6 +36,13 @@ public:
     virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView() const = 0;
     virtual void drawDefaultSceneViewport(Ui& ui) = 0;
+
+    virtual ViewportId createTextureViewport(std::string_view debug_name = {}) = 0;
+    virtual void destroyTextureViewport(ViewportId viewport_id) = 0;
+    virtual bool isTextureViewportValid(ViewportId viewport_id) const noexcept = 0;
+    virtual TextureViewportPresentation
+        syncTextureViewport(ViewportId viewport_id, TextureView texture, UVec2 framebuffer_size) = 0;
+    virtual TextureViewportPresentation textureViewportPresentation(ViewportId viewport_id) const = 0;
 
     virtual Vec3 editorCameraPosition() const noexcept = 0;
     virtual std::string gizmoOperationName() const = 0;

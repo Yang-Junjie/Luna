@@ -11,7 +11,8 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneRuntime.h"
-#include "Viewport/ViewportInstanceManager.h"
+#include "Viewport/SceneViewportInstanceManager.h"
+#include "Viewport/TextureViewportInstanceManager.h"
 #include "Script/ScriptPluginManifest.h"
 
 #include <array>
@@ -33,7 +34,7 @@ struct Extent2D;
 namespace luna {
 
 class LunaEditorApplication;
-class ViewportInstance;
+class SceneViewportInstance;
 
 namespace editor {
 class EditorPluginManager;
@@ -114,6 +115,13 @@ public:
     editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
     editor::TextureView getSceneTextureView(editor::ViewportId viewport_id) const;
     editor::TextureView getSceneTextureView() const;
+    editor::ViewportId createTextureViewport(std::string_view debug_name = {});
+    void destroyTextureViewport(editor::ViewportId viewport_id);
+    bool isTextureViewportValid(editor::ViewportId viewport_id) const noexcept;
+    editor::TextureViewportPresentation syncTextureViewport(editor::ViewportId viewport_id,
+                                                            editor::TextureView texture,
+                                                            editor::UVec2 framebuffer_size);
+    editor::TextureViewportPresentation textureViewportPresentation(editor::ViewportId viewport_id) const;
     void drawDefaultSceneViewport(editor::Ui& ui);
     UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() override;
@@ -177,8 +185,9 @@ private:
     void beginRuntimeViewport();
     void endRuntimeViewport();
     Scene& activeRenderScene();
-    ViewportInstance& activeViewportInstance() noexcept;
-    const ViewportInstance& activeViewportInstance() const noexcept;
+    SceneViewportInstance& activeSceneViewportInstance() noexcept;
+    const SceneViewportInstance& activeSceneViewportInstance() const noexcept;
+    editor::ViewportId allocateViewportId() noexcept;
     void processAuthoringEvents();
 
     bool syncProjectAssets();
@@ -221,7 +230,9 @@ private:
     bool m_runtime_viewport_requested{false};
     GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
     GizmoMode m_gizmo_mode{GizmoMode::Local};
-    ViewportInstanceManager m_viewport_instances;
+    SceneViewportInstanceManager m_viewport_instances;
+    TextureViewportInstanceManager m_texture_viewport_instances;
+    editor::ViewportId m_next_viewport_id{editor::kDefaultViewportId + 1u};
     std::unique_ptr<editor::EditorShell> m_editor_shell;
     std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };

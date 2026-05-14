@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 #include <vector>
 
@@ -43,7 +44,15 @@ luna::editor::Vec2 fitImageSize(const luna::editor::TextureView& texture, luna::
     };
 }
 
-void drawRenderDebugWindow(luna::editor::WindowDrawContext& context)
+luna::editor::UVec2 surfaceSize(luna::editor::Vec2 available)
+{
+    return luna::editor::UVec2{
+        .x = static_cast<uint32_t>((std::max)(available.x, 0.0f)),
+        .y = static_cast<uint32_t>((std::max)(available.y, 0.0f)),
+    };
+}
+
+void drawRenderDebugWindow(luna::editor::WindowDrawContext& context, luna::editor::ViewportId texture_viewport)
 {
     luna::editor::Host& host = context.host();
     luna::editor::Ui& ui = context.ui();
@@ -92,12 +101,19 @@ void drawRenderDebugWindow(luna::editor::WindowDrawContext& context)
         return;
     }
 
-    const luna::editor::Vec2 image_size = fitImageSize(debug_texture, ui.contentRegionAvail());
+    const luna::editor::Vec2 available = ui.contentRegionAvail();
+    const luna::editor::TextureViewportPresentation preview =
+        host.viewport().syncTextureViewport(texture_viewport, debug_texture, surfaceSize(available));
+    if (!preview.presentable) {
+        return;
+    }
+
+    const luna::editor::Vec2 image_size = fitImageSize(preview.texture, available);
     if (image_size.x <= 0.0f || image_size.y <= 0.0f) {
         return;
     }
 
-    (void) ui.image(debug_texture, image_size);
+    (void) ui.image(preview.texture, image_size);
 }
 
 class RenderDebugPlugin final : public luna::editor::Plugin {
@@ -113,19 +129,38 @@ public:
 
     bool onLoad(luna::editor::Host& host) override
     {
-        return host.windows().registerWindow(luna::editor::WindowDescriptor{
+        m_texture_viewport = host.viewport().createTextureViewport("Render Debug Preview");
+        if (m_texture_viewport == luna::editor::kInvalidViewportId) {
+            return false;
+        }
+
+        const bool window_registered = host.windows().registerWindow(luna::editor::WindowDescriptor{
             .id = kWindowId,
             .title = "Render Debug",
             .default_open = false,
             .default_size = luna::editor::Vec2{.x = 640.0f, .y = 420.0f},
-            .draw = drawRenderDebugWindow,
+            .draw =
+                [this](luna::editor::WindowDrawContext& context) {
+                    drawRenderDebugWindow(context, m_texture_viewport);
+                },
         });
+        if (!window_registered) {
+            host.viewport().destroyTextureViewport(m_texture_viewport);
+            m_texture_viewport = luna::editor::kInvalidViewportId;
+            return false;
+        }
+
+        return true;
     }
 
     void onUnload(luna::editor::Host& host) override
     {
         host.rendering().setRenderDebugViewMode(luna::editor::RenderDebugViewMode::None);
         host.windows().unregisterWindow(kWindowId);
+        if (m_texture_viewport != luna::editor::kInvalidViewportId) {
+            host.viewport().destroyTextureViewport(m_texture_viewport);
+            m_texture_viewport = luna::editor::kInvalidViewportId;
+        }
     }
 
     void onUpdate(luna::editor::Host& host, float) override
@@ -135,6 +170,9 @@ public:
             host.rendering().setRenderDebugViewMode(luna::editor::RenderDebugViewMode::None);
         }
     }
+
+private:
+    luna::editor::ViewportId m_texture_viewport{luna::editor::kInvalidViewportId};
 };
 
 } // namespace

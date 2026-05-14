@@ -2202,6 +2202,38 @@ public:
         }
     }
 
+    ViewportId createTextureViewport(std::string_view debug_name = {}) override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->createTextureViewport(debug_name)
+                                         : editor::kInvalidViewportId;
+    }
+
+    void destroyTextureViewport(ViewportId viewport_id) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->destroyTextureViewport(viewport_id);
+        }
+    }
+
+    bool isTextureViewportValid(ViewportId viewport_id) const noexcept override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->isTextureViewportValid(viewport_id);
+    }
+
+    TextureViewportPresentation syncTextureViewport(ViewportId viewport_id,
+                                                    TextureView texture,
+                                                    UVec2 framebuffer_size) override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->syncTextureViewport(viewport_id, texture, framebuffer_size)
+                                         : TextureViewportPresentation{};
+    }
+
+    TextureViewportPresentation textureViewportPresentation(ViewportId viewport_id) const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->textureViewportPresentation(viewport_id)
+                                         : TextureViewportPresentation{};
+    }
+
     Vec3 editorCameraPosition() const noexcept override
     {
         if (m_editor_layer == nullptr) {

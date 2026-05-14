@@ -1,49 +1,48 @@
-#include "Viewport/ViewportInstanceManager.h"
+#include "Viewport/SceneViewportInstanceManager.h"
 
 #include "Renderer/Renderer.h"
 
 namespace luna {
 
-ViewportInstance& ViewportInstanceManager::defaultViewport()
+SceneViewportInstance& SceneViewportInstanceManager::defaultViewport()
 {
     return m_default_viewport;
 }
 
-const ViewportInstance& ViewportInstanceManager::defaultViewport() const
+const SceneViewportInstance& SceneViewportInstanceManager::defaultViewport() const
 {
     return m_default_viewport;
 }
 
-ViewportInstance& ViewportInstanceManager::runtimeViewport()
+SceneViewportInstance& SceneViewportInstanceManager::runtimeViewport()
 {
     return m_runtime_viewport;
 }
 
-const ViewportInstance& ViewportInstanceManager::runtimeViewport() const
+const SceneViewportInstance& SceneViewportInstanceManager::runtimeViewport() const
 {
     return m_runtime_viewport;
 }
 
-editor::ViewportId ViewportInstanceManager::defaultViewportId() const noexcept
+editor::ViewportId SceneViewportInstanceManager::defaultViewportId() const noexcept
 {
     return editor::kDefaultViewportId;
 }
 
-editor::ViewportId ViewportInstanceManager::createViewport()
+bool SceneViewportInstanceManager::createViewport(editor::ViewportId viewport_id)
 {
-    editor::ViewportId viewport_id = m_next_viewport_id++;
-    while (viewport_id == editor::kInvalidViewportId || viewport_id == editor::kDefaultViewportId ||
-           m_plugin_viewports.contains(viewport_id)) {
-        viewport_id = m_next_viewport_id++;
+    if (viewport_id == editor::kInvalidViewportId || viewport_id == editor::kDefaultViewportId ||
+        m_plugin_viewports.contains(viewport_id)) {
+        return false;
     }
 
     m_plugin_viewports.emplace(
         viewport_id,
-        std::make_unique<ViewportInstance>(ViewportInstance::RendererViewportKind::Owned));
-    return viewport_id;
+        std::make_unique<SceneViewportInstance>(SceneViewportInstance::RendererViewportKind::Owned));
+    return true;
 }
 
-bool ViewportInstanceManager::destroyViewport(editor::ViewportId viewport_id, Renderer& renderer)
+bool SceneViewportInstanceManager::destroyViewport(editor::ViewportId viewport_id, Renderer& renderer)
 {
     const auto viewport_it = m_plugin_viewports.find(viewport_id);
     if (viewport_it == m_plugin_viewports.end()) {
@@ -57,7 +56,7 @@ bool ViewportInstanceManager::destroyViewport(editor::ViewportId viewport_id, Re
     return true;
 }
 
-ViewportInstance* ViewportInstanceManager::findViewport(editor::ViewportId viewport_id) noexcept
+SceneViewportInstance* SceneViewportInstanceManager::findViewport(editor::ViewportId viewport_id) noexcept
 {
     if (viewport_id == editor::kDefaultViewportId) {
         return &m_default_viewport;
@@ -67,7 +66,7 @@ ViewportInstance* ViewportInstanceManager::findViewport(editor::ViewportId viewp
     return viewport_it != m_plugin_viewports.end() ? viewport_it->second.get() : nullptr;
 }
 
-const ViewportInstance* ViewportInstanceManager::findViewport(editor::ViewportId viewport_id) const noexcept
+const SceneViewportInstance* SceneViewportInstanceManager::findViewport(editor::ViewportId viewport_id) const noexcept
 {
     if (viewport_id == editor::kDefaultViewportId) {
         return &m_default_viewport;
@@ -77,12 +76,12 @@ const ViewportInstance* ViewportInstanceManager::findViewport(editor::ViewportId
     return viewport_it != m_plugin_viewports.end() ? viewport_it->second.get() : nullptr;
 }
 
-bool ViewportInstanceManager::isViewportValid(editor::ViewportId viewport_id) const noexcept
+bool SceneViewportInstanceManager::isViewportValid(editor::ViewportId viewport_id) const noexcept
 {
     return findViewport(viewport_id) != nullptr;
 }
 
-void ViewportInstanceManager::clearPluginViewports(Renderer& renderer)
+void SceneViewportInstanceManager::clearPluginViewports(Renderer& renderer)
 {
     for (auto& [viewport_id, viewport] : m_plugin_viewports) {
         (void) viewport_id;

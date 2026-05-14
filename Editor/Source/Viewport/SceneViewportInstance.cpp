@@ -1,45 +1,45 @@
-#include "Viewport/ViewportInstance.h"
+#include "Viewport/SceneViewportInstance.h"
 
-#include "EditorCamera.h"
 #include "Renderer/Renderer.h"
 
 #include <Swapchain.h>
 #include <algorithm>
+#include <utility>
 
 namespace luna {
 
-ViewportInstance::ViewportInstance(RendererViewportKind kind)
+SceneViewportInstance::SceneViewportInstance(RendererViewportKind kind)
     : m_renderer_viewport_kind(kind)
 {}
 
-ViewportInstance::~ViewportInstance() = default;
+SceneViewportInstance::~SceneViewportInstance() = default;
 
-ViewportInstance::ViewportInstance(ViewportInstance&& other) noexcept
-    : m_state(other.m_state),
+SceneViewportInstance::SceneViewportInstance(SceneViewportInstance&& other) noexcept
+    : m_surface(std::move(other.m_surface)),
       m_renderer_viewport_kind(other.m_renderer_viewport_kind),
       m_renderer_viewport(other.m_renderer_viewport)
 {
-    other.m_state = {};
+    other.m_surface.reset();
     other.m_renderer_viewport_kind = RendererViewportKind::Default;
     other.m_renderer_viewport = Renderer::kInvalidSceneViewportHandle;
 }
 
-ViewportInstance& ViewportInstance::operator=(ViewportInstance&& other) noexcept
+SceneViewportInstance& SceneViewportInstance::operator=(SceneViewportInstance&& other) noexcept
 {
     if (this == &other) {
         return *this;
     }
 
-    m_state = other.m_state;
+    m_surface = std::move(other.m_surface);
     m_renderer_viewport_kind = other.m_renderer_viewport_kind;
     m_renderer_viewport = other.m_renderer_viewport;
-    other.m_state = {};
+    other.m_surface.reset();
     other.m_renderer_viewport_kind = RendererViewportKind::Default;
     other.m_renderer_viewport = Renderer::kInvalidSceneViewportHandle;
     return *this;
 }
 
-void ViewportInstance::configureRenderer(Renderer& renderer, bool imgui_overlay_enabled) const
+void SceneViewportInstance::configureRenderer(Renderer& renderer, bool imgui_overlay_enabled) const
 {
     const Renderer::SceneViewportHandle handle = rendererViewportHandle(renderer);
     if (handle == Renderer::kInvalidSceneViewportHandle) {
@@ -56,7 +56,7 @@ void ViewportInstance::configureRenderer(Renderer& renderer, bool imgui_overlay_
                                                               : Renderer::SceneOutputMode::Swapchain);
 }
 
-void ViewportInstance::resetRenderer(Renderer& renderer)
+void SceneViewportInstance::resetRenderer(Renderer& renderer)
 {
     if (m_renderer_viewport_kind == RendererViewportKind::Owned) {
         release(renderer);
@@ -67,27 +67,27 @@ void ViewportInstance::resetRenderer(Renderer& renderer)
     renderer.setRenderDebugViewMode(RenderDebugViewMode::None);
     renderer.setScenePickDebugVisualizationEnabled(false);
     renderer.setDefaultRenderFeatureEnabled("EditorInfiniteGrid", false);
-    m_state = {};
+    m_surface.reset();
 }
 
-void ViewportInstance::release(Renderer& renderer)
+void SceneViewportInstance::release(Renderer& renderer)
 {
     if (m_renderer_viewport_kind == RendererViewportKind::Owned &&
         m_renderer_viewport != Renderer::kInvalidSceneViewportHandle) {
         renderer.destroySceneViewportHandle(m_renderer_viewport);
         m_renderer_viewport = Renderer::kInvalidSceneViewportHandle;
     }
-    m_state = {};
+    m_surface.reset();
 }
 
-void ViewportInstance::setPickDebugVisualization(Renderer& renderer, bool enabled) const
+void SceneViewportInstance::setPickDebugVisualization(Renderer& renderer, bool enabled) const
 {
     if (m_renderer_viewport_kind == RendererViewportKind::Default) {
         renderer.setScenePickDebugVisualizationEnabled(enabled);
     }
 }
 
-void ViewportInstance::setEditorGrid(Renderer& renderer, bool enabled, bool runtime_viewport_enabled) const
+void SceneViewportInstance::setEditorGrid(Renderer& renderer, bool enabled, bool runtime_viewport_enabled) const
 {
     if (m_renderer_viewport_kind != RendererViewportKind::Default) {
         return;
@@ -98,17 +98,14 @@ void ViewportInstance::setEditorGrid(Renderer& renderer, bool enabled, bool runt
     renderer.setDefaultRenderFeatureEnabled("EditorInfiniteGrid", editor_grid_enabled);
 }
 
-const ViewportInstanceState& ViewportInstance::sync(Renderer& renderer, EditorCamera& camera, uint32_t width, uint32_t height)
+const SceneViewportInstanceState& SceneViewportInstance::sync(Renderer& renderer, uint32_t width, uint32_t height)
 {
     const Renderer::SceneViewportHandle handle = ensureRendererViewport(renderer);
     if (handle == Renderer::kInvalidSceneViewportHandle) {
-        m_state = {};
-        return m_state;
+        m_surface.reset();
+        return m_surface.state();
     }
 
-    if (m_renderer_viewport_kind == RendererViewportKind::Default) {
-        camera.setViewportSize(static_cast<float>(width), static_cast<float>(height));
-    }
     renderer.setSceneViewportOutputSize(handle, width, height);
 
     const auto& scene_texture = renderer.getSceneViewportOutputTexture(handle);
@@ -119,14 +116,15 @@ const ViewportInstanceState& ViewportInstance::sync(Renderer& renderer, EditorCa
     const bool texture_ready = offscreen ? static_cast<bool>(scene_texture) : static_cast<bool>(swapchain);
     const luna::RHI::Extent2D viewport_extent = renderer.getSceneViewportOutputSize(handle);
 
-    m_state.width = viewport_extent.width;
-    m_state.height = viewport_extent.height;
-    m_state.y_flip = offscreen && renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip;
-    m_state.presentable = texture_ready && viewport_extent.width > 0 && viewport_extent.height > 0;
-    return m_state;
+    m_surface.setPresentation(
+        viewport_extent.width,
+        viewport_extent.height,
+        offscreen && renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip,
+        texture_ready && viewport_extent.width > 0 && viewport_extent.height > 0);
+    return m_surface.state();
 }
 
-bool ViewportInstance::requestScenePick(Renderer& renderer, uint32_t pixel_x, uint32_t pixel_y) const
+bool SceneViewportInstance::requestScenePick(Renderer& renderer, uint32_t pixel_x, uint32_t pixel_y) const
 {
     if (m_renderer_viewport_kind != RendererViewportKind::Default) {
         return false;
@@ -154,34 +152,34 @@ bool ViewportInstance::requestScenePick(Renderer& renderer, uint32_t pixel_x, ui
     return true;
 }
 
-std::optional<uint32_t> ViewportInstance::consumeScenePickResult(Renderer& renderer) const
+std::optional<uint32_t> SceneViewportInstance::consumeScenePickResult(Renderer& renderer) const
 {
     return m_renderer_viewport_kind == RendererViewportKind::Default ? renderer.consumeScenePickResult() : std::nullopt;
 }
 
-const ViewportInstanceState& ViewportInstance::state() const noexcept
+const SceneViewportInstanceState& SceneViewportInstance::state() const noexcept
 {
-    return m_state;
+    return m_surface.state();
 }
 
-Renderer::SceneViewportHandle ViewportInstance::rendererViewportHandle(Renderer& renderer)
+Renderer::SceneViewportHandle SceneViewportInstance::rendererViewportHandle(Renderer& renderer)
 {
     return m_renderer_viewport_kind == RendererViewportKind::Default ? renderer.getDefaultSceneViewportHandle()
                                                                     : ensureRendererViewport(renderer);
 }
 
-Renderer::SceneViewportHandle ViewportInstance::rendererViewportHandle(const Renderer& renderer) const
+Renderer::SceneViewportHandle SceneViewportInstance::rendererViewportHandle(const Renderer& renderer) const
 {
     return m_renderer_viewport_kind == RendererViewportKind::Default ? renderer.getDefaultSceneViewportHandle()
                                                                     : m_renderer_viewport;
 }
 
-bool ViewportInstance::ownsRendererViewport() const noexcept
+bool SceneViewportInstance::ownsRendererViewport() const noexcept
 {
     return m_renderer_viewport_kind == RendererViewportKind::Owned;
 }
 
-Renderer::SceneViewportHandle ViewportInstance::ensureRendererViewport(Renderer& renderer)
+Renderer::SceneViewportHandle SceneViewportInstance::ensureRendererViewport(Renderer& renderer)
 {
     if (m_renderer_viewport_kind == RendererViewportKind::Default) {
         return renderer.getDefaultSceneViewportHandle();

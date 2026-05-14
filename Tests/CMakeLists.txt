@@ -35,6 +35,13 @@ add_executable(
     AuthoringProtocolTests.cpp
 )
 
+add_executable(
+    ViewportInstanceTests
+    ViewportInstanceTests.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Viewport/TextureViewportInstance.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Viewport/ViewportSurface.cpp
+)
+
 function(luna_set_test_properties test_name timeout labels)
     set_tests_properties(
         ${test_name}
@@ -198,6 +205,12 @@ target_link_libraries(
         LunaCore
 )
 
+target_link_libraries(
+    ViewportInstanceTests
+    PRIVATE
+        LunaCore
+)
+
 target_compile_features(
     ScriptPluginContractTests
     PRIVATE
@@ -240,6 +253,12 @@ target_compile_features(
         cxx_std_20
 )
 
+target_compile_features(
+    ViewportInstanceTests
+    PRIVATE
+        cxx_std_20
+)
+
 target_compile_definitions(
     ScriptPluginContractTests
     PRIVATE
@@ -254,6 +273,12 @@ target_compile_definitions(
 
 target_include_directories(
     NativeEditorPluginContractTests
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/Editor/Source
+)
+
+target_include_directories(
+    ViewportInstanceTests
     PRIVATE
         ${PROJECT_SOURCE_DIR}/Editor/Source
 )
@@ -313,3 +338,9 @@ add_test(
     COMMAND AuthoringProtocolTests
 )
 luna_set_test_properties(AuthoringProtocolTests 20 "quick;unit;authoring;protocol")
+
+add_test(
+    NAME ViewportInstanceTests
+    COMMAND ViewportInstanceTests
+)
+luna_set_test_properties(ViewportInstanceTests 20 "quick;unit;editor;viewport")

@@ -52,10 +52,16 @@ add_executable(
     Source/Shell/EditorPluginDependencyResolver.cpp
     Source/Shell/EditorPluginManifest.h
     Source/Shell/EditorPluginManifest.cpp
-    Source/Viewport/ViewportInstance.h
-    Source/Viewport/ViewportInstance.cpp
-    Source/Viewport/ViewportInstanceManager.h
-    Source/Viewport/ViewportInstanceManager.cpp
+    Source/Viewport/SceneViewportInstance.h
+    Source/Viewport/SceneViewportInstance.cpp
+    Source/Viewport/SceneViewportInstanceManager.h
+    Source/Viewport/SceneViewportInstanceManager.cpp
+    Source/Viewport/TextureViewportInstance.h
+    Source/Viewport/TextureViewportInstance.cpp
+    Source/Viewport/TextureViewportInstanceManager.h
+    Source/Viewport/TextureViewportInstanceManager.cpp
+    Source/Viewport/ViewportSurface.h
+    Source/Viewport/ViewportSurface.cpp
     Source/LunaEditorApp.h
     Source/LunaEditorApp.cpp
     Source/LunaEditorLayer.h
