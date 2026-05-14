@@ -1,6 +1,7 @@
 #include "ContentBrowserPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <algorithm>
 #include <cctype>
@@ -651,5 +652,14 @@ std::unique_ptr<Plugin> createContentBrowserPlugin()
 {
     return std::make_unique<ContentBrowserPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kContentBrowserPluginRegistration{
+    kPluginId,
+    createContentBrowserPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

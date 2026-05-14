@@ -1,6 +1,7 @@
 #include "EditorApiSamplePlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <string>
 
@@ -105,5 +106,14 @@ std::unique_ptr<Plugin> createEditorApiSamplePlugin()
 {
     return std::make_unique<EditorApiSamplePlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kEditorApiSamplePluginRegistration{
+    kPluginId,
+    createEditorApiSamplePlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

@@ -1,6 +1,7 @@
 #include "BackendCapabilitiesPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <string>
 #include <string_view>
@@ -156,5 +157,14 @@ std::unique_ptr<Plugin> createBackendCapabilitiesPlugin()
 {
     return std::make_unique<BackendCapabilitiesPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kBackendCapabilitiesPluginRegistration{
+    kPluginId,
+    createBackendCapabilitiesPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

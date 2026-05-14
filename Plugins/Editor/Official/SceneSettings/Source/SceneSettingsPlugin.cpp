@@ -1,6 +1,7 @@
 #include "SceneSettingsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <algorithm>
 #include <array>
@@ -426,5 +427,14 @@ std::unique_ptr<Plugin> createSceneSettingsPlugin()
 {
     return std::make_unique<SceneSettingsPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kSceneSettingsPluginRegistration{
+    kPluginId,
+    createSceneSettingsPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

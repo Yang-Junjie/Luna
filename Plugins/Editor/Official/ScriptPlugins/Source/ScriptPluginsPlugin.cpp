@@ -1,6 +1,7 @@
 #include "ScriptPluginsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <string>
 #include <vector>
@@ -157,5 +158,14 @@ std::unique_ptr<Plugin> createScriptPluginsPlugin()
 {
     return std::make_unique<ScriptPluginsPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kScriptPluginsPluginRegistration{
+    kPluginId,
+    createScriptPluginsPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

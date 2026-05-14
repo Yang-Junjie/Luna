@@ -1,6 +1,7 @@
 #include "RenderFeaturesPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <cstdint>
 #include <string>
@@ -469,5 +470,14 @@ std::unique_ptr<Plugin> createRenderFeaturesPlugin()
 {
     return std::make_unique<RenderFeaturesPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kRenderFeaturesPluginRegistration{
+    kPluginId,
+    createRenderFeaturesPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

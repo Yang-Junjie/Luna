@@ -1,6 +1,7 @@
 #include "InspectorPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <algorithm>
 #include <charconv>
@@ -1737,5 +1738,14 @@ std::unique_ptr<Plugin> createInspectorPlugin()
 {
     return std::make_unique<InspectorPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kInspectorPluginRegistration{
+    kPluginId,
+    createInspectorPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

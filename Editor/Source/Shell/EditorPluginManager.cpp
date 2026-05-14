@@ -12,21 +12,6 @@
 #include "EditorApi/EditorUi.h"
 #include "EditorApi/EditorViewportService.h"
 #include "EditorApi/EditorWindowService.h"
-#include "AssetLoading/Source/AssetLoadingPlugin.h"
-#include "BackendCapabilities/Source/BackendCapabilitiesPlugin.h"
-#include "BuiltinMaterials/Source/BuiltinMaterialsPlugin.h"
-#include "ContentBrowser/Source/ContentBrowserPlugin.h"
-#include "CoreCommands/Source/CoreCommandsPlugin.h"
-#include "EditorApiSample/Source/EditorApiSamplePlugin.h"
-#include "Inspector/Source/InspectorPlugin.h"
-#include "RenderDebug/Source/RenderDebugPlugin.h"
-#include "RenderFeatures/Source/RenderFeaturesPlugin.h"
-#include "RenderProfiler/Source/RenderProfilerPlugin.h"
-#include "SceneHierarchy/Source/SceneHierarchyPlugin.h"
-#include "SceneSettings/Source/SceneSettingsPlugin.h"
-#include "SceneStatus/Source/SceneStatusPlugin.h"
-#include "ScriptPlugins/Source/ScriptPluginsPlugin.h"
-#include "Viewport/Source/ViewportPlugin.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Shell/EditorPluginDependencyResolver.h"
 #include "Shell/EditorPluginManifest.h"
@@ -35,17 +20,10 @@
 #include <algorithm>
 #include <cstring>
 #include <optional>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
 namespace {
-
-std::filesystem::path officialPluginRoot(std::string_view directory_name)
-{
-    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor" / "Official" / directory_name)
-        .lexically_normal();
-}
 
 std::filesystem::path officialPluginsRoot()
 {
@@ -73,79 +51,6 @@ bool isSameOrNestedPath(const std::filesystem::path& path, const std::filesystem
     return true;
 }
 
-struct BuiltinFactoryEntry {
-    const char* id;
-    const char* display_name;
-    const char* directory_name;
-    luna::editor::EditorBuiltinPluginFactory create;
-};
-
-const std::vector<BuiltinFactoryEntry>& officialFactoryEntries()
-{
-    static const std::vector<BuiltinFactoryEntry> entries{
-        {"luna.editor.core-commands", "Core Editor Commands", "CoreCommands", luna::editor::createCoreCommandsPlugin},
-        {"luna.editor.content-browser", "Content Browser", "ContentBrowser", luna::editor::createContentBrowserPlugin},
-        {"luna.editor.viewport", "Viewport", "Viewport", luna::editor::createViewportPlugin},
-        {"luna.editor.scene-hierarchy", "Scene Hierarchy", "SceneHierarchy", luna::editor::createSceneHierarchyPlugin},
-        {"luna.editor.inspector", "Inspector", "Inspector", luna::editor::createInspectorPlugin},
-        {"luna.editor.scene-status", "Scene Status", "SceneStatus", luna::editor::createSceneStatusPlugin},
-        {"luna.editor.scene-settings", "Scene Settings", "SceneSettings", luna::editor::createSceneSettingsPlugin},
-        {"luna.editor.asset-loading", "Asset Loading", "AssetLoading", luna::editor::createAssetLoadingPlugin},
-        {"luna.editor.backend-capabilities",
-         "Backend Capabilities",
-         "BackendCapabilities",
-         luna::editor::createBackendCapabilitiesPlugin},
-        {"luna.editor.render-debug", "Render Debug", "RenderDebug", luna::editor::createRenderDebugPlugin},
-        {"luna.editor.render-features", "Render Features", "RenderFeatures", luna::editor::createRenderFeaturesPlugin},
-        {"luna.editor.render-profiler", "Render Profiler", "RenderProfiler", luna::editor::createRenderProfilerPlugin},
-        {"luna.editor.builtin-materials",
-         "Builtin Materials",
-         "BuiltinMaterials",
-         luna::editor::createBuiltinMaterialsPlugin},
-        {"luna.editor.script-plugins", "Script Plugins", "ScriptPlugins", luna::editor::createScriptPluginsPlugin},
-        {"luna.editor.api-sample", "Editor API Sample", "EditorApiSample", luna::editor::createEditorApiSamplePlugin},
-    };
-    return entries;
-}
-
-std::vector<std::string> defaultOfficialDependencies(std::string_view plugin_id)
-{
-    if (plugin_id == "luna.editor.core-commands") {
-        return {};
-    }
-    return {"luna.editor.core-commands"};
-}
-
-luna::editor::EditorPluginPackage makeFallbackOfficialPackage(
-    std::string id,
-    std::string display_name,
-    std::string_view directory_name,
-    luna::editor::EditorBuiltinPluginFactory create)
-{
-    std::vector<std::string> dependencies = defaultOfficialDependencies(id);
-    return luna::editor::EditorPluginPackage{
-        .id = std::move(id),
-        .display_name = std::move(display_name),
-        .version = "0.1.0",
-        .root_path = officialPluginRoot(directory_name),
-        .runtime = luna::editor::EditorPluginRuntime::BuiltinNative,
-        .dependencies = std::move(dependencies),
-        .enabled = true,
-        .create = std::move(create),
-    };
-}
-
-void registerOfficialBuiltinFactories()
-{
-    static const bool registered = [] {
-        for (const BuiltinFactoryEntry& entry : officialFactoryEntries()) {
-            (void) luna::editor::EditorBuiltinPluginRegistry::registerFactory(entry.id, entry.create);
-        }
-        return true;
-    }();
-    (void) registered;
-}
-
 void attachBuiltinFactories(std::vector<luna::editor::EditorPluginPackage>& packages)
 {
     for (luna::editor::EditorPluginPackage& package : packages) {
@@ -153,25 +58,6 @@ void attachBuiltinFactories(std::vector<luna::editor::EditorPluginPackage>& pack
                 luna::editor::EditorBuiltinPluginRegistry::findFactory(package.id)) {
             package.create = std::move(factory);
         }
-    }
-}
-
-void appendMissingOfficialFallbackPackages(std::vector<luna::editor::EditorPluginPackage>& packages)
-{
-    std::unordered_set<std::string> package_ids;
-    for (const luna::editor::EditorPluginPackage& package : packages) {
-        package_ids.insert(package.id);
-    }
-
-    for (const BuiltinFactoryEntry& entry : officialFactoryEntries()) {
-        if (package_ids.find(entry.id) != package_ids.end()) {
-            continue;
-        }
-
-        LUNA_EDITOR_WARN("Official editor plugin '{}' has no editor-plugin.yaml; using built-in package fallback",
-                         entry.id);
-        packages.push_back(
-            makeFallbackOfficialPackage(entry.id, entry.display_name, entry.directory_name, entry.create));
     }
 }
 
@@ -2676,15 +2562,7 @@ void EditorPluginManager::unloadAll()
         m_shell.cleanupPluginContributions(it->package.id);
     }
     m_native_plugins.clear();
-    m_builtin_materials_plugin = nullptr;
     m_shell.unloadPlugins();
-}
-
-void EditorPluginManager::focusBuiltinMaterial(AssetHandle material_handle)
-{
-    if (m_builtin_materials_plugin != nullptr && material_handle.isValid()) {
-        m_builtin_materials_plugin->focusMaterial(material_handle);
-    }
 }
 
 const std::vector<EditorPluginPackage>& EditorPluginManager::packages() const noexcept
@@ -2730,12 +2608,10 @@ bool EditorPluginManager::loadBuiltinPackage(EditorPluginPackage& package)
         return false;
     }
 
-    Plugin* plugin_ptr = plugin.get();
     if (!m_shell.loadPlugin(std::move(plugin), package.root_path)) {
         return false;
     }
 
-    rememberLoadedPlugin(package, *plugin_ptr);
     return true;
 }
 
@@ -2849,21 +2725,11 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
     return true;
 }
 
-void EditorPluginManager::rememberLoadedPlugin(const EditorPluginPackage& package, Plugin& plugin)
-{
-    if (package.id == "luna.editor.builtin-materials") {
-        m_builtin_materials_plugin = dynamic_cast<BuiltinMaterialsPlugin*>(&plugin);
-    }
-}
-
 std::vector<EditorPluginPackage> createEditorPluginPackages()
 {
-    registerOfficialBuiltinFactories();
-
     EditorPluginManifestLoader manifest_loader;
     std::vector<EditorPluginPackage> packages = manifest_loader.loadPackagesFromRoot(officialPluginsRoot());
     attachBuiltinFactories(packages);
-    appendMissingOfficialFallbackPackages(packages);
 
     std::vector<EditorPluginPackage> source_packages = manifest_loader.loadPackagesFromRoot(sourceEditorPluginsRoot());
     const std::filesystem::path official_root = officialPluginsRoot();

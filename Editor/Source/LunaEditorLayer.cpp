@@ -2,6 +2,8 @@
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
+#include "EditorApi/EditorCommandService.h"
+#include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorUi.h"
 #include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorWindowService.h"
@@ -1799,11 +1801,12 @@ bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings
 
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
 {
-    if (m_editor_plugin_manager != nullptr) {
-        m_editor_plugin_manager->focusBuiltinMaterial(material_handle);
-    }
     if (m_editor_shell) {
-        m_editor_shell->windows().setWindowOpen("luna.editor.builtin-materials.window", true);
+        editor::CommandSubject subject = std::nullopt;
+        if (material_handle.isValid()) {
+            subject = static_cast<uint64_t>(material_handle);
+        }
+        (void) m_editor_shell->commands().execute(editor::commands::kOpenBuiltinMaterials, std::move(subject));
     }
 }
 

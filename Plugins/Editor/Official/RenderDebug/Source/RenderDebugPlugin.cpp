@@ -1,6 +1,7 @@
 #include "RenderDebugPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <cstddef>
 #include <string_view>
@@ -141,5 +142,14 @@ std::unique_ptr<Plugin> createRenderDebugPlugin()
 {
     return std::make_unique<RenderDebugPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kRenderDebugPluginRegistration{
+    kPluginId,
+    createRenderDebugPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

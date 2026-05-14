@@ -1,6 +1,7 @@
 #include "RenderProfilerPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -416,5 +417,14 @@ std::unique_ptr<Plugin> createRenderProfilerPlugin()
 {
     return std::make_unique<RenderProfilerPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kRenderProfilerPluginRegistration{
+    kPluginId,
+    createRenderProfilerPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

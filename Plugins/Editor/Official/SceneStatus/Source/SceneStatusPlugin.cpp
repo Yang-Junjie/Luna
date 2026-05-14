@@ -1,6 +1,7 @@
 #include "SceneStatusPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <iomanip>
 #include <sstream>
@@ -101,5 +102,14 @@ std::unique_ptr<Plugin> createSceneStatusPlugin()
 {
     return std::make_unique<SceneStatusPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kSceneStatusPluginRegistration{
+    kPluginId,
+    createSceneStatusPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

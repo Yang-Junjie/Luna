@@ -1,6 +1,7 @@
 #include "ViewportPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 namespace {
 
@@ -47,5 +48,14 @@ std::unique_ptr<Plugin> createViewportPlugin()
 {
     return std::make_unique<ViewportPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kViewportPluginRegistration{
+    kPluginId,
+    createViewportPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

@@ -1,6 +1,7 @@
 #include "CoreCommandsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 namespace {
 
@@ -138,5 +139,14 @@ std::unique_ptr<Plugin> createCoreCommandsPlugin()
 {
     return std::make_unique<CoreCommandsPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kCoreCommandsPluginRegistration{
+    kPluginId,
+    createCoreCommandsPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

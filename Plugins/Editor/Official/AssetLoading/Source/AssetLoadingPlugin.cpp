@@ -1,6 +1,7 @@
 #include "AssetLoadingPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
 
@@ -101,5 +102,14 @@ std::unique_ptr<Plugin> createAssetLoadingPlugin()
 {
     return std::make_unique<AssetLoadingPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kAssetLoadingPluginRegistration{
+    kPluginId,
+    createAssetLoadingPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

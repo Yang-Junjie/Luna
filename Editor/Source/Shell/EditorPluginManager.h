@@ -14,7 +14,6 @@
 
 namespace luna::editor {
 
-class BuiltinMaterialsPlugin;
 class EditorShell;
 struct NativePluginContext;
 
@@ -46,7 +45,6 @@ public:
     void registerPackage(EditorPluginPackage package);
     bool loadRegisteredPackages();
     void unloadAll();
-    void focusBuiltinMaterial(AssetHandle material_handle);
 
     [[nodiscard]] const std::vector<EditorPluginPackage>& packages() const noexcept;
 
@@ -54,7 +52,6 @@ private:
     bool loadPackage(EditorPluginPackage& package);
     bool loadBuiltinPackage(EditorPluginPackage& package);
     bool loadNativePackage(EditorPluginPackage& package);
-    void rememberLoadedPlugin(const EditorPluginPackage& package, Plugin& plugin);
 
     struct NativePluginInstance {
         EditorPluginPackage package;
@@ -67,7 +64,6 @@ private:
     EditorShell& m_shell;
     std::vector<EditorPluginPackage> m_packages;
     std::vector<NativePluginInstance> m_native_plugins;
-    BuiltinMaterialsPlugin* m_builtin_materials_plugin{nullptr};
 };
 
 std::vector<EditorPluginPackage> createEditorPluginPackages();

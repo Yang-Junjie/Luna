@@ -2648,6 +2648,7 @@ public:
         const std::string owner_key = toString(owner_id);
         for (auto it = m_commands.begin(); it != m_commands.end();) {
             if (it->second.owner_id == owner_key) {
+                m_subjects.erase(it->first);
                 it = m_commands.erase(it);
             } else {
                 ++it;
@@ -2667,6 +2668,7 @@ public:
     {
         const std::string key = toString(id);
         m_commands.erase(key);
+        m_subjects.erase(key);
         const auto order_it = m_order_by_id.find(key);
         if (order_it == m_order_by_id.end()) {
             return;
@@ -2678,13 +2680,38 @@ public:
 
     bool execute(std::string_view id) override
     {
-        const auto it = m_commands.find(toString(id));
+        return execute(id, std::nullopt);
+    }
+
+    bool execute(std::string_view id, CommandSubject subject) override
+    {
+        const std::string key = toString(id);
+        const auto it = m_commands.find(key);
         if (it == m_commands.end() || !canExecute(id) || m_host == nullptr) {
             return false;
         }
 
+        if (subject) {
+            m_subjects[key] = std::move(subject);
+        } else {
+            m_subjects.erase(key);
+        }
         it->second.execute(*m_host);
+        m_subjects.erase(key);
         return true;
+    }
+
+    CommandSubject takeSubject(std::string_view id) override
+    {
+        const std::string key = toString(id);
+        const auto it = m_subjects.find(key);
+        if (it == m_subjects.end()) {
+            return std::nullopt;
+        }
+
+        CommandSubject subject = std::move(it->second);
+        m_subjects.erase(it);
+        return subject;
     }
 
     bool canExecute(std::string_view id) const override
@@ -2732,6 +2759,7 @@ private:
     Host* m_host{nullptr};
     std::string* m_current_owner_id{nullptr};
     std::unordered_map<std::string, CommandDescriptor> m_commands;
+    std::unordered_map<std::string, CommandSubject> m_subjects;
     std::vector<std::string> m_order;
     std::unordered_map<std::string, size_t> m_order_by_id;
 };

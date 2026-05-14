@@ -1,6 +1,7 @@
 #include "SceneHierarchyPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include "Asset/BuiltinAssets.h"
 
@@ -381,5 +382,14 @@ std::unique_ptr<Plugin> createSceneHierarchyPlugin()
 {
     return std::make_unique<SceneHierarchyPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kSceneHierarchyPluginRegistration{
+    kPluginId,
+    createSceneHierarchyPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

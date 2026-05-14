@@ -1,6 +1,7 @@
 #include "BuiltinMaterialsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
@@ -73,7 +74,17 @@ PluginDescriptor BuiltinMaterialsPlugin::descriptor() const
 
 bool BuiltinMaterialsPlugin::onLoad(Host& host)
 {
-    return host.windows().registerWindow(WindowDescriptor{
+    const bool command_registered = host.commands().registerCommand(CommandDescriptor{
+        .id = commands::kOpenBuiltinMaterials,
+        .label = "Builtin Materials",
+        .description = "Open the built-in materials editor.",
+        .execute =
+            [this](Host& host) {
+                open(host);
+            },
+    });
+
+    const bool window_registered = host.windows().registerWindow(WindowDescriptor{
         .id = kWindowId,
         .title = "Builtin Materials",
         .default_open = false,
@@ -189,23 +200,47 @@ bool BuiltinMaterialsPlugin::onLoad(Host& host)
                 }
             },
     });
+
+    if (!command_registered || !window_registered) {
+        onUnload(host);
+        return false;
+    }
+
+    return true;
 }
 
 void BuiltinMaterialsPlugin::onUnload(Host& host)
 {
     host.windows().unregisterWindow(kWindowId);
+    host.commands().unregisterCommand(commands::kOpenBuiltinMaterials);
 }
 
-void BuiltinMaterialsPlugin::focusMaterial(AssetHandle material_handle)
+void BuiltinMaterialsPlugin::open(Host& host)
 {
-    if (BuiltinAssets::isBuiltinMaterial(material_handle)) {
-        m_selected_material = material_handle;
+    const CommandSubject subject = host.commands().takeSubject(commands::kOpenBuiltinMaterials);
+    if (subject) {
+        if (const auto* material_handle = std::get_if<uint64_t>(&*subject)) {
+            const AssetHandle handle{*material_handle};
+            if (BuiltinAssets::isBuiltinMaterial(handle)) {
+                m_selected_material = handle;
+            }
+        }
     }
+    host.windows().setWindowOpen(kWindowId, true);
 }
 
-std::unique_ptr<BuiltinMaterialsPlugin> createBuiltinMaterialsPlugin()
+std::unique_ptr<Plugin> createBuiltinMaterialsPlugin()
 {
     return std::make_unique<BuiltinMaterialsPlugin>();
 }
+
+namespace {
+
+const EditorBuiltinPluginFactoryRegistration kBuiltinMaterialsPluginRegistration{
+    kPluginId,
+    createBuiltinMaterialsPlugin,
+};
+
+} // namespace
 
 } // namespace luna::editor

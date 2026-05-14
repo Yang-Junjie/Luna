@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Asset/Asset.h"
 #include "EditorApi/EditorHost.h"
 #include "EditorApi/EditorTypes.h"
 
