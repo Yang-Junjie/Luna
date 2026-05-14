@@ -57,6 +57,8 @@ class Window;
 class Renderer {
 public:
     using DefaultRenderFlowConfigureFunction = std::function<void(render_flow::RenderFlowBuilder&)>;
+    using SceneViewportHandle = uint64_t;
+    static constexpr SceneViewportHandle kInvalidSceneViewportHandle{0};
 
     struct InitializationOptions {
         InitializationOptions()
@@ -106,6 +108,18 @@ public:
     void setSceneOutputSize(uint32_t width, uint32_t height);
     luna::RHI::Extent2D getSceneOutputSize() const;
     const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
+
+    [[nodiscard]] SceneViewportHandle getDefaultSceneViewportHandle() const noexcept;
+    [[nodiscard]] SceneViewportHandle createSceneViewportHandle();
+    void destroySceneViewportHandle(SceneViewportHandle handle);
+    [[nodiscard]] bool isSceneViewportHandleValid(SceneViewportHandle handle) const;
+    void setSceneViewportOutputMode(SceneViewportHandle handle, SceneOutputMode mode);
+    void setSceneViewportOutputSize(SceneViewportHandle handle, uint32_t width, uint32_t height);
+    [[nodiscard]] luna::RHI::Extent2D getSceneViewportOutputSize(SceneViewportHandle handle) const;
+    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>&
+        getSceneViewportOutputTexture(SceneViewportHandle handle) const;
+    [[nodiscard]] RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle);
+    [[nodiscard]] const RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle) const;
 
     void setRenderDebugViewMode(RenderDebugViewMode mode);
     [[nodiscard]] RenderDebugViewMode getRenderDebugViewMode() const;
@@ -267,7 +281,7 @@ private:
         std::unique_ptr<IRenderFlow> render_flow;
     };
 
-    using SceneViewportId = uint64_t;
+    using SceneViewportId = SceneViewportHandle;
     static constexpr SceneViewportId kInvalidSceneViewportId{0};
 
     struct SceneViewportSlot {
@@ -309,6 +323,8 @@ private:
     [[nodiscard]] SceneViewportRenderResult renderSceneViewport(SceneViewportState& viewport,
                                                                 luna::RenderGraphBuilder& graph_builder,
                                                                 const SceneViewportRenderRequest& request);
+    [[nodiscard]] SceneViewportState* findSceneViewportByHandle(SceneViewportHandle handle);
+    [[nodiscard]] const SceneViewportState* findSceneViewportByHandle(SceneViewportHandle handle) const;
     void invalidateRenderFeatureHistory(SceneViewportState& viewport,
                                         render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
     [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(

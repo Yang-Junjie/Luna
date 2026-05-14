@@ -30,6 +30,13 @@ struct FakeNativeEditorPluginState {
 
 FakeNativeEditorPluginState g_state{};
 
+void logError(const LunaEditorHostApi* host_api, const char* message)
+{
+    if (host_api != nullptr && host_api->log.log != nullptr) {
+        host_api->log.log(host_api->log.api_user_data, LunaEditorLogLevel_Error, message);
+    }
+}
+
 int canExecuteOpenWindow(void*, const LunaEditorHostApi* host_api)
 {
     return host_api != nullptr && host_api->windows.set_window_open != nullptr ? 1 : 0;
@@ -93,6 +100,13 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
         host_api->scene.get_camera_component == nullptr || host_api->scene.set_camera_component == nullptr ||
         host_api->scene.get_light_component == nullptr || host_api->scene.set_light_component == nullptr ||
         host_api->scene.get_mesh_component == nullptr || host_api->scene.set_mesh_component == nullptr ||
+        host_api->viewport.default_scene_viewport == nullptr ||
+        host_api->viewport.create_scene_viewport == nullptr ||
+        host_api->viewport.destroy_scene_viewport == nullptr ||
+        host_api->viewport.is_scene_viewport_valid == nullptr ||
+        host_api->viewport.sync_scene_viewport_ex == nullptr ||
+        host_api->viewport.scene_texture_view_ex == nullptr ||
+        host_api->viewport.sync_scene_viewport == nullptr ||
         host_api->viewport.scene_texture_view == nullptr ||
         host_api->viewport.editor_camera_position == nullptr || host_api->viewport.gizmo_operation_name == nullptr ||
         host_api->viewport.gizmo_mode_name == nullptr ||
@@ -103,10 +117,12 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
         host_api->runtime_viewport.is_runtime_viewport_requested == nullptr ||
         host_api->runtime_viewport.set_runtime_viewport_requested == nullptr ||
         host_api->runtime_viewport.runtime_entity_count == nullptr) {
+        logError(host_api, "missing required host api");
         return 0;
     }
 
     if (host_api->project.has_project_loaded(host_api->project.api_user_data) == 0) {
+        logError(host_api, "project not loaded");
         return 0;
     }
 
@@ -118,12 +134,14 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     project_info.name_size = sizeof(project_name);
     if (host_api->project.project_info(host_api->project.api_user_data, &project_info) == 0 ||
         project_name[0] == '\0') {
+        logError(host_api, "project info failed");
         return 0;
     }
 
     char scene_label[64]{};
     if (host_api->scene.scene_label(host_api->scene.api_user_data, scene_label, sizeof(scene_label)) == 0 ||
         host_api->scene.entity_count(host_api->scene.api_user_data) == 0u) {
+        logError(host_api, "scene info failed");
         return 0;
     }
 
@@ -135,6 +153,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     entity_info.name_size = sizeof(entity_name);
     if (host_api->scene.entity_info(host_api->scene.api_user_data, 1u, &entity_info) == 0 ||
         entity_info.id != 1u) {
+        logError(host_api, "entity info failed");
         return 0;
     }
 
@@ -153,6 +172,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
         camera.orthographic_far = 50.0f;
     }
     if (host_api->scene.set_camera_component(host_api->scene.api_user_data, 1u, &camera) == 0) {
+        logError(host_api, "set camera failed");
         return 0;
     }
 
@@ -169,6 +189,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
         light.outer_cone_angle_degrees = 20.0f;
     }
     if (host_api->scene.set_light_component(host_api->scene.api_user_data, 1u, &light) == 0) {
+        logError(host_api, "set light failed");
         return 0;
     }
 
@@ -183,6 +204,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     mesh.submesh_material_capacity = 1u;
     mesh.submesh_material_count = 1u;
     if (host_api->scene.set_mesh_component(host_api->scene.api_user_data, 1u, &mesh) == 0) {
+        logError(host_api, "set mesh failed");
         return 0;
     }
 
@@ -191,6 +213,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     if (host_api->plugin_assets.read_text(
             host_api->plugin_assets.api_user_data, "fixture.txt", plugin_asset_text, sizeof(plugin_asset_text), &plugin_asset_text_size) == 0 ||
         plugin_asset_text_size == 0) {
+        logError(host_api, "plugin asset failed");
         return 0;
     }
 
@@ -202,17 +225,63 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     asset_info.label_size = sizeof(asset_label);
     if (host_api->assets.describe_asset(host_api->assets.api_user_data, 42u, &asset_info) == 0 ||
         asset_info.handle != 42u) {
+        logError(host_api, "asset describe failed");
         return 0;
     }
 
     LunaEditorTextureView texture{};
     if (host_api->viewport.scene_texture_view(host_api->viewport.api_user_data, &texture) == 0 || texture.texture_id == 0u) {
+        logError(host_api, "default scene texture failed");
         return 0;
     }
+
+    const uint64_t default_viewport = host_api->viewport.default_scene_viewport(host_api->viewport.api_user_data);
+    if (default_viewport == 0u ||
+        host_api->viewport.is_scene_viewport_valid(host_api->viewport.api_user_data, default_viewport) == 0) {
+        logError(host_api, "default viewport invalid");
+        return 0;
+    }
+
+    LunaEditorViewportPresentation default_presentation{};
+    default_presentation.struct_size = sizeof(LunaEditorViewportPresentation);
+    default_presentation.api_version = LUNA_EDITOR_VIEWPORT_API_VERSION;
+    if (host_api->viewport.sync_scene_viewport(host_api->viewport.api_user_data, 640u, 360u, &default_presentation) == 0 ||
+        default_presentation.presentable == 0 || default_presentation.scene_texture.texture_id == 0u) {
+        logError(host_api, "default viewport sync failed");
+        return 0;
+    }
+
+    const uint64_t plugin_viewport =
+        host_api->viewport.create_scene_viewport(host_api->viewport.api_user_data, "FakeNativeViewport");
+    if (plugin_viewport == 0u ||
+        host_api->viewport.is_scene_viewport_valid(host_api->viewport.api_user_data, plugin_viewport) == 0) {
+        logError(host_api, "plugin viewport invalid");
+        return 0;
+    }
+
+    LunaEditorViewportPresentation plugin_presentation{};
+    plugin_presentation.struct_size = sizeof(LunaEditorViewportPresentation);
+    plugin_presentation.api_version = LUNA_EDITOR_VIEWPORT_API_VERSION;
+    if (host_api->viewport.sync_scene_viewport_ex(
+            host_api->viewport.api_user_data, plugin_viewport, 320u, 180u, &plugin_presentation) == 0 ||
+        plugin_presentation.presentable == 0 || plugin_presentation.scene_texture.texture_id == 0u) {
+        logError(host_api, "plugin viewport sync failed");
+        return 0;
+    }
+
+    LunaEditorTextureView plugin_texture{};
+    if (host_api->viewport.scene_texture_view_ex(
+            host_api->viewport.api_user_data, plugin_viewport, &plugin_texture) == 0 ||
+        plugin_texture.texture_id == 0u) {
+        logError(host_api, "plugin viewport texture failed");
+        return 0;
+    }
+    host_api->viewport.destroy_scene_viewport(host_api->viewport.api_user_data, plugin_viewport);
 
     LunaEditorVec3 camera_position{};
     host_api->viewport.editor_camera_position(host_api->viewport.api_user_data, &camera_position);
     if (camera_position.x == 0.0f && camera_position.y == 0.0f && camera_position.z == 0.0f) {
+        logError(host_api, "camera position failed");
         return 0;
     }
 
@@ -223,15 +292,18 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
                                                 sizeof(gizmo_operation)) == 0 ||
         host_api->viewport.gizmo_mode_name(host_api->viewport.api_user_data, gizmo_mode, sizeof(gizmo_mode)) == 0 ||
         gizmo_operation[0] == '\0' || gizmo_mode[0] == '\0') {
+        logError(host_api, "gizmo names failed");
         return 0;
     }
 
     host_api->viewport.set_pick_debug_visualization_enabled(host_api->viewport.api_user_data, 1);
     if (host_api->viewport.pick_debug_visualization_enabled(host_api->viewport.api_user_data) == 0) {
+        logError(host_api, "pick debug failed");
         return 0;
     }
     host_api->viewport.set_editor_grid_enabled(host_api->viewport.api_user_data, 0);
     if (host_api->viewport.editor_grid_enabled(host_api->viewport.api_user_data) != 0) {
+        logError(host_api, "editor grid failed");
         return 0;
     }
 
@@ -241,6 +313,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     host_api->runtime_viewport.set_runtime_viewport_requested(host_api->runtime_viewport.api_user_data, 1);
     if (host_api->runtime_viewport.is_runtime_viewport_requested(host_api->runtime_viewport.api_user_data) == 0 ||
         host_api->runtime_viewport.runtime_entity_count(host_api->runtime_viewport.api_user_data) == 0u) {
+        logError(host_api, "runtime viewport failed");
         return 0;
     }
 
@@ -257,6 +330,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     command.execute = &executeOpenWindow;
 
     if (host_api->commands.register_command(host_api->commands.api_user_data, &command) == 0) {
+        logError(host_api, "register command failed");
         return 0;
     }
 
@@ -272,6 +346,7 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     window.draw = &drawWindow;
 
     if (host_api->windows.register_window(host_api->windows.api_user_data, &window) == 0) {
+        logError(host_api, "register window failed");
         return 0;
     }
 
@@ -283,7 +358,11 @@ int registerContributions(FakeNativeEditorPluginState* state, const LunaEditorHo
     menu_item.label = "Open Fake Native Window";
     menu_item.shortcut = "";
 
-    return host_api->menus.add_menu_item(host_api->menus.api_user_data, &menu_item);
+    const int menu_result = host_api->menus.add_menu_item(host_api->menus.api_user_data, &menu_item);
+    if (menu_result == 0) {
+        logError(host_api, "register menu failed");
+    }
+    return menu_result;
 }
 
 int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)

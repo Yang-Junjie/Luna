@@ -225,6 +225,18 @@ LunaEditorTextureView toNativeTextureView(TextureView value) noexcept
     };
 }
 
+LunaEditorViewportPresentation toNativeViewportPresentation(ViewportPresentation value) noexcept
+{
+    return LunaEditorViewportPresentation{
+        .struct_size = sizeof(LunaEditorViewportPresentation),
+        .api_version = LUNA_EDITOR_VIEWPORT_API_VERSION,
+        .scene_texture = toNativeTextureView(value.scene_texture),
+        .framebuffer_width = value.framebuffer_size.x,
+        .framebuffer_height = value.framebuffer_size.y,
+        .presentable = value.presentable ? 1 : 0,
+    };
+}
+
 AssetType toEditorAssetType(uint32_t value) noexcept
 {
     switch (value) {
@@ -2128,6 +2140,78 @@ void nativeClearSelection(void* api_user_data)
     }
 }
 
+uint64_t nativeDefaultSceneViewport(void* api_user_data)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    return viewport != nullptr ? viewport->defaultSceneViewport() : kInvalidViewportId;
+}
+
+uint64_t nativeCreateSceneViewport(void* api_user_data, const char* debug_name)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    return viewport != nullptr ? viewport->createSceneViewport(nativeString(debug_name)) : kInvalidViewportId;
+}
+
+void nativeDestroySceneViewport(void* api_user_data, uint64_t viewport_id)
+{
+    if (ViewportService* viewport = nativeViewport(api_user_data)) {
+        viewport->destroySceneViewport(static_cast<ViewportId>(viewport_id));
+    }
+}
+
+int nativeIsSceneViewportValid(void* api_user_data, uint64_t viewport_id)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    return viewport != nullptr && viewport->isSceneViewportValid(static_cast<ViewportId>(viewport_id)) ? 1 : 0;
+}
+
+int nativeSyncSceneViewportEx(void* api_user_data,
+                              uint64_t viewport_id,
+                              uint32_t framebuffer_width,
+                              uint32_t framebuffer_height,
+                              LunaEditorViewportPresentation* out_presentation)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr || out_presentation == nullptr ||
+        out_presentation->struct_size < sizeof(LunaEditorViewportPresentation) ||
+        out_presentation->api_version != LUNA_EDITOR_VIEWPORT_API_VERSION) {
+        return 0;
+    }
+
+    *out_presentation = toNativeViewportPresentation(viewport->syncSceneViewport(
+        static_cast<ViewportId>(viewport_id),
+        UVec2{.x = framebuffer_width, .y = framebuffer_height}));
+    return 1;
+}
+
+int nativeSceneTextureViewEx(void* api_user_data, uint64_t viewport_id, LunaEditorTextureView* out_texture)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr || out_texture == nullptr) {
+        return 0;
+    }
+
+    *out_texture = toNativeTextureView(viewport->sceneTextureView(static_cast<ViewportId>(viewport_id)));
+    return 1;
+}
+
+int nativeSyncSceneViewport(void* api_user_data,
+                            uint32_t framebuffer_width,
+                            uint32_t framebuffer_height,
+                            LunaEditorViewportPresentation* out_presentation)
+{
+    ViewportService* viewport = nativeViewport(api_user_data);
+    if (viewport == nullptr || out_presentation == nullptr ||
+        out_presentation->struct_size < sizeof(LunaEditorViewportPresentation) ||
+        out_presentation->api_version != LUNA_EDITOR_VIEWPORT_API_VERSION) {
+        return 0;
+    }
+
+    *out_presentation = toNativeViewportPresentation(
+        viewport->syncSceneViewport(UVec2{.x = framebuffer_width, .y = framebuffer_height}));
+    return 1;
+}
+
 int nativeSceneTextureView(void* api_user_data, LunaEditorTextureView* out_texture)
 {
     ViewportService* viewport = nativeViewport(api_user_data);
@@ -2447,7 +2531,7 @@ LunaEditorViewportApi makeNativeViewportApi(NativePluginContext& context)
         .struct_size = sizeof(LunaEditorViewportApi),
         .api_version = LUNA_EDITOR_VIEWPORT_API_VERSION,
         .api_user_data = &context,
-        .sync_scene_viewport = nullptr,
+        .sync_scene_viewport = &nativeSyncSceneViewport,
         .scene_texture_view = &nativeSceneTextureView,
         .editor_camera_position = &nativeEditorCameraPosition,
         .gizmo_operation_name = &nativeGizmoOperationName,
@@ -2456,6 +2540,12 @@ LunaEditorViewportApi makeNativeViewportApi(NativePluginContext& context)
         .set_pick_debug_visualization_enabled = &nativeSetPickDebugVisualizationEnabled,
         .editor_grid_enabled = &nativeEditorGridEnabled,
         .set_editor_grid_enabled = &nativeSetEditorGridEnabled,
+        .default_scene_viewport = &nativeDefaultSceneViewport,
+        .create_scene_viewport = &nativeCreateSceneViewport,
+        .destroy_scene_viewport = &nativeDestroySceneViewport,
+        .is_scene_viewport_valid = &nativeIsSceneViewportValid,
+        .sync_scene_viewport_ex = &nativeSyncSceneViewportEx,
+        .scene_texture_view_ex = &nativeSceneTextureViewEx,
     };
 }
 

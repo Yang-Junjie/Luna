@@ -103,7 +103,16 @@ public:
     bool isRuntimeViewportEnabled() const noexcept override;
     bool isRuntimeViewportRequested() const noexcept;
     void setRuntimeViewportRequested(bool enabled);
+    editor::ViewportId defaultSceneViewportId() const noexcept;
+    editor::ViewportId createSceneViewport(std::string_view debug_name = {});
+    void destroySceneViewport(editor::ViewportId viewport_id);
+    bool isSceneViewportValid(editor::ViewportId viewport_id) const noexcept;
+    editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id, editor::UVec2 framebuffer_size);
+    editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id,
+                                                   uint32_t framebuffer_width,
+                                                   uint32_t framebuffer_height);
     editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
+    editor::TextureView getSceneTextureView(editor::ViewportId viewport_id) const;
     editor::TextureView getSceneTextureView() const;
     void drawDefaultSceneViewport(editor::Ui& ui);
     UUID getSelectedEntityId() const noexcept;

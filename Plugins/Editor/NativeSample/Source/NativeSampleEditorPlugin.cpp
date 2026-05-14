@@ -17,6 +17,7 @@ struct NativeSampleState {
     LunaEditorVec3 accent{0.2f, 0.7f, 0.9f};
     char label[96]{"Native sample state"};
     char asset_note[256]{};
+    uint64_t viewport_id{0};
 };
 
 NativeSampleState g_state{};
@@ -178,6 +179,35 @@ void drawNativeSampleWindow(void* window_user_data, const LunaEditorHostApi* hos
                           texture.height,
                           texture.texture_id != 0u ? "available" : "missing");
             ui.text(ui.api_user_data, viewport_size_text);
+        }
+    }
+
+    if (host_api->viewport.create_scene_viewport != nullptr &&
+        host_api->viewport.destroy_scene_viewport != nullptr &&
+        host_api->viewport.is_scene_viewport_valid != nullptr &&
+        host_api->viewport.sync_scene_viewport_ex != nullptr &&
+        host_api->viewport.scene_texture_view_ex != nullptr) {
+        if (state->viewport_id == 0u ||
+            host_api->viewport.is_scene_viewport_valid(host_api->viewport.api_user_data, state->viewport_id) == 0) {
+            state->viewport_id =
+                host_api->viewport.create_scene_viewport(host_api->viewport.api_user_data, "NativeSampleViewport");
+        }
+
+        if (state->viewport_id != 0u) {
+            LunaEditorViewportPresentation presentation{};
+            presentation.struct_size = sizeof(LunaEditorViewportPresentation);
+            presentation.api_version = LUNA_EDITOR_VIEWPORT_API_VERSION;
+            if (host_api->viewport.sync_scene_viewport_ex(
+                    host_api->viewport.api_user_data, state->viewport_id, 320u, 180u, &presentation) != 0) {
+                char plugin_viewport_text[128]{};
+                std::snprintf(plugin_viewport_text,
+                              sizeof(plugin_viewport_text),
+                              "Plugin Viewport: %ux%u (%s)",
+                              presentation.framebuffer_width,
+                              presentation.framebuffer_height,
+                              presentation.scene_texture.texture_id != 0u ? "available" : "missing");
+                ui.text(ui.api_user_data, plugin_viewport_text);
+            }
         }
     }
 
@@ -400,6 +430,10 @@ int loadNativeSample(void* plugin_user_data, const LunaEditorHostApi* host_api)
 void unloadNativeSample(void*, const LunaEditorHostApi* host_api)
 {
     if (host_api != nullptr) {
+        if (g_state.viewport_id != 0u && host_api->viewport.destroy_scene_viewport != nullptr) {
+            host_api->viewport.destroy_scene_viewport(host_api->viewport.api_user_data, g_state.viewport_id);
+            g_state.viewport_id = 0u;
+        }
         if (host_api->windows.unregister_window != nullptr) {
             host_api->windows.unregister_window(host_api->windows.api_user_data, kWindowId);
         }

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace luna::editor {
 
@@ -18,6 +19,13 @@ struct ViewportPresentation {
 class ViewportService {
 public:
     virtual ~ViewportService() = default;
+
+    virtual ViewportId defaultSceneViewport() const noexcept = 0;
+    virtual ViewportId createSceneViewport(std::string_view debug_name = {}) = 0;
+    virtual void destroySceneViewport(ViewportId viewport_id) = 0;
+    virtual bool isSceneViewportValid(ViewportId viewport_id) const noexcept = 0;
+    virtual ViewportPresentation syncSceneViewport(ViewportId viewport_id, UVec2 framebuffer_size) = 0;
+    virtual TextureView sceneTextureView(ViewportId viewport_id) const = 0;
 
     virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView() const = 0;

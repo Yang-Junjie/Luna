@@ -615,6 +615,16 @@ typedef struct LunaEditorViewportApi {
     void (*set_pick_debug_visualization_enabled)(void* api_user_data, int enabled);
     int (*editor_grid_enabled)(void* api_user_data);
     void (*set_editor_grid_enabled)(void* api_user_data, int enabled);
+    uint64_t (*default_scene_viewport)(void* api_user_data);
+    uint64_t (*create_scene_viewport)(void* api_user_data, const char* debug_name);
+    void (*destroy_scene_viewport)(void* api_user_data, uint64_t viewport_id);
+    int (*is_scene_viewport_valid)(void* api_user_data, uint64_t viewport_id);
+    int (*sync_scene_viewport_ex)(void* api_user_data,
+                                  uint64_t viewport_id,
+                                  uint32_t framebuffer_width,
+                                  uint32_t framebuffer_height,
+                                  LunaEditorViewportPresentation* out_presentation);
+    int (*scene_texture_view_ex)(void* api_user_data, uint64_t viewport_id, LunaEditorTextureView* out_texture);
 } LunaEditorViewportApi;
 
 typedef struct LunaEditorRuntimeViewportApi {

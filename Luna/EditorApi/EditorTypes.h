@@ -13,6 +13,10 @@ using EditorId = std::string;
 using EntityId = UUID;
 using ScriptEntryId = UUID;
 using TextureHandle = uintptr_t;
+using ViewportId = uint64_t;
+
+inline constexpr ViewportId kInvalidViewportId{0};
+inline constexpr ViewportId kDefaultViewportId{1};
 
 struct Vec2 {
     float x{0.0f};

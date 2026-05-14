@@ -2151,10 +2151,43 @@ public:
         : m_editor_layer(&editor_layer)
     {}
 
+    ViewportId defaultSceneViewport() const noexcept override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->defaultSceneViewportId() : editor::kInvalidViewportId;
+    }
+
+    ViewportId createSceneViewport(std::string_view debug_name = {}) override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->createSceneViewport(debug_name) : editor::kInvalidViewportId;
+    }
+
+    void destroySceneViewport(ViewportId viewport_id) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->destroySceneViewport(viewport_id);
+        }
+    }
+
+    bool isSceneViewportValid(ViewportId viewport_id) const noexcept override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->isSceneViewportValid(viewport_id);
+    }
+
+    ViewportPresentation syncSceneViewport(ViewportId viewport_id, UVec2 framebuffer_size) override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->syncSceneViewport(viewport_id, framebuffer_size)
+                                         : ViewportPresentation{};
+    }
+
     ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) override
     {
         return m_editor_layer != nullptr ? m_editor_layer->syncSceneViewport(framebuffer_size.x, framebuffer_size.y)
                                          : ViewportPresentation{};
+    }
+
+    TextureView sceneTextureView(ViewportId viewport_id) const override
+    {
+        return m_editor_layer != nullptr ? m_editor_layer->getSceneTextureView(viewport_id) : TextureView{};
     }
 
     TextureView sceneTextureView() const override

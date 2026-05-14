@@ -335,7 +335,7 @@ struct TestNativeHost {
             .struct_size = sizeof(LunaEditorViewportApi),
             .api_version = LUNA_EDITOR_VIEWPORT_API_VERSION,
             .api_user_data = this,
-            .sync_scene_viewport = nullptr,
+            .sync_scene_viewport = &syncSceneViewport,
             .scene_texture_view = &sceneTextureView,
             .editor_camera_position = &editorCameraPosition,
             .gizmo_operation_name = &gizmoOperationName,
@@ -344,6 +344,12 @@ struct TestNativeHost {
             .set_pick_debug_visualization_enabled = &setPickDebugVisualizationEnabled,
             .editor_grid_enabled = &editorGridEnabled,
             .set_editor_grid_enabled = &setEditorGridEnabled,
+            .default_scene_viewport = &defaultSceneViewport,
+            .create_scene_viewport = &createSceneViewport,
+            .destroy_scene_viewport = &destroySceneViewport,
+            .is_scene_viewport_valid = &isSceneViewportValid,
+            .sync_scene_viewport_ex = &syncSceneViewportEx,
+            .scene_texture_view_ex = &sceneTextureViewEx,
         };
         api.runtime_viewport = LunaEditorRuntimeViewportApi{
             .struct_size = sizeof(LunaEditorRuntimeViewportApi),
@@ -414,6 +420,8 @@ struct TestNativeHost {
         .height = 540u,
         .y_flip = 0,
     };
+    uint64_t next_viewport_id{2u};
+    uint64_t created_viewport_id{0u};
     LunaEditorVec3 editor_camera_position{1.0f, 2.0f, 3.0f};
     std::string gizmo_operation_name{"Translate"};
     std::string gizmo_mode_name{"Local"};
@@ -1189,6 +1197,55 @@ private:
         }
     }
 
+    static uint64_t defaultSceneViewport(void* api_user_data)
+    {
+        return self(api_user_data) != nullptr ? 1u : 0u;
+    }
+
+    static uint64_t createSceneViewport(void* api_user_data, const char*)
+    {
+        TestNativeHost* host = self(api_user_data);
+        if (host == nullptr) {
+            return 0u;
+        }
+
+        host->created_viewport_id = host->next_viewport_id++;
+        return host->created_viewport_id;
+    }
+
+    static void destroySceneViewport(void* api_user_data, uint64_t viewport_id)
+    {
+        if (TestNativeHost* host = self(api_user_data); host != nullptr && host->created_viewport_id == viewport_id) {
+            host->created_viewport_id = 0u;
+        }
+    }
+
+    static int isSceneViewportValid(void* api_user_data, uint64_t viewport_id)
+    {
+        TestNativeHost* host = self(api_user_data);
+        return host != nullptr && (viewport_id == 1u || viewport_id == host->created_viewport_id) ? 1 : 0;
+    }
+
+    static int syncSceneViewportEx(void* api_user_data,
+                                   uint64_t viewport_id,
+                                   uint32_t framebuffer_width,
+                                   uint32_t framebuffer_height,
+                                   LunaEditorViewportPresentation* out_presentation)
+    {
+        if (isSceneViewportValid(api_user_data, viewport_id) == 0) {
+            return 0;
+        }
+        return syncSceneViewport(api_user_data, framebuffer_width, framebuffer_height, out_presentation);
+    }
+
+    static int sceneTextureViewEx(void* api_user_data, uint64_t viewport_id, LunaEditorTextureView* out_texture)
+    {
+        if (isSceneViewportValid(api_user_data, viewport_id) == 0) {
+            return 0;
+        }
+        return sceneTextureView(api_user_data, out_texture);
+    }
+
     static int syncSceneViewport(void* api_user_data,
                                  uint32_t framebuffer_width,
                                  uint32_t framebuffer_height,
@@ -1443,8 +1500,12 @@ void testSuccessfulNativePluginLoad(TestContext& context)
                    "native plugin should use host plugin asset API during load");
     context.expect(result.host->project_info_count > 0, "native plugin should use host project API during load");
     context.expect(result.host->scene_info_count > 0, "native plugin should use host scene API during load");
-    context.expect(result.host->api.viewport.sync_scene_viewport == nullptr,
-                   "native plugin should not receive global viewport sync API");
+    context.expect(result.host->api.viewport.sync_scene_viewport != nullptr,
+                   "native plugin should receive default viewport sync API");
+    context.expect(result.host->api.viewport.create_scene_viewport != nullptr,
+                   "native plugin should receive scene viewport creation API");
+    context.expect(result.host->api.viewport.sync_scene_viewport_ex != nullptr,
+                   "native plugin should receive viewport-id sync API");
     context.expect(result.host->api.runtime_viewport.set_runtime_viewport_requested != nullptr,
                    "native plugin should receive runtime viewport API");
     context.expect(result.host->pick_debug_visualization_enabled,
