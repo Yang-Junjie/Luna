@@ -20,8 +20,15 @@ and build against the exported CMake target:
 
 ```cmake
 find_package(LunaEditorSDK CONFIG REQUIRED)
-target_link_libraries(MyEditorPlugin PRIVATE Luna::EditorSDK)
+
+luna_add_editor_native_plugin(
+    TARGET MyEditorPlugin
+    OUTPUT_NAME MyEditorPlugin
+    SOURCES Source/MyEditorPlugin.cpp
+)
 ```
+
+`luna_add_editor_native_plugin` creates a shared library, links `Luna::EditorSDK`, enables C++20, and writes the binary to the package-local `Binaries/<platform>/` directory expected by `editor-plugin.yaml`. Advanced builds can still link `Luna::EditorSDK` manually.
 
 The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a command/window/menu tool using the C++ wrapper for project, asset, scene, selection, viewport, and runtime viewport access.
 
@@ -69,6 +76,7 @@ Those source-level plugins still need the editor source build because they use t
 The SDK currently installs:
 
 - `Luna::EditorSDK`
+- `luna_add_editor_native_plugin`
 - `EditorApi/*.h`
 - `Luna/Editor/*.h`
 - `Luna/Editor/Native/*.h`
@@ -87,7 +95,7 @@ Current `Luna/Editor/Native` wrappers cover the v1 Native ABI basics used by rea
 
 Two contract tests protect this boundary:
 
-- `EditorSdkNativeTemplateContract` installs only the `LunaEditorSDK` component, configures the installed native template with `find_package(LunaEditorSDK CONFIG REQUIRED)`, and builds it as an external plugin.
+- `EditorSdkNativeTemplateContract` installs only the `LunaEditorSDK` component, configures the installed native template with `find_package(LunaEditorSDK CONFIG REQUIRED)`, builds it as an external plugin through `luna_add_editor_native_plugin`, loads the resulting dynamic library, and verifies `on_load` / draw / `on_unload`.
 - `EditorPluginBoundaryContract` scans editor plugin sources and SDK templates for editor-private includes and raw ImGui usage.
 
 The goal is that native editor plugin authors can download the SDK package instead of the full engine source. Higher-level C++ wrappers and Lua editor plugin bindings should be layered on top of the same underlying Editor API instead of creating a separate plugin model.

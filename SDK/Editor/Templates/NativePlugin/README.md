@@ -9,6 +9,7 @@ It uses the Luna editor native C++ wrapper:
 
 The wrapper is header-only and sits on top of `EditorApi/EditorNativePluginApi.h`; the exported plugin symbol remains the C ABI entry point.
 Do not change the ABI version macros in plugin code.
+The template CMake uses `luna_add_editor_native_plugin`, which is installed with `LunaEditorSDK` and writes the binary to the `Binaries/<platform>/` path referenced by the manifest.
 
 This template demonstrates:
 
@@ -50,6 +51,8 @@ Before turning this into a real plugin, change the plugin ID in both:
 
 - `editor-plugin.yaml`
 - `Source/NativeTemplatePlugin.cpp`
+
+If you rename the binary target or output name in `CMakeLists.txt`, keep the `Entry` paths in `editor-plugin.yaml` in sync.
 
 Configure it against an installed SDK:
 

@@ -12,8 +12,13 @@ if(NOT DEFINED LUNA_TEST_CONFIGURATION OR LUNA_TEST_CONFIGURATION STREQUAL "")
     set(LUNA_TEST_CONFIGURATION Debug)
 endif()
 
+if(NOT DEFINED LUNA_SDK_TEMPLATE_LOAD_TEST OR LUNA_SDK_TEMPLATE_LOAD_TEST STREQUAL "")
+    message(FATAL_ERROR "LUNA_SDK_TEMPLATE_LOAD_TEST is required")
+endif()
+
 get_filename_component(LUNA_BINARY_DIR_ABS "${LUNA_BINARY_DIR}" ABSOLUTE)
 get_filename_component(LUNA_SDK_CONTRACT_ROOT_ABS "${LUNA_SDK_CONTRACT_ROOT}" ABSOLUTE)
+get_filename_component(LUNA_SDK_TEMPLATE_LOAD_TEST_ABS "${LUNA_SDK_TEMPLATE_LOAD_TEST}" ABSOLUTE)
 
 file(TO_CMAKE_PATH "${LUNA_BINARY_DIR_ABS}" LUNA_BINARY_DIR_NORM)
 file(TO_CMAKE_PATH "${LUNA_SDK_CONTRACT_ROOT_ABS}" LUNA_SDK_CONTRACT_ROOT_NORM)
@@ -96,4 +101,30 @@ if(NOT LUNA_TEMPLATE_BUILD_RESULT EQUAL 0)
     message(FATAL_ERROR "Failed to build SDK native template.\n${LUNA_TEMPLATE_BUILD_OUTPUT}\n${LUNA_TEMPLATE_BUILD_ERROR}")
 endif()
 
-message(STATUS "LunaEditorSDK native template contract passed")
+if(WIN32)
+    set(LUNA_SDK_TEMPLATE_BINARY
+        "${LUNA_SDK_TEMPLATE_SOURCE_DIR}/Binaries/Win64/LunaEditorNativePluginTemplate.dll")
+elseif(APPLE)
+    set(LUNA_SDK_TEMPLATE_BINARY
+        "${LUNA_SDK_TEMPLATE_SOURCE_DIR}/Binaries/macOS/libLunaEditorNativePluginTemplate.dylib")
+else()
+    set(LUNA_SDK_TEMPLATE_BINARY
+        "${LUNA_SDK_TEMPLATE_SOURCE_DIR}/Binaries/Linux/libLunaEditorNativePluginTemplate.so")
+endif()
+
+if(NOT EXISTS "${LUNA_SDK_TEMPLATE_BINARY}")
+    message(FATAL_ERROR "SDK native template binary was not produced: ${LUNA_SDK_TEMPLATE_BINARY}")
+endif()
+
+execute_process(
+    COMMAND "${LUNA_SDK_TEMPLATE_LOAD_TEST_ABS}" "${LUNA_SDK_TEMPLATE_BINARY}"
+    RESULT_VARIABLE LUNA_TEMPLATE_LOAD_RESULT
+    OUTPUT_VARIABLE LUNA_TEMPLATE_LOAD_OUTPUT
+    ERROR_VARIABLE LUNA_TEMPLATE_LOAD_ERROR
+)
+
+if(NOT LUNA_TEMPLATE_LOAD_RESULT EQUAL 0)
+    message(FATAL_ERROR "Failed to load SDK native template plugin.\n${LUNA_TEMPLATE_LOAD_OUTPUT}\n${LUNA_TEMPLATE_LOAD_ERROR}")
+endif()
+
+message(STATUS "LunaEditorSDK native template build/load contract passed")

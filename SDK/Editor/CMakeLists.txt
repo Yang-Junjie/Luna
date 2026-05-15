@@ -69,6 +69,7 @@ install(
     FILES
         ${CMAKE_CURRENT_BINARY_DIR}/LunaEditorSDKConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/LunaEditorSDKConfigVersion.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/LunaEditorSDKHelpers.cmake
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LunaEditorSDK
     COMPONENT LunaEditorSDK
 )

@@ -14,6 +14,11 @@ add_executable(
 )
 
 add_executable(
+    EditorSdkNativeTemplateLoadTest
+    EditorSdkNativeTemplateLoadTest.cpp
+)
+
+add_executable(
     SceneSerializerTests
     SceneSerializerTests.cpp
 )
@@ -181,6 +186,12 @@ target_link_libraries(
 )
 
 target_link_libraries(
+    EditorSdkNativeTemplateLoadTest
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
     SceneSerializerTests
     PRIVATE
         LunaCore
@@ -224,6 +235,12 @@ target_compile_features(
 
 target_compile_features(
     NativeEditorPluginContractTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    EditorSdkNativeTemplateLoadTest
     PRIVATE
         cxx_std_20
 )
@@ -360,6 +377,7 @@ add_test(
         "-DLUNA_CMAKE_GENERATOR=${CMAKE_GENERATOR}"
         "-DLUNA_CMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
         "-DLUNA_CMAKE_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+        "-DLUNA_SDK_TEMPLATE_LOAD_TEST=$<TARGET_FILE:EditorSdkNativeTemplateLoadTest>"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/EditorSdkNativeTemplateContract.cmake"
 )
 luna_set_test_properties(EditorSdkNativeTemplateContract 120 "sdk;contract;editor;plugin")
