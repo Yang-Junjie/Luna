@@ -1,7 +1,9 @@
-build/
+.env
 .claude/
 .cache/
+.codex/
 bin/
+build/
 cmake-build-debug-mingw/
 Experimental/
 logs/
@@ -13,8 +15,6 @@ devdocs/
 !Docs/**
 shader_cache/
 imgui.ini
-.codex/
 devdocs/
 Plugins/**/Binaries/
 Plugins/**/Intermediate/
-.env

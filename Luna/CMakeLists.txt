@@ -221,6 +221,7 @@ set(AUTHORING_SOURCE
 set(EDITOR_API_SOURCE
     EditorApi/EditorApi.h
     EditorApi/EditorAssetService.h
+    EditorApi/EditorBuiltinPluginRegistration.h
     EditorApi/EditorCommandService.h
     EditorApi/EditorHistoryService.h
     EditorApi/EditorHost.h
@@ -361,6 +362,7 @@ target_include_directories(
     LunaCore
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${PROJECT_SOURCE_DIR}/SDK/Editor/Include
 )
 
 target_include_directories(

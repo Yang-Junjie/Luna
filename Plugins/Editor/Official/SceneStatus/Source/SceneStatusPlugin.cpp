@@ -1,7 +1,7 @@
 #include "SceneStatusPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <iomanip>
 #include <sstream>

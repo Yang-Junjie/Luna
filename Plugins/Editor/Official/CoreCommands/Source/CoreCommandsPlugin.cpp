@@ -1,7 +1,7 @@
 #include "CoreCommandsPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 namespace {
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "EditorApi/EditorAssetService.h"
+#include "EditorApi/EditorBuiltinPluginRegistration.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorHistoryService.h"
 #include "EditorApi/EditorHost.h"

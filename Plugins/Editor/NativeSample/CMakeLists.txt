@@ -4,10 +4,10 @@ add_library(
     Source/NativeSampleEditorPlugin.cpp
 )
 
-target_include_directories(
+target_link_libraries(
     LunaEditorNativeSample
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/Luna
+        LunaEditorSDK
 )
 
 if(WIN32)

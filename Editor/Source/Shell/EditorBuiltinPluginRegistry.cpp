@@ -17,7 +17,7 @@ std::unordered_map<std::string, luna::editor::EditorBuiltinPluginFactory>& regis
 
 namespace luna::editor {
 
-bool EditorBuiltinPluginRegistry::registerFactory(std::string plugin_id, EditorBuiltinPluginFactory factory)
+bool registerBuiltinEditorPluginFactory(std::string plugin_id, EditorBuiltinPluginFactory factory)
 {
     if (plugin_id.empty() || !factory) {
         return false;
@@ -44,7 +44,7 @@ EditorBuiltinPluginFactoryRegistration::EditorBuiltinPluginFactoryRegistration(
     std::string plugin_id,
     EditorBuiltinPluginFactory factory)
 {
-    (void) EditorBuiltinPluginRegistry::registerFactory(std::move(plugin_id), std::move(factory));
+    (void) registerBuiltinEditorPluginFactory(std::move(plugin_id), std::move(factory));
 }
 
 } // namespace luna::editor

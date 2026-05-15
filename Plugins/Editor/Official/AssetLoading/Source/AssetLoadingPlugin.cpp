@@ -1,7 +1,7 @@
 #include "AssetLoadingPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
 

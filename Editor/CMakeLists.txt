@@ -44,6 +44,7 @@ target_include_directories(
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
+        ${PROJECT_SOURCE_DIR}/SDK/Editor/Include
         ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo
 )
 
@@ -51,6 +52,7 @@ target_link_libraries(
     LunaEditor
     PRIVATE
         LunaCore
+        LunaEditorSDK
 )
 
 set_target_properties(

@@ -1,7 +1,7 @@
 #include "RenderFeaturesPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <cstdint>
 #include <string>

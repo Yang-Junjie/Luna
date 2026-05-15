@@ -120,6 +120,10 @@ set_target_properties(lua PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(Luna)
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDK/CMakeLists.txt")
+    add_subdirectory(SDK)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Editor/CMakeLists.txt")
     add_subdirectory(Editor)
 endif()

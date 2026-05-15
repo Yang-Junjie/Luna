@@ -1,0 +1,16 @@
+EditorPlugin:
+  Id: com.example.native-template
+  DisplayName: Native Template Tool
+  Runtime: Native
+  Version: 0.1.0
+  Enabled: true
+  Entry:
+    Windows:
+      x64: Binaries/Win64/LunaEditorNativePluginTemplate.dll
+      arm64: Binaries/Win64/LunaEditorNativePluginTemplate.dll
+    Linux:
+      x64: Binaries/Linux/libLunaEditorNativePluginTemplate.so
+      arm64: Binaries/Linux/libLunaEditorNativePluginTemplate.so
+    macOS:
+      x64: Binaries/macOS/libLunaEditorNativePluginTemplate.dylib
+      arm64: Binaries/macOS/libLunaEditorNativePluginTemplate.dylib

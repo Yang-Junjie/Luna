@@ -1,7 +1,7 @@
 #include "InspectorPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <algorithm>
 #include <charconv>

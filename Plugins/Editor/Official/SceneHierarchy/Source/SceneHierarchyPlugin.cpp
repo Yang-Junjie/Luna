@@ -1,7 +1,7 @@
 #include "SceneHierarchyPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include "Asset/BuiltinAssets.h"
 
