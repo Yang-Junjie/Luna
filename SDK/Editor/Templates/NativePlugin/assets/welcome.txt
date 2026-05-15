@@ -1,0 +1,2 @@
+This text file is packaged with the native editor plugin template.
+Plugin assets live beside the plugin manifest and are accessed through host.pluginAssets().

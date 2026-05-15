@@ -7,6 +7,7 @@ class CommandService;
 class HistoryService;
 class MenuService;
 class PluginAssetService;
+class PluginService;
 class ProjectService;
 class ScriptPluginService;
 class ScriptService;
@@ -30,6 +31,7 @@ public:
     virtual HistoryService& history() = 0;
     virtual MenuService& menus() = 0;
     virtual PluginAssetService& pluginAssets() = 0;
+    virtual PluginService& plugins() = 0;
     virtual ProjectService& project() = 0;
     virtual ScriptPluginService& scriptPlugins() = 0;
     virtual ScriptService& scripts() = 0;

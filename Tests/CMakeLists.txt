@@ -42,6 +42,7 @@ add_executable(
     ViewportInstanceTests
     ViewportInstanceTests.cpp
     ${PROJECT_SOURCE_DIR}/Editor/Source/Viewport/TextureViewportInstance.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Viewport/ViewportInteraction.cpp
     ${PROJECT_SOURCE_DIR}/Editor/Source/Viewport/ViewportSurface.cpp
 )
 

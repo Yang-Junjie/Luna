@@ -16,6 +16,7 @@
 #include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
 #include "Shell/EditorShell.h"
+#include "Viewport/ViewportInteraction.h"
 
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -29,6 +30,7 @@
 #include <algorithm>
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <cmath>
 #include <glm/trigonometric.hpp>
@@ -57,6 +59,11 @@ ImVec4 withAlpha(ImVec4 color, float alpha)
 {
     color.w = alpha;
     return color;
+}
+
+luna::editor::Vec2 toEditorVec2(const ImVec2& value) noexcept
+{
+    return luna::editor::Vec2{.x = value.x, .y = value.y};
 }
 
 bool pushButtonVariant(luna::editor::ButtonVariant variant)
@@ -184,6 +191,14 @@ luna::editor::UVec2 framebufferSizeForUi(luna::editor::Ui& ui, luna::editor::Vec
     return luna::editor::UVec2{
         .x = static_cast<uint32_t>((std::max)(size.x * scale_x, 0.0f)),
         .y = static_cast<uint32_t>((std::max)(size.y * scale_y, 0.0f)),
+    };
+}
+
+luna::editor::Vec2 resolveViewportDrawRegion(luna::editor::Vec2 available, luna::editor::Vec2 requested)
+{
+    return luna::editor::Vec2{
+        .x = requested.x > 0.0f ? requested.x : available.x,
+        .y = requested.y > 0.0f ? requested.y : available.y,
     };
 }
 
@@ -2418,8 +2433,55 @@ public:
     void drawDefaultSceneViewport(Ui& ui) override
     {
         if (m_editor_layer != nullptr) {
-            m_editor_layer->drawDefaultSceneViewport(ui);
+            m_editor_layer->drawDefaultSceneViewport(ui, currentOwnerId());
         }
+    }
+
+    SceneViewportDrawResult drawSceneViewport(Ui& ui,
+                                              ViewportId viewport_id,
+                                              SceneViewportDrawOptions options = {}) override
+    {
+        SceneViewportDrawResult result{};
+        const Vec2 available = ui.contentRegionAvail();
+        const Vec2 draw_region = resolveViewportDrawRegion(available, options.requested_size);
+        result.presentation = syncSceneViewport(viewport_id, framebufferSizeForUi(ui, draw_region));
+        if (!result.presentation.presentable || !result.presentation.scene_texture.valid()) {
+            return result;
+        }
+
+        result.drawn_size = fitTextureViewportDrawSize(result.presentation.scene_texture,
+                                                       draw_region,
+                                                       TextureViewportDrawOptions{
+                                                           .preserve_aspect = options.preserve_aspect,
+                                                           .fill_available = options.fill_available,
+                                                       });
+        if (result.drawn_size.x <= 0.0f || result.drawn_size.y <= 0.0f) {
+            return result;
+        }
+
+        result.drawn = ui.image(result.presentation.scene_texture, result.drawn_size);
+        if (result.drawn && m_editor_layer != nullptr) {
+            const ImVec2 item_min = ImGui::GetItemRectMin();
+            const ImVec2 item_max = ImGui::GetItemRectMax();
+            const bool item_hovered = ImGui::IsItemHovered();
+            const ViewportInteractionState& interaction = m_editor_layer->recordViewportSurfaceInteraction(
+                viewport_id,
+                currentOwnerId(),
+                ViewportInteractionInput{
+                    .rect = ViewportSurfaceRect{
+                        .min = toEditorVec2(item_min),
+                        .max = toEditorVec2(item_max),
+                    },
+                    .hovered = item_hovered,
+                    .active = ImGui::IsItemActive(),
+                    .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
+                    .double_clicked = item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
+                });
+            result.hovered = interaction.hovered;
+            result.clicked = interaction.clicked;
+            result.double_clicked = interaction.double_clicked;
+        }
+        return result;
     }
 
     ViewportId createTextureViewport(std::string_view debug_name = {}) override
@@ -2486,9 +2548,25 @@ public:
 
         result.drawn = ui.image(result.presentation.texture, result.drawn_size);
         if (result.drawn) {
-            result.hovered = ui.isItemHovered();
-            result.clicked = ui.isItemClicked(MouseButton::Left);
-            result.double_clicked = ui.isItemDoubleClicked(MouseButton::Left);
+            const ImVec2 item_min = ImGui::GetItemRectMin();
+            const ImVec2 item_max = ImGui::GetItemRectMax();
+            const bool item_hovered = ImGui::IsItemHovered();
+            const ViewportInteractionState& interaction = m_editor_layer->recordViewportSurfaceInteraction(
+                viewport_id,
+                currentOwnerId(),
+                ViewportInteractionInput{
+                    .rect = ViewportSurfaceRect{
+                        .min = toEditorVec2(item_min),
+                        .max = toEditorVec2(item_max),
+                    },
+                    .hovered = item_hovered,
+                    .active = ImGui::IsItemActive(),
+                    .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
+                    .double_clicked = item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
+                });
+            result.hovered = interaction.hovered;
+            result.clicked = interaction.clicked;
+            result.double_clicked = interaction.double_clicked;
         }
         return result;
     }
@@ -3461,6 +3539,22 @@ public:
     }
 };
 
+class EditorPluginDiagnosticsService final : public PluginService {
+public:
+    void setProvider(std::function<std::vector<PluginInfo>()> provider)
+    {
+        m_provider = std::move(provider);
+    }
+
+    std::vector<PluginInfo> plugins() const override
+    {
+        return m_provider ? m_provider() : std::vector<PluginInfo>{};
+    }
+
+private:
+    std::function<std::vector<PluginInfo>()> m_provider;
+};
+
 class EditorScriptPluginService final : public ScriptPluginService {
 public:
     explicit EditorScriptPluginService(ProjectService& project_service)
@@ -3932,6 +4026,7 @@ struct EditorShell::Impl {
           shortcut_service(command_service, current_plugin_owner_id),
           menu_service(command_service, shortcut_service, current_plugin_owner_id),
           plugin_asset_service(),
+          plugin_diagnostics_service(),
           script_plugin_service(project_service),
           script_service(project_service),
           window_service(shell, ui, current_plugin_owner_id)
@@ -3951,6 +4046,7 @@ struct EditorShell::Impl {
     EditorShortcutService shortcut_service;
     EditorMenuService menu_service;
     EditorPluginAssetService plugin_asset_service;
+    EditorPluginDiagnosticsService plugin_diagnostics_service;
     EditorScriptPluginService script_plugin_service;
     EditorScriptService script_service;
     EditorWindowService window_service;
@@ -4004,6 +4100,11 @@ MenuService& EditorShell::menus()
 PluginAssetService& EditorShell::pluginAssets()
 {
     return m_impl->plugin_asset_service;
+}
+
+PluginService& EditorShell::plugins()
+{
+    return m_impl->plugin_diagnostics_service;
 }
 
 ScriptPluginService& EditorShell::scriptPlugins()
@@ -4113,6 +4214,11 @@ void EditorShell::cleanupPluginContributions(std::string_view owner_id)
 ViewportId EditorShell::createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name)
 {
     return m_impl->viewport_service.createSceneViewportForOwner(debug_name, owner_id);
+}
+
+void EditorShell::setPluginInfoProvider(std::function<std::vector<PluginInfo>()> provider)
+{
+    m_impl->plugin_diagnostics_service.setProvider(std::move(provider));
 }
 
 void EditorShell::update(float delta_seconds)

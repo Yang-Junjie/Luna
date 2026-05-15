@@ -4,6 +4,7 @@
 #include "EditorEnginePaths.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "EditorApi/EditorPlugin.h"
+#include "EditorApi/EditorPluginService.h"
 #include "Platform/Common/DynamicLibrary.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
 
@@ -24,6 +25,13 @@ enum class EditorPluginRuntime {
     Lua,
 };
 
+enum class EditorPluginSource {
+    Unknown,
+    Official,
+    Installed,
+    Development,
+};
+
 struct EditorPluginPackage {
     std::string id;
     std::string display_name;
@@ -32,10 +40,25 @@ struct EditorPluginPackage {
     std::filesystem::path entry_path;
     std::filesystem::path resolved_entry_path;
     EditorPluginRuntime runtime{EditorPluginRuntime::BuiltinNative};
+    EditorPluginSource source{EditorPluginSource::Unknown};
     std::vector<std::string> dependencies;
     bool enabled{true};
     bool entry_exists{false};
     EditorBuiltinPluginFactory create;
+};
+
+enum class EditorPluginLoadState {
+    Registered,
+    Loaded,
+    Disabled,
+    Failed,
+};
+
+struct EditorPluginDiagnostic {
+    EditorPluginPackage package;
+    EditorPluginLoadState state{EditorPluginLoadState::Registered};
+    std::string status;
+    bool load_candidate{true};
 };
 
 class EditorPluginManager final {
@@ -48,11 +71,13 @@ public:
     void unloadAll();
 
     [[nodiscard]] const std::vector<EditorPluginPackage>& packages() const noexcept;
+    [[nodiscard]] std::vector<PluginInfo> pluginInfos() const;
 
 private:
-    bool loadPackage(EditorPluginPackage& package);
-    bool loadBuiltinPackage(EditorPluginPackage& package);
-    bool loadNativePackage(EditorPluginPackage& package);
+    bool loadPackage(EditorPluginPackage& package, std::string& failure_status);
+    bool loadBuiltinPackage(EditorPluginPackage& package, std::string& failure_status);
+    bool loadNativePackage(EditorPluginPackage& package, std::string& failure_status);
+    void rebuildDiagnosticPackages();
 
     struct NativePluginInstance {
         EditorPluginPackage package;
@@ -64,6 +89,7 @@ private:
 
     EditorShell& m_shell;
     std::vector<EditorPluginPackage> m_packages;
+    std::vector<EditorPluginDiagnostic> m_diagnostics;
     std::vector<NativePluginInstance> m_native_plugins;
 };
 

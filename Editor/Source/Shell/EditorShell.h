@@ -2,11 +2,14 @@
 
 #include "Asset/Asset.h"
 #include "EditorApi/EditorHost.h"
+#include "EditorApi/EditorPluginService.h"
 #include "EditorApi/EditorTypes.h"
 
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
 #include <memory>
+#include <vector>
 #include <string_view>
 
 namespace luna {
@@ -24,6 +27,7 @@ class CommandService;
 class HistoryService;
 class MenuService;
 class PluginAssetService;
+class PluginService;
 class ProjectService;
 class ScriptPluginService;
 class ScriptService;
@@ -45,6 +49,7 @@ public:
     HistoryService& history() override;
     MenuService& menus() override;
     PluginAssetService& pluginAssets() override;
+    PluginService& plugins() override;
     ProjectService& project() override;
     ScriptPluginService& scriptPlugins() override;
     ScriptService& scripts() override;
@@ -60,6 +65,7 @@ public:
     void registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path);
     void cleanupPluginContributions(std::string_view owner_id);
     ViewportId createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name);
+    void setPluginInfoProvider(std::function<std::vector<PluginInfo>()> provider);
     void update(float delta_seconds);
     bool dispatchShortcuts();
     void drawMenuItems(std::string_view menu_path);

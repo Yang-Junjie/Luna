@@ -291,20 +291,22 @@ private:
         const luna::editor::Vec2 available = ui.contentRegionAvail();
         const uint32_t width = static_cast<uint32_t>((std::max)(available.x, 256.0f));
         const uint32_t height = static_cast<uint32_t>((std::max)((std::min)(available.y, 260.0f), 180.0f));
-        const luna::editor::ViewportPresentation presentation =
-            host.viewport().syncSceneViewport(m_preview_viewport_id, luna::editor::UVec2{.x = width, .y = height});
+        const luna::editor::SceneViewportDrawResult result =
+            host.viewport().drawSceneViewport(ui,
+                                              m_preview_viewport_id,
+                                              luna::editor::SceneViewportDrawOptions{
+                                                  .requested_size = luna::editor::Vec2{
+                                                      .x = static_cast<float>(width),
+                                                      .y = static_cast<float>(height),
+                                                  },
+                                              });
 
-        if (!presentation.presentable || !presentation.scene_texture.valid()) {
+        if (!result.drawn) {
             ui.textDisabled("Viewport texture is not ready.");
             return;
         }
 
-        const luna::editor::Vec2 draw_size{
-            .x = static_cast<float>(presentation.framebuffer_size.x),
-            .y = static_cast<float>(presentation.framebuffer_size.y),
-        };
-        (void) ui.image(presentation.scene_texture, draw_size);
-        if (ui.isItemHovered()) {
+        if (result.hovered) {
             ui.setTooltip("This image is drawn from a plugin-owned viewport instance.");
         }
     }

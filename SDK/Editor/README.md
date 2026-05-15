@@ -23,7 +23,40 @@ find_package(LunaEditorSDK CONFIG REQUIRED)
 target_link_libraries(MyEditorPlugin PRIVATE Luna::EditorSDK)
 ```
 
-The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, and a minimal command/window/menu plugin using the C++ wrapper.
+The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a minimal command/window/menu/window-UI plugin using the C++ wrapper.
+
+## Minimal Native Plugin Flow
+
+1. Start from `Templates/NativePlugin`.
+2. Change the plugin ID in `editor-plugin.yaml` and `Source/NativeTemplatePlugin.cpp`.
+3. Build against an installed SDK:
+
+```powershell
+cmake -S . -B build -DCMAKE_PREFIX_PATH=<LunaEditorSDK install prefix>
+cmake --build build --config Debug
+```
+
+4. Run LunaEditor with the plugin package directory as a development root:
+
+```powershell
+LunaEditor.exe --editor-plugin-dir <path-to-NativePlugin>
+```
+
+You can also set `LUNA_EDITOR_PLUGIN_PATH`. It uses `;` on Windows and `:` on Linux/macOS.
+Installed editor plugins belong under `<EngineDataRoot>/Plugins/Editor/Installed/`. Game projects should not store editor plugin packages.
+
+The package directory is the unit of distribution:
+
+```text
+MyPlugin/
+  editor-plugin.yaml
+  CMakeLists.txt
+  Source/
+  assets/
+  Binaries/
+```
+
+Files in `assets/` are private editor-plugin files and should be accessed through `host.pluginAssets()`.
 
 Source-level `BuiltinNative` plugins are a separate integration path for plugins compiled with the editor source tree. They can register their factory with:
 

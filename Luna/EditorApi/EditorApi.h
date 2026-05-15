@@ -10,6 +10,7 @@
 #include "EditorApi/EditorProjectService.h"
 #include "EditorApi/EditorPlugin.h"
 #include "EditorApi/EditorPluginAssetService.h"
+#include "EditorApi/EditorPluginService.h"
 #include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorScriptService.h"
 #include "EditorApi/EditorRuntimeViewportService.h"

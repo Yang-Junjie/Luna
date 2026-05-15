@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <cstring>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -36,6 +38,86 @@ struct NativePluginContext {
 };
 
 namespace {
+
+PluginRuntimeKind toPluginRuntimeKind(EditorPluginRuntime runtime) noexcept
+{
+    switch (runtime) {
+        case EditorPluginRuntime::BuiltinNative:
+            return PluginRuntimeKind::BuiltinNative;
+        case EditorPluginRuntime::Native:
+            return PluginRuntimeKind::Native;
+        case EditorPluginRuntime::Lua:
+            return PluginRuntimeKind::Lua;
+    }
+
+    return PluginRuntimeKind::BuiltinNative;
+}
+
+PluginSourceKind toPluginSourceKind(EditorPluginSource source) noexcept
+{
+    switch (source) {
+        case EditorPluginSource::Official:
+            return PluginSourceKind::Official;
+        case EditorPluginSource::Installed:
+            return PluginSourceKind::Installed;
+        case EditorPluginSource::Development:
+            return PluginSourceKind::Development;
+        case EditorPluginSource::Unknown:
+            break;
+    }
+
+    return PluginSourceKind::Unknown;
+}
+
+PluginLoadState toPluginLoadState(EditorPluginLoadState state) noexcept
+{
+    switch (state) {
+        case EditorPluginLoadState::Registered:
+            return PluginLoadState::Registered;
+        case EditorPluginLoadState::Loaded:
+            return PluginLoadState::Loaded;
+        case EditorPluginLoadState::Disabled:
+            return PluginLoadState::Disabled;
+        case EditorPluginLoadState::Failed:
+            return PluginLoadState::Failed;
+    }
+
+    return PluginLoadState::Registered;
+}
+
+std::string joinDependencyList(const std::vector<std::string>& dependencies)
+{
+    std::string result;
+    for (const std::string& dependency : dependencies) {
+        if (!result.empty()) {
+            result += ", ";
+        }
+        result += dependency;
+    }
+    return result;
+}
+
+std::string dependencyFailureMessage(const EditorPluginPackage& package)
+{
+    std::string dependencies = joinDependencyList(package.dependencies);
+    if (dependencies.empty()) {
+        dependencies = "<none>";
+    }
+    return "Dependencies were not met: " + dependencies;
+}
+
+std::unordered_map<std::string, std::size_t> buildLoadDiagnosticIndex(
+    const std::vector<EditorPluginDiagnostic>& diagnostics)
+{
+    std::unordered_map<std::string, std::size_t> diagnostic_index_by_id;
+    for (std::size_t index = 0; index < diagnostics.size(); ++index) {
+        const EditorPluginDiagnostic& diagnostic = diagnostics[index];
+        if (diagnostic.load_candidate && !diagnostic.package.id.empty()) {
+            diagnostic_index_by_id.emplace(diagnostic.package.id, index);
+        }
+    }
+    return diagnostic_index_by_id;
+}
 
 std::string_view nativeString(const char* value) noexcept
 {
@@ -2454,6 +2536,12 @@ void EditorPluginManager::registerPackage(EditorPluginPackage package)
         return item.id == package.id;
     });
     if (existing != m_packages.end()) {
+        m_diagnostics.push_back(EditorPluginDiagnostic{
+            .package = package,
+            .state = EditorPluginLoadState::Failed,
+            .status = "Duplicate plugin id; using package from " + existing->root_path.string(),
+            .load_candidate = false,
+        });
         LUNA_EDITOR_WARN("Ignoring duplicate editor plugin package '{}' from '{}'; already using '{}'",
                          package.id,
                          package.root_path.string(),
@@ -2461,6 +2549,11 @@ void EditorPluginManager::registerPackage(EditorPluginPackage package)
         return;
     }
 
+    m_diagnostics.push_back(EditorPluginDiagnostic{
+        .package = package,
+        .state = package.enabled ? EditorPluginLoadState::Registered : EditorPluginLoadState::Disabled,
+        .status = package.enabled ? std::string("Registered") : std::string("Disabled by manifest"),
+    });
     m_packages.push_back(std::move(package));
 }
 
@@ -2469,6 +2562,24 @@ bool EditorPluginManager::loadRegisteredPackages()
     bool all_loaded = true;
     std::unordered_set<std::string> loaded_ids;
     std::vector<bool> attempted(m_packages.size(), false);
+    rebuildDiagnosticPackages();
+    const std::unordered_map<std::string, std::size_t> diagnostic_index_by_id = buildLoadDiagnosticIndex(m_diagnostics);
+    for (const EditorPluginPackage& package : m_packages) {
+        const auto diagnostic_it = diagnostic_index_by_id.find(package.id);
+        if (diagnostic_it == diagnostic_index_by_id.end()) {
+            continue;
+        }
+
+        EditorPluginDiagnostic& diagnostic = m_diagnostics[diagnostic_it->second];
+        diagnostic.state = diagnostic.package.enabled ? EditorPluginLoadState::Registered
+                                                      : EditorPluginLoadState::Disabled;
+        diagnostic.status = diagnostic.package.enabled ? std::string("Registered") : std::string("Disabled by manifest");
+    }
+    for (const EditorPluginDiagnostic& diagnostic : m_diagnostics) {
+        if (!diagnostic.load_candidate && diagnostic.state == EditorPluginLoadState::Failed) {
+            all_loaded = false;
+        }
+    }
 
     for (std::size_t loaded_count = 0; loaded_count < m_packages.size();) {
         bool progressed = false;
@@ -2479,7 +2590,19 @@ bool EditorPluginManager::loadRegisteredPackages()
             }
 
             EditorPluginPackage& package = m_packages[index];
+            const auto diagnostic_it = diagnostic_index_by_id.find(package.id);
+            if (diagnostic_it == diagnostic_index_by_id.end()) {
+                attempted[index] = true;
+                ++loaded_count;
+                all_loaded = false;
+                LUNA_EDITOR_WARN("Editor plugin package '{}' has no load diagnostic record", package.id);
+                continue;
+            }
+
+            EditorPluginDiagnostic& diagnostic = m_diagnostics[diagnostic_it->second];
             if (!package.enabled) {
+                diagnostic.state = EditorPluginLoadState::Disabled;
+                diagnostic.status = "Disabled by manifest";
                 attempted[index] = true;
                 ++loaded_count;
                 progressed = true;
@@ -2494,9 +2617,14 @@ bool EditorPluginManager::loadRegisteredPackages()
             ++loaded_count;
             progressed = true;
 
-            if (loadPackage(package)) {
+            std::string failure_status;
+            if (loadPackage(package, failure_status)) {
                 loaded_ids.insert(package.id);
+                diagnostic.state = EditorPluginLoadState::Loaded;
+                diagnostic.status = "Loaded";
             } else {
+                diagnostic.state = EditorPluginLoadState::Failed;
+                diagnostic.status = failure_status.empty() ? std::string("Load failed") : std::move(failure_status);
                 all_loaded = false;
             }
         }
@@ -2507,6 +2635,11 @@ bool EditorPluginManager::loadRegisteredPackages()
                     attempted[index] = true;
                     ++loaded_count;
                     all_loaded = false;
+                    if (const auto diagnostic_it = diagnostic_index_by_id.find(m_packages[index].id);
+                        diagnostic_it != diagnostic_index_by_id.end()) {
+                        m_diagnostics[diagnostic_it->second].state = EditorPluginLoadState::Failed;
+                        m_diagnostics[diagnostic_it->second].status = dependencyFailureMessage(m_packages[index]);
+                    }
                     LUNA_EDITOR_WARN("Editor plugin package '{}' could not load because dependencies were not met",
                                      m_packages[index].id);
                 }
@@ -2534,38 +2667,89 @@ const std::vector<EditorPluginPackage>& EditorPluginManager::packages() const no
     return m_packages;
 }
 
-bool EditorPluginManager::loadPackage(EditorPluginPackage& package)
+void EditorPluginManager::rebuildDiagnosticPackages()
+{
+    std::unordered_map<std::string, std::size_t> diagnostic_index_by_id = buildLoadDiagnosticIndex(m_diagnostics);
+
+    for (const EditorPluginPackage& package : m_packages) {
+        const auto diagnostic_it = diagnostic_index_by_id.find(package.id);
+        if (diagnostic_it == diagnostic_index_by_id.end()) {
+            m_diagnostics.push_back(EditorPluginDiagnostic{
+                .package = package,
+                .state = package.enabled ? EditorPluginLoadState::Registered : EditorPluginLoadState::Disabled,
+                .status = package.enabled ? std::string("Registered") : std::string("Disabled by manifest"),
+            });
+            diagnostic_index_by_id.emplace(package.id, m_diagnostics.size() - 1u);
+        } else {
+            EditorPluginDiagnostic& diagnostic = m_diagnostics[diagnostic_it->second];
+            diagnostic.package = package;
+            diagnostic.load_candidate = true;
+        }
+    }
+}
+
+std::vector<PluginInfo> EditorPluginManager::pluginInfos() const
+{
+    std::vector<PluginInfo> result;
+    result.reserve(m_diagnostics.size());
+    for (const EditorPluginDiagnostic& diagnostic : m_diagnostics) {
+        const EditorPluginPackage& package = diagnostic.package;
+        result.push_back(PluginInfo{
+            .id = package.id,
+            .display_name = package.display_name,
+            .version = package.version,
+            .runtime = toPluginRuntimeKind(package.runtime),
+            .source = toPluginSourceKind(package.source),
+            .state = toPluginLoadState(diagnostic.state),
+            .root_path = package.root_path,
+            .entry_path = package.entry_path,
+            .resolved_entry_path = package.resolved_entry_path,
+            .dependencies = package.dependencies,
+            .enabled = package.enabled,
+            .entry_exists = package.entry_exists,
+            .status = diagnostic.status,
+        });
+    }
+    return result;
+}
+
+bool EditorPluginManager::loadPackage(EditorPluginPackage& package, std::string& failure_status)
 {
     switch (package.runtime) {
         case EditorPluginRuntime::BuiltinNative:
-            return loadBuiltinPackage(package);
+            return loadBuiltinPackage(package, failure_status);
         case EditorPluginRuntime::Native:
-            return loadNativePackage(package);
+            return loadNativePackage(package, failure_status);
         case EditorPluginRuntime::Lua:
+            failure_status = "Lua editor plugin loading is not implemented yet";
             LUNA_EDITOR_WARN("Editor plugin package '{}' resolved entry '{}' but Lua editor plugin loading is not implemented yet",
                              package.id,
                              package.resolved_entry_path.string());
             return false;
     }
 
+    failure_status = "Unsupported editor plugin runtime";
     return false;
 }
 
-bool EditorPluginManager::loadBuiltinPackage(EditorPluginPackage& package)
+bool EditorPluginManager::loadBuiltinPackage(EditorPluginPackage& package, std::string& failure_status)
 {
     if (!package.create) {
+        failure_status = "Builtin plugin factory was not registered";
         LUNA_EDITOR_WARN("Editor plugin package '{}' has no factory", package.id);
         return false;
     }
 
     std::unique_ptr<Plugin> plugin = package.create();
     if (!plugin) {
+        failure_status = "Builtin plugin factory returned null";
         LUNA_EDITOR_WARN("Editor plugin package '{}' factory returned null", package.id);
         return false;
     }
 
     const PluginDescriptor descriptor = plugin->descriptor();
     if (descriptor.id != package.id) {
+        failure_status = "Plugin descriptor id '" + descriptor.id + "' does not match package id";
         LUNA_EDITOR_WARN("Editor plugin package id '{}' does not match plugin descriptor id '{}'",
                          package.id,
                          descriptor.id);
@@ -2573,19 +2757,22 @@ bool EditorPluginManager::loadBuiltinPackage(EditorPluginPackage& package)
     }
 
     if (!m_shell.loadPlugin(std::move(plugin), package.root_path)) {
+        failure_status = "EditorShell rejected the builtin plugin";
         return false;
     }
 
     return true;
 }
 
-bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
+bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package, std::string& failure_status)
 {
     if (package.resolved_entry_path.empty()) {
+        failure_status = "Native plugin has no resolved entry path";
         LUNA_EDITOR_WARN("Native editor plugin '{}' has no resolved entry path", package.id);
         return false;
     }
     if (!package.entry_exists) {
+        failure_status = "Native plugin entry does not exist: " + package.resolved_entry_path.string();
         LUNA_EDITOR_WARN("Native editor plugin '{}' entry '{}' does not exist",
                          package.id,
                          package.resolved_entry_path.string());
@@ -2594,12 +2781,14 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
 
     std::shared_ptr<DynamicLibrary> library = DynamicLibrary::load(package.resolved_entry_path);
     if (!library) {
+        failure_status = "Failed to load native plugin library: " + package.resolved_entry_path.string();
         return false;
     }
 
     auto* create_plugin_fn =
         reinterpret_cast<LunaCreateEditorPluginFn>(library->findSymbol(LUNA_EDITOR_CREATE_PLUGIN_SYMBOL));
     if (create_plugin_fn == nullptr) {
+        failure_status = "Native plugin does not export " + std::string(LUNA_EDITOR_CREATE_PLUGIN_SYMBOL);
         LUNA_EDITOR_WARN("Native editor plugin '{}' does not export {}", package.id, LUNA_EDITOR_CREATE_PLUGIN_SYMBOL);
         return false;
     }
@@ -2639,11 +2828,15 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
     };
 
     if (create_plugin_fn(LUNA_EDITOR_HOST_API_VERSION, instance.host_api.get(), &instance.plugin_api) == 0) {
+        failure_status = "Native plugin failed to initialize its plugin API";
         LUNA_EDITOR_WARN("Native editor plugin '{}' failed to initialize its plugin API", package.id);
         cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.struct_size != sizeof(LunaEditorPluginApi)) {
+        failure_status = "Native plugin API struct size mismatch: got " +
+                         std::to_string(instance.plugin_api.struct_size) + ", expected " +
+                         std::to_string(sizeof(LunaEditorPluginApi));
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned plugin API struct size {} but editor expects {}",
                          package.id,
                          instance.plugin_api.struct_size,
@@ -2652,6 +2845,9 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
         return false;
     }
     if (instance.plugin_api.api_version != LUNA_EDITOR_PLUGIN_API_VERSION) {
+        failure_status = "Native plugin API version mismatch: got " +
+                         std::to_string(instance.plugin_api.api_version) + ", expected " +
+                         std::to_string(LUNA_EDITOR_PLUGIN_API_VERSION);
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned API version {} but editor expects {}",
                          package.id,
                          instance.plugin_api.api_version,
@@ -2660,11 +2856,14 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
         return false;
     }
     if (instance.plugin_api.plugin_id == nullptr || instance.plugin_api.plugin_id[0] == '\0') {
+        failure_status = "Native plugin returned an empty plugin_id";
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned an empty plugin_id", package.id);
         cleanup_failed_load();
         return false;
     }
     if (package.id != instance.plugin_api.plugin_id) {
+        failure_status = "Native plugin API id '" + std::string(instance.plugin_api.plugin_id) +
+                         "' does not match package id";
         LUNA_EDITOR_WARN("Native editor plugin package id '{}' does not match plugin API id '{}'",
                          package.id,
                          instance.plugin_api.plugin_id);
@@ -2672,11 +2871,13 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
         return false;
     }
     if (instance.plugin_api.on_load == nullptr || instance.plugin_api.on_unload == nullptr) {
+        failure_status = "Native plugin must provide on_load and on_unload callbacks";
         LUNA_EDITOR_WARN("Native editor plugin '{}' must provide on_load and on_unload callbacks", package.id);
         cleanup_failed_load();
         return false;
     }
     if (instance.plugin_api.on_load(instance.plugin_api.plugin_user_data, instance.host_api.get()) == 0) {
+        failure_status = "Native plugin on_load returned failure";
         LUNA_EDITOR_WARN("Native editor plugin '{}' on_load failed", package.id);
         cleanup_failed_load();
         return false;

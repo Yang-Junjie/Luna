@@ -49,6 +49,9 @@ set(LUNA_SDK_TEMPLATE_SOURCE_DIR "${LUNA_SDK_INSTALL_DIR}/share/LunaEditorSDK/Te
 if(NOT EXISTS "${LUNA_SDK_TEMPLATE_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "Installed SDK native template is missing: ${LUNA_SDK_TEMPLATE_SOURCE_DIR}")
 endif()
+if(NOT EXISTS "${LUNA_SDK_TEMPLATE_SOURCE_DIR}/assets/welcome.txt")
+    message(FATAL_ERROR "Installed SDK native template is missing assets/welcome.txt")
+endif()
 
 set(LUNA_TEMPLATE_CONFIGURE_ARGS
     -S "${LUNA_SDK_TEMPLATE_SOURCE_DIR}"

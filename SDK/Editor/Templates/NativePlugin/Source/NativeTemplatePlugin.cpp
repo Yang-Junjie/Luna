@@ -1,5 +1,6 @@
 #include "Luna/Editor/Native/NativePlugin.h"
 
+#include <cstddef>
 #include <cstdio>
 
 namespace {
@@ -13,7 +14,10 @@ constexpr const char* kWindowId = "com.example.native-template.window";
 constexpr const char* kCommandId = "com.example.native-template.open";
 
 struct NativeTemplateState {
+    int enabled{1};
     int click_count{0};
+    char label[96]{"Native template state"};
+    char asset_note[256]{};
 };
 
 NativeTemplateState g_state{};
@@ -50,8 +54,11 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     }
 
     ui.text("Native editor plugin template");
-    ui.textDisabled("This window uses Luna/Editor/Native C++ wrappers over EditorNativePluginApi.h.");
+    ui.textDisabled("This window uses only the Luna editor native SDK wrapper.");
     ui.separator();
+
+    ui.checkbox("Enabled", &state->enabled);
+    ui.inputTextWithHint("Label", "Plugin-local text", state->label, sizeof(state->label));
 
     if (ui.button("Run Tool Action", native::fillWidth(), LunaEditorButtonVariant_Primary)) {
         ++state->click_count;
@@ -61,6 +68,23 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     char counter_text[64]{};
     std::snprintf(counter_text, sizeof(counter_text), "Actions: %d", state->click_count);
     ui.text(counter_text);
+
+    ui.separatorText("Plugin Asset");
+    if (state->asset_note[0] == '\0') {
+        size_t required_size = 0;
+        if (host.pluginAssets().readText("welcome.txt", nullptr, 0, &required_size) && required_size > 0) {
+            (void) host.pluginAssets().readText("welcome.txt",
+                                                state->asset_note,
+                                                sizeof(state->asset_note),
+                                                &required_size);
+        }
+    }
+
+    if (state->asset_note[0] != '\0') {
+        ui.textWrapped(state->asset_note);
+    } else {
+        ui.textDisabled("Plugin asset assets/welcome.txt was not found.");
+    }
 }
 
 int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
@@ -71,8 +95,9 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
         return 0;
     }
 
-    if (!host.commands().canRegister() || !host.windows().canRegister() || !host.menus().canAdd()) {
-        host.log().error("Native template requires command, window, and menu APIs.");
+    if (!host.commands().canRegister() || !host.windows().canRegister() || !host.menus().canAdd() ||
+        host.pluginAssets().native() == nullptr) {
+        host.log().error("Native template requires command, window, menu, and plugin asset APIs.");
         return 0;
     }
 

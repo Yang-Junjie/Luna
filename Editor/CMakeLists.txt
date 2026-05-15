@@ -33,6 +33,8 @@ add_executable(
     Source/Viewport/TextureViewportInstance.cpp
     Source/Viewport/TextureViewportInstanceManager.h
     Source/Viewport/TextureViewportInstanceManager.cpp
+    Source/Viewport/ViewportInteraction.h
+    Source/Viewport/ViewportInteraction.cpp
     Source/Viewport/ViewportSurface.h
     Source/Viewport/ViewportSurface.cpp
     Source/LunaEditorApp.h

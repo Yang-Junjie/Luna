@@ -35,6 +35,14 @@ void attachBuiltinFactories(std::vector<luna::editor::EditorPluginPackage>& pack
     }
 }
 
+void setPackageSource(std::vector<luna::editor::EditorPluginPackage>& packages,
+                      luna::editor::EditorPluginSource source)
+{
+    for (luna::editor::EditorPluginPackage& package : packages) {
+        package.source = source;
+    }
+}
+
 void appendPackages(std::vector<luna::editor::EditorPluginPackage>& packages,
                     std::vector<luna::editor::EditorPluginPackage> discovered)
 {
@@ -54,16 +62,20 @@ std::vector<EditorPluginPackage> createEditorPluginPackages(const EditorEnginePa
 
     for (const std::filesystem::path& root : engine_paths.official_editor_plugin_roots) {
         std::vector<EditorPluginPackage> official_packages = manifest_loader.loadPackagesFromRoot(root);
+        setPackageSource(official_packages, EditorPluginSource::Official);
         attachBuiltinFactories(official_packages);
         appendPackages(packages, std::move(official_packages));
     }
 
     for (const std::filesystem::path& root : engine_paths.installed_editor_plugin_roots) {
-        appendPackages(packages, manifest_loader.loadPackagesFromRoot(root));
+        std::vector<EditorPluginPackage> installed_packages = manifest_loader.loadPackagesFromRoot(root);
+        setPackageSource(installed_packages, EditorPluginSource::Installed);
+        appendPackages(packages, std::move(installed_packages));
     }
 
     for (const std::filesystem::path& root : engine_paths.development_editor_plugin_roots) {
         std::vector<EditorPluginPackage> development_packages = manifest_loader.loadPackagesFromRoot(root);
+        setPackageSource(development_packages, EditorPluginSource::Development);
         for (const std::filesystem::path& official_root : engine_paths.official_editor_plugin_roots) {
             development_packages.erase(std::remove_if(development_packages.begin(),
                                                       development_packages.end(),

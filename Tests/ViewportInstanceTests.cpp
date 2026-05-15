@@ -1,4 +1,5 @@
 #include "Viewport/TextureViewportInstance.h"
+#include "Viewport/ViewportInteraction.h"
 #include "Viewport/ViewportSurface.h"
 
 #include <iostream>
@@ -88,6 +89,78 @@ void testTextureViewportPresentation(TestContext& context)
     context.expect(!viewport.presentation().texture.valid(), "cleared texture viewport should clear texture");
 }
 
+void testViewportInteractionTopmostHover(TestContext& context)
+{
+    luna::ViewportInteractionTracker tracker;
+    tracker.beginFrame();
+
+    const luna::ViewportInteractionInput base_input{
+        .rect =
+            luna::ViewportSurfaceRect{
+                .min = luna::editor::Vec2{.x = 0.0f, .y = 0.0f},
+                .max = luna::editor::Vec2{.x = 100.0f, .y = 100.0f},
+            },
+        .hovered = true,
+        .clicked = true,
+    };
+
+    tracker.recordSurface(10u, "base", base_input);
+    context.expect(tracker.isHovered(10u), "first hovered viewport should own hover");
+    context.expect(tracker.isClicked(10u), "first hovered viewport should own click");
+
+    tracker.recordSurface(20u,
+                          "overlay",
+                          luna::ViewportInteractionInput{
+                              .rect =
+                                  luna::ViewportSurfaceRect{
+                                      .min = luna::editor::Vec2{.x = 10.0f, .y = 10.0f},
+                                      .max = luna::editor::Vec2{.x = 80.0f, .y = 80.0f},
+                                  },
+                              .hovered = true,
+                              .clicked = true,
+                          });
+
+    context.expect(!tracker.isHovered(10u), "later hovered viewport should block lower hover");
+    context.expect(!tracker.isClicked(10u), "later hovered viewport should block lower click");
+    context.expect(tracker.isHovered(20u), "later hovered viewport should own hover");
+    context.expect(tracker.isClicked(20u), "later hovered viewport should own click");
+
+    tracker.beginFrame();
+    context.expect(!tracker.isHovered(20u), "beginFrame should clear transient hover");
+    context.expect(!tracker.isClicked(20u), "beginFrame should clear transient click");
+}
+
+void testViewportInteractionCapture(TestContext& context)
+{
+    luna::ViewportInteractionTracker tracker;
+    tracker.recordSurface(30u, "viewport", luna::ViewportInteractionInput{});
+    context.expect(!tracker.allowsInput(30u), "non-hovered viewport should not accept input");
+
+    tracker.setMouseCapture(30u, true);
+    context.expect(tracker.hasMouseCapture(30u), "captured viewport should expose capture");
+    context.expect(tracker.allowsInput(30u), "captured viewport should accept input without hover");
+
+    tracker.beginFrame();
+    context.expect(tracker.allowsInput(30u), "beginFrame should preserve capture");
+
+    tracker.setMouseCapture(30u, false);
+    context.expect(!tracker.hasMouseCapture(30u), "released viewport should clear capture");
+    context.expect(!tracker.allowsInput(30u), "released non-hovered viewport should stop accepting input");
+}
+
+void testViewportInteractionOwnerCleanup(TestContext& context)
+{
+    luna::ViewportInteractionTracker tracker;
+    tracker.recordSurface(40u, "owner.a", luna::ViewportInteractionInput{.hovered = true});
+    tracker.recordSurface(41u, "owner.b", luna::ViewportInteractionInput{.hovered = true});
+    tracker.setMouseCapture(40u, true);
+
+    tracker.clearOwner("owner.a");
+    context.expect(tracker.find(40u) == nullptr, "owner cleanup should remove matching viewport interaction");
+    context.expect(tracker.find(41u) != nullptr, "owner cleanup should keep other owner interactions");
+    context.expect(tracker.capturedViewport() != 40u, "owner cleanup should clear matching capture");
+}
+
 } // namespace
 
 int main()
@@ -95,5 +168,8 @@ int main()
     TestContext context;
     testViewportSurfaceState(context);
     testTextureViewportPresentation(context);
+    testViewportInteractionTopmostHover(context);
+    testViewportInteractionCapture(context);
+    testViewportInteractionOwnerCleanup(context);
     return context.result();
 }

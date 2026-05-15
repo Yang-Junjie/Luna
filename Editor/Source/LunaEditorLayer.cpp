@@ -37,6 +37,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <ImGuizmo.h>
 #include <imgui.h>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -50,6 +51,8 @@ namespace {
 constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
 constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr float kUiScaleChangeThreshold = 0.01f;
+constexpr luna::editor::ViewportId kRuntimeSceneViewportId =
+    (std::numeric_limits<luna::editor::ViewportId>::max)();
 
 struct RenderDebugModeItem {
     luna::RenderDebugViewMode engine_mode;
@@ -92,6 +95,11 @@ constexpr std::array<RenderDebugModeItem, 19> kRenderDebugModes{{
 std::string toOwnedString(std::string_view value)
 {
     return std::string(value.data(), value.size());
+}
+
+luna::editor::Vec2 toEditorVec2(const ImVec2& value) noexcept
+{
+    return luna::editor::Vec2{.x = value.x, .y = value.y};
 }
 
 luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexcept
@@ -549,6 +557,9 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_plugin_manager = std::make_unique<editor::EditorPluginManager>(*m_editor_shell);
+    m_editor_shell->setPluginInfoProvider([this]() {
+        return m_editor_plugin_manager ? m_editor_plugin_manager->pluginInfos() : std::vector<editor::PluginInfo>{};
+    });
     for (auto& package : editor::createEditorPluginPackages(application.enginePaths())) {
         m_editor_plugin_manager->registerPackage(std::move(package));
     }
@@ -594,6 +605,7 @@ void LunaEditorLayer::onDetach()
     endRuntimeViewport();
     m_viewport_instances.clearPluginViewports(m_application->getRenderer());
     m_texture_viewport_instances.clearViewports();
+    m_viewport_interactions.clear();
     activeSceneViewportInstance().resetRenderer(m_application->getRenderer());
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
 }
@@ -607,17 +619,20 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     }
     consumePendingScenePick();
     setRuntimeViewportEnabled(m_runtime_viewport_requested);
+    syncDefaultViewportMouseCapture();
 
     const bool allow_editor_camera = !m_runtime_viewport_enabled &&
-                                     (m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
+                                     isViewportInputAllowed(defaultSceneViewportId()) &&
                                      !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
     if (!m_runtime_viewport_enabled) {
         m_editor_camera.onUpdate(dt);
+        syncDefaultViewportMouseCapture();
         activeRenderScene().renderFromEditorCamera(m_editor_camera.getCamera());
     } else {
         m_editor_camera.releaseMouseCapture();
         m_editor_camera.setInputEnabled(false);
+        syncDefaultViewportMouseCapture();
         if (m_runtime_scene_runtime) {
             m_runtime_scene_runtime->update(dt);
         }
@@ -630,7 +645,8 @@ void LunaEditorLayer::onEvent(Event& event)
         return;
     }
 
-    if ((m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing()) {
+    syncDefaultViewportMouseCapture();
+    if (isViewportInputAllowed(defaultSceneViewportId()) && !ImGuizmo::IsUsing()) {
         m_editor_camera.onEvent(event);
     }
 }
@@ -643,12 +659,12 @@ void LunaEditorLayer::onImGuiRender()
 
     syncEditorUiScale();
     ImGuizmo::BeginFrame();
+    m_viewport_interactions.beginFrame();
     updateEditorShortcuts();
 
     drawDockSpace();
 
     m_viewport_focused = false;
-    m_viewport_hovered = false;
     if (m_editor_shell) {
         m_editor_shell->drawWindows();
     }
@@ -809,7 +825,7 @@ void LunaEditorLayer::updateEditorShortcuts()
     }
 }
 
-void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
+void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui, std::string_view owner_id)
 {
     if (m_application == nullptr) {
         return;
@@ -818,7 +834,6 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
     auto& renderer = m_application->getRenderer();
 
     m_viewport_focused = ImGui::IsWindowFocused();
-    m_viewport_hovered = false;
     updateGizmoShortcuts();
 
     const editor::Vec2 available = ui.contentRegionAvail();
@@ -832,9 +847,11 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
     if (!m_runtime_viewport_enabled) {
         m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
     }
-    const auto& viewport_state = activeSceneViewportInstance().sync(renderer, viewport_width, viewport_height);
+    SceneViewportInstance& active_viewport = activeSceneViewportInstance();
+    const editor::ViewportId active_viewport_id = activeSceneViewportId();
+    const auto& viewport_state = active_viewport.sync(renderer, viewport_width, viewport_height);
 
-    const auto& scene_texture = renderer.getSceneOutputTexture();
+    const auto& scene_texture = renderer.getSceneViewportOutputTexture(active_viewport.rendererViewportHandle(renderer));
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
         const bool flip_uv_y = viewport_state.y_flip;
@@ -845,13 +862,26 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
         const ImVec2 viewport_max = ImGui::GetItemRectMax();
         const ImVec2 viewport_size = ImGui::GetItemRectSize();
-        const bool viewport_image_hovered = ImGui::IsItemHovered();
-        m_viewport_hovered = viewport_image_hovered;
+        const bool viewport_item_hovered = ImGui::IsItemHovered();
+        const ViewportInteractionState& interaction = recordViewportSurfaceInteraction(
+            active_viewport_id,
+            owner_id,
+            ViewportInteractionInput{
+                .rect = ViewportSurfaceRect{
+                    .min = toEditorVec2(viewport_min),
+                    .max = toEditorVec2(viewport_max),
+                },
+                .hovered = viewport_item_hovered,
+                .active = ImGui::IsItemActive(),
+                .clicked = viewport_item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
+                .double_clicked = viewport_item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
+            });
 
-        const bool allow_gizmo_interaction = viewport_image_hovered || m_gizmo_transform_transaction_active;
+        const bool allow_gizmo_interaction =
+            isViewportInputAllowed(active_viewport_id) || m_gizmo_transform_transaction_active;
         const bool gizmo_active = !m_runtime_viewport_enabled &&
                                   drawViewportGizmo(viewport_min, viewport_size, allow_gizmo_interaction);
-        if (viewport_image_hovered && !gizmo_active) {
+        if (interaction.clicked && !gizmo_active) {
             if (!m_runtime_viewport_enabled) {
                 requestViewportPick(
                     viewport_min,
@@ -1394,6 +1424,7 @@ void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
 
     if (m_viewport_instances.destroyViewport(viewport_id, m_application->getRenderer())) {
         m_viewport_owner_by_id.erase(viewport_id);
+        m_viewport_interactions.clearViewport(viewport_id);
     }
 }
 
@@ -1471,6 +1502,11 @@ editor::TextureView LunaEditorLayer::getSceneTextureView() const
     return getSceneTextureView(defaultSceneViewportId());
 }
 
+editor::ViewportId LunaEditorLayer::activeSceneViewportId() const noexcept
+{
+    return m_runtime_viewport_enabled ? kRuntimeSceneViewportId : defaultSceneViewportId();
+}
+
 editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view)
 {
     return createTextureViewport({}, {});
@@ -1492,6 +1528,7 @@ void LunaEditorLayer::destroyTextureViewport(editor::ViewportId viewport_id)
 {
     if (m_texture_viewport_instances.destroyViewport(viewport_id)) {
         m_viewport_owner_by_id.erase(viewport_id);
+        m_viewport_interactions.clearViewport(viewport_id);
     }
 }
 
@@ -1542,6 +1579,25 @@ void LunaEditorLayer::destroyViewportsForOwner(std::string_view owner_id)
             destroySceneViewport(viewport_id);
         }
     }
+    m_viewport_interactions.clearOwner(owner_id);
+}
+
+const ViewportInteractionState& LunaEditorLayer::recordViewportSurfaceInteraction(
+    editor::ViewportId viewport_id,
+    std::string_view owner_id,
+    const ViewportInteractionInput& input)
+{
+    return m_viewport_interactions.recordSurface(viewport_id, owner_id, input);
+}
+
+bool LunaEditorLayer::isViewportInputAllowed(editor::ViewportId viewport_id) const noexcept
+{
+    return m_viewport_interactions.allowsInput(viewport_id);
+}
+
+void LunaEditorLayer::syncDefaultViewportMouseCapture() noexcept
+{
+    m_viewport_interactions.setMouseCapture(defaultSceneViewportId(), m_editor_camera.isMouseCaptured());
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
@@ -1957,6 +2013,7 @@ void LunaEditorLayer::endRuntimeViewport()
     m_runtime_document_context.setRunning(false);
     m_runtime_scene.reset();
     m_runtime_viewport_enabled = false;
+    m_viewport_interactions.clearViewport(kRuntimeSceneViewportId);
     LUNA_EDITOR_INFO("Runtime viewport stopped");
 }
 
@@ -1979,6 +2036,7 @@ editor::ViewportId LunaEditorLayer::allocateViewportId() noexcept
 {
     editor::ViewportId viewport_id = m_next_viewport_id++;
     while (viewport_id == editor::kInvalidViewportId || viewport_id == editor::kDefaultViewportId ||
+           viewport_id == kRuntimeSceneViewportId ||
            m_viewport_instances.isViewportValid(viewport_id) ||
            m_texture_viewport_instances.isViewportValid(viewport_id)) {
         viewport_id = m_next_viewport_id++;

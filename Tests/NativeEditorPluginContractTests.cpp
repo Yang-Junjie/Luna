@@ -1777,10 +1777,18 @@ void testEditorPluginPackageRootContract(TestContext& context)
     paths.development_editor_plugin_roots.push_back(engine_root / "Plugins" / "Editor" / "MissingDev");
 
     const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
-    context.expect(findPackage(packages, "luna.test.installed-native") != nullptr,
-                   "installed editor plugin root should contribute packages");
-    context.expect(findPackage(packages, "luna.test.dev-native") != nullptr,
-                   "development editor plugin root should contribute packages");
+    const luna::editor::EditorPluginPackage* installed_package = findPackage(packages, "luna.test.installed-native");
+    const luna::editor::EditorPluginPackage* development_package = findPackage(packages, "luna.test.dev-native");
+    context.expect(installed_package != nullptr, "installed editor plugin root should contribute packages");
+    context.expect(development_package != nullptr, "development editor plugin root should contribute packages");
+    if (installed_package != nullptr) {
+        context.expect(installed_package->source == luna::editor::EditorPluginSource::Installed,
+                       "installed editor plugin package should record installed source");
+    }
+    if (development_package != nullptr) {
+        context.expect(development_package->source == luna::editor::EditorPluginSource::Development,
+                       "development editor plugin package should record development source");
+    }
 }
 
 } // namespace

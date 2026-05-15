@@ -11,6 +11,7 @@
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Scene/SceneRuntime.h"
+#include "Viewport/ViewportInteraction.h"
 #include "Viewport/SceneViewportInstanceManager.h"
 #include "Viewport/TextureViewportInstanceManager.h"
 #include "Script/ScriptPluginManifest.h"
@@ -117,6 +118,7 @@ public:
     editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
     editor::TextureView getSceneTextureView(editor::ViewportId viewport_id) const;
     editor::TextureView getSceneTextureView() const;
+    editor::ViewportId activeSceneViewportId() const noexcept;
     editor::ViewportId createTextureViewport(std::string_view debug_name = {});
     editor::ViewportId createTextureViewport(std::string_view debug_name, std::string_view owner_id);
     void destroyTextureViewport(editor::ViewportId viewport_id);
@@ -126,7 +128,11 @@ public:
                                                             editor::UVec2 framebuffer_size);
     editor::TextureViewportPresentation textureViewportPresentation(editor::ViewportId viewport_id) const;
     void destroyViewportsForOwner(std::string_view owner_id);
-    void drawDefaultSceneViewport(editor::Ui& ui);
+    void drawDefaultSceneViewport(editor::Ui& ui, std::string_view owner_id = {});
+    const ViewportInteractionState& recordViewportSurfaceInteraction(editor::ViewportId viewport_id,
+                                                                     std::string_view owner_id,
+                                                                     const ViewportInteractionInput& input);
+    bool isViewportInputAllowed(editor::ViewportId viewport_id) const noexcept;
     UUID getSelectedEntityId() const noexcept;
     Entity getSelectedEntity() override;
     void setSelectedEntity(Entity entity) override;
@@ -205,6 +211,7 @@ private:
     bool saveSceneAs(const std::filesystem::path& scene_file_path);
     bool undo();
     bool redo();
+    void syncDefaultViewportMouseCapture() noexcept;
 
     std::filesystem::path sceneDialogDefaultPath() const;
     void updateSceneLabel();
@@ -225,7 +232,6 @@ private:
     std::string m_asset_label{"No scene loaded"};
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
-    bool m_viewport_hovered{false};
     bool m_show_editor_grid{true};
     bool m_gizmo_transform_transaction_active{false};
     float m_editor_ui_scale{0.0f};
@@ -236,6 +242,7 @@ private:
     GizmoMode m_gizmo_mode{GizmoMode::Local};
     SceneViewportInstanceManager m_viewport_instances;
     TextureViewportInstanceManager m_texture_viewport_instances;
+    ViewportInteractionTracker m_viewport_interactions;
     editor::ViewportId m_next_viewport_id{editor::kDefaultViewportId + 1u};
     std::unordered_map<editor::ViewportId, std::string> m_viewport_owner_by_id;
     std::unique_ptr<editor::EditorShell> m_editor_shell;

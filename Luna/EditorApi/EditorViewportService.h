@@ -16,6 +16,21 @@ struct ViewportPresentation {
     bool presentable{false};
 };
 
+struct SceneViewportDrawOptions {
+    bool preserve_aspect{true};
+    bool fill_available{true};
+    Vec2 requested_size{};
+};
+
+struct SceneViewportDrawResult {
+    ViewportPresentation presentation;
+    Vec2 drawn_size{};
+    bool drawn{false};
+    bool hovered{false};
+    bool clicked{false};
+    bool double_clicked{false};
+};
+
 struct TextureViewportPresentation {
     TextureView texture;
     UVec2 framebuffer_size{};
@@ -50,6 +65,9 @@ public:
     virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView() const = 0;
     virtual void drawDefaultSceneViewport(Ui& ui) = 0;
+    virtual SceneViewportDrawResult drawSceneViewport(Ui& ui,
+                                                      ViewportId viewport_id,
+                                                      SceneViewportDrawOptions options = {}) = 0;
 
     virtual ViewportId createTextureViewport(std::string_view debug_name = {}) = 0;
     virtual void destroyTextureViewport(ViewportId viewport_id) = 0;
