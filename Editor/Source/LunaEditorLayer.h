@@ -183,7 +183,7 @@ private:
     void onImGuiMenuBar();
     void updateEditorShortcuts();
     void updateGizmoShortcuts();
-    bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size);
+    bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size, bool allow_interaction);
     void resetEditorState();
     void setRuntimeViewportEnabled(bool enabled);
     void beginRuntimeViewport();

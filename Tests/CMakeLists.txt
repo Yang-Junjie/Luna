@@ -6,6 +6,9 @@ add_executable(
 add_executable(
     NativeEditorPluginContractTests
     NativeEditorPluginContractTests.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/EditorEnginePaths.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginDiscovery.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorBuiltinPluginRegistry.cpp
     ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManifest.cpp
     ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginDependencyResolver.cpp
 )
@@ -345,3 +348,26 @@ add_test(
     COMMAND ViewportInstanceTests
 )
 luna_set_test_properties(ViewportInstanceTests 20 "quick;unit;editor;viewport")
+
+add_test(
+    NAME EditorSdkNativeTemplateContract
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DLUNA_BINARY_DIR=${PROJECT_BINARY_DIR}"
+        "-DLUNA_SDK_CONTRACT_ROOT=${CMAKE_CURRENT_BINARY_DIR}/EditorSdkNativeTemplateContract"
+        -DLUNA_TEST_CONFIGURATION=$<CONFIG>
+        "-DLUNA_CMAKE_GENERATOR=${CMAKE_GENERATOR}"
+        "-DLUNA_CMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+        "-DLUNA_CMAKE_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/EditorSdkNativeTemplateContract.cmake"
+)
+luna_set_test_properties(EditorSdkNativeTemplateContract 120 "sdk;contract;editor;plugin")
+
+add_test(
+    NAME EditorPluginBoundaryContract
+    COMMAND
+        ${CMAKE_COMMAND}
+        "-DLUNA_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/EditorPluginBoundaryContract.cmake"
+)
+luna_set_test_properties(EditorPluginBoundaryContract 20 "quick;sdk;contract;editor;plugin")

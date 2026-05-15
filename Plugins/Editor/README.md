@@ -6,6 +6,7 @@ Editor plugins placed here are not game project content. Runtime scripting backe
 
 - `Official` contains the default Luna editor plugins. They are still `Runtime: BuiltinNative` source plugins compiled into `LunaEditor`, but they use the same package layout and public `Luna/EditorApi` plus `SDK/Editor` surface as user plugins.
 - `ExampleTool` is a source-level `BuiltinNative` editor plugin compiled into `LunaEditor`.
+- `HighFreedomSample` is a source-level `BuiltinNative` sample that demonstrates a plugin-owned workflow using commands, menus, windows, plugin assets, scene/selection APIs, project assets, and a plugin-owned viewport.
 - `NativeSample` is a dynamic `Runtime: Native` editor plugin that validates the v1 C ABI, command/window registration, and `EditorUi` drawing. It now builds through the SDK target, matching the standalone SDK direction.
 
 Each plugin directory now owns its own `CMakeLists.txt` and package metadata, so official plugins and user source plugins follow the same physical shape.

@@ -1,10 +1,13 @@
 #include "Core/Log.h"
+#include "EditorEnginePaths.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "Platform/Common/DynamicLibrary.h"
 #include "Shell/EditorPluginDependencyResolver.h"
+#include "Shell/EditorPluginManager.h"
 #include "Shell/EditorPluginManifest.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
@@ -1715,6 +1718,71 @@ void testManifestAndDependencyContract(TestContext& context)
     }
 }
 
+void testEditorEnginePathParsingContract(TestContext& context)
+{
+    const char* argv[] = {
+        "LunaEditor",
+        "--engine-data-root",
+        "InstallRoot",
+        "--editor-plugin-dir=DevA",
+        "--editor-plugin-dir",
+        "DevB",
+    };
+    luna::editor::EditorStartupOptions options =
+        luna::editor::parseEditorStartupOptions(static_cast<int>(std::size(argv)), const_cast<char**>(argv));
+
+    context.expect(options.engine_data_root_override == std::filesystem::path("InstallRoot"),
+                   "engine data root command line option should parse");
+    context.expect(options.editor_plugin_path_overrides.size() == 2u,
+                   "editor plugin dir command line options should parse");
+    if (options.editor_plugin_path_overrides.size() == 2u) {
+        context.expect(options.editor_plugin_path_overrides[0] == std::filesystem::path("DevA"),
+                       "editor plugin dir equals form should parse");
+        context.expect(options.editor_plugin_path_overrides[1] == std::filesystem::path("DevB"),
+                       "editor plugin dir separate value form should parse");
+    }
+
+    const std::string list_value =
+        std::string("One") + luna::editor::editorPathListSeparator() + "Two" +
+        luna::editor::editorPathListSeparator();
+    const std::vector<std::filesystem::path> split_paths = luna::editor::splitEditorPathList(list_value);
+    context.expect(split_paths.size() == 2u, "editor plugin path list should skip empty entries");
+    if (split_paths.size() == 2u) {
+        context.expect(split_paths[0] == std::filesystem::path("One"), "first path list entry should parse");
+        context.expect(split_paths[1] == std::filesystem::path("Two"), "second path list entry should parse");
+    }
+}
+
+void testEditorPluginPackageRootContract(TestContext& context)
+{
+    TempDirectory temp("EditorPluginRoots");
+    const std::filesystem::path engine_root = temp.path() / "EngineData";
+    const std::filesystem::path installed_root = engine_root / "Plugins" / "Editor" / "Installed";
+    const std::filesystem::path dev_root = temp.path() / "DevPlugins";
+    const std::filesystem::path good_entry = testPluginBinaryPath("LunaTestEditorPluginGood");
+
+    writeEditorPluginManifest(installed_root,
+                              "InstalledNative",
+                              "luna.test.installed-native",
+                              "Installed Native",
+                              good_entry,
+                              {});
+    writeEditorPluginManifest(dev_root, "DevNative", "luna.test.dev-native", "Dev Native", good_entry, {});
+
+    luna::editor::EditorEnginePaths paths{};
+    paths.engine_data_root = engine_root;
+    paths.official_editor_plugin_roots.push_back(engine_root / "Plugins" / "Editor" / "OfficialMissing");
+    paths.installed_editor_plugin_roots.push_back(installed_root);
+    paths.development_editor_plugin_roots.push_back(dev_root);
+    paths.development_editor_plugin_roots.push_back(engine_root / "Plugins" / "Editor" / "MissingDev");
+
+    const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
+    context.expect(findPackage(packages, "luna.test.installed-native") != nullptr,
+                   "installed editor plugin root should contribute packages");
+    context.expect(findPackage(packages, "luna.test.dev-native") != nullptr,
+                   "development editor plugin root should contribute packages");
+}
+
 } // namespace
 
 int main()
@@ -1726,6 +1794,8 @@ int main()
     testNativePluginViewportOwnerCleanup(context);
     testNativePluginLoadFailures(context);
     testManifestAndDependencyContract(context);
+    testEditorEnginePathParsingContract(context);
+    testEditorPluginPackageRootContract(context);
 
     luna::Logger::shutdown();
     return context.result();

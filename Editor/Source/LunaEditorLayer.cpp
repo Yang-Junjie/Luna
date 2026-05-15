@@ -549,7 +549,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this);
     m_editor_plugin_manager = std::make_unique<editor::EditorPluginManager>(*m_editor_shell);
-    for (auto& package : editor::createEditorPluginPackages()) {
+    for (auto& package : editor::createEditorPluginPackages(application.enginePaths())) {
         m_editor_plugin_manager->registerPackage(std::move(package));
     }
     (void) m_editor_plugin_manager->loadRegisteredPackages();
@@ -609,7 +609,7 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     setRuntimeViewportEnabled(m_runtime_viewport_requested);
 
     const bool allow_editor_camera = !m_runtime_viewport_enabled &&
-                                     (m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
+                                     (m_viewport_hovered || m_editor_camera.isMouseCaptured()) &&
                                      !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
     if (!m_runtime_viewport_enabled) {
@@ -630,7 +630,7 @@ void LunaEditorLayer::onEvent(Event& event)
         return;
     }
 
-    if ((m_viewport_focused || m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing()) {
+    if ((m_viewport_hovered || m_editor_camera.isMouseCaptured()) && !ImGuizmo::IsUsing()) {
         m_editor_camera.onEvent(event);
     }
 }
@@ -818,7 +818,7 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
     auto& renderer = m_application->getRenderer();
 
     m_viewport_focused = ImGui::IsWindowFocused();
-    m_viewport_hovered = ImGui::IsWindowHovered();
+    m_viewport_hovered = false;
     updateGizmoShortcuts();
 
     const editor::Vec2 available = ui.contentRegionAvail();
@@ -845,11 +845,16 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui)
         const ImVec2 viewport_min = ImGui::GetItemRectMin();
         const ImVec2 viewport_max = ImGui::GetItemRectMax();
         const ImVec2 viewport_size = ImGui::GetItemRectSize();
-        const bool gizmo_active = !m_runtime_viewport_enabled && drawViewportGizmo(viewport_min, viewport_size);
-        if (!gizmo_active) {
+        const bool viewport_image_hovered = ImGui::IsItemHovered();
+        m_viewport_hovered = viewport_image_hovered;
+
+        const bool allow_gizmo_interaction = viewport_image_hovered || m_gizmo_transform_transaction_active;
+        const bool gizmo_active = !m_runtime_viewport_enabled &&
+                                  drawViewportGizmo(viewport_min, viewport_size, allow_gizmo_interaction);
+        if (viewport_image_hovered && !gizmo_active) {
             if (!m_runtime_viewport_enabled) {
                 requestViewportPick(
-                    ImGui::GetItemRectMin(),
+                    viewport_min,
                     viewport_max,
                     uv0,
                     uv1,
@@ -884,7 +889,7 @@ void LunaEditorLayer::updateGizmoShortcuts()
     }
 }
 
-bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size)
+bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size, bool allow_interaction)
 {
     Entity selected_entity = getSelectedEntity();
     if (!selected_entity || !selected_entity.isValid() || !selected_entity.hasComponent<TransformComponent>()) {
@@ -911,6 +916,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(viewport_min.x, viewport_min.y, viewport_size.x, viewport_size.y);
     ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7fffffff));
+    ImGuizmo::Enable(allow_interaction);
 
     const ImGuizmo::MODE mode = m_gizmo_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_gizmo_mode);
     ImGuizmo::Manipulate(glm::value_ptr(view),
@@ -933,6 +939,7 @@ bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2
     }
 
     const bool gizmo_active = ImGuizmo::IsOver() || gizmo_using;
+    ImGuizmo::Enable(true);
     ImGuizmo::PopID();
     return gizmo_active;
 }

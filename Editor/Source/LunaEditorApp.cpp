@@ -110,7 +110,7 @@ luna::RHI::BackendType resolveCapabilitiesBackend(luna::RHI::BackendType backend
 
 namespace luna {
 
-LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend)
+LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend, editor::EditorEnginePaths engine_paths)
     : Application(ApplicationSpecification{
           .m_name = "Luna Editor",
           .m_window_width = 1'600,
@@ -119,12 +119,18 @@ LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend)
           .m_enable_imgui = luna::RHI::makeCapabilitiesForBackend(resolveCapabilitiesBackend(backend)).supports_imgui,
           .m_enable_multi_viewport = false,
       }),
-      m_backend(backend)
+      m_backend(backend),
+      m_engine_paths(std::move(engine_paths))
 {}
 
 luna::RHI::BackendType LunaEditorApplication::getBackend() const
 {
     return m_backend;
+}
+
+const editor::EditorEnginePaths& LunaEditorApplication::enginePaths() const noexcept
+{
+    return m_engine_paths;
 }
 
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()
@@ -146,9 +152,11 @@ void LunaEditorApplication::onInit()
 Application* createApplication(int argc, char** argv)
 {
     const auto backend = parseBackendFromArgs(argc, argv);
+    const editor::EditorStartupOptions startup_options = editor::parseEditorStartupOptions(argc, argv);
+    editor::EditorEnginePaths engine_paths = editor::resolveEditorEnginePaths(startup_options);
     LUNA_EDITOR_INFO("Starting LunaEditor with requested backend '{}'", luna::RHI::BackendTypeToString(backend));
     logBackendStartupSelection(backend);
-    return new LunaEditorApplication(backend);
+    return new LunaEditorApplication(backend, std::move(engine_paths));
 }
 
 } // namespace luna

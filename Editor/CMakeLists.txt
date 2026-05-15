@@ -5,6 +5,8 @@ add_executable(
     Source/EditorCamera.cpp
     Source/EditorDocumentContext.h
     Source/EditorDocumentHost.h
+    Source/EditorEnginePaths.h
+    Source/EditorEnginePaths.cpp
     Source/EditorAssetDragDrop.h
     Source/EditorRuntime.h
     Source/EditorRuntime.cpp
@@ -18,6 +20,7 @@ add_executable(
     Source/Shell/EditorBuiltinPluginRegistry.cpp
     Source/Shell/EditorPluginManager.h
     Source/Shell/EditorPluginManager.cpp
+    Source/Shell/EditorPluginDiscovery.cpp
     Source/Shell/EditorPluginDependencyResolver.h
     Source/Shell/EditorPluginDependencyResolver.cpp
     Source/Shell/EditorPluginManifest.h

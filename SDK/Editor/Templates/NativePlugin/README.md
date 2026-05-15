@@ -1,6 +1,14 @@
 # Native Plugin Template
 
-This template builds a `Runtime: Native` editor plugin that uses only the Luna editor C ABI header.
+This template builds a `Runtime: Native` editor plugin that uses the Luna editor native C++ wrapper:
+
+```cpp
+#include "Luna/Editor/Native/NativePlugin.h"
+```
+
+The wrapper is header-only and sits on top of `EditorApi/EditorNativePluginApi.h`; the exported plugin symbol remains the C ABI entry point.
+
+For a broader example that uses project, scene, selection, asset, plugin asset, viewport, and runtime viewport services, see `Plugins/Editor/NativeSample` in the Luna source tree.
 
 Configure it against an installed SDK:
 

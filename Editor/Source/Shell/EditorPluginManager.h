@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Asset/Asset.h"
+#include "EditorEnginePaths.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "EditorApi/EditorPlugin.h"
 #include "Platform/Common/DynamicLibrary.h"
@@ -66,6 +67,7 @@ private:
     std::vector<NativePluginInstance> m_native_plugins;
 };
 
+std::vector<EditorPluginPackage> createEditorPluginPackages(const EditorEnginePaths& engine_paths);
 std::vector<EditorPluginPackage> createEditorPluginPackages();
 
 } // namespace luna::editor

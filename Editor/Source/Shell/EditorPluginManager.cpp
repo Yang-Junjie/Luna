@@ -25,42 +25,6 @@
 
 namespace {
 
-std::filesystem::path officialPluginsRoot()
-{
-    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor" / "Official").lexically_normal();
-}
-
-std::filesystem::path sourceEditorPluginsRoot()
-{
-    return (std::filesystem::path(LUNA_PROJECT_ROOT) / "Plugins" / "Editor").lexically_normal();
-}
-
-bool isSameOrNestedPath(const std::filesystem::path& path, const std::filesystem::path& root)
-{
-    const std::filesystem::path normalized_path = path.lexically_normal();
-    const std::filesystem::path normalized_root = root.lexically_normal();
-
-    auto path_it = normalized_path.begin();
-    auto root_it = normalized_root.begin();
-    for (; root_it != normalized_root.end(); ++root_it, ++path_it) {
-        if (path_it == normalized_path.end() || *path_it != *root_it) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void attachBuiltinFactories(std::vector<luna::editor::EditorPluginPackage>& packages)
-{
-    for (luna::editor::EditorPluginPackage& package : packages) {
-        if (luna::editor::EditorBuiltinPluginFactory factory =
-                luna::editor::EditorBuiltinPluginRegistry::findFactory(package.id)) {
-            package.create = std::move(factory);
-        }
-    }
-}
-
 } // namespace
 
 namespace luna::editor {
@@ -2723,28 +2687,6 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package)
                      instance.plugin_api.display_name != nullptr ? instance.plugin_api.display_name : package.display_name);
     m_native_plugins.push_back(std::move(instance));
     return true;
-}
-
-std::vector<EditorPluginPackage> createEditorPluginPackages()
-{
-    EditorPluginManifestLoader manifest_loader;
-    std::vector<EditorPluginPackage> packages = manifest_loader.loadPackagesFromRoot(officialPluginsRoot());
-    attachBuiltinFactories(packages);
-
-    std::vector<EditorPluginPackage> source_packages = manifest_loader.loadPackagesFromRoot(sourceEditorPluginsRoot());
-    const std::filesystem::path official_root = officialPluginsRoot();
-    source_packages.erase(std::remove_if(source_packages.begin(),
-                                         source_packages.end(),
-                                         [&](const EditorPluginPackage& package) {
-                                             return isSameOrNestedPath(package.root_path, official_root);
-                                         }),
-                          source_packages.end());
-    attachBuiltinFactories(source_packages);
-    packages.insert(packages.end(),
-                    std::make_move_iterator(source_packages.begin()),
-                    std::make_move_iterator(source_packages.end()));
-
-    return packages;
 }
 
 } // namespace luna::editor

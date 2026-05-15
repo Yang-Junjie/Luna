@@ -1,8 +1,10 @@
-#include "EditorApi/EditorNativePluginApi.h"
+#include "Luna/Editor/Native/NativePlugin.h"
 
 #include <cstdio>
 
 namespace {
+
+namespace native = luna::editor::native;
 
 constexpr const char* kPluginId = "com.example.native-template";
 constexpr const char* kDisplayName = "Native Template Tool";
@@ -16,142 +18,118 @@ struct NativeTemplateState {
 
 NativeTemplateState g_state{};
 
-void logMessage(const LunaEditorHostApi* host_api, LunaEditorLogLevel level, const char* message)
-{
-    if (host_api != nullptr && host_api->log.log != nullptr) {
-        host_api->log.log(host_api->log.api_user_data, level, message);
-    }
-}
-
 int canOpenWindow(void*, const LunaEditorHostApi* host_api)
 {
-    return host_api != nullptr && host_api->windows.set_window_open != nullptr ? 1 : 0;
+    const native::Host host(host_api);
+    return host.windows().canSetOpen() ? 1 : 0;
 }
 
 int isWindowOpen(void*, const LunaEditorHostApi* host_api)
 {
-    if (host_api == nullptr || host_api->windows.is_window_open == nullptr) {
-        return 0;
-    }
-    return host_api->windows.is_window_open(host_api->windows.api_user_data, kWindowId);
+    const native::Host host(host_api);
+    return host.windows().isOpen(kWindowId) ? 1 : 0;
 }
 
 void executeOpenWindow(void*, const LunaEditorHostApi* host_api)
 {
-    if (host_api != nullptr && host_api->windows.set_window_open != nullptr) {
-        host_api->windows.set_window_open(host_api->windows.api_user_data, kWindowId, 1);
-    }
+    const native::Host host(host_api);
+    host.windows().setOpen(kWindowId, true);
 }
 
 void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
 {
     auto* state = static_cast<NativeTemplateState*>(window_user_data);
-    if (state == nullptr || host_api == nullptr) {
+    if (state == nullptr) {
         return;
     }
 
-    const LunaEditorUiApi& ui = host_api->ui;
-    if (ui.text == nullptr) {
+    const native::Host host(host_api);
+    const native::Ui ui = host.ui();
+    if (!ui.canDrawText()) {
         return;
     }
 
-    ui.text(ui.api_user_data, "Native editor plugin template");
-    ui.text_disabled(ui.api_user_data, "This window uses only EditorNativePluginApi.h.");
-    ui.separator(ui.api_user_data);
+    ui.text("Native editor plugin template");
+    ui.textDisabled("This window uses Luna/Editor/Native C++ wrappers over EditorNativePluginApi.h.");
+    ui.separator();
 
-    if (ui.button != nullptr) {
-        const LunaEditorVec2 button_size{.x = -1.0f, .y = 0.0f};
-        if (ui.button(ui.api_user_data, "Run Tool Action", &button_size, LunaEditorButtonVariant_Primary) != 0) {
-            ++state->click_count;
-            logMessage(host_api, LunaEditorLogLevel_Info, "Native template action executed.");
-        }
+    if (ui.button("Run Tool Action", native::fillWidth(), LunaEditorButtonVariant_Primary)) {
+        ++state->click_count;
+        host.log().info("Native template action executed.");
     }
 
     char counter_text[64]{};
     std::snprintf(counter_text, sizeof(counter_text), "Actions: %d", state->click_count);
-    ui.text(ui.api_user_data, counter_text);
+    ui.text(counter_text);
 }
 
 int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
 {
     auto* state = static_cast<NativeTemplateState*>(plugin_user_data);
-    if (state == nullptr || host_api == nullptr) {
+    const native::Host host(host_api);
+    if (state == nullptr || !host.valid()) {
         return 0;
     }
 
-    if (host_api->commands.register_command == nullptr || host_api->windows.register_window == nullptr ||
-        host_api->menus.add_menu_item == nullptr) {
-        logMessage(host_api, LunaEditorLogLevel_Error, "Native template requires command, window, and menu APIs.");
+    if (!host.commands().canRegister() || !host.windows().canRegister() || !host.menus().canAdd()) {
+        host.log().error("Native template requires command, window, and menu APIs.");
         return 0;
     }
 
-    LunaEditorCommandDescriptor command{};
-    command.struct_size = sizeof(LunaEditorCommandDescriptor);
-    command.api_version = LUNA_EDITOR_COMMAND_DESCRIPTOR_API_VERSION;
+    native::CommandDescriptor command{};
     command.id = kCommandId;
     command.label = "Open Native Template Tool";
     command.description = "Opens the native editor plugin template window.";
     command.shortcut = "";
-    command.command_user_data = state;
+    command.user_data = state;
     command.can_execute = &canOpenWindow;
     command.is_checked = &isWindowOpen;
     command.execute = &executeOpenWindow;
 
-    if (host_api->commands.register_command(host_api->commands.api_user_data, &command) == 0) {
-        logMessage(host_api, LunaEditorLogLevel_Error, "Failed to register native template command.");
+    if (!host.commands().registerCommand(command)) {
+        host.log().error("Failed to register native template command.");
         return 0;
     }
 
-    LunaEditorWindowDescriptor window{};
-    window.struct_size = sizeof(LunaEditorWindowDescriptor);
-    window.api_version = LUNA_EDITOR_WINDOW_DESCRIPTOR_API_VERSION;
+    native::WindowDescriptor window{};
     window.id = kWindowId;
     window.title = "Native Template";
-    window.default_open = 1;
-    window.default_size = LunaEditorVec2{.x = 320.0f, .y = 180.0f};
+    window.default_open = true;
+    window.default_size = native::vec2(320.0f, 180.0f);
     window.flags = LunaEditorWindowFlag_None;
-    window.window_user_data = state;
+    window.user_data = state;
     window.draw = &drawWindow;
 
-    if (host_api->windows.register_window(host_api->windows.api_user_data, &window) == 0) {
-        host_api->commands.unregister_command(host_api->commands.api_user_data, kCommandId);
-        logMessage(host_api, LunaEditorLogLevel_Error, "Failed to register native template window.");
+    if (!host.windows().registerWindow(window)) {
+        host.commands().unregisterCommand(kCommandId);
+        host.log().error("Failed to register native template window.");
         return 0;
     }
 
-    LunaEditorMenuItemDescriptor menu_item{};
-    menu_item.struct_size = sizeof(LunaEditorMenuItemDescriptor);
-    menu_item.api_version = LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION;
+    native::MenuItemDescriptor menu_item{};
     menu_item.menu_path = "Tools/Native Template";
     menu_item.command_id = kCommandId;
     menu_item.label = "Open Native Template Tool";
     menu_item.shortcut = "";
 
-    if (host_api->menus.add_menu_item(host_api->menus.api_user_data, &menu_item) == 0) {
-        host_api->windows.unregister_window(host_api->windows.api_user_data, kWindowId);
-        host_api->commands.unregister_command(host_api->commands.api_user_data, kCommandId);
-        logMessage(host_api, LunaEditorLogLevel_Error, "Failed to register native template menu item.");
+    if (!host.menus().addItem(menu_item)) {
+        host.windows().unregisterWindow(kWindowId);
+        host.commands().unregisterCommand(kCommandId);
+        host.log().error("Failed to register native template menu item.");
         return 0;
     }
 
-    logMessage(host_api, LunaEditorLogLevel_Info, "Native template loaded.");
+    host.log().info("Native template loaded.");
     return 1;
 }
 
 void onUnload(void*, const LunaEditorHostApi* host_api)
 {
-    if (host_api != nullptr) {
-        if (host_api->menus.remove_menu_items_for_command != nullptr) {
-            host_api->menus.remove_menu_items_for_command(host_api->menus.api_user_data, kCommandId);
-        }
-        if (host_api->windows.unregister_window != nullptr) {
-            host_api->windows.unregister_window(host_api->windows.api_user_data, kWindowId);
-        }
-        if (host_api->commands.unregister_command != nullptr) {
-            host_api->commands.unregister_command(host_api->commands.api_user_data, kCommandId);
-        }
-    }
-    logMessage(host_api, LunaEditorLogLevel_Info, "Native template unloaded.");
+    const native::Host host(host_api);
+    host.menus().removeItemsForCommand(kCommandId);
+    host.windows().unregisterWindow(kWindowId);
+    host.commands().unregisterCommand(kCommandId);
+    host.log().info("Native template unloaded.");
 }
 
 } // namespace
@@ -160,19 +138,17 @@ extern "C" LUNA_EDITOR_PLUGIN_EXPORT int LunaCreateEditorPlugin(uint32_t host_ap
                                                                 const LunaEditorHostApi* host_api,
                                                                 LunaEditorPluginApi* out_plugin_api)
 {
-    if (host_api_version != LUNA_EDITOR_HOST_API_VERSION || host_api == nullptr ||
-        host_api->struct_size < sizeof(LunaEditorHostApi) || host_api->api_version != LUNA_EDITOR_HOST_API_VERSION ||
-        out_plugin_api == nullptr) {
+    if (!native::isCompatibleHost(host_api_version, host_api) || out_plugin_api == nullptr) {
         return 0;
     }
 
-    out_plugin_api->struct_size = sizeof(LunaEditorPluginApi);
-    out_plugin_api->api_version = LUNA_EDITOR_PLUGIN_API_VERSION;
-    out_plugin_api->plugin_id = kPluginId;
-    out_plugin_api->display_name = kDisplayName;
-    out_plugin_api->version = kVersion;
-    out_plugin_api->plugin_user_data = &g_state;
-    out_plugin_api->on_load = &onLoad;
-    out_plugin_api->on_unload = &onUnload;
-    return 1;
+    native::PluginDescriptor plugin{};
+    plugin.plugin_id = kPluginId;
+    plugin.display_name = kDisplayName;
+    plugin.version = kVersion;
+    plugin.user_data = &g_state;
+    plugin.on_load = &onLoad;
+    plugin.on_unload = &onUnload;
+
+    return native::fillPluginApi(plugin, out_plugin_api) ? 1 : 0;
 }
