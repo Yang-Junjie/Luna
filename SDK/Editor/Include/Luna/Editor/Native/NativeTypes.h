@@ -2,12 +2,20 @@
 
 #include "EditorApi/EditorNativePluginApi.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
 namespace luna::editor::native {
 
 using Vec2 = LunaEditorVec2;
 using Vec3 = LunaEditorVec3;
 using Vec4 = LunaEditorVec4;
 using TextureView = LunaEditorTextureView;
+using AssetHandle = uint64_t;
+using EntityId = uint64_t;
+using ViewportId = uint64_t;
 
 [[nodiscard]] constexpr Vec2 vec2(float x, float y) noexcept
 {
@@ -18,6 +26,87 @@ using TextureView = LunaEditorTextureView;
 {
     return vec2(-1.0f, 0.0f);
 }
+
+struct AssetInfo {
+    AssetHandle handle{};
+    LunaEditorAssetType type{LunaEditorAssetType_None};
+    bool exists{};
+    bool builtin{};
+    bool loading{};
+    bool memory_only{};
+    std::string label;
+    std::string detail;
+    std::string project_path;
+    std::string absolute_path;
+};
+
+struct AssetRefreshResult {
+    bool success{};
+    bool project_loaded{};
+    uint64_t revision{};
+    std::string message;
+    size_t discovered_assets{};
+    size_t imported_missing_assets{};
+    size_t loaded_existing_metadata{};
+    size_t rebuilt_metadata{};
+    size_t unsupported_files_skipped{};
+    size_t failed_assets{};
+    size_t missing_metadata_after_sync{};
+    size_t script_files_skipped_no_plugin{};
+    size_t script_files_skipped_unsupported_language{};
+    size_t generated_model_files{};
+    size_t generated_model_metadata{};
+    size_t generated_material_files{};
+    size_t generated_material_metadata{};
+    size_t generated_texture_metadata{};
+    size_t failed_generated_model_assets{};
+};
+
+struct ProjectInfo {
+    std::string name;
+    std::string version;
+    std::string author;
+    std::string description;
+    std::string start_scene;
+    std::string assets_path;
+    std::string selected_script_plugin_id;
+    std::string selected_script_backend_name;
+};
+
+struct SceneEntityInfo {
+    EntityId id{};
+    EntityId parent_id{};
+    uint32_t component_flags{};
+    size_t child_count{};
+    std::string name;
+    std::string parent_name;
+};
+
+struct SceneEntityCreateRequest {
+    LunaEditorSceneEntityCreateKind kind{LunaEditorSceneEntityCreateKind_Empty};
+    const char* name{};
+    EntityId parent_id{};
+    AssetHandle asset_handle{};
+
+    [[nodiscard]] LunaEditorSceneEntityCreateRequest native() const noexcept
+    {
+        LunaEditorSceneEntityCreateRequest request{};
+        request.struct_size = sizeof(LunaEditorSceneEntityCreateRequest);
+        request.api_version = LUNA_EDITOR_SCENE_ENTITY_CREATE_REQUEST_API_VERSION;
+        request.kind = kind;
+        request.name = name;
+        request.parent_id = parent_id;
+        request.asset_handle = asset_handle;
+        return request;
+    }
+};
+
+struct MeshComponent {
+    AssetHandle mesh_handle{};
+    uint32_t first_submesh{};
+    uint32_t submesh_count{};
+    std::vector<AssetHandle> submesh_material_handles;
+};
 
 struct CommandDescriptor {
     const char* id{};

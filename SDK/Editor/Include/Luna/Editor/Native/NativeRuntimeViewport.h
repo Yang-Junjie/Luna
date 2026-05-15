@@ -12,6 +12,11 @@ public:
     {
     }
 
+    [[nodiscard]] bool available() const noexcept
+    {
+        return api_ != nullptr;
+    }
+
     [[nodiscard]] bool enabled() const noexcept
     {
         return api_ != nullptr && api_->is_runtime_viewport_enabled != nullptr &&

@@ -18,9 +18,13 @@ This template demonstrates:
 - a Window menu entry;
 - a plugin-owned editor window;
 - basic `EditorUi` controls through the native wrapper;
-- plugin-owned assets through `host.pluginAssets()`.
+- plugin-owned assets through `host.pluginAssets()`;
+- project and project asset reads through `host.project()` and `host.assets()`;
+- entity creation and selection through `host.scene()` and `host.selection()`;
+- an independent scene viewport preview through `host.viewport()`;
+- runtime viewport state reads through `host.runtimeViewport()`.
 
-For a broader example that uses project, scene, selection, asset, viewport, and runtime viewport services, see `Plugins/Editor/NativeSample` in the Luna source tree.
+The template intentionally uses the same high-level wrapper path that external plugin authors should use. For more focused experiments, see source-tree editor plugins under `Plugins/Editor`.
 
 ## Package Layout
 

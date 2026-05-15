@@ -2,6 +2,9 @@
 
 #include "Luna/Editor/Native/NativeTypes.h"
 
+#include <array>
+#include <string>
+
 namespace luna::editor::native {
 
 class Viewport final {
@@ -10,6 +13,22 @@ public:
     explicit constexpr Viewport(const LunaEditorViewportApi* api) noexcept
         : api_(api)
     {
+    }
+
+    [[nodiscard]] bool available() const noexcept
+    {
+        return api_ != nullptr;
+    }
+
+    [[nodiscard]] bool syncDefaultSceneViewport(uint32_t framebuffer_width,
+                                                uint32_t framebuffer_height,
+                                                LunaEditorViewportPresentation* out_presentation) const noexcept
+    {
+        return api_ != nullptr && api_->sync_scene_viewport != nullptr && out_presentation != nullptr &&
+               api_->sync_scene_viewport(api_->api_user_data,
+                                         framebuffer_width,
+                                         framebuffer_height,
+                                         out_presentation) != 0;
     }
 
     [[nodiscard]] bool sceneTextureView(TextureView* out_texture) const noexcept
@@ -33,10 +52,20 @@ public:
                api_->gizmo_operation_name(api_->api_user_data, out_value, out_value_size) != 0;
     }
 
+    [[nodiscard]] std::string gizmoOperationName() const
+    {
+        return readName(&LunaEditorViewportApi::gizmo_operation_name);
+    }
+
     [[nodiscard]] bool gizmoModeName(char* out_value, size_t out_value_size) const noexcept
     {
         return api_ != nullptr && api_->gizmo_mode_name != nullptr && out_value != nullptr &&
                api_->gizmo_mode_name(api_->api_user_data, out_value, out_value_size) != 0;
+    }
+
+    [[nodiscard]] std::string gizmoModeName() const
+    {
+        return readName(&LunaEditorViewportApi::gizmo_mode_name);
     }
 
     [[nodiscard]] bool pickDebugVisualizationEnabled() const noexcept
@@ -119,6 +148,22 @@ public:
     }
 
 private:
+    using NameReadFn = int (*)(void*, char*, size_t);
+    using NameReadMember = NameReadFn LunaEditorViewportApi::*;
+
+    [[nodiscard]] std::string readName(NameReadMember read_fn) const
+    {
+        if (api_ == nullptr || read_fn == nullptr || (api_->*read_fn) == nullptr) {
+            return {};
+        }
+
+        std::array<char, 128> buffer{};
+        if ((api_->*read_fn)(api_->api_user_data, buffer.data(), buffer.size()) == 0) {
+            return {};
+        }
+        return buffer.data();
+    }
+
     const LunaEditorViewportApi* api_{};
 };
 

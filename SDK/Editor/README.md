@@ -23,7 +23,7 @@ find_package(LunaEditorSDK CONFIG REQUIRED)
 target_link_libraries(MyEditorPlugin PRIVATE Luna::EditorSDK)
 ```
 
-The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a minimal command/window/menu/window-UI plugin using the C++ wrapper.
+The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a command/window/menu tool using the C++ wrapper for project, asset, scene, selection, viewport, and runtime viewport access.
 
 ## Minimal Native Plugin Flow
 
@@ -77,9 +77,13 @@ The SDK currently installs:
 Current `Luna/Editor/Native` wrappers cover the v1 Native ABI basics used by real sample plugins:
 
 - log, UI, commands, windows, menus
-- project, project assets, plugin-owned assets
-- scene, selection
-- scene viewport and runtime viewport state
+- project info and root paths
+- project asset metadata, enumeration, path resolution, refresh status, mesh submesh counts, and asset drag/drop sources
+- plugin-owned asset paths, text/binary reads, and texture lookup
+- scene labels, entity enumeration/details, entity create/delete/reparent/rename, transform access, camera/light/mesh components, and scene file opening
+- selection
+- independent scene viewport creation/sync/texture access plus default viewport state
+- runtime viewport request/enabled/entity-count state
 
 Two contract tests protect this boundary:
 

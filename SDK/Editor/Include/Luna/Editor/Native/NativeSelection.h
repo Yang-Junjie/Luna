@@ -12,6 +12,11 @@ public:
     {
     }
 
+    [[nodiscard]] bool available() const noexcept
+    {
+        return api_ != nullptr;
+    }
+
     [[nodiscard]] uint64_t selectedEntityId() const noexcept
     {
         if (api_ != nullptr && api_->selected_entity_id != nullptr) {

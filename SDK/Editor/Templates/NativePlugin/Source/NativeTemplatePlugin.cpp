@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdio>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -16,8 +18,10 @@ constexpr const char* kCommandId = "com.example.native-template.open";
 struct NativeTemplateState {
     int enabled{1};
     int click_count{0};
+    uint64_t created_entity_id{0};
+    uint64_t preview_viewport_id{0};
     char label[96]{"Native template state"};
-    char asset_note[256]{};
+    std::string asset_note;
 };
 
 NativeTemplateState g_state{};
@@ -60,31 +64,81 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     ui.checkbox("Enabled", &state->enabled);
     ui.inputTextWithHint("Label", "Plugin-local text", state->label, sizeof(state->label));
 
-    if (ui.button("Run Tool Action", native::fillWidth(), LunaEditorButtonVariant_Primary)) {
+    if (ui.button("Create Entity", native::fillWidth(), LunaEditorButtonVariant_Primary)) {
         ++state->click_count;
-        host.log().info("Native template action executed.");
+        state->created_entity_id = host.scene().createEntity("Native Template Entity");
+        if (state->created_entity_id != 0u) {
+            host.selection().selectEntity(state->created_entity_id);
+            host.log().info("Native template created and selected an entity.");
+        } else {
+            host.log().warn("Native template could not create an entity.");
+        }
     }
 
     char counter_text[64]{};
     std::snprintf(counter_text, sizeof(counter_text), "Actions: %d", state->click_count);
     ui.text(counter_text);
 
-    ui.separatorText("Plugin Asset");
-    if (state->asset_note[0] == '\0') {
-        size_t required_size = 0;
-        if (host.pluginAssets().readText("welcome.txt", nullptr, 0, &required_size) && required_size > 0) {
-            (void) host.pluginAssets().readText("welcome.txt",
-                                                state->asset_note,
-                                                sizeof(state->asset_note),
-                                                &required_size);
-        }
+    if (state->created_entity_id != 0u && host.scene().entityExists(state->created_entity_id)) {
+        const native::SceneEntityInfo entity_info = host.scene().entityInfo(state->created_entity_id);
+        ui.textWrapped(("Created entity: " + entity_info.name).c_str());
     }
 
-    if (state->asset_note[0] != '\0') {
-        ui.textWrapped(state->asset_note);
+    ui.separatorText("Plugin Asset");
+    if (state->asset_note.empty()) {
+        state->asset_note = host.pluginAssets().readText("welcome.txt");
+    }
+
+    if (!state->asset_note.empty()) {
+        ui.textWrapped(state->asset_note.c_str());
     } else {
         ui.textDisabled("Plugin asset assets/welcome.txt was not found.");
     }
+
+    ui.separatorText("Project");
+    if (host.project().hasProjectLoaded()) {
+        const native::ProjectInfo project_info = host.project().info();
+        ui.text(("Project: " + project_info.name).c_str());
+        ui.textWrapped(("Root: " + host.project().rootPath()).c_str());
+        ui.textWrapped(("Assets: " + host.assets().rootPath()).c_str());
+    } else {
+        ui.textDisabled("No project is loaded.");
+    }
+
+    const std::vector<native::AssetInfo> assets = host.assets().list(LunaEditorAssetType_None, false);
+    char asset_count_text[96]{};
+    std::snprintf(asset_count_text, sizeof(asset_count_text), "Project assets visible to SDK: %zu", assets.size());
+    ui.text(asset_count_text);
+    if (!assets.empty()) {
+        ui.textDisabled(("First asset: " + assets.front().label).c_str());
+    }
+
+    ui.separatorText("Viewport");
+    if (state->preview_viewport_id == 0u) {
+        state->preview_viewport_id = host.viewport().createSceneViewport("NativeTemplatePreview");
+    }
+    const native::Vec2 available = ui.contentRegionAvail();
+    const float viewport_width = available.x > 64.0f ? available.x : 320.0f;
+    const float viewport_height = viewport_width * 0.5625f;
+    LunaEditorViewportPresentation presentation = native::makeViewportPresentation();
+    if (state->preview_viewport_id != 0u &&
+        host.viewport().syncSceneViewport(state->preview_viewport_id,
+                                          static_cast<uint32_t>(viewport_width),
+                                          static_cast<uint32_t>(viewport_height),
+                                          &presentation) &&
+        presentation.presentable != 0) {
+        ui.image(presentation.scene_texture, native::vec2(viewport_width, viewport_height));
+    } else {
+        ui.textDisabled("Scene viewport preview is not available.");
+    }
+
+    char runtime_text[96]{};
+    std::snprintf(runtime_text,
+                  sizeof(runtime_text),
+                  "Runtime requested: %s, entities: %zu",
+                  host.runtimeViewport().requested() ? "yes" : "no",
+                  host.runtimeViewport().entityCount());
+    ui.text(runtime_text);
 }
 
 int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
@@ -96,8 +150,9 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
     }
 
     if (!host.commands().canRegister() || !host.windows().canRegister() || !host.menus().canAdd() ||
-        host.pluginAssets().native() == nullptr) {
-        host.log().error("Native template requires command, window, menu, and plugin asset APIs.");
+        !host.pluginAssets().available() || !host.assets().available() || !host.scene().available() ||
+        !host.selection().available() || !host.viewport().available()) {
+        host.log().error("Native template requires command, window, menu, asset, scene, selection, and viewport APIs.");
         return 0;
     }
 
@@ -151,6 +206,10 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
 void onUnload(void*, const LunaEditorHostApi* host_api)
 {
     const native::Host host(host_api);
+    if (g_state.preview_viewport_id != 0u) {
+        host.viewport().destroySceneViewport(g_state.preview_viewport_id);
+        g_state.preview_viewport_id = 0u;
+    }
     host.menus().removeItemsForCommand(kCommandId);
     host.windows().unregisterWindow(kWindowId);
     host.commands().unregisterCommand(kCommandId);
