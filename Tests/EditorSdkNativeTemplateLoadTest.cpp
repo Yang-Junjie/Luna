@@ -86,6 +86,12 @@ struct TemplateHost {
     int project_info_count{};
     int list_assets_count{};
     int created_entity_count{};
+    int section_count{};
+    int combo_count{};
+    int tree_count{};
+    int drag_drop_source_count{};
+    int drag_drop_target_count{};
+    int tooltip_count{};
     bool next_button_pressed{};
 
     TemplateHost()
@@ -108,13 +114,65 @@ struct TemplateHost {
             .text = &text,
             .text_disabled = &text,
             .text_wrapped = &text,
+            .bullet_text = &text,
             .separator = &separator,
             .separator_text = &separatorText,
+            .same_line = &sameLine,
+            .spacing = &spacing,
+            .indent = &indent,
+            .unindent = &unindent,
+            .begin_disabled = &beginDisabled,
+            .end_disabled = &endDisabled,
+            .set_next_item_width = &setNextItemWidth,
             .content_region_avail = &contentRegionAvail,
+            .window_framebuffer_scale = &windowFramebufferScale,
             .button = &button,
             .checkbox = &checkbox,
+            .slider_int = &sliderInt,
+            .slider_float = &sliderFloat,
+            .drag_int = &dragInt,
+            .drag_float = &dragFloat,
+            .drag_float3 = &dragFloat3,
+            .input_text = &inputText,
             .input_text_with_hint = &inputTextWithHint,
+            .tree_node = &treeNode,
+            .tree_node_ex = &treeNodeEx,
+            .tree_pop = &treePop,
+            .begin_combo = &beginCombo,
+            .end_combo = &endCombo,
+            .selectable = &selectable,
+            .set_item_default_focus = &setItemDefaultFocus,
             .image = &image,
+            .is_item_hovered = &isItemHovered,
+            .is_item_clicked = &isItemClicked,
+            .is_item_double_clicked = &isItemDoubleClicked,
+            .is_item_deactivated_after_edit = &isItemDeactivatedAfterEdit,
+            .set_tooltip = &setTooltip,
+            .invisible_button = &invisibleButton,
+            .begin_section = &beginSection,
+            .end_section = &endSection,
+            .begin_menu = &beginMenu,
+            .end_menu = &endMenu,
+            .menu_item = &menuItem,
+            .open_popup = &openPopup,
+            .begin_popup = &beginPopup,
+            .begin_popup_context_item = &beginPopupContextItem,
+            .close_current_popup = &closeCurrentPopup,
+            .end_popup = &endPopup,
+            .begin_drag_drop_source = &beginDragDropSource,
+            .set_drag_drop_payload = &setDragDropPayload,
+            .end_drag_drop_source = &endDragDropSource,
+            .begin_drag_drop_target = &beginDragDropTarget,
+            .accept_drag_drop_payload = &acceptDragDropPayload,
+            .end_drag_drop_target = &endDragDropTarget,
+            .scale = &scale,
+            .scaled = &scaled,
+            .begin_table = &beginTable,
+            .end_table = &endTable,
+            .table_setup_column = &tableSetupColumn,
+            .table_headers_row = &tableHeadersRow,
+            .table_next_row = &tableNextRow,
+            .table_next_column = &tableNextColumn,
         };
         api.commands = LunaEditorCommandApi{
             .struct_size = sizeof(LunaEditorCommandApi),
@@ -301,11 +359,25 @@ struct TemplateHost {
 
     static void separator(void*) {}
     static void separatorText(void*, const char*) {}
+    static void sameLine(void*) {}
+    static void spacing(void*) {}
+    static void indent(void*, float) {}
+    static void unindent(void*, float) {}
+    static void beginDisabled(void*) {}
+    static void endDisabled(void*) {}
+    static void setNextItemWidth(void*, float) {}
 
     static void contentRegionAvail(void*, LunaEditorVec2* out_value)
     {
         if (out_value != nullptr) {
             *out_value = LunaEditorVec2{.x = 320.0f, .y = 180.0f};
+        }
+    }
+
+    static void windowFramebufferScale(void*, LunaEditorVec2* out_value)
+    {
+        if (out_value != nullptr) {
+            *out_value = LunaEditorVec2{.x = 1.0f, .y = 1.0f};
         }
     }
 
@@ -325,10 +397,72 @@ struct TemplateHost {
         return 0;
     }
 
+    static int sliderInt(void*, const char*, int*, int, int)
+    {
+        return 0;
+    }
+
+    static int sliderFloat(void*, const char*, float*, float, float, const char*)
+    {
+        return 0;
+    }
+
+    static int dragInt(void*, const char*, int*, float, int, int)
+    {
+        return 0;
+    }
+
+    static int dragFloat(void*, const char*, float*, float, float, float, const char*)
+    {
+        return 0;
+    }
+
+    static int dragFloat3(void*, const char*, LunaEditorVec3*, float, float, float, const char*)
+    {
+        return 0;
+    }
+
+    static int inputText(void*, const char*, char*, size_t)
+    {
+        return 0;
+    }
+
     static int inputTextWithHint(void*, const char*, const char*, char*, size_t)
     {
         return 0;
     }
+
+    static int treeNode(void* api_user_data, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->tree_count;
+        }
+        return 1;
+    }
+
+    static int treeNodeEx(void* api_user_data, const char*, const char*, uint32_t)
+    {
+        return treeNode(api_user_data, nullptr);
+    }
+
+    static void treePop(void*) {}
+
+    static int beginCombo(void* api_user_data, const char*, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->combo_count;
+        }
+        return 1;
+    }
+
+    static void endCombo(void*) {}
+
+    static int selectable(void*, const char*, int)
+    {
+        return 0;
+    }
+
+    static void setItemDefaultFocus(void*) {}
 
     static int image(void* api_user_data, const LunaEditorTextureView* texture, const LunaEditorVec2*)
     {
@@ -337,6 +471,136 @@ struct TemplateHost {
             return 0;
         }
         ++host->image_count;
+        return 1;
+    }
+
+    static int isItemHovered(void*)
+    {
+        return 1;
+    }
+
+    static int isItemClicked(void*, int)
+    {
+        return 0;
+    }
+
+    static int isItemDoubleClicked(void*, int)
+    {
+        return 0;
+    }
+
+    static int isItemDeactivatedAfterEdit(void*)
+    {
+        return 0;
+    }
+
+    static void setTooltip(void* api_user_data, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->tooltip_count;
+        }
+    }
+
+    static int invisibleButton(void*, const char*, const LunaEditorVec2*)
+    {
+        return 0;
+    }
+
+    static int beginSection(void* api_user_data, const char*, const char*, int)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->section_count;
+        }
+        return 1;
+    }
+
+    static void endSection(void*) {}
+
+    static int beginMenu(void*, const char*, int)
+    {
+        return 1;
+    }
+
+    static void endMenu(void*) {}
+
+    static int menuItem(void*, const char*, int, int)
+    {
+        return 0;
+    }
+
+    static void openPopup(void*, const char*) {}
+
+    static int beginPopup(void*, const char*)
+    {
+        return 0;
+    }
+
+    static int beginPopupContextItem(void*, const char*, int)
+    {
+        return 0;
+    }
+
+    static void closeCurrentPopup(void*) {}
+    static void endPopup(void*) {}
+
+    static int beginDragDropSource(void* api_user_data)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->drag_drop_source_count;
+        }
+        return 1;
+    }
+
+    static int setDragDropPayload(void*, const char*, const void*, size_t)
+    {
+        return 1;
+    }
+
+    static void endDragDropSource(void*) {}
+
+    static int beginDragDropTarget(void* api_user_data)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->drag_drop_target_count;
+        }
+        return 1;
+    }
+
+    static int acceptDragDropPayload(void*, const char*, void* out_data, size_t size)
+    {
+        if (out_data != nullptr && size == sizeof(uint64_t)) {
+            uint64_t value = 0u;
+            std::memcpy(out_data, &value, sizeof(value));
+        }
+        return 1;
+    }
+
+    static void endDragDropTarget(void*) {}
+
+    static float scale(void*, float value)
+    {
+        return value;
+    }
+
+    static void scaled(void*, const LunaEditorVec2* value, LunaEditorVec2* out_value)
+    {
+        if (value != nullptr && out_value != nullptr) {
+            *out_value = *value;
+        }
+    }
+
+    static int beginTable(void*, const char*, int, uint32_t, const LunaEditorVec2*)
+    {
+        return 1;
+    }
+
+    static void endTable(void*) {}
+    static void tableSetupColumn(void*, const char*, uint32_t, float) {}
+    static void tableHeadersRow(void*) {}
+    static void tableNextRow(void*) {}
+
+    static int tableNextColumn(void*)
+    {
         return 1;
     }
 
@@ -1016,6 +1280,12 @@ int main(int argc, char** argv)
     context.expect(host.plugin_asset_read_text_count > 0, "SDK template should read plugin assets through host API");
     context.expect(host.project_info_count > 0, "SDK template should read project info through host API");
     context.expect(host.list_assets_count > 0, "SDK template should enumerate project assets through host API");
+    context.expect(host.section_count > 0, "SDK template should draw through section UI wrapper");
+    context.expect(host.combo_count > 0, "SDK template should draw through combo UI wrapper");
+    context.expect(host.tree_count > 0, "SDK template should draw through tree UI wrapper");
+    context.expect(host.drag_drop_source_count > 0, "SDK template should draw through drag/drop source wrapper");
+    context.expect(host.drag_drop_target_count > 0, "SDK template should draw through drag/drop target wrapper");
+    context.expect(host.tooltip_count > 0, "SDK template should draw through item hover/tooltip wrappers");
     context.expect(host.image_count > 0, "SDK template should draw a scene viewport texture");
     context.expect(host.created_viewport_id != 0u, "SDK template should create an independent scene viewport");
 

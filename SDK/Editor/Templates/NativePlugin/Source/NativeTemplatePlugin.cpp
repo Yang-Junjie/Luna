@@ -63,6 +63,47 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
 
     ui.checkbox("Enabled", &state->enabled);
     ui.inputTextWithHint("Label", "Plugin-local text", state->label, sizeof(state->label));
+    ui.sameLine();
+    ui.textDisabled("SDK wrapper parity");
+
+    if (ui.beginSection("NativeTemplateControls", "Controls", true)) {
+        int slider_value = state->click_count;
+        ui.setNextItemWidth(ui.scale(180.0f));
+        ui.sliderInt("Action Preview", &slider_value, 0, 32);
+
+        native::Vec3 offset{.x = 0.0f, .y = 1.0f, .z = 2.0f};
+        ui.dragFloat3("Offset", &offset, 0.05f, -10.0f, 10.0f);
+
+        if (ui.beginCombo("Mode", state->enabled != 0 ? "Enabled" : "Disabled")) {
+            if (ui.selectable("Enabled", state->enabled != 0)) {
+                state->enabled = 1;
+            }
+            if (ui.selectable("Disabled", state->enabled == 0)) {
+                state->enabled = 0;
+            }
+            ui.setItemDefaultFocus();
+            ui.endCombo();
+        }
+
+        if (ui.treeNodeEx("NativeTemplateTree", "Scene Tool", LunaEditorTreeNodeFlag_DefaultOpen)) {
+            ui.bulletText("Create entities through host.scene().");
+            ui.treePop();
+        }
+
+        if (ui.beginDragDropSource()) {
+            const uint64_t payload = state->created_entity_id;
+            ui.setDragDropPayload("LUNA_TEMPLATE_ENTITY", &payload, sizeof(payload));
+            ui.text("Entity payload");
+            ui.endDragDropSource();
+        }
+        if (ui.beginDragDropTarget()) {
+            uint64_t payload = 0u;
+            (void) ui.acceptDragDropPayload("LUNA_TEMPLATE_ENTITY", &payload, sizeof(payload));
+            ui.endDragDropTarget();
+        }
+
+        ui.endSection();
+    }
 
     if (ui.button("Create Entity", native::fillWidth(), LunaEditorButtonVariant_Primary)) {
         ++state->click_count;
@@ -78,6 +119,9 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     char counter_text[64]{};
     std::snprintf(counter_text, sizeof(counter_text), "Actions: %d", state->click_count);
     ui.text(counter_text);
+    if (ui.isItemHovered()) {
+        ui.setTooltip("Native SDK item query wrapper");
+    }
 
     if (state->created_entity_id != 0u && host.scene().entityExists(state->created_entity_id)) {
         const native::SceneEntityInfo entity_info = host.scene().entityInfo(state->created_entity_id);
