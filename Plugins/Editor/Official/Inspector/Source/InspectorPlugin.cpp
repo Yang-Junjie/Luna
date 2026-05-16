@@ -1,7 +1,6 @@
 #include "InspectorPlugin.h"
 
 #include "EditorApi/EditorApi.h"
-#include "EditorUI.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <algorithm>
@@ -422,6 +421,64 @@ bool fullWidthButton(luna::editor::Ui& ui, std::string_view label)
                      luna::editor::ButtonVariant::Subtle);
 }
 
+std::string assetDetailText(const luna::editor::AssetInfo& asset, bool has_asset)
+{
+    std::string detail = asset.detail;
+    if (has_asset && asset.exists) {
+        if (asset.loading) {
+            if (!detail.empty()) {
+                detail += " \u00B7 ";
+            }
+            detail += "Loading";
+        }
+        if (asset.memory_only && !asset.builtin) {
+            if (!detail.empty()) {
+                detail += " \u00B7 ";
+            }
+            detail += "Memory";
+        }
+    }
+    return detail;
+}
+
+std::string assetTooltipText(const luna::editor::AssetInfo& asset, bool has_asset)
+{
+    std::string tooltip = asset.label;
+    if (!asset.detail.empty()) {
+        tooltip += '\n';
+        tooltip += asset.detail;
+    }
+    if (has_asset && asset.exists) {
+        if (!asset.project_path.empty()) {
+            tooltip += '\n';
+            tooltip += asset.project_path.generic_string();
+        }
+        if (asset.loading) {
+            tooltip += '\n';
+            tooltip += "Loading";
+        }
+        if (asset.memory_only && !asset.builtin) {
+            tooltip += '\n';
+            tooltip += "Memory only";
+        }
+    }
+    return tooltip;
+}
+
+luna::editor::StatusVariant assetFieldVariant(const luna::editor::AssetInfo& asset, bool has_asset)
+{
+    if (!has_asset) {
+        return luna::editor::StatusVariant::Neutral;
+    }
+    if (!asset.exists) {
+        return luna::editor::StatusVariant::Danger;
+    }
+    if (asset.loading) {
+        return luna::editor::StatusVariant::Warning;
+    }
+    return luna::editor::StatusVariant::Info;
+}
+
 bool beginPropertyTable(luna::editor::Ui& ui, std::string_view id, float label_width = kPropertyLabelWidth)
 {
     const luna::editor::TableFlags flags = luna::editor::TableFlag::RowBg |
@@ -529,18 +586,6 @@ bool drawColor3Property(luna::editor::Ui& ui,
 struct InspectorSection {
     bool open{false};
     bool remove_requested{false};
-};
-
-struct CompactInspectorStyleGuard {
-    CompactInspectorStyleGuard()
-    {
-        luna::editor::ui::pushCompactInspectorStyle();
-    }
-
-    ~CompactInspectorStyleGuard()
-    {
-        luna::editor::ui::popCompactInspectorStyle();
-    }
 };
 
 InspectorSection beginInspectorSection(luna::editor::Ui& ui,
@@ -728,12 +773,12 @@ bool drawAssetField(luna::editor::Host& host,
                     luna::AssetHandle& handle,
                     std::initializer_list<luna::AssetType> accepted_types)
 {
-    bool changed = false;
     const luna::editor::AssetInfo asset = host.assets().describeAsset(handle);
+    const bool has_asset = handle.isValid();
+    const std::string detail = assetDetailText(asset, has_asset);
+    (void) ui.assetField("AssetField" + id, asset.label, detail, assetFieldVariant(asset, has_asset));
 
-    const std::string button_label = asset.label + "##" + id;
-    (void) ui.button(button_label, luna::editor::Vec2{.x = -1.0f, .y = ui.scale(38.0f)});
-
+    bool changed = false;
     const bool hovered = ui.isItemHovered();
     if (ui.beginDragDropTarget()) {
         luna::editor::AssetDropPayload payload{};
@@ -753,17 +798,8 @@ bool drawAssetField(luna::editor::Host& host,
         ui.endPopup();
     }
 
-    std::string detail = asset.detail;
-    if (handle.isValid()) {
-        detail += " | " + handle.toString();
-    }
-    if (asset.loading) {
-        detail += " | Loading";
-    }
-    ui.textDisabled(detail);
-
     if (hovered) {
-        ui.setTooltip("Drop an accepted asset here. Right-click to clear.");
+        ui.setTooltip(assetTooltipText(asset, has_asset));
     }
 
     return changed;
@@ -1193,14 +1229,6 @@ bool drawScriptAssetSelector(luna::editor::Host& host,
 
     const luna::editor::ScriptAssetValidation current_validation =
         host.scripts().validateScriptAsset(script.script_asset);
-    const luna::editor::AssetInfo current_asset = host.assets().describeAsset(script.script_asset);
-    if (!script.script_asset.isValid()) {
-        ui.textDisabled("Script Asset: None");
-    } else if (current_asset.exists) {
-        ui.textDisabled("Script Asset: " + current_asset.label);
-        ui.textDisabled("Script Type: " + assetTypeLabel(current_asset.type));
-    }
-
     if (!rejected_message.empty()) {
         ui.textDisabled(rejected_message);
     } else if (!current_validation.accepted && !current_validation.message.empty()) {
@@ -1300,16 +1328,10 @@ bool drawScriptAssetProperty(luna::editor::Host& host,
     }
 
     const luna::editor::AssetInfo asset = host.assets().describeAsset(property.asset_value);
-    if (!property.asset_value.isValid()) {
-        ui.textDisabled("Resolved Asset: None");
-    } else if (!asset.exists) {
+    if (property.asset_value.isValid() && !asset.exists) {
         ui.textDisabled("Referenced asset does not exist.");
-    } else {
-        ui.textDisabled("Resolved Asset: " + asset.label);
-        ui.textDisabled("Asset Type: " + assetTypeLabel(asset.type));
-        if (required_type != luna::AssetType::None && asset.type != required_type) {
-            ui.textDisabled("Referenced asset does not match required type '" + assetTypeLabel(required_type) + "'.");
-        }
+    } else if (required_type != luna::AssetType::None && asset.exists && asset.type != required_type) {
+        ui.textDisabled("Referenced asset does not match required type '" + assetTypeLabel(required_type) + "'.");
     }
 
     return changed;
@@ -1818,7 +1840,6 @@ private:
     {
         Host& host = context.host();
         Ui& ui = context.ui();
-        const CompactInspectorStyleGuard compact_style_guard{};
 
         const EntityId selected_entity_id = host.selection().selectedEntityId();
         if (!selected_entity_id.isValid()) {

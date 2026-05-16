@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include <initializer_list>
+#include <string>
 #include <string_view>
 
 namespace luna::editor {
@@ -149,6 +150,31 @@ public:
     virtual void tableHeadersRow() = 0;
     virtual void tableNextRow() = 0;
     virtual bool tableNextColumn() = 0;
+
+    virtual bool assetField(std::string_view id,
+                            std::string_view label,
+                            std::string_view detail = {},
+                            StatusVariant variant = StatusVariant::Neutral,
+                            Vec2 size = {})
+    {
+        std::string field_label;
+        field_label.reserve(label.size() + detail.size() + id.size() + 8u);
+        if (!label.empty()) {
+            field_label.append(label.data(), label.size());
+        }
+        if (!detail.empty()) {
+            field_label.append("  ");
+            field_label.append(detail.data(), detail.size());
+        }
+        field_label.append("##");
+        if (!id.empty()) {
+            field_label.append(id.data(), id.size());
+        }
+
+        const Vec2 field_size{.x = size.x != 0.0f ? size.x : -1.0f, .y = size.y};
+        (void) variant;
+        return button(field_label, field_size, ButtonVariant::Subtle);
+    }
 };
 
 } // namespace luna::editor

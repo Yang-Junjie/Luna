@@ -1247,6 +1247,82 @@ public:
         }
     }
 
+    bool assetField(std::string_view id,
+                    std::string_view label,
+                    std::string_view detail,
+                    StatusVariant variant,
+                    Vec2 size) override
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        const bool has_detail = !detail.empty();
+        const float line_height = ImGui::GetTextLineHeight();
+        const float line_gap = has_detail ? editorThemeMetric(EditorThemeMetric::AssetPreviewLineGap) : 0.0f;
+        const float default_height = line_height * (has_detail ? 2.0f : 1.0f) + line_gap +
+                                     style.FramePadding.y * 2.0f +
+                                     editorThemeMetric(EditorThemeMetric::AssetPreviewExtraHeight);
+
+        ImVec2 draw_size{
+            size.x > 0.0f ? scaleEditorUi(size.x)
+                          : (size.x < 0.0f ? (std::max) (available.x + size.x, 1.0f) : available.x),
+            size.y > 0.0f ? scaleEditorUi(size.y) : default_height,
+        };
+        if (draw_size.x <= 0.0f) {
+            draw_size.x = editorThemeMetric(EditorThemeMetric::AssetPreviewMinWidth);
+        }
+
+        const std::string id_string = "##AssetField" + toString(id);
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const bool pressed = ImGui::InvisibleButton(id_string.c_str(), draw_size);
+        const bool hovered = ImGui::IsItemHovered();
+        const bool active = ImGui::IsItemActive();
+        const ImVec2 max{min.x + draw_size.x, min.y + draw_size.y};
+
+        const ImVec4 accent = statusAccent(variant);
+        const float fill_amount = variant == StatusVariant::Neutral ? 0.045f
+                                  : variant == StatusVariant::Danger  ? 0.14f
+                                                                      : 0.08f;
+        const ImVec4 fill = statusFill(variant, hovered || active ? fill_amount + 0.05f : fill_amount);
+        const ImVec4 border = hovered || active ? withAlpha(accent, 0.72f)
+                                                : editorThemeColor(EditorThemeColor::PanelBorder, 0.78f);
+        const ImVec4 title_color = variant == StatusVariant::Danger
+                                       ? editorThemeColor(EditorThemeColor::Danger)
+                                       : editorThemeColor(variant == StatusVariant::Neutral
+                                                              ? EditorThemeColor::TextMuted
+                                                              : EditorThemeColor::Text);
+        const ImVec4 detail_color = variant == StatusVariant::Danger ? editorThemeColor(EditorThemeColor::Danger)
+                                                                     : editorThemeColor(EditorThemeColor::TextMuted);
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
+        drawRectBorder(*draw_list, min, max, border, style.FrameRounding);
+
+        const float accent_offset_x = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetX);
+        const float accent_offset_y = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetY);
+        const float accent_width = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentWidth);
+        draw_list->AddRectFilled(ImVec2{min.x + accent_offset_x, min.y + accent_offset_y},
+                                 ImVec2{min.x + accent_offset_x + accent_width, max.y - accent_offset_y},
+                                 ImGui::GetColorU32(accent),
+                                 editorThemeMetric(EditorThemeMetric::AssetPreviewAccentRounding));
+
+        const ImVec2 text_min{min.x + editorThemeMetric(EditorThemeMetric::AssetPreviewTextOffsetX),
+                              min.y + style.FramePadding.y +
+                                  editorThemeMetric(EditorThemeMetric::AssetPreviewTextOffsetY)};
+        const ImVec2 text_max{max.x - editorThemeMetric(EditorThemeMetric::AssetPreviewTextRightPadding),
+                              max.y - style.FramePadding.y};
+        addClippedText(*draw_list, text_min, text_min, text_max, ImGui::GetColorU32(title_color), label);
+        if (has_detail) {
+            addClippedText(*draw_list,
+                           ImVec2{text_min.x, text_min.y + line_height + line_gap},
+                           text_min,
+                           text_max,
+                           ImGui::GetColorU32(detail_color),
+                           detail);
+        }
+
+        return pressed;
+    }
+
     void emptyState(std::string_view title, std::string_view detail) override
     {
         const ImGuiStyle& style = ImGui::GetStyle();
