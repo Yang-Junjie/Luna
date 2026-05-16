@@ -1,8 +1,0 @@
-EditorPlugin:
-  Id: luna.editor.api-sample
-  DisplayName: Editor API Sample
-  Runtime: BuiltinNative
-  Version: 0.1.0
-  Enabled: true
-  Dependencies:
-    - luna.editor.core-commands
