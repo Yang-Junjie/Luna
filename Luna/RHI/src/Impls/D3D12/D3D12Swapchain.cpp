@@ -25,6 +25,9 @@ D3D12Swapchain::D3D12Swapchain(const Ref<Device>& device, const SwapchainCreateI
     swapchainDesc.Format = ToDXGIFormat(info.Format);
     swapchainDesc.SampleDesc.Count = 1;
     swapchainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    if (info.Usage & SwapchainUsageFlags::TransferSrc) {
+        swapchainDesc.BufferUsage |= DXGI_USAGE_SHADER_INPUT;
+    }
     swapchainDesc.BufferCount = info.MinImageCount;
     swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
@@ -68,6 +71,12 @@ void D3D12Swapchain::CreateBackBuffers()
         texInfo.Depth = 1;
         texInfo.Format = m_createInfo.Format;
         texInfo.Usage = TextureUsageFlags::ColorAttachment;
+        if (m_createInfo.Usage & SwapchainUsageFlags::TransferSrc) {
+            texInfo.Usage |= TextureUsageFlags::TransferSrc;
+        }
+        if (m_createInfo.Usage & SwapchainUsageFlags::TransferDst) {
+            texInfo.Usage |= TextureUsageFlags::TransferDst;
+        }
         texInfo.MipLevels = 1;
         texInfo.ArrayLayers = 1;
         texInfo.InitialState = ResourceState::Present;

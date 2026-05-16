@@ -702,11 +702,12 @@ bool EditorInfiniteGridFeature::registerPasses(RenderFlowBuilder& builder)
     namespace extension_slots = luna::render_flow::slots::extension_points;
 
     const bool registered = builder.insertFeaturePassAfter(kFeatureName,
-                                                          extension_slots::AfterPostProcess,
-                                                          "EditorInfiniteGrid",
-                                                          std::make_unique<EditorInfiniteGridPass>(*m_resources, m_options));
+                                                           extension_slots::BeforeOverlay,
+                                                           "EditorInfiniteGrid",
+                                                           std::make_unique<EditorInfiniteGridPass>(*m_resources,
+                                                                                                    m_options));
     if (registered) {
-        LUNA_RENDERER_INFO("Registered EditorInfiniteGrid after '{}'", extension_slots::AfterPostProcess);
+        LUNA_RENDERER_INFO("Registered EditorInfiniteGrid after '{}'", extension_slots::BeforeOverlay);
     }
     return registered;
 }

@@ -27,6 +27,7 @@ inline constexpr std::string_view BeforeTransparent = "BeforeTransparent";
 inline constexpr std::string_view AfterTransparent = "AfterTransparent";
 inline constexpr std::string_view BeforePostProcess = "BeforePostProcess";
 inline constexpr std::string_view AfterPostProcess = "AfterPostProcess";
+inline constexpr std::string_view BeforeOverlay = "BeforeOverlay";
 
 } // namespace extension_points
 

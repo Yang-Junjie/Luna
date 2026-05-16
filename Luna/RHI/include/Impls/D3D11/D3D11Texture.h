@@ -53,6 +53,10 @@ class LUNA_RHI_API D3D11Texture : public Texture {
 public:
     D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& createInfo);
     D3D11Texture(Ref<D3D11Device> device, ComPtr<ID3D11Texture2D> existingTexture, Format format);
+    D3D11Texture(Ref<D3D11Device> device,
+                 ComPtr<ID3D11Texture2D> existingTexture,
+                 Format format,
+                 TextureUsageFlags additional_usage);
 
     uint32_t GetWidth() const override
     {

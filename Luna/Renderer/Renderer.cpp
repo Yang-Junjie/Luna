@@ -32,6 +32,24 @@ namespace {
 constexpr uint64_t kScenePickReadbackBufferSize = 256;
 constexpr uint32_t kRenderGraphGpuTimestampQueryCount = 512;
 
+RenderGraphTextureDesc makeSwapchainSceneColorDesc(luna::RHI::Extent2D extent, luna::RHI::Format format)
+{
+    return RenderGraphTextureDesc{
+        .Name = "SceneSwapchainOutputColor",
+        .Type = luna::RHI::TextureType::Texture2D,
+        .Width = extent.width,
+        .Height = extent.height,
+        .Depth = 1,
+        .ArrayLayers = 1,
+        .MipLevels = 1,
+        .Format = format,
+        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled |
+                 luna::RHI::TextureUsageFlags::TransferSrc,
+        .InitialState = luna::RHI::ResourceState::Undefined,
+        .SampleCount = luna::RHI::SampleCount::Count1,
+    };
+}
+
 const luna::RHI::Ref<luna::RHI::Texture>& emptyRendererTextureRef()
 {
     static const luna::RHI::Ref<luna::RHI::Texture> empty_ref{};
@@ -535,10 +553,11 @@ void Renderer::renderFrame()
         },
         transient_texture_cache);
 
-    const auto back_buffer_handle = graph_builder.ImportTexture("SwapchainBackBuffer",
-                                                                back_buffer,
-                                                                was_presented ? luna::RHI::ResourceState::Present
-                                                                              : luna::RHI::ResourceState::Undefined);
+    const auto back_buffer_handle = graph_builder.ImportTexture(
+        "SwapchainBackBuffer",
+        back_buffer,
+        was_presented ? luna::RHI::ResourceState::Present : luna::RHI::ResourceState::Undefined,
+        luna::RHI::ResourceState::Present);
     const bool pick_readback_slot_available =
         frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
         frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
@@ -1308,7 +1327,8 @@ void Renderer::createSwapchain(uint32_t width, uint32_t height)
                                                    .SetPresentMode(selected_present_mode)
                                                    .SetMinImageCount(min_image_count)
                                                    .SetPreTransform(capabilities.currentTransform)
-                                                   .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment)
+                                                   .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment |
+                                                             luna::RHI::SwapchainUsageFlags::TransferDst)
                                                    .SetSurface(device_context.surface)
                                                    .Build());
     if (!device_context.swapchain) {
@@ -1419,7 +1439,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
     uint32_t scene_height = 0;
 
     if (render_to_swapchain) {
-        result.color = request.back_buffer;
+        result.color = graph_builder.CreateTexture(
+            makeSwapchainSceneColorDesc(request.framebuffer_extent, request.surface_format));
         scene_color_format = request.surface_format;
         scene_width = request.framebuffer_extent.width;
         scene_height = request.framebuffer_extent.height;
@@ -1540,6 +1561,10 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                     pass_context.beginRendering();
                     pass_context.endRendering();
                 });
+        }
+
+        if (render_to_swapchain && result.color.isValid() && request.back_buffer.isValid()) {
+            graph_builder.AddCopyPass("SceneOutputToSwapchain", result.color, request.back_buffer);
         }
     }
 

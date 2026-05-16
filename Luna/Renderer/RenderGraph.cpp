@@ -144,12 +144,17 @@ void RenderGraph::execute() const
         static_cast<size_t>(std::count_if(m_compiled_passes.begin(), m_compiled_passes.end(), [](const auto& pass) {
             return pass.Pass.Type == RenderGraphPassType::Raster;
         }));
-    const size_t compute_pass_count = m_compiled_passes.size() - raster_pass_count;
+    const size_t compute_pass_count =
+        static_cast<size_t>(std::count_if(m_compiled_passes.begin(), m_compiled_passes.end(), [](const auto& pass) {
+            return pass.Pass.Type == RenderGraphPassType::Compute;
+        }));
+    const size_t copy_pass_count = m_compiled_passes.size() - raster_pass_count - compute_pass_count;
     LUNA_RENDERER_FRAME_DEBUG(
-        "Executing render graph with {} pass(es) (raster={}, compute={}), {} texture(s), {} final barrier(s)",
+        "Executing render graph with {} pass(es) (raster={}, compute={}, copy={}), {} texture(s), {} final barrier(s)",
                               m_compiled_passes.size(),
                               raster_pass_count,
                               compute_pass_count,
+                              copy_pass_count,
                               m_textures.size(),
                               m_final_texture_barriers.size());
     auto& command_buffer = *m_frame_context.command_buffer;
@@ -208,8 +213,10 @@ void RenderGraph::execute() const
                                       pass.FramebufferHeight,
                                       pass.RenderingInfo.ColorAttachments.size(),
                                       static_cast<bool>(pass.RenderingInfo.DepthAttachment));
-        } else {
+        } else if (pass.Pass.Type == RenderGraphPassType::Compute) {
             LUNA_RENDERER_FRAME_TRACE("Executing compute render graph pass '{}'", pass.Pass.Name);
+        } else {
+            LUNA_RENDERER_FRAME_TRACE("Executing copy render graph pass '{}'", pass.Pass.Name);
         }
         command_buffer.BeginDebugLabel(pass.Pass.Name, 0.20f, 0.55f, 0.85f, 1.0f);
 
@@ -223,7 +230,7 @@ void RenderGraph::execute() const
             if (pass.ExecuteRaster) {
                 pass.ExecuteRaster(pass_context);
             }
-        } else {
+        } else if (pass.Pass.Type == RenderGraphPassType::Compute) {
             RenderGraphComputePassContext pass_context(m_frame_context.device,
                                                        m_frame_context.command_buffer,
                                                        &m_textures,
@@ -231,6 +238,23 @@ void RenderGraph::execute() const
                                                        m_frame_context.framebuffer_height);
             if (pass.ExecuteCompute) {
                 pass.ExecuteCompute(pass_context);
+            }
+        } else {
+            const luna::RHI::Ref<luna::RHI::Texture>& source = pass.CopySource.isValid() &&
+                                                                      pass.CopySource.Index < m_textures.size()
+                                                                  ? m_textures[pass.CopySource.Index]
+                                                                  : emptyTextureRef();
+            const luna::RHI::Ref<luna::RHI::Texture>& destination =
+                pass.CopyDestination.isValid() && pass.CopyDestination.Index < m_textures.size()
+                    ? m_textures[pass.CopyDestination.Index]
+                    : emptyTextureRef();
+            if (source && destination) {
+                command_buffer.CopyTexture2D(source, destination);
+            } else {
+                LUNA_RENDERER_WARN("Skipping copy render graph pass '{}': source={} destination={}",
+                                   pass.Pass.Name,
+                                   static_cast<bool>(source),
+                                   static_cast<bool>(destination));
             }
         }
 

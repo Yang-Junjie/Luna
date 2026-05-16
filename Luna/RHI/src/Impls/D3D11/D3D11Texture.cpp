@@ -263,6 +263,13 @@ D3D11Texture::D3D11Texture(Ref<D3D11Device> device, const TextureCreateInfo& cre
 }
 
 D3D11Texture::D3D11Texture(Ref<D3D11Device> device, ComPtr<ID3D11Texture2D> existingTexture, Format format)
+    : D3D11Texture(std::move(device), std::move(existingTexture), format, TextureUsageFlags::None)
+{}
+
+D3D11Texture::D3D11Texture(Ref<D3D11Device> device,
+                           ComPtr<ID3D11Texture2D> existingTexture,
+                           Format format,
+                           TextureUsageFlags additional_usage)
     : m_device(std::move(device)),
       m_texture(std::move(existingTexture)),
       m_format(format)
@@ -283,6 +290,7 @@ D3D11Texture::D3D11Texture(Ref<D3D11Device> device, ComPtr<ID3D11Texture2D> exis
     if (desc.BindFlags & D3D11_BIND_DEPTH_STENCIL) {
         m_usage = m_usage | TextureUsageFlags::DepthStencilAttachment;
     }
+    m_usage |= additional_usage;
     if (m_usage == TextureUsageFlags{}) {
         m_usage = TextureUsageFlags::ColorAttachment;
     }

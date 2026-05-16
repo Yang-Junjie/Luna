@@ -26,6 +26,7 @@ namespace luna {
 enum class RenderGraphPassType : uint8_t {
     Raster,
     Compute,
+    Copy,
 };
 
 struct RenderGraphTextureHandle {
@@ -152,6 +153,8 @@ struct RenderGraphCompiledPass {
     uint32_t WriteTextureCount{0};
     std::function<void(RenderGraphRasterPassContext&)> ExecuteRaster;
     std::function<void(RenderGraphComputePassContext&)> ExecuteCompute;
+    RenderGraphTextureHandle CopySource{};
+    RenderGraphTextureHandle CopyDestination{};
 };
 
 class RenderGraph {

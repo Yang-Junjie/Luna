@@ -58,6 +58,12 @@ struct RenderGraphComputePassNode {
     bool SideEffect{false};
 };
 
+struct RenderGraphCopyPassNode {
+    std::string Name;
+    RenderGraphTextureHandle Source{};
+    RenderGraphTextureHandle Destination{};
+};
+
 struct RenderGraphPassOrderEntry {
     RenderGraphPassType Type{RenderGraphPassType::Raster};
     size_t Index{0};
@@ -145,6 +151,9 @@ public:
                                        ComputePassSetupCallback setup,
                                        ComputePassExecuteCallback execute,
                                        bool side_effect = false);
+    RenderGraphBuilder& AddCopyPass(const std::string& name,
+                                    RenderGraphTextureHandle source,
+                                    RenderGraphTextureHandle destination);
 
     std::unique_ptr<RenderGraph> Build();
 
@@ -157,6 +166,7 @@ private:
     std::vector<detail::RenderGraphTextureNode> m_texture_nodes;
     std::vector<detail::RenderGraphRasterPassNode> m_raster_pass_nodes;
     std::vector<detail::RenderGraphComputePassNode> m_compute_pass_nodes;
+    std::vector<detail::RenderGraphCopyPassNode> m_copy_pass_nodes;
     std::vector<detail::RenderGraphPassOrderEntry> m_pass_order;
 };
 

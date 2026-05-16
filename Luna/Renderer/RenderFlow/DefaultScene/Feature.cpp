@@ -139,7 +139,12 @@ bool registerScenePasses(RenderFlowBuilder& builder, PassSharedState& state)
                kFeatureName,
                pass_slots::PostProcess,
                std::string(extension_slots::AfterPostProcess),
-               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterPostProcess)));
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::AfterPostProcess))) &&
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               extension_slots::AfterPostProcess,
+               std::string(extension_slots::BeforeOverlay),
+               std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeOverlay)));
 }
 
 AssetCache::ClearMode toClearMode(PipelineResources::Invalidation invalidation)

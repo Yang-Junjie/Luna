@@ -57,6 +57,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/Features/RenderFeatureModules.cpp
     Renderer/RenderFlow/Features/BloomFeature.h
     Renderer/RenderFlow/Features/BloomFeature.cpp
+    Renderer/RenderFlow/Features/FXAAFeature.h
+    Renderer/RenderFlow/Features/FXAAFeature.cpp
     Renderer/RenderFlow/Features/EditorInfiniteGridFeature.h
     Renderer/RenderFlow/Features/EditorInfiniteGridFeature.cpp
     Renderer/RenderFlow/Features/ScreenSpaceAmbientOcclusionFeature.h
@@ -126,6 +128,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/TransparentComposite.slang
     Renderer/Shaders/PostProcess.slang
     Renderer/Shaders/Bloom.slang
+    Renderer/Shaders/FXAA.slang
     Renderer/Shaders/EditorInfiniteGrid.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang

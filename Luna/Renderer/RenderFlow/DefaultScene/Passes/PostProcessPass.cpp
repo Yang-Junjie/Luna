@@ -41,16 +41,19 @@ void PostProcessPass::setup(RenderPassContext& context)
     const SceneRenderContext& scene_context = context.sceneContext();
     const RenderGraphTextureHandle scene_color =
         readBlackboardTexture(context.blackboard(), blackboard::SceneBloomCompositedColor, name());
-    blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::Final, scene_context.color_target);
-    if (!scene_color.isValid() || scene_color.Index == scene_context.color_target.Index) {
+    const auto requested_output = context.blackboard().get(blackboard::SceneFinalColor);
+    const RenderGraphTextureHandle output =
+        requested_output.has_value() && requested_output->isValid() ? *requested_output : scene_context.color_target;
+    blackboard::publishSceneColorStage(context.blackboard(), blackboard::SceneColorStage::Final, output);
+    if (!scene_color.isValid() || scene_color.Index == output.Index) {
         return;
     }
 
     context.graph().AddRasterPass(
         name(),
-        [scene_color, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
+        [scene_color, output](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(scene_color);
-            pass_builder.WriteColor(scene_context.color_target,
+            pass_builder.WriteColor(output,
                                     luna::RHI::AttachmentLoadOp::Clear,
                                     luna::RHI::AttachmentStoreOp::Store,
                                     luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));

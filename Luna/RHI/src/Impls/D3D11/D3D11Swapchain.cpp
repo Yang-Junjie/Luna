@@ -14,7 +14,8 @@ D3D11Swapchain::D3D11Swapchain(Ref<D3D11Device> device, const SwapchainCreateInf
       m_extent(createInfo.Extent),
       m_format(createInfo.Format),
       m_presentMode(createInfo.PresentMode),
-      m_imageCount(createInfo.MinImageCount)
+      m_imageCount(createInfo.MinImageCount),
+      m_usage(createInfo.Usage)
 {
     DXGI_SWAP_CHAIN_DESC1 desc{};
     desc.Width = m_extent.width;
@@ -22,6 +23,9 @@ D3D11Swapchain::D3D11Swapchain(Ref<D3D11Device> device, const SwapchainCreateInf
     desc.Format = D3D11_ToDXGIFormat(m_format);
     desc.SampleDesc.Count = 1;
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    if (m_usage & SwapchainUsageFlags::TransferSrc) {
+        desc.BufferUsage |= DXGI_USAGE_SHADER_INPUT;
+    }
     desc.BufferCount = m_imageCount;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
@@ -55,7 +59,14 @@ void D3D11Swapchain::CreateBackBuffers()
     ComPtr<ID3D11Texture2D> backBuffer;
     m_swapchain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
     if (backBuffer) {
-        auto tex = CreateRef<D3D11Texture>(m_device, backBuffer, m_format);
+        TextureUsageFlags additional_usage = TextureUsageFlags::None;
+        if (m_usage & SwapchainUsageFlags::TransferDst) {
+            additional_usage |= TextureUsageFlags::TransferDst;
+        }
+        if (m_usage & SwapchainUsageFlags::TransferSrc) {
+            additional_usage |= TextureUsageFlags::TransferSrc;
+        }
+        auto tex = CreateRef<D3D11Texture>(m_device, backBuffer, m_format, additional_usage);
         m_backBuffers.resize(m_imageCount, tex);
     }
 }

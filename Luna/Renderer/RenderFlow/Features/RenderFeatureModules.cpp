@@ -6,6 +6,7 @@ void linkBloomFeature();
 void linkScreenSpaceAmbientOcclusionFeature();
 void linkEditorInfiniteGridFeature();
 void linkTemporalAntiAliasingFeature();
+void linkFXAAFeature();
 
 void linkBuiltInRenderFeatureModules()
 {
@@ -13,6 +14,7 @@ void linkBuiltInRenderFeatureModules()
     linkScreenSpaceAmbientOcclusionFeature();
     linkEditorInfiniteGridFeature();
     linkTemporalAntiAliasingFeature();
+    linkFXAAFeature();
 }
 
 } // namespace luna::render_flow

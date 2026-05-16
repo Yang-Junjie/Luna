@@ -16,6 +16,8 @@ const char* renderGraphPassTypeToString(RenderGraphPassType type)
             return "Raster";
         case RenderGraphPassType::Compute:
             return "Compute";
+        case RenderGraphPassType::Copy:
+            return "Copy";
         default:
             return "Unknown";
     }

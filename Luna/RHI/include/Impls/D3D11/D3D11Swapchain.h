@@ -53,6 +53,7 @@ private:
     Extent2D m_extent{};
     Format m_format = Format::BGRA8_UNORM;
     PresentMode m_presentMode = PresentMode::Mailbox;
+    SwapchainUsageFlags m_usage = SwapchainUsageFlags::ColorAttachment;
 };
 } // namespace luna::RHI
 #endif

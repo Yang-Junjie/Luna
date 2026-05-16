@@ -422,6 +422,28 @@ RenderGraphBuilder& RenderGraphBuilder::AddComputePass(const std::string& name,
     return *this;
 }
 
+RenderGraphBuilder& RenderGraphBuilder::AddCopyPass(const std::string& name,
+                                                    RenderGraphTextureHandle source,
+                                                    RenderGraphTextureHandle destination)
+{
+    const size_t pass_index = m_copy_pass_nodes.size();
+    m_copy_pass_nodes.push_back(detail::RenderGraphCopyPassNode{
+        .Name = name,
+        .Source = source,
+        .Destination = destination,
+    });
+    m_pass_order.push_back(detail::RenderGraphPassOrderEntry{
+        .Type = RenderGraphPassType::Copy,
+        .Index = pass_index,
+    });
+
+    LUNA_RENDERER_FRAME_DEBUG("Added copy render graph pass '{}' (source={} destination={})",
+                              name,
+                              source.Index,
+                              destination.Index);
+    return *this;
+}
+
 std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
 {
     if (!m_frame_context.device || !m_frame_context.command_buffer) {
@@ -487,7 +509,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                 isHandleValid(pass_node.DepthAttachment->Handle, texture_count)) {
                 live_resources[pass_node.DepthAttachment->Handle.Index] = true;
             }
-        } else {
+        } else if (pass_entry.Type == RenderGraphPassType::Compute) {
             if (pass_entry.Index >= m_compute_pass_nodes.size()) {
                 continue;
             }
@@ -517,6 +539,25 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                 if (isHandleValid(write.Handle, texture_count)) {
                     live_resources[write.Handle.Index] = true;
                 }
+            }
+        } else {
+            if (pass_entry.Index >= m_copy_pass_nodes.size()) {
+                continue;
+            }
+
+            const auto& pass_node = m_copy_pass_nodes[pass_entry.Index];
+            const bool is_live = isHandleValid(pass_node.Destination, texture_count) &&
+                                 live_resources[pass_node.Destination.Index];
+            if (!is_live) {
+                continue;
+            }
+
+            live_passes[order_index] = true;
+            if (isHandleValid(pass_node.Source, texture_count)) {
+                live_resources[pass_node.Source.Index] = true;
+            }
+            if (isHandleValid(pass_node.Destination, texture_count)) {
+                live_resources[pass_node.Destination.Index] = true;
             }
         }
     }
@@ -561,6 +602,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             } else if (pass_entry.Type == RenderGraphPassType::Compute &&
                        pass_entry.Index < m_compute_pass_nodes.size()) {
                 LUNA_RENDERER_FRAME_TRACE("Culled render graph pass '{}'", m_compute_pass_nodes[pass_entry.Index].Name);
+            } else if (pass_entry.Type == RenderGraphPassType::Copy && pass_entry.Index < m_copy_pass_nodes.size()) {
+                LUNA_RENDERER_FRAME_TRACE("Culled render graph pass '{}'", m_copy_pass_nodes[pass_entry.Index].Name);
             }
             continue;
         }
@@ -634,7 +677,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
 
             pass_list.push_back(compiled_pass.Pass);
             compiled_passes.push_back(std::move(compiled_pass));
-        } else {
+        } else if (pass_entry.Type == RenderGraphPassType::Compute) {
             if (pass_entry.Index >= m_compute_pass_nodes.size()) {
                 continue;
             }
@@ -666,6 +709,37 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    write.Handle,
                                    luna::RHI::ResourceState::UnorderedAccess);
             }
+
+            pass_list.push_back(compiled_pass.Pass);
+            compiled_passes.push_back(std::move(compiled_pass));
+        } else {
+            if (pass_entry.Index >= m_copy_pass_nodes.size()) {
+                continue;
+            }
+
+            auto& pass_node = m_copy_pass_nodes[pass_entry.Index];
+            RenderGraphCompiledPass compiled_pass;
+            compiled_pass.Pass = RenderGraphPass{
+                .Name = pass_node.Name,
+                .Type = RenderGraphPassType::Copy,
+            };
+            compiled_pass.CopySource = pass_node.Source;
+            compiled_pass.CopyDestination = pass_node.Destination;
+            compiled_pass.FramebufferWidth = m_frame_context.framebuffer_width;
+            compiled_pass.FramebufferHeight = m_frame_context.framebuffer_height;
+            compiled_pass.ReadTextureCount = 1;
+            compiled_pass.WriteTextureCount = 1;
+
+            addBarrierIfNeeded(compiled_pass.PreTextureBarriers,
+                               current_states,
+                               physical_textures,
+                               pass_node.Source,
+                               luna::RHI::ResourceState::CopySource);
+            addBarrierIfNeeded(compiled_pass.PreTextureBarriers,
+                               current_states,
+                               physical_textures,
+                               pass_node.Destination,
+                               luna::RHI::ResourceState::CopyDest);
 
             pass_list.push_back(compiled_pass.Pass);
             compiled_passes.push_back(std::move(compiled_pass));
