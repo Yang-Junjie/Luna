@@ -27,6 +27,20 @@ struct StaticMeshVertex {
     glm::vec3 Bitangent{0.0f, 1.0f, 0.0f};
 };
 
+struct MeshBounds {
+    glm::vec3 Min{0.0f};
+    glm::vec3 Max{0.0f};
+    glm::vec3 Center{0.0f};
+    glm::vec3 Extents{0.0f};
+    float Radius{0.0f};
+    bool Valid{false};
+
+    [[nodiscard]] bool isValid() const noexcept
+    {
+        return Valid;
+    }
+};
+
 struct SubMesh {
     std::string Name;
 
@@ -34,6 +48,7 @@ struct SubMesh {
     std::vector<uint32_t> Indices;
 
     uint32_t MaterialIndex{UINT32_MAX};
+    MeshBounds Bounds{};
 };
 
 class Mesh final : public Asset {
@@ -46,6 +61,7 @@ public:
 
     const std::string& getName() const;
     const std::vector<SubMesh>& getSubMeshes() const;
+    const MeshBounds& getBounds() const;
 
     AssetType getAssetsType() const override
     {
@@ -57,10 +73,7 @@ public:
 private:
     std::string m_name;
     std::vector<SubMesh> m_subMeshes;
+    MeshBounds m_bounds{};
 };
 
 } // namespace luna
-
-
-
-

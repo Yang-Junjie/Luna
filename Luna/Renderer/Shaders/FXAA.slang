@@ -119,7 +119,7 @@ float4 FXAAFragmentMain(FXAAVertexOutput input) : SV_Target
     float lumaEndNegative = 0.0;
     float lumaEndPositive = 0.0;
 
-    [unroll]
+    [loop]
     for (int i = 0; i < 12; ++i)
     {
         if (!doneNegative)
