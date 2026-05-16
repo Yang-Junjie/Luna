@@ -1,6 +1,7 @@
 #include "InspectorPlugin.h"
 
 #include "EditorApi/EditorApi.h"
+#include "EditorUI.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <algorithm>
@@ -402,7 +403,7 @@ void syncMaterialSlotsToMesh(luna::editor::Host& host, luna::editor::SceneMeshCo
     }
 }
 
-constexpr float kPropertyLabelWidth = 116.0f;
+constexpr float kPropertyLabelWidth = 108.0f;
 
 std::string hiddenLabel(std::string_view id)
 {
@@ -423,8 +424,9 @@ bool fullWidthButton(luna::editor::Ui& ui, std::string_view label)
 
 bool beginPropertyTable(luna::editor::Ui& ui, std::string_view id, float label_width = kPropertyLabelWidth)
 {
-    const luna::editor::TableFlags flags =
-        luna::editor::TableFlag::RowBg | luna::editor::TableFlag::SizingStretchProp;
+    const luna::editor::TableFlags flags = luna::editor::TableFlag::RowBg |
+                                           luna::editor::TableFlag::BordersInnerH |
+                                           luna::editor::TableFlag::SizingStretchProp;
     if (!ui.beginTable(id, 2, flags)) {
         return false;
     }
@@ -520,6 +522,18 @@ struct InspectorSection {
     bool remove_requested{false};
 };
 
+struct CompactInspectorStyleGuard {
+    CompactInspectorStyleGuard()
+    {
+        luna::editor::ui::pushCompactInspectorStyle();
+    }
+
+    ~CompactInspectorStyleGuard()
+    {
+        luna::editor::ui::popCompactInspectorStyle();
+    }
+};
+
 InspectorSection beginInspectorSection(luna::editor::Ui& ui,
                                        std::string_view id,
                                        std::string_view label,
@@ -543,7 +557,6 @@ void endInspectorSection(luna::editor::Ui& ui, const InspectorSection& section)
     if (section.open) {
         ui.endSection();
     }
-    ui.spacing();
 }
 
 bool drawCameraProjectionCombo(luna::editor::Ui& ui,
@@ -718,7 +731,11 @@ bool drawAssetField(luna::editor::Host& host,
 
 void drawEntityHeader(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor::SceneEntityDetails& details)
 {
-    ui.separatorText("Entity");
+    const InspectorSection section = beginInspectorSection(ui, "InspectorEntity", "Entity");
+    if (!section.open) {
+        endInspectorSection(ui, section);
+        return;
+    }
 
     if (!host.scene().canEditScene()) {
         ui.beginDisabled();
@@ -734,6 +751,7 @@ void drawEntityHeader(luna::editor::Host& host, luna::editor::Ui& ui, const luna
     if (!host.scene().canEditScene()) {
         ui.endDisabled();
     }
+    endInspectorSection(ui, section);
 }
 
 void drawAddComponentPopup(luna::editor::Host& host,
@@ -767,7 +785,12 @@ void drawAddComponentActions(luna::editor::Host& host,
         return;
     }
 
-    ui.separatorText("Add Component");
+    const InspectorSection section = beginInspectorSection(ui, "InspectorAddComponent", "Add Component");
+    if (!section.open) {
+        endInspectorSection(ui, section);
+        return;
+    }
+
     if (!host.scene().canEditScene()) {
         ui.beginDisabled();
     }
@@ -780,6 +803,7 @@ void drawAddComponentActions(luna::editor::Host& host,
     if (!host.scene().canEditScene()) {
         ui.endDisabled();
     }
+    endInspectorSection(ui, section);
 }
 
 void drawTransform(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor::SceneEntityDetails& details)
@@ -1730,6 +1754,7 @@ private:
     {
         Host& host = context.host();
         Ui& ui = context.ui();
+        const CompactInspectorStyleGuard compact_style_guard{};
 
         const EntityId selected_entity_id = host.selection().selectedEntityId();
         if (!selected_entity_id.isValid()) {
