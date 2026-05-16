@@ -7,6 +7,7 @@
 #include "Core/Log.h"
 #include "EditorApi/EditorApi.h"
 #include "EditorAssetDragDrop.h"
+#include "EditorSettings.h"
 #include "EditorStyle.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorLayer.h"
@@ -4010,13 +4011,85 @@ private:
     std::unordered_map<std::string, size_t> m_order_by_id;
 };
 
+class EditorSettingsService final : public SettingsService {
+public:
+    explicit EditorSettingsService(EditorSettingsStore& settings_store)
+        : m_settings_store(&settings_store)
+    {}
+
+    EditorFontSettings editorFont() const override
+    {
+        if (m_settings_store == nullptr) {
+            return {};
+        }
+
+        const EditorSettingsData& data = m_settings_store->data();
+        return EditorFontSettings{
+            .font_path = data.font_path.empty() ? m_settings_store->defaultFontPath() : data.font_path,
+            .size_pixels = data.font_size_pixels,
+            .using_default = data.font_path.empty(),
+        };
+    }
+
+    std::vector<EditorFontInfo> listEditorFonts() const override
+    {
+        if (m_settings_store == nullptr) {
+            return {};
+        }
+
+        std::vector<EditorFontInfo> fonts;
+        for (const EditorSettingsFontInfo& font : m_settings_store->listFonts()) {
+            fonts.push_back(EditorFontInfo{
+                .display_name = font.display_name,
+                .path = font.path,
+                .active = font.active,
+            });
+        }
+        return fonts;
+    }
+
+    std::filesystem::path settingsPath() const override
+    {
+        return m_settings_store != nullptr ? m_settings_store->settingsPath() : std::filesystem::path{};
+    }
+
+    std::string lastError() const override
+    {
+        return m_settings_store != nullptr ? m_settings_store->lastError() : std::string{};
+    }
+
+    bool restartRequired() const noexcept override
+    {
+        return m_settings_store != nullptr && m_settings_store->restartRequired();
+    }
+
+    bool setEditorFont(const std::filesystem::path& font_path, float size_pixels) override
+    {
+        return m_settings_store != nullptr && m_settings_store->setEditorFont(font_path, size_pixels);
+    }
+
+    bool resetEditorFont() override
+    {
+        return m_settings_store != nullptr && m_settings_store->resetEditorFont();
+    }
+
+    bool save() override
+    {
+        return m_settings_store != nullptr && m_settings_store->save();
+    }
+
+private:
+    EditorSettingsStore* m_settings_store{nullptr};
+};
+
 struct EditorShell::Impl {
-    Impl(EditorShell& shell, LunaEditorLayer& editor_layer)
+    Impl(EditorShell& shell, LunaEditorLayer& editor_layer, EditorSettingsStore& settings_store)
         : ui(),
           asset_service(shell),
           project_service(),
           scene_service(editor_layer),
           selection_service(editor_layer),
+          settings_service(settings_store),
           rendering_service(editor_layer),
           current_plugin_owner_id(),
           viewport_service(editor_layer, current_plugin_owner_id),
@@ -4037,6 +4110,7 @@ struct EditorShell::Impl {
     EditorProjectService project_service;
     EditorSceneService scene_service;
     EditorSelectionService selection_service;
+    EditorSettingsService settings_service;
     EditorRenderingService rendering_service;
     std::string current_plugin_owner_id;
     EditorViewportService viewport_service;
@@ -4053,8 +4127,8 @@ struct EditorShell::Impl {
     std::vector<std::unique_ptr<Plugin>> plugins;
 };
 
-EditorShell::EditorShell(LunaEditorLayer& editor_layer)
-    : m_impl(std::make_unique<Impl>(*this, editor_layer))
+EditorShell::EditorShell(LunaEditorLayer& editor_layer, EditorSettingsStore& settings_store)
+    : m_impl(std::make_unique<Impl>(*this, editor_layer, settings_store))
 {}
 
 EditorShell::~EditorShell()
@@ -4130,6 +4204,11 @@ SceneService& EditorShell::scene()
 SelectionService& EditorShell::selection()
 {
     return m_impl->selection_service;
+}
+
+SettingsService& EditorShell::settings()
+{
+    return m_impl->settings_service;
 }
 
 ShortcutService& EditorShell::shortcuts()

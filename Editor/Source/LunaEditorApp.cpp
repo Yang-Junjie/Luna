@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -30,6 +31,30 @@ luna::ImGuiFontConfig defaultEditorFontConfig()
         .font_path = sourceRoot() / kDefaultEditorFontRelativePath,
         .size_pixels = kDefaultEditorFontSizePixels,
     };
+}
+
+luna::editor::EditorSettingsStore makeEditorSettingsStore(const luna::editor::EditorEnginePaths& engine_paths)
+{
+    std::vector<std::filesystem::path> font_roots;
+    font_roots.push_back(engine_paths.engine_resources_root / "fonts");
+    font_roots.push_back(engine_paths.engine_resources_root / "Editor" / "fonts");
+    font_roots.push_back(sourceRoot() / "Editor" / "Asset" / "fonts");
+
+    std::filesystem::path default_font_path = defaultEditorFontConfig().font_path;
+    const std::filesystem::path installed_default_font =
+        engine_paths.engine_resources_root / "fonts" / "Play-Regular.ttf";
+    std::error_code exists_ec;
+    if (std::filesystem::exists(installed_default_font, exists_ec) && !exists_ec) {
+        default_font_path = installed_default_font;
+    }
+
+    luna::editor::EditorSettingsStore settings{
+        engine_paths.engine_data_root / "Settings" / "EditorSettings.yaml",
+        std::move(default_font_path),
+        std::move(font_roots),
+    };
+    (void) settings.load();
+    return settings;
 }
 
 const char* presentModeToString(luna::RHI::PresentMode mode)
@@ -127,6 +152,12 @@ luna::RHI::BackendType resolveCapabilitiesBackend(luna::RHI::BackendType backend
 namespace luna {
 
 LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend, editor::EditorEnginePaths engine_paths)
+    : LunaEditorApplication(backend, engine_paths, makeEditorSettingsStore(engine_paths))
+{}
+
+LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend,
+                                             editor::EditorEnginePaths engine_paths,
+                                             editor::EditorSettingsStore editor_settings)
     : Application(ApplicationSpecification{
           .m_name = "Luna Editor",
           .m_window_width = 1'600,
@@ -134,10 +165,11 @@ LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend, edi
           .m_maximized = false,
           .m_enable_imgui = luna::RHI::makeCapabilitiesForBackend(resolveCapabilitiesBackend(backend)).supports_imgui,
           .m_enable_multi_viewport = false,
-          .m_imgui_font = defaultEditorFontConfig(),
+          .m_imgui_font = editor_settings.imguiFontConfig(),
       }),
       m_backend(backend),
-      m_engine_paths(std::move(engine_paths))
+      m_engine_paths(std::move(engine_paths)),
+      m_editor_settings(std::move(editor_settings))
 {}
 
 luna::RHI::BackendType LunaEditorApplication::getBackend() const
@@ -148,6 +180,16 @@ luna::RHI::BackendType LunaEditorApplication::getBackend() const
 const editor::EditorEnginePaths& LunaEditorApplication::enginePaths() const noexcept
 {
     return m_engine_paths;
+}
+
+editor::EditorSettingsStore& LunaEditorApplication::editorSettings() noexcept
+{
+    return m_editor_settings;
+}
+
+const editor::EditorSettingsStore& LunaEditorApplication::editorSettings() const noexcept
+{
+    return m_editor_settings;
 }
 
 Renderer::InitializationOptions LunaEditorApplication::getRendererInitializationOptions()

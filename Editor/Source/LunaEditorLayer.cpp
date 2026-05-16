@@ -555,7 +555,7 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application)
 {
-    m_editor_shell = std::make_unique<editor::EditorShell>(*this);
+    m_editor_shell = std::make_unique<editor::EditorShell>(*this, application.editorSettings());
     m_editor_plugin_manager = std::make_unique<editor::EditorPluginManager>(*m_editor_shell);
     m_editor_shell->setPluginInfoProvider([this]() {
         return m_editor_plugin_manager ? m_editor_plugin_manager->pluginInfos() : std::vector<editor::PluginInfo>{};

@@ -34,12 +34,14 @@ class ScriptService;
 class RenderingService;
 class SceneService;
 class SelectionService;
+class SettingsService;
 class ShortcutService;
 class ViewportService;
+class EditorSettingsStore;
 
 class EditorShell final : public EditorPluginManagerHost {
 public:
-    explicit EditorShell(LunaEditorLayer& editor_layer);
+    EditorShell(LunaEditorLayer& editor_layer, EditorSettingsStore& settings_store);
     ~EditorShell() override;
 
     Ui& ui() override;
@@ -56,6 +58,7 @@ public:
     RenderingService& rendering() override;
     SceneService& scene() override;
     SelectionService& selection() override;
+    SettingsService& settings() override;
     ShortcutService& shortcuts() override;
     RuntimeViewportService& runtimeViewport() override;
     ViewportService& viewport() override;

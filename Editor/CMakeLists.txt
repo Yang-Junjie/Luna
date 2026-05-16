@@ -7,6 +7,8 @@ add_executable(
     Source/EditorDocumentHost.h
     Source/EditorEnginePaths.h
     Source/EditorEnginePaths.cpp
+    Source/EditorSettings.h
+    Source/EditorSettings.cpp
     Source/EditorAssetDragDrop.h
     Source/EditorRuntime.h
     Source/EditorRuntime.cpp

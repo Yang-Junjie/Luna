@@ -1,0 +1,9 @@
+EditorPlugin:
+  Id: luna.editor.editor-settings
+  DisplayName: Editor Settings
+  Runtime: BuiltinNative
+  Category: Core
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

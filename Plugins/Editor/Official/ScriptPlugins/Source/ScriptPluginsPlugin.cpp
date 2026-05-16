@@ -35,6 +35,34 @@ std::string joinScriptExtensions(const std::vector<std::string>& extensions)
     return joined_extensions;
 }
 
+std::string describeAssetRefresh(const luna::editor::AssetRefreshResult& result)
+{
+    std::string message = result.message.empty()
+                              ? (result.project_loaded ? std::string("Asset sync completed.")
+                                                       : std::string("Asset sync did not run."))
+                              : result.message;
+    if (!result.project_loaded) {
+        return message;
+    }
+
+    message += " Discovered " + std::to_string(result.discovered_assets) + " asset(s), imported " +
+               std::to_string(result.imported_missing_assets) + ".";
+    if (result.script_files_skipped_no_plugin > 0u) {
+        message += " Skipped " + std::to_string(result.script_files_skipped_no_plugin) +
+                   " script file(s) because no usable script plugin is loaded.";
+    }
+    if (result.script_files_skipped_unsupported_language > 0u) {
+        message += " Skipped " + std::to_string(result.script_files_skipped_unsupported_language) +
+                   " script file(s) because they are not supported by the selected script plugin.";
+    }
+    if (result.failed_assets > 0u || result.missing_metadata_after_sync > 0u) {
+        message += " Failed " + std::to_string(result.failed_assets) + " asset(s), missing metadata for " +
+                   std::to_string(result.missing_metadata_after_sync) + ".";
+    }
+
+    return message;
+}
+
 } // namespace
 
 namespace luna::editor {
@@ -58,7 +86,7 @@ public:
             .default_open = true,
             .default_size = Vec2{.x = 700.0f, .y = 520.0f},
             .draw =
-                [](WindowDrawContext& context) {
+                [this](WindowDrawContext& context) {
                     Host& host = context.host();
                     Ui& ui = context.ui();
                     ScriptPluginService& script_plugins = host.scriptPlugins();
@@ -70,6 +98,7 @@ public:
 
                     if (ui.button("Refresh")) {
                         script_plugins.refreshProjectScriptPlugins();
+                        m_asset_refresh_status = describeAssetRefresh(host.assets().refreshAssets());
                     }
 
                     const ScriptPluginCandidate* selected_candidate = script_plugins.getSelectedScriptPluginCandidate();
@@ -84,6 +113,10 @@ public:
                     if (!status.empty()) {
                         ui.spacing();
                         ui.textWrapped(status);
+                    }
+                    if (!m_asset_refresh_status.empty()) {
+                        ui.spacing();
+                        ui.textWrapped(m_asset_refresh_status);
                     }
 
                     const auto& candidates = script_plugins.getDiscoveredScriptPlugins();
@@ -117,7 +150,11 @@ public:
                         if (ui.selectable(std::string(candidate.Manifest.DisplayName) + "##" +
                                               candidate.Manifest.PluginId,
                                           is_selected)) {
-                            (void) script_plugins.selectScriptPlugin(&candidate);
+                            if (script_plugins.selectScriptPlugin(&candidate)) {
+                                m_asset_refresh_status = describeAssetRefresh(host.assets().refreshAssets());
+                            } else {
+                                m_asset_refresh_status = "Failed to select script plugin.";
+                            }
                         }
                         if (is_selected) {
                             ui.setItemDefaultFocus();
@@ -152,6 +189,9 @@ public:
     {
         host.windows().unregisterWindow(kWindowId);
     }
+
+private:
+    std::string m_asset_refresh_status;
 };
 
 std::unique_ptr<Plugin> createScriptPluginsPlugin()

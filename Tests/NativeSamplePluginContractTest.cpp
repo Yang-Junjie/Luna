@@ -12,6 +12,7 @@
 #include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorScriptService.h"
 #include "EditorApi/EditorSelectionService.h"
+#include "EditorApi/EditorSettingsService.h"
 #include "EditorApi/EditorShortcutService.h"
 #include "EditorApi/EditorUi.h"
 #include "EditorApi/EditorViewportService.h"
@@ -977,6 +978,18 @@ public:
     }
 };
 
+class ManagerSmokeSettingsService final : public luna::editor::SettingsService {
+public:
+    [[nodiscard]] luna::editor::EditorFontSettings editorFont() const override { return {}; }
+    [[nodiscard]] std::vector<luna::editor::EditorFontInfo> listEditorFonts() const override { return {}; }
+    [[nodiscard]] std::filesystem::path settingsPath() const override { return {}; }
+    [[nodiscard]] std::string lastError() const override { return {}; }
+    [[nodiscard]] bool restartRequired() const noexcept override { return false; }
+    bool setEditorFont(const std::filesystem::path&, float) override { return true; }
+    bool resetEditorFont() override { return true; }
+    bool save() override { return true; }
+};
+
 class ManagerSmokeBuiltinPlugin final : public luna::editor::Plugin {
 public:
     explicit ManagerSmokeBuiltinPlugin(std::string plugin_id)
@@ -1014,6 +1027,7 @@ public:
     luna::editor::RenderingService& rendering() override { return rendering_service; }
     luna::editor::SceneService& scene() override { return scene_service; }
     luna::editor::SelectionService& selection() override { return selection_service; }
+    luna::editor::SettingsService& settings() override { return settings_service; }
     luna::editor::ShortcutService& shortcuts() override { return shortcut_service; }
     luna::editor::RuntimeViewportService& runtimeViewport() override { return runtime_viewport_service; }
     luna::editor::ViewportService& viewport() override { return viewport_service; }
@@ -1088,6 +1102,7 @@ public:
     ManagerSmokeRenderingService rendering_service;
     ManagerSmokeSceneService scene_service;
     ManagerSmokeSelectionService selection_service;
+    ManagerSmokeSettingsService settings_service;
     ManagerSmokeShortcutService shortcut_service;
     ManagerSmokeRuntimeViewportService runtime_viewport_service;
     ManagerSmokeViewportService viewport_service;
