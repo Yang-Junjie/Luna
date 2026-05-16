@@ -15,7 +15,6 @@
 #include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Shell/EditorPluginDependencyResolver.h"
 #include "Shell/EditorPluginManifest.h"
-#include "Shell/EditorShell.h"
 
 #include <algorithm>
 #include <cstring>
@@ -32,7 +31,7 @@ namespace {
 namespace luna::editor {
 
 struct NativePluginContext {
-    EditorShell* shell{nullptr};
+    EditorPluginManagerHost* shell{nullptr};
     std::string plugin_id;
     const LunaEditorHostApi* host_api{nullptr};
 };
@@ -523,7 +522,7 @@ NativePluginContext* nativeContext(void* api_user_data) noexcept
     return static_cast<NativePluginContext*>(api_user_data);
 }
 
-EditorShell* nativeShell(void* api_user_data) noexcept
+EditorPluginManagerHost* nativeShell(void* api_user_data) noexcept
 {
     NativePluginContext* context = nativeContext(api_user_data);
     return context != nullptr ? context->shell : nullptr;
@@ -531,49 +530,49 @@ EditorShell* nativeShell(void* api_user_data) noexcept
 
 Ui* nativeUi(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->ui() : nullptr;
 }
 
 AssetService* nativeAssets(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->assets() : nullptr;
 }
 
 PluginAssetService* nativePluginAssets(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->pluginAssets() : nullptr;
 }
 
 ProjectService* nativeProject(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->project() : nullptr;
 }
 
 SceneService* nativeScene(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->scene() : nullptr;
 }
 
 SelectionService* nativeSelection(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->selection() : nullptr;
 }
 
 ViewportService* nativeViewport(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->viewport() : nullptr;
 }
 
 RuntimeViewportService* nativeRuntimeViewport(void* api_user_data) noexcept
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr ? &shell->runtimeViewport() : nullptr;
 }
 
@@ -1260,26 +1259,26 @@ int nativeRegisterCommand(void* api_user_data, const LunaEditorCommandDescriptor
 
 void nativeUnregisterCommand(void* api_user_data, const char* id)
 {
-    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
         shell->commands().unregisterCommand(nativeString(id));
     }
 }
 
 int nativeExecuteCommand(void* api_user_data, const char* id)
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr && id != nullptr && shell->commands().execute(nativeString(id)) ? 1 : 0;
 }
 
 int nativeCanExecuteCommand(void* api_user_data, const char* id)
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr && id != nullptr && shell->commands().canExecute(nativeString(id)) ? 1 : 0;
 }
 
 int nativeIsCommandChecked(void* api_user_data, const char* id)
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr && id != nullptr && shell->commands().isChecked(nativeString(id)) ? 1 : 0;
 }
 
@@ -1315,20 +1314,20 @@ int nativeRegisterWindow(void* api_user_data, const LunaEditorWindowDescriptor* 
 
 void nativeUnregisterWindow(void* api_user_data, const char* id)
 {
-    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
         shell->windows().unregisterWindow(nativeString(id));
     }
 }
 
 int nativeIsWindowOpen(void* api_user_data, const char* id)
 {
-    EditorShell* shell = nativeShell(api_user_data);
+    EditorPluginManagerHost* shell = nativeShell(api_user_data);
     return shell != nullptr && id != nullptr && shell->windows().isWindowOpen(nativeString(id)) ? 1 : 0;
 }
 
 void nativeSetWindowOpen(void* api_user_data, const char* id, int open)
 {
-    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && id != nullptr) {
         shell->windows().setWindowOpen(nativeString(id), open != 0);
     }
 }
@@ -1740,7 +1739,7 @@ int nativeAddMenuItem(void* api_user_data, const LunaEditorMenuItemDescriptor* d
 
 void nativeRemoveMenuItem(void* api_user_data, const char* menu_path, const char* command_id)
 {
-    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && menu_path != nullptr &&
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && menu_path != nullptr &&
                                                            command_id != nullptr) {
         shell->menus().removeMenuItem(nativeString(menu_path), nativeString(command_id));
     }
@@ -1748,7 +1747,7 @@ void nativeRemoveMenuItem(void* api_user_data, const char* menu_path, const char
 
 void nativeRemoveMenuItemsForCommand(void* api_user_data, const char* command_id)
 {
-    if (EditorShell* shell = nativeShell(api_user_data); shell != nullptr && command_id != nullptr) {
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && command_id != nullptr) {
         shell->menus().removeMenuItemsForCommand(nativeString(command_id));
     }
 }
@@ -2516,7 +2515,7 @@ LunaEditorRuntimeViewportApi makeNativeRuntimeViewportApi(NativePluginContext& c
 
 } // namespace
 
-EditorPluginManager::EditorPluginManager(EditorShell& shell)
+EditorPluginManager::EditorPluginManager(EditorPluginManagerHost& shell)
     : m_shell(shell)
 {}
 

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -19,9 +20,20 @@ struct NativeTemplateState {
     int enabled{1};
     int click_count{0};
     uint64_t created_entity_id{0};
-    uint64_t preview_viewport_id{0};
     char label[96]{"Native template state"};
     std::string asset_note;
+    native::RegisteredCommand command;
+    native::RegisteredWindow window;
+    native::RegisteredMenuItemsForCommand menu_items;
+    native::SceneViewportHandle preview_viewport;
+
+    void cleanup() noexcept
+    {
+        preview_viewport.reset();
+        menu_items.reset();
+        window.reset();
+        command.reset();
+    }
 };
 
 NativeTemplateState g_state{};
@@ -158,15 +170,15 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     }
 
     ui.separatorText("Viewport");
-    if (state->preview_viewport_id == 0u) {
-        state->preview_viewport_id = host.viewport().createSceneViewport("NativeTemplatePreview");
+    if (!state->preview_viewport) {
+        state->preview_viewport = host.viewport().createScopedSceneViewport("NativeTemplatePreview");
     }
     const native::Vec2 available = ui.contentRegionAvail();
     const float viewport_width = available.x > 64.0f ? available.x : 320.0f;
     const float viewport_height = viewport_width * 0.5625f;
     LunaEditorViewportPresentation presentation = native::makeViewportPresentation();
-    if (state->preview_viewport_id != 0u &&
-        host.viewport().syncSceneViewport(state->preview_viewport_id,
+    if (state->preview_viewport &&
+        host.viewport().syncSceneViewport(state->preview_viewport.id(),
                                           static_cast<uint32_t>(viewport_width),
                                           static_cast<uint32_t>(viewport_height),
                                           &presentation) &&
@@ -192,6 +204,10 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
     if (state == nullptr || !host.valid()) {
         return 0;
     }
+    state->cleanup();
+    state->click_count = 0;
+    state->created_entity_id = 0u;
+    state->asset_note.clear();
 
     if (!host.commands().canRegister() || !host.windows().canRegister() || !host.menus().canAdd() ||
         !host.pluginAssets().available() || !host.assets().available() || !host.scene().available() ||
@@ -210,7 +226,8 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
     command.is_checked = &isWindowOpen;
     command.execute = &executeOpenWindow;
 
-    if (!host.commands().registerCommand(command)) {
+    native::RegisteredCommand command_registration = host.commands().registerScoped(command);
+    if (!command_registration) {
         host.log().error("Failed to register native template command.");
         return 0;
     }
@@ -224,8 +241,8 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
     window.user_data = state;
     window.draw = &drawWindow;
 
-    if (!host.windows().registerWindow(window)) {
-        host.commands().unregisterCommand(kCommandId);
+    native::RegisteredWindow window_registration = host.windows().registerScoped(window);
+    if (!window_registration) {
         host.log().error("Failed to register native template window.");
         return 0;
     }
@@ -236,27 +253,27 @@ int onLoad(void* plugin_user_data, const LunaEditorHostApi* host_api)
     menu_item.label = "Open Native Template Tool";
     menu_item.shortcut = "";
 
-    if (!host.menus().addItem(menu_item)) {
-        host.windows().unregisterWindow(kWindowId);
-        host.commands().unregisterCommand(kCommandId);
+    native::RegisteredMenuItemsForCommand menu_registration = host.menus().addScopedItemsForCommand(menu_item);
+    if (!menu_registration) {
         host.log().error("Failed to register native template menu item.");
         return 0;
     }
+
+    state->command = std::move(command_registration);
+    state->window = std::move(window_registration);
+    state->menu_items = std::move(menu_registration);
 
     host.log().info("Native template loaded.");
     return 1;
 }
 
-void onUnload(void*, const LunaEditorHostApi* host_api)
+void onUnload(void* plugin_user_data, const LunaEditorHostApi* host_api)
 {
+    auto* state = static_cast<NativeTemplateState*>(plugin_user_data);
     const native::Host host(host_api);
-    if (g_state.preview_viewport_id != 0u) {
-        host.viewport().destroySceneViewport(g_state.preview_viewport_id);
-        g_state.preview_viewport_id = 0u;
+    if (state != nullptr) {
+        state->cleanup();
     }
-    host.menus().removeItemsForCommand(kCommandId);
-    host.windows().unregisterWindow(kWindowId);
-    host.commands().unregisterCommand(kCommandId);
     host.log().info("Native template unloaded.");
 }
 

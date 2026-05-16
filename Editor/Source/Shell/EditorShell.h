@@ -1,9 +1,9 @@
 #pragma once
 
 #include "Asset/Asset.h"
-#include "EditorApi/EditorHost.h"
 #include "EditorApi/EditorPluginService.h"
 #include "EditorApi/EditorTypes.h"
+#include "Shell/EditorPluginManagerHost.h"
 
 #include <filesystem>
 #include <functional>
@@ -37,7 +37,7 @@ class SelectionService;
 class ShortcutService;
 class ViewportService;
 
-class EditorShell final : public Host {
+class EditorShell final : public EditorPluginManagerHost {
 public:
     explicit EditorShell(LunaEditorLayer& editor_layer);
     ~EditorShell() override;
@@ -60,11 +60,11 @@ public:
     RuntimeViewportService& runtimeViewport() override;
     ViewportService& viewport() override;
 
-    bool loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesystem::path& root_path = {});
-    void unloadPlugins();
-    void registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path);
-    void cleanupPluginContributions(std::string_view owner_id);
-    ViewportId createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name);
+    bool loadPlugin(std::unique_ptr<Plugin> plugin, const std::filesystem::path& root_path = {}) override;
+    void unloadPlugins() override;
+    void registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path) override;
+    void cleanupPluginContributions(std::string_view owner_id) override;
+    ViewportId createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name) override;
     void setPluginInfoProvider(std::function<std::vector<PluginInfo>()> provider);
     void update(float delta_seconds);
     bool dispatchShortcuts();

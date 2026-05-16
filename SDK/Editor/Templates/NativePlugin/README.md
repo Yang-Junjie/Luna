@@ -10,6 +10,7 @@ It uses the Luna editor native C++ wrapper:
 The wrapper is header-only and sits on top of `EditorApi/EditorNativePluginApi.h`; the exported plugin symbol remains the C ABI entry point.
 Do not change the ABI version macros in plugin code.
 The template CMake uses `luna_add_editor_native_plugin`, which is installed with `LunaEditorSDK` and writes the binary to the `Binaries/<platform>/` path referenced by the manifest.
+The template also uses SDK scoped registration handles for commands, windows, menu items, and scene viewports so `on_load` failure paths and `on_unload` cleanup stay short and deterministic.
 
 This template demonstrates:
 
@@ -18,6 +19,7 @@ This template demonstrates:
 - a registered command;
 - a Window menu entry;
 - a plugin-owned editor window;
+- scoped cleanup handles for registered editor contributions;
 - basic `EditorUi` controls through the native wrapper;
 - plugin-owned assets through `host.pluginAssets()`;
 - project and project asset reads through `host.project()` and `host.assets()`;
@@ -69,14 +71,15 @@ During development, point LunaEditor at the package directory or any parent dire
 
 ```powershell
 LunaEditor.exe --editor-plugin-dir <path-to-NativePlugin>
+LunaEditor.exe --editor-plugin-dir <path-containing-editor-plugin-packages>
 ```
 
-or set `LUNA_EDITOR_PLUGIN_PATH`. Use `;` between paths on Windows and `:` on Linux/macOS.
+You can pass `--editor-plugin-dir` more than once, or set `LUNA_EDITOR_PLUGIN_PATH`. Use `;` between paths on Windows and `:` on Linux/macOS.
 
 For installed engine data, place editor plugins under:
 
 ```text
-<EngineDataRoot>/Plugins/Editor/Installed/
+<EngineDataRoot>/Plugins/Editor/Installed/<PluginFolder>/editor-plugin.yaml
 ```
 
 Game projects should not store editor plugin packages.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Luna/Editor/Native/NativeRegistration.h"
 #include "Luna/Editor/Native/NativeTypes.h"
 
 namespace luna::editor::native {
@@ -26,6 +27,16 @@ public:
     {
         const LunaEditorCommandDescriptor native_descriptor = descriptor.native();
         return registerCommand(native_descriptor);
+    }
+
+    [[nodiscard]] RegisteredCommand registerScoped(const CommandDescriptor& descriptor) const
+    {
+        return registerCommand(descriptor) ? RegisteredCommand(api_, descriptor.id) : RegisteredCommand{};
+    }
+
+    [[nodiscard]] RegisteredCommand registerScoped(const LunaEditorCommandDescriptor& descriptor) const
+    {
+        return registerCommand(descriptor) ? RegisteredCommand(api_, descriptor.id) : RegisteredCommand{};
     }
 
     void unregisterCommand(const char* id) const noexcept

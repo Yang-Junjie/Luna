@@ -1,4 +1,0 @@
-High Freedom Sample
-
-This text is packaged with the plugin under its own assets directory.
-The plugin reads it through host.pluginAssets(), then builds the rest of the window with EditorUi and public Luna editor services.

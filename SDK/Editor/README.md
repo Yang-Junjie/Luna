@@ -32,6 +32,8 @@ luna_add_editor_native_plugin(
 
 The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a command/window/menu tool using the C++ wrapper for project, asset, scene, selection, viewport, and runtime viewport access.
 
+For the stable authoring path, see `docs/native-plugin-authoring.md`.
+
 ## Minimal Native Plugin Flow
 
 1. Start from `Templates/NativePlugin`.
@@ -43,14 +45,15 @@ cmake -S . -B build -DCMAKE_PREFIX_PATH=<LunaEditorSDK install prefix>
 cmake --build build --config Debug
 ```
 
-4. Run LunaEditor with the plugin package directory as a development root:
+4. Run LunaEditor with the plugin package directory, or a parent directory containing plugin packages, as a development root:
 
 ```powershell
 LunaEditor.exe --editor-plugin-dir <path-to-NativePlugin>
+LunaEditor.exe --editor-plugin-dir <path-containing-editor-plugin-packages>
 ```
 
-You can also set `LUNA_EDITOR_PLUGIN_PATH`. It uses `;` on Windows and `:` on Linux/macOS.
-Installed editor plugins belong under `<EngineDataRoot>/Plugins/Editor/Installed/`. Game projects should not store editor plugin packages.
+You can pass `--editor-plugin-dir` more than once. You can also set `LUNA_EDITOR_PLUGIN_PATH`; it accepts the same package-or-parent roots and uses `;` on Windows and `:` on Linux/macOS.
+Installed editor plugins belong under `<EngineDataRoot>/Plugins/Editor/Installed/<PluginFolder>/editor-plugin.yaml`. Game projects should not store editor plugin packages.
 
 The package directory is the unit of distribution:
 
@@ -85,6 +88,7 @@ The SDK currently installs:
 Current `Luna/Editor/Native` wrappers cover the v1 Native ABI basics used by real sample plugins:
 
 - log, UI, commands, windows, menus
+- scoped registration handles for commands, windows, menu items, and scene viewports
 - project info and root paths
 - project asset metadata, enumeration, path resolution, refresh status, mesh submesh counts, and asset drag/drop sources
 - plugin-owned asset paths, text/binary reads, and texture lookup

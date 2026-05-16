@@ -1,5 +1,6 @@
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/LunaEditorSDKHelpers.cmake)
 
 set(LUNA_EDITOR_SDK_VERSION 0.1.0)
 

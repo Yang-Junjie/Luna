@@ -1,14 +1,34 @@
 #include "Core/Log.h"
+#include "EditorApi/EditorAssetService.h"
+#include "EditorApi/EditorCommandService.h"
+#include "EditorApi/EditorHistoryService.h"
+#include "EditorApi/EditorMenuService.h"
 #include "EditorApi/EditorNativePluginApi.h"
+#include "EditorApi/EditorPluginAssetService.h"
+#include "EditorApi/EditorProjectService.h"
+#include "EditorApi/EditorRenderingService.h"
+#include "EditorApi/EditorRuntimeViewportService.h"
+#include "EditorApi/EditorSceneService.h"
+#include "EditorApi/EditorScriptPluginService.h"
+#include "EditorApi/EditorScriptService.h"
+#include "EditorApi/EditorSelectionService.h"
+#include "EditorApi/EditorShortcutService.h"
+#include "EditorApi/EditorUi.h"
+#include "EditorApi/EditorViewportService.h"
+#include "EditorApi/EditorWindowService.h"
 #include "Platform/Common/DynamicLibrary.h"
+#include "Shell/EditorPluginManifest.h"
+#include "Shell/EditorPluginManager.h"
 
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
 
@@ -1217,9 +1237,929 @@ struct TemplateHost {
     static size_t runtimeEntityCount(void*) { return 17u; }
 };
 
+class TemplateManagerUi final : public luna::editor::Ui {
+public:
+    bool beginWindow(std::string_view, std::string_view, bool*, luna::editor::WindowFlags) override { return true; }
+    void endWindow() override {}
+    void text(std::string_view) override { ++text_count; }
+    void textDisabled(std::string_view) override { ++text_count; }
+    void textWrapped(std::string_view) override { ++text_count; }
+    void bulletText(std::string_view) override { ++text_count; }
+    void separator() override {}
+    void separatorText(std::string_view) override {}
+    void sameLine() override {}
+    void spacing() override {}
+    void indent(float = 0.0f) override {}
+    void unindent(float = 0.0f) override {}
+    void beginDisabled() override {}
+    void endDisabled() override {}
+    void setNextItemWidth(float) override {}
+    [[nodiscard]] luna::editor::Vec2 contentRegionAvail() const noexcept override { return {.x = 320.0f, .y = 180.0f}; }
+    [[nodiscard]] luna::editor::Vec2 windowFramebufferScale() const noexcept override { return {.x = 1.0f, .y = 1.0f}; }
+    bool button(std::string_view, luna::editor::Vec2 = {}, luna::editor::ButtonVariant = luna::editor::ButtonVariant::Default) override
+    {
+        const bool pressed = next_button_pressed;
+        next_button_pressed = false;
+        ++button_count;
+        return pressed;
+    }
+    bool checkbox(std::string_view, bool&) override { return false; }
+    bool colorEdit3(std::string_view, luna::editor::Vec3&) override { return false; }
+    bool sliderInt(std::string_view, int&, int, int) override
+    {
+        ++slider_count;
+        return false;
+    }
+    bool sliderFloat(std::string_view, float&, float, float, std::string_view = "%.3f") override { return false; }
+    bool dragFloat3(std::string_view, luna::editor::Vec3&, float, float, float, std::string_view = "%.3f") override
+    {
+        ++drag_float3_count;
+        return false;
+    }
+    bool dragInt(std::string_view, int&, float, int, int) override { return false; }
+    bool dragFloat(std::string_view, float&, float, float, float, std::string_view = "%.3f") override { return false; }
+    bool inputText(std::string_view, std::string&, std::size_t = 256) override { return false; }
+    bool inputTextWithHint(std::string_view, std::string_view, std::string&, std::size_t = 256) override { return false; }
+    bool colorEdit4(std::string_view, luna::editor::Vec4&) override { return false; }
+    bool treeNode(std::string_view) override
+    {
+        ++tree_count;
+        return true;
+    }
+    void treePop() override {}
+    bool beginCombo(std::string_view, std::string_view) override
+    {
+        ++combo_count;
+        return true;
+    }
+    void endCombo() override {}
+    bool selectable(std::string_view, bool = false) override { return false; }
+    void setItemDefaultFocus() override {}
+    bool image(const luna::editor::TextureView& texture, luna::editor::Vec2) override
+    {
+        if (texture.valid()) {
+            ++image_count;
+            return true;
+        }
+        return false;
+    }
+    [[nodiscard]] bool isItemHovered() const noexcept override { return true; }
+    [[nodiscard]] bool isItemClicked(luna::editor::MouseButton = luna::editor::MouseButton::Left) const noexcept override { return false; }
+    [[nodiscard]] bool isItemDoubleClicked(luna::editor::MouseButton = luna::editor::MouseButton::Left) const noexcept override { return false; }
+    [[nodiscard]] bool isItemDeactivatedAfterEdit() const noexcept override { return false; }
+    void setTooltip(std::string_view) override { ++tooltip_count; }
+    bool invisibleButton(std::string_view, luna::editor::Vec2) override { return false; }
+    bool treeNodeEx(std::string_view, std::string_view, luna::editor::TreeNodeFlags) override
+    {
+        ++tree_count;
+        return true;
+    }
+    bool beginSection(std::string_view, std::string_view, bool = true) override
+    {
+        ++section_count;
+        return true;
+    }
+    void endSection() override {}
+    bool beginMenu(std::string_view, bool = true) override { return true; }
+    void endMenu() override {}
+    bool menuItem(std::string_view, bool = false, bool = true) override { return false; }
+    void openPopup(std::string_view) override {}
+    bool beginPopup(std::string_view) override { return false; }
+    bool beginPopupContextItem(std::string_view = {}, luna::editor::MouseButton = luna::editor::MouseButton::Right) override { return false; }
+    void closeCurrentPopup() override {}
+    void endPopup() override {}
+    bool beginDragDropSource() override
+    {
+        ++drag_drop_source_count;
+        return true;
+    }
+    bool setDragDropPayload(std::string_view, const void*, std::size_t) override { return true; }
+    void endDragDropSource() override {}
+    bool beginDragDropTarget() override
+    {
+        ++drag_drop_target_count;
+        return true;
+    }
+    bool acceptDragDropPayload(std::string_view, void*, std::size_t) override { return true; }
+    bool acceptAssetDragDropPayload(luna::editor::AssetDropPayload&, const luna::AssetType*, std::size_t) override { return false; }
+    void endDragDropTarget() override {}
+    [[nodiscard]] float scale(float value) const noexcept override { return value; }
+    [[nodiscard]] luna::editor::Vec2 scaled(luna::editor::Vec2 value) const noexcept override { return value; }
+    bool beginTable(std::string_view, int, luna::editor::TableFlags = static_cast<luna::editor::TableFlags>(luna::editor::TableFlag::None), luna::editor::Vec2 = {}) override { return true; }
+    void endTable() override {}
+    void tableSetupColumn(std::string_view, luna::editor::TableColumnFlags = static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::None), float = 0.0f) override {}
+    void tableHeadersRow() override {}
+    void tableNextRow() override {}
+    bool tableNextColumn() override { return true; }
+
+    bool next_button_pressed{};
+    int text_count{};
+    int button_count{};
+    int slider_count{};
+    int drag_float3_count{};
+    int section_count{};
+    int combo_count{};
+    int tree_count{};
+    int drag_drop_source_count{};
+    int drag_drop_target_count{};
+    int image_count{};
+    int tooltip_count{};
+};
+
+class TemplateManagerCommandService final : public luna::editor::CommandService {
+public:
+    explicit TemplateManagerCommandService(luna::editor::Host& host)
+        : m_host(host)
+    {}
+
+    bool registerCommand(luna::editor::CommandDescriptor descriptor) override
+    {
+        if (descriptor.id.empty() || !descriptor.execute) {
+            return false;
+        }
+        commands[descriptor.id] = std::move(descriptor);
+        return true;
+    }
+    void unregisterCommand(std::string_view id) override { commands.erase(std::string(id)); }
+    bool execute(std::string_view id) override { return execute(id, std::nullopt); }
+    bool execute(std::string_view id, luna::editor::CommandSubject subject) override
+    {
+        const auto it = commands.find(std::string(id));
+        if (it == commands.end() || !it->second.execute) {
+            return false;
+        }
+        if (it->second.can_execute && !it->second.can_execute(m_host)) {
+            return false;
+        }
+        subjects[it->first] = std::move(subject);
+        it->second.execute(m_host);
+        return true;
+    }
+    luna::editor::CommandSubject takeSubject(std::string_view id) override
+    {
+        const auto it = subjects.find(std::string(id));
+        if (it == subjects.end()) {
+            return std::nullopt;
+        }
+        luna::editor::CommandSubject subject = std::move(it->second);
+        subjects.erase(it);
+        return subject;
+    }
+    bool canExecute(std::string_view id) const override
+    {
+        const auto it = commands.find(std::string(id));
+        return it != commands.end() && (!it->second.can_execute || it->second.can_execute(m_host));
+    }
+    bool isChecked(std::string_view id) const override
+    {
+        const auto it = commands.find(std::string(id));
+        return it != commands.end() && it->second.is_checked && it->second.is_checked(m_host);
+    }
+    void removeOwner(std::string_view owner_id)
+    {
+        for (auto it = commands.begin(); it != commands.end();) {
+            if (it->second.owner_id == owner_id) {
+                it = commands.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::unordered_map<std::string, luna::editor::CommandDescriptor> commands;
+
+private:
+    luna::editor::Host& m_host;
+    std::unordered_map<std::string, luna::editor::CommandSubject> subjects;
+};
+
+class TemplateManagerWindowService final : public luna::editor::WindowService {
+public:
+    bool registerWindow(luna::editor::WindowDescriptor descriptor) override
+    {
+        if (descriptor.id.empty() || !descriptor.draw) {
+            return false;
+        }
+        open[descriptor.id] = descriptor.default_open;
+        windows[descriptor.id] = std::move(descriptor);
+        return true;
+    }
+    void unregisterWindow(std::string_view id) override
+    {
+        windows.erase(std::string(id));
+        open.erase(std::string(id));
+    }
+    bool isWindowOpen(std::string_view id) const override
+    {
+        const auto it = open.find(std::string(id));
+        return it != open.end() && it->second;
+    }
+    void setWindowOpen(std::string_view id, bool value) override
+    {
+        if (windows.contains(std::string(id))) {
+            open[std::string(id)] = value;
+        }
+    }
+    bool drawWindow(std::string_view id, luna::editor::Host& host, luna::editor::Ui& ui)
+    {
+        const auto it = windows.find(std::string(id));
+        if (it == windows.end() || !it->second.draw) {
+            return false;
+        }
+        luna::editor::WindowDrawContext context(host, ui);
+        it->second.draw(context);
+        return true;
+    }
+    void removeOwner(std::string_view owner_id)
+    {
+        for (auto it = windows.begin(); it != windows.end();) {
+            if (it->second.owner_id == owner_id) {
+                open.erase(it->first);
+                it = windows.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::unordered_map<std::string, luna::editor::WindowDescriptor> windows;
+    std::unordered_map<std::string, bool> open;
+};
+
+class TemplateManagerMenuService final : public luna::editor::MenuService {
+public:
+    bool addMenuItem(luna::editor::MenuItemDescriptor descriptor) override
+    {
+        if (descriptor.menu_path.empty() || descriptor.command_id.empty()) {
+            return false;
+        }
+        menus.push_back(std::move(descriptor));
+        return true;
+    }
+    void removeMenuItem(std::string_view menu_path, std::string_view command_id) override
+    {
+        menus.erase(std::remove_if(menus.begin(), menus.end(), [&](const auto& item) {
+                        return item.menu_path == menu_path && item.command_id == command_id;
+                    }),
+                    menus.end());
+    }
+    void removeMenuItemsForCommand(std::string_view command_id) override
+    {
+        menus.erase(std::remove_if(menus.begin(), menus.end(), [&](const auto& item) {
+                        return item.command_id == command_id;
+                    }),
+                    menus.end());
+    }
+    void removeOwner(std::string_view owner_id)
+    {
+        menus.erase(std::remove_if(menus.begin(), menus.end(), [&](const auto& item) {
+                        return item.owner_id == owner_id;
+                    }),
+                    menus.end());
+    }
+
+    std::vector<luna::editor::MenuItemDescriptor> menus;
+};
+
+class TemplateManagerAssetService final : public luna::editor::AssetService {
+public:
+    TemplateManagerAssetService()
+    {
+        asset.handle = luna::AssetHandle(42u);
+        asset.type = luna::AssetType::Texture;
+        asset.label = "SDK Texture";
+        asset.detail = "SDK template manager asset";
+        asset.exists = true;
+        asset.project_path = "Textures/sdk.png";
+        asset.absolute_path = "F:/SdkTemplateProject/Assets/Textures/sdk.png";
+    }
+
+    luna::editor::AssetInfo describeAsset(luna::AssetHandle handle) const override
+    {
+        return handle == asset.handle ? asset : luna::editor::AssetInfo{};
+    }
+    std::optional<luna::editor::AssetInfo> assetInfo(luna::AssetHandle handle) const override
+    {
+        return handle == asset.handle ? std::optional<luna::editor::AssetInfo>(asset) : std::nullopt;
+    }
+    std::optional<luna::editor::AssetInfo> assetInfoByPath(const std::filesystem::path& path) const override
+    {
+        return path == asset.project_path ? std::optional<luna::editor::AssetInfo>(asset) : std::nullopt;
+    }
+    std::vector<luna::editor::AssetInfo> listAssets(luna::AssetType type_filter, bool) const override
+    {
+        ++list_count;
+        if (type_filter == luna::AssetType::None || type_filter == asset.type) {
+            return {asset};
+        }
+        return {};
+    }
+    std::vector<luna::editor::AssetInfo> builtinAssets(luna::AssetType) const override { return {}; }
+    bool assetExists(luna::AssetHandle handle) const override { return handle == asset.handle; }
+    bool assetPathExists(const std::filesystem::path& path) const override { return path == asset.project_path; }
+    luna::AssetHandle findAssetHandleByPath(const std::filesystem::path& path) const override
+    {
+        return path == asset.project_path ? asset.handle : luna::AssetHandle(0u);
+    }
+    std::optional<std::filesystem::path> assetsRootPath() const override { return std::filesystem::path("F:/SdkTemplateProject/Assets"); }
+    std::optional<std::filesystem::path> resolveProjectAssetPath(const std::filesystem::path& path) const override
+    {
+        return std::filesystem::path("F:/SdkTemplateProject/Assets") / path;
+    }
+    std::optional<std::filesystem::path> makeProjectRelativeAssetPath(const std::filesystem::path& path) const override
+    {
+        return path.filename();
+    }
+    luna::editor::AssetRefreshResult refreshAssets() override { return {.success = true, .project_loaded = true, .revision = revision}; }
+    uint64_t assetRevision() const noexcept override { return revision; }
+    bool isAssetLoading(luna::AssetHandle) const override { return false; }
+    bool acceptsAssetType(luna::AssetType type, const luna::AssetType* accepted_types, std::size_t accepted_type_count) const override
+    {
+        if (accepted_types == nullptr || accepted_type_count == 0u) {
+            return true;
+        }
+        return std::find(accepted_types, accepted_types + accepted_type_count, type) != accepted_types + accepted_type_count;
+    }
+    std::optional<std::size_t> meshSubmeshCount(luna::AssetHandle) const override { return 1u; }
+    bool beginAssetDragDropSource(luna::AssetHandle, std::string_view = {}) override { return false; }
+
+    luna::editor::AssetInfo asset;
+    uint64_t revision{9u};
+    mutable int list_count{};
+};
+
+class TemplateManagerPluginAssetService final : public luna::editor::PluginAssetService {
+public:
+    void registerPlugin(std::string_view plugin_id, const std::filesystem::path& root_path)
+    {
+        roots[std::string(plugin_id)] = root_path;
+    }
+    void unregisterPlugin(std::string_view plugin_id)
+    {
+        roots.erase(std::string(plugin_id));
+    }
+    [[nodiscard]] std::optional<std::filesystem::path> pluginRootPath(std::string_view plugin_id) const override
+    {
+        const auto it = roots.find(std::string(plugin_id));
+        return it != roots.end() ? std::optional<std::filesystem::path>(it->second) : std::nullopt;
+    }
+    [[nodiscard]] std::optional<std::filesystem::path> assetRootPath(std::string_view plugin_id) const override
+    {
+        const auto root = pluginRootPath(plugin_id);
+        return root ? std::optional<std::filesystem::path>(*root / "assets") : std::nullopt;
+    }
+    [[nodiscard]] std::optional<std::filesystem::path> resolvePath(std::string_view plugin_id, const std::filesystem::path& path) const override
+    {
+        const auto root = assetRootPath(plugin_id);
+        return root ? std::optional<std::filesystem::path>(*root / path) : std::nullopt;
+    }
+    [[nodiscard]] bool exists(std::string_view plugin_id, const std::filesystem::path& path) const override
+    {
+        return resolvePath(plugin_id, path).has_value();
+    }
+    [[nodiscard]] std::optional<std::string> readText(std::string_view plugin_id, const std::filesystem::path& path) const override
+    {
+        if (!exists(plugin_id, path)) {
+            return std::nullopt;
+        }
+        ++read_text_count;
+        return std::string("SDK template manager asset text");
+    }
+    [[nodiscard]] luna::editor::PluginAssetBytes readBytes(std::string_view plugin_id, const std::filesystem::path& path) const override
+    {
+        return exists(plugin_id, path) ? luna::editor::PluginAssetBytes{.data = {1u, 2u, 3u}}
+                                      : luna::editor::PluginAssetBytes{};
+    }
+    [[nodiscard]] luna::editor::TextureView texture(std::string_view, const std::filesystem::path&) override
+    {
+        return {.id = 0x99u, .size = {.x = 16u, .y = 16u}, .y_flip = false};
+    }
+
+    std::unordered_map<std::string, std::filesystem::path> roots;
+    mutable int read_text_count{};
+};
+
+class TemplateManagerProjectService final : public luna::editor::ProjectService {
+public:
+    [[nodiscard]] bool hasProjectLoaded() const override { return true; }
+    [[nodiscard]] std::optional<std::filesystem::path> projectRootPath() const override { return std::filesystem::path("F:/SdkTemplateProject"); }
+    [[nodiscard]] std::optional<luna::ProjectInfo> projectInfo() const override
+    {
+        ++info_count;
+        luna::ProjectInfo info{};
+        info.Name = "SDK Template Project";
+        info.Version = "0.1.0";
+        info.AssetsPath = "Assets";
+        return info;
+    }
+    void setProjectInfo(const luna::ProjectInfo&) override {}
+    bool saveProject() override { return true; }
+
+    mutable int info_count{};
+};
+
+class TemplateManagerSceneService final : public luna::editor::SceneService {
+public:
+    TemplateManagerSceneService()
+    {
+        luna::editor::SceneEntityDetails root{};
+        root.id = luna::editor::EntityId(1u);
+        root.name = "Root";
+        root.components.transform = true;
+        root.transform.scale = {.x = 1.0f, .y = 1.0f, .z = 1.0f};
+        entities[root.id] = root;
+    }
+
+    std::string sceneLabel() const override { return "SDK Template Scene"; }
+    size_t entityCount() const override { return entities.size(); }
+    bool canEditScene() const noexcept override { return true; }
+    bool openSceneFile(const std::filesystem::path&) override { return true; }
+    std::vector<luna::editor::SceneEntityInfo> entityHierarchy() const override
+    {
+        std::vector<luna::editor::SceneEntityInfo> result;
+        for (const auto& [id, entity] : entities) {
+            result.push_back({.id = id, .parent_id = entity.parent_id, .name = entity.name});
+        }
+        return result;
+    }
+    bool entityExists(luna::editor::EntityId entity_id) const noexcept override { return entities.contains(entity_id); }
+    std::optional<luna::editor::SceneEntityDetails> entityDetails(luna::editor::EntityId entity_id) const override
+    {
+        const auto it = entities.find(entity_id);
+        return it != entities.end() ? std::optional<luna::editor::SceneEntityDetails>(it->second) : std::nullopt;
+    }
+    bool isEntityDescendantOf(luna::editor::EntityId, luna::editor::EntityId) const override { return false; }
+    luna::SceneEnvironmentSettings sceneEnvironmentSettings() const override { return {}; }
+    luna::SceneShadowSettings sceneShadowSettings() const override { return {}; }
+    bool setSceneEnvironmentSettings(const luna::SceneEnvironmentSettings&) override { return true; }
+    bool setSceneShadowSettings(const luna::SceneShadowSettings&) override { return true; }
+    luna::editor::EntityId createEntity(std::string name) override
+    {
+        const luna::editor::EntityId id(next_entity_id++);
+        luna::editor::SceneEntityDetails entity{};
+        entity.id = id;
+        entity.name = name.empty() ? "Entity" : std::move(name);
+        entity.components.transform = true;
+        entity.transform.scale = {.x = 1.0f, .y = 1.0f, .z = 1.0f};
+        entities[id] = entity;
+        ++created_entity_count;
+        return id;
+    }
+    luna::editor::EntityId createEntity(const luna::editor::SceneEntityCreateRequest& request) override { return createEntity(request.name); }
+    bool destroyEntity(luna::editor::EntityId entity_id) override { return entities.erase(entity_id) > 0u; }
+    bool reparentEntity(luna::editor::EntityId entity_id, luna::editor::EntityId parent_id, bool = true) override
+    {
+        const auto it = entities.find(entity_id);
+        if (it == entities.end()) {
+            return false;
+        }
+        it->second.parent_id = parent_id;
+        return true;
+    }
+    bool setEntityName(luna::editor::EntityId entity_id, std::string name) override
+    {
+        const auto it = entities.find(entity_id);
+        if (it == entities.end()) {
+            return false;
+        }
+        it->second.name = std::move(name);
+        return true;
+    }
+    bool setEntityTransform(luna::editor::EntityId entity_id, const luna::editor::SceneTransform& transform) override
+    {
+        const auto it = entities.find(entity_id);
+        if (it == entities.end()) {
+            return false;
+        }
+        it->second.transform = transform;
+        return true;
+    }
+    bool setCameraComponent(luna::editor::EntityId entity_id, const luna::editor::SceneCameraComponent& value) override
+    {
+        return setComponent(entity_id, value);
+    }
+    bool setLightComponent(luna::editor::EntityId entity_id, const luna::editor::SceneLightComponent& value) override
+    {
+        return setComponent(entity_id, value);
+    }
+    bool setMeshComponent(luna::editor::EntityId entity_id, const luna::editor::SceneMeshComponent& value) override
+    {
+        return setComponent(entity_id, value);
+    }
+    bool setScriptComponent(luna::editor::EntityId entity_id, const luna::editor::SceneScriptComponent& value) override
+    {
+        return setComponent(entity_id, value);
+    }
+    bool setScriptProperty(luna::editor::EntityId, std::size_t, std::size_t, const luna::editor::SceneScriptProperty&) override { return false; }
+    bool addComponent(luna::editor::EntityId entity_id, luna::editor::SceneComponentKind kind) override
+    {
+        const auto it = entities.find(entity_id);
+        if (it == entities.end()) {
+            return false;
+        }
+        if (kind == luna::editor::SceneComponentKind::Camera) {
+            it->second.camera = luna::editor::SceneCameraComponent{};
+            it->second.components.camera = true;
+        } else if (kind == luna::editor::SceneComponentKind::Light) {
+            it->second.light = luna::editor::SceneLightComponent{};
+            it->second.components.light = true;
+        } else if (kind == luna::editor::SceneComponentKind::Mesh) {
+            it->second.mesh = luna::editor::SceneMeshComponent{};
+            it->second.components.mesh = true;
+        }
+        return true;
+    }
+    bool removeComponent(luna::editor::EntityId, luna::editor::SceneComponentKind) override { return true; }
+    bool applyMeshAssetToEntity(luna::editor::EntityId entity_id, luna::AssetHandle mesh_handle) override
+    {
+        luna::editor::SceneMeshComponent mesh{};
+        mesh.mesh_handle = mesh_handle;
+        return setMeshComponent(entity_id, mesh);
+    }
+
+    template <typename Component> bool setComponent(luna::editor::EntityId entity_id, const Component& value)
+    {
+        const auto it = entities.find(entity_id);
+        if (it == entities.end()) {
+            return false;
+        }
+        if constexpr (std::is_same_v<Component, luna::editor::SceneCameraComponent>) {
+            it->second.camera = value;
+            it->second.components.camera = true;
+        } else if constexpr (std::is_same_v<Component, luna::editor::SceneLightComponent>) {
+            it->second.light = value;
+            it->second.components.light = true;
+        } else if constexpr (std::is_same_v<Component, luna::editor::SceneMeshComponent>) {
+            it->second.mesh = value;
+            it->second.components.mesh = true;
+        } else {
+            it->second.script = value;
+            it->second.components.script = true;
+        }
+        return true;
+    }
+
+    std::unordered_map<luna::editor::EntityId, luna::editor::SceneEntityDetails> entities;
+    uint64_t next_entity_id{100u};
+    int created_entity_count{};
+};
+
+class TemplateManagerSelectionService final : public luna::editor::SelectionService {
+public:
+    luna::editor::EntityId selectedEntityId() const noexcept override { return selected; }
+    void selectEntity(luna::editor::EntityId entity_id) override { selected = entity_id; }
+    void clearSelection() override { selected = luna::editor::EntityId(0u); }
+
+    luna::editor::EntityId selected{0u};
+};
+
+class TemplateManagerViewportService final : public luna::editor::ViewportService {
+public:
+    luna::editor::ViewportId defaultSceneViewport() const noexcept override { return luna::editor::kDefaultViewportId; }
+    luna::editor::ViewportId createSceneViewport(std::string_view debug_name = {}) override
+    {
+        return createSceneViewportForOwner(debug_name, {});
+    }
+    void destroySceneViewport(luna::editor::ViewportId viewport_id) override { viewports.erase(viewport_id); }
+    bool isSceneViewportValid(luna::editor::ViewportId viewport_id) const noexcept override
+    {
+        return viewport_id == luna::editor::kDefaultViewportId || viewports.contains(viewport_id);
+    }
+    luna::editor::ViewportPresentation syncSceneViewport(luna::editor::ViewportId viewport_id, luna::editor::UVec2 framebuffer_size) override
+    {
+        if (!isSceneViewportValid(viewport_id)) {
+            return {};
+        }
+        return {
+            .scene_texture = luna::editor::TextureView{
+                .id = static_cast<luna::editor::TextureHandle>(0x700u + viewport_id),
+                .size = framebuffer_size,
+                .y_flip = false,
+            },
+            .framebuffer_size = framebuffer_size,
+            .presentable = true,
+        };
+    }
+    luna::editor::TextureView sceneTextureView(luna::editor::ViewportId viewport_id) const override
+    {
+        if (!isSceneViewportValid(viewport_id)) {
+            return {};
+        }
+        return {.id = static_cast<luna::editor::TextureHandle>(0x700u + viewport_id), .size = {.x = 320u, .y = 180u}, .y_flip = false};
+    }
+    luna::editor::ViewportPresentation syncSceneViewport(luna::editor::UVec2 framebuffer_size) override
+    {
+        return syncSceneViewport(luna::editor::kDefaultViewportId, framebuffer_size);
+    }
+    luna::editor::TextureView sceneTextureView() const override { return sceneTextureView(luna::editor::kDefaultViewportId); }
+    void drawDefaultSceneViewport(luna::editor::Ui&) override {}
+    luna::editor::SceneViewportDrawResult drawSceneViewport(luna::editor::Ui&, luna::editor::ViewportId viewport_id, luna::editor::SceneViewportDrawOptions = {}) override
+    {
+        luna::editor::SceneViewportDrawResult result{};
+        result.presentation = syncSceneViewport(viewport_id, {.x = 320u, .y = 180u});
+        result.drawn = result.presentation.presentable;
+        return result;
+    }
+    luna::editor::ViewportId createTextureViewport(std::string_view = {}) override
+    {
+        const luna::editor::ViewportId id = next_viewport_id++;
+        texture_viewports[id] = {};
+        return id;
+    }
+    void destroyTextureViewport(luna::editor::ViewportId viewport_id) override { texture_viewports.erase(viewport_id); }
+    bool isTextureViewportValid(luna::editor::ViewportId viewport_id) const noexcept override { return texture_viewports.contains(viewport_id); }
+    luna::editor::TextureViewportPresentation syncTextureViewport(luna::editor::ViewportId viewport_id, luna::editor::TextureView texture, luna::editor::UVec2 framebuffer_size) override
+    {
+        if (!isTextureViewportValid(viewport_id)) {
+            return {};
+        }
+        luna::editor::TextureViewportPresentation presentation{.texture = texture, .framebuffer_size = framebuffer_size, .presentable = texture.valid()};
+        texture_viewports[viewport_id] = presentation;
+        return presentation;
+    }
+    luna::editor::TextureViewportPresentation textureViewportPresentation(luna::editor::ViewportId viewport_id) const override
+    {
+        const auto it = texture_viewports.find(viewport_id);
+        return it != texture_viewports.end() ? it->second : luna::editor::TextureViewportPresentation{};
+    }
+    luna::editor::TextureViewportDrawResult drawTextureViewport(luna::editor::Ui&, luna::editor::ViewportId viewport_id, luna::editor::TextureView texture, luna::editor::TextureViewportDrawOptions = {}) override
+    {
+        luna::editor::TextureViewportDrawResult result{};
+        result.presentation = syncTextureViewport(viewport_id, texture, texture.size);
+        result.drawn = result.presentation.presentable;
+        return result;
+    }
+    luna::editor::Vec3 editorCameraPosition() const noexcept override { return {.x = 1.0f, .y = 2.0f, .z = 3.0f}; }
+    std::string gizmoOperationName() const override { return "Translate"; }
+    std::string gizmoModeName() const override { return "Local"; }
+    bool pickDebugVisualizationEnabled() const noexcept override { return false; }
+    void setPickDebugVisualizationEnabled(bool) override {}
+    bool editorGridEnabled() const noexcept override { return true; }
+    void setEditorGridEnabled(bool) override {}
+
+    luna::editor::ViewportId createSceneViewportForOwner(std::string_view, std::string_view owner_id)
+    {
+        const luna::editor::ViewportId id = next_viewport_id++;
+        viewports[id] = std::string(owner_id);
+        return id;
+    }
+    void destroyViewportsForOwner(std::string_view owner_id)
+    {
+        for (auto it = viewports.begin(); it != viewports.end();) {
+            if (it->second == owner_id) {
+                it = viewports.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::unordered_map<luna::editor::ViewportId, std::string> viewports;
+    std::unordered_map<luna::editor::ViewportId, luna::editor::TextureViewportPresentation> texture_viewports;
+    luna::editor::ViewportId next_viewport_id{2u};
+};
+
+class TemplateManagerRuntimeViewportService final : public luna::editor::RuntimeViewportService {
+public:
+    bool isRuntimeViewportEnabled() const noexcept override { return false; }
+    bool isRuntimeViewportRequested() const noexcept override { return requested; }
+    void setRuntimeViewportRequested(bool enabled) override { requested = enabled; }
+    size_t runtimeEntityCount() const noexcept override { return 17u; }
+
+    bool requested{};
+};
+
+class TemplateManagerHistoryService final : public luna::editor::HistoryService {
+public:
+    bool canUndo() const noexcept override { return false; }
+    bool canRedo() const noexcept override { return false; }
+    bool undo() override { return false; }
+    bool redo() override { return false; }
+};
+
+class TemplateManagerPluginService final : public luna::editor::PluginService {
+public:
+    std::vector<luna::editor::PluginInfo> plugins() const override { return {}; }
+};
+
+class TemplateManagerShortcutService final : public luna::editor::ShortcutService {
+public:
+    bool registerShortcut(luna::editor::ShortcutDescriptor) override { return true; }
+    void unregisterShortcut(std::string_view) override {}
+    std::string shortcutText(std::string_view) const override { return {}; }
+    std::string commandShortcutText(std::string_view) const override { return {}; }
+};
+
+class TemplateManagerRenderingService final : public luna::editor::RenderingService {
+public:
+    std::string backendName() const override { return "SDKTest"; }
+    luna::editor::RenderingBackendCapabilities backendCapabilities() const override { return {}; }
+    luna::editor::RenderGraphProfileSnapshot renderGraphProfile() const override { return {}; }
+    bool isRenderGraphProfilingEnabled() const noexcept override { return false; }
+    void setRenderGraphProfilingEnabled(bool) override {}
+    std::filesystem::path defaultRenderProfileExportPath(std::string_view = {}) const override { return {}; }
+    bool exportRenderGraphProfileChromeTraceJson(const luna::editor::RenderGraphProfileSnapshot&, const std::filesystem::path&, std::string* = nullptr) const override { return false; }
+    std::vector<luna::editor::RenderFeatureInfo> defaultRenderFeatureInfos() const override { return {}; }
+    std::vector<luna::editor::RenderFeatureParameterInfo> defaultRenderFeatureParameters(std::string_view) const override { return {}; }
+    bool setDefaultRenderFeatureEnabled(std::string_view, bool) override { return false; }
+    bool setDefaultRenderFeatureParameter(std::string_view, std::string_view, const luna::editor::RenderFeatureParameterValue&) override { return false; }
+    std::vector<luna::editor::RenderDebugViewModeInfo> renderDebugViewModes() const override { return {}; }
+    luna::editor::RenderDebugViewMode renderDebugViewMode() const noexcept override { return luna::editor::RenderDebugViewMode::None; }
+    void setRenderDebugViewMode(luna::editor::RenderDebugViewMode) override {}
+    float renderDebugVelocityScale() const noexcept override { return 1.0f; }
+    void setRenderDebugVelocityScale(float) override {}
+    luna::editor::TextureView renderDebugTextureView() const override { return {}; }
+    float frameTimeMilliseconds() const noexcept override { return 16.0f; }
+    float framesPerSecond() const noexcept override { return 60.0f; }
+    luna::editor::UVec2 sceneOutputSize() const noexcept override { return {.x = 1280u, .y = 720u}; }
+};
+
+class TemplateManagerScriptPluginService final : public luna::editor::ScriptPluginService {
+public:
+    void refreshProjectScriptPlugins() override {}
+    [[nodiscard]] const std::vector<luna::ScriptPluginCandidate>& getDiscoveredScriptPlugins() const override { return candidates; }
+    [[nodiscard]] const std::string& getScriptPluginStatus() const override { return status; }
+    [[nodiscard]] const luna::ScriptPluginCandidate* getSelectedScriptPluginCandidate() const override { return nullptr; }
+    bool selectScriptPlugin(const luna::ScriptPluginCandidate*) override { return false; }
+
+    std::vector<luna::ScriptPluginCandidate> candidates;
+    std::string status;
+};
+
+class TemplateManagerScriptService final : public luna::editor::ScriptService {
+public:
+    [[nodiscard]] luna::editor::ScriptLanguageStatus projectScriptLanguage() const override { return {}; }
+    [[nodiscard]] luna::editor::ScriptAssetValidation validateScriptAsset(luna::AssetHandle) const override { return {}; }
+    [[nodiscard]] luna::editor::ScriptSchemaSyncResult syncScriptProperties(const luna::editor::SceneScriptEntry&) const override { return {}; }
+};
+
+class TemplateManagerHost final : public luna::editor::EditorPluginManagerHost {
+public:
+    TemplateManagerHost()
+        : command_service(*this)
+    {}
+
+    luna::editor::Ui& ui() override { return ui_service; }
+    luna::editor::AssetService& assets() override { return asset_service; }
+    luna::editor::WindowService& windows() override { return window_service; }
+    luna::editor::CommandService& commands() override { return command_service; }
+    luna::editor::HistoryService& history() override { return history_service; }
+    luna::editor::MenuService& menus() override { return menu_service; }
+    luna::editor::PluginAssetService& pluginAssets() override { return plugin_asset_service; }
+    luna::editor::PluginService& plugins() override { return plugin_service; }
+    luna::editor::ProjectService& project() override { return project_service; }
+    luna::editor::ScriptPluginService& scriptPlugins() override { return script_plugin_service; }
+    luna::editor::ScriptService& scripts() override { return script_service; }
+    luna::editor::RenderingService& rendering() override { return rendering_service; }
+    luna::editor::SceneService& scene() override { return scene_service; }
+    luna::editor::SelectionService& selection() override { return selection_service; }
+    luna::editor::ShortcutService& shortcuts() override { return shortcut_service; }
+    luna::editor::RuntimeViewportService& runtimeViewport() override { return runtime_viewport_service; }
+    luna::editor::ViewportService& viewport() override { return viewport_service; }
+
+    bool loadPlugin(std::unique_ptr<luna::editor::Plugin>, const std::filesystem::path& = {}) override { return false; }
+    void unloadPlugins() override {}
+    void registerPluginAssetRoot(std::string_view plugin_id, const std::filesystem::path& root_path) override
+    {
+        plugin_asset_service.registerPlugin(plugin_id, root_path);
+    }
+    void cleanupPluginContributions(std::string_view owner_id) override
+    {
+        viewport_service.destroyViewportsForOwner(owner_id);
+        menu_service.removeOwner(owner_id);
+        command_service.removeOwner(owner_id);
+        window_service.removeOwner(owner_id);
+        plugin_asset_service.unregisterPlugin(owner_id);
+    }
+    luna::editor::ViewportId createSceneViewportForPlugin(std::string_view owner_id, std::string_view debug_name) override
+    {
+        return viewport_service.createSceneViewportForOwner(debug_name, owner_id);
+    }
+    bool drawWindow(std::string_view id)
+    {
+        return window_service.drawWindow(id, *this, ui_service);
+    }
+
+    TemplateManagerUi ui_service;
+    TemplateManagerAssetService asset_service;
+    TemplateManagerWindowService window_service;
+    TemplateManagerCommandService command_service;
+    TemplateManagerHistoryService history_service;
+    TemplateManagerMenuService menu_service;
+    TemplateManagerPluginAssetService plugin_asset_service;
+    TemplateManagerPluginService plugin_service;
+    TemplateManagerProjectService project_service;
+    TemplateManagerScriptPluginService script_plugin_service;
+    TemplateManagerScriptService script_service;
+    TemplateManagerRenderingService rendering_service;
+    TemplateManagerSceneService scene_service;
+    TemplateManagerSelectionService selection_service;
+    TemplateManagerShortcutService shortcut_service;
+    TemplateManagerRuntimeViewportService runtime_viewport_service;
+    TemplateManagerViewportService viewport_service;
+};
+
 std::filesystem::path absolutePathFromArg(const char* value)
 {
     return std::filesystem::absolute(std::filesystem::path(value)).lexically_normal();
+}
+
+const luna::editor::EditorPluginPackage*
+findPackageById(const std::vector<luna::editor::EditorPluginPackage>& packages, std::string_view package_id)
+{
+    const auto it = std::find_if(packages.begin(), packages.end(), [package_id](const auto& package) {
+        return package.id == package_id;
+    });
+    return it != packages.end() ? &(*it) : nullptr;
+}
+
+const luna::editor::PluginInfo*
+findPluginInfoById(const std::vector<luna::editor::PluginInfo>& plugins, std::string_view plugin_id)
+{
+    const auto it = std::find_if(plugins.begin(), plugins.end(), [plugin_id](const auto& plugin) {
+        return plugin.id == plugin_id;
+    });
+    return it != plugins.end() ? &(*it) : nullptr;
+}
+
+void testTemplateEditorPluginManagerLoad(TestContext& context,
+                                         const std::filesystem::path& package_root,
+                                         const std::filesystem::path& plugin_binary)
+{
+    context.expect(std::filesystem::exists(package_root / "editor-plugin.yaml"),
+                   "SDK template package manifest should exist");
+
+    const luna::editor::EditorPluginManifestLoader loader;
+    const std::vector<luna::editor::EditorPluginPackage> packages = loader.loadPackagesFromRoot(package_root);
+    const luna::editor::EditorPluginPackage* package = findPackageById(packages, kExpectedPluginId);
+    if (!context.expect(package != nullptr, "SDK template manifest should be discoverable from package root")) {
+        return;
+    }
+
+    context.expect(package->runtime == luna::editor::EditorPluginRuntime::Native,
+                   "SDK template manifest runtime should be Native");
+    context.expect(package->entry_exists, "SDK template manifest entry should exist");
+    context.expect(package->resolved_entry_path == plugin_binary,
+                   "SDK template manifest should resolve to built template binary");
+
+    TemplateManagerHost host;
+    luna::editor::EditorPluginManager manager(host);
+    manager.registerPackage(*package);
+    context.expect(manager.loadRegisteredPackages(),
+                   "EditorPluginManager should load SDK template through real native path");
+
+    const std::vector<luna::editor::PluginInfo> plugin_infos = manager.pluginInfos();
+    const luna::editor::PluginInfo* plugin_info = findPluginInfoById(plugin_infos, kExpectedPluginId);
+    if (context.expect(plugin_info != nullptr, "SDK template PluginInfo should exist after manager load")) {
+        context.expect(plugin_info->runtime == luna::editor::PluginRuntimeKind::Native,
+                       "SDK template PluginInfo runtime should be Native");
+        context.expect(plugin_info->state == luna::editor::PluginLoadState::Loaded,
+                       "SDK template PluginInfo state should be Loaded");
+        context.expect(plugin_info->status == "Loaded", "SDK template PluginInfo status should be Loaded");
+    }
+
+    context.expect(host.command_service.commands.contains(kExpectedCommandId),
+                   "manager-loaded SDK template should register its command");
+    context.expect(host.window_service.windows.contains(kExpectedWindowId),
+                   "manager-loaded SDK template should register its window");
+    context.expect(!host.menu_service.menus.empty(),
+                   "manager-loaded SDK template should register its menu item");
+    context.expect(host.window_service.isWindowOpen(kExpectedWindowId),
+                   "manager-loaded SDK template window should start open");
+
+    context.expect(host.drawWindow(kExpectedWindowId),
+                   "manager-loaded SDK template window should draw");
+    context.expect(host.ui_service.text_count > 0, "manager-loaded SDK template should draw text");
+    context.expect(host.plugin_asset_service.read_text_count > 0,
+                   "manager-loaded SDK template should read plugin assets");
+    context.expect(host.project_service.info_count > 0,
+                   "manager-loaded SDK template should read project info");
+    context.expect(host.asset_service.list_count > 0,
+                   "manager-loaded SDK template should enumerate project assets");
+    context.expect(host.ui_service.section_count > 0 && host.ui_service.combo_count > 0 &&
+                       host.ui_service.tree_count > 0,
+                   "manager-loaded SDK template should draw advanced UI wrappers");
+    context.expect(host.ui_service.drag_drop_source_count > 0 && host.ui_service.drag_drop_target_count > 0,
+                   "manager-loaded SDK template should draw drag/drop wrappers");
+    context.expect(host.ui_service.tooltip_count > 0, "manager-loaded SDK template should use item tooltip wrapper");
+    context.expect(host.ui_service.image_count > 0, "manager-loaded SDK template should draw viewport image");
+    context.expect(!host.viewport_service.viewports.empty(),
+                   "manager-loaded SDK template should create an independent scene viewport");
+
+    host.ui_service.next_button_pressed = true;
+    context.expect(host.drawWindow(kExpectedWindowId),
+                   "manager-loaded SDK template button draw should run");
+    context.expect(host.scene_service.created_entity_count == 1,
+                   "manager-loaded SDK template button should create an entity");
+    context.expect(static_cast<uint64_t>(host.selection_service.selectedEntityId()) >= 100u,
+                   "manager-loaded SDK template should select its created entity");
+
+    manager.unloadAll();
+    context.expect(host.command_service.commands.empty(), "manager unload should remove SDK template commands");
+    context.expect(host.window_service.windows.empty(), "manager unload should remove SDK template windows");
+    context.expect(host.menu_service.menus.empty(), "manager unload should remove SDK template menu items");
+    context.expect(host.viewport_service.viewports.empty(), "manager unload should remove SDK template viewports");
+    context.expect(host.plugin_asset_service.roots.empty(), "manager unload should unregister SDK template asset root");
 }
 
 } // namespace
@@ -1229,14 +2169,16 @@ int main(int argc, char** argv)
     luna::Logger::init("", luna::Logger::Level::Warn);
 
     TestContext context;
-    if (argc != 2) {
-        context.expect(false, "expected one plugin binary path argument");
+    if (argc != 3) {
+        context.expect(false, "expected plugin binary path and package root arguments");
         luna::Logger::shutdown();
         return context.result();
     }
 
     const std::filesystem::path plugin_binary = absolutePathFromArg(argv[1]);
+    const std::filesystem::path package_root = absolutePathFromArg(argv[2]);
     context.expect(std::filesystem::exists(plugin_binary), "SDK template plugin binary should exist");
+    context.expect(std::filesystem::exists(package_root), "SDK template package root should exist");
 
     std::shared_ptr<luna::DynamicLibrary> library = luna::DynamicLibrary::load(plugin_binary);
     if (!context.expect(library != nullptr, "SDK template plugin binary should load")) {
@@ -1301,6 +2243,8 @@ int main(int argc, char** argv)
     context.expect(host.windows.empty(), "SDK template unload should unregister windows");
     context.expect(host.menus.empty(), "SDK template unload should remove menu items");
     context.expect(host.created_viewport_id == 0u, "SDK template unload should destroy its viewport");
+
+    testTemplateEditorPluginManagerLoad(context, package_root, plugin_binary);
 
     luna::Logger::shutdown();
     return context.result();

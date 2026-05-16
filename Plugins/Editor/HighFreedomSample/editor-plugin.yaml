@@ -1,8 +1,0 @@
-EditorPlugin:
-  Id: luna.source.high-freedom-sample
-  DisplayName: High Freedom Sample
-  Runtime: BuiltinNative
-  Version: 0.1.0
-  Enabled: true
-  Dependencies:
-    - luna.editor.core-commands

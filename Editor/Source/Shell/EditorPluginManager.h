@@ -7,6 +7,7 @@
 #include "EditorApi/EditorPluginService.h"
 #include "Platform/Common/DynamicLibrary.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Shell/EditorPluginManagerHost.h"
 
 #include <filesystem>
 #include <memory>
@@ -16,7 +17,6 @@
 
 namespace luna::editor {
 
-class EditorShell;
 struct NativePluginContext;
 
 enum class EditorPluginRuntime {
@@ -63,7 +63,7 @@ struct EditorPluginDiagnostic {
 
 class EditorPluginManager final {
 public:
-    explicit EditorPluginManager(EditorShell& shell);
+    explicit EditorPluginManager(EditorPluginManagerHost& shell);
     ~EditorPluginManager();
 
     void registerPackage(EditorPluginPackage package);
@@ -87,7 +87,7 @@ private:
         LunaEditorPluginApi plugin_api{};
     };
 
-    EditorShell& m_shell;
+    EditorPluginManagerHost& m_shell;
     std::vector<EditorPluginPackage> m_packages;
     std::vector<EditorPluginDiagnostic> m_diagnostics;
     std::vector<NativePluginInstance> m_native_plugins;

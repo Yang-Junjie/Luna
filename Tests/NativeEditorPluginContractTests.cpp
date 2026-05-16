@@ -1483,6 +1483,14 @@ const luna::editor::EditorPluginPackage* findPackage(const std::vector<luna::edi
     return it != packages.end() ? &*it : nullptr;
 }
 
+bool containsPath(const std::vector<std::filesystem::path>& paths, const std::filesystem::path& expected)
+{
+    const std::filesystem::path normalized_expected = expected.lexically_normal();
+    return std::find_if(paths.begin(), paths.end(), [&](const std::filesystem::path& path) {
+               return path.lexically_normal() == normalized_expected;
+           }) != paths.end();
+}
+
 void testSuccessfulNativePluginLoad(TestContext& context)
 {
     NativePluginLoadResult result =
@@ -1791,6 +1799,108 @@ void testEditorPluginPackageRootContract(TestContext& context)
     }
 }
 
+void testEditorStartupDiscoveryPathContract(TestContext& context)
+{
+    TempDirectory temp("EditorStartupPluginDiscovery");
+    const std::filesystem::path engine_root = temp.path() / "EngineData";
+    const std::filesystem::path installed_root = engine_root / "Plugins" / "Editor" / "Installed";
+    const std::filesystem::path dev_parent_root = temp.path() / "DevelopmentPlugins";
+    const std::filesystem::path dev_direct_root = temp.path() / "DirectNative";
+    const std::filesystem::path good_entry = testPluginBinaryPath("LunaTestEditorPluginGood");
+
+    writeEditorPluginManifest(installed_root,
+                              "InstalledNative",
+                              "luna.test.startup-installed",
+                              "Startup Installed Native",
+                              good_entry,
+                              {});
+    writeEditorPluginManifest(dev_parent_root,
+                              "DevNative",
+                              "luna.test.startup-dev-parent",
+                              "Startup Dev Parent Native",
+                              good_entry,
+                              {});
+    writeEditorPluginManifest(dev_direct_root.parent_path(),
+                              dev_direct_root.filename().generic_string(),
+                              "luna.test.startup-dev-direct",
+                              "Startup Dev Direct Native",
+                              good_entry,
+                              {});
+
+    const std::string engine_root_arg = engine_root.string();
+    const std::string dev_parent_arg = dev_parent_root.string();
+    const std::string dev_direct_arg = "--editor-plugin-dir=" + dev_direct_root.string();
+    std::array<char*, 6> argv{
+        const_cast<char*>("LunaEditor"),
+        const_cast<char*>("--engine-data-root"),
+        const_cast<char*>(engine_root_arg.c_str()),
+        const_cast<char*>("--editor-plugin-dir"),
+        const_cast<char*>(dev_parent_arg.c_str()),
+        const_cast<char*>(dev_direct_arg.c_str()),
+    };
+
+    const luna::editor::EditorStartupOptions options =
+        luna::editor::parseEditorStartupOptions(static_cast<int>(argv.size()), argv.data());
+    const luna::editor::EditorEnginePaths paths = luna::editor::resolveEditorEnginePaths(options);
+
+    context.expect(paths.engine_data_root == engine_root.lexically_normal(),
+                   "startup engine data root override should flow into resolved paths");
+    context.expect(containsPath(paths.installed_editor_plugin_roots, installed_root),
+                   "startup paths should include installed editor plugin root under engine data root");
+    context.expect(containsPath(paths.development_editor_plugin_roots, dev_parent_root),
+                   "startup paths should include CLI parent development plugin root");
+    context.expect(containsPath(paths.development_editor_plugin_roots, dev_direct_root),
+                   "startup paths should include CLI direct development plugin package root");
+
+    const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
+    const luna::editor::EditorPluginPackage* installed_package =
+        findPackage(packages, "luna.test.startup-installed");
+    const luna::editor::EditorPluginPackage* dev_parent_package =
+        findPackage(packages, "luna.test.startup-dev-parent");
+    const luna::editor::EditorPluginPackage* dev_direct_package =
+        findPackage(packages, "luna.test.startup-dev-direct");
+
+    context.expect(installed_package != nullptr,
+                   "startup package discovery should find installed engine data plugins");
+    context.expect(dev_parent_package != nullptr,
+                   "startup package discovery should find plugins under a development parent root");
+    context.expect(dev_direct_package != nullptr,
+                   "startup package discovery should find a direct development package root");
+
+    if (installed_package != nullptr) {
+        context.expect(installed_package->source == luna::editor::EditorPluginSource::Installed,
+                       "startup installed plugin package should record installed source");
+        context.expect(installed_package->root_path == (installed_root / "InstalledNative").lexically_normal(),
+                       "startup installed plugin root path should be package directory");
+        context.expect(installed_package->entry_exists,
+                       "startup installed plugin package should keep existing native entry state");
+        context.expect(installed_package->resolved_entry_path == good_entry.lexically_normal(),
+                       "startup installed plugin package should resolve native entry path");
+    }
+
+    if (dev_parent_package != nullptr) {
+        context.expect(dev_parent_package->source == luna::editor::EditorPluginSource::Development,
+                       "startup parent development plugin package should record development source");
+        context.expect(dev_parent_package->root_path == (dev_parent_root / "DevNative").lexically_normal(),
+                       "startup parent development plugin root path should be package directory");
+        context.expect(dev_parent_package->entry_exists,
+                       "startup parent development plugin should keep existing native entry state");
+        context.expect(dev_parent_package->resolved_entry_path == good_entry.lexically_normal(),
+                       "startup parent development plugin should resolve native entry path");
+    }
+
+    if (dev_direct_package != nullptr) {
+        context.expect(dev_direct_package->source == luna::editor::EditorPluginSource::Development,
+                       "startup direct development plugin package should record development source");
+        context.expect(dev_direct_package->root_path == dev_direct_root.lexically_normal(),
+                       "startup direct development plugin root path should be direct package directory");
+        context.expect(dev_direct_package->entry_exists,
+                       "startup direct development plugin should keep existing native entry state");
+        context.expect(dev_direct_package->resolved_entry_path == good_entry.lexically_normal(),
+                       "startup direct development plugin should resolve native entry path");
+    }
+}
+
 } // namespace
 
 int main()
@@ -1804,6 +1914,7 @@ int main()
     testManifestAndDependencyContract(context);
     testEditorEnginePathParsingContract(context);
     testEditorPluginPackageRootContract(context);
+    testEditorStartupDiscoveryPathContract(context);
 
     luna::Logger::shutdown();
     return context.result();

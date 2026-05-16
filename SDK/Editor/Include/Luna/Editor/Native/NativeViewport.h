@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Luna/Editor/Native/NativeRegistration.h"
 #include "Luna/Editor/Native/NativeTypes.h"
 
 #include <array>
@@ -108,6 +109,11 @@ public:
             return api_->create_scene_viewport(api_->api_user_data, debug_name);
         }
         return 0u;
+    }
+
+    [[nodiscard]] SceneViewportHandle createScopedSceneViewport(const char* debug_name) const noexcept
+    {
+        return SceneViewportHandle(api_, createSceneViewport(debug_name));
     }
 
     void destroySceneViewport(uint64_t viewport_id) const noexcept

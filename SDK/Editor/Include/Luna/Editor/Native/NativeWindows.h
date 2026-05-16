@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Luna/Editor/Native/NativeRegistration.h"
 #include "Luna/Editor/Native/NativeTypes.h"
 
 namespace luna::editor::native {
@@ -31,6 +32,16 @@ public:
     {
         const LunaEditorWindowDescriptor native_descriptor = descriptor.native();
         return registerWindow(native_descriptor);
+    }
+
+    [[nodiscard]] RegisteredWindow registerScoped(const WindowDescriptor& descriptor) const
+    {
+        return registerWindow(descriptor) ? RegisteredWindow(api_, descriptor.id) : RegisteredWindow{};
+    }
+
+    [[nodiscard]] RegisteredWindow registerScoped(const LunaEditorWindowDescriptor& descriptor) const
+    {
+        return registerWindow(descriptor) ? RegisteredWindow(api_, descriptor.id) : RegisteredWindow{};
     }
 
     void unregisterWindow(const char* id) const noexcept

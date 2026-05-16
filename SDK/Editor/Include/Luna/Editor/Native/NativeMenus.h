@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Luna/Editor/Native/NativeRegistration.h"
 #include "Luna/Editor/Native/NativeTypes.h"
 
 namespace luna::editor::native {
@@ -26,6 +27,31 @@ public:
     {
         const LunaEditorMenuItemDescriptor native_descriptor = descriptor.native();
         return addItem(native_descriptor);
+    }
+
+    [[nodiscard]] RegisteredMenuItem addScopedItem(const MenuItemDescriptor& descriptor) const
+    {
+        return addItem(descriptor) ? RegisteredMenuItem(api_, descriptor.menu_path, descriptor.command_id)
+                                   : RegisteredMenuItem{};
+    }
+
+    [[nodiscard]] RegisteredMenuItem addScopedItem(const LunaEditorMenuItemDescriptor& descriptor) const
+    {
+        return addItem(descriptor) ? RegisteredMenuItem(api_, descriptor.menu_path, descriptor.command_id)
+                                   : RegisteredMenuItem{};
+    }
+
+    [[nodiscard]] RegisteredMenuItemsForCommand addScopedItemsForCommand(const MenuItemDescriptor& descriptor) const
+    {
+        return addItem(descriptor) ? RegisteredMenuItemsForCommand(api_, descriptor.command_id)
+                                   : RegisteredMenuItemsForCommand{};
+    }
+
+    [[nodiscard]] RegisteredMenuItemsForCommand addScopedItemsForCommand(
+        const LunaEditorMenuItemDescriptor& descriptor) const
+    {
+        return addItem(descriptor) ? RegisteredMenuItemsForCommand(api_, descriptor.command_id)
+                                   : RegisteredMenuItemsForCommand{};
     }
 
     void removeItem(const char* menu_path, const char* command_id) const noexcept

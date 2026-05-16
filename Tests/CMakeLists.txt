@@ -16,6 +16,17 @@ add_executable(
 add_executable(
     EditorSdkNativeTemplateLoadTest
     EditorSdkNativeTemplateLoadTest.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManager.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManifest.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginDependencyResolver.cpp
+)
+
+add_executable(
+    NativeSamplePluginContractTest
+    NativeSamplePluginContractTest.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManager.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginManifest.cpp
+    ${PROJECT_SOURCE_DIR}/Editor/Source/Shell/EditorPluginDependencyResolver.cpp
 )
 
 add_executable(
@@ -189,6 +200,14 @@ target_link_libraries(
     EditorSdkNativeTemplateLoadTest
     PRIVATE
         LunaCore
+        yaml-cpp
+)
+
+target_link_libraries(
+    NativeSamplePluginContractTest
+    PRIVATE
+        LunaCore
+        yaml-cpp
 )
 
 target_link_libraries(
@@ -246,6 +265,12 @@ target_compile_features(
 )
 
 target_compile_features(
+    NativeSamplePluginContractTest
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
     SceneSerializerTests
     PRIVATE
         cxx_std_20
@@ -293,6 +318,34 @@ target_compile_definitions(
         LUNA_TEST_EDITOR_PLUGIN_DIR="${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
 )
 
+if(TARGET LunaEditorNativeSample)
+    target_compile_definitions(
+        NativeSamplePluginContractTest
+        PRIVATE
+            LUNA_NATIVE_SAMPLE_PLUGIN_BINARY="$<TARGET_FILE:LunaEditorNativeSample>"
+            LUNA_NATIVE_SAMPLE_PLUGIN_ROOT="${PROJECT_SOURCE_DIR}/Plugins/Editor/NativeSample"
+    )
+    add_dependencies(NativeSamplePluginContractTest LunaEditorNativeSample)
+endif()
+
+target_compile_definitions(
+    NativeSamplePluginContractTest
+    PRIVATE
+        LUNA_TEST_EDITOR_PLUGIN_DIR="${LUNA_TEST_EDITOR_PLUGIN_OUTPUT_DIR}"
+)
+
+target_include_directories(
+    EditorSdkNativeTemplateLoadTest
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/Editor/Source
+)
+
+target_include_directories(
+    NativeSamplePluginContractTest
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/Editor/Source
+)
+
 target_include_directories(
     NativeEditorPluginContractTests
     PRIVATE
@@ -318,6 +371,7 @@ endif()
 
 add_dependencies(ScriptPluginContractTests ${LUNA_TEST_SCRIPT_PLUGIN_TARGETS})
 add_dependencies(NativeEditorPluginContractTests ${LUNA_TEST_EDITOR_PLUGIN_TARGETS})
+add_dependencies(NativeSamplePluginContractTest ${LUNA_TEST_EDITOR_PLUGIN_TARGETS})
 
 add_test(
     NAME ScriptPluginContractTests
@@ -330,6 +384,12 @@ add_test(
     COMMAND NativeEditorPluginContractTests
 )
 luna_set_test_properties(NativeEditorPluginContractTests 20 "quick;unit;editor;plugin")
+
+add_test(
+    NAME NativeSamplePluginContractTest
+    COMMAND NativeSamplePluginContractTest
+)
+luna_set_test_properties(NativeSamplePluginContractTest 20 "quick;contract;editor;plugin;sdk")
 
 add_test(
     NAME SceneSerializerTests
