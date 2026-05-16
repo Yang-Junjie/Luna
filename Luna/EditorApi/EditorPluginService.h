@@ -26,12 +26,19 @@ enum class PluginLoadState {
     Failed,
 };
 
+enum class PluginCategoryKind {
+    Core,
+    Tool,
+    Diagnostics,
+};
+
 struct PluginInfo {
     std::string id;
     std::string display_name;
     std::string version;
     PluginRuntimeKind runtime{PluginRuntimeKind::BuiltinNative};
     PluginSourceKind source{PluginSourceKind::Unknown};
+    PluginCategoryKind category{PluginCategoryKind::Tool};
     PluginLoadState state{PluginLoadState::Registered};
     std::filesystem::path root_path;
     std::filesystem::path entry_path;

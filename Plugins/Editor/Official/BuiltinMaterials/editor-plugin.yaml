@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.builtin-materials
   DisplayName: Builtin Materials
   Runtime: BuiltinNative
+  Category: Tool
   Version: 0.1.0
   Enabled: true
   Dependencies:

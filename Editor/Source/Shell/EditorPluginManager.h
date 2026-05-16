@@ -32,6 +32,12 @@ enum class EditorPluginSource {
     Development,
 };
 
+enum class EditorPluginCategory {
+    Core,
+    Tool,
+    Diagnostics,
+};
+
 struct EditorPluginPackage {
     std::string id;
     std::string display_name;
@@ -41,6 +47,7 @@ struct EditorPluginPackage {
     std::filesystem::path resolved_entry_path;
     EditorPluginRuntime runtime{EditorPluginRuntime::BuiltinNative};
     EditorPluginSource source{EditorPluginSource::Unknown};
+    EditorPluginCategory category{EditorPluginCategory::Tool};
     std::vector<std::string> dependencies;
     bool enabled{true};
     bool entry_exists{false};

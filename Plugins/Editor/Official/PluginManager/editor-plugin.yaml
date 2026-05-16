@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.plugin-manager
   DisplayName: Plugin Manager
   Runtime: BuiltinNative
+  Category: Core
   Version: 0.1.0
   Enabled: true
   Dependencies:

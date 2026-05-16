@@ -30,7 +30,7 @@ luna_add_editor_native_plugin(
 
 `luna_add_editor_native_plugin` creates a shared library, links `Luna::EditorSDK`, enables C++20, and writes the binary to the package-local `Binaries/<platform>/` directory expected by `editor-plugin.yaml`. Advanced builds can still link `Luna::EditorSDK` manually.
 
-The template in `Templates/NativePlugin` shows the expected package shape, manifest, binary output paths, plugin-owned `assets/`, and a command/window/menu tool using the C++ wrapper for project, asset, scene, selection, viewport, and runtime viewport access.
+The template in `Templates/NativePlugin` shows the expected package shape, manifest metadata including `Category: Tool`, binary output paths, plugin-owned `assets/`, and a command/window/menu tool using the C++ wrapper for project, asset, scene, selection, viewport, and runtime viewport access.
 
 For the stable authoring path, see `docs/native-plugin-authoring.md`.
 

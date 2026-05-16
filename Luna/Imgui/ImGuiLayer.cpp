@@ -6,6 +6,11 @@
 #include "Imgui/ImGuiContext.h"
 #include "Imgui/ImGuiLayer.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <utility>
+
 #include <imgui.h>
 
 namespace luna {
@@ -133,6 +138,44 @@ struct ModifierKeyState {
 
 ModifierKeyState g_modifier_key_state{};
 
+float sanitizeFontSize(float size_pixels) noexcept
+{
+    if (!std::isfinite(size_pixels) || size_pixels <= 0.0f) {
+        return 16.0f;
+    }
+    return std::clamp(size_pixels, 8.0f, 48.0f);
+}
+
+bool loadConfiguredFont(ImGuiIO& io, const ImGuiFontConfig& config)
+{
+    if (config.font_path.empty()) {
+        io.Fonts->AddFontDefault();
+        LUNA_IMGUI_INFO("Loaded default ImGui font");
+        return true;
+    }
+
+    std::error_code exists_ec;
+    if (!std::filesystem::exists(config.font_path, exists_ec) || exists_ec) {
+        LUNA_IMGUI_WARN("Configured ImGui font '{}' is missing; using default font", config.font_path.string());
+        io.Fonts->AddFontDefault();
+        return false;
+    }
+
+    const float size_pixels = sanitizeFontSize(config.size_pixels);
+    ImFont* font = io.Fonts->AddFontFromFileTTF(config.font_path.string().c_str(), size_pixels);
+    if (font == nullptr) {
+        LUNA_IMGUI_WARN("Failed to load configured ImGui font '{}' at {}px; using default font",
+                        config.font_path.string(),
+                        size_pixels);
+        io.Fonts->AddFontDefault();
+        return false;
+    }
+
+    io.FontDefault = font;
+    LUNA_IMGUI_INFO("Loaded ImGui font '{}' at {}px", config.font_path.string(), size_pixels);
+    return true;
+}
+
 void updateModifierKeys(ImGuiIO& io, KeyCode key, bool down)
 {
     switch (key) {
@@ -167,9 +210,10 @@ void updateModifierKeys(ImGuiIO& io, KeyCode key, bool down)
 
 } // namespace
 
-ImGuiLayer::ImGuiLayer(Renderer& renderer, bool enable_multi_viewport)
+ImGuiLayer::ImGuiLayer(Renderer& renderer, bool enable_multi_viewport, ImGuiFontConfig font_config)
     : Layer("ImGuiLayer"),
       m_enable_multi_viewport(enable_multi_viewport),
+      m_font_config(std::move(font_config)),
       m_renderer(&renderer)
 {}
 
@@ -193,7 +237,7 @@ void ImGuiLayer::onAttach()
     if (m_enable_multi_viewport) {
         LUNA_IMGUI_WARN("ImGui multi-viewport is disabled until the RHI path supports rendering platform windows");
     }
-    io.Fonts->AddFontDefault();
+    loadConfiguredFont(io, m_font_config);
 
     if (!luna::ImGuiRhiContext::Init(*m_renderer)) {
         LUNA_IMGUI_ERROR("Failed to initialize ImGui RHI backend");

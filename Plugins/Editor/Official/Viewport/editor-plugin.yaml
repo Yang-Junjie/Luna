@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.viewport
   DisplayName: Viewport
   Runtime: BuiltinNative
+  Category: Core
   Version: 0.1.0
   Enabled: true
   Dependencies:

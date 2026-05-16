@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.backend-capabilities
   DisplayName: Backend Capabilities
   Runtime: BuiltinNative
+  Category: Diagnostics
   Version: 0.1.0
   Enabled: true
   Dependencies:

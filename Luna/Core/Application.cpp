@@ -111,7 +111,7 @@ bool Application::enableImGui(bool enable_multi_viewport)
 
     m_renderer.setImGuiEnabled(true);
 
-    m_imgui_layer = std::make_unique<ImGuiLayer>(m_renderer, enable_multi_viewport);
+    m_imgui_layer = std::make_unique<ImGuiLayer>(m_renderer, enable_multi_viewport, m_specification.m_imgui_font);
     m_imgui_layer_raw = m_imgui_layer.get();
     m_imgui_layer->onAttach();
 

@@ -86,6 +86,35 @@ std::optional<luna::editor::EditorPluginRuntime> readRuntime(const YAML::Node& r
     return std::nullopt;
 }
 
+std::optional<luna::editor::EditorPluginCategory> readCategory(const YAML::Node& category_node,
+                                                               const std::filesystem::path& manifest_path)
+{
+    if (!category_node) {
+        return luna::editor::EditorPluginCategory::Tool;
+    }
+    if (!category_node.IsScalar()) {
+        LUNA_EDITOR_WARN("Skipped editor plugin manifest '{}' because 'EditorPlugin.Category' must be a string",
+                         manifest_path.string());
+        return std::nullopt;
+    }
+
+    const std::string category = toLower(category_node.as<std::string>());
+    if (category == "core") {
+        return luna::editor::EditorPluginCategory::Core;
+    }
+    if (category == "tool" || category == "tools") {
+        return luna::editor::EditorPluginCategory::Tool;
+    }
+    if (category == "diagnostics" || category == "diagnostic" || category == "debug") {
+        return luna::editor::EditorPluginCategory::Diagnostics;
+    }
+
+    LUNA_EDITOR_WARN("Skipped editor plugin manifest '{}' because category '{}' is unknown",
+                     manifest_path.string(),
+                     category);
+    return std::nullopt;
+}
+
 std::vector<std::string> readDependencies(const YAML::Node& dependencies_node,
                                           const std::filesystem::path& manifest_path)
 {
@@ -227,6 +256,11 @@ EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_pa
         }
         if (const std::optional<EditorPluginRuntime> runtime = readRuntime(plugin["Runtime"], manifest_path)) {
             package.runtime = *runtime;
+        } else {
+            return std::nullopt;
+        }
+        if (const std::optional<EditorPluginCategory> category = readCategory(plugin["Category"], manifest_path)) {
+            package.category = *category;
         } else {
             return std::nullopt;
         }

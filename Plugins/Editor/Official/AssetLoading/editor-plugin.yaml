@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.asset-loading
   DisplayName: Asset Loading
   Runtime: BuiltinNative
+  Category: Diagnostics
   Version: 0.1.0
   Enabled: true
   Dependencies:

@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.script-plugins
   DisplayName: Script Plugins
   Runtime: BuiltinNative
+  Category: Tool
   Version: 0.1.0
   Enabled: true
   Dependencies:

@@ -42,6 +42,19 @@ std::string sourceLabel(luna::editor::PluginSourceKind source)
     return "Unknown";
 }
 
+std::string categoryLabel(luna::editor::PluginCategoryKind category)
+{
+    switch (category) {
+        case luna::editor::PluginCategoryKind::Core:
+            return "Core";
+        case luna::editor::PluginCategoryKind::Tool:
+            return "Tool";
+        case luna::editor::PluginCategoryKind::Diagnostics:
+            return "Diagnostics";
+    }
+    return "Tool";
+}
+
 std::string stateLabel(luna::editor::PluginLoadState state)
 {
     switch (state) {
@@ -157,7 +170,7 @@ private:
         const luna::editor::TableFlags table_flags =
             luna::editor::TableFlag::RowBg | luna::editor::TableFlag::BordersInnerH |
             luna::editor::TableFlag::SizingStretchProp;
-        if (!ui.beginTable("##EditorPluginDiagnostics", 5, table_flags, ui.contentRegionAvail())) {
+        if (!ui.beginTable("##EditorPluginDiagnostics", 6, table_flags, ui.contentRegionAvail())) {
             return;
         }
 
@@ -177,6 +190,10 @@ private:
                             static_cast<luna::editor::TableColumnFlags>(
                                 luna::editor::TableColumnFlag::WidthFixed),
                             112.0f);
+        ui.tableSetupColumn("Category",
+                            static_cast<luna::editor::TableColumnFlags>(
+                                luna::editor::TableColumnFlag::WidthFixed),
+                            118.0f);
         ui.tableSetupColumn("Details",
                             static_cast<luna::editor::TableColumnFlags>(
                                 luna::editor::TableColumnFlag::WidthStretch),
@@ -201,6 +218,9 @@ private:
 
             ui.tableNextColumn();
             ui.text(sourceLabel(plugin.source));
+
+            ui.tableNextColumn();
+            ui.text(categoryLabel(plugin.category));
 
             ui.tableNextColumn();
             ui.textWrapped(plugin.status.empty() ? stateLabel(plugin.state) : plugin.status);

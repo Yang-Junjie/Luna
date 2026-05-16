@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.render-debug
   DisplayName: Render Debug
   Runtime: BuiltinNative
+  Category: Diagnostics
   Version: 0.1.0
   Enabled: true
   Dependencies:

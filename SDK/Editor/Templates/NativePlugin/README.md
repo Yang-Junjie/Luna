@@ -15,6 +15,7 @@ The template also uses SDK scoped registration handles for commands, windows, me
 This template demonstrates:
 
 - a plugin manifest;
+- `Category: Tool` plugin metadata;
 - a native dynamic library entry point;
 - a registered command;
 - a Window menu entry;

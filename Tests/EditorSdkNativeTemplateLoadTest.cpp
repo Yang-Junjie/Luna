@@ -2098,6 +2098,8 @@ void testTemplateEditorPluginManagerLoad(TestContext& context,
 
     context.expect(package->runtime == luna::editor::EditorPluginRuntime::Native,
                    "SDK template manifest runtime should be Native");
+    context.expect(package->category == luna::editor::EditorPluginCategory::Tool,
+                   "SDK template manifest category should default to Tool");
     context.expect(package->entry_exists, "SDK template manifest entry should exist");
     context.expect(package->resolved_entry_path == plugin_binary,
                    "SDK template manifest should resolve to built template binary");
@@ -2113,6 +2115,8 @@ void testTemplateEditorPluginManagerLoad(TestContext& context,
     if (context.expect(plugin_info != nullptr, "SDK template PluginInfo should exist after manager load")) {
         context.expect(plugin_info->runtime == luna::editor::PluginRuntimeKind::Native,
                        "SDK template PluginInfo runtime should be Native");
+        context.expect(plugin_info->category == luna::editor::PluginCategoryKind::Tool,
+                       "SDK template PluginInfo category should be Tool");
         context.expect(plugin_info->state == luna::editor::PluginLoadState::Loaded,
                        "SDK template PluginInfo state should be Loaded");
         context.expect(plugin_info->status == "Loaded", "SDK template PluginInfo status should be Loaded");

@@ -9,6 +9,7 @@
 #include "Timestep.h"
 #include "Window.h"
 
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -20,6 +21,7 @@ struct ApplicationSpecification {
     bool m_maximized{false};
     bool m_enable_imgui{true};
     bool m_enable_multi_viewport{false};
+    ImGuiFontConfig m_imgui_font{};
 };
 
 class Application {

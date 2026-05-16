@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.source.native-sample
   DisplayName: Native Sample Tool
   Runtime: Native
+  Category: Tool
   Version: 0.1.0
   Enabled: true
   Entry:

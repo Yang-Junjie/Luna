@@ -120,13 +120,15 @@ void writeEditorPluginManifest(const std::filesystem::path& plugins_root,
                                std::string_view plugin_id,
                                std::string_view display_name,
                                const std::filesystem::path& entry_path,
-                               const std::vector<std::string_view>& dependencies)
+                               const std::vector<std::string_view>& dependencies,
+                               std::string_view category = {})
 {
     std::ostringstream manifest;
     manifest << "EditorPlugin:\n"
              << "  Id: " << plugin_id << "\n"
              << "  DisplayName: " << display_name << "\n"
              << "  Runtime: Native\n"
+             << "  Category: " << (category.empty() ? std::string_view("Tool") : category) << "\n"
              << "  Version: 0.1.0\n"
              << "  Enabled: true\n"
              << "  Entry: " << yamlQuotedPath(entry_path) << "\n";
@@ -1707,6 +1709,8 @@ void testManifestAndDependencyContract(TestContext& context)
     if (good != nullptr) {
         context.expect(good->runtime == luna::editor::EditorPluginRuntime::Native,
                        "native manifest should parse Runtime=Native");
+        context.expect(good->category == luna::editor::EditorPluginCategory::Tool,
+                       "native manifest should default to Tool category");
         context.expect(good->entry_exists, "native manifest should record existing entry");
         context.expect(good->resolved_entry_path == good_entry.lexically_normal(),
                        "native manifest should resolve absolute entry path");
@@ -1777,6 +1781,14 @@ void testEditorPluginPackageRootContract(TestContext& context)
                               {});
     writeEditorPluginManifest(dev_root, "DevNative", "luna.test.dev-native", "Dev Native", good_entry, {});
 
+    writeEditorPluginManifest(dev_root,
+                              "DiagnosticNative",
+                              "luna.test.diagnostic-native",
+                              "Diagnostic Native",
+                              good_entry,
+                              {},
+                              "Diagnostics");
+
     luna::editor::EditorEnginePaths paths{};
     paths.engine_data_root = engine_root;
     paths.official_editor_plugin_roots.push_back(engine_root / "Plugins" / "Editor" / "OfficialMissing");
@@ -1787,8 +1799,11 @@ void testEditorPluginPackageRootContract(TestContext& context)
     const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
     const luna::editor::EditorPluginPackage* installed_package = findPackage(packages, "luna.test.installed-native");
     const luna::editor::EditorPluginPackage* development_package = findPackage(packages, "luna.test.dev-native");
+    const luna::editor::EditorPluginPackage* diagnostic_package =
+        findPackage(packages, "luna.test.diagnostic-native");
     context.expect(installed_package != nullptr, "installed editor plugin root should contribute packages");
     context.expect(development_package != nullptr, "development editor plugin root should contribute packages");
+    context.expect(diagnostic_package != nullptr, "development diagnostics editor plugin should contribute packages");
     if (installed_package != nullptr) {
         context.expect(installed_package->source == luna::editor::EditorPluginSource::Installed,
                        "installed editor plugin package should record installed source");
@@ -1796,6 +1811,10 @@ void testEditorPluginPackageRootContract(TestContext& context)
     if (development_package != nullptr) {
         context.expect(development_package->source == luna::editor::EditorPluginSource::Development,
                        "development editor plugin package should record development source");
+    }
+    if (diagnostic_package != nullptr) {
+        context.expect(diagnostic_package->category == luna::editor::EditorPluginCategory::Diagnostics,
+                       "editor plugin package should parse diagnostics category");
     }
 }
 

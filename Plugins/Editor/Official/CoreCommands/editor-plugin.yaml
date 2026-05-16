@@ -2,5 +2,6 @@ EditorPlugin:
   Id: luna.editor.core-commands
   DisplayName: Core Editor Commands
   Runtime: BuiltinNative
+  Category: Core
   Version: 0.1.0
   Enabled: true

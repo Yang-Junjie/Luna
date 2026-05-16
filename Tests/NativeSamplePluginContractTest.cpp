@@ -2303,6 +2303,7 @@ void testNativeSampleEditorPluginManagerLoad(TestContext& context,
         .root_path = package_root.parent_path() / "Official" / "CoreCommands",
         .runtime = luna::editor::EditorPluginRuntime::BuiltinNative,
         .source = luna::editor::EditorPluginSource::Official,
+        .category = luna::editor::EditorPluginCategory::Core,
         .enabled = true,
         .create = [] {
             return std::make_unique<ManagerSmokeBuiltinPlugin>(kCoreCommandsPluginId);
@@ -2317,6 +2318,8 @@ void testNativeSampleEditorPluginManagerLoad(TestContext& context,
     if (context.expect(native_sample != nullptr, "PluginInfo should include NativeSample after manager load")) {
         context.expect(native_sample->runtime == luna::editor::PluginRuntimeKind::Native,
                        "NativeSample PluginInfo runtime should be Native");
+        context.expect(native_sample->category == luna::editor::PluginCategoryKind::Tool,
+                       "NativeSample PluginInfo category should default to Tool");
         context.expect(native_sample->state == luna::editor::PluginLoadState::Loaded,
                        "NativeSample PluginInfo state should be Loaded");
         context.expect(native_sample->status == "Loaded", "NativeSample PluginInfo status should be Loaded");

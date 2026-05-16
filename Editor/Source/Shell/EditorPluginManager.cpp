@@ -68,6 +68,20 @@ PluginSourceKind toPluginSourceKind(EditorPluginSource source) noexcept
     return PluginSourceKind::Unknown;
 }
 
+PluginCategoryKind toPluginCategoryKind(EditorPluginCategory category) noexcept
+{
+    switch (category) {
+        case EditorPluginCategory::Core:
+            return PluginCategoryKind::Core;
+        case EditorPluginCategory::Tool:
+            return PluginCategoryKind::Tool;
+        case EditorPluginCategory::Diagnostics:
+            return PluginCategoryKind::Diagnostics;
+    }
+
+    return PluginCategoryKind::Tool;
+}
+
 PluginLoadState toPluginLoadState(EditorPluginLoadState state) noexcept
 {
     switch (state) {
@@ -2699,6 +2713,7 @@ std::vector<PluginInfo> EditorPluginManager::pluginInfos() const
             .version = package.version,
             .runtime = toPluginRuntimeKind(package.runtime),
             .source = toPluginSourceKind(package.source),
+            .category = toPluginCategoryKind(package.category),
             .state = toPluginLoadState(diagnostic.state),
             .root_path = package.root_path,
             .entry_path = package.entry_path,

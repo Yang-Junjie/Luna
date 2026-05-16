@@ -57,6 +57,7 @@ EditorPlugin:
   Id: com.example.my-tool
   DisplayName: My Tool
   Runtime: Native
+  Category: Tool
   Version: 0.1.0
   Enabled: true
   Entry:
@@ -74,6 +75,8 @@ EditorPlugin:
 Keep the manifest `Id` stable. Use a reverse-DNS style ID and use the same prefix for command IDs, window IDs, viewport IDs, and menu-owned identifiers.
 
 `Runtime: Native` means the entry binary exports `LunaCreateEditorPlugin`.
+
+`Category` is editor-facing metadata for grouping plugins in diagnostics and future default-load policy. Current values are `Core`, `Tool`, and `Diagnostics`. External editor plugins should normally use `Tool`; omit the field only if the default `Tool` category is acceptable.
 
 ## CMake
 

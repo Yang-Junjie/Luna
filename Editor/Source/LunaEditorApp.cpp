@@ -7,6 +7,7 @@
 #include <Capabilities.h>
 
 #include <exception>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -15,6 +16,21 @@
 namespace {
 
 constexpr luna::RHI::PresentMode kRequestedPresentMode = luna::RHI::PresentMode::Immediate;
+constexpr const char* kDefaultEditorFontRelativePath = "Editor/Asset/fonts/Play-Regular.ttf";
+constexpr float kDefaultEditorFontSizePixels = 16.0f;
+
+std::filesystem::path sourceRoot()
+{
+    return std::filesystem::path(LUNA_PROJECT_ROOT).lexically_normal();
+}
+
+luna::ImGuiFontConfig defaultEditorFontConfig()
+{
+    return luna::ImGuiFontConfig{
+        .font_path = sourceRoot() / kDefaultEditorFontRelativePath,
+        .size_pixels = kDefaultEditorFontSizePixels,
+    };
+}
 
 const char* presentModeToString(luna::RHI::PresentMode mode)
 {
@@ -118,6 +134,7 @@ LunaEditorApplication::LunaEditorApplication(luna::RHI::BackendType backend, edi
           .m_maximized = false,
           .m_enable_imgui = luna::RHI::makeCapabilitiesForBackend(resolveCapabilitiesBackend(backend)).supports_imgui,
           .m_enable_multi_viewport = false,
+          .m_imgui_font = defaultEditorFontConfig(),
       }),
       m_backend(backend),
       m_engine_paths(std::move(engine_paths))

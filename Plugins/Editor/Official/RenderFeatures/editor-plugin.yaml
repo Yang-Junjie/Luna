@@ -2,6 +2,7 @@ EditorPlugin:
   Id: luna.editor.render-features
   DisplayName: Render Features
   Runtime: BuiltinNative
+  Category: Diagnostics
   Version: 0.1.0
   Enabled: true
   Dependencies:
