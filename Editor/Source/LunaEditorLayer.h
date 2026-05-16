@@ -5,6 +5,7 @@
 #include "EditorDocumentHost.h"
 #include "EditorRuntime.h"
 #include "EditorApi/EditorRenderingService.h"
+#include "EditorApi/EditorSettingsService.h"
 #include "EditorApi/EditorViewportService.h"
 #include "Core/Layer.h"
 #include "Events/Event.h"
@@ -235,6 +236,7 @@ private:
     bool m_show_editor_grid{true};
     bool m_gizmo_transform_transaction_active{false};
     float m_editor_ui_scale{0.0f};
+    editor::EditorThemePreset m_editor_theme_preset{editor::EditorThemePreset::ModernLightweight};
 
     bool m_runtime_viewport_enabled{false};
     bool m_runtime_viewport_requested{false};

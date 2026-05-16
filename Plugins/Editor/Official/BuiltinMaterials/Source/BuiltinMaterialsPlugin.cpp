@@ -132,7 +132,7 @@ bool BuiltinMaterialsPlugin::onLoad(Host& host)
                                                         : overrides_path.generic_string()));
 
                 ui.separator();
-                ui.text("Surface");
+                ui.separatorText("Surface");
 
                 auto surface = material->getSurface();
                 bool changed = false;
@@ -191,11 +191,15 @@ bool BuiltinMaterialsPlugin::onLoad(Host& host)
                     BuiltinMaterialOverrides::load();
                 }
 
-                if (ui.button("Clear Selected Override", Vec2{.x = -1.0f, .y = 0.0f})) {
+                if (ui.button("Clear Selected Override",
+                              Vec2{.x = -1.0f, .y = 0.0f},
+                              ButtonVariant::Danger)) {
                     BuiltinMaterialOverrides::clearSelected(m_selected_material);
                 }
 
-                if (ui.button("Clear All Overrides", Vec2{.x = -1.0f, .y = 0.0f})) {
+                if (ui.button("Clear All Overrides",
+                              Vec2{.x = -1.0f, .y = 0.0f},
+                              ButtonVariant::Danger)) {
                     BuiltinMaterialOverrides::clearAll();
                 }
             },

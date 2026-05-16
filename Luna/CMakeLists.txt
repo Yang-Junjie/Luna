@@ -373,6 +373,7 @@ target_include_directories(
         ${THIRD_PARTY_DIR}/spdlog/include
         ${THIRD_PARTY_DIR}/glfw/include
         ${THIRD_PARTY_DIR}/glm
+        ${THIRD_PARTY_DIR}
         ${THIRD_PARTY_DIR}/entt/src
         ${THIRD_PARTY_DIR}/yaml-cpp/include
         ${PROJECT_SOURCE_DIR}

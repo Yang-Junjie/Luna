@@ -261,8 +261,7 @@ private:
             ui.textDisabled("Runtime viewport is active; scene editing is disabled.");
         }
 
-        ui.text("Environment");
-        ui.separator();
+        ui.separatorText("Environment");
 
         if (!host.scene().canEditScene()) {
             ui.beginDisabled();
@@ -293,7 +292,7 @@ private:
 
         if (m_environment_draft.backgroundMode == SceneBackgroundMode::ProceduralSky) {
             ui.separator();
-            ui.text("Default Sky");
+            ui.separatorText("Default Sky");
             luna::editor::Vec3 sun_direction = toEditorVec3(m_environment_draft.proceduralSunDirection);
             if (ui.dragFloat3("Sun Direction", sun_direction, 0.01f, 0.0f, 0.0f, "%.2f")) {
                 fromEditorVec3(sun_direction, m_environment_draft.proceduralSunDirection);
@@ -359,8 +358,7 @@ private:
         }
 
         ui.spacing();
-        ui.text("Shadows");
-        ui.separator();
+        ui.separatorText("Shadows");
 
         if (!host.scene().canEditScene()) {
             ui.beginDisabled();

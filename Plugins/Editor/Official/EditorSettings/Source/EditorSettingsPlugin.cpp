@@ -1,6 +1,5 @@
-#include "EditorSettingsPlugin.h"
-
 #include "EditorApi/EditorApi.h"
+#include "EditorSettingsPlugin.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <filesystem>
@@ -20,12 +19,28 @@ std::string pathLabel(const std::filesystem::path& path)
 void saveStatus(luna::editor::SettingsService& settings, std::string& status)
 {
     if (settings.save()) {
-        status = "Saved. Restart Luna Editor to apply font changes.";
+        status = settings.restartRequired() ? "Saved. Restart Luna Editor to apply font changes." : "Saved.";
         return;
     }
 
     status = settings.lastError().empty() ? "Failed to save editor settings." : settings.lastError();
 }
+
+std::string_view themePresetLabel(luna::editor::EditorThemePreset preset)
+{
+    switch (preset) {
+        case luna::editor::EditorThemePreset::ModernLightweight:
+            return "Modern Lightweight";
+        case luna::editor::EditorThemePreset::HighContrastDark:
+            return "High Contrast Dark";
+    }
+    return "Modern Lightweight";
+}
+
+constexpr luna::editor::EditorThemePreset kThemePresets[]{
+    luna::editor::EditorThemePreset::ModernLightweight,
+    luna::editor::EditorThemePreset::HighContrastDark,
+};
 
 class EditorSettingsPlugin final : public luna::editor::Plugin {
 public:
@@ -52,11 +67,35 @@ public:
                     luna::editor::SettingsService& settings = host.settings();
 
                     luna::editor::EditorFontSettings font = settings.editorFont();
-                    ui.text(std::string("Settings File: ") + pathLabel(settings.settingsPath()));
-                    ui.separatorText("Font");
+                    ui.heading("Editor Settings");
+                    ui.beginPanel("##EditorSettingsSummary");
+                    ui.keyValue("Settings File", pathLabel(settings.settingsPath()));
+                    ui.keyValue("Theme", themePresetLabel(settings.editorTheme()));
+                    ui.keyValue("Active Font", pathLabel(font.font_path));
+                    ui.keyValue("Mode", font.using_default ? "Default" : "Custom");
+                    ui.endPanel();
 
-                    ui.text(std::string("Active: ") + pathLabel(font.font_path));
-                    ui.text(std::string("Mode: ") + (font.using_default ? "Default" : "Custom"));
+                    ui.heading("Theme");
+                    luna::editor::EditorThemePreset selected_theme = settings.editorTheme();
+                    if (ui.beginCombo("Preset", themePresetLabel(selected_theme))) {
+                        for (const luna::editor::EditorThemePreset preset : kThemePresets) {
+                            const bool selected = preset == selected_theme;
+                            if (ui.selectable(themePresetLabel(preset), selected)) {
+                                if (settings.setEditorTheme(preset)) {
+                                    saveStatus(settings, m_status);
+                                    selected_theme = preset;
+                                } else {
+                                    m_status = settings.lastError();
+                                }
+                            }
+                            if (selected) {
+                                ui.setItemDefaultFocus();
+                            }
+                        }
+                        ui.endCombo();
+                    }
+
+                    ui.heading("Font");
 
                     float font_size = font.size_pixels;
                     if (ui.dragFloat("Size Pixels", font_size, 0.25f, 8.0f, 48.0f, "%.1f")) {
@@ -79,17 +118,17 @@ public:
 
                     const std::vector<luna::editor::EditorFontInfo> fonts = settings.listEditorFonts();
                     if (fonts.empty()) {
-                        ui.textDisabled("No editor fonts were found.");
+                        ui.emptyState("No editor fonts found", "Add fonts to the editor font asset directory.");
                     } else {
                         const luna::editor::TableFlags table_flags =
                             luna::editor::TableFlag::RowBg | luna::editor::TableFlag::BordersInnerH |
                             luna::editor::TableFlag::SizingStretchProp | luna::editor::TableFlag::ScrollY;
-                        if (ui.beginTable("##EditorSettingsFonts", 2, table_flags,
-                                          luna::editor::Vec2{.x = 0.0f, .y = 210.0f})) {
-                            ui.tableSetupColumn("Font",
-                                                static_cast<luna::editor::TableColumnFlags>(
-                                                    luna::editor::TableColumnFlag::WidthFixed),
-                                                180.0f);
+                        if (ui.beginTable(
+                                "##EditorSettingsFonts", 2, table_flags, luna::editor::Vec2{.x = 0.0f, .y = 210.0f})) {
+                            ui.tableSetupColumn(
+                                "Font",
+                                static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                                180.0f);
                             ui.tableSetupColumn("Path",
                                                 static_cast<luna::editor::TableColumnFlags>(
                                                     luna::editor::TableColumnFlag::WidthStretch),

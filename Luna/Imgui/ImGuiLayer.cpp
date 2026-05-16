@@ -148,32 +148,35 @@ float sanitizeFontSize(float size_pixels) noexcept
 
 bool loadConfiguredFont(ImGuiIO& io, const ImGuiFontConfig& config)
 {
+    ImFont* font = nullptr;
+
     if (config.font_path.empty()) {
-        io.Fonts->AddFontDefault();
+        font = io.Fonts->AddFontDefault();
         LUNA_IMGUI_INFO("Loaded default ImGui font");
-        return true;
+    } else {
+        std::error_code exists_ec;
+        if (std::filesystem::exists(config.font_path, exists_ec) && !exists_ec) {
+            const float size_pixels = sanitizeFontSize(config.size_pixels);
+            font = io.Fonts->AddFontFromFileTTF(config.font_path.string().c_str(), size_pixels);
+            if (font != nullptr) {
+                LUNA_IMGUI_INFO("Loaded ImGui font '{}' at {}px", config.font_path.string(), size_pixels);
+            } else {
+                LUNA_IMGUI_WARN("Failed to load configured ImGui font '{}' at {}px; using default font",
+                                config.font_path.string(),
+                                size_pixels);
+            }
+        }
     }
 
-    std::error_code exists_ec;
-    if (!std::filesystem::exists(config.font_path, exists_ec) || exists_ec) {
-        LUNA_IMGUI_WARN("Configured ImGui font '{}' is missing; using default font", config.font_path.string());
-        io.Fonts->AddFontDefault();
-        return false;
-    }
-
-    const float size_pixels = sanitizeFontSize(config.size_pixels);
-    ImFont* font = io.Fonts->AddFontFromFileTTF(config.font_path.string().c_str(), size_pixels);
+    const bool loaded_configured_font = font != nullptr;
     if (font == nullptr) {
-        LUNA_IMGUI_WARN("Failed to load configured ImGui font '{}' at {}px; using default font",
-                        config.font_path.string(),
-                        size_pixels);
-        io.Fonts->AddFontDefault();
-        return false;
+        LUNA_IMGUI_WARN("Configured ImGui font '{}' is missing; using default font", config.font_path.string());
+        font = io.Fonts->AddFontDefault();
     }
 
     io.FontDefault = font;
-    LUNA_IMGUI_INFO("Loaded ImGui font '{}' at {}px", config.font_path.string(), size_pixels);
-    return true;
+
+    return loaded_configured_font;
 }
 
 void updateModifierKeys(ImGuiIO& io, KeyCode key, bool down)

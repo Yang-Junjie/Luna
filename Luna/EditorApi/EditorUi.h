@@ -3,6 +3,7 @@
 #include "EditorApi/EditorTypes.h"
 
 #include <cstddef>
+
 #include <initializer_list>
 #include <string_view>
 
@@ -13,6 +14,14 @@ enum class ButtonVariant {
     Primary,
     Danger,
     Subtle,
+};
+
+enum class StatusVariant {
+    Neutral,
+    Info,
+    Success,
+    Warning,
+    Danger,
 };
 
 class Ui {
@@ -41,13 +50,25 @@ public:
     [[nodiscard]] virtual Vec2 contentRegionAvail() const noexcept = 0;
     [[nodiscard]] virtual Vec2 windowFramebufferScale() const noexcept = 0;
 
-    virtual bool button(std::string_view label,
-                        Vec2 size = {},
-                        ButtonVariant variant = ButtonVariant::Default) = 0;
+    virtual void heading(std::string_view title, std::string_view detail = {}) = 0;
+    virtual void keyValue(std::string_view label, std::string_view value) = 0;
+    virtual void badge(std::string_view label, StatusVariant variant = StatusVariant::Neutral) = 0;
+    virtual void metric(std::string_view label,
+                        std::string_view value,
+                        std::string_view detail = {},
+                        StatusVariant variant = StatusVariant::Neutral,
+                        Vec2 size = {}) = 0;
+    virtual void emptyState(std::string_view title, std::string_view detail = {}) = 0;
+    virtual void beginPanel(std::string_view id, Vec2 size = {}) = 0;
+    virtual void endPanel() = 0;
+
+    virtual bool button(std::string_view label, Vec2 size = {}, ButtonVariant variant = ButtonVariant::Default) = 0;
+
     bool button(std::string_view label, ButtonVariant variant)
     {
         return button(label, Vec2{}, variant);
     }
+
     virtual bool checkbox(std::string_view label, bool& value) = 0;
     virtual bool colorEdit3(std::string_view label, Vec3& value) = 0;
     virtual bool sliderInt(std::string_view label, int& value, int min_value, int max_value) = 0;
@@ -67,9 +88,7 @@ public:
                            float min_value = 0.0f,
                            float max_value = 0.0f,
                            std::string_view format = "%.3f") = 0;
-    virtual bool inputText(std::string_view label,
-                           std::string& value,
-                           std::size_t buffer_size = 256) = 0;
+    virtual bool inputText(std::string_view label, std::string& value, std::size_t buffer_size = 256) = 0;
     virtual bool inputTextWithHint(std::string_view label,
                                    std::string_view hint,
                                    std::string& value,

@@ -1,7 +1,6 @@
-#include "ScriptPluginsPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "ScriptPluginsPlugin.h"
 
 #include <string>
 #include <vector>
@@ -37,10 +36,9 @@ std::string joinScriptExtensions(const std::vector<std::string>& extensions)
 
 std::string describeAssetRefresh(const luna::editor::AssetRefreshResult& result)
 {
-    std::string message = result.message.empty()
-                              ? (result.project_loaded ? std::string("Asset sync completed.")
-                                                       : std::string("Asset sync did not run."))
-                              : result.message;
+    std::string message = result.message.empty() ? (result.project_loaded ? std::string("Asset sync completed.")
+                                                                          : std::string("Asset sync did not run."))
+                                                 : result.message;
     if (!result.project_loaded) {
         return message;
     }
@@ -92,11 +90,13 @@ public:
                     ScriptPluginService& script_plugins = host.scriptPlugins();
 
                     if (!host.project().hasProjectLoaded()) {
-                        ui.text("Open a project to configure script plugins.");
+                        ui.emptyState("No project loaded", "Open a project to configure script plugins.");
                         return;
                     }
 
-                    if (ui.button("Refresh")) {
+                    ui.heading("Script Plugins");
+                    ui.beginPanel("##ScriptPluginsToolbar");
+                    if (ui.button("Refresh", luna::editor::ButtonVariant::Subtle)) {
                         script_plugins.refreshProjectScriptPlugins();
                         m_asset_refresh_status = describeAssetRefresh(host.assets().refreshAssets());
                     }
@@ -104,10 +104,11 @@ public:
                     const ScriptPluginCandidate* selected_candidate = script_plugins.getSelectedScriptPluginCandidate();
                     ui.sameLine();
                     if (selected_candidate != nullptr) {
-                        ui.text(std::string("Selected: ") + selected_candidate->Manifest.DisplayName);
+                        ui.badge(selected_candidate->Manifest.DisplayName, luna::editor::StatusVariant::Success);
                     } else {
-                        ui.text("Selected: <none>");
+                        ui.badge("None selected", luna::editor::StatusVariant::Warning);
                     }
+                    ui.endPanel();
 
                     const std::string& status = script_plugins.getScriptPluginStatus();
                     if (!status.empty()) {
@@ -120,24 +121,19 @@ public:
                     }
 
                     const auto& candidates = script_plugins.getDiscoveredScriptPlugins();
-                    ui.separator();
                     if (candidates.empty()) {
-                        ui.text("No script plugin candidates were discovered.");
+                        ui.emptyState("No script plugins found", "Install or enable a script plugin for this project.");
                         return;
                     }
 
-                    const TableFlags table_flags = TableFlag::RowBg | TableFlag::BordersInnerH |
-                                                   TableFlag::SizingStretchProp | TableFlag::ScrollY;
+                    const TableFlags table_flags =
+                        TableFlag::RowBg | TableFlag::BordersInnerH | TableFlag::SizingStretchProp | TableFlag::ScrollY;
                     if (!ui.beginTable("##ScriptPluginsTable", 2, table_flags)) {
                         return;
                     }
 
-                    ui.tableSetupColumn("Plugin",
-                                        static_cast<TableColumnFlags>(TableColumnFlag::WidthFixed),
-                                        220.0f);
-                    ui.tableSetupColumn("Details",
-                                        static_cast<TableColumnFlags>(TableColumnFlag::WidthStretch),
-                                        1.0f);
+                    ui.tableSetupColumn("Plugin", static_cast<TableColumnFlags>(TableColumnFlag::WidthFixed), 220.0f);
+                    ui.tableSetupColumn("Details", static_cast<TableColumnFlags>(TableColumnFlag::WidthStretch), 1.0f);
                     ui.tableHeadersRow();
 
                     for (const auto& candidate : candidates) {
@@ -161,12 +157,17 @@ public:
                         }
 
                         ui.tableNextColumn();
-                        ui.textDisabled(std::string(candidate.Manifest.Language) + " | " +
-                                        candidate.Manifest.BackendName + " | " +
-                                        scriptPluginScopeToString(candidate.Scope));
+                        ui.badge(candidate.Manifest.Language, luna::editor::StatusVariant::Info);
+                        ui.sameLine();
+                        ui.badge(candidate.Manifest.BackendName, luna::editor::StatusVariant::Neutral);
+                        ui.sameLine();
+                        ui.badge(scriptPluginScopeToString(candidate.Scope),
+                                 candidate.Scope == luna::ScriptPluginScope::Project
+                                     ? luna::editor::StatusVariant::Success
+                                     : luna::editor::StatusVariant::Neutral);
                         if (!candidate.Manifest.SupportedExtensions.empty()) {
                             ui.textDisabled(std::string("Extensions: ") +
-                                           joinScriptExtensions(candidate.Manifest.SupportedExtensions));
+                                            joinScriptExtensions(candidate.Manifest.SupportedExtensions));
                         }
                         ui.textWrapped(std::string("Id: ") + candidate.Manifest.PluginId);
                         if (!candidate.Manifest.Version.empty()) {

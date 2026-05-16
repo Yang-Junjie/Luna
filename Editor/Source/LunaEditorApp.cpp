@@ -203,7 +203,7 @@ Renderer::InitializationOptions LunaEditorApplication::getRendererInitialization
 void LunaEditorApplication::onInit()
 {
     if (auto* imgui_layer = getImGuiLayer(); imgui_layer != nullptr && imgui_layer->isInitialized()) {
-        editor::applyEditorTheme();
+        editor::applyEditorTheme(m_editor_settings.data().theme_preset);
     }
     pushOverlay(std::make_unique<LunaEditorLayer>(*this));
 }

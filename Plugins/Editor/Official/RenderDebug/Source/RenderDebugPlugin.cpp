@@ -1,9 +1,9 @@
-#include "RenderDebugPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "RenderDebugPlugin.h"
 
 #include <cstddef>
+
 #include <string_view>
 #include <vector>
 
@@ -12,8 +12,7 @@ namespace {
 constexpr const char* kPluginId = "luna.editor.render-debug";
 constexpr const char* kWindowId = "luna.editor.render-debug.window";
 
-int modeIndex(luna::editor::RenderDebugViewMode mode,
-              const std::vector<luna::editor::RenderDebugViewModeInfo>& modes)
+int modeIndex(luna::editor::RenderDebugViewMode mode, const std::vector<luna::editor::RenderDebugViewModeInfo>& modes)
 {
     for (int index = 0; index < static_cast<int>(modes.size()); ++index) {
         if (modes[static_cast<size_t>(index)].mode == mode) {
@@ -29,10 +28,12 @@ void drawRenderDebugWindow(luna::editor::WindowDrawContext& context, luna::edito
     luna::editor::Ui& ui = context.ui();
     const std::vector<luna::editor::RenderDebugViewModeInfo> modes = host.rendering().renderDebugViewModes();
     if (modes.empty()) {
-        ui.text("No render debug views registered.");
+        ui.emptyState("No render debug views", "No render debug views are registered.");
         return;
     }
 
+    ui.heading("Render Debug");
+    ui.beginPanel("##RenderDebugControls");
     const luna::editor::RenderDebugViewMode current_mode = host.rendering().renderDebugViewMode();
     int selected_mode = modeIndex(current_mode, modes);
     ui.setNextItemWidth(220.0f);
@@ -58,17 +59,17 @@ void drawRenderDebugWindow(luna::editor::WindowDrawContext& context, luna::edito
             host.rendering().setRenderDebugVelocityScale(velocity_scale);
         }
     }
-
-    ui.separator();
+    ui.endPanel();
+    ui.spacing();
 
     if (host.rendering().renderDebugViewMode() == luna::editor::RenderDebugViewMode::None) {
-        ui.text("Select a debug view to render a preview.");
+        ui.emptyState("No debug view selected", "Select a debug view to render a preview.");
         return;
     }
 
     const luna::editor::TextureView debug_texture = host.rendering().renderDebugTextureView();
     if (!debug_texture.valid()) {
-        ui.text("Debug texture will appear after the next rendered frame.");
+        ui.emptyState("Waiting for frame", "Debug texture will appear after the next rendered frame.");
         return;
     }
 

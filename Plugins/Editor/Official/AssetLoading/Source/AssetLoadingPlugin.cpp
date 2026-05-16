@@ -1,9 +1,8 @@
-#include "AssetLoadingPlugin.h"
-
-#include "EditorApi/EditorApi.h"
-#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 #include "Asset/AssetManager.h"
 #include "Asset/AssetTypes.h"
+#include "AssetLoadingPlugin.h"
+#include "EditorApi/EditorApi.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
 #include <string>
 #include <vector>
@@ -37,11 +36,16 @@ public:
                     const std::vector<luna::AssetManager::LoadingAssetInfo> loading_assets =
                         luna::AssetManager::get().getLoadingAssetsSnapshot();
 
-                    ui.text("Loading Assets: " + std::to_string(loading_assets.size()));
-                    ui.separator();
+                    ui.heading("Asset Loading");
+                    ui.metric("Loading Assets",
+                              std::to_string(loading_assets.size()),
+                              loading_assets.empty() ? "Queue is idle" : "Imports or loads in flight",
+                              loading_assets.empty() ? luna::editor::StatusVariant::Success
+                                                     : luna::editor::StatusVariant::Info);
+                    ui.spacing();
 
                     if (loading_assets.empty()) {
-                        ui.text("No assets are loading.");
+                        ui.emptyState("No assets are loading", "The asset queue is currently idle.");
                         return;
                     }
 
@@ -53,25 +57,29 @@ public:
                         return;
                     }
 
-                    ui.tableSetupColumn("Type", static_cast<luna::editor::TableColumnFlags>(
-                                                    luna::editor::TableColumnFlag::WidthFixed),
-                                        90.0f);
-                    ui.tableSetupColumn("Name", static_cast<luna::editor::TableColumnFlags>(
-                                                    luna::editor::TableColumnFlag::WidthStretch),
-                                        0.25f);
-                    ui.tableSetupColumn("Path", static_cast<luna::editor::TableColumnFlags>(
-                                                    luna::editor::TableColumnFlag::WidthStretch),
-                                        0.55f);
-                    ui.tableSetupColumn("Handle", static_cast<luna::editor::TableColumnFlags>(
-                                                      luna::editor::TableColumnFlag::WidthStretch),
-                                        0.20f);
+                    ui.tableSetupColumn(
+                        "Type",
+                        static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                        90.0f);
+                    ui.tableSetupColumn(
+                        "Name",
+                        static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch),
+                        0.25f);
+                    ui.tableSetupColumn(
+                        "Path",
+                        static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch),
+                        0.55f);
+                    ui.tableSetupColumn(
+                        "Handle",
+                        static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch),
+                        0.20f);
                     ui.tableHeadersRow();
 
                     for (const luna::AssetManager::LoadingAssetInfo& info : loading_assets) {
                         ui.tableNextRow();
 
                         ui.tableNextColumn();
-                        ui.text(luna::AssetUtils::AssetTypeToString(info.Type));
+                        ui.badge(luna::AssetUtils::AssetTypeToString(info.Type), luna::editor::StatusVariant::Info);
 
                         ui.tableNextColumn();
                         ui.text(info.Name.empty() ? "Unnamed Asset" : info.Name);

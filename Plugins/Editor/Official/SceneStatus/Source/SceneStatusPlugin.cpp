@@ -1,7 +1,6 @@
-#include "SceneStatusPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "SceneStatusPlugin.h"
 
 #include <iomanip>
 #include <sstream>
@@ -49,27 +48,51 @@ public:
 
                     const luna::editor::UVec2 viewport_size = host.rendering().sceneOutputSize();
                     const luna::editor::Vec3 camera_position = host.viewport().editorCameraPosition();
+                    const bool runtime_viewport = host.runtimeViewport().isRuntimeViewportEnabled();
 
-                    ui.text("Backend: Luna RHI / " + host.rendering().backendName());
-                    ui.text("Frame: " + formatFloat(host.rendering().frameTimeMilliseconds(), 2) + " ms  |  " +
-                            formatFloat(host.rendering().framesPerSecond(), 1) + " FPS");
-                    ui.separator();
-                    ui.text("Scene File: " + host.scene().sceneLabel());
-                    ui.text("Entities: " + std::to_string(host.scene().entityCount()));
-                    ui.separator();
-
-                    ui.text("Viewport: " + std::to_string(viewport_size.x) + " x " +
-                            std::to_string(viewport_size.y));
-                    ui.text(std::string("Viewport Mode: ") +
-                            (host.runtimeViewport().isRuntimeViewportEnabled() ? "Runtime" : "Editor"));
-                    if (host.runtimeViewport().isRuntimeViewportEnabled()) {
-                        ui.text("Runtime Entities: " + std::to_string(host.runtimeViewport().runtimeEntityCount()));
+                    ui.heading("Rendering",
+                               std::string("Luna RHI / ") + host.rendering().backendName());
+                    if (ui.beginTable(
+                            "##SceneStatusMetrics",
+                            2,
+                            static_cast<luna::editor::TableFlags>(luna::editor::TableFlag::SizingStretchProp))) {
+                        ui.tableNextRow();
+                        ui.tableNextColumn();
+                        ui.metric("Frame", formatFloat(host.rendering().frameTimeMilliseconds(), 2) + " ms");
+                        ui.tableNextColumn();
+                        ui.metric("Rate",
+                                  formatFloat(host.rendering().framesPerSecond(), 1) + " FPS",
+                                  {},
+                                  luna::editor::StatusVariant::Success);
+                        ui.tableNextRow();
+                        ui.tableNextColumn();
+                        ui.metric("Entities",
+                                  std::to_string(host.scene().entityCount()),
+                                  runtime_viewport ? "Editor scene" : "Active scene",
+                                  luna::editor::StatusVariant::Info);
+                        ui.tableNextColumn();
+                        ui.metric("Viewport",
+                                  std::to_string(viewport_size.x) + " x " + std::to_string(viewport_size.y),
+                                  runtime_viewport ? "Runtime" : "Editor",
+                                  runtime_viewport ? luna::editor::StatusVariant::Warning
+                                                   : luna::editor::StatusVariant::Info);
+                        ui.endTable();
                     }
 
-                    ui.text("Editor Camera: " + formatVec3(camera_position, 2));
-                    ui.text("Gizmo: " + host.viewport().gizmoOperationName() + " / " +
-                            host.viewport().gizmoModeName());
-                    ui.textDisabled("Gizmo shortcuts: W Translate, E Rotate, R Scale, Q Local/World.");
+                    ui.heading("Scene");
+                    ui.beginPanel("##SceneStatusScenePanel");
+                    ui.keyValue("Scene File", host.scene().sceneLabel());
+                    ui.keyValue("Mode", runtime_viewport ? "Runtime" : "Editor");
+                    if (runtime_viewport) {
+                        ui.keyValue("Runtime Entities", std::to_string(host.runtimeViewport().runtimeEntityCount()));
+                    }
+                    ui.endPanel();
+
+                    ui.heading("Viewport");
+                    ui.beginPanel("##SceneStatusViewportPanel");
+                    ui.keyValue("Editor Camera", formatVec3(camera_position, 2));
+                    ui.keyValue("Gizmo",
+                                host.viewport().gizmoOperationName() + " / " + host.viewport().gizmoModeName());
 
                     bool pick_debug = host.viewport().pickDebugVisualizationEnabled();
                     if (ui.checkbox("Show Picking Debug", pick_debug)) {
@@ -80,10 +103,7 @@ public:
                     if (ui.checkbox("Show Editor Grid", editor_grid)) {
                         host.viewport().setEditorGridEnabled(editor_grid);
                     }
-
-                    ui.textDisabled("Highlights pickable pixels and shows the requested pick marker.");
-                    ui.textDisabled(
-                        "Scene rendering targets a persistent offscreen texture and is presented in the Viewport panel.");
+                    ui.endPanel();
                 },
         });
     }

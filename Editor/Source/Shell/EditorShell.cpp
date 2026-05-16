@@ -19,27 +19,26 @@
 #include "Shell/EditorShell.h"
 #include "Viewport/ViewportInteraction.h"
 
-#include <Builders.h>
-#include <CommandBufferEncoder.h>
-#include <Device.h>
-#include <Queue.h>
-
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 
 #include <algorithm>
 #include <array>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <Device.h>
 #include <filesystem>
-#include <functional>
 #include <fstream>
-#include <cmath>
+#include <functional>
 #include <glm/trigonometric.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <initializer_list>
 #include <iterator>
 #include <optional>
+#include <Queue.h>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -62,6 +61,107 @@ ImVec4 withAlpha(ImVec4 color, float alpha)
     return color;
 }
 
+ImVec4 mixColor(ImVec4 lhs, ImVec4 rhs, float amount)
+{
+    const float inverse_amount = 1.0f - amount;
+    return ImVec4{
+        lhs.x * inverse_amount + rhs.x * amount,
+        lhs.y * inverse_amount + rhs.y * amount,
+        lhs.z * inverse_amount + rhs.z * amount,
+        lhs.w * inverse_amount + rhs.w * amount,
+    };
+}
+
+ImVec4 statusAccent(luna::editor::StatusVariant variant)
+{
+    switch (variant) {
+        case luna::editor::StatusVariant::Info:
+            return luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Info);
+        case luna::editor::StatusVariant::Success:
+            return luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Success);
+        case luna::editor::StatusVariant::Warning:
+            return luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Warning);
+        case luna::editor::StatusVariant::Danger:
+            return luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Danger);
+        case luna::editor::StatusVariant::Neutral:
+            break;
+    }
+
+    return luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted);
+}
+
+ImVec4 statusFill(luna::editor::StatusVariant variant, float amount)
+{
+    return mixColor(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg), statusAccent(variant), amount);
+}
+
+ImVec2 multilineTextSize(std::string_view value)
+{
+    const float line_height = ImGui::GetTextLineHeight();
+    float width = 0.0f;
+    int line_count = 0;
+
+    size_t offset = 0;
+    while (offset <= value.size()) {
+        const size_t newline = value.find('\n', offset);
+        size_t line_end = newline == std::string_view::npos ? value.size() : newline;
+        if (line_end > offset && value[line_end - 1] == '\r') {
+            --line_end;
+        }
+
+        const ImVec2 line_size = ImGui::CalcTextSize(value.data() + offset, value.data() + line_end);
+        width = (std::max) (width, line_size.x);
+        ++line_count;
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        offset = newline + 1;
+    }
+
+    return ImVec2{width, line_height * static_cast<float>((std::max) (line_count, 1))};
+}
+
+void addMultilineText(ImDrawList& draw_list, ImVec2 position, const ImVec4& clip_rect, ImU32 color, std::string_view value)
+{
+    const float line_height = ImGui::GetTextLineHeight();
+    float y = position.y;
+
+    size_t offset = 0;
+    while (offset <= value.size()) {
+        const size_t newline = value.find('\n', offset);
+        size_t line_end = newline == std::string_view::npos ? value.size() : newline;
+        if (line_end > offset && value[line_end - 1] == '\r') {
+            --line_end;
+        }
+
+        if (line_end > offset) {
+            draw_list.AddText(ImGui::GetFont(),
+                              ImGui::GetFontSize(),
+                              ImVec2{position.x, y},
+                              color,
+                              value.data() + offset,
+                              value.data() + line_end,
+                              0.0f,
+                              &clip_rect);
+        }
+
+        if (newline == std::string_view::npos) {
+            break;
+        }
+        y += line_height;
+        offset = newline + 1;
+    }
+}
+
+void addClippedText(
+    ImDrawList& draw_list, ImVec2 position, ImVec2 clip_min, ImVec2 clip_max, ImU32 color, std::string_view value)
+{
+    draw_list.PushClipRect(clip_min, clip_max, true);
+    draw_list.AddText(position, color, value.data(), value.data() + value.size());
+    draw_list.PopClipRect();
+}
+
 luna::editor::Vec2 toEditorVec2(const ImVec2& value) noexcept
 {
     return luna::editor::Vec2{.x = value.x, .y = value.y};
@@ -71,19 +171,31 @@ bool pushButtonVariant(luna::editor::ButtonVariant variant)
 {
     switch (variant) {
         case luna::editor::ButtonVariant::Primary:
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.15f, 0.31f, 0.35f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.18f, 0.40f, 0.45f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.11f, 0.26f, 0.30f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimary));
+            ImGui::PushStyleColor(
+                ImGuiCol_ButtonHovered,
+                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryHovered));
+            ImGui::PushStyleColor(
+                ImGuiCol_ButtonActive,
+                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryActive));
             return true;
         case luna::editor::ButtonVariant::Danger:
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.32f, 0.16f, 0.17f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.46f, 0.20f, 0.22f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.26f, 0.12f, 0.14f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonDanger));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonDangerHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonDangerActive));
             return true;
         case luna::editor::ButtonVariant::Subtle:
-            ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_Button), 0.55f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            ImGui::PushStyleColor(
+                ImGuiCol_Button,
+                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Button, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonActive));
             return true;
         case luna::editor::ButtonVariant::Default:
             break;
@@ -164,14 +276,14 @@ luna::editor::Vec2 fitTextureViewportDrawSize(const luna::editor::TextureView& t
     if (!options.preserve_aspect) {
         return options.fill_available ? available
                                       : luna::editor::Vec2{
-                                            .x = (std::min)(static_cast<float>(texture.size.x), available.x),
-                                            .y = (std::min)(static_cast<float>(texture.size.y), available.y),
+                                            .x = (std::min) (static_cast<float>(texture.size.x), available.x),
+                                            .y = (std::min) (static_cast<float>(texture.size.y), available.y),
                                         };
     }
 
-    const float aspect = texture.size.y > 0u ? static_cast<float>(texture.size.x) / static_cast<float>(texture.size.y)
-                                             : 1.0f;
-    float width = options.fill_available ? available.x : (std::min)(static_cast<float>(texture.size.x), available.x);
+    const float aspect =
+        texture.size.y > 0u ? static_cast<float>(texture.size.x) / static_cast<float>(texture.size.y) : 1.0f;
+    float width = options.fill_available ? available.x : (std::min) (static_cast<float>(texture.size.x), available.x);
     float height = width / aspect;
     if (height > available.y) {
         height = available.y;
@@ -179,8 +291,8 @@ luna::editor::Vec2 fitTextureViewportDrawSize(const luna::editor::TextureView& t
     }
 
     return luna::editor::Vec2{
-        .x = (std::max)(width, 1.0f),
-        .y = (std::max)(height, 1.0f),
+        .x = (std::max) (width, 1.0f),
+        .y = (std::max) (height, 1.0f),
     };
 }
 
@@ -190,8 +302,8 @@ luna::editor::UVec2 framebufferSizeForUi(luna::editor::Ui& ui, luna::editor::Vec
     const float scale_x = std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
     const float scale_y = std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
     return luna::editor::UVec2{
-        .x = static_cast<uint32_t>((std::max)(size.x * scale_x, 0.0f)),
-        .y = static_cast<uint32_t>((std::max)(size.y * scale_y, 0.0f)),
+        .x = static_cast<uint32_t>((std::max) (size.x * scale_x, 0.0f)),
+        .y = static_cast<uint32_t>((std::max) (size.y * scale_y, 0.0f)),
     };
 }
 
@@ -960,6 +1072,236 @@ public:
         return Vec2{.x = scale.x, .y = scale.y};
     }
 
+    void heading(std::string_view title, std::string_view detail) override
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 cursor = ImGui::GetCursorScreenPos();
+        const float line_height = ImGui::GetTextLineHeight();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const float accent_offset_y = editorThemeMetric(EditorThemeMetric::HeadingAccentOffsetY);
+        const float accent_width = editorThemeMetric(EditorThemeMetric::HeadingAccentWidth);
+        draw_list->AddRectFilled(
+            ImVec2{cursor.x, cursor.y + accent_offset_y},
+            ImVec2{cursor.x + accent_width, cursor.y + line_height},
+            ImGui::GetColorU32(statusAccent(StatusVariant::Info)),
+            editorThemeMetric(EditorThemeMetric::HeadingAccentRounding));
+
+        const float heading_indent = editorThemeMetric(EditorThemeMetric::HeadingIndent);
+        ImGui::Indent(heading_indent);
+        ImGui::TextUnformatted(title.data(), title.data() + title.size());
+        if (!detail.empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%.*s", static_cast<int>(detail.size()), detail.data());
+        }
+        ImGui::Unindent(heading_indent);
+
+        const ImVec2 separator_min{ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y + style.ItemSpacing.y};
+        const ImVec2 separator_max{separator_min.x + ImGui::GetContentRegionAvail().x, separator_min.y};
+        draw_list->AddLine(separator_min,
+                           separator_max,
+                           ImGui::GetColorU32(
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.55f)));
+        ImGui::Dummy(ImVec2{0.0f, style.ItemSpacing.y});
+    }
+
+    void keyValue(std::string_view label, std::string_view value) override
+    {
+        const std::string id_string = toString(label);
+        ImGui::PushID(id_string.c_str());
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+                            ImVec2{0.0f, editorThemeMetric(EditorThemeMetric::PropertyRowPaddingY)});
+        if (ImGui::BeginTable("##KeyValue", 2, ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_SizingStretchProp)) {
+            ImGui::TableSetupColumn(
+                "##Label", ImGuiTableColumnFlags_WidthFixed, editorThemeMetric(EditorThemeMetric::PropertyLabelWidth));
+            ImGui::TableSetupColumn("##Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextDisabled("%.*s", static_cast<int>(label.size()), label.data());
+            ImGui::TableNextColumn();
+            ImGui::TextWrapped("%.*s", static_cast<int>(value.size()), value.data());
+            ImGui::EndTable();
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopID();
+    }
+
+    void badge(std::string_view label, StatusVariant variant) override
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 text_size = multilineTextSize(label);
+        const ImVec2 padding =
+            editorThemeMetric(EditorThemeMetric::BadgePaddingX, EditorThemeMetric::BadgePaddingY);
+        const ImVec2 size{text_size.x + padding.x * 2.0f,
+                          (std::max) (text_size.y + padding.y * 2.0f, ImGui::GetFrameHeight() * 0.72f)};
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const ImVec2 max{min.x + size.x, min.y + size.y};
+        ImGui::Dummy(size);
+
+        const ImVec4 accent = statusAccent(variant);
+        const ImVec4 fill = statusFill(variant, 0.18f);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        const float rounding = (std::min) (style.FrameRounding, editorThemeMetric(EditorThemeMetric::BadgeRounding));
+        draw_list->AddRectFilled(
+            min, max, ImGui::GetColorU32(fill), rounding);
+        draw_list->AddRect(min, max, ImGui::GetColorU32(withAlpha(accent, 0.62f)), rounding);
+        addMultilineText(*draw_list,
+                         ImVec2{min.x + padding.x, min.y + (size.y - text_size.y) * 0.5f},
+                         ImVec4{min.x + padding.x, min.y + padding.y, max.x - padding.x, max.y - padding.y},
+                         ImGui::GetColorU32(accent),
+                         label);
+    }
+
+    void metric(std::string_view label,
+                std::string_view value,
+                std::string_view detail,
+                StatusVariant variant,
+                Vec2 size) override
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        const ImVec2 label_size = multilineTextSize(label);
+        const ImVec2 value_size = multilineTextSize(value);
+        const ImVec2 detail_size = !detail.empty() ? multilineTextSize(detail) : ImVec2{};
+        const float text_top_padding = editorThemeMetric(EditorThemeMetric::MetricPaddingTop);
+        const float text_bottom_padding = editorThemeMetric(EditorThemeMetric::MetricPaddingBottom);
+        const float line_gap = editorThemeMetric(EditorThemeMetric::MetricLineGap);
+        const float text_height = label_size.y + line_gap + value_size.y +
+                                  (!detail.empty() ? line_gap + detail_size.y : 0.0f);
+        const float default_height = (std::max) (
+            text_height + text_top_padding + text_bottom_padding,
+            editorThemeMetric(detail.empty() ? EditorThemeMetric::MetricDefaultHeight
+                                             : EditorThemeMetric::MetricDetailedHeight));
+        ImVec2 draw_size{
+            size.x > 0.0f ? scaleEditorUi(size.x)
+                          : (size.x < 0.0f ? (std::max) (available.x + size.x, 1.0f) : available.x),
+            size.y > 0.0f ? scaleEditorUi(size.y) : default_height,
+        };
+        if (draw_size.x <= 0.0f) {
+            draw_size.x = editorThemeMetric(EditorThemeMetric::MetricMinWidth);
+        }
+
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const ImVec2 max{min.x + draw_size.x, min.y + draw_size.y};
+        ImGui::Dummy(draw_size);
+
+        const ImVec4 accent = statusAccent(variant);
+        const ImVec4 fill = statusFill(variant, 0.08f);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
+        draw_list->AddRect(min,
+                           max,
+                           ImGui::GetColorU32(
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f)),
+                           style.FrameRounding);
+        draw_list->AddRectFilled(ImVec2{min.x, min.y},
+                                 ImVec2{min.x + editorThemeMetric(EditorThemeMetric::MetricAccentWidth), max.y},
+                                 ImGui::GetColorU32(accent),
+                                 style.FrameRounding);
+
+        const ImVec2 text_min{min.x + editorThemeMetric(EditorThemeMetric::MetricPaddingLeft),
+                              min.y + text_top_padding};
+        const ImVec2 text_max{max.x - editorThemeMetric(EditorThemeMetric::MetricPaddingRight),
+                              max.y - text_bottom_padding};
+        addClippedText(*draw_list,
+                       text_min,
+                       text_min,
+                       text_max,
+                       ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted)),
+                       label);
+        addClippedText(*draw_list,
+                       ImVec2{text_min.x, text_min.y + label_size.y + line_gap},
+                       text_min,
+                       text_max,
+                       ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Text)),
+                       value);
+        if (!detail.empty()) {
+            addClippedText(*draw_list,
+                           ImVec2{text_min.x, text_min.y + label_size.y + line_gap + value_size.y + line_gap},
+                           text_min,
+                           text_max,
+                           ImGui::GetColorU32(
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted)),
+                           detail);
+        }
+    }
+
+    void emptyState(std::string_view title, std::string_view detail) override
+    {
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const ImVec2 available = ImGui::GetContentRegionAvail();
+        const float width = (std::max) (available.x, editorThemeMetric(EditorThemeMetric::EmptyStateMinWidth));
+        const float height = editorThemeMetric(detail.empty() ? EditorThemeMetric::EmptyStateHeight
+                                                              : EditorThemeMetric::EmptyStateDetailedHeight);
+        const ImVec2 min = ImGui::GetCursorScreenPos();
+        const ImVec2 max{min.x + width, min.y + height};
+        ImGui::Dummy(ImVec2{width, height});
+
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRectFilled(
+            min,
+            max,
+            ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBg)),
+            style.FrameRounding);
+        draw_list->AddRect(min,
+                           max,
+                           ImGui::GetColorU32(
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f)),
+                           style.FrameRounding);
+
+        const ImVec2 title_size = ImGui::CalcTextSize(title.data(), title.data() + title.size());
+        const float text_top = detail.empty() ? min.y + (height - title_size.y) * 0.5f
+                                              : min.y + editorThemeMetric(EditorThemeMetric::EmptyStateDetailTop);
+        addClippedText(*draw_list,
+                       ImVec2{min.x + (width - title_size.x) * 0.5f, text_top},
+                       min,
+                       max,
+                       ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Text)),
+                       title);
+        if (!detail.empty()) {
+            const ImVec2 detail_size = ImGui::CalcTextSize(detail.data(), detail.data() + detail.size());
+            addClippedText(
+                *draw_list,
+                ImVec2{min.x + (width - detail_size.x) * 0.5f,
+                       text_top + title_size.y + editorThemeMetric(EditorThemeMetric::EmptyStateLineGap)},
+                min,
+                max,
+                ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted)),
+                detail);
+        }
+    }
+
+    void beginPanel(std::string_view id, Vec2 size) override
+    {
+        const std::string id_string = toString(id);
+        const Vec2 panel_size{
+            .x = size.x > 0.0f ? scaleEditorUi(size.x) : size.x,
+            .y = size.y > 0.0f ? scaleEditorUi(size.y) : size.y,
+        };
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                            editorThemeMetric(EditorThemeMetric::PanelPaddingX, EditorThemeMetric::PanelPaddingY));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, editorThemeMetric(EditorThemeMetric::PanelRounding));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
+        ImGui::PushStyleColor(ImGuiCol_ChildBg,
+                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBg));
+        ImGui::PushStyleColor(
+            ImGuiCol_Border,
+            luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.78f));
+        ImGuiChildFlags child_flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding;
+        if (size.y <= 0.0f) {
+            child_flags |= ImGuiChildFlags_AutoResizeY;
+        }
+        ImGui::BeginChild(
+            id_string.c_str(), ImVec2{panel_size.x, panel_size.y}, child_flags, ImGuiWindowFlags_NoScrollbar);
+    }
+
+    void endPanel() override
+    {
+        ImGui::EndChild();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+    }
+
     bool button(std::string_view label, Vec2 size, ButtonVariant variant) override
     {
         const std::string label_string = toString(label);
@@ -1057,8 +1399,8 @@ public:
         const std::string label_string = toString(label);
         const std::string hint_string = toString(hint);
         std::vector<char> buffer = makeTextEditBuffer(value, buffer_size);
-        const bool changed = ImGui::InputTextWithHint(
-            label_string.c_str(), hint_string.c_str(), buffer.data(), buffer.size());
+        const bool changed =
+            ImGui::InputTextWithHint(label_string.c_str(), hint_string.c_str(), buffer.data(), buffer.size());
         if (changed) {
             value = buffer.data();
         }
@@ -1184,10 +1526,15 @@ public:
             flags |= ImGuiTreeNodeFlags_DefaultOpen;
         }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{scaleEditorUi(2.0f), scaleEditorUi(2.0f)});
-        ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                            editorThemeMetric(EditorThemeMetric::SectionFramePaddingX,
+                                              EditorThemeMetric::SectionFramePaddingY));
+        ImGui::PushStyleColor(ImGuiCol_Header,
+                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg));
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
+                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBgHovered));
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive,
+                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBgActive));
         const bool open = ImGui::TreeNodeEx(id_string.c_str(), flags, "%s", label_string.c_str());
         ImGui::PopStyleColor(3);
         ImGui::PopStyleVar();
@@ -1195,13 +1542,15 @@ public:
         const ImVec2 item_min = ImGui::GetItemRectMin();
         const ImVec2 item_max = ImGui::GetItemRectMax();
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        const float accent_width = scaleEditorUi(3.0f);
+        const float accent_width = editorThemeMetric(EditorThemeMetric::SectionAccentWidth);
         draw_list->AddRectFilled(item_min,
                                  ImVec2{item_min.x + accent_width, item_max.y},
-                                 ImGui::GetColorU32(withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), 0.72f)));
+                                 ImGui::GetColorU32(
+                                     luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Accent, 0.72f)));
         draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
                            ImVec2{item_max.x, item_max.y - 1.0f},
-                           ImGui::GetColorU32(ImGuiCol_Border));
+                           ImGui::GetColorU32(
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder)));
         return open;
     }
 
@@ -2438,9 +2787,8 @@ public:
         }
     }
 
-    SceneViewportDrawResult drawSceneViewport(Ui& ui,
-                                              ViewportId viewport_id,
-                                              SceneViewportDrawOptions options = {}) override
+    SceneViewportDrawResult
+        drawSceneViewport(Ui& ui, ViewportId viewport_id, SceneViewportDrawOptions options = {}) override
     {
         SceneViewportDrawResult result{};
         const Vec2 available = ui.contentRegionAvail();
@@ -2469,10 +2817,11 @@ public:
                 viewport_id,
                 currentOwnerId(),
                 ViewportInteractionInput{
-                    .rect = ViewportSurfaceRect{
-                        .min = toEditorVec2(item_min),
-                        .max = toEditorVec2(item_max),
-                    },
+                    .rect =
+                        ViewportSurfaceRect{
+                            .min = toEditorVec2(item_min),
+                            .max = toEditorVec2(item_max),
+                        },
                     .hovered = item_hovered,
                     .active = ImGui::IsItemActive(),
                     .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
@@ -2516,9 +2865,8 @@ public:
         return m_editor_layer != nullptr && m_editor_layer->isTextureViewportValid(viewport_id);
     }
 
-    TextureViewportPresentation syncTextureViewport(ViewportId viewport_id,
-                                                    TextureView texture,
-                                                    UVec2 framebuffer_size) override
+    TextureViewportPresentation
+        syncTextureViewport(ViewportId viewport_id, TextureView texture, UVec2 framebuffer_size) override
     {
         return m_editor_layer != nullptr ? m_editor_layer->syncTextureViewport(viewport_id, texture, framebuffer_size)
                                          : TextureViewportPresentation{};
@@ -2556,10 +2904,11 @@ public:
                 viewport_id,
                 currentOwnerId(),
                 ViewportInteractionInput{
-                    .rect = ViewportSurfaceRect{
-                        .min = toEditorVec2(item_min),
-                        .max = toEditorVec2(item_max),
-                    },
+                    .rect =
+                        ViewportSurfaceRect{
+                            .min = toEditorVec2(item_min),
+                            .max = toEditorVec2(item_max),
+                        },
                     .hovered = item_hovered,
                     .active = ImGui::IsItemActive(),
                     .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
@@ -3259,8 +3608,8 @@ public:
         return (*root_path / "assets").lexically_normal();
     }
 
-    std::optional<std::filesystem::path>
-        resolvePath(std::string_view plugin_id, const std::filesystem::path& relative_asset_path) const override
+    std::optional<std::filesystem::path> resolvePath(std::string_view plugin_id,
+                                                     const std::filesystem::path& relative_asset_path) const override
     {
         const auto asset_root = assetRootPath(plugin_id);
         if (!asset_root) {
@@ -3349,9 +3698,8 @@ public:
 
         const ImageData image = ImageLoader::LoadImageFromFile(resolved_path->string());
         if (!image.isValid()) {
-            LUNA_EDITOR_WARN("Plugin asset '{}' failed to load texture '{}'",
-                             plugin_id_string,
-                             resolved_path->string());
+            LUNA_EDITOR_WARN(
+                "Plugin asset '{}' failed to load texture '{}'", plugin_id_string, resolved_path->string());
             return {};
         }
 
@@ -3425,11 +3773,10 @@ private:
 
         const uint32_t bytes_per_pixel = static_cast<uint32_t>(image.ByteData.size() / texel_count);
         const uint32_t bytes_per_row = image.Width * bytes_per_pixel;
-        const uint32_t aligned_bytes_per_row = static_cast<uint32_t>(
-            ((bytes_per_row + kTextureDataPitchAlignment - 1u) / kTextureDataPitchAlignment) *
-            kTextureDataPitchAlignment);
-        const uint64_t upload_size = static_cast<uint64_t>(aligned_bytes_per_row) *
-                                     static_cast<uint64_t>(image.Height);
+        const uint32_t aligned_bytes_per_row =
+            static_cast<uint32_t>(((bytes_per_row + kTextureDataPitchAlignment - 1u) / kTextureDataPitchAlignment) *
+                                  kTextureDataPitchAlignment);
+        const uint64_t upload_size = static_cast<uint64_t>(aligned_bytes_per_row) * static_cast<uint64_t>(image.Height);
 
         const std::string debug_name_string = toString(debug_name);
         const auto staging_buffer = device->CreateBuffer(RHI::BufferBuilder()
@@ -3457,14 +3804,14 @@ private:
         staging_buffer->Flush(0, upload_size);
         staging_buffer->Unmap();
 
-        const auto texture = device->CreateTexture(RHI::TextureBuilder()
-                                                       .SetSize(image.Width, image.Height)
-                                                       .SetFormat(image.ImageFormat)
-                                                       .SetUsage(RHI::TextureUsageFlags::Sampled |
-                                                                 RHI::TextureUsageFlags::TransferDst)
-                                                       .SetInitialState(RHI::ResourceState::Undefined)
-                                                       .SetName(debug_name_string)
-                                                       .Build());
+        const auto texture =
+            device->CreateTexture(RHI::TextureBuilder()
+                                      .SetSize(image.Width, image.Height)
+                                      .SetFormat(image.ImageFormat)
+                                      .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::TransferDst)
+                                      .SetInitialState(RHI::ResourceState::Undefined)
+                                      .SetName(debug_name_string)
+                                      .Build());
         if (!texture) {
             return {};
         }
@@ -4017,6 +4364,11 @@ public:
         : m_settings_store(&settings_store)
     {}
 
+    EditorThemePreset editorTheme() const override
+    {
+        return m_settings_store != nullptr ? m_settings_store->data().theme_preset : EditorThemePreset::ModernLightweight;
+    }
+
     EditorFontSettings editorFont() const override
     {
         if (m_settings_store == nullptr) {
@@ -4061,6 +4413,11 @@ public:
     bool restartRequired() const noexcept override
     {
         return m_settings_store != nullptr && m_settings_store->restartRequired();
+    }
+
+    bool setEditorTheme(EditorThemePreset preset) override
+    {
+        return m_settings_store != nullptr && m_settings_store->setEditorTheme(preset);
     }
 
     bool setEditorFont(const std::filesystem::path& font_path, float size_pixels) override

@@ -1,7 +1,6 @@
-#include "RenderProfilerPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "RenderProfilerPlugin.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -45,7 +44,7 @@ void appendHistory(std::vector<luna::editor::RenderGraphProfileSnapshot>& histor
 
 size_t averageBeginIndex(size_t history_size, int average_frames)
 {
-    const size_t frame_count = static_cast<size_t>((std::max)(average_frames, 1));
+    const size_t frame_count = static_cast<size_t>((std::max) (average_frames, 1));
     return history_size > frame_count ? history_size - frame_count : 0;
 }
 
@@ -101,9 +100,10 @@ double averagePassCpuMs(std::string_view pass_name,
     const size_t begin_index = averageBeginIndex(history.size(), average_frames);
     for (size_t snapshot_index = begin_index; snapshot_index < history.size(); ++snapshot_index) {
         const auto& snapshot = history[snapshot_index];
-        const auto pass_it = std::find_if(snapshot.passes.begin(), snapshot.passes.end(), [pass_name](const auto& pass) {
-            return pass.name == pass_name;
-        });
+        const auto pass_it =
+            std::find_if(snapshot.passes.begin(), snapshot.passes.end(), [pass_name](const auto& pass) {
+                return pass.name == pass_name;
+            });
         if (pass_it == snapshot.passes.end()) {
             continue;
         }
@@ -128,9 +128,10 @@ double averagePassGpuMs(std::string_view pass_name,
     const size_t begin_index = averageBeginIndex(history.size(), average_frames);
     for (size_t snapshot_index = begin_index; snapshot_index < history.size(); ++snapshot_index) {
         const auto& snapshot = history[snapshot_index];
-        const auto pass_it = std::find_if(snapshot.passes.begin(), snapshot.passes.end(), [pass_name](const auto& pass) {
-            return pass.name == pass_name;
-        });
+        const auto pass_it =
+            std::find_if(snapshot.passes.begin(), snapshot.passes.end(), [pass_name](const auto& pass) {
+                return pass.name == pass_name;
+            });
         if (pass_it == snapshot.passes.end() || !pass_it->has_gpu_time) {
             continue;
         }
@@ -172,6 +173,28 @@ std::string joinText(std::initializer_list<std::string_view> parts)
     return result;
 }
 
+std::string gpuMetricValue(const luna::editor::RenderGraphProfileSnapshot& profile)
+{
+    if (!profile.gpu_timing_supported) {
+        return "Unavailable";
+    }
+    if (profile.gpu_timing_pending) {
+        return "Pending";
+    }
+    return formatFloat(profile.total_gpu_time_ms, 3) + " ms";
+}
+
+luna::editor::StatusVariant gpuMetricVariant(const luna::editor::RenderGraphProfileSnapshot& profile)
+{
+    if (!profile.gpu_timing_supported) {
+        return luna::editor::StatusVariant::Warning;
+    }
+    if (profile.gpu_timing_pending) {
+        return luna::editor::StatusVariant::Info;
+    }
+    return luna::editor::StatusVariant::Success;
+}
+
 class RenderProfilerPlugin final : public luna::editor::Plugin {
 public:
     [[nodiscard]] luna::editor::PluginDescriptor descriptor() const override
@@ -201,12 +224,15 @@ public:
                     }
 
                     const luna::editor::RenderGraphProfileSnapshot& profile = m_display_profile;
+                    ui.heading("Render Profiler",
+                               profiling_enabled ? std::string("Profiling enabled") : std::string("Profiling stopped"));
+                    ui.beginPanel("##RenderProfilerToolbar");
                     if (profiling_enabled) {
                         if (ui.button("Stop Profile")) {
                             host.rendering().setRenderGraphProfilingEnabled(false);
                         }
                     } else {
-                        if (ui.button("Start Profile")) {
+                        if (ui.button("Start Profile", luna::editor::ButtonVariant::Primary)) {
                             m_display_profile = {};
                             m_history.clear();
                             m_last_export_path.clear();
@@ -221,11 +247,11 @@ public:
                     ui.sameLine();
                     ui.sliderInt("Average Frames", m_average_frames, 1, static_cast<int>(kMaxHistoryFrames));
                     ui.sameLine();
-                    if (ui.button("Clear History")) {
+                    if (ui.button("Clear History", luna::editor::ButtonVariant::Subtle)) {
                         m_history.clear();
                     }
                     ui.sameLine();
-                    if (ui.button("Export Trace JSON")) {
+                    if (ui.button("Export Trace JSON", luna::editor::ButtonVariant::Subtle)) {
                         const std::filesystem::path export_path =
                             host.rendering().defaultRenderProfileExportPath(host.rendering().backendName());
                         std::string error_message;
@@ -238,28 +264,44 @@ public:
                             m_export_status = "Export failed: " + error_message;
                         }
                     }
+                    ui.endPanel();
 
-                    m_average_frames = (std::max)(m_average_frames, 1);
-                    m_average_frames = (std::min)(m_average_frames, static_cast<int>(kMaxHistoryFrames));
+                    m_average_frames = (std::max) (m_average_frames, 1);
+                    m_average_frames = (std::min) (m_average_frames, static_cast<int>(kMaxHistoryFrames));
                     const double average_total_cpu_ms =
                         !m_history.empty() ? averageGraphCpuMs(m_history, m_average_frames) : profile.total_cpu_time_ms;
                     const double average_total_gpu_ms =
                         !m_history.empty() ? averageGraphGpuMs(m_history, m_average_frames) : profile.total_gpu_time_ms;
 
-                    ui.text(joinText({"RenderGraph CPU:", formatFloat(profile.total_cpu_time_ms, 3), "ms  |  Avg:",
-                                      formatFloat(average_total_cpu_ms, 3), "ms"}));
-                    if (!profile.gpu_timing_supported) {
-                        ui.text("RenderGraph GPU: unavailable");
-                    } else if (profile.gpu_timing_pending) {
-                        ui.text("RenderGraph GPU: pending");
-                    } else {
-                        ui.text(joinText({"RenderGraph GPU:", formatFloat(profile.total_gpu_time_ms, 3),
-                                          "ms  |  Avg:", formatFloat(average_total_gpu_ms, 3), "ms"}));
+                    if (ui.beginTable(
+                            "##RenderProfilerMetrics",
+                            4,
+                            static_cast<luna::editor::TableFlags>(luna::editor::TableFlag::SizingStretchProp))) {
+                        ui.tableNextRow();
+                        ui.tableNextColumn();
+                        ui.metric("CPU",
+                                  formatFloat(profile.total_cpu_time_ms, 3) + " ms",
+                                  "Avg " + formatFloat(average_total_cpu_ms, 3) + " ms",
+                                  luna::editor::StatusVariant::Info);
+                        ui.tableNextColumn();
+                        ui.metric("GPU",
+                                  gpuMetricValue(profile),
+                                  profile.gpu_timing_supported && !profile.gpu_timing_pending
+                                      ? "Avg " + formatFloat(average_total_gpu_ms, 3) + " ms"
+                                      : std::string{},
+                                  gpuMetricVariant(profile));
+                        ui.tableNextColumn();
+                        ui.metric("Passes",
+                                  formatUInt(static_cast<uint32_t>(profile.passes.size())),
+                                  "Textures " + formatUInt(profile.texture_count),
+                                  luna::editor::StatusVariant::Neutral);
+                        ui.tableNextColumn();
+                        ui.metric("Samples",
+                                  formatUInt(static_cast<uint32_t>(m_history.size())),
+                                  "Barriers " + formatUInt(profile.final_barrier_count),
+                                  luna::editor::StatusVariant::Neutral);
+                        ui.endTable();
                     }
-                    ui.text(joinText({"Passes:", formatUInt(static_cast<uint32_t>(profile.passes.size())), " | Textures:",
-                                      formatUInt(profile.texture_count), " | Final Barriers:",
-                                      formatUInt(profile.final_barrier_count), " | Samples:",
-                                      formatUInt(static_cast<uint32_t>(m_history.size()))}));
                     if (!m_export_status.empty()) {
                         ui.textDisabled(m_export_status);
                         if (!m_last_export_path.empty()) {
@@ -269,7 +311,8 @@ public:
                     ui.separator();
 
                     if (profile.passes.empty()) {
-                        ui.text("No render graph profile data for the latest frame.");
+                        ui.emptyState("No render graph profile data",
+                                      "Start profiling and render a frame to populate this table.");
                         return;
                     }
 
@@ -293,45 +336,58 @@ public:
                         luna::editor::TableFlag::BordersInnerV | luna::editor::TableFlag::RowBg |
                         luna::editor::TableFlag::SizingStretchProp | luna::editor::TableFlag::ScrollY;
                     if (ui.beginTable("##RenderGraphPassProfile", 13, table_flags)) {
-                        ui.tableSetupColumn("Pass", static_cast<luna::editor::TableColumnFlags>(
-                                                     luna::editor::TableColumnFlag::WidthStretch),
-                                            0.35f);
-                        ui.tableSetupColumn("Type", static_cast<luna::editor::TableColumnFlags>(
-                                                     luna::editor::TableColumnFlag::WidthFixed),
-                                            72.0f);
-                        ui.tableSetupColumn("CPU ms", static_cast<luna::editor::TableColumnFlags>(
-                                                          luna::editor::TableColumnFlag::WidthFixed),
-                                            76.0f);
-                        ui.tableSetupColumn("CPU Avg", static_cast<luna::editor::TableColumnFlags>(
-                                                           luna::editor::TableColumnFlag::WidthFixed),
-                                            76.0f);
-                        ui.tableSetupColumn("CPU %", static_cast<luna::editor::TableColumnFlags>(
-                                                         luna::editor::TableColumnFlag::WidthFixed),
-                                            54.0f);
-                        ui.tableSetupColumn("GPU ms", static_cast<luna::editor::TableColumnFlags>(
-                                                          luna::editor::TableColumnFlag::WidthFixed),
-                                            76.0f);
-                        ui.tableSetupColumn("GPU Avg", static_cast<luna::editor::TableColumnFlags>(
-                                                           luna::editor::TableColumnFlag::WidthFixed),
-                                            76.0f);
-                        ui.tableSetupColumn("GPU %", static_cast<luna::editor::TableColumnFlags>(
-                                                         luna::editor::TableColumnFlag::WidthFixed),
-                                            54.0f);
-                        ui.tableSetupColumn("Size", static_cast<luna::editor::TableColumnFlags>(
-                                                         luna::editor::TableColumnFlag::WidthFixed),
-                                            90.0f);
-                        ui.tableSetupColumn("Reads", static_cast<luna::editor::TableColumnFlags>(
-                                                          luna::editor::TableColumnFlag::WidthFixed),
-                                            54.0f);
-                        ui.tableSetupColumn("Writes", static_cast<luna::editor::TableColumnFlags>(
-                                                           luna::editor::TableColumnFlag::WidthFixed),
-                                            54.0f);
-                        ui.tableSetupColumn("Colors", static_cast<luna::editor::TableColumnFlags>(
-                                                           luna::editor::TableColumnFlag::WidthFixed),
-                                            54.0f);
-                        ui.tableSetupColumn("Barriers", static_cast<luna::editor::TableColumnFlags>(
-                                                             luna::editor::TableColumnFlag::WidthFixed),
-                                            62.0f);
+                        ui.tableSetupColumn(
+                            "Pass",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch),
+                            0.35f);
+                        ui.tableSetupColumn(
+                            "Type",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            72.0f);
+                        ui.tableSetupColumn(
+                            "CPU ms",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            76.0f);
+                        ui.tableSetupColumn(
+                            "CPU Avg",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            76.0f);
+                        ui.tableSetupColumn(
+                            "CPU %",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            54.0f);
+                        ui.tableSetupColumn(
+                            "GPU ms",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            76.0f);
+                        ui.tableSetupColumn(
+                            "GPU Avg",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            76.0f);
+                        ui.tableSetupColumn(
+                            "GPU %",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            54.0f);
+                        ui.tableSetupColumn(
+                            "Size",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            90.0f);
+                        ui.tableSetupColumn(
+                            "Reads",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            54.0f);
+                        ui.tableSetupColumn(
+                            "Writes",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            54.0f);
+                        ui.tableSetupColumn(
+                            "Colors",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            54.0f);
+                        ui.tableSetupColumn(
+                            "Barriers",
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
+                            62.0f);
                         ui.tableHeadersRow();
 
                         for (const size_t pass_index : pass_indices) {
@@ -364,8 +420,8 @@ public:
                             ui.tableNextColumn();
                             ui.text(pass.has_gpu_time ? formatFloat(gpu_percent, 1) : std::string("-"));
                             ui.tableNextColumn();
-                            ui.text(joinText({formatUInt(pass.framebuffer_width), "x",
-                                              formatUInt(pass.framebuffer_height)}));
+                            ui.text(joinText(
+                                {formatUInt(pass.framebuffer_width), "x", formatUInt(pass.framebuffer_height)}));
                             ui.tableNextColumn();
                             ui.text(formatUInt(pass.read_texture_count));
                             ui.tableNextColumn();

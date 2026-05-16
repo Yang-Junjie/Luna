@@ -526,7 +526,6 @@ InspectorSection beginInspectorSection(luna::editor::Ui& ui,
                                        bool allow_remove = false,
                                        std::string_view remove_label = "Remove Component")
 {
-    ui.spacing();
     InspectorSection section{
         .open = ui.beginSection(id, label, true),
     };
@@ -789,7 +788,8 @@ void drawTransform(luna::editor::Host& host, luna::editor::Ui& ui, const luna::e
         return;
     }
 
-    const InspectorSection section = beginInspectorSection(ui, "InspectorTransform", "Transform");
+    const InspectorSection section =
+        beginInspectorSection(ui, "InspectorTransform", "Transform", false, "Remove Component");
     if (!section.open) {
         endInspectorSection(ui, section);
         return;
@@ -826,7 +826,11 @@ void drawCamera(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui, "InspectorCamera", "Camera", host.scene().canEditScene());
+        beginInspectorSection(ui,
+                              "InspectorCamera",
+                              "Camera",
+                              host.scene().canEditScene(),
+                              "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Camera);
@@ -900,7 +904,11 @@ void drawLight(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edito
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui, "InspectorLight", "Light", host.scene().canEditScene());
+        beginInspectorSection(ui,
+                              "InspectorLight",
+                              "Light",
+                              host.scene().canEditScene(),
+                              "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Light);
@@ -961,7 +969,11 @@ void drawMesh(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor
         return;
     }
 
-    const InspectorSection section = beginInspectorSection(ui, "InspectorMesh", "Mesh", host.scene().canEditScene());
+    const InspectorSection section = beginInspectorSection(ui,
+                                                           "InspectorMesh",
+                                                           "Mesh",
+                                                           host.scene().canEditScene(),
+                                                           "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Mesh);
@@ -1378,7 +1390,11 @@ bool drawScriptProperty(luna::editor::Host& host,
         "InspectorScriptProperty" + std::to_string(script_index) + "_" + std::to_string(property_index);
     const std::string property_section_label = display_name + " (" + scriptPropertyTypeLabel(property.type) + ")";
     const InspectorSection section = beginInspectorSection(
-        ui, property_section_id, property_section_label, allow_structure_edit, "Remove Property");
+        ui,
+        property_section_id,
+        property_section_label,
+        allow_structure_edit,
+        "Remove Property");
     if (section.remove_requested) {
         script.properties.erase(script.properties.begin() + static_cast<std::ptrdiff_t>(property_index));
         removed_property = true;
@@ -1464,7 +1480,11 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui, "InspectorScript", "Script", host.scene().canEditScene());
+        beginInspectorSection(ui,
+                              "InspectorScript",
+                              "Script",
+                              host.scene().canEditScene(),
+                              "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Script);
@@ -1519,7 +1539,11 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
 
         const std::string script_section_id = "InspectorScriptEntry" + std::to_string(script_index);
         const InspectorSection script_section = beginInspectorSection(
-            ui, script_section_id, "Script " + std::to_string(script_index), allow_structure_edit, "Remove Script");
+            ui,
+            script_section_id,
+            "Script " + std::to_string(script_index),
+            allow_structure_edit,
+            "Remove Script");
         if (script_section.remove_requested) {
             script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
             changed = true;
@@ -1614,7 +1638,8 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
 
 void drawRelationship(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor::SceneEntityDetails& details)
 {
-    const InspectorSection section = beginInspectorSection(ui, "InspectorRelationship", "Relationship");
+    const InspectorSection section =
+        beginInspectorSection(ui, "InspectorRelationship", "Relationship", false, "Remove Component");
     if (!section.open) {
         endInspectorSection(ui, section);
         return;

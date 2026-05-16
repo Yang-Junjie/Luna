@@ -1,0 +1,14 @@
+Asset:
+  Name: studio_kontrast_04_4k
+  Handle: 12872212666140907458
+  Type: Texture
+  FilePath: Assets/Texture/studio_kontrast_04_4k.hdr
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

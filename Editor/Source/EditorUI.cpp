@@ -31,13 +31,13 @@ ImVec4 axisColor(char axis)
 {
     switch (axis) {
         case 'X':
-            return ImVec4{0.78f, 0.22f, 0.26f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AxisX);
         case 'Y':
-            return ImVec4{0.28f, 0.66f, 0.32f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AxisY);
         case 'Z':
-            return ImVec4{0.25f, 0.46f, 0.84f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AxisZ);
         default:
-            return ImGui::GetStyleColorVec4(ImGuiCol_Button);
+            return editorThemeColor(EditorThemeColor::Button);
     }
 }
 
@@ -45,22 +45,22 @@ ImVec4 assetAccentColor(AssetType type)
 {
     switch (type) {
         case AssetType::Texture:
-            return ImVec4{0.86f, 0.57f, 0.22f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetTexture);
         case AssetType::Mesh:
-            return ImVec4{0.28f, 0.53f, 0.86f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetMesh);
         case AssetType::Material:
-            return ImVec4{0.34f, 0.70f, 0.43f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetMaterial);
         case AssetType::Model:
-            return ImVec4{0.58f, 0.48f, 0.86f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetModel);
         case AssetType::Scene:
-            return ImVec4{0.74f, 0.59f, 0.34f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetScene);
         case AssetType::Script:
-            return ImVec4{0.25f, 0.68f, 0.74f, 1.0f};
+            return editorThemeColor(EditorThemeColor::AssetScript);
         case AssetType::None:
             break;
     }
 
-    return ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    return editorThemeColor(EditorThemeColor::TextMuted);
 }
 
 struct AssetDisplayInfo {
@@ -138,8 +138,10 @@ bool drawAssetPreview(const char* id,
 {
     const AssetDisplayInfo info = describeAsset(handle);
     const ImGuiStyle& style = ImGui::GetStyle();
-    const float width = (std::max)(ImGui::GetContentRegionAvail().x, scale(64.0f));
-    const float height = ImGui::GetTextLineHeight() * 2.0f + style.FramePadding.y * 2.0f + scale(6.0f);
+    const float width = (std::max)(ImGui::GetContentRegionAvail().x,
+                                   editorThemeMetric(EditorThemeMetric::AssetPreviewMinWidth));
+    const float height = ImGui::GetTextLineHeight() * 2.0f + style.FramePadding.y * 2.0f +
+                         editorThemeMetric(EditorThemeMetric::AssetPreviewExtraHeight);
     const ImVec2 position = ImGui::GetCursorScreenPos();
     const ImVec2 size{width, height};
 
@@ -151,30 +153,39 @@ bool drawAssetPreview(const char* id,
 
     const ImVec2 min = position;
     const ImVec2 max{position.x + size.x, position.y + size.y};
-    const ImVec4 frame_bg = ImGui::GetStyleColorVec4(ImGuiCol_FrameBg);
-    const ImVec4 accent = info.missing ? ImVec4{0.86f, 0.32f, 0.32f, 1.0f} : assetAccentColor(info.type);
+    const ImVec4 frame_bg = editorThemeColor(EditorThemeColor::FrameBg);
+    const ImVec4 accent = info.missing ? editorThemeColor(EditorThemeColor::Danger) : assetAccentColor(info.type);
     const ImVec4 fill = hovered || active ? mixColor(frame_bg, accent, 0.12f) : mixColor(frame_bg, accent, 0.06f);
-    const ImVec4 border = hovered || active ? withAlpha(accent, 0.70f) : ImGui::GetStyleColorVec4(ImGuiCol_Border);
-    const ImGuiCol label_color_index = handle.isValid() ? ImGuiCol_Text : ImGuiCol_TextDisabled;
-    const ImU32 label_color = info.missing ? ImGui::GetColorU32(ImVec4{1.0f, 0.48f, 0.48f, 1.0f})
-                                           : ImGui::GetColorU32(label_color_index);
-    const ImU32 detail_color = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+    const ImVec4 border = hovered || active ? withAlpha(accent, 0.70f) : editorThemeColor(EditorThemeColor::PanelBorder);
+    const ImVec4 label_color_value = info.missing ? editorThemeColor(EditorThemeColor::Danger)
+                                                  : editorThemeColor(handle.isValid() ? EditorThemeColor::Text
+                                                                                      : EditorThemeColor::TextMuted);
+    const ImU32 label_color = ImGui::GetColorU32(label_color_value);
+    const ImU32 detail_color = ImGui::GetColorU32(editorThemeColor(EditorThemeColor::TextMuted));
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
     draw_list->AddRect(min, max, ImGui::GetColorU32(border), style.FrameRounding);
-    draw_list->AddRectFilled(ImVec2{min.x + scale(6.0f), min.y + scale(7.0f)},
-                             ImVec2{min.x + scale(9.0f), max.y - scale(7.0f)},
+    const float accent_offset_x = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetX);
+    const float accent_offset_y = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetY);
+    const float accent_width = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentWidth);
+    draw_list->AddRectFilled(ImVec2{min.x + accent_offset_x, min.y + accent_offset_y},
+                             ImVec2{min.x + accent_offset_x + accent_width, max.y - accent_offset_y},
                              ImGui::GetColorU32(accent),
-                             scale(2.0f));
+                             editorThemeMetric(EditorThemeMetric::AssetPreviewAccentRounding));
 
-    const ImVec2 text_min{min.x + scale(16.0f), min.y + style.FramePadding.y + scale(3.0f)};
-    const ImVec2 text_max{max.x - scale(8.0f), max.y - style.FramePadding.y};
+    const ImVec2 text_min{min.x + editorThemeMetric(EditorThemeMetric::AssetPreviewTextOffsetX),
+                          min.y + style.FramePadding.y +
+                              editorThemeMetric(EditorThemeMetric::AssetPreviewTextOffsetY)};
+    const ImVec2 text_max{max.x - editorThemeMetric(EditorThemeMetric::AssetPreviewTextRightPadding),
+                          max.y - style.FramePadding.y};
     draw_list->PushClipRect(text_min, text_max, true);
     draw_list->AddText(text_min, label_color, info.label.c_str());
-    draw_list->AddText(ImVec2{text_min.x, text_min.y + ImGui::GetTextLineHeight() + scale(3.0f)},
-                       detail_color,
-                       info.detail.c_str());
+    draw_list->AddText(
+        ImVec2{text_min.x,
+               text_min.y + ImGui::GetTextLineHeight() + editorThemeMetric(EditorThemeMetric::AssetPreviewLineGap)},
+        detail_color,
+        info.detail.c_str());
     draw_list->PopClipRect();
 
     return changed;
@@ -194,7 +205,7 @@ bool drawAxisControl(const char* label,
     const ImVec4 color = axisColor(axis);
 
     ImGui::PushID(label);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(3.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{editorThemeMetric(EditorThemeMetric::AxisControlSpacing), 0.0f});
     ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(color, 0.72f));
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, withAlpha(color, 0.95f));
     ImGui::PushStyleColor(ImGuiCol_ButtonActive, withAlpha(color, 1.0f));
@@ -205,7 +216,9 @@ bool drawAxisControl(const char* label,
     ImGui::PopStyleColor(3);
 
     ImGui::SameLine();
-    ImGui::SetNextItemWidth((std::max)(width - button_size.x - scale(3.0f), scale(24.0f)));
+    const float spacing = editorThemeMetric(EditorThemeMetric::AxisControlSpacing);
+    ImGui::SetNextItemWidth(
+        (std::max)(width - button_size.x - spacing, editorThemeMetric(EditorThemeMetric::AxisControlMinDragWidth)));
     changed |= ImGui::DragFloat("##value", &value, drag_speed, 0.0f, 0.0f, "%.2f");
     ImGui::PopStyleVar();
     ImGui::PopID();
@@ -220,19 +233,20 @@ bool pushButtonVariant(ButtonVariant variant)
 {
     switch (variant) {
         case ButtonVariant::Primary:
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.15f, 0.31f, 0.35f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.18f, 0.40f, 0.45f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.11f, 0.26f, 0.30f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_Button, editorThemeColor(EditorThemeColor::ButtonPrimary));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  editorThemeColor(EditorThemeColor::ButtonPrimaryHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, editorThemeColor(EditorThemeColor::ButtonPrimaryActive));
             return true;
         case ButtonVariant::Danger:
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.32f, 0.16f, 0.17f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{0.46f, 0.20f, 0.22f, 1.0f});
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{0.26f, 0.12f, 0.14f, 1.0f});
+            ImGui::PushStyleColor(ImGuiCol_Button, editorThemeColor(EditorThemeColor::ButtonDanger));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, editorThemeColor(EditorThemeColor::ButtonDangerHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, editorThemeColor(EditorThemeColor::ButtonDangerActive));
             return true;
         case ButtonVariant::Subtle:
-            ImGui::PushStyleColor(ImGuiCol_Button, withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_Button), 0.55f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            ImGui::PushStyleColor(ImGuiCol_Button, editorThemeColor(EditorThemeColor::Button, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, editorThemeColor(EditorThemeColor::ButtonHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, editorThemeColor(EditorThemeColor::ButtonActive));
             return true;
         case ButtonVariant::Default:
             break;
@@ -428,11 +442,20 @@ bool drawButton(const char* label, ButtonVariant variant, const ImVec2& size)
 
 void pushCompactInspectorStyle()
 {
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, scaled(6.0f, 2.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, scaled(4.0f, 2.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(6.0f, 2.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, scaled(4.0f, 1.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, scale(10.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        editorThemeMetric(EditorThemeMetric::CompactInspectorItemSpacingX,
+                                          EditorThemeMetric::CompactInspectorItemSpacingY));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing,
+                        editorThemeMetric(EditorThemeMetric::CompactInspectorItemInnerSpacingX,
+                                          EditorThemeMetric::CompactInspectorItemInnerSpacingY));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        editorThemeMetric(EditorThemeMetric::CompactInspectorFramePaddingX,
+                                          EditorThemeMetric::CompactInspectorFramePaddingY));
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+                        editorThemeMetric(EditorThemeMetric::CompactInspectorCellPaddingX,
+                                          EditorThemeMetric::CompactInspectorCellPaddingY));
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing,
+                        editorThemeMetric(EditorThemeMetric::CompactInspectorIndentSpacing));
 }
 
 void popCompactInspectorStyle()
@@ -445,10 +468,12 @@ bool beginSection(const char* label, const char* id, ImGuiTreeNodeFlags extra_fl
     const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
                                      ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_AllowOverlap | extra_flags;
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(2.0f, 2.0f));
-    ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
-    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgHovered));
-    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImGui::GetStyleColorVec4(ImGuiCol_FrameBgActive));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        editorThemeMetric(EditorThemeMetric::SectionFramePaddingX,
+                                          EditorThemeMetric::SectionFramePaddingY));
+    ImGui::PushStyleColor(ImGuiCol_Header, editorThemeColor(EditorThemeColor::FrameBg));
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, editorThemeColor(EditorThemeColor::FrameBgHovered));
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, editorThemeColor(EditorThemeColor::FrameBgActive));
     const bool open = ImGui::TreeNodeEx(id, flags, "%s", label);
     ImGui::PopStyleColor(3);
     ImGui::PopStyleVar();
@@ -456,13 +481,13 @@ bool beginSection(const char* label, const char* id, ImGuiTreeNodeFlags extra_fl
     const ImVec2 item_min = ImGui::GetItemRectMin();
     const ImVec2 item_max = ImGui::GetItemRectMax();
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    const float accent_width = scale(3.0f);
+    const float accent_width = editorThemeMetric(EditorThemeMetric::SectionAccentWidth);
     draw_list->AddRectFilled(item_min,
                              ImVec2{item_min.x + accent_width, item_max.y},
-                             ImGui::GetColorU32(withAlpha(ImGui::GetStyleColorVec4(ImGuiCol_CheckMark), 0.72f)));
+                             ImGui::GetColorU32(editorThemeColor(EditorThemeColor::Accent, 0.72f)));
     draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
                        ImVec2{item_max.x, item_max.y - 1.0f},
-                       ImGui::GetColorU32(ImGuiCol_Border));
+                       ImGui::GetColorU32(editorThemeColor(EditorThemeColor::PanelBorder)));
     return open;
 }
 
@@ -483,7 +508,9 @@ bool drawVec2Control(const char* label,
         return false;
     }
 
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(6.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        editorThemeMetric(EditorThemeMetric::Vector2FramePaddingX,
+                                          EditorThemeMetric::Vector2FramePaddingY));
     const bool changed = ImGui::DragFloat2("##value", &values.x, drag_speed, min_value, max_value, format);
     ImGui::PopStyleVar();
     endPropertyRow();
@@ -501,9 +528,12 @@ bool drawVec3Control(const char* label,
     }
 
     bool changed = false;
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, scaled(5.0f, 2.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                        editorThemeMetric(EditorThemeMetric::Vector3FramePaddingX,
+                                          EditorThemeMetric::Vector3FramePaddingY));
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    const float axis_width = (std::max)((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f, scale(40.0f));
+    const float axis_width = (std::max)((ImGui::GetContentRegionAvail().x - spacing * 2.0f) / 3.0f,
+                                        editorThemeMetric(EditorThemeMetric::Vector3MinAxisWidth));
     changed |= drawAxisControl("X", 'X', values.x, reset_value, drag_speed, axis_width, false);
     changed |= drawAxisControl("Y", 'Y', values.y, reset_value, drag_speed, axis_width, false);
     changed |= drawAxisControl("Z", 'Z', values.z, reset_value, drag_speed, axis_width, true);

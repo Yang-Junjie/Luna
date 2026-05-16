@@ -1,9 +1,9 @@
-#include "RenderFeaturesPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "RenderFeaturesPlugin.h"
 
 #include <cstdint>
+
 #include <string>
 #include <string_view>
 #include <vector>
@@ -42,6 +42,20 @@ const char* featureStatusLabel(const luna::editor::RenderFeatureInfo& feature) n
         return "Active";
     }
     return "Inactive";
+}
+
+luna::editor::StatusVariant featureStatusVariant(const luna::editor::RenderFeatureInfo& feature) noexcept
+{
+    if (!feature.supported) {
+        return luna::editor::StatusVariant::Danger;
+    }
+    if (!feature.enabled) {
+        return luna::editor::StatusVariant::Warning;
+    }
+    if (feature.active) {
+        return luna::editor::StatusVariant::Success;
+    }
+    return luna::editor::StatusVariant::Neutral;
 }
 
 const char* graphResourceKindLabel(luna::editor::RenderFeatureGraphResourceKind kind) noexcept
@@ -146,8 +160,7 @@ void drawGraphResourceList(luna::editor::Ui& ui,
     ui.unindent();
 }
 
-void drawPassResourceList(luna::editor::Ui& ui,
-                          const std::vector<luna::editor::RenderPassResourceUsage>& resources)
+void drawPassResourceList(luna::editor::Ui& ui, const std::vector<luna::editor::RenderPassResourceUsage>& resources)
 {
     ui.indent();
     if (resources.empty()) {
@@ -165,8 +178,7 @@ void drawPassResourceList(luna::editor::Ui& ui,
     ui.unindent();
 }
 
-void drawStatusEntryList(luna::editor::Ui& ui,
-                         const std::vector<luna::editor::RenderFeatureStatusEntry>& entries)
+void drawStatusEntryList(luna::editor::Ui& ui, const std::vector<luna::editor::RenderFeatureStatusEntry>& entries)
 {
     ui.indent();
     if (entries.empty()) {
@@ -264,13 +276,11 @@ void drawFeaturePassContract(luna::editor::Ui& ui, const luna::editor::RenderFea
 void drawFeatureResourceDiagnostics(luna::editor::Ui& ui, const luna::editor::RenderFeatureInfo& feature)
 {
     const auto& diagnostics = feature.diagnostics;
-    const bool has_diagnostics = !diagnostics.binding_contract_summary.empty() ||
-                                 !diagnostics.pipeline_resources_summary.empty() ||
-                                 !diagnostics.pipeline_resources.empty() ||
-                                 !diagnostics.persistent_resources_summary.empty() ||
-                                 !diagnostics.persistent_resources.empty() ||
-                                 !diagnostics.history_resources_summary.empty() ||
-                                 !diagnostics.history_resources.empty();
+    const bool has_diagnostics =
+        !diagnostics.binding_contract_summary.empty() || !diagnostics.pipeline_resources_summary.empty() ||
+        !diagnostics.pipeline_resources.empty() || !diagnostics.persistent_resources_summary.empty() ||
+        !diagnostics.persistent_resources.empty() || !diagnostics.history_resources_summary.empty() ||
+        !diagnostics.history_resources.empty();
     if (!has_diagnostics) {
         return;
     }
@@ -281,15 +291,19 @@ void drawFeatureResourceDiagnostics(luna::editor::Ui& ui, const luna::editor::Re
     }
 
     drawStatusLine(ui, "Binding Contract", diagnostics.binding_contract_valid, diagnostics.binding_contract_summary);
-    drawStatusLine(ui, "Pipeline Resources", diagnostics.pipeline_resources_valid, diagnostics.pipeline_resources_summary);
+    drawStatusLine(
+        ui, "Pipeline Resources", diagnostics.pipeline_resources_valid, diagnostics.pipeline_resources_summary);
     drawStatusEntryList(ui, diagnostics.pipeline_resources);
     if (!diagnostics.persistent_resources_summary.empty() || !diagnostics.persistent_resources.empty()) {
-        drawStatusLine(
-            ui, "Persistent Resources", diagnostics.persistent_resources_valid, diagnostics.persistent_resources_summary);
+        drawStatusLine(ui,
+                       "Persistent Resources",
+                       diagnostics.persistent_resources_valid,
+                       diagnostics.persistent_resources_summary);
         drawStatusEntryList(ui, diagnostics.persistent_resources);
     }
     if (!diagnostics.history_resources_summary.empty() || !diagnostics.history_resources.empty()) {
-        drawStatusLine(ui, "History Resources", diagnostics.history_resources_valid, diagnostics.history_resources_summary);
+        drawStatusLine(
+            ui, "History Resources", diagnostics.history_resources_valid, diagnostics.history_resources_summary);
         drawStatusEntryList(ui, diagnostics.history_resources);
     }
     ui.treePop();
@@ -341,12 +355,10 @@ void drawFeatureParameters(luna::editor::Host& host,
     const std::string table_id = makeFeatureScopedLabel("##RenderFeatureParameters", feature.name);
     if (ui.beginTable(table_id, 2, table_flags)) {
         ui.tableSetupColumn("Parameter",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthFixed),
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed),
                             150.0f);
         ui.tableSetupColumn("Value",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthStretch));
+                            static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch));
 
         for (const luna::editor::RenderFeatureParameterInfo& parameter : parameters) {
             ui.tableNextRow();
@@ -381,9 +393,7 @@ void drawFeatureParameters(luna::editor::Host& host,
     ui.unindent();
 }
 
-void drawFeature(luna::editor::Host& host,
-                 luna::editor::Ui& ui,
-                 const luna::editor::RenderFeatureInfo& feature)
+void drawFeature(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor::RenderFeatureInfo& feature)
 {
     const std::string display_name = feature.display_name.empty() ? feature.name : feature.display_name;
     const std::string feature_label = makeFeatureScopedLabel(display_name, feature.name);
@@ -405,7 +415,7 @@ void drawFeature(luna::editor::Host& host,
         ui.textDisabled("[" + feature.category + "]");
     }
     ui.sameLine();
-    ui.textDisabled(featureStatusLabel(feature));
+    ui.badge(featureStatusLabel(feature), featureStatusVariant(feature));
     drawFeatureStatusTooltip(ui, feature);
 
     ui.indent();
@@ -425,10 +435,11 @@ void drawRenderFeaturesWindow(luna::editor::WindowDrawContext& context)
     const std::vector<luna::editor::RenderFeatureInfo> features = host.rendering().defaultRenderFeatureInfos();
 
     if (features.empty()) {
-        ui.text("No render features registered.");
+        ui.emptyState("No render features", "No render features are registered.");
         return;
     }
 
+    ui.heading("Render Features");
     for (const luna::editor::RenderFeatureInfo& feature : features) {
         drawFeature(host, ui, feature);
     }

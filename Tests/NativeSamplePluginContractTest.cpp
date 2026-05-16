@@ -82,6 +82,14 @@ public:
     [[nodiscard]] luna::editor::Vec2 contentRegionAvail() const noexcept override { return {.x = 360.0f, .y = 220.0f}; }
     [[nodiscard]] luna::editor::Vec2 windowFramebufferScale() const noexcept override { return {.x = 1.0f, .y = 1.0f}; }
 
+    void heading(std::string_view, std::string_view = {}) override { ++text_count; }
+    void keyValue(std::string_view, std::string_view) override { ++text_count; }
+    void badge(std::string_view, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral) override { ++text_count; }
+    void metric(std::string_view, std::string_view, std::string_view = {}, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral, luna::editor::Vec2 = {}) override { ++text_count; }
+    void emptyState(std::string_view, std::string_view = {}) override { ++text_count; }
+    void beginPanel(std::string_view, luna::editor::Vec2 = {}) override {}
+    void endPanel() override {}
+
     bool button(std::string_view, luna::editor::Vec2 = {}, luna::editor::ButtonVariant = luna::editor::ButtonVariant::Default) override
     {
         ++button_count;
@@ -980,11 +988,16 @@ public:
 
 class ManagerSmokeSettingsService final : public luna::editor::SettingsService {
 public:
+    [[nodiscard]] luna::editor::EditorThemePreset editorTheme() const override
+    {
+        return luna::editor::EditorThemePreset::ModernLightweight;
+    }
     [[nodiscard]] luna::editor::EditorFontSettings editorFont() const override { return {}; }
     [[nodiscard]] std::vector<luna::editor::EditorFontInfo> listEditorFonts() const override { return {}; }
     [[nodiscard]] std::filesystem::path settingsPath() const override { return {}; }
     [[nodiscard]] std::string lastError() const override { return {}; }
     [[nodiscard]] bool restartRequired() const noexcept override { return false; }
+    bool setEditorTheme(luna::editor::EditorThemePreset) override { return true; }
     bool setEditorFont(const std::filesystem::path&, float) override { return true; }
     bool resetEditorFont() override { return true; }
     bool save() override { return true; }

@@ -38,6 +38,11 @@ bool canEditScene(luna::editor::Host& host)
     return host.scene().canEditScene();
 }
 
+std::string entityLabel(const luna::editor::SceneEntityInfo& entity)
+{
+    return entity.name.empty() ? "Unnamed Entity" : entity.name;
+}
+
 void drawCreateEntityMenu(luna::editor::Host& host, luna::editor::EntityId parent_id = {})
 {
     luna::editor::Ui& ui = host.ui();
@@ -265,9 +270,7 @@ void drawEntityNode(HierarchyDrawContext& context, const luna::editor::SceneEnti
         flags = flags | luna::editor::TreeNodeFlag::Selected;
     }
 
-    const bool opened = ui.treeNodeEx(entityScopedId(entity.id),
-                                      entity.name.empty() ? std::string("Unnamed Entity") : entity.name,
-                                      flags);
+    const bool opened = ui.treeNodeEx(entityScopedId(entity.id), entityLabel(entity), flags);
 
     if (ui.isItemClicked(luna::editor::MouseButton::Left)) {
         context.host.selection().selectEntity(entity.id);
@@ -276,7 +279,7 @@ void drawEntityNode(HierarchyDrawContext& context, const luna::editor::SceneEnti
     if (canEditScene(context.host) && ui.beginDragDropSource()) {
         const uint64_t entity_id = entityKey(entity.id);
         ui.setDragDropPayload(kEntityDragPayload, &entity_id, sizeof(entity_id));
-        ui.text(entity.name.empty() ? std::string("Unnamed Entity") : entity.name);
+        ui.text(entityLabel(entity));
         ui.endDragDropSource();
     }
 

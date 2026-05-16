@@ -1,5 +1,4 @@
 #include "BackendCapabilitiesPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
@@ -16,15 +15,17 @@ const char* boolText(bool value)
     return value ? "Yes" : "No";
 }
 
+luna::editor::StatusVariant boolVariant(bool value)
+{
+    return value ? luna::editor::StatusVariant::Success : luna::editor::StatusVariant::Warning;
+}
+
 void setupTwoColumnTable(luna::editor::Ui& ui, std::string_view first_column, std::string_view second_column)
 {
     ui.tableSetupColumn(first_column,
-                        static_cast<luna::editor::TableColumnFlags>(
-                            luna::editor::TableColumnFlag::WidthStretch));
-    ui.tableSetupColumn(second_column,
-                        static_cast<luna::editor::TableColumnFlags>(
-                            luna::editor::TableColumnFlag::WidthFixed),
-                        170.0f);
+                        static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch));
+    ui.tableSetupColumn(
+        second_column, static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 170.0f);
     ui.tableHeadersRow();
 }
 
@@ -39,7 +40,11 @@ void textRow(luna::editor::Ui& ui, std::string_view name, std::string_view value
 
 void capabilityRow(luna::editor::Ui& ui, std::string_view name, bool value)
 {
-    textRow(ui, name, boolText(value));
+    ui.tableNextRow();
+    ui.tableNextColumn();
+    ui.text(name);
+    ui.tableNextColumn();
+    ui.badge(boolText(value), boolVariant(value));
 }
 
 bool beginTwoColumnTable(luna::editor::Ui& ui,
@@ -81,13 +86,24 @@ public:
                     const luna::editor::RenderingBackendCapabilities capabilities =
                         context.host().rendering().backendCapabilities();
 
-                    ui.text("Backend: " + capabilities.active_backend_name);
-                    ui.separator();
-                    ui.text("Compiled: " + capabilities.compiled_backend_names);
+                    ui.heading("Backend Capabilities", capabilities.active_backend_name);
+                    ui.beginPanel("##BackendSummary");
+                    ui.keyValue("Active Backend", capabilities.active_backend_name);
+                    ui.keyValue("Compiled", capabilities.compiled_backend_names);
+                    ui.endPanel();
+                    ui.spacing();
 
                     if (beginTwoColumnTable(ui, "CompiledRHIBackendsTable", "Backend", "Status")) {
                         for (const luna::editor::RenderingBackendEntry& backend : capabilities.compiled_backends) {
-                            textRow(ui, backend.name, backend.status);
+                            ui.tableNextRow();
+                            ui.tableNextColumn();
+                            ui.text(backend.name);
+                            ui.tableNextColumn();
+                            ui.badge(backend.status,
+                                     backend.current
+                                         ? luna::editor::StatusVariant::Success
+                                         : (backend.default_backend ? luna::editor::StatusVariant::Info
+                                                                    : luna::editor::StatusVariant::Neutral));
                         }
                         ui.endTable();
                     }
@@ -98,12 +114,12 @@ public:
                         capabilityRow(ui, "ImGui", capabilities.supports_imgui);
                         capabilityRow(ui, "Scene Pick Readback", capabilities.supports_scene_pick_readback);
                         capabilityRow(ui, "GPU Timestamp", capabilities.supports_gpu_timestamp);
-                        textRow(ui,
-                                "GPU Timestamp Mode",
-                                capabilities.supports_gpu_timestamp
-                                    ? (capabilities.gpu_timestamp_uses_disjoint_query ? "Disjoint query"
-                                                                                      : "Fixed period")
-                                    : "Unavailable");
+                        textRow(
+                            ui,
+                            "GPU Timestamp Mode",
+                            capabilities.supports_gpu_timestamp
+                                ? (capabilities.gpu_timestamp_uses_disjoint_query ? "Disjoint query" : "Fixed period")
+                                : "Unavailable");
                         ui.endTable();
                     }
 
@@ -123,16 +139,13 @@ public:
 
                     ui.spacing();
                     if (beginTwoColumnTable(ui, "BackendConventionsTable", "Convention", "Value")) {
-                        capabilityRow(ui,
-                                      "Projection Y Flip",
-                                      capabilities.conventions.requires_projection_y_flip);
+                        capabilityRow(ui, "Projection Y Flip", capabilities.conventions.requires_projection_y_flip);
                         textRow(ui,
                                 "ImGui Clip Top Y",
                                 capabilities.conventions.imgui_clip_top_y_is_negative_one ? "-1" : "+1");
                         textRow(ui,
                                 "ImGui Render Target UV",
-                                capabilities.conventions.imgui_render_target_requires_uv_y_flip ? "Flip Y"
-                                                                                                 : "Direct");
+                                capabilities.conventions.imgui_render_target_requires_uv_y_flip ? "Flip Y" : "Direct");
                         textRow(ui,
                                 "Scene Pick Y",
                                 capabilities.conventions.scene_pick_y_matches_display_y ? "Displayed Y"

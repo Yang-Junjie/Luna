@@ -1,7 +1,6 @@
-#include "PluginManagerPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include "PluginManagerPlugin.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -68,6 +67,21 @@ std::string stateLabel(luna::editor::PluginLoadState state)
             return "Failed";
     }
     return "Unknown";
+}
+
+luna::editor::StatusVariant stateVariant(luna::editor::PluginLoadState state)
+{
+    switch (state) {
+        case luna::editor::PluginLoadState::Loaded:
+            return luna::editor::StatusVariant::Success;
+        case luna::editor::PluginLoadState::Failed:
+            return luna::editor::StatusVariant::Danger;
+        case luna::editor::PluginLoadState::Disabled:
+            return luna::editor::StatusVariant::Warning;
+        case luna::editor::PluginLoadState::Registered:
+            return luna::editor::StatusVariant::Info;
+    }
+    return luna::editor::StatusVariant::Neutral;
 }
 
 std::string pathText(const std::filesystem::path& path)
@@ -148,12 +162,6 @@ private:
             return lhs.id < rhs.id;
         });
 
-        ui.checkbox("Loaded", m_show_loaded);
-        ui.sameLine();
-        ui.checkbox("Failed", m_show_failed);
-        ui.sameLine();
-        ui.checkbox("Disabled", m_show_disabled);
-
         size_t loaded_count = 0;
         size_t failed_count = 0;
         size_t disabled_count = 0;
@@ -163,41 +171,50 @@ private:
             disabled_count += plugin.state == luna::editor::PluginLoadState::Disabled ? 1u : 0u;
         }
 
-        ui.text("Discovered: " + std::to_string(plugins.size()) + "  Loaded: " + std::to_string(loaded_count) +
-                "  Failed: " + std::to_string(failed_count) + "  Disabled: " + std::to_string(disabled_count));
-        ui.separator();
+        ui.heading("Plugins");
+        if (ui.beginTable("##PluginManagerMetrics",
+                          4,
+                          static_cast<luna::editor::TableFlags>(luna::editor::TableFlag::SizingStretchProp))) {
+            ui.tableNextRow();
+            ui.tableNextColumn();
+            ui.metric("Discovered", std::to_string(plugins.size()), {}, luna::editor::StatusVariant::Info);
+            ui.tableNextColumn();
+            ui.metric("Loaded", std::to_string(loaded_count), {}, luna::editor::StatusVariant::Success);
+            ui.tableNextColumn();
+            ui.metric("Failed", std::to_string(failed_count), {}, luna::editor::StatusVariant::Danger);
+            ui.tableNextColumn();
+            ui.metric("Disabled", std::to_string(disabled_count), {}, luna::editor::StatusVariant::Warning);
+            ui.endTable();
+        }
 
-        const luna::editor::TableFlags table_flags =
-            luna::editor::TableFlag::RowBg | luna::editor::TableFlag::BordersInnerH |
-            luna::editor::TableFlag::SizingStretchProp;
+        ui.beginPanel("##PluginManagerFilters");
+        ui.checkbox("Loaded", m_show_loaded);
+        ui.sameLine();
+        ui.checkbox("Failed", m_show_failed);
+        ui.sameLine();
+        ui.checkbox("Disabled", m_show_disabled);
+        ui.endPanel();
+        ui.spacing();
+
+        const luna::editor::TableFlags table_flags = luna::editor::TableFlag::RowBg |
+                                                     luna::editor::TableFlag::BordersInnerH |
+                                                     luna::editor::TableFlag::SizingStretchProp;
         if (!ui.beginTable("##EditorPluginDiagnostics", 6, table_flags, ui.contentRegionAvail())) {
             return;
         }
 
-        ui.tableSetupColumn("State",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthFixed),
-                            92.0f);
-        ui.tableSetupColumn("Plugin",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthStretch),
-                            1.5f);
-        ui.tableSetupColumn("Runtime",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthFixed),
-                            112.0f);
-        ui.tableSetupColumn("Source",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthFixed),
-                            112.0f);
-        ui.tableSetupColumn("Category",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthFixed),
-                            118.0f);
-        ui.tableSetupColumn("Details",
-                            static_cast<luna::editor::TableColumnFlags>(
-                                luna::editor::TableColumnFlag::WidthStretch),
-                            2.0f);
+        ui.tableSetupColumn(
+            "State", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 92.0f);
+        ui.tableSetupColumn(
+            "Plugin", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch), 1.5f);
+        ui.tableSetupColumn(
+            "Runtime", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 112.0f);
+        ui.tableSetupColumn(
+            "Source", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 112.0f);
+        ui.tableSetupColumn(
+            "Category", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 118.0f);
+        ui.tableSetupColumn(
+            "Details", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch), 2.0f);
         ui.tableHeadersRow();
 
         for (const luna::editor::PluginInfo& plugin : plugins) {
@@ -207,20 +224,20 @@ private:
 
             ui.tableNextRow();
             ui.tableNextColumn();
-            ui.text(stateLabel(plugin.state));
+            ui.badge(stateLabel(plugin.state), stateVariant(plugin.state));
 
             ui.tableNextColumn();
             ui.text(plugin.display_name.empty() ? plugin.id : plugin.display_name);
             ui.textDisabled(plugin.id);
 
             ui.tableNextColumn();
-            ui.text(runtimeLabel(plugin.runtime));
+            ui.badge(runtimeLabel(plugin.runtime), luna::editor::StatusVariant::Neutral);
 
             ui.tableNextColumn();
-            ui.text(sourceLabel(plugin.source));
+            ui.badge(sourceLabel(plugin.source), luna::editor::StatusVariant::Info);
 
             ui.tableNextColumn();
-            ui.text(categoryLabel(plugin.category));
+            ui.badge(categoryLabel(plugin.category), luna::editor::StatusVariant::Neutral);
 
             ui.tableNextColumn();
             ui.textWrapped(plugin.status.empty() ? stateLabel(plugin.state) : plugin.status);

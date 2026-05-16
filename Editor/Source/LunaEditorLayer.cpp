@@ -679,11 +679,16 @@ void LunaEditorLayer::syncEditorUiScale()
         ui_scale = main_viewport->DpiScale;
     }
 
-    if (std::abs(ui_scale - m_editor_ui_scale) <= kUiScaleChangeThreshold) {
+    const editor::EditorThemePreset theme_preset = m_application != nullptr
+                                                       ? m_application->editorSettings().data().theme_preset
+                                                       : editor::EditorThemePreset::ModernLightweight;
+    if (theme_preset == m_editor_theme_preset &&
+        std::abs(ui_scale - m_editor_ui_scale) <= kUiScaleChangeThreshold) {
         return;
     }
 
-    editor::applyEditorTheme(editor::EditorThemePreset::ModernLightweight, ui_scale);
+    editor::applyEditorTheme(theme_preset, ui_scale);
+    m_editor_theme_preset = theme_preset;
     m_editor_ui_scale = editor::getEditorUiScale();
 }
 

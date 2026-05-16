@@ -52,6 +52,7 @@ target_include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
         ${PROJECT_SOURCE_DIR}/SDK/Editor/Include
+        ${PROJECT_SOURCE_DIR}/third_party
         ${PROJECT_SOURCE_DIR}/third_party/ImGuizmo
 )
 

@@ -1,12 +1,12 @@
 #include "ContentBrowserPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -163,6 +163,22 @@ const char* entryKindLabel(const BrowserEntry& entry)
     return "File";
 }
 
+luna::editor::StatusVariant entryKindVariant(const BrowserEntry& entry)
+{
+    switch (entry.kind) {
+        case BrowserEntryKind::Directory:
+            return luna::editor::StatusVariant::Info;
+        case BrowserEntryKind::SceneFile:
+            return luna::editor::StatusVariant::Success;
+        case BrowserEntryKind::AssetFile:
+            return luna::editor::StatusVariant::Neutral;
+        case BrowserEntryKind::OtherFile:
+            return luna::editor::StatusVariant::Warning;
+    }
+
+    return luna::editor::StatusVariant::Neutral;
+}
+
 std::string currentDirectoryLabel(const std::filesystem::path& assets_root,
                                   const std::filesystem::path& current_directory)
 {
@@ -304,9 +320,7 @@ DirectoryCache& ensureDirectoryCache(ContentBrowserState& state,
     return cache;
 }
 
-void rebuildVisibleEntries(ContentBrowserState& state,
-                           luna::editor::Host& host,
-                           const std::filesystem::path& directory)
+void rebuildVisibleEntries(ContentBrowserState& state, luna::editor::Host& host, const std::filesystem::path& directory)
 {
     DirectoryCache& cache = ensureDirectoryCache(state, host, directory, DirectoryScanMode::Entries);
     state.visible_entry_indices.clear();
@@ -413,8 +427,8 @@ void drawFolderTree(ContentBrowserState& state, luna::editor::Host& host, const 
     const bool selected = directory == state.current_directory;
     const bool on_current_branch = isSameOrDescendant(directory, state.current_directory);
 
-    luna::editor::TreeNodeFlags flags = luna::editor::TreeNodeFlag::OpenOnArrow |
-                                        luna::editor::TreeNodeFlag::SpanAvailWidth;
+    luna::editor::TreeNodeFlags flags =
+        luna::editor::TreeNodeFlag::OpenOnArrow | luna::editor::TreeNodeFlag::SpanAvailWidth;
     if (!has_children) {
         flags = flags | luna::editor::TreeNodeFlag::Leaf | luna::editor::TreeNodeFlag::NoTreePushOnOpen;
     }
@@ -454,33 +468,30 @@ void drawDirectoryContents(ContentBrowserState& state, luna::editor::Host& host)
     luna::editor::Ui& ui = host.ui();
     DirectoryCache& directory_cache =
         ensureDirectoryCache(state, host, state.current_directory, DirectoryScanMode::Entries);
-    if (state.visible_entries_dirty ||
-        state.visible_entries_directory != state.current_directory.lexically_normal()) {
+    if (state.visible_entries_dirty || state.visible_entries_directory != state.current_directory.lexically_normal()) {
         rebuildVisibleEntries(state, host, state.current_directory);
     }
 
     const auto& visible_entries = state.visible_entry_indices;
     if (visible_entries.empty()) {
-        ui.textDisabled("Empty.");
+        ui.emptyState("No matching files",
+                      state.search_filter.empty() ? "This folder is empty." : "Try another search filter.");
         return;
     }
 
-    const luna::editor::TableFlags table_flags =
-        luna::editor::TableFlag::RowBg | luna::editor::TableFlag::BordersInnerH |
-        luna::editor::TableFlag::SizingStretchProp;
+    const luna::editor::TableFlags table_flags = luna::editor::TableFlag::RowBg |
+                                                 luna::editor::TableFlag::BordersInnerH |
+                                                 luna::editor::TableFlag::SizingStretchProp;
     if (!ui.beginTable("##ContentBrowserEntries", 3, table_flags)) {
         return;
     }
 
-    ui.tableSetupColumn("Name", static_cast<luna::editor::TableColumnFlags>(
-                                    luna::editor::TableColumnFlag::WidthStretch),
-                        0.45f);
-    ui.tableSetupColumn("Type", static_cast<luna::editor::TableColumnFlags>(
-                                    luna::editor::TableColumnFlag::WidthFixed),
-                        96.0f);
-    ui.tableSetupColumn("Path", static_cast<luna::editor::TableColumnFlags>(
-                                    luna::editor::TableColumnFlag::WidthStretch),
-                        0.55f);
+    ui.tableSetupColumn(
+        "Name", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch), 0.45f);
+    ui.tableSetupColumn(
+        "Type", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 96.0f);
+    ui.tableSetupColumn(
+        "Path", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch), 0.55f);
     ui.tableHeadersRow();
 
     for (std::size_t visible_index : visible_entries) {
@@ -496,7 +507,8 @@ void drawDirectoryContents(ContentBrowserState& state, luna::editor::Host& host)
             ui.image(icon, ui.scaled(luna::editor::Vec2{.x = 16.0f, .y = 16.0f}));
             ui.sameLine();
         }
-        if (ui.selectable(entry.label + "###ContentBrowserEntry" + entry_id, selected)) {
+        const std::string label = entry.label + "###ContentBrowserEntry" + entry_id;
+        if (ui.selectable(label, selected)) {
             state.selected_entry = entry.path;
         }
 
@@ -517,7 +529,7 @@ void drawDirectoryContents(ContentBrowserState& state, luna::editor::Host& host)
         }
 
         ui.tableNextColumn();
-        ui.textDisabled(entryKindLabel(entry));
+        ui.badge(entryKindLabel(entry), entryKindVariant(entry));
 
         ui.tableNextColumn();
         ui.textDisabled(pathRelativeToAssetsLabel(state.assets_root, entry.path));
@@ -529,8 +541,10 @@ void drawDirectoryContents(ContentBrowserState& state, luna::editor::Host& host)
 void drawHeader(ContentBrowserState& state, luna::editor::Host& host)
 {
     luna::editor::Ui& ui = host.ui();
+    ui.beginPanel("##ContentBrowserToolbar");
     if (state.current_directory != state.assets_root) {
-        if (ui.button("<##ContentBrowserBack", luna::editor::Vec2{.x = 28.0f, .y = 0.0f},
+        if (ui.button("Back##ContentBrowserBack",
+                      luna::editor::Vec2{.x = 64.0f, .y = 0.0f},
                       luna::editor::ButtonVariant::Subtle)) {
             navigateTo(state, state.current_directory.parent_path());
         }
@@ -562,6 +576,7 @@ void drawHeader(ContentBrowserState& state, luna::editor::Host& host)
     if (!state.status_message.empty()) {
         ui.textDisabled(state.status_message);
     }
+    ui.endPanel();
 }
 
 void drawContentBrowserWindow(ContentBrowserState& state, luna::editor::WindowDrawContext& context)
@@ -578,27 +593,24 @@ void drawContentBrowserWindow(ContentBrowserState& state, luna::editor::WindowDr
 
     syncProjectDirectories(state, host);
     if (state.assets_root.empty()) {
-        ui.text("No project loaded.");
-        ui.textDisabled("Open a .lunaproj from the Project menu to browse project assets.");
+        ui.emptyState("No project loaded", "Open a .lunaproj from the Project menu to browse project assets.");
         return;
     }
 
     drawHeader(state, host);
-    ui.separator();
+    ui.spacing();
 
-    const luna::editor::TableFlags layout_flags =
-        luna::editor::TableFlag::BordersInnerV | luna::editor::TableFlag::SizingStretchProp |
-        luna::editor::TableFlag::ScrollY;
+    const luna::editor::TableFlags layout_flags = luna::editor::TableFlag::BordersInnerV |
+                                                  luna::editor::TableFlag::SizingStretchProp |
+                                                  luna::editor::TableFlag::ScrollY;
     if (!ui.beginTable("##ContentBrowserLayout", 2, layout_flags, ui.contentRegionAvail())) {
         return;
     }
 
-    ui.tableSetupColumn("Folders", static_cast<luna::editor::TableColumnFlags>(
-                                       luna::editor::TableColumnFlag::WidthFixed),
-                        240.0f);
-    ui.tableSetupColumn("Files", static_cast<luna::editor::TableColumnFlags>(
-                                     luna::editor::TableColumnFlag::WidthStretch),
-                        1.0f);
+    ui.tableSetupColumn(
+        "Folders", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthFixed), 240.0f);
+    ui.tableSetupColumn(
+        "Files", static_cast<luna::editor::TableColumnFlags>(luna::editor::TableColumnFlag::WidthStretch), 1.0f);
     ui.tableNextRow();
 
     ui.tableNextColumn();

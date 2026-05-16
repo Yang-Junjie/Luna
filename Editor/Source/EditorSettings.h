@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EditorApi/EditorSettingsService.h"
 #include "Imgui/ImGuiLayer.hpp"
 
 #include <filesystem>
@@ -9,6 +10,7 @@
 namespace luna::editor {
 
 struct EditorSettingsData {
+    EditorThemePreset theme_preset{EditorThemePreset::ModernLightweight};
     std::filesystem::path font_path;
     float font_size_pixels{16.0f};
 };
@@ -36,6 +38,7 @@ public:
 
     bool load();
     bool save();
+    bool setEditorTheme(EditorThemePreset preset);
     bool setEditorFont(std::filesystem::path font_path, float size_pixels);
     bool resetEditorFont();
 

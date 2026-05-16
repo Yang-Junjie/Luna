@@ -34,18 +34,18 @@ enum class ButtonVariant {
 };
 
 struct PropertyLayout {
-    float label_width = 112.0f;
+    float label_width = 0.0f;
     float row_padding_y = -1.0f;
 
     [[nodiscard]] float scaledLabelWidth() const noexcept
     {
-        return scale(label_width);
+        return label_width > 0.0f ? scale(label_width) : editor::editorThemeMetric(editor::EditorThemeMetric::PropertyLabelWidth);
     }
 
     [[nodiscard]] float scaledRowPaddingY() const noexcept
     {
         if (row_padding_y < 0.0f) {
-            return ImGui::GetStyle().CellPadding.y;
+            return editor::editorThemeMetric(editor::EditorThemeMetric::PropertyRowPaddingY);
         }
         return scale(row_padding_y);
     }
@@ -135,7 +135,7 @@ bool drawComponentSection(const char* label, Entity entity, UIFunction&& ui_func
     }
 
     if (open) {
-        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, scale(10.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::editorThemeMetric(editor::EditorThemeMetric::ComponentIndentSpacing));
         changed |= ui_function(component);
         ImGui::PopStyleVar();
         endSection();

@@ -15,6 +15,30 @@ namespace {
 constexpr const char* kRootKey = "EditorSettings";
 constexpr float kDefaultFontSizePixels = 16.0f;
 
+std::string_view themePresetName(luna::editor::EditorThemePreset preset) noexcept
+{
+    switch (preset) {
+        case luna::editor::EditorThemePreset::HighContrastDark:
+            return "HighContrastDark";
+        case luna::editor::EditorThemePreset::ModernLightweight:
+            return "ModernLightweight";
+    }
+    return "ModernLightweight";
+}
+
+bool tryParseThemePreset(std::string_view value, luna::editor::EditorThemePreset& out_preset) noexcept
+{
+    if (value == "ModernLightweight" || value == "Modern Lightweight") {
+        out_preset = luna::editor::EditorThemePreset::ModernLightweight;
+        return true;
+    }
+    if (value == "HighContrastDark" || value == "High Contrast Dark") {
+        out_preset = luna::editor::EditorThemePreset::HighContrastDark;
+        return true;
+    }
+    return false;
+}
+
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
     return path.lexically_normal();
@@ -50,7 +74,8 @@ EditorSettingsStore::EditorSettingsStore(std::filesystem::path settings_path,
     for (std::filesystem::path& root : m_font_roots) {
         root = normalizePath(std::move(root));
     }
-    m_data.font_size_pixels = kDefaultFontSizePixels;
+    m_data = EditorSettingsData{.theme_preset = EditorThemePreset::ModernLightweight,
+                                .font_size_pixels = kDefaultFontSizePixels};
     m_loaded_data = m_data;
 }
 
@@ -142,7 +167,8 @@ std::vector<EditorSettingsFontInfo> EditorSettingsStore::listFonts() const
 bool EditorSettingsStore::load()
 {
     m_last_error.clear();
-    m_data = EditorSettingsData{.font_size_pixels = kDefaultFontSizePixels};
+    m_data = EditorSettingsData{.theme_preset = EditorThemePreset::ModernLightweight,
+                                .font_size_pixels = kDefaultFontSizePixels};
 
     std::error_code exists_ec;
     if (!std::filesystem::exists(m_settings_path, exists_ec)) {
@@ -161,6 +187,14 @@ bool EditorSettingsStore::load()
     try {
         const YAML::Node root = YAML::LoadFile(m_settings_path.string());
         const YAML::Node settings = root[kRootKey] ? root[kRootKey] : root;
+        if (const YAML::Node theme = settings["Theme"]) {
+            if (const YAML::Node preset = theme["Preset"]) {
+                EditorThemePreset parsed_preset = EditorThemePreset::ModernLightweight;
+                if (tryParseThemePreset(preset.as<std::string>(), parsed_preset)) {
+                    m_data.theme_preset = parsed_preset;
+                }
+            }
+        }
         if (const YAML::Node font = settings["Font"]) {
             if (const YAML::Node path = font["Path"]) {
                 m_data.font_path = normalizePath(std::filesystem::path(path.as<std::string>()));
@@ -172,7 +206,8 @@ bool EditorSettingsStore::load()
     } catch (const YAML::Exception& error) {
         m_last_error = std::string("Failed to load editor settings: ") + error.what();
         LUNA_EDITOR_WARN("{}", m_last_error);
-        m_data = EditorSettingsData{.font_size_pixels = kDefaultFontSizePixels};
+        m_data = EditorSettingsData{.theme_preset = EditorThemePreset::ModernLightweight,
+                                    .font_size_pixels = kDefaultFontSizePixels};
         m_loaded_data = m_data;
         m_restart_required = false;
         return false;
@@ -198,6 +233,9 @@ bool EditorSettingsStore::save()
     YAML::Emitter out;
     out << YAML::BeginMap;
     out << YAML::Key << kRootKey << YAML::Value << YAML::BeginMap;
+    out << YAML::Key << "Theme" << YAML::Value << YAML::BeginMap;
+    out << YAML::Key << "Preset" << YAML::Value << std::string(themePresetName(m_data.theme_preset));
+    out << YAML::EndMap;
     out << YAML::Key << "Font" << YAML::Value << YAML::BeginMap;
     out << YAML::Key << "Path" << YAML::Value << m_data.font_path.generic_string();
     out << YAML::Key << "SizePixels" << YAML::Value << sanitizedFontSize(m_data.font_size_pixels);
@@ -219,6 +257,13 @@ bool EditorSettingsStore::save()
         return false;
     }
 
+    return true;
+}
+
+bool EditorSettingsStore::setEditorTheme(EditorThemePreset preset)
+{
+    m_last_error.clear();
+    m_data.theme_preset = preset;
     return true;
 }
 
