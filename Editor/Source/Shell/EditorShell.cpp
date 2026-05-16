@@ -3041,6 +3041,26 @@ public:
         return m_editor_layer != nullptr && m_editor_layer->canRedo();
     }
 
+    bool hasOpenTransaction() const noexcept override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->hasOpenEditorTransaction();
+    }
+
+    bool beginTransaction(std::string name) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->beginEditorTransaction(std::move(name));
+    }
+
+    bool commitTransaction() override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->commitEditorTransaction();
+    }
+
+    bool rollbackTransaction() override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->rollbackEditorTransaction();
+    }
+
     bool undo() override
     {
         return m_editor_layer != nullptr && m_editor_layer->undoEditorCommand();

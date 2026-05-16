@@ -173,6 +173,10 @@ public:
     bool selectScriptPlugin(const ScriptPluginCandidate* candidate) override;
     bool canUndo() const noexcept;
     bool canRedo() const noexcept;
+    bool hasOpenEditorTransaction() const noexcept;
+    bool beginEditorTransaction(std::string name);
+    bool commitEditorTransaction();
+    bool rollbackEditorTransaction();
     bool undoEditorCommand();
     bool redoEditorCommand();
 

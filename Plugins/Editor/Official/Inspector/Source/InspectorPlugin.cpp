@@ -495,17 +495,26 @@ bool drawDragIntProperty(luna::editor::Ui& ui,
     return ui.dragInt(hiddenLabel(id), value, speed, min_value, max_value);
 }
 
-bool drawDragFloat3Property(luna::editor::Ui& ui,
-                            std::string_view label,
-                            std::string_view id,
-                            luna::editor::Vec3& value,
-                            float speed,
-                            float min_value,
-                            float max_value,
-                            std::string_view format)
+struct DragFloat3Edit {
+    bool changed{false};
+    bool deactivated_after_edit{false};
+};
+
+DragFloat3Edit drawDragFloat3Property(luna::editor::Ui& ui,
+                                      std::string_view label,
+                                      std::string_view id,
+                                      luna::editor::Vec3& value,
+                                      float speed,
+                                      float min_value,
+                                      float max_value,
+                                      std::string_view format)
 {
     beginPropertyRow(ui, label);
-    return ui.dragFloat3(hiddenLabel(id), value, speed, min_value, max_value, format);
+    const bool changed = ui.dragFloat3(hiddenLabel(id), value, speed, min_value, max_value, format);
+    return DragFloat3Edit{
+        .changed = changed,
+        .deactivated_after_edit = ui.isItemDeactivatedAfterEdit(),
+    };
 }
 
 bool drawColor3Property(luna::editor::Ui& ui,
@@ -556,6 +565,37 @@ void endInspectorSection(luna::editor::Ui& ui, const InspectorSection& section)
 {
     if (section.open) {
         ui.endSection();
+    }
+}
+
+void commitTransformTransaction(luna::editor::Host& host,
+                                bool& transaction_active,
+                                luna::editor::EntityId& transaction_entity)
+{
+    if (!transaction_active) {
+        return;
+    }
+
+    (void) host.history().commitTransaction();
+    transaction_active = false;
+    transaction_entity = luna::editor::EntityId{};
+}
+
+void beginTransformTransaction(luna::editor::Host& host,
+                               luna::editor::EntityId entity_id,
+                               bool& transaction_active,
+                               luna::editor::EntityId& transaction_entity)
+{
+    if (transaction_active) {
+        if (transaction_entity == entity_id) {
+            return;
+        }
+        commitTransformTransaction(host, transaction_active, transaction_entity);
+    }
+
+    if (host.history().beginTransaction("Transform Entity")) {
+        transaction_active = true;
+        transaction_entity = entity_id;
     }
 }
 
@@ -806,15 +846,21 @@ void drawAddComponentActions(luna::editor::Host& host,
     endInspectorSection(ui, section);
 }
 
-void drawTransform(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor::SceneEntityDetails& details)
+void drawTransform(luna::editor::Host& host,
+                   luna::editor::Ui& ui,
+                   const luna::editor::SceneEntityDetails& details,
+                   bool& transaction_active,
+                   luna::editor::EntityId& transaction_entity)
 {
     if (!details.components.transform) {
+        commitTransformTransaction(host, transaction_active, transaction_entity);
         return;
     }
 
     const InspectorSection section =
         beginInspectorSection(ui, "InspectorTransform", "Transform", false, "Remove Component");
     if (!section.open) {
+        commitTransformTransaction(host, transaction_active, transaction_entity);
         endInspectorSection(ui, section);
         return;
     }
@@ -825,10 +871,22 @@ void drawTransform(luna::editor::Host& host, luna::editor::Ui& ui, const luna::e
     }
 
     bool changed = false;
+    bool edit_finished = false;
     if (beginPropertyTable(ui, "TransformProperties")) {
-        changed |= drawDragFloat3Property(ui, "Translation", "TransformTranslation", transform.translation, 0.05f, 0.0f, 0.0f, "%.2f");
-        changed |= drawDragFloat3Property(ui, "Rotation", "TransformRotation", transform.rotation_degrees, 0.25f, 0.0f, 0.0f, "%.2f");
-        changed |= drawDragFloat3Property(ui, "Scale", "TransformScale", transform.scale, 0.01f, 0.0f, 0.0f, "%.2f");
+        const DragFloat3Edit translation_edit =
+            drawDragFloat3Property(ui, "Translation", "TransformTranslation", transform.translation, 0.05f, 0.0f, 0.0f, "%.2f");
+        changed |= translation_edit.changed;
+        edit_finished |= translation_edit.deactivated_after_edit;
+
+        const DragFloat3Edit rotation_edit =
+            drawDragFloat3Property(ui, "Rotation", "TransformRotation", transform.rotation_degrees, 0.25f, 0.0f, 0.0f, "%.2f");
+        changed |= rotation_edit.changed;
+        edit_finished |= rotation_edit.deactivated_after_edit;
+
+        const DragFloat3Edit scale_edit =
+            drawDragFloat3Property(ui, "Scale", "TransformScale", transform.scale, 0.01f, 0.0f, 0.0f, "%.2f");
+        changed |= scale_edit.changed;
+        edit_finished |= scale_edit.deactivated_after_edit;
         ui.endTable();
     }
 
@@ -837,7 +895,12 @@ void drawTransform(luna::editor::Host& host, luna::editor::Ui& ui, const luna::e
     }
 
     if (changed && !sameTransform(transform, details.transform)) {
+        beginTransformTransaction(host, details.id, transaction_active, transaction_entity);
         (void) host.scene().setEntityTransform(details.id, transform);
+    }
+
+    if (edit_finished) {
+        commitTransformTransaction(host, transaction_active, transaction_entity);
     }
 
     endInspectorSection(ui, section);
@@ -1738,7 +1801,7 @@ public:
             .default_open = true,
             .default_size = Vec2{.x = 380.0f, .y = 520.0f},
             .draw =
-                [](WindowDrawContext& context) {
+                [this](WindowDrawContext& context) {
                     drawInspectorWindow(context);
                 },
         });
@@ -1746,11 +1809,12 @@ public:
 
     void onUnload(Host& host) override
     {
+        commitTransformTransaction(host, m_transform_transaction_active, m_transform_transaction_entity);
         host.windows().unregisterWindow(kWindowId);
     }
 
 private:
-    static void drawInspectorWindow(WindowDrawContext& context)
+    void drawInspectorWindow(WindowDrawContext& context)
     {
         Host& host = context.host();
         Ui& ui = context.ui();
@@ -1758,30 +1822,41 @@ private:
 
         const EntityId selected_entity_id = host.selection().selectedEntityId();
         if (!selected_entity_id.isValid()) {
+            commitTransformTransaction(host, m_transform_transaction_active, m_transform_transaction_entity);
             ui.text("Select an entity to inspect.");
             return;
         }
 
         const std::optional<SceneEntityDetails> details = host.scene().entityDetails(selected_entity_id);
         if (!details) {
+            commitTransformTransaction(host, m_transform_transaction_active, m_transform_transaction_entity);
             host.selection().clearSelection();
             ui.text("Select an entity to inspect.");
             return;
         }
 
         if (!host.scene().canEditScene()) {
+            commitTransformTransaction(host, m_transform_transaction_active, m_transform_transaction_entity);
             ui.textDisabled("Runtime viewport is active; scene editing is disabled.");
+        }
+        if (m_transform_transaction_active &&
+            (m_transform_transaction_entity != details->id || !details->components.transform)) {
+            commitTransformTransaction(host, m_transform_transaction_active, m_transform_transaction_entity);
         }
 
         drawEntityHeader(host, ui, *details);
         drawAddComponentActions(host, ui, *details);
-        drawTransform(host, ui, *details);
+        drawTransform(host, ui, *details, m_transform_transaction_active, m_transform_transaction_entity);
         drawCamera(host, ui, *details);
         drawLight(host, ui, *details);
         drawMesh(host, ui, *details);
         drawScript(host, ui, *details);
         drawRelationship(host, ui, *details);
     }
+
+private:
+    bool m_transform_transaction_active{false};
+    EntityId m_transform_transaction_entity{};
 };
 
 std::unique_ptr<Plugin> createInspectorPlugin()

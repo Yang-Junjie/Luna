@@ -1806,8 +1806,9 @@ bool LunaEditorLayer::setEntityName(Entity entity, std::string name)
 
 bool LunaEditorLayer::setEntityTransform(Entity entity, const TransformComponent& transform)
 {
+    const bool defer_events = m_editor_runtime.hasOpenTransaction();
     const bool changed = m_editor_runtime.setEntityTransform(entity, transform);
-    if (changed) {
+    if (changed && !defer_events) {
         processAuthoringEvents();
     }
     return changed;
@@ -2266,6 +2267,44 @@ bool LunaEditorLayer::canUndo() const noexcept
 bool LunaEditorLayer::canRedo() const noexcept
 {
     return !m_runtime_viewport_enabled && m_editor_runtime.canRedo();
+}
+
+bool LunaEditorLayer::hasOpenEditorTransaction() const noexcept
+{
+    return m_editor_runtime.hasOpenTransaction();
+}
+
+bool LunaEditorLayer::beginEditorTransaction(std::string name)
+{
+    if (m_runtime_viewport_enabled) {
+        return false;
+    }
+
+    return m_editor_runtime.beginTransaction(std::move(name));
+}
+
+bool LunaEditorLayer::commitEditorTransaction()
+{
+    if (!m_editor_runtime.hasOpenTransaction()) {
+        return false;
+    }
+
+    const bool committed = m_editor_runtime.commitTransaction();
+    processAuthoringEvents();
+    return committed;
+}
+
+bool LunaEditorLayer::rollbackEditorTransaction()
+{
+    if (!m_editor_runtime.hasOpenTransaction()) {
+        return false;
+    }
+
+    const bool rolled_back = m_editor_runtime.rollbackTransaction();
+    if (rolled_back) {
+        processAuthoringEvents();
+    }
+    return rolled_back;
 }
 
 bool LunaEditorLayer::undoEditorCommand()

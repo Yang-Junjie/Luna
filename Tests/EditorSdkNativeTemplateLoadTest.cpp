@@ -1941,6 +1941,10 @@ class TemplateManagerHistoryService final : public luna::editor::HistoryService 
 public:
     bool canUndo() const noexcept override { return false; }
     bool canRedo() const noexcept override { return false; }
+    bool hasOpenTransaction() const noexcept override { return false; }
+    bool beginTransaction(std::string) override { return false; }
+    bool commitTransaction() override { return false; }
+    bool rollbackTransaction() override { return false; }
     bool undo() override { return false; }
     bool redo() override { return false; }
 };
