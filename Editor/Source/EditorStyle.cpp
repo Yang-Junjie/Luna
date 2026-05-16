@@ -160,106 +160,106 @@ ImVec4 color(float r, float g, float b, float a = 1.0f)
 EditorThemePalette modernLightweightPalette()
 {
     return EditorThemePalette{
-        .text = color(0.80f, 0.80f, 0.80f),
-        .text_muted = color(0.52f, 0.52f, 0.52f),
-        .window_bg = color(0.118f, 0.118f, 0.118f),
-        .popup_bg = color(0.145f, 0.145f, 0.149f, 0.98f),
-        .panel_bg = color(0.145f, 0.145f, 0.149f),
-        .panel_border = color(0.235f, 0.235f, 0.235f),
-        .frame_bg = color(0.176f, 0.176f, 0.188f),
-        .frame_bg_hovered = color(0.235f, 0.235f, 0.247f),
-        .frame_bg_active = color(0.000f, 0.353f, 0.620f),
-        .header = color(0.000f, 0.478f, 0.800f, 0.36f),
-        .header_hovered = color(0.000f, 0.478f, 0.800f, 0.52f),
-        .header_active = color(0.000f, 0.478f, 0.800f, 0.70f),
+        .text = color(0.800f, 0.824f, 0.855f),
+        .text_muted = color(0.525f, 0.557f, 0.600f),
+        .window_bg = color(0.118f, 0.122f, 0.133f),
+        .popup_bg = color(0.145f, 0.153f, 0.169f, 0.98f),
+        .panel_bg = color(0.145f, 0.153f, 0.169f),
+        .panel_border = color(0.255f, 0.278f, 0.310f),
+        .frame_bg = color(0.180f, 0.192f, 0.212f),
+        .frame_bg_hovered = color(0.220f, 0.240f, 0.267f),
+        .frame_bg_active = color(0.106f, 0.278f, 0.427f),
+        .header = color(0.176f, 0.259f, 0.349f, 0.78f),
+        .header_hovered = color(0.212f, 0.329f, 0.443f, 0.88f),
+        .header_active = color(0.117f, 0.388f, 0.635f, 0.92f),
         .accent = color(0.000f, 0.478f, 0.800f),
-        .accent_hovered = color(0.216f, 0.580f, 1.000f),
-        .accent_active = color(0.000f, 0.353f, 0.620f),
-        .info = color(0.216f, 0.580f, 1.000f),
-        .success = color(0.350f, 0.690f, 0.360f),
-        .warning = color(0.890f, 0.640f, 0.250f),
-        .danger = color(0.860f, 0.270f, 0.270f),
-        .button = color(0.176f, 0.176f, 0.188f),
-        .button_hovered = color(0.235f, 0.235f, 0.247f),
-        .button_active = color(0.000f, 0.353f, 0.620f),
+        .accent_hovered = color(0.231f, 0.620f, 0.996f),
+        .accent_active = color(0.047f, 0.333f, 0.541f),
+        .info = color(0.231f, 0.620f, 0.996f),
+        .success = color(0.365f, 0.722f, 0.455f),
+        .warning = color(0.890f, 0.650f, 0.310f),
+        .danger = color(0.900f, 0.330f, 0.330f),
+        .button = color(0.188f, 0.200f, 0.220f),
+        .button_hovered = color(0.240f, 0.263f, 0.294f),
+        .button_active = color(0.106f, 0.278f, 0.427f),
         .button_primary = color(0.000f, 0.478f, 0.800f),
-        .button_primary_hovered = color(0.216f, 0.580f, 1.000f),
-        .button_primary_active = color(0.000f, 0.353f, 0.620f),
-        .button_danger = color(0.470f, 0.170f, 0.170f),
-        .button_danger_hovered = color(0.620f, 0.220f, 0.220f),
-        .button_danger_active = color(0.350f, 0.120f, 0.120f),
-        .axis_x = color(0.870f, 0.310f, 0.310f),
-        .axis_y = color(0.350f, 0.690f, 0.360f),
-        .axis_z = color(0.216f, 0.580f, 1.000f),
-        .asset_texture = color(0.820f, 0.600f, 0.300f),
-        .asset_mesh = color(0.216f, 0.580f, 1.000f),
-        .asset_material = color(0.350f, 0.690f, 0.360f),
-        .asset_model = color(0.680f, 0.540f, 0.900f),
-        .asset_scene = color(0.760f, 0.610f, 0.360f),
-        .asset_script = color(0.300f, 0.640f, 0.780f),
+        .button_primary_hovered = color(0.231f, 0.620f, 0.996f),
+        .button_primary_active = color(0.047f, 0.333f, 0.541f),
+        .button_danger = color(0.459f, 0.155f, 0.165f),
+        .button_danger_hovered = color(0.610f, 0.210f, 0.220f),
+        .button_danger_active = color(0.349f, 0.110f, 0.120f),
+        .axis_x = color(0.890f, 0.365f, 0.365f),
+        .axis_y = color(0.365f, 0.722f, 0.455f),
+        .axis_z = color(0.231f, 0.620f, 0.996f),
+        .asset_texture = color(0.840f, 0.610f, 0.330f),
+        .asset_mesh = color(0.231f, 0.620f, 0.996f),
+        .asset_material = color(0.365f, 0.722f, 0.455f),
+        .asset_model = color(0.650f, 0.560f, 0.880f),
+        .asset_scene = color(0.760f, 0.620f, 0.380f),
+        .asset_script = color(0.320f, 0.680f, 0.780f),
     };
 }
 
 EditorThemeMetrics modernLightweightMetrics()
 {
     return EditorThemeMetrics{
-        .window_padding_x = 8.0f,
+        .window_padding_x = 9.0f,
         .window_padding_y = 8.0f,
-        .frame_padding_x = 7.0f,
-        .frame_padding_y = 3.0f,
-        .cell_padding_x = 5.0f,
-        .cell_padding_y = 3.0f,
+        .frame_padding_x = 8.0f,
+        .frame_padding_y = 4.0f,
+        .cell_padding_x = 6.0f,
+        .cell_padding_y = 4.0f,
         .item_spacing_x = 7.0f,
-        .item_spacing_y = 4.0f,
-        .item_inner_spacing_x = 5.0f,
+        .item_spacing_y = 5.0f,
+        .item_inner_spacing_x = 6.0f,
         .item_inner_spacing_y = 3.0f,
         .indent_spacing = 14.0f,
-        .scrollbar_size = 10.0f,
-        .grab_min_size = 9.0f,
-        .window_rounding = 4.0f,
-        .child_rounding = 3.0f,
+        .scrollbar_size = 11.0f,
+        .grab_min_size = 10.0f,
+        .window_rounding = 5.0f,
+        .child_rounding = 4.0f,
         .frame_rounding = 3.0f,
         .popup_rounding = 4.0f,
         .scrollbar_rounding = 4.0f,
         .grab_rounding = 3.0f,
         .tab_rounding = 3.0f,
         .property_label_width = 112.0f,
-        .property_row_padding_y = 3.0f,
-        .badge_padding_x = 8.0f,
+        .property_row_padding_y = 4.0f,
+        .badge_padding_x = 9.0f,
         .badge_padding_y = 3.0f,
-        .badge_rounding = 5.0f,
+        .badge_rounding = 4.0f,
         .metric_min_width = 140.0f,
         .metric_padding_left = 12.0f,
-        .metric_padding_right = 8.0f,
+        .metric_padding_right = 10.0f,
         .metric_padding_top = 8.0f,
-        .metric_padding_bottom = 6.0f,
+        .metric_padding_bottom = 7.0f,
         .metric_line_gap = 4.0f,
         .metric_accent_width = 3.0f,
-        .metric_default_height = 54.0f,
+        .metric_default_height = 56.0f,
         .metric_detailed_height = 70.0f,
         .empty_state_min_width = 180.0f,
-        .empty_state_height = 58.0f,
+        .empty_state_height = 60.0f,
         .empty_state_detailed_height = 82.0f,
         .empty_state_detail_top = 18.0f,
         .empty_state_line_gap = 6.0f,
-        .panel_padding_x = 10.0f,
+        .panel_padding_x = 11.0f,
         .panel_padding_y = 8.0f,
-        .panel_rounding = 5.0f,
+        .panel_rounding = 4.0f,
         .heading_accent_offset_y = 2.0f,
         .heading_accent_width = 3.0f,
         .heading_accent_rounding = 2.0f,
-        .heading_indent = 9.0f,
-        .section_frame_padding_x = 2.0f,
-        .section_frame_padding_y = 2.0f,
+        .heading_indent = 10.0f,
+        .section_frame_padding_x = 7.0f,
+        .section_frame_padding_y = 4.0f,
         .section_accent_width = 3.0f,
         .compact_inspector_item_spacing_x = 6.0f,
-        .compact_inspector_item_spacing_y = 2.0f,
+        .compact_inspector_item_spacing_y = 3.0f,
         .compact_inspector_item_inner_spacing_x = 4.0f,
         .compact_inspector_item_inner_spacing_y = 2.0f,
         .compact_inspector_frame_padding_x = 6.0f,
-        .compact_inspector_frame_padding_y = 2.0f,
+        .compact_inspector_frame_padding_y = 3.0f,
         .compact_inspector_cell_padding_x = 4.0f,
-        .compact_inspector_cell_padding_y = 1.0f,
+        .compact_inspector_cell_padding_y = 2.0f,
         .compact_inspector_indent_spacing = 10.0f,
         .asset_preview_min_width = 64.0f,
         .asset_preview_extra_height = 6.0f,
@@ -385,8 +385,8 @@ void applyActiveEditorTheme()
     style.WindowBorderSize = 1.0f;
     style.ChildBorderSize = 1.0f;
     style.PopupBorderSize = 1.0f;
-    style.FrameBorderSize = 0.0f;
-    style.TabBorderSize = 0.0f;
+    style.FrameBorderSize = 1.0f;
+    style.TabBorderSize = 1.0f;
 
     style.WindowRounding = metrics.window_rounding;
     style.ChildRounding = metrics.child_rounding;
@@ -397,6 +397,10 @@ void applyActiveEditorTheme()
     style.TabRounding = metrics.tab_rounding;
 
     style.WindowTitleAlign = ImVec2(0.0f, 0.5f);
+    style.SelectableTextAlign = ImVec2(0.0f, 0.5f);
+    style.SeparatorTextBorderSize = 1.0f;
+    style.SeparatorTextAlign = ImVec2(0.0f, 0.5f);
+    style.SeparatorTextPadding = ImVec2(20.0f, 4.0f);
 
     ImVec4* colors = style.Colors;
     colors[ImGuiCol_Text] = palette.text;
@@ -412,8 +416,8 @@ void applyActiveEditorTheme()
     colors[ImGuiCol_FrameBgHovered] = palette.frame_bg_hovered;
     colors[ImGuiCol_FrameBgActive] = palette.frame_bg_active;
 
-    colors[ImGuiCol_TitleBg] = palette.panel_bg;
-    colors[ImGuiCol_TitleBgActive] = palette.frame_bg;
+    colors[ImGuiCol_TitleBg] = palette.window_bg;
+    colors[ImGuiCol_TitleBgActive] = palette.panel_bg;
     colors[ImGuiCol_TitleBgCollapsed] = palette.panel_bg;
     colors[ImGuiCol_MenuBarBg] = palette.window_bg;
 
@@ -425,15 +429,21 @@ void applyActiveEditorTheme()
     colors[ImGuiCol_HeaderHovered] = palette.header_hovered;
     colors[ImGuiCol_HeaderActive] = palette.header_active;
 
-    colors[ImGuiCol_CheckMark] = palette.accent;
+    colors[ImGuiCol_CheckMark] = palette.accent_hovered;
     colors[ImGuiCol_SliderGrab] = palette.accent;
     colors[ImGuiCol_SliderGrabActive] = palette.accent_hovered;
 
-    colors[ImGuiCol_Tab] = palette.panel_bg;
+    colors[ImGuiCol_ScrollbarBg] = color(0.0f, 0.0f, 0.0f, 0.16f);
+    colors[ImGuiCol_ScrollbarGrab] = color(0.36f, 0.39f, 0.43f, 0.72f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = color(0.44f, 0.48f, 0.54f, 0.86f);
+    colors[ImGuiCol_ScrollbarGrabActive] = palette.accent;
+
+    colors[ImGuiCol_Tab] = palette.window_bg;
     colors[ImGuiCol_TabHovered] = palette.header_hovered;
-    colors[ImGuiCol_TabActive] = palette.frame_bg;
+    colors[ImGuiCol_TabSelected] = palette.panel_bg;
+    colors[ImGuiCol_TabSelectedOverline] = palette.accent;
     colors[ImGuiCol_TabUnfocused] = palette.window_bg;
-    colors[ImGuiCol_TabUnfocusedActive] = palette.panel_bg;
+    colors[ImGuiCol_TabUnfocusedActive] = palette.frame_bg;
 
     colors[ImGuiCol_Separator] = palette.panel_border;
     colors[ImGuiCol_SeparatorHovered] = palette.accent_hovered;
@@ -442,13 +452,13 @@ void applyActiveEditorTheme()
     colors[ImGuiCol_ResizeGrip] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.18f};
     colors[ImGuiCol_ResizeGripHovered] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.45f};
     colors[ImGuiCol_ResizeGripActive] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.70f};
-    colors[ImGuiCol_TextSelectedBg] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.30f};
+    colors[ImGuiCol_TextSelectedBg] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.32f};
 
-    colors[ImGuiCol_TableHeaderBg] = palette.frame_bg;
+    colors[ImGuiCol_TableHeaderBg] = color(0.165f, 0.180f, 0.204f);
     colors[ImGuiCol_TableBorderStrong] = palette.panel_border;
     colors[ImGuiCol_TableBorderLight] = ImVec4{palette.panel_border.x, palette.panel_border.y, palette.panel_border.z, 0.55f};
-    colors[ImGuiCol_TableRowBg] = color(0.0f, 0.0f, 0.0f, 0.0f);
-    colors[ImGuiCol_TableRowBgAlt] = color(1.0f, 1.0f, 1.0f, 0.025f);
+    colors[ImGuiCol_TableRowBg] = color(1.0f, 1.0f, 1.0f, 0.010f);
+    colors[ImGuiCol_TableRowBgAlt] = color(1.0f, 1.0f, 1.0f, 0.035f);
 
     colors[ImGuiCol_DockingPreview] = ImVec4{palette.accent.x, palette.accent.y, palette.accent.z, 0.35f};
     colors[ImGuiCol_DockingEmptyBg] = palette.window_bg;

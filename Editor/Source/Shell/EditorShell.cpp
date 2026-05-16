@@ -95,6 +95,28 @@ ImVec4 statusFill(luna::editor::StatusVariant variant, float amount)
     return mixColor(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg), statusAccent(variant), amount);
 }
 
+void drawRectBorder(ImDrawList& draw_list, ImVec2 min, ImVec2 max, const ImVec4& color, float rounding)
+{
+    draw_list.AddRect(min, max, ImGui::GetColorU32(color), rounding, 0, 1.0f);
+}
+
+void drawSectionChrome(ImVec2 min, ImVec2 max, bool hovered)
+{
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float rounding = luna::editor::editorThemeMetric(luna::editor::EditorThemeMetric::FrameRounding);
+    const float accent_width = luna::editor::editorThemeMetric(luna::editor::EditorThemeMetric::SectionAccentWidth);
+    draw_list->AddRectFilled(min,
+                             ImVec2{min.x + accent_width, max.y},
+                             ImGui::GetColorU32(
+                                 luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Accent, 0.74f)),
+                             rounding);
+    drawRectBorder(*draw_list,
+                   min,
+                   max,
+                   luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, hovered ? 0.92f : 0.72f),
+                   rounding);
+}
+
 ImVec2 multilineTextSize(std::string_view value)
 {
     const float line_height = ImGui::GetTextLineHeight();
@@ -191,7 +213,7 @@ bool pushButtonVariant(luna::editor::ButtonVariant variant)
         case luna::editor::ButtonVariant::Subtle:
             ImGui::PushStyleColor(
                 ImGuiCol_Button,
-                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Button, 0.55f));
+                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Button, 0.72f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                                   luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonHovered));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
@@ -1100,7 +1122,7 @@ public:
         draw_list->AddLine(separator_min,
                            separator_max,
                            ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.55f)));
+                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.72f)));
         ImGui::Dummy(ImVec2{0.0f, style.ItemSpacing.y});
     }
 
@@ -1139,12 +1161,11 @@ public:
         ImGui::Dummy(size);
 
         const ImVec4 accent = statusAccent(variant);
-        const ImVec4 fill = statusFill(variant, 0.18f);
+        const ImVec4 fill = statusFill(variant, variant == StatusVariant::Neutral ? 0.10f : 0.16f);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         const float rounding = (std::min) (style.FrameRounding, editorThemeMetric(EditorThemeMetric::BadgeRounding));
-        draw_list->AddRectFilled(
-            min, max, ImGui::GetColorU32(fill), rounding);
-        draw_list->AddRect(min, max, ImGui::GetColorU32(withAlpha(accent, 0.62f)), rounding);
+        draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), rounding);
+        drawRectBorder(*draw_list, min, max, withAlpha(accent, 0.58f), rounding);
         addMultilineText(*draw_list,
                          ImVec2{min.x + padding.x, min.y + (size.y - text_size.y) * 0.5f},
                          ImVec4{min.x + padding.x, min.y + padding.y, max.x - padding.x, max.y - padding.y},
@@ -1186,14 +1207,14 @@ public:
         ImGui::Dummy(draw_size);
 
         const ImVec4 accent = statusAccent(variant);
-        const ImVec4 fill = statusFill(variant, 0.08f);
+        const ImVec4 fill = statusFill(variant, variant == StatusVariant::Neutral ? 0.05f : 0.08f);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
-        draw_list->AddRect(min,
-                           max,
-                           ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f)),
-                           style.FrameRounding);
+        drawRectBorder(*draw_list,
+                       min,
+                       max,
+                       luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f),
+                       style.FrameRounding);
         draw_list->AddRectFilled(ImVec2{min.x, min.y},
                                  ImVec2{min.x + editorThemeMetric(EditorThemeMetric::MetricAccentWidth), max.y},
                                  ImGui::GetColorU32(accent),
@@ -1243,11 +1264,11 @@ public:
             max,
             ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBg)),
             style.FrameRounding);
-        draw_list->AddRect(min,
-                           max,
-                           ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f)),
-                           style.FrameRounding);
+        drawRectBorder(*draw_list,
+                       min,
+                       max,
+                       luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.75f),
+                       style.FrameRounding);
 
         const ImVec2 title_size = ImGui::CalcTextSize(title.data(), title.data() + title.size());
         const float text_top = detail.empty() ? min.y + (height - title_size.y) * 0.5f
@@ -1286,7 +1307,7 @@ public:
                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBg));
         ImGui::PushStyleColor(
             ImGuiCol_Border,
-            luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.78f));
+            luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.86f));
         ImGuiChildFlags child_flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding;
         if (size.y <= 0.0f) {
             child_flags |= ImGuiChildFlags_AutoResizeY;
@@ -1306,7 +1327,9 @@ public:
     {
         const std::string label_string = toString(label);
         const bool pushed_colors = pushButtonVariant(variant);
-        const bool pressed = ImGui::Button(label_string.c_str(), ImVec2{size.x, size.y});
+        const ImVec2 scaled_size{size.x > 0.0f ? scaleEditorUi(size.x) : size.x,
+                                 size.y > 0.0f ? scaleEditorUi(size.y) : size.y};
+        const bool pressed = ImGui::Button(label_string.c_str(), scaled_size);
         if (pushed_colors) {
             ImGui::PopStyleColor(3);
         }
@@ -1541,16 +1564,7 @@ public:
 
         const ImVec2 item_min = ImGui::GetItemRectMin();
         const ImVec2 item_max = ImGui::GetItemRectMax();
-        ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        const float accent_width = editorThemeMetric(EditorThemeMetric::SectionAccentWidth);
-        draw_list->AddRectFilled(item_min,
-                                 ImVec2{item_min.x + accent_width, item_max.y},
-                                 ImGui::GetColorU32(
-                                     luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Accent, 0.72f)));
-        draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
-                           ImVec2{item_max.x, item_max.y - 1.0f},
-                           ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder)));
+        drawSectionChrome(item_min, item_max, ImGui::IsItemHovered());
         return open;
     }
 

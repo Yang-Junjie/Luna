@@ -27,6 +27,27 @@ ImVec4 mixColor(ImVec4 lhs, ImVec4 rhs, float amount)
     };
 }
 
+void drawRectBorder(ImDrawList& draw_list, ImVec2 min, ImVec2 max, const ImVec4& color, float rounding)
+{
+    draw_list.AddRect(min, max, ImGui::GetColorU32(color), rounding, 0, 1.0f);
+}
+
+void drawSectionChrome(ImVec2 min, ImVec2 max, bool hovered)
+{
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    const float rounding = editorThemeMetric(EditorThemeMetric::FrameRounding);
+    const float accent_width = editorThemeMetric(EditorThemeMetric::SectionAccentWidth);
+    draw_list->AddRectFilled(ImVec2{min.x, min.y},
+                             ImVec2{min.x + accent_width, max.y},
+                             ImGui::GetColorU32(editorThemeColor(EditorThemeColor::Accent, 0.74f)),
+                             rounding);
+    drawRectBorder(*draw_list,
+                   min,
+                   max,
+                   editorThemeColor(EditorThemeColor::PanelBorder, hovered ? 0.92f : 0.72f),
+                   rounding);
+}
+
 ImVec4 axisColor(char axis)
 {
     switch (axis) {
@@ -155,8 +176,8 @@ bool drawAssetPreview(const char* id,
     const ImVec2 max{position.x + size.x, position.y + size.y};
     const ImVec4 frame_bg = editorThemeColor(EditorThemeColor::FrameBg);
     const ImVec4 accent = info.missing ? editorThemeColor(EditorThemeColor::Danger) : assetAccentColor(info.type);
-    const ImVec4 fill = hovered || active ? mixColor(frame_bg, accent, 0.12f) : mixColor(frame_bg, accent, 0.06f);
-    const ImVec4 border = hovered || active ? withAlpha(accent, 0.70f) : editorThemeColor(EditorThemeColor::PanelBorder);
+    const ImVec4 fill = hovered || active ? mixColor(frame_bg, accent, 0.12f) : mixColor(frame_bg, accent, 0.055f);
+    const ImVec4 border = hovered || active ? withAlpha(accent, 0.70f) : editorThemeColor(EditorThemeColor::PanelBorder, 0.78f);
     const ImVec4 label_color_value = info.missing ? editorThemeColor(EditorThemeColor::Danger)
                                                   : editorThemeColor(handle.isValid() ? EditorThemeColor::Text
                                                                                       : EditorThemeColor::TextMuted);
@@ -165,7 +186,7 @@ bool drawAssetPreview(const char* id,
 
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), style.FrameRounding);
-    draw_list->AddRect(min, max, ImGui::GetColorU32(border), style.FrameRounding);
+    drawRectBorder(*draw_list, min, max, border, style.FrameRounding);
     const float accent_offset_x = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetX);
     const float accent_offset_y = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentOffsetY);
     const float accent_width = editorThemeMetric(EditorThemeMetric::AssetPreviewAccentWidth);
@@ -244,7 +265,7 @@ bool pushButtonVariant(ButtonVariant variant)
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, editorThemeColor(EditorThemeColor::ButtonDangerActive));
             return true;
         case ButtonVariant::Subtle:
-            ImGui::PushStyleColor(ImGuiCol_Button, editorThemeColor(EditorThemeColor::Button, 0.55f));
+            ImGui::PushStyleColor(ImGuiCol_Button, editorThemeColor(EditorThemeColor::Button, 0.72f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, editorThemeColor(EditorThemeColor::ButtonHovered));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, editorThemeColor(EditorThemeColor::ButtonActive));
             return true;
@@ -291,6 +312,7 @@ bool beginPropertyRow(const char* label, const PropertyLayout& layout)
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
     ImGui::AlignTextToFramePadding();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + editorThemeMetric(EditorThemeMetric::SectionAccentWidth));
     ImGui::TextDisabled("%s", label);
     ImGui::TableNextColumn();
     ImGui::SetNextItemWidth(-1.0f);
@@ -480,14 +502,7 @@ bool beginSection(const char* label, const char* id, ImGuiTreeNodeFlags extra_fl
 
     const ImVec2 item_min = ImGui::GetItemRectMin();
     const ImVec2 item_max = ImGui::GetItemRectMax();
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    const float accent_width = editorThemeMetric(EditorThemeMetric::SectionAccentWidth);
-    draw_list->AddRectFilled(item_min,
-                             ImVec2{item_min.x + accent_width, item_max.y},
-                             ImGui::GetColorU32(editorThemeColor(EditorThemeColor::Accent, 0.72f)));
-    draw_list->AddLine(ImVec2{item_min.x, item_max.y - 1.0f},
-                       ImVec2{item_max.x, item_max.y - 1.0f},
-                       ImGui::GetColorU32(editorThemeColor(EditorThemeColor::PanelBorder)));
+    drawSectionChrome(item_min, item_max, ImGui::IsItemHovered());
     return open;
 }
 
