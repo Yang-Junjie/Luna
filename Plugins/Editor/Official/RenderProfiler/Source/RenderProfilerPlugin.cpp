@@ -15,7 +15,17 @@ namespace {
 
 constexpr const char* kPluginId = "luna.editor.render-profiler";
 constexpr const char* kWindowId = "luna.editor.render-profiler.window";
+constexpr std::string_view kDefaultSceneFeatureName = "DefaultScene";
 constexpr size_t kMaxHistoryFrames = 120;
+
+struct CullingProfileStats {
+    double draw_queue_cpu_ms{0.0};
+    double avg_us_per_submitted_draw{0.0};
+    uint64_t submitted{0};
+    uint64_t camera_visible{0};
+    uint64_t camera_culled{0};
+    bool available{false};
+};
 
 std::string formatFloat(double value, int precision)
 {
@@ -27,6 +37,54 @@ std::string formatFloat(double value, int precision)
 std::string formatUInt(uint32_t value)
 {
     return std::to_string(value);
+}
+
+std::string formatUInt64(uint64_t value)
+{
+    return std::to_string(value);
+}
+
+void assignCullingProfileStat(CullingProfileStats& stats, const luna::editor::RenderFeatureRuntimeStat& stat)
+{
+    const std::string_view name(stat.name);
+    if (stat.type == luna::editor::RenderFeatureRuntimeStatType::Float) {
+        if (name == "culling.draw_queue_cpu_ms") {
+            stats.draw_queue_cpu_ms = stat.float_value;
+            stats.available = true;
+        } else if (name == "culling.avg_us_per_submitted_draw") {
+            stats.avg_us_per_submitted_draw = stat.float_value;
+            stats.available = true;
+        }
+        return;
+    }
+
+    if (stat.type != luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger) {
+        return;
+    }
+
+    if (name == "draws.submitted") {
+        stats.submitted = stat.uint_value;
+    } else if (name == "draws.camera_visible") {
+        stats.camera_visible = stat.uint_value;
+    } else if (name == "draws.camera_culled") {
+        stats.camera_culled = stat.uint_value;
+    }
+}
+
+CullingProfileStats cullingProfileStats(const std::vector<luna::editor::RenderFeatureInfo>& features)
+{
+    for (const luna::editor::RenderFeatureInfo& feature : features) {
+        if (std::string_view(feature.name) != kDefaultSceneFeatureName) {
+            continue;
+        }
+
+        CullingProfileStats stats{};
+        for (const luna::editor::RenderFeatureRuntimeStat& stat : feature.diagnostics.runtime_stats) {
+            assignCullingProfileStat(stats, stat);
+        }
+        return stats;
+    }
+    return {};
 }
 
 void appendHistory(std::vector<luna::editor::RenderGraphProfileSnapshot>& history,
@@ -224,6 +282,8 @@ public:
                     }
 
                     const luna::editor::RenderGraphProfileSnapshot& profile = m_display_profile;
+                    const CullingProfileStats culling_stats =
+                        cullingProfileStats(host.rendering().defaultRenderFeatureInfos());
                     ui.heading("Render Profiler",
                                profiling_enabled ? std::string("Profiling enabled") : std::string("Profiling stopped"));
                     ui.beginPanel("##RenderProfilerToolbar");
@@ -275,7 +335,7 @@ public:
 
                     if (ui.beginTable(
                             "##RenderProfilerMetrics",
-                            4,
+                            6,
                             static_cast<luna::editor::TableFlags>(luna::editor::TableFlag::SizingStretchProp))) {
                         ui.tableNextRow();
                         ui.tableNextColumn();
@@ -294,6 +354,21 @@ public:
                         ui.metric("Passes",
                                   formatUInt(static_cast<uint32_t>(profile.passes.size())),
                                   "Textures " + formatUInt(profile.texture_count),
+                                  luna::editor::StatusVariant::Neutral);
+                        ui.tableNextColumn();
+                        ui.metric("Culling",
+                                  culling_stats.available
+                                      ? formatFloat(culling_stats.draw_queue_cpu_ms, 3) + " ms"
+                                      : std::string("-"),
+                                  culling_stats.available
+                                      ? formatFloat(culling_stats.avg_us_per_submitted_draw, 2) + " us / draw"
+                                      : std::string{},
+                                  luna::editor::StatusVariant::Info);
+                        ui.tableNextColumn();
+                        ui.metric("Draws",
+                                  formatUInt64(culling_stats.submitted),
+                                  formatUInt64(culling_stats.camera_visible) + " visible / " +
+                                      formatUInt64(culling_stats.camera_culled) + " culled",
                                   luna::editor::StatusVariant::Neutral);
                         ui.tableNextColumn();
                         ui.metric("Samples",

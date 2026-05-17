@@ -47,6 +47,8 @@ private:
     DrawQueue m_draw_queue{};
     DrawQueueStats m_last_draw_stats{};
     DrawQueueStats m_last_logged_draw_stats{};
+    double m_last_draw_queue_cpu_ms{0.0};
+    double m_last_draw_queue_avg_us_per_submitted_draw{0.0};
     VisibilityDebugStats m_last_visibility_debug_stats{};
     VisibilityDebugOptions m_visibility_debug{};
     Camera m_frozen_culling_camera{};

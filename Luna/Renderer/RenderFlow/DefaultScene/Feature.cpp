@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <Backend.h>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -198,6 +199,15 @@ RenderFeatureRuntimeStat makeRuntimeUIntStat(std::string name, uint64_t value)
     };
 }
 
+RenderFeatureRuntimeStat makeRuntimeFloatStat(std::string name, double value)
+{
+    return RenderFeatureRuntimeStat{
+        .name = std::move(name),
+        .type = RenderFeatureRuntimeStatType::Float,
+        .float_value = value,
+    };
+}
+
 RenderFeatureRuntimeStat makeRuntimeBoolStat(std::string name, bool value)
 {
     return RenderFeatureRuntimeStat{
@@ -295,6 +305,8 @@ RenderFeatureDiagnostics Feature::diagnostics() const
     RenderFeatureDiagnostics diagnostics{};
     diagnostics.runtime_stats = {
         makeRuntimeUIntStat("draws.submitted", m_last_draw_stats.submitted),
+        makeRuntimeFloatStat("culling.draw_queue_cpu_ms", m_last_draw_queue_cpu_ms),
+        makeRuntimeFloatStat("culling.avg_us_per_submitted_draw", m_last_draw_queue_avg_us_per_submitted_draw),
         makeRuntimeUIntStat("draws.camera_visible", m_last_draw_stats.camera_visible),
         makeRuntimeUIntStat("draws.camera_culled", m_last_draw_stats.camera_culled),
         makeRuntimeUIntStat("draws.invalid_bounds", m_last_draw_stats.invalid_bounds),
@@ -358,6 +370,7 @@ void Feature::prepareFrame(const RenderWorld& world,
     const float culling_aspect_ratio =
         m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera ? m_frozen_culling_aspect_ratio
                                                                                : aspect_ratio;
+    const auto draw_queue_begin = std::chrono::steady_clock::now();
     m_draw_queue.beginScene(world.camera(),
                             aspect_ratio,
                             culling_camera,
@@ -372,25 +385,35 @@ void Feature::prepareFrame(const RenderWorld& world,
     for (const auto& packet : world.drawPackets()) {
         m_draw_queue.submitDrawPacket(packet);
     }
+    const auto draw_queue_end = std::chrono::steady_clock::now();
+    m_last_draw_queue_cpu_ms = std::chrono::duration<double, std::milli>(draw_queue_end - draw_queue_begin).count();
     m_last_draw_stats = m_draw_queue.stats();
+    m_last_draw_queue_avg_us_per_submitted_draw =
+        m_last_draw_stats.submitted > 0
+            ? (m_last_draw_queue_cpu_ms * 1000.0) / static_cast<double>(m_last_draw_stats.submitted)
+            : 0.0;
     m_last_visibility_debug_stats = m_draw_queue.visibilityDebugStats();
     LUNA_RENDERER_FRAME_DEBUG(
-        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} visibility_debug_items={} culling_frustums={}",
+        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} culling_ms={:.3f} visibility_debug_items={} culling_frustums={}",
         m_last_draw_stats.submitted,
         m_last_draw_stats.camera_visible,
         m_last_draw_stats.camera_culled,
         m_last_draw_stats.invalid_bounds,
         m_last_draw_stats.shadow_unculled,
+        m_last_draw_queue_cpu_ms,
         m_last_visibility_debug_stats.captured,
         m_last_visibility_debug_stats.culling_frustums);
     if (!m_has_logged_draw_stats || !drawStatsEqual(m_last_draw_stats, m_last_logged_draw_stats)) {
         LUNA_RENDERER_DEBUG("Scene draw culling stats: submitted={} camera_visible={} camera_culled={} "
-                            "invalid_bounds={} shadow_unculled={} gbuffer={} transparent={} shadow={} picking={}",
+                            "invalid_bounds={} shadow_unculled={} culling_ms={:.3f} avg_us_per_draw={:.3f} "
+                            "gbuffer={} transparent={} shadow={} picking={}",
                             m_last_draw_stats.submitted,
                             m_last_draw_stats.camera_visible,
                             m_last_draw_stats.camera_culled,
                             m_last_draw_stats.invalid_bounds,
                             m_last_draw_stats.shadow_unculled,
+                            m_last_draw_queue_cpu_ms,
+                            m_last_draw_queue_avg_us_per_submitted_draw,
                             m_last_draw_stats.phase_gbuffer,
                             m_last_draw_stats.phase_transparent,
                             m_last_draw_stats.phase_shadow_caster,
