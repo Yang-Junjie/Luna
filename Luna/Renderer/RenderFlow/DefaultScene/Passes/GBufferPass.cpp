@@ -147,7 +147,7 @@ void GeometryPass::execute(RenderGraphRasterPassContext& pass_context, const Sce
     PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
-    const auto geometry_draw_commands = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
+    const auto& geometry_draw_commands = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
     LUNA_RENDERER_FRAME_DEBUG("Executing scene geometry pass with {} GBuffer draw command(s)", geometry_draw_commands.size());
 
     const DrawPassResources pass_resources = pipelines.geometryPassResources();

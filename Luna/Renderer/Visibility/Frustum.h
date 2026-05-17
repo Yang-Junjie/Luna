@@ -10,10 +10,14 @@
 
 namespace luna {
 
+class Camera;
+
 struct Plane {
     glm::vec3 Normal{0.0f, 1.0f, 0.0f};
     float Distance{0.0f};
 };
+
+using FrustumCorners = std::array<glm::vec3, 8>;
 
 class Frustum {
 public:
@@ -35,5 +39,7 @@ public:
 private:
     std::array<Plane, static_cast<size_t>(PlaneIndex::Count)> m_planes{};
 };
+
+[[nodiscard]] FrustumCorners cameraFrustumCorners(const Camera& camera, float aspect_ratio);
 
 } // namespace luna

@@ -411,6 +411,43 @@ std::vector<luna::editor::RenderFeatureStatusEntry> toEditorRenderFeatureStatusE
     return result;
 }
 
+luna::editor::RenderFeatureRuntimeStatType toEditorRenderFeatureRuntimeStatType(
+    luna::render_flow::RenderFeatureRuntimeStatType type)
+{
+    switch (type) {
+        case luna::render_flow::RenderFeatureRuntimeStatType::UnsignedInteger:
+            return luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger;
+        case luna::render_flow::RenderFeatureRuntimeStatType::Float:
+            return luna::editor::RenderFeatureRuntimeStatType::Float;
+        case luna::render_flow::RenderFeatureRuntimeStatType::Bool:
+            return luna::editor::RenderFeatureRuntimeStatType::Bool;
+    }
+    return luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger;
+}
+
+luna::editor::RenderFeatureRuntimeStat toEditorRenderFeatureRuntimeStat(
+    const luna::render_flow::RenderFeatureRuntimeStat& stat)
+{
+    return luna::editor::RenderFeatureRuntimeStat{
+        .name = stat.name,
+        .type = toEditorRenderFeatureRuntimeStatType(stat.type),
+        .uint_value = stat.uint_value,
+        .float_value = stat.float_value,
+        .bool_value = stat.bool_value,
+    };
+}
+
+std::vector<luna::editor::RenderFeatureRuntimeStat> toEditorRenderFeatureRuntimeStats(
+    const std::vector<luna::render_flow::RenderFeatureRuntimeStat>& stats)
+{
+    std::vector<luna::editor::RenderFeatureRuntimeStat> result;
+    result.reserve(stats.size());
+    for (const auto& stat : stats) {
+        result.push_back(toEditorRenderFeatureRuntimeStat(stat));
+    }
+    return result;
+}
+
 luna::editor::RenderFeatureDiagnostics toEditorRenderFeatureDiagnostics(
     const luna::render_flow::RenderFeatureDiagnostics& diagnostics)
 {
@@ -426,6 +463,7 @@ luna::editor::RenderFeatureDiagnostics toEditorRenderFeatureDiagnostics(
         .history_resources_valid = diagnostics.history_resources_valid,
         .history_resources_summary = diagnostics.history_resources_summary,
         .history_resources = toEditorRenderFeatureStatusEntries(diagnostics.history_resources),
+        .runtime_stats = toEditorRenderFeatureRuntimeStats(diagnostics.runtime_stats),
     };
 }
 

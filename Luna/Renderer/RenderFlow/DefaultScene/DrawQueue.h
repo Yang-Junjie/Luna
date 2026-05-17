@@ -8,6 +8,7 @@
 #include "Renderer/RenderWorld/RenderTypes.h"
 #include "Renderer/Visibility/Frustum.h"
 
+#include <cstddef>
 #include <cstdint>
 
 #include <array>
@@ -33,6 +34,12 @@ struct DrawQueueStats {
     uint32_t camera_culled{0};
     uint32_t invalid_bounds{0};
     uint32_t shadow_unculled{0};
+    uint32_t phase_depth_only{0};
+    uint32_t phase_gbuffer{0};
+    uint32_t phase_forward_opaque{0};
+    uint32_t phase_transparent{0};
+    uint32_t phase_shadow_caster{0};
+    uint32_t phase_picking{0};
 };
 
 enum class VisibilityDebugClassification : uint8_t {
@@ -98,7 +105,7 @@ public:
     }
 
     [[nodiscard]] const std::vector<DrawCommand>& drawCommands() const noexcept;
-    [[nodiscard]] std::vector<DrawCommand> drawCommands(RenderPhase phase) const;
+    [[nodiscard]] const std::vector<DrawCommand>& drawCommands(RenderPhase phase) const noexcept;
 
     [[nodiscard]] const DrawQueueStats& stats() const noexcept
     {
@@ -121,6 +128,9 @@ public:
     }
 
 private:
+    static constexpr std::size_t kRenderPhaseCount = static_cast<std::size_t>(RenderPhase::Picking) + 1u;
+
+    void cacheDrawCommandForPhases(const RenderDrawPacket& packet, bool camera_visible);
     void captureVisibilityDebugFrustum(const Camera& camera, float aspect_ratio);
     void captureVisibilityDebugItem(const RenderDrawPacket& packet,
                                     VisibilityDebugClassification classification);
@@ -130,6 +140,7 @@ private:
     Frustum m_culling_frustum{};
     std::vector<DrawCommand> m_all_draw_commands;
     std::vector<DrawCommand> m_camera_visible_draw_commands;
+    std::array<std::vector<DrawCommand>, kRenderPhaseCount> m_draw_commands_by_phase;
     std::vector<VisibilityDebugItem> m_visibility_debug_items;
     std::vector<VisibilityDebugFrustumItem> m_visibility_debug_frustums;
     VisibilityDebugCaptureOptions m_visibility_debug_options{};

@@ -462,7 +462,7 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
     PipelineResources& pipelines = m_state->pipelines();
     DrawQueue& draw_queue = m_state->drawQueue();
     const Material& default_material = m_state->defaultMaterial();
-    const auto shadow_draw_commands = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
+    const auto& shadow_draw_commands = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
     LUNA_RENDERER_FRAME_DEBUG("Executing scene shadow pass with {} shadow caster draw command(s)",
                               shadow_draw_commands.size());
 

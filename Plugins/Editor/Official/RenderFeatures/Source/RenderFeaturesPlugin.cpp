@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -96,6 +98,22 @@ const char* statusValueLabel(bool valid, const std::string& summary) noexcept
 std::string parameterDisplayName(const luna::editor::RenderFeatureParameterInfo& parameter)
 {
     return parameter.display_name.empty() ? parameter.name : parameter.display_name;
+}
+
+std::string formatRuntimeStatValue(const luna::editor::RenderFeatureRuntimeStat& stat)
+{
+    switch (stat.type) {
+        case luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger:
+            return std::to_string(stat.uint_value);
+        case luna::editor::RenderFeatureRuntimeStatType::Float: {
+            std::ostringstream stream;
+            stream << std::fixed << std::setprecision(3) << stat.float_value;
+            return stream.str();
+        }
+        case luna::editor::RenderFeatureRuntimeStatType::Bool:
+            return stat.bool_value ? "true" : "false";
+    }
+    return {};
 }
 
 void drawFeatureStatusTooltip(luna::editor::Ui& ui, const luna::editor::RenderFeatureInfo& feature)
@@ -309,6 +327,26 @@ void drawFeatureResourceDiagnostics(luna::editor::Ui& ui, const luna::editor::Re
     ui.treePop();
 }
 
+void drawFeatureRuntimeStats(luna::editor::Ui& ui, const luna::editor::RenderFeatureInfo& feature)
+{
+    const auto& stats = feature.diagnostics.runtime_stats;
+    if (stats.empty()) {
+        return;
+    }
+
+    const std::string label = makeFeatureScopedLabel("Runtime Stats", feature.name);
+    if (!ui.treeNode(label)) {
+        return;
+    }
+
+    ui.indent();
+    for (const luna::editor::RenderFeatureRuntimeStat& stat : stats) {
+        ui.bulletText(stat.name + ": " + formatRuntimeStatValue(stat));
+    }
+    ui.unindent();
+    ui.treePop();
+}
+
 bool drawParameterControl(luna::editor::Ui& ui,
                           const luna::editor::RenderFeatureInfo& feature,
                           const luna::editor::RenderFeatureParameterInfo& parameter,
@@ -423,6 +461,7 @@ void drawFeature(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edi
     drawFeatureGraphContract(ui, feature);
     drawFeaturePassContract(ui, feature);
     drawFeatureResourceDiagnostics(ui, feature);
+    drawFeatureRuntimeStats(ui, feature);
     drawFeatureParameters(host, ui, feature);
     ui.unindent();
     ui.separator();

@@ -86,6 +86,20 @@ struct RenderFeatureStatusEntry {
     bool ready{false};
 };
 
+enum class RenderFeatureRuntimeStatType : uint8_t {
+    UnsignedInteger,
+    Float,
+    Bool,
+};
+
+struct RenderFeatureRuntimeStat {
+    std::string name;
+    RenderFeatureRuntimeStatType type{RenderFeatureRuntimeStatType::UnsignedInteger};
+    uint64_t uint_value{0};
+    double float_value{0.0};
+    bool bool_value{false};
+};
+
 struct RenderFeatureDiagnostics {
     bool binding_contract_valid{true};
     std::string binding_contract_summary;
@@ -98,6 +112,7 @@ struct RenderFeatureDiagnostics {
     bool history_resources_valid{true};
     std::string history_resources_summary;
     std::vector<RenderFeatureStatusEntry> history_resources;
+    std::vector<RenderFeatureRuntimeStat> runtime_stats;
 };
 
 struct RenderFeatureInfo {

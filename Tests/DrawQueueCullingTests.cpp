@@ -1,6 +1,7 @@
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.h"
+#include "Renderer/Visibility/Frustum.h"
 
 #include <glm/geometric.hpp>
 #include <cmath>
@@ -115,19 +116,31 @@ void testDrawQueueKeepsShadowCastersUnculled(TestContext& context)
     draw_queue.submitDrawPacket(makePacket(mesh,
                                            makeBounds({0.0f, 0.0f, -6.0f}, {0.5f, 0.5f, 0.5f}),
                                            luna::renderPhaseBit(luna::RenderPhase::Transparent)));
+    draw_queue.submitDrawPacket(makePacket(mesh,
+                                           makeBounds({0.0f, 0.0f, -7.0f}, {0.5f, 0.5f, 0.5f}),
+                                           luna::renderPhaseBit(luna::RenderPhase::DepthOnly) |
+                                               luna::renderPhaseBit(luna::RenderPhase::Picking)));
+    draw_queue.submitDrawPacket(makePacket(mesh,
+                                           makeBounds({100.0f, 0.0f, -7.0f}, {0.5f, 0.5f, 0.5f}),
+                                           luna::renderPhaseBit(luna::RenderPhase::DepthOnly) |
+                                               luna::renderPhaseBit(luna::RenderPhase::Picking)));
 
-    const auto gbuffer_draws = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
-    const auto transparent_draws = draw_queue.drawCommands(luna::RenderPhase::Transparent);
-    const auto shadow_draws = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
+    const auto& depth_draws = draw_queue.drawCommands(luna::RenderPhase::DepthOnly);
+    const auto& gbuffer_draws = draw_queue.drawCommands(luna::RenderPhase::GBuffer);
+    const auto& transparent_draws = draw_queue.drawCommands(luna::RenderPhase::Transparent);
+    const auto& shadow_draws = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
+    const auto& picking_draws = draw_queue.drawCommands(luna::RenderPhase::Picking);
     const auto& stats = draw_queue.stats();
 
-    context.expect(draw_queue.drawCommands().size() == 3, "camera-visible draw view should exclude culled draws");
+    context.expect(draw_queue.drawCommands().size() == 4, "camera-visible draw view should exclude culled draws");
+    context.expect(depth_draws.size() == 1, "DepthOnly draws should use the cached camera-visible phase list");
     context.expect(gbuffer_draws.size() == 2, "GBuffer draws should include visible and invalid-bounds packets");
     context.expect(transparent_draws.size() == 1, "Transparent draws should exclude camera-culled packets");
     context.expect(shadow_draws.size() == 4, "ShadowCaster draws should use the unculled draw set");
-    context.expect(stats.submitted == 5, "stats should count valid submitted draws");
-    context.expect(stats.camera_visible == 3, "stats should count camera-visible draws");
-    context.expect(stats.camera_culled == 2, "stats should count camera-culled draws");
+    context.expect(picking_draws.size() == 1, "Picking draws should use the cached camera-visible phase list");
+    context.expect(stats.submitted == 7, "stats should count valid submitted draws");
+    context.expect(stats.camera_visible == 4, "stats should count camera-visible draws");
+    context.expect(stats.camera_culled == 3, "stats should count camera-culled draws");
     context.expect(stats.invalid_bounds == 1, "stats should count invalid bounds");
     context.expect(stats.shadow_unculled == 4, "stats should count unculled shadow casters");
     context.expect(draw_queue.visibilityDebugItems().empty(), "visibility debug capture should be disabled by default");
@@ -228,6 +241,35 @@ void testDrawQueueUsesSeparateCullingCamera(TestContext& context)
     }
 }
 
+void testCameraFrustumCorners(TestContext& context)
+{
+    luna::Camera perspective_camera;
+    perspective_camera.setPerspective(1.0f, 0.1f, 10.0f);
+
+    const luna::FrustumCorners perspective_corners = luna::cameraFrustumCorners(perspective_camera, 2.0f);
+    const float perspective_near_half_height = std::tan(0.5f) * 0.1f;
+    const float perspective_near_half_width = perspective_near_half_height * 2.0f;
+    const float perspective_far_half_height = std::tan(0.5f) * 10.0f;
+    const float perspective_far_half_width = perspective_far_half_height * 2.0f;
+
+    context.expect(sameVec3(perspective_corners[0],
+                            glm::vec3{-perspective_near_half_width, -perspective_near_half_height, -0.1f}),
+                   "perspective frustum near-min corner should match camera settings");
+    context.expect(sameVec3(perspective_corners[6],
+                            glm::vec3{perspective_far_half_width, perspective_far_half_height, -10.0f}),
+                   "perspective frustum far-max corner should match camera settings");
+
+    luna::Camera orthographic_camera;
+    orthographic_camera.setOrthographic(4.0f, 0.5f, 8.0f);
+
+    const luna::FrustumCorners orthographic_corners = luna::cameraFrustumCorners(orthographic_camera, 1.5f);
+
+    context.expect(sameVec3(orthographic_corners[0], glm::vec3{-3.0f, -2.0f, -0.5f}),
+                   "orthographic frustum near-min corner should match camera settings");
+    context.expect(sameVec3(orthographic_corners[6], glm::vec3{3.0f, 2.0f, -8.0f}),
+                   "orthographic frustum far-max corner should match camera settings");
+}
+
 void testVisibilityBoundsOverlayBuildsLineVertices(TestContext& context)
 {
     std::vector<luna::render_flow::default_scene::VisibilityDebugItem> items;
@@ -291,6 +333,7 @@ int main()
     testDrawQueueKeepsShadowCastersUnculled(context);
     testDrawQueueCapturesVisibilityDebugItems(context);
     testDrawQueueUsesSeparateCullingCamera(context);
+    testCameraFrustumCorners(context);
     testVisibilityBoundsOverlayBuildsLineVertices(context);
     return context.failures() == 0 ? 0 : 1;
 }

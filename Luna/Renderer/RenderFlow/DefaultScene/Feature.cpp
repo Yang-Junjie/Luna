@@ -21,9 +21,9 @@
 #include <array>
 #include <Backend.h>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -169,7 +169,10 @@ bool drawStatsEqual(const DrawQueueStats& lhs, const DrawQueueStats& rhs)
 {
     return lhs.submitted == rhs.submitted && lhs.camera_visible == rhs.camera_visible &&
            lhs.camera_culled == rhs.camera_culled && lhs.invalid_bounds == rhs.invalid_bounds &&
-           lhs.shadow_unculled == rhs.shadow_unculled;
+           lhs.shadow_unculled == rhs.shadow_unculled && lhs.phase_depth_only == rhs.phase_depth_only &&
+           lhs.phase_gbuffer == rhs.phase_gbuffer && lhs.phase_forward_opaque == rhs.phase_forward_opaque &&
+           lhs.phase_transparent == rhs.phase_transparent && lhs.phase_shadow_caster == rhs.phase_shadow_caster &&
+           lhs.phase_picking == rhs.phase_picking;
 }
 
 RenderFeatureParameterInfo makeBoolParameter(std::string_view name,
@@ -184,6 +187,24 @@ RenderFeatureParameterInfo makeBoolParameter(std::string_view name,
     parameter.value.bool_value = value;
     parameter.read_only = false;
     return parameter;
+}
+
+RenderFeatureRuntimeStat makeRuntimeUIntStat(std::string name, uint64_t value)
+{
+    return RenderFeatureRuntimeStat{
+        .name = std::move(name),
+        .type = RenderFeatureRuntimeStatType::UnsignedInteger,
+        .uint_value = value,
+    };
+}
+
+RenderFeatureRuntimeStat makeRuntimeBoolStat(std::string name, bool value)
+{
+    return RenderFeatureRuntimeStat{
+        .name = std::move(name),
+        .type = RenderFeatureRuntimeStatType::Bool,
+        .bool_value = value,
+    };
 }
 
 } // namespace
@@ -271,45 +292,36 @@ RenderFeatureDiagnostics Feature::diagnostics() const
 {
     const VisibilityBoundsOverlayStats visibility_overlay_stats = m_visibility_bounds_overlay.stats();
 
-    std::ostringstream summary;
-    summary << "draw culling: submitted=" << m_last_draw_stats.submitted
-            << " camera_visible=" << m_last_draw_stats.camera_visible
-            << " camera_culled=" << m_last_draw_stats.camera_culled
-            << " invalid_bounds=" << m_last_draw_stats.invalid_bounds
-            << " shadow_unculled=" << m_last_draw_stats.shadow_unculled
-            << " visibility_debug_items=" << m_last_visibility_debug_stats.captured
-            << " culling_frustums=" << m_last_visibility_debug_stats.culling_frustums
-            << " overlay_vertices=" << visibility_overlay_stats.build.vertices;
-
     RenderFeatureDiagnostics diagnostics{};
-    diagnostics.persistent_resources_summary = summary.str();
-    diagnostics.persistent_resources = {
-        {"draws.submitted=" + std::to_string(m_last_draw_stats.submitted), true},
-        {"draws.camera_visible=" + std::to_string(m_last_draw_stats.camera_visible), true},
-        {"draws.camera_culled=" + std::to_string(m_last_draw_stats.camera_culled), true},
-        {"draws.invalid_bounds=" + std::to_string(m_last_draw_stats.invalid_bounds), true},
-        {"draws.shadow_unculled=" + std::to_string(m_last_draw_stats.shadow_unculled), true},
-        {"visibility_debug.visible_enabled=" + std::to_string(m_visibility_debug.show_visible_bounds), true},
-        {"visibility_debug.culled_enabled=" + std::to_string(m_visibility_debug.show_culled_bounds), true},
-        {"visibility_debug.frustum_enabled=" + std::to_string(m_visibility_debug.show_culling_frustum), true},
-        {"visibility_debug.culling_camera_frozen=" + std::to_string(m_visibility_debug.freeze_culling_camera), true},
-        {"visibility_debug.has_frozen_culling_camera=" + std::to_string(m_has_frozen_culling_camera), true},
-        {"visibility_debug.captured=" + std::to_string(m_last_visibility_debug_stats.captured), true},
-        {"visibility_debug.camera_visible=" + std::to_string(m_last_visibility_debug_stats.camera_visible), true},
-        {"visibility_debug.camera_culled=" + std::to_string(m_last_visibility_debug_stats.camera_culled), true},
-        {"visibility_debug.invalid_bounds=" + std::to_string(m_last_visibility_debug_stats.invalid_bounds), true},
-        {"visibility_debug.culling_frustums=" + std::to_string(m_last_visibility_debug_stats.culling_frustums), true},
-        {"visibility_overlay.resources_ready=" + std::to_string(visibility_overlay_stats.resources_ready), true},
-        {"visibility_overlay.items=" + std::to_string(visibility_overlay_stats.build.items), true},
-        {"visibility_overlay.bounds=" + std::to_string(visibility_overlay_stats.build.bounds), true},
-        {"visibility_overlay.frustums=" + std::to_string(visibility_overlay_stats.build.frustums), true},
-        {"visibility_overlay.invalid_markers=" +
-             std::to_string(visibility_overlay_stats.build.invalid_markers),
-         true},
-        {"visibility_overlay.vertices=" + std::to_string(visibility_overlay_stats.build.vertices), true},
-        {"visibility_overlay.vertex_buffer_bytes=" +
-             std::to_string(visibility_overlay_stats.vertex_buffer_bytes),
-         true},
+    diagnostics.runtime_stats = {
+        makeRuntimeUIntStat("draws.submitted", m_last_draw_stats.submitted),
+        makeRuntimeUIntStat("draws.camera_visible", m_last_draw_stats.camera_visible),
+        makeRuntimeUIntStat("draws.camera_culled", m_last_draw_stats.camera_culled),
+        makeRuntimeUIntStat("draws.invalid_bounds", m_last_draw_stats.invalid_bounds),
+        makeRuntimeUIntStat("draws.shadow_unculled", m_last_draw_stats.shadow_unculled),
+        makeRuntimeUIntStat("draws.phase.depth_only", m_last_draw_stats.phase_depth_only),
+        makeRuntimeUIntStat("draws.phase.gbuffer", m_last_draw_stats.phase_gbuffer),
+        makeRuntimeUIntStat("draws.phase.forward_opaque", m_last_draw_stats.phase_forward_opaque),
+        makeRuntimeUIntStat("draws.phase.transparent", m_last_draw_stats.phase_transparent),
+        makeRuntimeUIntStat("draws.phase.shadow_caster", m_last_draw_stats.phase_shadow_caster),
+        makeRuntimeUIntStat("draws.phase.picking", m_last_draw_stats.phase_picking),
+        makeRuntimeBoolStat("visibility_debug.visible_enabled", m_visibility_debug.show_visible_bounds),
+        makeRuntimeBoolStat("visibility_debug.culled_enabled", m_visibility_debug.show_culled_bounds),
+        makeRuntimeBoolStat("visibility_debug.frustum_enabled", m_visibility_debug.show_culling_frustum),
+        makeRuntimeBoolStat("visibility_debug.culling_camera_frozen", m_visibility_debug.freeze_culling_camera),
+        makeRuntimeBoolStat("visibility_debug.has_frozen_culling_camera", m_has_frozen_culling_camera),
+        makeRuntimeUIntStat("visibility_debug.captured", m_last_visibility_debug_stats.captured),
+        makeRuntimeUIntStat("visibility_debug.camera_visible", m_last_visibility_debug_stats.camera_visible),
+        makeRuntimeUIntStat("visibility_debug.camera_culled", m_last_visibility_debug_stats.camera_culled),
+        makeRuntimeUIntStat("visibility_debug.invalid_bounds", m_last_visibility_debug_stats.invalid_bounds),
+        makeRuntimeUIntStat("visibility_debug.culling_frustums", m_last_visibility_debug_stats.culling_frustums),
+        makeRuntimeBoolStat("visibility_overlay.resources_ready", visibility_overlay_stats.resources_ready),
+        makeRuntimeUIntStat("visibility_overlay.items", visibility_overlay_stats.build.items),
+        makeRuntimeUIntStat("visibility_overlay.bounds", visibility_overlay_stats.build.bounds),
+        makeRuntimeUIntStat("visibility_overlay.frustums", visibility_overlay_stats.build.frustums),
+        makeRuntimeUIntStat("visibility_overlay.invalid_markers", visibility_overlay_stats.build.invalid_markers),
+        makeRuntimeUIntStat("visibility_overlay.vertices", visibility_overlay_stats.build.vertices),
+        makeRuntimeUIntStat("visibility_overlay.vertex_buffer_bytes", visibility_overlay_stats.vertex_buffer_bytes),
     };
     return diagnostics;
 }
@@ -373,12 +385,16 @@ void Feature::prepareFrame(const RenderWorld& world,
         m_last_visibility_debug_stats.culling_frustums);
     if (!m_has_logged_draw_stats || !drawStatsEqual(m_last_draw_stats, m_last_logged_draw_stats)) {
         LUNA_RENDERER_DEBUG("Scene draw culling stats: submitted={} camera_visible={} camera_culled={} "
-                            "invalid_bounds={} shadow_unculled={}",
+                            "invalid_bounds={} shadow_unculled={} gbuffer={} transparent={} shadow={} picking={}",
                             m_last_draw_stats.submitted,
                             m_last_draw_stats.camera_visible,
                             m_last_draw_stats.camera_culled,
                             m_last_draw_stats.invalid_bounds,
-                            m_last_draw_stats.shadow_unculled);
+                            m_last_draw_stats.shadow_unculled,
+                            m_last_draw_stats.phase_gbuffer,
+                            m_last_draw_stats.phase_transparent,
+                            m_last_draw_stats.phase_shadow_caster,
+                            m_last_draw_stats.phase_picking);
         m_last_logged_draw_stats = m_last_draw_stats;
         m_has_logged_draw_stats = true;
     }

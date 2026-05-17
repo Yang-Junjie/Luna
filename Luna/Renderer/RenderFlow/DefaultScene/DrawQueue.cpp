@@ -6,77 +6,8 @@
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 
 #include <algorithm>
-#include <array>
-#include <cmath>
 
 namespace luna::render_flow::default_scene {
-namespace {
-
-std::array<glm::vec3, 8> perspectiveFrustumCorners(const Camera& camera, float aspect_ratio)
-{
-    const Camera::PerspectiveSettings& settings = camera.getPerspectiveSettings();
-    const float near_distance = settings.near_clip;
-    const float far_distance = settings.far_clip;
-    const float tan_half_fov = std::tan(settings.vertical_fov_radians * 0.5f);
-    const float near_half_height = tan_half_fov * near_distance;
-    const float near_half_width = near_half_height * aspect_ratio;
-    const float far_half_height = tan_half_fov * far_distance;
-    const float far_half_width = far_half_height * aspect_ratio;
-
-    const glm::vec3 position = camera.getPosition();
-    const glm::vec3 forward = camera.getForwardDirection();
-    const glm::vec3 right = camera.getRightDirection();
-    const glm::vec3 up = camera.getUpDirection();
-    const glm::vec3 near_center = position + forward * near_distance;
-    const glm::vec3 far_center = position + forward * far_distance;
-
-    return {{
-        near_center - right * near_half_width - up * near_half_height,
-        near_center + right * near_half_width - up * near_half_height,
-        near_center + right * near_half_width + up * near_half_height,
-        near_center - right * near_half_width + up * near_half_height,
-        far_center - right * far_half_width - up * far_half_height,
-        far_center + right * far_half_width - up * far_half_height,
-        far_center + right * far_half_width + up * far_half_height,
-        far_center - right * far_half_width + up * far_half_height,
-    }};
-}
-
-std::array<glm::vec3, 8> orthographicFrustumCorners(const Camera& camera, float aspect_ratio)
-{
-    const Camera::OrthographicSettings& settings = camera.getOrthographicSettings();
-    const float half_height = settings.vertical_size * 0.5f;
-    const float half_width = half_height * aspect_ratio;
-
-    const glm::vec3 position = camera.getPosition();
-    const glm::vec3 forward = camera.getForwardDirection();
-    const glm::vec3 right = camera.getRightDirection();
-    const glm::vec3 up = camera.getUpDirection();
-    const glm::vec3 near_center = position + forward * settings.near_clip;
-    const glm::vec3 far_center = position + forward * settings.far_clip;
-
-    return {{
-        near_center - right * half_width - up * half_height,
-        near_center + right * half_width - up * half_height,
-        near_center + right * half_width + up * half_height,
-        near_center - right * half_width + up * half_height,
-        far_center - right * half_width - up * half_height,
-        far_center + right * half_width - up * half_height,
-        far_center + right * half_width + up * half_height,
-        far_center - right * half_width + up * half_height,
-    }};
-}
-
-std::array<glm::vec3, 8> frustumCorners(const Camera& camera, float aspect_ratio)
-{
-    const float clamped_aspect_ratio = std::max(aspect_ratio, 0.001f);
-    if (camera.getProjectionType() == Camera::ProjectionType::Orthographic) {
-        return orthographicFrustumCorners(camera, clamped_aspect_ratio);
-    }
-    return perspectiveFrustumCorners(camera, clamped_aspect_ratio);
-}
-
-} // namespace
 
 void DrawQueue::beginScene(const Camera& camera,
                            float aspect_ratio,
@@ -113,6 +44,9 @@ void DrawQueue::clear() noexcept
     }
     m_all_draw_commands.clear();
     m_camera_visible_draw_commands.clear();
+    for (auto& draw_commands : m_draw_commands_by_phase) {
+        draw_commands.clear();
+    }
     m_visibility_debug_items.clear();
     m_visibility_debug_frustums.clear();
     m_visibility_debug_stats = {};
@@ -154,6 +88,7 @@ void DrawQueue::submitDrawPacket(const RenderDrawPacket& packet)
 
     if (m_culling_frustum.intersects(packet.world_bounds)) {
         m_camera_visible_draw_commands.push_back(packet);
+        cacheDrawCommandForPhases(packet, true);
         ++m_stats.camera_visible;
         captureVisibilityDebugItem(packet,
                                    invalid_bounds ? VisibilityDebugClassification::InvalidBounds
@@ -162,6 +97,7 @@ void DrawQueue::submitDrawPacket(const RenderDrawPacket& packet)
     }
 
     ++m_stats.camera_culled;
+    cacheDrawCommandForPhases(packet, false);
     captureVisibilityDebugItem(packet, VisibilityDebugClassification::CameraCulled);
 }
 
@@ -170,17 +106,9 @@ const std::vector<DrawCommand>& DrawQueue::drawCommands() const noexcept
     return m_camera_visible_draw_commands;
 }
 
-std::vector<DrawCommand> DrawQueue::drawCommands(RenderPhase phase) const
+const std::vector<DrawCommand>& DrawQueue::drawCommands(RenderPhase phase) const noexcept
 {
-    const std::vector<DrawCommand>& source =
-        phase == RenderPhase::ShadowCaster ? m_all_draw_commands : m_camera_visible_draw_commands;
-    std::vector<DrawCommand> commands;
-    for (const auto& command : source) {
-        if (hasRenderPhase(command.phases, phase)) {
-            commands.push_back(command);
-        }
-    }
-    return commands;
+    return m_draw_commands_by_phase[static_cast<std::size_t>(phase)];
 }
 
 void DrawQueue::sortBackToFront(std::vector<DrawCommand>& draw_commands) const
@@ -194,6 +122,40 @@ void DrawQueue::sortBackToFront(std::vector<DrawCommand>& draw_commands) const
         });
 }
 
+void DrawQueue::cacheDrawCommandForPhases(const RenderDrawPacket& packet, bool camera_visible)
+{
+    for (std::size_t phase_index = 0; phase_index < m_draw_commands_by_phase.size(); ++phase_index) {
+        const RenderPhase phase = static_cast<RenderPhase>(phase_index);
+        if (!hasRenderPhase(packet.phases, phase)) {
+            continue;
+        }
+        if (!camera_visible && phase != RenderPhase::ShadowCaster) {
+            continue;
+        }
+        m_draw_commands_by_phase[phase_index].push_back(packet);
+        switch (phase) {
+            case RenderPhase::DepthOnly:
+                ++m_stats.phase_depth_only;
+                break;
+            case RenderPhase::GBuffer:
+                ++m_stats.phase_gbuffer;
+                break;
+            case RenderPhase::ForwardOpaque:
+                ++m_stats.phase_forward_opaque;
+                break;
+            case RenderPhase::Transparent:
+                ++m_stats.phase_transparent;
+                break;
+            case RenderPhase::ShadowCaster:
+                ++m_stats.phase_shadow_caster;
+                break;
+            case RenderPhase::Picking:
+                ++m_stats.phase_picking;
+                break;
+        }
+    }
+}
+
 void DrawQueue::captureVisibilityDebugFrustum(const Camera& camera, float aspect_ratio)
 {
     if (!m_visibility_debug_options.capture_culling_frustum) {
@@ -201,7 +163,7 @@ void DrawQueue::captureVisibilityDebugFrustum(const Camera& camera, float aspect
     }
 
     m_visibility_debug_frustums.push_back(VisibilityDebugFrustumItem{
-        .corners = frustumCorners(camera, aspect_ratio),
+        .corners = cameraFrustumCorners(camera, aspect_ratio),
         .color = m_visibility_debug_options.culling_frustum_frozen ? glm::vec4{0.35f, 0.72f, 1.0f, 0.96f}
                                                                    : glm::vec4{0.12f, 0.58f, 1.0f, 0.82f},
         .frozen = m_visibility_debug_options.culling_frustum_frozen,
