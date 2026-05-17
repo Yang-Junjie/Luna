@@ -3,6 +3,7 @@
 #include "RenderProfilerPlugin.h"
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <initializer_list>
 #include <iomanip>
@@ -26,6 +27,14 @@ struct CullingProfileStats {
     uint64_t submitted{0};
     uint64_t camera_visible{0};
     uint64_t camera_culled{0};
+    uint64_t shadow_candidate_casters{0};
+    uint64_t shadow_unique_visible{0};
+    uint64_t shadow_unique_culled{0};
+    uint64_t shadow_cascade_visible{0};
+    uint64_t shadow_cascade_culled{0};
+    uint64_t shadow_cascade_count{0};
+    std::array<uint64_t, 4> shadow_cascade_visible_by_index{};
+    std::array<uint64_t, 4> shadow_cascade_culled_by_index{};
     bool available{false};
 };
 
@@ -76,6 +85,34 @@ void assignCullingProfileStat(CullingProfileStats& stats, const luna::editor::Re
         stats.camera_visible = stat.uint_value;
     } else if (name == "draws.camera_culled") {
         stats.camera_culled = stat.uint_value;
+    } else if (name == "shadow.culling.candidate_casters") {
+        stats.shadow_candidate_casters = stat.uint_value;
+    } else if (name == "shadow.culling.unique_visible") {
+        stats.shadow_unique_visible = stat.uint_value;
+    } else if (name == "shadow.culling.unique_culled") {
+        stats.shadow_unique_culled = stat.uint_value;
+    } else if (name == "shadow.culling.cascade_visible") {
+        stats.shadow_cascade_visible = stat.uint_value;
+    } else if (name == "shadow.culling.cascade_culled") {
+        stats.shadow_cascade_culled = stat.uint_value;
+    } else if (name == "shadow.culling.cascade_count") {
+        stats.shadow_cascade_count = stat.uint_value;
+    } else if (name == "shadow.culling.cascade0.visible") {
+        stats.shadow_cascade_visible_by_index[0] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade0.culled") {
+        stats.shadow_cascade_culled_by_index[0] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade1.visible") {
+        stats.shadow_cascade_visible_by_index[1] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade1.culled") {
+        stats.shadow_cascade_culled_by_index[1] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade2.visible") {
+        stats.shadow_cascade_visible_by_index[2] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade2.culled") {
+        stats.shadow_cascade_culled_by_index[2] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade3.visible") {
+        stats.shadow_cascade_visible_by_index[3] = stat.uint_value;
+    } else if (name == "shadow.culling.cascade3.culled") {
+        stats.shadow_cascade_culled_by_index[3] = stat.uint_value;
     }
 }
 
@@ -405,6 +442,23 @@ public:
                         ui.keyValue("Visible / Culled",
                                     formatUInt64(culling_stats.camera_visible) + " / " +
                                         formatUInt64(culling_stats.camera_culled));
+                        ui.keyValue("Shadow Candidates", formatUInt64(culling_stats.shadow_candidate_casters));
+                        ui.keyValue("Shadow Unique Visible / Culled",
+                                    formatUInt64(culling_stats.shadow_unique_visible) + " / " +
+                                        formatUInt64(culling_stats.shadow_unique_culled));
+                        ui.keyValue("Shadow Visible / Culled",
+                                    formatUInt64(culling_stats.shadow_cascade_visible) + " / " +
+                                        formatUInt64(culling_stats.shadow_cascade_culled));
+                        ui.keyValue("Shadow Cascades", formatUInt64(culling_stats.shadow_cascade_count));
+                        const uint64_t cascade_count =
+                            (std::min)(culling_stats.shadow_cascade_count,
+                                       static_cast<uint64_t>(culling_stats.shadow_cascade_visible_by_index.size()));
+                        for (uint64_t cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
+                            ui.keyValue("Shadow Cascade " + formatUInt(static_cast<uint32_t>(cascade_index)),
+                                        formatUInt64(culling_stats.shadow_cascade_visible_by_index[cascade_index]) +
+                                            " / " +
+                                            formatUInt64(culling_stats.shadow_cascade_culled_by_index[cascade_index]));
+                        }
                         ui.endPanel();
                     }
 

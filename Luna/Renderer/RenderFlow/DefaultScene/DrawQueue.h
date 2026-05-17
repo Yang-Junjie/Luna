@@ -48,6 +48,21 @@ enum class VisibilityDebugClassification : uint8_t {
     InvalidBounds,
 };
 
+enum class DrawPacketVisibility : uint8_t {
+    CameraVisible,
+    CameraCulled,
+};
+
+struct DrawPacketVisibilityResult {
+    DrawPacketVisibility visibility{DrawPacketVisibility::CameraVisible};
+    bool invalid_bounds{false};
+
+    [[nodiscard]] bool cameraVisible() const noexcept
+    {
+        return visibility == DrawPacketVisibility::CameraVisible;
+    }
+};
+
 struct VisibilityDebugCaptureOptions {
     bool capture_visible_bounds{false};
     bool capture_culled_bounds{false};
@@ -94,6 +109,7 @@ public:
                     float culling_aspect_ratio,
                     VisibilityDebugCaptureOptions visibility_debug_options = {});
     void clear() noexcept;
+    void reserveForFrame(const DrawQueueStats& previous_stats);
 
     void submitDrawPacket(const RenderDrawPacket& packet);
 
@@ -130,6 +146,9 @@ public:
 private:
     static constexpr std::size_t kRenderPhaseCount = static_cast<std::size_t>(RenderPhase::Picking) + 1u;
 
+    [[nodiscard]] bool validateDrawPacket(const RenderDrawPacket& packet) const;
+    [[nodiscard]] DrawPacketVisibilityResult classifyDrawPacketVisibility(const RenderDrawPacket& packet) const;
+    void recordDrawPacketVisibility(const RenderDrawPacket& packet, const DrawPacketVisibilityResult& visibility);
     void cacheDrawCommandForPhases(const RenderDrawPacket& packet, bool camera_visible);
     void captureVisibilityDebugFrustum(const Camera& camera, float aspect_ratio);
     void captureVisibilityDebugItem(const RenderDrawPacket& packet,
@@ -138,7 +157,6 @@ private:
     Camera m_camera{};
     Camera m_culling_camera{};
     Frustum m_culling_frustum{};
-    std::vector<DrawCommand> m_all_draw_commands;
     std::vector<DrawCommand> m_camera_visible_draw_commands;
     std::array<std::vector<DrawCommand>, kRenderPhaseCount> m_draw_commands_by_phase;
     std::vector<VisibilityDebugItem> m_visibility_debug_items;

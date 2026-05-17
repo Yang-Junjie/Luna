@@ -5,6 +5,8 @@
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 
+#include <array>
+
 namespace luna {
 class Material;
 class RenderWorld;
@@ -30,6 +32,17 @@ struct ShadowResources {
     render_flow::default_scene_detail::ShadowRenderParams render_params{};
 };
 
+struct ShadowCullingStats {
+    uint32_t candidate_casters{0};
+    uint32_t unique_visible{0};
+    uint32_t unique_culled{0};
+    uint32_t cascade_visible{0};
+    uint32_t cascade_culled{0};
+    uint32_t cascade_count{0};
+    std::array<uint32_t, render_flow::default_scene_detail::kShadowCascadeCount> cascade_visible_by_index{};
+    std::array<uint32_t, render_flow::default_scene_detail::kShadowCascadeCount> cascade_culled_by_index{};
+};
+
 class PassSharedState final {
 public:
     PassSharedState(AssetCache& assets,
@@ -49,6 +62,8 @@ public:
     [[nodiscard]] const RenderFeatureFrameContext* frameContext() const noexcept;
     void setShadowParams(const render_flow::default_scene_detail::ShadowRenderParams& shadow_params) noexcept;
     [[nodiscard]] const render_flow::default_scene_detail::ShadowRenderParams& shadowParams() const noexcept;
+    void setShadowCullingStats(const ShadowCullingStats& stats) noexcept;
+    [[nodiscard]] const ShadowCullingStats& shadowCullingStats() const noexcept;
 
 private:
     AssetCache* m_assets{nullptr};
@@ -60,6 +75,7 @@ private:
     RenderFeatureFrameContext m_frame_context{};
     bool m_has_frame_context{false};
     render_flow::default_scene_detail::ShadowRenderParams m_shadow_params{};
+    ShadowCullingStats m_shadow_culling_stats{};
 };
 
 } // namespace luna::render_flow::default_scene

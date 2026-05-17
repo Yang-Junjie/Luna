@@ -71,4 +71,14 @@ const render_flow::default_scene_detail::ShadowRenderParams& PassSharedState::sh
     return m_shadow_params;
 }
 
+void PassSharedState::setShadowCullingStats(const ShadowCullingStats& stats) noexcept
+{
+    m_shadow_culling_stats = stats;
+}
+
+const ShadowCullingStats& PassSharedState::shadowCullingStats() const noexcept
+{
+    return m_shadow_culling_stats;
+}
+
 } // namespace luna::render_flow::default_scene

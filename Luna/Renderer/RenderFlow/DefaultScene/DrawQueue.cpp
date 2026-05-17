@@ -33,16 +33,14 @@ void DrawQueue::beginScene(const Camera& camera,
 
 void DrawQueue::clear() noexcept
 {
-    if (!m_all_draw_commands.empty() || !m_camera_visible_draw_commands.empty() || !m_visibility_debug_items.empty() ||
+    if (!m_camera_visible_draw_commands.empty() || !m_visibility_debug_items.empty() ||
         !m_visibility_debug_frustums.empty()) {
         LUNA_RENDERER_FRAME_TRACE(
-            "Clearing draw queue: all_draws={} camera_visible_draws={} visibility_debug_items={} visibility_debug_frustums={}",
-            m_all_draw_commands.size(),
+            "Clearing draw queue: camera_visible_draws={} visibility_debug_items={} visibility_debug_frustums={}",
             m_camera_visible_draw_commands.size(),
             m_visibility_debug_items.size(),
             m_visibility_debug_frustums.size());
     }
-    m_all_draw_commands.clear();
     m_camera_visible_draw_commands.clear();
     for (auto& draw_commands : m_draw_commands_by_phase) {
         draw_commands.clear();
@@ -53,11 +51,55 @@ void DrawQueue::clear() noexcept
     m_stats = {};
 }
 
+void DrawQueue::reserveForFrame(const DrawQueueStats& previous_stats)
+{
+    m_camera_visible_draw_commands.reserve(previous_stats.camera_visible);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::DepthOnly)].reserve(
+        previous_stats.phase_depth_only);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::GBuffer)].reserve(previous_stats.phase_gbuffer);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::ForwardOpaque)].reserve(
+        previous_stats.phase_forward_opaque);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::Transparent)].reserve(
+        previous_stats.phase_transparent);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::ShadowCaster)].reserve(
+        previous_stats.phase_shadow_caster);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::Picking)].reserve(previous_stats.phase_picking);
+    uint32_t debug_item_capacity = 0;
+    if (m_visibility_debug_options.capture_visible_bounds) {
+        debug_item_capacity += previous_stats.camera_visible;
+    }
+    if (m_visibility_debug_options.capture_culled_bounds) {
+        debug_item_capacity += previous_stats.camera_culled;
+    }
+    if (debug_item_capacity > 0) {
+        m_visibility_debug_items.reserve(debug_item_capacity);
+    }
+}
+
 void DrawQueue::submitDrawPacket(const RenderDrawPacket& packet)
+{
+    if (!validateDrawPacket(packet)) {
+        return;
+    }
+
+    ++m_stats.submitted;
+    if (hasRenderPhase(packet.phases, RenderPhase::ShadowCaster)) {
+        ++m_stats.shadow_unculled;
+    }
+
+    const DrawPacketVisibilityResult visibility = classifyDrawPacketVisibility(packet);
+    if (visibility.invalid_bounds) {
+        ++m_stats.invalid_bounds;
+    }
+
+    recordDrawPacketVisibility(packet, visibility);
+}
+
+bool DrawQueue::validateDrawPacket(const RenderDrawPacket& packet) const
 {
     if (!packet.mesh || !packet.mesh->isValid()) {
         LUNA_RENDERER_WARN("Ignoring draw packet because mesh is null or invalid");
-        return;
+        return false;
     }
 
     const auto& sub_meshes = packet.mesh->getSubMeshes();
@@ -65,34 +107,38 @@ void DrawQueue::submitDrawPacket(const RenderDrawPacket& packet)
         LUNA_RENDERER_WARN("Ignoring draw packet because submesh {} is out of range for mesh '{}'",
                            packet.submesh_index,
                            packet.mesh->getName());
-        return;
+        return false;
     }
 
     const auto& sub_mesh = sub_meshes[packet.submesh_index];
     if (sub_mesh.Vertices.empty() || sub_mesh.Indices.empty()) {
         LUNA_RENDERER_FRAME_TRACE(
             "Skipping empty draw packet submesh {} from mesh '{}'", packet.submesh_index, packet.mesh->getName());
-        return;
+        return false;
     }
 
-    m_all_draw_commands.push_back(packet);
-    ++m_stats.submitted;
-    if (hasRenderPhase(packet.phases, RenderPhase::ShadowCaster)) {
-        ++m_stats.shadow_unculled;
-    }
+    return true;
+}
 
-    const bool invalid_bounds = !packet.world_bounds.isValid();
-    if (invalid_bounds) {
-        ++m_stats.invalid_bounds;
-    }
+DrawPacketVisibilityResult DrawQueue::classifyDrawPacketVisibility(const RenderDrawPacket& packet) const
+{
+    DrawPacketVisibilityResult result{};
+    result.invalid_bounds = !packet.world_bounds.isValid();
+    result.visibility = m_culling_frustum.intersects(packet.world_bounds) ? DrawPacketVisibility::CameraVisible
+                                                                          : DrawPacketVisibility::CameraCulled;
+    return result;
+}
 
-    if (m_culling_frustum.intersects(packet.world_bounds)) {
+void DrawQueue::recordDrawPacketVisibility(const RenderDrawPacket& packet,
+                                           const DrawPacketVisibilityResult& visibility)
+{
+    if (visibility.cameraVisible()) {
         m_camera_visible_draw_commands.push_back(packet);
         cacheDrawCommandForPhases(packet, true);
         ++m_stats.camera_visible;
         captureVisibilityDebugItem(packet,
-                                   invalid_bounds ? VisibilityDebugClassification::InvalidBounds
-                                                  : VisibilityDebugClassification::CameraVisible);
+                                   visibility.invalid_bounds ? VisibilityDebugClassification::InvalidBounds
+                                                             : VisibilityDebugClassification::CameraVisible);
         return;
     }
 

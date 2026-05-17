@@ -12,6 +12,7 @@
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
+#include "Renderer/Visibility/Frustum.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -24,6 +25,8 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -316,6 +319,31 @@ glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
     return adjustProjectionForConventions(projection, conventions) * view;
 }
 
+void collectShadowCasterDrawCommandsForCascade(const std::vector<DrawCommand>& shadow_draw_commands,
+                                               const Frustum& shadow_frustum,
+                                               uint32_t cascade_index,
+                                               std::vector<DrawCommand>& cascade_visible_draw_commands,
+                                               std::vector<DrawCommand>& unique_visible_draw_commands,
+                                               std::unordered_set<const DrawCommand*>& unique_visible_draw_command_ids,
+                                               ShadowCullingStats& stats)
+{
+    cascade_visible_draw_commands.clear();
+    cascade_visible_draw_commands.reserve(shadow_draw_commands.size());
+    for (const DrawCommand& draw_command : shadow_draw_commands) {
+        if (shadow_frustum.intersects(draw_command.world_bounds)) {
+            cascade_visible_draw_commands.push_back(draw_command);
+            ++stats.cascade_visible;
+            ++stats.cascade_visible_by_index[cascade_index];
+            if (unique_visible_draw_command_ids.insert(&draw_command).second) {
+                unique_visible_draw_commands.push_back(draw_command);
+            }
+        } else {
+            ++stats.cascade_culled;
+            ++stats.cascade_culled_by_index[cascade_index];
+        }
+    }
+}
+
 render_flow::default_scene_detail::ShadowRenderParams
     buildDirectionalShadowParams(const RenderWorld* world, const SceneRenderContext& context, const DrawQueue& draw_queue)
 {
@@ -416,6 +444,8 @@ std::span<const RenderPassResourceUsage> ShadowDepthPass::resourceUsages() const
 
 void ShadowDepthPass::setup(RenderPassContext& context)
 {
+    m_state->setShadowCullingStats({});
+
     const render_flow::default_scene_detail::ShadowRenderParams render_params =
         buildDirectionalShadowParams(m_state->world(), context.sceneContext(), m_state->drawQueue());
     const uint32_t shadow_count = static_cast<uint32_t>(render_params.params.z + 0.5f);
@@ -474,8 +504,41 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
         return;
     }
 
+    ShadowCullingStats shadow_culling_stats{};
+    shadow_culling_stats.candidate_casters = static_cast<uint32_t>(
+        (std::min)(shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    const uint32_t shadow_count =
+        (std::min)(static_cast<uint32_t>(m_state->shadowParams().params.z + 0.5f),
+                   render_flow::default_scene_detail::kShadowCascadeCount);
+    shadow_culling_stats.cascade_count = shadow_count;
+    const uint32_t cascade_size = csmCascadeSize(m_state->world());
+    const uint32_t pcf_map_size = pcfShadowMapSize(m_state->world());
+    std::array<std::vector<DrawCommand>, render_flow::default_scene_detail::kShadowCascadeCount>
+        cascade_shadow_draw_commands_by_index;
+    std::vector<DrawCommand> unique_visible_shadow_draw_commands;
+    unique_visible_shadow_draw_commands.reserve(shadow_draw_commands.size());
+    std::unordered_set<const DrawCommand*> unique_visible_shadow_draw_command_ids;
+    unique_visible_shadow_draw_command_ids.reserve(shadow_draw_commands.size());
+    for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
+        const Frustum shadow_frustum =
+            Frustum::fromViewProjection(m_state->shadowParams().view_projections[cascade_index]);
+        collectShadowCasterDrawCommandsForCascade(shadow_draw_commands,
+                                                  shadow_frustum,
+                                                  cascade_index,
+                                                  cascade_shadow_draw_commands_by_index[cascade_index],
+                                                  unique_visible_shadow_draw_commands,
+                                                  unique_visible_shadow_draw_command_ids,
+                                                  shadow_culling_stats);
+    }
+    shadow_culling_stats.unique_visible = static_cast<uint32_t>(
+        (std::min)(unique_visible_shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    shadow_culling_stats.unique_culled =
+        shadow_culling_stats.candidate_casters > shadow_culling_stats.unique_visible
+            ? shadow_culling_stats.candidate_casters - shadow_culling_stats.unique_visible
+            : 0u;
+
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, shadow_draw_commands, default_material, AssetCache::Bindings{
+    assets.prepareDraws(commands, unique_visible_shadow_draw_commands, default_material, AssetCache::Bindings{
         .device = pipelines.device(),
         .descriptor_pool = pipelines.descriptorPool(),
         .material_layout = pipelines.materialLayout(),
@@ -484,11 +547,6 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     size_t recorded_draw_count = 0;
-    const uint32_t shadow_count =
-        (std::min)(static_cast<uint32_t>(m_state->shadowParams().params.z + 0.5f),
-                   render_flow::default_scene_detail::kShadowCascadeCount);
-    const uint32_t cascade_size = csmCascadeSize(m_state->world());
-    const uint32_t pcf_map_size = pcfShadowMapSize(m_state->world());
     for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
         if (shadow_count <= 1u) {
             configurePcfViewportAndScissor(commands, pcf_map_size);
@@ -496,12 +554,22 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
             configureCascadeViewportAndScissor(commands, cascade_index, cascade_size);
         }
         recorded_draw_count +=
-            recordShadowDrawCommands(commands, pass_resources, shadow_draw_commands, assets, default_material, cascade_index);
+            recordShadowDrawCommands(commands,
+                                     pass_resources,
+                                     cascade_shadow_draw_commands_by_index[cascade_index],
+                                     assets,
+                                     default_material,
+                                     cascade_index);
     }
-    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} draw command(s) across {} cascade(s)",
+    m_state->setShadowCullingStats(shadow_culling_stats);
+    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} cascade-visible shadow candidate(s), unique visible {}, unique culled {}, cascade-culled {} from {} caster command(s) across {} cascade(s)",
                               recorded_draw_count,
-                              shadow_draw_commands.size() * shadow_count,
-                              shadow_count);
+                              shadow_culling_stats.cascade_visible,
+                              shadow_culling_stats.unique_visible,
+                              shadow_culling_stats.unique_culled,
+                              shadow_culling_stats.cascade_culled,
+                              shadow_culling_stats.candidate_casters,
+                              shadow_culling_stats.cascade_count);
     pass_context.endRendering();
 }
 

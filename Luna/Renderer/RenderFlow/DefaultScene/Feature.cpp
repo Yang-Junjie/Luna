@@ -307,6 +307,7 @@ bool Feature::setParameter(std::string_view name, const RenderFeatureParameterVa
 RenderFeatureDiagnostics Feature::diagnostics() const
 {
     const VisibilityBoundsOverlayStats visibility_overlay_stats = m_visibility_bounds_overlay.stats();
+    const ShadowCullingStats shadow_culling_stats = m_scene_state.shadowCullingStats();
 
     RenderFeatureDiagnostics diagnostics{};
     diagnostics.runtime_stats = {
@@ -319,6 +320,20 @@ RenderFeatureDiagnostics Feature::diagnostics() const
         makeRuntimeUIntStat("draws.camera_culled", m_last_draw_stats.camera_culled),
         makeRuntimeUIntStat("draws.invalid_bounds", m_last_draw_stats.invalid_bounds),
         makeRuntimeUIntStat("draws.shadow_unculled", m_last_draw_stats.shadow_unculled),
+        makeRuntimeUIntStat("shadow.culling.candidate_casters", shadow_culling_stats.candidate_casters),
+        makeRuntimeUIntStat("shadow.culling.unique_visible", shadow_culling_stats.unique_visible),
+        makeRuntimeUIntStat("shadow.culling.unique_culled", shadow_culling_stats.unique_culled),
+        makeRuntimeUIntStat("shadow.culling.cascade_visible", shadow_culling_stats.cascade_visible),
+        makeRuntimeUIntStat("shadow.culling.cascade_culled", shadow_culling_stats.cascade_culled),
+        makeRuntimeUIntStat("shadow.culling.cascade_count", shadow_culling_stats.cascade_count),
+        makeRuntimeUIntStat("shadow.culling.cascade0.visible", shadow_culling_stats.cascade_visible_by_index[0]),
+        makeRuntimeUIntStat("shadow.culling.cascade0.culled", shadow_culling_stats.cascade_culled_by_index[0]),
+        makeRuntimeUIntStat("shadow.culling.cascade1.visible", shadow_culling_stats.cascade_visible_by_index[1]),
+        makeRuntimeUIntStat("shadow.culling.cascade1.culled", shadow_culling_stats.cascade_culled_by_index[1]),
+        makeRuntimeUIntStat("shadow.culling.cascade2.visible", shadow_culling_stats.cascade_visible_by_index[2]),
+        makeRuntimeUIntStat("shadow.culling.cascade2.culled", shadow_culling_stats.cascade_culled_by_index[2]),
+        makeRuntimeUIntStat("shadow.culling.cascade3.visible", shadow_culling_stats.cascade_visible_by_index[3]),
+        makeRuntimeUIntStat("shadow.culling.cascade3.culled", shadow_culling_stats.cascade_culled_by_index[3]),
         makeRuntimeUIntStat("draws.phase.depth_only", m_last_draw_stats.phase_depth_only),
         makeRuntimeUIntStat("draws.phase.gbuffer", m_last_draw_stats.phase_gbuffer),
         makeRuntimeUIntStat("draws.phase.forward_opaque", m_last_draw_stats.phase_forward_opaque),
@@ -390,6 +405,7 @@ void Feature::prepareFrame(const RenderWorld& world,
                                 .culling_frustum_frozen =
                                     m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera,
                             });
+    m_draw_queue.reserveForFrame(m_last_draw_stats);
     const auto submit_packets_begin = std::chrono::steady_clock::now();
     for (const auto& packet : world.drawPackets()) {
         m_draw_queue.submitDrawPacket(packet);
