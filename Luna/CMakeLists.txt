@@ -78,6 +78,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Feature.cpp
     Renderer/RenderFlow/DefaultScene/Constants.h
     Renderer/RenderFlow/DefaultScene/GpuTypes.h
+    Renderer/RenderFlow/DefaultScene/ShadowCascadeBounds.h
+    Renderer/RenderFlow/DefaultScene/ShadowCascadeBounds.cpp
     Renderer/RenderFlow/DefaultScene/PassResources.h
     Renderer/RenderFlow/DefaultScene/SharedState.h
     Renderer/RenderFlow/DefaultScene/SharedState.cpp

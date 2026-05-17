@@ -3,25 +3,23 @@
 #include "Core/Log.h"
 #include "Math/Math.h"
 #include "Renderer/Material.h"
-#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
-#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
+#include "Renderer/RenderFlow/DefaultScene/ShadowCascadeBounds.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/Visibility/Frustum.h"
 
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/geometric.hpp>
-#include <glm/gtx/norm.hpp>
+#include <cmath>
 
 #include <algorithm>
 #include <array>
-#include <cmath>
+#include <glm/geometric.hpp>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -36,8 +34,7 @@ constexpr std::array<RenderPassResourceUsage, 1> kShadowPassResources{{
 }};
 constexpr float kCascadeShadowDistance = 120.0f;
 constexpr float kCascadeSplitLambda = 0.55f;
-constexpr float kCascadeLightDepthPadding = 40.0f;
-constexpr float kCascadeBoundsPaddingScale = 1.08f;
+constexpr float kCascadeLightDepthPadding = 4.0f;
 constexpr float kCascadeOverlapScale = 0.12f;
 constexpr float kMinCascadeOverlap = 0.5f;
 constexpr float kMaxCascadeOverlap = 12.0f;
@@ -117,11 +114,6 @@ ShadowResources createDisabledShadowResources(RenderGraphBuilder& graph)
     };
 }
 
-glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
-{
-    return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
-}
-
 glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
 {
     const float length_squared = glm::dot(value, value);
@@ -160,26 +152,24 @@ float viewportAspectRatio(const SceneRenderContext& context)
         return 1.0f;
     }
 
-    return (std::max)(static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height),
-                      0.001f);
+    return std::max(static_cast<float>(context.framebuffer_width) / static_cast<float>(context.framebuffer_height),
+                    0.001f);
 }
 
-std::array<float, render_flow::default_scene_detail::kShadowCascadeCount>
-    calculateCascadeSplits(float near_clip, float far_clip)
+std::array<float, render_flow::default_scene_detail::kShadowCascadeCount> calculateCascadeSplits(float near_clip,
+                                                                                                 float far_clip)
 {
     std::array<float, render_flow::default_scene_detail::kShadowCascadeCount> splits{};
-    const float clamped_near = (std::max)(near_clip, 0.001f);
-    const float clamped_far = (std::max)(far_clip, clamped_near + 0.001f);
+    const float clamped_near = std::max(near_clip, 0.001f);
+    const float clamped_far = std::max(far_clip, clamped_near + 0.001f);
 
     for (uint32_t cascade_index = 0; cascade_index < render_flow::default_scene_detail::kShadowCascadeCount;
          ++cascade_index) {
-        const float split_ratio =
-            static_cast<float>(cascade_index + 1u) /
-            static_cast<float>(render_flow::default_scene_detail::kShadowCascadeCount);
+        const float split_ratio = static_cast<float>(cascade_index + 1u) /
+                                  static_cast<float>(render_flow::default_scene_detail::kShadowCascadeCount);
         const float linear_split = clamped_near + (clamped_far - clamped_near) * split_ratio;
         const float logarithmic_split = clamped_near * std::pow(clamped_far / clamped_near, split_ratio);
-        splits[cascade_index] =
-            kCascadeSplitLambda * logarithmic_split + (1.0f - kCascadeSplitLambda) * linear_split;
+        splits[cascade_index] = kCascadeSplitLambda * logarithmic_split + (1.0f - kCascadeSplitLambda) * linear_split;
     }
 
     splits.back() = clamped_far;
@@ -189,13 +179,13 @@ std::array<float, render_flow::default_scene_detail::kShadowCascadeCount>
 float calculatePcfBiasScale(float near_clip, float far_clip)
 {
     const auto csm_splits = calculateCascadeSplits(near_clip, far_clip);
-    const float first_cascade_span = (std::max)(csm_splits[0], 0.001f);
-    return std::sqrt((std::max)(far_clip / first_cascade_span, 1.0f));
+    const float first_cascade_span = std::max(csm_splits[0], 0.001f);
+    return std::sqrt(std::max(far_clip / first_cascade_span, 1.0f));
 }
 
 float calculateCascadeOverlap(float cascade_near, float cascade_far)
 {
-    const float cascade_span = (std::max)(cascade_far - cascade_near, 0.001f);
+    const float cascade_span = std::max(cascade_far - cascade_near, 0.001f);
     return std::clamp(cascade_span * kCascadeOverlapScale, kMinCascadeOverlap, kMaxCascadeOverlap);
 }
 
@@ -205,7 +195,7 @@ float pcfShadowDistance(const RenderWorld* world)
         return 40.0f;
     }
 
-    return (std::clamp)(world->shadowSettings().pcf_shadow_distance, 1.0f, 1000.0f);
+    return std::clamp(world->shadowSettings().pcf_shadow_distance, 1.0f, 1000.0f);
 }
 
 std::array<glm::vec3, 8>
@@ -264,61 +254,6 @@ std::array<glm::vec3, 8> orthographicFrustumCorners(const Camera& camera, float 
     return corners;
 }
 
-glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
-                                     const glm::vec3& light_direction,
-                                     const luna::RHI::RHIConventions& conventions,
-                                     uint32_t shadow_map_size)
-{
-    glm::vec3 center{0.0f};
-    for (const glm::vec3& corner : corners) {
-        center += corner;
-    }
-    center /= static_cast<float>(corners.size());
-
-    glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-    if (glm::length2(glm::cross(-light_direction, up)) <= 1.0e-6f) {
-        up = glm::vec3(0.0f, 0.0f, 1.0f);
-    }
-
-    const glm::mat4 view = glm::lookAtRH(center + light_direction, center, up);
-    glm::vec3 min_bounds{std::numeric_limits<float>::max()};
-    glm::vec3 max_bounds{std::numeric_limits<float>::lowest()};
-    for (const glm::vec3& corner : corners) {
-        const glm::vec3 light_space_corner = glm::vec3(view * glm::vec4(corner, 1.0f));
-        min_bounds = glm::min(min_bounds, light_space_corner);
-        max_bounds = glm::max(max_bounds, light_space_corner);
-    }
-
-    const glm::vec2 bounds_center = (glm::vec2(min_bounds) + glm::vec2(max_bounds)) * 0.5f;
-    const glm::vec2 half_extent = (glm::vec2(max_bounds) - glm::vec2(min_bounds)) * (0.5f * kCascadeBoundsPaddingScale);
-    min_bounds.x = bounds_center.x - half_extent.x;
-    max_bounds.x = bounds_center.x + half_extent.x;
-    min_bounds.y = bounds_center.y - half_extent.y;
-    max_bounds.y = bounds_center.y + half_extent.y;
-
-    const float cascade_width = max_bounds.x - min_bounds.x;
-    const float cascade_height = max_bounds.y - min_bounds.y;
-    const float texel_size_x = cascade_width / static_cast<float>((std::max)(shadow_map_size, 1u));
-    const float texel_size_y = cascade_height / static_cast<float>((std::max)(shadow_map_size, 1u));
-    if (texel_size_x > 0.0f && texel_size_y > 0.0f) {
-        const glm::vec2 snapped_center{
-            std::floor(bounds_center.x / texel_size_x) * texel_size_x,
-            std::floor(bounds_center.y / texel_size_y) * texel_size_y,
-        };
-        min_bounds.x = snapped_center.x - half_extent.x;
-        max_bounds.x = snapped_center.x + half_extent.x;
-        min_bounds.y = snapped_center.y - half_extent.y;
-        max_bounds.y = snapped_center.y + half_extent.y;
-    }
-
-    min_bounds.z -= kCascadeLightDepthPadding;
-    max_bounds.z += kCascadeLightDepthPadding;
-
-    const glm::mat4 projection =
-        glm::orthoRH_ZO(min_bounds.x, max_bounds.x, min_bounds.y, max_bounds.y, -max_bounds.z, -min_bounds.z);
-    return adjustProjectionForConventions(projection, conventions) * view;
-}
-
 void collectShadowCasterDrawCommandsForCascade(const std::vector<DrawCommand>& shadow_draw_commands,
                                                const Frustum& shadow_frustum,
                                                uint32_t cascade_index,
@@ -344,8 +279,24 @@ void collectShadowCasterDrawCommandsForCascade(const std::vector<DrawCommand>& s
     }
 }
 
-render_flow::default_scene_detail::ShadowRenderParams
-    buildDirectionalShadowParams(const RenderWorld* world, const SceneRenderContext& context, const DrawQueue& draw_queue)
+glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
+                                     const glm::vec3& light_direction,
+                                     const luna::RHI::RHIConventions& conventions,
+                                     uint32_t shadow_map_size,
+                                     const std::vector<DrawCommand>& shadow_draw_commands)
+{
+    render_flow::default_scene_detail::ShadowCascadeLightBounds bounds =
+        render_flow::default_scene_detail::buildShadowCascadeReceiverBounds(corners, light_direction, shadow_map_size);
+    for (const DrawCommand& draw_command : shadow_draw_commands) {
+        (void)render_flow::default_scene_detail::expandShadowCascadeDepthForCaster(bounds, draw_command.world_bounds);
+    }
+    render_flow::default_scene_detail::padShadowCascadeDepth(bounds, kCascadeLightDepthPadding);
+    return render_flow::default_scene_detail::buildShadowCascadeViewProjection(bounds, conventions);
+}
+
+render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowParams(const RenderWorld* world,
+                                                                                   const SceneRenderContext& context,
+                                                                                   const DrawQueue& draw_queue)
 {
     render_flow::default_scene_detail::ShadowRenderParams params{};
     params.params = glm::vec4(0.0f,
@@ -365,6 +316,7 @@ render_flow::default_scene_detail::ShadowRenderParams
     const glm::vec3 light_direction = safeNormalize(light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
     const Camera& camera = world->camera();
     const float aspect_ratio = viewportAspectRatio(context);
+    const std::vector<DrawCommand>& shadow_draw_commands = draw_queue.drawCommands(luna::RenderPhase::ShadowCaster);
     const RenderShadowMode shadow_mode = world->shadowSettings().mode;
     const uint32_t shadow_count =
         shadow_mode == RenderShadowMode::PcfShadowMap ? 1u : render_flow::default_scene_detail::kShadowCascadeCount;
@@ -378,14 +330,14 @@ render_flow::default_scene_detail::ShadowRenderParams
 
     if (camera.getProjectionType() == Camera::ProjectionType::Perspective) {
         const auto& perspective = camera.getPerspectiveSettings();
-        const float near_clip = (std::max)(perspective.near_clip, 0.001f);
+        const float near_clip = std::max(perspective.near_clip, 0.001f);
         const float far_clip = shadow_mode == RenderShadowMode::PcfShadowMap
-                                   ? (std::min)(perspective.far_clip, pcfShadowDistance(world))
-                                   : (std::min)(perspective.far_clip, kCascadeShadowDistance);
+                                   ? std::min(perspective.far_clip, pcfShadowDistance(world))
+                                   : std::min(perspective.far_clip, kCascadeShadowDistance);
         if (shadow_mode == RenderShadowMode::PcfShadowMap) {
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, near_clip, far_clip);
-            params.view_projections[0] =
-                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
+            params.view_projections[0] = buildCascadeViewProjection(
+                corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
             params.cascade_splits[0] = far_clip;
             params.params.y = kShadowDepthBias * calculatePcfBiasScale(near_clip, far_clip);
             params.params.x = 1.0f;
@@ -399,25 +351,24 @@ render_flow::default_scene_detail::ShadowRenderParams
             const float cascade_far = splits[cascade_index];
             const float overlap = calculateCascadeOverlap(cascade_near, cascade_far);
             const float shadow_near =
-                cascade_index == 0u ? cascade_near : (std::max)(near_clip, cascade_near - overlap);
+                cascade_index == 0u ? cascade_near : std::max(near_clip, cascade_near - overlap);
             const float shadow_far =
-                cascade_index + 1u >= shadow_count ? cascade_far : (std::min)(far_clip, cascade_far + overlap);
+                cascade_index + 1u >= shadow_count ? cascade_far : std::min(far_clip, cascade_far + overlap);
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, shadow_near, shadow_far);
-            params.view_projections[cascade_index] =
-                buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
+            params.view_projections[cascade_index] = buildCascadeViewProjection(
+                corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
             params.cascade_splits[cascade_index] = cascade_far;
             cascade_near = cascade_far;
         }
     } else {
         const auto corners = orthographicFrustumCorners(camera, aspect_ratio);
-        const glm::mat4 view_projection =
-            buildCascadeViewProjection(corners, light_direction, context.capabilities.conventions, shadow_map_size);
+        const glm::mat4 view_projection = buildCascadeViewProjection(
+            corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
         for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
             params.view_projections[cascade_index] = view_projection;
-            params.cascade_splits[cascade_index] =
-                shadow_mode == RenderShadowMode::PcfShadowMap
-                    ? (std::max)(camera.getOrthographicSettings().far_clip, 0.001f)
-                    : static_cast<float>(cascade_index + 1u);
+            params.cascade_splits[cascade_index] = shadow_mode == RenderShadowMode::PcfShadowMap
+                                                       ? std::max(camera.getOrthographicSettings().far_clip, 0.001f)
+                                                       : static_cast<float>(cascade_index + 1u);
         }
         if (shadow_mode == RenderShadowMode::PcfShadowMap) {
             params.params.y = kShadowDepthBias * 3.0f;
@@ -430,7 +381,9 @@ render_flow::default_scene_detail::ShadowRenderParams
 
 } // namespace
 
-ShadowDepthPass::ShadowDepthPass(PassSharedState& state) : m_state(&state) {}
+ShadowDepthPass::ShadowDepthPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* ShadowDepthPass::name() const noexcept
 {
@@ -506,10 +459,9 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
 
     ShadowCullingStats shadow_culling_stats{};
     shadow_culling_stats.candidate_casters = static_cast<uint32_t>(
-        (std::min)(shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
-    const uint32_t shadow_count =
-        (std::min)(static_cast<uint32_t>(m_state->shadowParams().params.z + 0.5f),
-                   render_flow::default_scene_detail::kShadowCascadeCount);
+        std::min(shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    const uint32_t shadow_count = std::min(static_cast<uint32_t>(m_state->shadowParams().params.z + 0.5f),
+                                           render_flow::default_scene_detail::kShadowCascadeCount);
     shadow_culling_stats.cascade_count = shadow_count;
     const uint32_t cascade_size = csmCascadeSize(m_state->world());
     const uint32_t pcf_map_size = pcfShadowMapSize(m_state->world());
@@ -530,19 +482,23 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
                                                   unique_visible_shadow_draw_command_ids,
                                                   shadow_culling_stats);
     }
-    shadow_culling_stats.unique_visible = static_cast<uint32_t>(
-        (std::min)(unique_visible_shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    shadow_culling_stats.unique_visible =
+        static_cast<uint32_t>(std::min(unique_visible_shadow_draw_commands.size(),
+                                       static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
     shadow_culling_stats.unique_culled =
         shadow_culling_stats.candidate_casters > shadow_culling_stats.unique_visible
             ? shadow_culling_stats.candidate_casters - shadow_culling_stats.unique_visible
             : 0u;
 
     auto& commands = pass_context.commandBuffer();
-    assets.prepareDraws(commands, unique_visible_shadow_draw_commands, default_material, AssetCache::Bindings{
-        .device = pipelines.device(),
-        .descriptor_pool = pipelines.descriptorPool(),
-        .material_layout = pipelines.materialLayout(),
-    });
+    assets.prepareDraws(commands,
+                        unique_visible_shadow_draw_commands,
+                        default_material,
+                        AssetCache::Bindings{
+                            .device = pipelines.device(),
+                            .descriptor_pool = pipelines.descriptorPool(),
+                            .material_layout = pipelines.materialLayout(),
+                        });
 
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
@@ -553,16 +509,16 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
         } else {
             configureCascadeViewportAndScissor(commands, cascade_index, cascade_size);
         }
-        recorded_draw_count +=
-            recordShadowDrawCommands(commands,
-                                     pass_resources,
-                                     cascade_shadow_draw_commands_by_index[cascade_index],
-                                     assets,
-                                     default_material,
-                                     cascade_index);
+        recorded_draw_count += recordShadowDrawCommands(commands,
+                                                        pass_resources,
+                                                        cascade_shadow_draw_commands_by_index[cascade_index],
+                                                        assets,
+                                                        default_material,
+                                                        cascade_index);
     }
     m_state->setShadowCullingStats(shadow_culling_stats);
-    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} cascade-visible shadow candidate(s), unique visible {}, unique culled {}, cascade-culled {} from {} caster command(s) across {} cascade(s)",
+    LUNA_RENDERER_FRAME_DEBUG("Scene shadow pass recorded {}/{} cascade-visible shadow candidate(s), unique visible "
+                              "{}, unique culled {}, cascade-culled {} from {} caster command(s) across {} cascade(s)",
                               recorded_draw_count,
                               shadow_culling_stats.cascade_visible,
                               shadow_culling_stats.unique_visible,

@@ -50,6 +50,11 @@ add_executable(
 )
 
 add_executable(
+    ShadowCascadeBoundsTests
+    ShadowCascadeBoundsTests.cpp
+)
+
+add_executable(
     AuthoringSessionTests
     AuthoringSessionTests.cpp
 )
@@ -250,6 +255,12 @@ target_link_libraries(
 )
 
 target_link_libraries(
+    ShadowCascadeBoundsTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
     AuthoringSessionTests
     PRIVATE
         LunaCore
@@ -323,6 +334,12 @@ target_compile_features(
 
 target_compile_features(
     DrawQueueCullingTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    ShadowCascadeBoundsTests
     PRIVATE
         cxx_std_20
 )
@@ -465,6 +482,12 @@ add_test(
     COMMAND DrawQueueCullingTests
 )
 luna_set_test_properties(DrawQueueCullingTests 20 "quick;unit;renderer")
+
+add_test(
+    NAME ShadowCascadeBoundsTests
+    COMMAND ShadowCascadeBoundsTests
+)
+luna_set_test_properties(ShadowCascadeBoundsTests 20 "quick;unit;renderer")
 
 add_test(
     NAME AuthoringSessionTests
