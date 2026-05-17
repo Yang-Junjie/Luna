@@ -3,6 +3,8 @@
 #include <cmath>
 
 #include <glm/geometric.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -117,6 +119,44 @@ void testEmptySubmeshBoundsAreInvalid(TestContext& context)
     context.expect(!mesh->getSubMeshes().front().Bounds.isValid(), "empty submesh bounds should be invalid");
 }
 
+void testTransformMeshBounds(TestContext& context)
+{
+    const luna::MeshBounds local_bounds{
+        .Min = {-1.0f, -2.0f, -3.0f},
+        .Max = {3.0f, 4.0f, 5.0f},
+        .Center = {1.0f, 1.0f, 1.0f},
+        .Extents = {2.0f, 3.0f, 4.0f},
+        .Radius = glm::length(glm::vec3{2.0f, 3.0f, 4.0f}),
+        .Valid = true,
+    };
+
+    const glm::mat4 translate_scale =
+        glm::translate(glm::mat4(1.0f), {10.0f, -4.0f, 2.0f}) * glm::scale(glm::mat4(1.0f), {2.0f, 3.0f, 0.5f});
+    expectBounds(context,
+                 luna::transformMeshBounds(local_bounds, translate_scale),
+                 {8.0f, -10.0f, 0.5f},
+                 {16.0f, 8.0f, 4.5f},
+                 "translated scaled mesh");
+
+    const luna::MeshBounds unit_box{
+        .Min = {-1.0f, -2.0f, -0.5f},
+        .Max = {1.0f, 2.0f, 0.5f},
+        .Center = {0.0f, 0.0f, 0.0f},
+        .Extents = {1.0f, 2.0f, 0.5f},
+        .Radius = glm::length(glm::vec3{1.0f, 2.0f, 0.5f}),
+        .Valid = true,
+    };
+    const glm::mat4 rotate_z = glm::rotate(glm::mat4(1.0f), glm::half_pi<float>(), {0.0f, 0.0f, 1.0f});
+    expectBounds(context,
+                 luna::transformMeshBounds(unit_box, rotate_z),
+                 {-2.0f, -1.0f, -0.5f},
+                 {2.0f, 1.0f, 0.5f},
+                 "rotated mesh");
+
+    context.expect(!luna::transformMeshBounds({}, glm::mat4(1.0f)).isValid(),
+                   "invalid bounds should stay invalid after transform");
+}
+
 } // namespace
 
 int main()
@@ -124,5 +164,6 @@ int main()
     TestContext context;
     testMeshComputesSubmeshAndAggregateBounds(context);
     testEmptySubmeshBoundsAreInvalid(context);
+    testTransformMeshBounds(context);
     return context.failures() == 0 ? 0 : 1;
 }

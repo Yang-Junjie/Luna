@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Defines mesh asset data used by scene submission and GPU upload paths.
 // Holds vertex/index buffers in CPU memory and groups them into submeshes
@@ -8,6 +8,7 @@
 
 #include <cstdint>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -40,6 +41,9 @@ struct MeshBounds {
         return Valid;
     }
 };
+
+[[nodiscard]] MeshBounds mergeMeshBounds(const MeshBounds& lhs, const MeshBounds& rhs);
+[[nodiscard]] MeshBounds transformMeshBounds(const MeshBounds& bounds, const glm::mat4& transform);
 
 struct SubMesh {
     std::string Name;

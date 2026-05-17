@@ -1,18 +1,18 @@
 ﻿#pragma once
 
 #include "Asset/Asset.h"
+#include "Renderer/Mesh.h"
+
+#include <cstdint>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
-
-#include <cstdint>
 #include <memory>
 #include <vector>
 
 namespace luna {
 
 class Material;
-class Mesh;
 
 enum class RenderPhase : uint8_t {
     DepthOnly,
@@ -45,6 +45,8 @@ struct RenderMeshInstance {
     glm::mat4 transform{1.0f};
     std::shared_ptr<Mesh> mesh;
     std::vector<std::shared_ptr<Material>> submesh_materials;
+    MeshBounds local_bounds{};
+    MeshBounds world_bounds{};
     uint32_t picking_id{0};
 };
 
@@ -53,6 +55,8 @@ struct RenderDrawPacket {
     std::shared_ptr<Mesh> mesh;
     std::shared_ptr<Material> material;
     uint32_t submesh_index{UINT32_MAX};
+    MeshBounds local_bounds{};
+    MeshBounds world_bounds{};
     uint32_t picking_id{0};
     RenderPhaseMask phases{0};
 };
@@ -115,7 +119,3 @@ struct RenderShadowSettings {
 };
 
 } // namespace luna
-
-
-
-

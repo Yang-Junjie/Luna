@@ -3,6 +3,7 @@
 
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
+#include <glm/mat3x3.hpp>
 #include <limits>
 #include <numeric>
 #include <utility>
@@ -66,6 +67,34 @@ MeshBounds computeMeshBounds(std::vector<SubMesh>& sub_meshes)
 }
 
 } // namespace
+
+MeshBounds mergeMeshBounds(const MeshBounds& lhs, const MeshBounds& rhs)
+{
+    if (!lhs.isValid()) {
+        return rhs;
+    }
+
+    if (!rhs.isValid()) {
+        return lhs;
+    }
+
+    return finalizeBounds(glm::min(lhs.Min, rhs.Min), glm::max(lhs.Max, rhs.Max));
+}
+
+MeshBounds transformMeshBounds(const MeshBounds& bounds, const glm::mat4& transform)
+{
+    if (!bounds.isValid()) {
+        return {};
+    }
+
+    const glm::vec3 center = glm::vec3(transform * glm::vec4(bounds.Center, 1.0f));
+    const glm::mat3 linear_transform(transform);
+    const glm::vec3 extents = glm::abs(linear_transform[0]) * bounds.Extents.x +
+                              glm::abs(linear_transform[1]) * bounds.Extents.y +
+                              glm::abs(linear_transform[2]) * bounds.Extents.z;
+
+    return finalizeBounds(center - extents, center + extents);
+}
 
 Mesh::Mesh(std::string name, std::vector<SubMesh> subMeshes)
     : m_name(std::move(name)),

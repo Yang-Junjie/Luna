@@ -1,9 +1,8 @@
-﻿#include "Renderer/RenderWorld/RenderWorldExtractor.h"
-
-#include "Asset/AssetManager.h"
+﻿#include "Asset/AssetManager.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
+#include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene/Entity.h"
 
 #include <algorithm>
@@ -21,11 +20,10 @@ uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
     return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
-std::vector<std::shared_ptr<Material>>
-    resolveSubmeshMaterials(const MeshComponent& mesh_component,
-                            const Mesh& mesh,
-                            AssetManager& asset_manager,
-                            Scene::AssetLoadBehavior asset_load_behavior)
+std::vector<std::shared_ptr<Material>> resolveSubmeshMaterials(const MeshComponent& mesh_component,
+                                                               const Mesh& mesh,
+                                                               AssetManager& asset_manager,
+                                                               Scene::AssetLoadBehavior asset_load_behavior)
 {
     const auto& sub_meshes = mesh.getSubMeshes();
     const size_t active_submesh_count = mesh_component.resolveSubmeshCount(sub_meshes.size());
@@ -126,7 +124,7 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
         .specular_intensity = (std::max)(environment_settings.specularIntensity, 0.0f),
         .allow_async_load = asset_load_behavior == Scene::AssetLoadBehavior::NonBlocking,
         .procedural_sun_direction = safeNormalize(environment_settings.proceduralSunDirection,
-                                                   glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
+                                                  glm::vec3(0.51214755f, 0.76822126f, 0.38411063f)),
         .procedural_sun_intensity = (std::max)(environment_settings.proceduralSunIntensity, 0.0f),
         .procedural_sun_angular_radius = (std::max)(environment_settings.proceduralSunAngularRadius, 0.0f),
         .procedural_sky_color_zenith = environment_settings.proceduralSkyColorZenith,
@@ -203,16 +201,27 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
             continue;
         }
 
+        const auto& sub_meshes = mesh->getSubMeshes();
+        const size_t active_submesh_count = mesh_component.resolveSubmeshCount(sub_meshes.size());
+
+        MeshBounds local_bounds{};
+        for (uint32_t local_submesh_index = 0; local_submesh_index < active_submesh_count; ++local_submesh_index) {
+            const uint32_t submesh_index = mesh_component.firstSubmesh + local_submesh_index;
+            local_bounds = mergeMeshBounds(local_bounds, sub_meshes[submesh_index].Bounds);
+        }
+
+        const glm::mat4 world_transform = entity_manager.getWorldSpaceTransformMatrix(entity);
+        const MeshBounds world_bounds = transformMeshBounds(local_bounds, world_transform);
         auto submesh_materials = resolveSubmeshMaterials(mesh_component, *mesh, asset_manager, asset_load_behavior);
         render_world.addMeshInstance(RenderMeshInstance{
-            .transform = entity_manager.getWorldSpaceTransformMatrix(entity),
+            .transform = world_transform,
             .mesh = mesh,
             .submesh_materials = submesh_materials,
+            .local_bounds = local_bounds,
+            .world_bounds = world_bounds,
             .picking_id = encodePickingId(entity),
         });
 
-        const auto& sub_meshes = mesh->getSubMeshes();
-        const size_t active_submesh_count = mesh_component.resolveSubmeshCount(sub_meshes.size());
         for (uint32_t local_submesh_index = 0; local_submesh_index < active_submesh_count; ++local_submesh_index) {
             const uint32_t submesh_index = mesh_component.firstSubmesh + local_submesh_index;
             std::shared_ptr<Material> material;
@@ -220,11 +229,14 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
                 material = submesh_materials[local_submesh_index];
             }
 
+            const MeshBounds submesh_local_bounds = sub_meshes[submesh_index].Bounds;
             render_world.addDrawPacket(RenderDrawPacket{
-                .transform = entity_manager.getWorldSpaceTransformMatrix(entity),
+                .transform = world_transform,
                 .mesh = mesh,
                 .material = material,
                 .submesh_index = submesh_index,
+                .local_bounds = submesh_local_bounds,
+                .world_bounds = transformMeshBounds(submesh_local_bounds, world_transform),
                 .picking_id = encodePickingId(entity),
                 .phases = phasesForMaterial(material),
             });
@@ -233,7 +245,3 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
 }
 
 } // namespace luna
-
-
-
-

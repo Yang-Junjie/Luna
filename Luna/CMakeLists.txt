@@ -109,6 +109,8 @@ set(RENDERER_SOURCE
     Renderer/RenderFlow/DefaultScene/Passes/TransparentPass.cpp
     Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.h
     Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.cpp
+    Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.h
+    Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.cpp
     Renderer/RenderWorld/RenderWorld.h
     Renderer/RenderWorld/RenderWorld.cpp
     Renderer/RenderWorld/RenderTypes.h
@@ -116,6 +118,8 @@ set(RENDERER_SOURCE
     Renderer/RenderWorld/RenderWorldExtractor.cpp
     Renderer/RendererUtilities.h
     Renderer/RendererUtilities.cpp
+    Renderer/Visibility/Frustum.h
+    Renderer/Visibility/Frustum.cpp
     Renderer/Image/ImageDataUtils.h
     Renderer/Image/ImageDataUtils.cpp
     Renderer/Resources/ShaderModuleLoader.h
@@ -130,6 +134,7 @@ set(RENDERER_SOURCE
     Renderer/Shaders/Bloom.slang
     Renderer/Shaders/FXAA.slang
     Renderer/Shaders/EditorInfiniteGrid.slang
+    Renderer/Shaders/VisibilityBoundsOverlay.slang
     Renderer/Shaders/ScreenSpaceAmbientOcclusion.slang
     Renderer/Shaders/ShadowMapping.slang
     Renderer/Shaders/TemporalAntiAliasing.slang

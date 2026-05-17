@@ -114,6 +114,51 @@ D3D12_COMPARISON_FUNC ToD3D12ComparisonFunc(luna::RHI::CompareOp op)
             return D3D12_COMPARISON_FUNC_LESS;
     }
 }
+
+D3D12_PRIMITIVE_TOPOLOGY_TYPE ToD3D12PrimitiveTopologyType(luna::RHI::PrimitiveTopology topology)
+{
+    using namespace luna::RHI;
+
+    switch (topology) {
+        case PrimitiveTopology::PointList:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+        case PrimitiveTopology::LineList:
+        case PrimitiveTopology::LineStrip:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+        case PrimitiveTopology::TriangleList:
+        case PrimitiveTopology::TriangleStrip:
+        case PrimitiveTopology::TriangleFan:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        case PrimitiveTopology::PatchList:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+        default:
+            return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    }
+}
+
+D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(const luna::RHI::InputAssemblyState& input_assembly)
+{
+    using namespace luna::RHI;
+
+    switch (input_assembly.Topology) {
+        case PrimitiveTopology::PointList:
+            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+        case PrimitiveTopology::LineList:
+            return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+        case PrimitiveTopology::LineStrip:
+            return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+        case PrimitiveTopology::TriangleList:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        case PrimitiveTopology::TriangleStrip:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+        case PrimitiveTopology::PatchList:
+            return static_cast<D3D12_PRIMITIVE_TOPOLOGY>(
+                D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST + input_assembly.PatchControlPoints - 1);
+        case PrimitiveTopology::TriangleFan:
+        default:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    }
+}
 }
 
 namespace luna::RHI {
@@ -234,7 +279,7 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
     psoDesc.SampleDesc.Count = info.Multisample.RasterizationSamples;
 
     // Topology
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.PrimitiveTopologyType = ToD3D12PrimitiveTopologyType(info.InputAssembly.Topology);
 
     // Render target formats
     psoDesc.NumRenderTargets = static_cast<UINT>(info.ColorAttachmentFormats.size());
@@ -298,7 +343,7 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
             d3dDevice->StorePSO(psoName, m_pipelineState.Get());
         }
     }
-    m_topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    m_topology = ToD3D12PrimitiveTopology(info.InputAssembly);
 }
 
 D3D12ComputePipeline::D3D12ComputePipeline(const Ref<Device>& device, const ComputePipelineCreateInfo& info)

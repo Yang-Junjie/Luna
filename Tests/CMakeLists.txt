@@ -40,6 +40,16 @@ add_executable(
 )
 
 add_executable(
+    RenderWorldExtractorBoundsTests
+    RenderWorldExtractorBoundsTests.cpp
+)
+
+add_executable(
+    DrawQueueCullingTests
+    DrawQueueCullingTests.cpp
+)
+
+add_executable(
     AuthoringSessionTests
     AuthoringSessionTests.cpp
 )
@@ -228,6 +238,18 @@ target_link_libraries(
 )
 
 target_link_libraries(
+    RenderWorldExtractorBoundsTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
+    DrawQueueCullingTests
+    PRIVATE
+        LunaCore
+)
+
+target_link_libraries(
     AuthoringSessionTests
     PRIVATE
         LunaCore
@@ -289,6 +311,18 @@ target_compile_features(
 
 target_compile_features(
     MeshBoundsTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    RenderWorldExtractorBoundsTests
+    PRIVATE
+        cxx_std_20
+)
+
+target_compile_features(
+    DrawQueueCullingTests
     PRIVATE
         cxx_std_20
 )
@@ -419,6 +453,18 @@ add_test(
     COMMAND MeshBoundsTests
 )
 luna_set_test_properties(MeshBoundsTests 20 "quick;unit;renderer")
+
+add_test(
+    NAME RenderWorldExtractorBoundsTests
+    COMMAND RenderWorldExtractorBoundsTests
+)
+luna_set_test_properties(RenderWorldExtractorBoundsTests 20 "quick;unit;renderer")
+
+add_test(
+    NAME DrawQueueCullingTests
+    COMMAND DrawQueueCullingTests
+)
+luna_set_test_properties(DrawQueueCullingTests 20 "quick;unit;renderer")
 
 add_test(
     NAME AuthoringSessionTests

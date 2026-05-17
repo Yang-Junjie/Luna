@@ -6,11 +6,14 @@
 
 #include "Renderer/Camera.h"
 #include "Renderer/RenderWorld/RenderTypes.h"
+#include "Renderer/Visibility/Frustum.h"
 
 #include <cstdint>
 
+#include <array>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -24,9 +27,65 @@ namespace luna::render_flow::default_scene {
 
 using DrawCommand = RenderDrawPacket;
 
+struct DrawQueueStats {
+    uint32_t submitted{0};
+    uint32_t camera_visible{0};
+    uint32_t camera_culled{0};
+    uint32_t invalid_bounds{0};
+    uint32_t shadow_unculled{0};
+};
+
+enum class VisibilityDebugClassification : uint8_t {
+    CameraVisible,
+    CameraCulled,
+    InvalidBounds,
+};
+
+struct VisibilityDebugCaptureOptions {
+    bool capture_visible_bounds{false};
+    bool capture_culled_bounds{false};
+    bool capture_culling_frustum{false};
+    bool culling_frustum_frozen{false};
+
+    [[nodiscard]] bool enabled() const noexcept
+    {
+        return capture_visible_bounds || capture_culled_bounds || capture_culling_frustum;
+    }
+};
+
+struct VisibilityDebugItem {
+    MeshBounds world_bounds{};
+    glm::vec3 world_origin{0.0f};
+    uint32_t picking_id{0};
+    uint32_t submesh_index{UINT32_MAX};
+    RenderPhaseMask phases{0};
+    VisibilityDebugClassification classification{VisibilityDebugClassification::CameraVisible};
+};
+
+struct VisibilityDebugStats {
+    uint32_t captured{0};
+    uint32_t camera_visible{0};
+    uint32_t camera_culled{0};
+    uint32_t invalid_bounds{0};
+    uint32_t culling_frustums{0};
+};
+
+struct VisibilityDebugFrustumItem {
+    std::array<glm::vec3, 8> corners{};
+    glm::vec4 color{0.20f, 0.62f, 1.0f, 0.95f};
+    bool frozen{false};
+};
+
 class DrawQueue final {
 public:
-    void beginScene(const Camera& camera);
+    void beginScene(const Camera& camera,
+                    float aspect_ratio,
+                    VisibilityDebugCaptureOptions visibility_debug_options = {});
+    void beginScene(const Camera& camera,
+                    float aspect_ratio,
+                    const Camera& culling_camera,
+                    float culling_aspect_ratio,
+                    VisibilityDebugCaptureOptions visibility_debug_options = {});
     void clear() noexcept;
 
     void submitDrawPacket(const RenderDrawPacket& packet);
@@ -41,14 +100,41 @@ public:
     [[nodiscard]] const std::vector<DrawCommand>& drawCommands() const noexcept;
     [[nodiscard]] std::vector<DrawCommand> drawCommands(RenderPhase phase) const;
 
+    [[nodiscard]] const DrawQueueStats& stats() const noexcept
+    {
+        return m_stats;
+    }
+
+    [[nodiscard]] const std::vector<VisibilityDebugItem>& visibilityDebugItems() const noexcept
+    {
+        return m_visibility_debug_items;
+    }
+
+    [[nodiscard]] const VisibilityDebugStats& visibilityDebugStats() const noexcept
+    {
+        return m_visibility_debug_stats;
+    }
+
+    [[nodiscard]] const std::vector<VisibilityDebugFrustumItem>& visibilityDebugFrustums() const noexcept
+    {
+        return m_visibility_debug_frustums;
+    }
+
 private:
+    void captureVisibilityDebugFrustum(const Camera& camera, float aspect_ratio);
+    void captureVisibilityDebugItem(const RenderDrawPacket& packet,
+                                    VisibilityDebugClassification classification);
+
     Camera m_camera{};
-    std::vector<DrawCommand> m_draw_commands;
+    Camera m_culling_camera{};
+    Frustum m_culling_frustum{};
+    std::vector<DrawCommand> m_all_draw_commands;
+    std::vector<DrawCommand> m_camera_visible_draw_commands;
+    std::vector<VisibilityDebugItem> m_visibility_debug_items;
+    std::vector<VisibilityDebugFrustumItem> m_visibility_debug_frustums;
+    VisibilityDebugCaptureOptions m_visibility_debug_options{};
+    VisibilityDebugStats m_visibility_debug_stats{};
+    DrawQueueStats m_stats{};
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-
