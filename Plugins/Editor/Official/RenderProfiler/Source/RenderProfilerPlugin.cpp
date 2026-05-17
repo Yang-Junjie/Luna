@@ -19,6 +19,8 @@ constexpr std::string_view kDefaultSceneFeatureName = "DefaultScene";
 constexpr size_t kMaxHistoryFrames = 120;
 
 struct CullingProfileStats {
+    double begin_scene_cpu_ms{0.0};
+    double submit_packets_cpu_ms{0.0};
     double draw_queue_cpu_ms{0.0};
     double avg_us_per_submitted_draw{0.0};
     uint64_t submitted{0};
@@ -48,7 +50,13 @@ void assignCullingProfileStat(CullingProfileStats& stats, const luna::editor::Re
 {
     const std::string_view name(stat.name);
     if (stat.type == luna::editor::RenderFeatureRuntimeStatType::Float) {
-        if (name == "culling.draw_queue_cpu_ms") {
+        if (name == "culling.begin_scene_cpu_ms") {
+            stats.begin_scene_cpu_ms = stat.float_value;
+            stats.available = true;
+        } else if (name == "culling.submit_packets_cpu_ms") {
+            stats.submit_packets_cpu_ms = stat.float_value;
+            stats.available = true;
+        } else if (name == "culling.draw_queue_cpu_ms") {
             stats.draw_queue_cpu_ms = stat.float_value;
             stats.available = true;
         } else if (name == "culling.avg_us_per_submitted_draw") {
@@ -384,6 +392,21 @@ public:
                         }
                     }
                     ui.separator();
+
+                    if (culling_stats.available) {
+                        ui.heading("DefaultScene Culling");
+                        ui.beginPanel("##RenderProfilerDefaultSceneCulling");
+                        ui.keyValue("Total", formatFloat(culling_stats.draw_queue_cpu_ms, 3) + " ms");
+                        ui.keyValue("Begin Scene", formatFloat(culling_stats.begin_scene_cpu_ms, 3) + " ms");
+                        ui.keyValue("Submit Packets", formatFloat(culling_stats.submit_packets_cpu_ms, 3) + " ms");
+                        ui.keyValue("Avg / Submitted Draw",
+                                    formatFloat(culling_stats.avg_us_per_submitted_draw, 2) + " us");
+                        ui.keyValue("Submitted", formatUInt64(culling_stats.submitted));
+                        ui.keyValue("Visible / Culled",
+                                    formatUInt64(culling_stats.camera_visible) + " / " +
+                                        formatUInt64(culling_stats.camera_culled));
+                        ui.endPanel();
+                    }
 
                     if (profile.passes.empty()) {
                         ui.emptyState("No render graph profile data",

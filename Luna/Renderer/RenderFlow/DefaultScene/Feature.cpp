@@ -217,6 +217,12 @@ RenderFeatureRuntimeStat makeRuntimeBoolStat(std::string name, bool value)
     };
 }
 
+double elapsedMilliseconds(std::chrono::steady_clock::time_point begin,
+                           std::chrono::steady_clock::time_point end)
+{
+    return std::chrono::duration<double, std::milli>(end - begin).count();
+}
+
 } // namespace
 
 Feature::Feature()
@@ -305,6 +311,8 @@ RenderFeatureDiagnostics Feature::diagnostics() const
     RenderFeatureDiagnostics diagnostics{};
     diagnostics.runtime_stats = {
         makeRuntimeUIntStat("draws.submitted", m_last_draw_stats.submitted),
+        makeRuntimeFloatStat("culling.begin_scene_cpu_ms", m_last_draw_queue_begin_scene_cpu_ms),
+        makeRuntimeFloatStat("culling.submit_packets_cpu_ms", m_last_draw_queue_submit_packets_cpu_ms),
         makeRuntimeFloatStat("culling.draw_queue_cpu_ms", m_last_draw_queue_cpu_ms),
         makeRuntimeFloatStat("culling.avg_us_per_submitted_draw", m_last_draw_queue_avg_us_per_submitted_draw),
         makeRuntimeUIntStat("draws.camera_visible", m_last_draw_stats.camera_visible),
@@ -382,11 +390,14 @@ void Feature::prepareFrame(const RenderWorld& world,
                                 .culling_frustum_frozen =
                                     m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera,
                             });
+    const auto submit_packets_begin = std::chrono::steady_clock::now();
     for (const auto& packet : world.drawPackets()) {
         m_draw_queue.submitDrawPacket(packet);
     }
     const auto draw_queue_end = std::chrono::steady_clock::now();
-    m_last_draw_queue_cpu_ms = std::chrono::duration<double, std::milli>(draw_queue_end - draw_queue_begin).count();
+    m_last_draw_queue_begin_scene_cpu_ms = elapsedMilliseconds(draw_queue_begin, submit_packets_begin);
+    m_last_draw_queue_submit_packets_cpu_ms = elapsedMilliseconds(submit_packets_begin, draw_queue_end);
+    m_last_draw_queue_cpu_ms = elapsedMilliseconds(draw_queue_begin, draw_queue_end);
     m_last_draw_stats = m_draw_queue.stats();
     m_last_draw_queue_avg_us_per_submitted_draw =
         m_last_draw_stats.submitted > 0
@@ -394,18 +405,21 @@ void Feature::prepareFrame(const RenderWorld& world,
             : 0.0;
     m_last_visibility_debug_stats = m_draw_queue.visibilityDebugStats();
     LUNA_RENDERER_FRAME_DEBUG(
-        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} culling_ms={:.3f} visibility_debug_items={} culling_frustums={}",
+        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} culling_ms={:.3f} begin_ms={:.3f} submit_ms={:.3f} visibility_debug_items={} culling_frustums={}",
         m_last_draw_stats.submitted,
         m_last_draw_stats.camera_visible,
         m_last_draw_stats.camera_culled,
         m_last_draw_stats.invalid_bounds,
         m_last_draw_stats.shadow_unculled,
         m_last_draw_queue_cpu_ms,
+        m_last_draw_queue_begin_scene_cpu_ms,
+        m_last_draw_queue_submit_packets_cpu_ms,
         m_last_visibility_debug_stats.captured,
         m_last_visibility_debug_stats.culling_frustums);
     if (!m_has_logged_draw_stats || !drawStatsEqual(m_last_draw_stats, m_last_logged_draw_stats)) {
         LUNA_RENDERER_DEBUG("Scene draw culling stats: submitted={} camera_visible={} camera_culled={} "
-                            "invalid_bounds={} shadow_unculled={} culling_ms={:.3f} avg_us_per_draw={:.3f} "
+                            "invalid_bounds={} shadow_unculled={} culling_ms={:.3f} begin_ms={:.3f} "
+                            "submit_ms={:.3f} avg_us_per_draw={:.3f} "
                             "gbuffer={} transparent={} shadow={} picking={}",
                             m_last_draw_stats.submitted,
                             m_last_draw_stats.camera_visible,
@@ -413,6 +427,8 @@ void Feature::prepareFrame(const RenderWorld& world,
                             m_last_draw_stats.invalid_bounds,
                             m_last_draw_stats.shadow_unculled,
                             m_last_draw_queue_cpu_ms,
+                            m_last_draw_queue_begin_scene_cpu_ms,
+                            m_last_draw_queue_submit_packets_cpu_ms,
                             m_last_draw_queue_avg_us_per_submitted_draw,
                             m_last_draw_stats.phase_gbuffer,
                             m_last_draw_stats.phase_transparent,
