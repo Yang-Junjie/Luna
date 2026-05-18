@@ -20,10 +20,10 @@ class Texture;
 namespace luna::renderer_detail {
 
 struct PendingTextureUpload {
-    luna::RHI::Ref<luna::RHI::Texture> texture;
-    luna::RHI::Ref<luna::RHI::Sampler> sampler;
-    luna::RHI::Ref<luna::RHI::Buffer> staging_buffer;
-    std::vector<luna::RHI::BufferImageCopy> copy_regions;
+    RHI::Ref<RHI::Texture> texture;
+    RHI::Ref<RHI::Sampler> sampler;
+    RHI::Ref<RHI::Buffer> staging_buffer;
+    std::vector<RHI::BufferImageCopy> copy_regions;
     std::string debug_name;
     bool uploaded{false};
 
@@ -33,13 +33,13 @@ struct PendingTextureUpload {
     }
 };
 
-PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>& device,
+PendingTextureUpload createTextureUpload(const RHI::Ref<RHI::Device>& device,
                                          const luna::ImageData& image,
                                          const luna::Texture::SamplerSettings& sampler_settings,
                                          std::string_view debug_name);
-void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands,
+void uploadTextureIfNeeded(RHI::CommandBufferEncoder& commands,
                            PendingTextureUpload& uploaded_texture,
-                           luna::RHI::ResourceState final_state = luna::RHI::ResourceState::ShaderRead,
-                           luna::RHI::SyncScope final_stage = luna::RHI::SyncScope::FragmentStage);
+                           RHI::ResourceState final_state = RHI::ResourceState::ShaderRead,
+                           RHI::SyncScope final_stage = RHI::SyncScope::FragmentStage);
 
 } // namespace luna::renderer_detail

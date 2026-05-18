@@ -27,6 +27,6 @@ struct ShadowCascadeLightBounds {
 void padShadowCascadeDepth(ShadowCascadeLightBounds& bounds, float depth_padding);
 
 [[nodiscard]] glm::mat4 buildShadowCascadeViewProjection(const ShadowCascadeLightBounds& bounds,
-                                                         const luna::RHI::RHIConventions& conventions);
+                                                         const RHI::RHIConventions& conventions);
 
 } // namespace luna::render_flow::default_scene_detail

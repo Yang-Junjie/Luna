@@ -20,16 +20,16 @@ struct ShaderBindingRequirement {
     uint32_t logical_binding{0};
     uint32_t set{0};
     uint32_t binding{0};
-    luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
+    RHI::DescriptorType type{RHI::DescriptorType::UniformBuffer};
     uint32_t count{1};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::AllGraphics};
+    RHI::ShaderStage stages{RHI::ShaderStage::AllGraphics};
 };
 
 struct ShaderPushConstantRequirement {
     std::string name;
     uint32_t offset{0};
     uint32_t size{0};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::None};
+    RHI::ShaderStage stages{RHI::ShaderStage::None};
 };
 
 struct ShaderBindingContract {
@@ -46,7 +46,7 @@ enum class ShaderBindingAddressMode : uint8_t {
 struct ShaderBindingValidationContext {
     std::string_view shader_file;
     std::string_view entry_point;
-    luna::RHI::ShaderStage shader_stage{luna::RHI::ShaderStage::None};
+    RHI::ShaderStage shader_stage{RHI::ShaderStage::None};
     bool enforce_stage_for_known_usage{true};
     bool enforce_resource_names{true};
 };
@@ -65,15 +65,15 @@ struct ShaderBindingValidationResult {
 void addDescriptorSetRequirements(ShaderBindingContract& contract,
                                   uint32_t set_index,
                                   std::string_view set_name,
-                                  std::span<const luna::RHI::DescriptorSetLayoutBinding> bindings);
+                                  std::span<const RHI::DescriptorSetLayoutBinding> bindings);
 
 void addPushConstantRequirements(ShaderBindingContract& contract,
                                  std::string_view name,
-                                 std::span<const luna::RHI::PushConstantRange> push_constants);
+                                 std::span<const RHI::PushConstantRange> push_constants);
 
 [[nodiscard]] ShaderBindingValidationResult
     validateShaderBindingContract(const ShaderBindingValidationContext& context,
                                   const ShaderBindingContract& contract,
-                                  const luna::RHI::ShaderReflectionData& reflection);
+                                  const RHI::ShaderReflectionData& reflection);
 
 } // namespace luna::render_flow

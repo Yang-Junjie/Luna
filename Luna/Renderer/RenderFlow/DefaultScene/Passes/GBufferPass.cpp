@@ -33,45 +33,45 @@ GBufferTextures createGBufferTextures(RenderGraphBuilder& graph, const SceneRend
             .Width = context.framebuffer_width,
             .Height = context.framebuffer_height,
             .Format = render_flow::default_scene_detail::kGBufferBaseColorFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .normal_metallic = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = "SceneGBufferNormalMetallic",
             .Width = context.framebuffer_width,
             .Height = context.framebuffer_height,
             .Format = render_flow::default_scene_detail::kGBufferLightingFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .world_position_roughness = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = "SceneGBufferWorldPositionRoughness",
             .Width = context.framebuffer_width,
             .Height = context.framebuffer_height,
             .Format = render_flow::default_scene_detail::kGBufferLightingFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .emissive_ao = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = "SceneGBufferEmissiveAo",
             .Width = context.framebuffer_width,
             .Height = context.framebuffer_height,
             .Format = render_flow::default_scene_detail::kGBufferLightingFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .velocity = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = "SceneVelocity",
             .Width = context.framebuffer_width,
             .Height = context.framebuffer_height,
             .Format = render_flow::default_scene_detail::kVelocityFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
     };
 }
@@ -108,32 +108,32 @@ void GeometryPass::setup(RenderPassContext& context)
         name(),
         [gbuffer, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.WriteColor(gbuffer.base_color,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(gbuffer.normal_metallic,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(gbuffer.world_position_roughness,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(gbuffer.emissive_ao,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(gbuffer.velocity,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(scene_context.pick_target,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteDepth(scene_context.depth_target,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
                                     {1.0f, 0});
         },
         [this, scene_context](RenderGraphRasterPassContext& pass_context) {

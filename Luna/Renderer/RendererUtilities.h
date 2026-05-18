@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Shared helper functions for renderer setup and diagnostics.
 // Keeps small backend-independent decisions such as adapter selection,
@@ -14,17 +14,17 @@
 
 namespace luna::renderer_detail {
 
-luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters);
-luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats);
-const char* presentModeToString(luna::RHI::PresentMode mode);
-const char* swapchainResultToString(luna::RHI::Result result);
-const char* adapterTypeToString(luna::RHI::AdapterType type);
-const char* formatToString(luna::RHI::Format format);
-bool supportsDefaultRenderFlow(luna::RHI::BackendType type);
-bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode);
-std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes);
-luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
-                                         luna::RHI::PresentMode requested_mode);
+RHI::Ref<RHI::Adapter> selectAdapter(const std::vector<RHI::Ref<RHI::Adapter>>& adapters);
+RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<RHI::SurfaceFormat>& formats);
+const char* presentModeToString(RHI::PresentMode mode);
+const char* swapchainResultToString(RHI::Result result);
+const char* adapterTypeToString(RHI::AdapterType type);
+const char* formatToString(RHI::Format format);
+bool supportsDefaultRenderFlow(RHI::BackendType type);
+bool isPresentModeSupported(const std::vector<RHI::PresentMode>& supported_modes, RHI::PresentMode mode);
+std::string describePresentModes(const std::vector<RHI::PresentMode>& supported_modes);
+RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supported_modes,
+                                         RHI::PresentMode requested_mode);
 
 } // namespace luna::renderer_detail
 

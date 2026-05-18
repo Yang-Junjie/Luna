@@ -19,13 +19,13 @@ class QueryPool;
 namespace luna {
 
 struct ScenePickReadbackSlot {
-    luna::RHI::Ref<luna::RHI::Buffer> buffer;
+    RHI::Ref<RHI::Buffer> buffer;
     bool pending{false};
 };
 
 struct GpuTimingSlot {
-    luna::RHI::Ref<luna::RHI::QueryPool> query_pool;
-    luna::RHI::Ref<luna::RHI::QueryPool> disjoint_query_pool;
+    RHI::Ref<RHI::QueryPool> query_pool;
+    RHI::Ref<RHI::QueryPool> disjoint_query_pool;
     RenderGraphProfileSnapshot profile;
     uint32_t query_count{0};
     bool pending{false};
@@ -33,7 +33,7 @@ struct GpuTimingSlot {
 };
 
 struct BeginFrameDesc {
-    luna::RHI::Ref<luna::RHI::Device> device;
+    RHI::Ref<RHI::Device> device;
 };
 
 struct FrameResourceReleaseStats {
@@ -49,8 +49,8 @@ public:
     void beginFrame(uint32_t frame_index, const BeginFrameDesc& desc);
     void releaseFrame(uint32_t frame_index);
 
-    [[nodiscard]] luna::RHI::CommandBufferEncoder* currentCommandBuffer() const;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::CommandBufferEncoder>& currentCommandBufferRef() const noexcept;
+    [[nodiscard]] RHI::CommandBufferEncoder* currentCommandBuffer() const;
+    [[nodiscard]] const RHI::Ref<RHI::CommandBufferEncoder>& currentCommandBufferRef() const noexcept;
     void resetCurrentCommandBuffer() noexcept;
 
     [[nodiscard]] RenderGraphTransientTextureCache* transientTextureCache(uint32_t frame_index);
@@ -76,8 +76,8 @@ private:
     [[nodiscard]] bool hasFrame(uint32_t frame_index) const noexcept;
 
 private:
-    luna::RHI::Ref<luna::RHI::CommandBufferEncoder> m_current_command_buffer;
-    std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> m_command_buffers;
+    RHI::Ref<RHI::CommandBufferEncoder> m_current_command_buffer;
+    std::vector<RHI::Ref<RHI::CommandBufferEncoder>> m_command_buffers;
     std::vector<std::unique_ptr<luna::RenderGraph>> m_render_graphs;
     std::vector<luna::RenderGraphTransientTextureCache> m_transient_texture_caches;
     std::vector<ScenePickReadbackSlot> m_scene_pick_readback_slots;

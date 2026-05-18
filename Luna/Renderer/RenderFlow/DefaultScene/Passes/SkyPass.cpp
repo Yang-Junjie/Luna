@@ -60,8 +60,8 @@ void SkyPass::setup(RenderPassContext& context)
             pass_builder.ReadTexture(normal_metallic);
             pass_builder.ReadTexture(pick_texture);
             pass_builder.WriteColor(scene_color,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+                                    RHI::AttachmentLoadOp::Load,
+                                    RHI::AttachmentStoreOp::Store);
         },
         [this, base_color, normal_metallic, pick_texture](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, base_color, normal_metallic, pick_texture);
@@ -102,7 +102,7 @@ void SkyPass::execute(RenderGraphRasterPassContext& pass_context,
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 2> descriptor_sets{
         pass_resources.gbuffer_descriptor_set,
         pass_resources.scene_descriptor_set,
     };

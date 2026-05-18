@@ -48,8 +48,8 @@ public:
     void ensure(const SceneRenderContext& context,
                 const RenderEnvironment* environment,
                 const SceneShaderPaths& shader_paths);
-    void uploadIfNeeded(luna::RHI::CommandBufferEncoder& commands);
-    void precomputeIfNeeded(luna::RHI::CommandBufferEncoder& commands);
+    void uploadIfNeeded(RHI::CommandBufferEncoder& commands);
+    void precomputeIfNeeded(RHI::CommandBufferEncoder& commands);
 
     [[nodiscard]] const renderer_detail::PendingTextureUpload& sourceTexture() const noexcept
     {
@@ -61,12 +61,12 @@ public:
         return m_irradiance_sh;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& prefilteredTexture() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& prefilteredTexture() const noexcept
     {
         return m_prefiltered_texture;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& brdfLutTexture() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& brdfLutTexture() const noexcept
     {
         return m_brdf_lut_texture;
     }
@@ -78,50 +78,50 @@ public:
     }
 
 private:
-    luna::RHI::Ref<luna::RHI::Device> m_device;
-    luna::RHI::BackendType m_backend_type{luna::RHI::BackendType::Auto};
+    RHI::Ref<RHI::Device> m_device;
+    RHI::BackendType m_backend_type{RHI::BackendType::Auto};
     SourceSignature m_source_signature{};
     bool m_has_source_signature{false};
     renderer_detail::PendingTextureUpload m_source_texture;
     std::array<glm::vec4, 9> m_irradiance_sh{};
 
-    luna::RHI::Ref<luna::RHI::Texture> m_environment_cube_texture;
-    luna::RHI::Ref<luna::RHI::Texture> m_irradiance_texture;
-    luna::RHI::Ref<luna::RHI::Texture> m_prefiltered_texture;
-    luna::RHI::Ref<luna::RHI::Texture> m_brdf_lut_texture;
+    RHI::Ref<RHI::Texture> m_environment_cube_texture;
+    RHI::Ref<RHI::Texture> m_irradiance_texture;
+    RHI::Ref<RHI::Texture> m_prefiltered_texture;
+    RHI::Ref<RHI::Texture> m_brdf_lut_texture;
 
-    luna::RHI::Ref<luna::RHI::TextureView> m_environment_cube_uav;
-    luna::RHI::Ref<luna::RHI::TextureView> m_irradiance_uav;
-    std::array<luna::RHI::Ref<luna::RHI::TextureView>,
+    RHI::Ref<RHI::TextureView> m_environment_cube_uav;
+    RHI::Ref<RHI::TextureView> m_irradiance_uav;
+    std::array<RHI::Ref<RHI::TextureView>,
                render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
         m_prefiltered_uavs{};
-    luna::RHI::Ref<luna::RHI::TextureView> m_brdf_lut_uav;
+    RHI::Ref<RHI::TextureView> m_brdf_lut_uav;
 
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_equirect_to_cube_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_cube_filter_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_prefilter_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> m_brdf_lut_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_equirect_to_cube_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_cube_filter_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_prefilter_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> m_brdf_lut_pipeline_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorPool> m_descriptor_pool;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> m_equirect_to_cube_descriptor_set;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> m_irradiance_descriptor_set;
-    std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>,
+    RHI::Ref<RHI::DescriptorSetLayout> m_equirect_to_cube_layout;
+    RHI::Ref<RHI::DescriptorSetLayout> m_cube_filter_layout;
+    RHI::Ref<RHI::DescriptorSetLayout> m_prefilter_layout;
+    RHI::Ref<RHI::DescriptorSetLayout> m_brdf_lut_layout;
+    RHI::Ref<RHI::PipelineLayout> m_equirect_to_cube_pipeline_layout;
+    RHI::Ref<RHI::PipelineLayout> m_cube_filter_pipeline_layout;
+    RHI::Ref<RHI::PipelineLayout> m_prefilter_pipeline_layout;
+    RHI::Ref<RHI::PipelineLayout> m_brdf_lut_pipeline_layout;
+    RHI::Ref<RHI::DescriptorPool> m_descriptor_pool;
+    RHI::Ref<RHI::DescriptorSet> m_equirect_to_cube_descriptor_set;
+    RHI::Ref<RHI::DescriptorSet> m_irradiance_descriptor_set;
+    std::array<RHI::Ref<RHI::DescriptorSet>,
                render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
         m_prefilter_descriptor_sets{};
-    luna::RHI::Ref<luna::RHI::DescriptorSet> m_brdf_lut_descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> m_sampler;
+    RHI::Ref<RHI::DescriptorSet> m_brdf_lut_descriptor_set;
+    RHI::Ref<RHI::Sampler> m_sampler;
 
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_equirect_to_cube_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_irradiance_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_prefilter_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> m_brdf_lut_shader;
-    luna::RHI::Ref<luna::RHI::ComputePipeline> m_equirect_to_cube_pipeline;
-    luna::RHI::Ref<luna::RHI::ComputePipeline> m_irradiance_pipeline;
-    luna::RHI::Ref<luna::RHI::ComputePipeline> m_prefilter_pipeline;
-    luna::RHI::Ref<luna::RHI::ComputePipeline> m_brdf_lut_pipeline;
+    RHI::Ref<RHI::ShaderModule> m_equirect_to_cube_shader;
+    RHI::Ref<RHI::ShaderModule> m_irradiance_shader;
+    RHI::Ref<RHI::ShaderModule> m_prefilter_shader;
+    RHI::Ref<RHI::ShaderModule> m_brdf_lut_shader;
+    RHI::Ref<RHI::ComputePipeline> m_equirect_to_cube_pipeline;
+    RHI::Ref<RHI::ComputePipeline> m_irradiance_pipeline;
+    RHI::Ref<RHI::ComputePipeline> m_prefilter_pipeline;
+    RHI::Ref<RHI::ComputePipeline> m_brdf_lut_pipeline;
 
     bool m_precomputed{false};
 };

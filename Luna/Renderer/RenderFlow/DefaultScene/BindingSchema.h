@@ -60,9 +60,9 @@ inline constexpr uint32_t EnvironmentBrdfLut = 6;
 struct DescriptorBindingSchema {
     const char* name{nullptr};
     uint32_t binding{0};
-    luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
+    RHI::DescriptorType type{RHI::DescriptorType::UniformBuffer};
     uint32_t count{1};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::AllGraphics};
+    RHI::ShaderStage stages{RHI::ShaderStage::AllGraphics};
     const char* shader_name{nullptr};
 };
 
@@ -79,7 +79,7 @@ enum class DescriptorSetSchemaId : uint8_t {
 
 struct PushConstantSchema {
     const char* name{nullptr};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::None};
+    RHI::ShaderStage stages{RHI::ShaderStage::None};
     uint32_t offset{0};
     uint32_t size{0};
 };
@@ -90,9 +90,9 @@ struct PipelineLayoutSetSchema {
 };
 
 struct DescriptorSetLayoutRefs {
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> material;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> gbuffer;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> scene;
+    RHI::Ref<RHI::DescriptorSetLayout> material;
+    RHI::Ref<RHI::DescriptorSetLayout> gbuffer;
+    RHI::Ref<RHI::DescriptorSetLayout> scene;
 };
 
 struct PipelineLayoutSchema {
@@ -111,22 +111,22 @@ struct PipelineLayoutSchema {
 [[nodiscard]] const PipelineLayoutSchema& lightingPipelineLayoutSchema() noexcept;
 [[nodiscard]] const PipelineLayoutSchema& transparentPipelineLayoutSchema() noexcept;
 
-[[nodiscard]] luna::RHI::DescriptorSetLayoutCreateInfo
+[[nodiscard]] RHI::DescriptorSetLayoutCreateInfo
     makeDescriptorSetLayoutCreateInfo(const DescriptorSetSchema& schema);
 
-[[nodiscard]] luna::RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
+[[nodiscard]] RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
                                                                                const DescriptorSetLayoutRefs& layouts);
 
 [[nodiscard]] luna::render_flow::ShaderBindingContract
     makePipelineShaderBindingContract(const PipelineLayoutSchema& schema,
                                       luna::render_flow::ShaderBindingAddressMode address_mode);
 
-[[nodiscard]] luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createDescriptorSetLayoutFromSchema(const luna::RHI::Ref<luna::RHI::Device>& device,
+[[nodiscard]] RHI::Ref<RHI::DescriptorSetLayout>
+    createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
                                         const DescriptorSetSchema& schema);
 
-[[nodiscard]] luna::RHI::Ref<luna::RHI::PipelineLayout>
-    createPipelineLayoutFromSchema(const luna::RHI::Ref<luna::RHI::Device>& device,
+[[nodiscard]] RHI::Ref<RHI::PipelineLayout>
+    createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
                                    const PipelineLayoutSchema& schema,
                                    const DescriptorSetLayoutRefs& layouts);
 

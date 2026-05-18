@@ -1,4 +1,4 @@
-﻿#include "Core/Log.h"
+#include "Core/Log.h"
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
 #include "Platform/Common/NativeWindowHandle.h"
@@ -30,27 +30,27 @@ namespace {
 constexpr uint64_t kScenePickReadbackBufferSize = 256;
 constexpr uint32_t kRenderGraphGpuTimestampQueryCount = 512;
 
-RenderGraphTextureDesc makeSwapchainSceneColorDesc(luna::RHI::Extent2D extent, luna::RHI::Format format)
+RenderGraphTextureDesc makeSwapchainSceneColorDesc(RHI::Extent2D extent, RHI::Format format)
 {
     return RenderGraphTextureDesc{
         .Name = "SceneSwapchainOutputColor",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = extent.width,
         .Height = extent.height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = format,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled |
-                 luna::RHI::TextureUsageFlags::TransferSrc,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled |
+                 RHI::TextureUsageFlags::TransferSrc,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& emptyRendererTextureRef()
+const RHI::Ref<RHI::Texture>& emptyRendererTextureRef()
 {
-    static const luna::RHI::Ref<luna::RHI::Texture> empty_ref{};
+    static const RHI::Ref<RHI::Texture> empty_ref{};
     return empty_ref;
 }
 
@@ -223,14 +223,14 @@ bool Renderer::init(Window& window, InitializationOptions options)
     m_window_context.native_window = static_cast<GLFWwindow*>(window.getNativeWindow());
     m_runtime.initialization_options = std::move(options);
     LUNA_RENDERER_INFO("Initializing renderer with requested backend '{}' and present mode '{}'",
-                       luna::RHI::BackendTypeToString(m_runtime.initialization_options.backend),
+                       RHI::BackendTypeToString(m_runtime.initialization_options.backend),
                        renderer_detail::presentModeToString(m_runtime.initialization_options.present_mode));
     if (m_window_context.native_window == nullptr) {
         LUNA_RENDERER_ERROR("Cannot initialize renderer without a GLFW window");
         return false;
     }
 
-    const luna::RHI::NativeWindowHandle window_handle = createNativeWindowHandle(window);
+    const RHI::NativeWindowHandle window_handle = createNativeWindowHandle(window);
     if (!window_handle.IsValid()) {
         LUNA_RENDERER_WARN("Native {} window handle is incomplete; surface creation may fail",
                            nativeWindowPlatformName());
@@ -240,18 +240,18 @@ bool Renderer::init(Window& window, InitializationOptions options)
     auto& runtime = m_runtime;
 
     try {
-        luna::RHI::InstanceCreateInfo instance_info;
+        RHI::InstanceCreateInfo instance_info;
         instance_info.type = runtime.initialization_options.backend;
         instance_info.applicationName = "Luna";
-        instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::Surface);
+        instance_info.enabledFeatures.push_back(RHI::InstanceFeature::Surface);
 #ifndef NDEBUG
-        instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::ValidationLayer);
+        instance_info.enabledFeatures.push_back(RHI::InstanceFeature::ValidationLayer);
 #endif
 
-        device_context.instance() = luna::RHI::Instance::Create(instance_info);
-        device_context.capabilities() = luna::RHI::makeCapabilitiesForBackend(device_context.instance()->GetType());
+        device_context.instance() = RHI::Instance::Create(instance_info);
+        device_context.capabilities() = RHI::makeCapabilitiesForBackend(device_context.instance()->GetType());
         LUNA_RENDERER_DEBUG("Created RHI instance for backend '{}'",
-                            luna::RHI::BackendTypeToString(device_context.instance()->GetType()));
+                            RHI::BackendTypeToString(device_context.instance()->GetType()));
         LUNA_RENDERER_DEBUG("RHI capabilities: default_flow={} imgui={} scene_pick_readback={} gpu_timestamp={} "
                             "gpu_timestamp_disjoint={} "
                             "projection_y_flip={} imgui_uv_y_flip={} pick_y_matches_display={}",
@@ -268,7 +268,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         if (!device_context.surface()) {
             throw std::runtime_error(
                 "Failed to create surface for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
+                std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
 
         const auto adapters = device_context.instance()->EnumerateAdapters();
@@ -292,7 +292,7 @@ bool Renderer::init(Window& window, InitializationOptions options)
         if (!device_context.adapter()) {
             throw std::runtime_error(
                 "No compatible adapter available for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
+                std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
         const auto selected_adapter_properties = device_context.adapter()->GetProperties();
         LUNA_RENDERER_INFO("Selected renderer adapter '{}' ({}, {} MiB dedicated VRAM)",
@@ -300,30 +300,30 @@ bool Renderer::init(Window& window, InitializationOptions options)
                            renderer_detail::adapterTypeToString(selected_adapter_properties.type),
                            selected_adapter_properties.dedicatedVideoMemory / (1'024ull * 1'024ull));
 
-        luna::RHI::DeviceCreateInfo device_info;
-        device_info.QueueRequests = {{luna::RHI::QueueType::Graphics, 1, 1.0f}};
+        RHI::DeviceCreateInfo device_info;
+        device_info.QueueRequests = {{RHI::QueueType::Graphics, 1, 1.0f}};
         device_info.CompatibleSurface = device_context.surface();
         const bool sampler_anisotropy_supported =
-            device_context.adapter()->IsFeatureSupported(luna::RHI::DeviceFeature::SamplerAnisotropy);
+            device_context.adapter()->IsFeatureSupported(RHI::DeviceFeature::SamplerAnisotropy);
         const bool independent_blending_supported =
-            device_context.adapter()->IsFeatureSupported(luna::RHI::DeviceFeature::IndependentBlending);
+            device_context.adapter()->IsFeatureSupported(RHI::DeviceFeature::IndependentBlending);
         if (sampler_anisotropy_supported) {
-            device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::SamplerAnisotropy);
+            device_info.EnabledFeatures.push_back(RHI::DeviceFeature::SamplerAnisotropy);
         }
         if (independent_blending_supported) {
-            device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::IndependentBlending);
+            device_info.EnabledFeatures.push_back(RHI::DeviceFeature::IndependentBlending);
         }
         LUNA_RENDERER_DEBUG("Device feature support: sampler_anisotropy={} independent_blending={}",
                             sampler_anisotropy_supported,
                             independent_blending_supported);
 
         device_context.device() = device_context.adapter()->CreateDevice(device_info);
-        device_context.graphicsQueue() = device_context.device()->GetQueue(luna::RHI::QueueType::Graphics, 0);
+        device_context.graphicsQueue() = device_context.device()->GetQueue(RHI::QueueType::Graphics, 0);
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
         LUNA_RENDERER_INFO("Initialized renderer backend '{}' with {} frame(s) in flight",
-                           luna::RHI::BackendTypeToString(device_context.instance()->GetType()),
+                           RHI::BackendTypeToString(device_context.instance()->GetType()),
                            m_swapchain_manager.framesInFlight());
         default_viewport.render_flow = std::make_unique<DefaultRenderFlow>();
     } catch (const std::exception& error) {
@@ -472,7 +472,7 @@ void Renderer::renderFrame()
         m_frame_index,
         extent.width,
         extent.height,
-        luna::RHI::BackendTypeToString(backend_type),
+        RHI::BackendTypeToString(backend_type),
         scene_output.mode == SceneOutputMode::OffscreenTexture ? "OffscreenTexture" : "Swapchain",
         runtime.imgui_enabled);
 
@@ -499,8 +499,8 @@ void Renderer::renderFrame()
     const auto back_buffer_handle = graph_builder.ImportTexture(
         "SwapchainBackBuffer",
         back_buffer,
-        was_presented ? luna::RHI::ResourceState::Present : luna::RHI::ResourceState::Undefined,
-        luna::RHI::ResourceState::Present);
+        was_presented ? RHI::ResourceState::Present : RHI::ResourceState::Undefined,
+        RHI::ResourceState::Present);
     const ScenePickReadbackSlot* pick_readback_slot = frame_resources.pickReadbackSlot(m_frame_index);
     const bool pick_readback_slot_available = pick_readback_slot != nullptr && pick_readback_slot->buffer;
     const SceneViewportRenderResult scene_result = renderSceneViewport(
@@ -576,10 +576,10 @@ void Renderer::renderFrame()
 
                 pass_builder.WriteColor(
                     back_buffer_handle,
-                    render_scene_to_swapchain && scene_output_valid ? luna::RHI::AttachmentLoadOp::Load
-                                                                    : luna::RHI::AttachmentLoadOp::Clear,
-                    luna::RHI::AttachmentStoreOp::Store,
-                    luna::RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+                    render_scene_to_swapchain && scene_output_valid ? RHI::AttachmentLoadOp::Load
+                                                                    : RHI::AttachmentLoadOp::Clear,
+                    RHI::AttachmentStoreOp::Store,
+                    RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
             },
             [this, back_buffer_handle](luna::RenderGraphRasterPassContext& pass_context) {
                 pass_context.beginRendering();
@@ -596,9 +596,9 @@ void Renderer::renderFrame()
             [back_buffer_handle, clear_color = runtime.clear_color](luna::RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.WriteColor(
                     back_buffer_handle,
-                    luna::RHI::AttachmentLoadOp::Clear,
-                    luna::RHI::AttachmentStoreOp::Store,
-                    luna::RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+                    RHI::AttachmentLoadOp::Clear,
+                    RHI::AttachmentStoreOp::Store,
+                    RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
             },
             [](luna::RenderGraphRasterPassContext& pass_context) {
                 pass_context.beginRendering();
@@ -606,7 +606,7 @@ void Renderer::renderFrame()
             });
     }
 
-    graph_builder.ExportTexture(back_buffer_handle, luna::RHI::ResourceState::Present);
+    graph_builder.ExportTexture(back_buffer_handle, RHI::ResourceState::Present);
 
     frame_resources.setRenderGraph(m_frame_index, graph_builder.Build());
     if (luna::RenderGraph* render_graph = frame_resources.renderGraph(m_frame_index)) {
@@ -643,7 +643,7 @@ void Renderer::renderFrame()
     if (scene_result.render_to_offscreen && scene_result.output_valid && scene_output.queued_pick_request.has_value() &&
         !capabilities.supports_scene_pick_readback) {
         LUNA_RENDERER_WARN("Scene pick readback is not supported on backend '{}'; dropping pick request",
-                           luna::RHI::BackendTypeToString(backend_type));
+                           RHI::BackendTypeToString(backend_type));
         scene_output.queued_pick_request.reset();
     }
 
@@ -658,13 +658,13 @@ void Renderer::renderFrame()
                                 pick_request.x,
                                 pick_request.y,
                                 m_frame_index);
-            const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{luna::RHI::BufferImageCopy{
+            const std::array<RHI::BufferImageCopy, 1> copy_regions{RHI::BufferImageCopy{
                 .BufferOffset = 0,
                 .BufferRowLength = 0,
                 .BufferImageHeight = 0,
                 .ImageSubresource =
                     {
-                        .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                        .AspectMask = RHI::ImageAspectFlags::Color,
                         .MipLevel = 0,
                         .BaseArrayLayer = 0,
                         .LayerCount = 1,
@@ -678,7 +678,7 @@ void Renderer::renderFrame()
             }};
 
             frame_resources.currentCommandBuffer()->CopyImageToBuffer(
-                scene_output.pick, luna::RHI::ResourceState::CopySource, readback_slot->buffer, copy_regions);
+                scene_output.pick, RHI::ResourceState::CopySource, readback_slot->buffer, copy_regions);
             readback_slot->pending = true;
             scene_output.queued_pick_request.reset();
         }
@@ -691,17 +691,17 @@ void Renderer::renderFrame()
         }
 
         auto& output = rendered_viewport.viewport->output;
-        output.color_state = luna::RHI::ResourceState::ShaderRead;
+        output.color_state = RHI::ResourceState::ShaderRead;
         output.depth_state =
-            rendered_viewport.result.depth.isValid() ? luna::RHI::ResourceState::Common : luna::RHI::ResourceState::Undefined;
+            rendered_viewport.result.depth.isValid() ? RHI::ResourceState::Common : RHI::ResourceState::Undefined;
         output.pick_state =
             rendered_viewport.result.pick.isValid()
-                ? (rendered_viewport.result.issue_pick_readback ? luna::RHI::ResourceState::CopySource
-                                                                : luna::RHI::ResourceState::Common)
-                : luna::RHI::ResourceState::Undefined;
+                ? (rendered_viewport.result.issue_pick_readback ? RHI::ResourceState::CopySource
+                                                                : RHI::ResourceState::Common)
+                : RHI::ResourceState::Undefined;
         output.debug_color_state = rendered_viewport.result.debug.isValid()
-                                       ? luna::RHI::ResourceState::ShaderRead
-                                       : luna::RHI::ResourceState::Undefined;
+                                       ? RHI::ResourceState::ShaderRead
+                                       : RHI::ResourceState::Undefined;
     }
 
     m_swapchain_image_history.markPresented(m_image_index);
@@ -811,12 +811,12 @@ void Renderer::setSceneOutputSize(uint32_t width, uint32_t height)
     setSceneViewportOutputSize(getDefaultSceneViewportHandle(), width, height);
 }
 
-luna::RHI::Extent2D Renderer::getSceneOutputSize() const
+RHI::Extent2D Renderer::getSceneOutputSize() const
 {
     return getSceneViewportOutputSize(getDefaultSceneViewportHandle());
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getSceneOutputTexture() const
+const RHI::Ref<RHI::Texture>& Renderer::getSceneOutputTexture() const
 {
     return getSceneViewportOutputTexture(getDefaultSceneViewportHandle());
 }
@@ -918,13 +918,13 @@ void Renderer::setSceneViewportOutputSize(SceneViewportHandle handle, uint32_t w
     ensureSceneOutputTargets(*viewport, width, height);
 }
 
-luna::RHI::Extent2D Renderer::getSceneViewportOutputSize(SceneViewportHandle handle) const
+RHI::Extent2D Renderer::getSceneViewportOutputSize(SceneViewportHandle handle) const
 {
     const SceneViewportState* viewport = findSceneViewportByHandle(handle);
-    return viewport != nullptr ? viewport->output.extent : luna::RHI::Extent2D{};
+    return viewport != nullptr ? viewport->output.extent : RHI::Extent2D{};
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getSceneViewportOutputTexture(SceneViewportHandle handle) const
+const RHI::Ref<RHI::Texture>& Renderer::getSceneViewportOutputTexture(SceneViewportHandle handle) const
 {
     const SceneViewportState* viewport = findSceneViewportByHandle(handle);
     return viewport != nullptr ? viewport->output.color : emptyRendererTextureRef();
@@ -981,7 +981,7 @@ float Renderer::getRenderDebugVelocityScale() const
     return defaultSceneViewport().output.debug_velocity_scale;
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& Renderer::getRenderDebugOutputTexture() const
+const RHI::Ref<RHI::Texture>& Renderer::getRenderDebugOutputTexture() const
 {
     return defaultSceneViewport().output.debug_color;
 }
@@ -1055,37 +1055,37 @@ GLFWwindow* Renderer::getNativeWindow() const
     return m_window_context.native_window;
 }
 
-const luna::RHI::Ref<luna::RHI::Instance>& Renderer::getInstance() const
+const RHI::Ref<RHI::Instance>& Renderer::getInstance() const
 {
     return m_device_context.instance();
 }
 
-const luna::RHI::Ref<luna::RHI::Adapter>& Renderer::getAdapter() const
+const RHI::Ref<RHI::Adapter>& Renderer::getAdapter() const
 {
     return m_device_context.adapter();
 }
 
-const luna::RHI::RHICapabilities& Renderer::getCapabilities() const noexcept
+const RHI::RHICapabilities& Renderer::getCapabilities() const noexcept
 {
     return m_device_context.capabilities();
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& Renderer::getDevice() const
+const RHI::Ref<RHI::Device>& Renderer::getDevice() const
 {
     return m_device_context.device();
 }
 
-const luna::RHI::Ref<luna::RHI::Queue>& Renderer::getGraphicsQueue() const
+const RHI::Ref<RHI::Queue>& Renderer::getGraphicsQueue() const
 {
     return m_device_context.graphicsQueue();
 }
 
-const luna::RHI::Ref<luna::RHI::Swapchain>& Renderer::getSwapchain() const
+const RHI::Ref<RHI::Swapchain>& Renderer::getSwapchain() const
 {
     return m_swapchain_manager.swapchain();
 }
 
-const luna::RHI::Ref<luna::RHI::Synchronization>& Renderer::getSynchronization() const
+const RHI::Ref<RHI::Synchronization>& Renderer::getSynchronization() const
 {
     return m_swapchain_manager.synchronization();
 }
@@ -1265,7 +1265,7 @@ void Renderer::configureSwapchainFrameResources()
     }
 }
 
-luna::RHI::Extent2D Renderer::getFramebufferExtent() const
+RHI::Extent2D Renderer::getFramebufferExtent() const
 {
     if (m_window_context.native_window == nullptr) {
         return {0, 0};
@@ -1311,8 +1311,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
         .render_to_swapchain = render_to_swapchain,
     };
 
-    luna::RHI::Format scene_color_format = request.surface_format;
-    luna::RHI::Format scene_debug_format = request.surface_format;
+    RHI::Format scene_color_format = request.surface_format;
+    RHI::Format scene_debug_format = request.surface_format;
     uint32_t scene_width = 0;
     uint32_t scene_height = 0;
 
@@ -1328,34 +1328,34 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                 .Name = "SceneDepthTexture",
                 .Width = request.framebuffer_extent.width,
                 .Height = request.framebuffer_extent.height,
-                .Format = luna::RHI::Format::D32_FLOAT,
-                .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment |
-                         luna::RHI::TextureUsageFlags::Sampled,
-                .InitialState = luna::RHI::ResourceState::Undefined,
-                .SampleCount = luna::RHI::SampleCount::Count1,
+                .Format = RHI::Format::D32_FLOAT,
+                .Usage = RHI::TextureUsageFlags::DepthStencilAttachment |
+                         RHI::TextureUsageFlags::Sampled,
+                .InitialState = RHI::ResourceState::Undefined,
+                .SampleCount = RHI::SampleCount::Count1,
             });
             result.pick = graph_builder.CreateTexture(luna::RenderGraphTextureDesc{
                 .Name = "ScenePickTexture",
                 .Width = request.framebuffer_extent.width,
                 .Height = request.framebuffer_extent.height,
-                .Format = luna::RHI::Format::R32_UINT,
-                .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-                .InitialState = luna::RHI::ResourceState::Undefined,
-                .SampleCount = luna::RHI::SampleCount::Count1,
+                .Format = RHI::Format::R32_UINT,
+                .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+                .InitialState = RHI::ResourceState::Undefined,
+                .SampleCount = RHI::SampleCount::Count1,
             });
         }
     } else if (render_to_offscreen) {
         result.color = graph_builder.ImportTexture(
-            "SceneOutputColor", output.color, output.color_state, luna::RHI::ResourceState::ShaderRead);
+            "SceneOutputColor", output.color, output.color_state, RHI::ResourceState::ShaderRead);
         result.depth = graph_builder.ImportTexture(
-            "SceneOutputDepth", output.depth, output.depth_state, luna::RHI::ResourceState::Common);
+            "SceneOutputDepth", output.depth, output.depth_state, RHI::ResourceState::Common);
         result.pick = graph_builder.ImportTexture(
-            "SceneOutputPick", output.pick, output.pick_state, luna::RHI::ResourceState::Common);
+            "SceneOutputPick", output.pick, output.pick_state, RHI::ResourceState::Common);
         if (output.debug_view_mode != RenderDebugViewMode::None && output.debug_color) {
             result.debug = graph_builder.ImportTexture("SceneDebugOutput",
                                                        output.debug_color,
                                                        output.debug_color_state,
-                                                       luna::RHI::ResourceState::ShaderRead);
+                                                       RHI::ResourceState::ShaderRead);
             scene_debug_format = output.debug_color->GetFormat();
         }
         scene_color_format = output.color ? output.color->GetFormat() : request.surface_format;
@@ -1431,9 +1431,9 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                  clear_color = request.clear_color](luna::RenderGraphRasterPassBuilder& pass_builder) {
                     pass_builder.WriteColor(
                         scene_color_handle,
-                        luna::RHI::AttachmentLoadOp::Clear,
-                        luna::RHI::AttachmentStoreOp::Store,
-                        luna::RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
+                        RHI::AttachmentLoadOp::Clear,
+                        RHI::AttachmentStoreOp::Store,
+                        RHI::ClearValue::ColorFloat(clear_color.r, clear_color.g, clear_color.b, clear_color.a));
                 },
                 [](luna::RenderGraphRasterPassContext& pass_context) {
                     pass_context.beginRendering();
@@ -1447,17 +1447,17 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
     }
 
     if (render_to_offscreen && result.output_valid) {
-        graph_builder.ExportTexture(result.color, luna::RHI::ResourceState::ShaderRead);
+        graph_builder.ExportTexture(result.color, RHI::ResourceState::ShaderRead);
         if (result.depth.isValid()) {
-            graph_builder.ExportTexture(result.depth, luna::RHI::ResourceState::Common);
+            graph_builder.ExportTexture(result.depth, RHI::ResourceState::Common);
         }
         if (result.pick.isValid()) {
             graph_builder.ExportTexture(result.pick,
-                                        result.issue_pick_readback ? luna::RHI::ResourceState::CopySource
-                                                                   : luna::RHI::ResourceState::Common);
+                                        result.issue_pick_readback ? RHI::ResourceState::CopySource
+                                                                   : RHI::ResourceState::Common);
         }
         if (result.debug.isValid()) {
-            graph_builder.ExportTexture(result.debug, luna::RHI::ResourceState::ShaderRead);
+            graph_builder.ExportTexture(result.debug, RHI::ResourceState::ShaderRead);
         }
     }
 
@@ -1472,7 +1472,7 @@ void Renderer::invalidateRenderFeatureHistory(SceneViewportState& viewport,
 
 render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
     const SceneViewportState& viewport,
-    luna::RHI::BackendType backend_type,
+    RHI::BackendType backend_type,
     SceneOutputMode scene_output_mode,
     uint64_t frame_index,
     uint32_t framebuffer_width,
@@ -1512,7 +1512,7 @@ render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
 }
 
 void Renderer::stageRenderFeatureFrameContext(SceneViewportState& viewport,
-                                              luna::RHI::BackendType backend_type,
+                                              RHI::BackendType backend_type,
                                               SceneOutputMode scene_output_mode,
                                               uint32_t framebuffer_width,
                                               uint32_t framebuffer_height) noexcept
@@ -1552,8 +1552,8 @@ bool Renderer::hasMatchingSceneOutputTargets(const SceneViewportState& viewport,
            output.pick->GetWidth() == width && output.pick->GetHeight() == height &&
            output.debug_color->GetWidth() == width && output.debug_color->GetHeight() == height &&
            output.color->GetFormat() == m_swapchain_manager.surfaceFormat() &&
-           output.depth->GetFormat() == luna::RHI::Format::D32_FLOAT &&
-           output.pick->GetFormat() == luna::RHI::Format::R32_UINT &&
+           output.depth->GetFormat() == RHI::Format::D32_FLOAT &&
+           output.pick->GetFormat() == RHI::Format::R32_UINT &&
            output.debug_color->GetFormat() == m_swapchain_manager.surfaceFormat();
 }
 
@@ -1583,47 +1583,47 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
     releaseSceneOutputTargets(viewport);
 
     output.color = m_device_context.device()->CreateTexture(
-        luna::RHI::TextureBuilder()
+        RHI::TextureBuilder()
             .SetSize(width, height)
             .SetFormat(m_swapchain_manager.surfaceFormat())
-            .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetUsage(RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled)
+            .SetInitialState(RHI::ResourceState::Undefined)
             .SetName("SceneOutputColor")
             .Build());
 
     output.depth =
-        m_device_context.device()->CreateTexture(luna::RHI::TextureBuilder()
+        m_device_context.device()->CreateTexture(RHI::TextureBuilder()
                                                    .SetSize(width, height)
-                                                   .SetFormat(luna::RHI::Format::D32_FLOAT)
-                                                   .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment |
-                                                             luna::RHI::TextureUsageFlags::Sampled)
-                                                   .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                                   .SetFormat(RHI::Format::D32_FLOAT)
+                                                   .SetUsage(RHI::TextureUsageFlags::DepthStencilAttachment |
+                                                             RHI::TextureUsageFlags::Sampled)
+                                                   .SetInitialState(RHI::ResourceState::Undefined)
                                                    .SetName("SceneOutputDepth")
                                                    .Build());
 
     output.pick = m_device_context.device()->CreateTexture(
-        luna::RHI::TextureBuilder()
+        RHI::TextureBuilder()
             .SetSize(width, height)
-            .SetFormat(luna::RHI::Format::R32_UINT)
-            .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled |
-                      luna::RHI::TextureUsageFlags::TransferSrc)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetFormat(RHI::Format::R32_UINT)
+            .SetUsage(RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled |
+                      RHI::TextureUsageFlags::TransferSrc)
+            .SetInitialState(RHI::ResourceState::Undefined)
             .SetName("SceneOutputPick")
             .Build());
 
     output.debug_color = m_device_context.device()->CreateTexture(
-        luna::RHI::TextureBuilder()
+        RHI::TextureBuilder()
             .SetSize(width, height)
             .SetFormat(m_swapchain_manager.surfaceFormat())
-            .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetUsage(RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled)
+            .SetInitialState(RHI::ResourceState::Undefined)
             .SetName("SceneDebugOutput")
             .Build());
 
-    output.color_state = luna::RHI::ResourceState::Undefined;
-    output.depth_state = luna::RHI::ResourceState::Undefined;
-    output.pick_state = luna::RHI::ResourceState::Undefined;
-    output.debug_color_state = luna::RHI::ResourceState::Undefined;
+    output.color_state = RHI::ResourceState::Undefined;
+    output.depth_state = RHI::ResourceState::Undefined;
+    output.pick_state = RHI::ResourceState::Undefined;
+    output.debug_color_state = RHI::ResourceState::Undefined;
 
     if (!output.color || !output.depth || !output.pick || !output.debug_color) {
         LUNA_RENDERER_ERROR("Failed to create complete scene output target set: color={} depth={} pick={} debug={}",
@@ -1646,10 +1646,10 @@ void Renderer::releaseSceneOutputTargets(SceneViewportState& viewport)
     output.depth.reset();
     output.pick.reset();
     output.debug_color.reset();
-    output.color_state = luna::RHI::ResourceState::Undefined;
-    output.depth_state = luna::RHI::ResourceState::Undefined;
-    output.pick_state = luna::RHI::ResourceState::Undefined;
-    output.debug_color_state = luna::RHI::ResourceState::Undefined;
+    output.color_state = RHI::ResourceState::Undefined;
+    output.depth_state = RHI::ResourceState::Undefined;
+    output.pick_state = RHI::ResourceState::Undefined;
+    output.debug_color_state = RHI::ResourceState::Undefined;
     output.queued_pick_request.reset();
     output.completed_pick_id.reset();
     output.debug_pick_marker = {};
@@ -1684,7 +1684,7 @@ void Renderer::ensureGpuTimingResources()
     if (!m_device_context.capabilities().supports_gpu_timestamp) {
         frame_resources.clearGpuTimingSlots();
         LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on backend '{}'",
-                           luna::RHI::BackendTypeToString(m_device_context.capabilities().backend_type));
+                           RHI::BackendTypeToString(m_device_context.capabilities().backend_type));
         return;
     }
 
@@ -1708,13 +1708,13 @@ void Renderer::ensureGpuTimingResources()
         if (!slot) {
             continue;
         }
-        slot->query_pool = m_device_context.device()->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
-            .Type = luna::RHI::QueryType::Timestamp,
+        slot->query_pool = m_device_context.device()->CreateQueryPool(RHI::QueryPoolCreateInfo{
+            .Type = RHI::QueryType::Timestamp,
             .Count = kRenderGraphGpuTimestampQueryCount,
         });
         if (use_disjoint_timestamps) {
-            slot->disjoint_query_pool = m_device_context.device()->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
-                .Type = luna::RHI::QueryType::TimestampDisjoint,
+            slot->disjoint_query_pool = m_device_context.device()->CreateQueryPool(RHI::QueryPoolCreateInfo{
+                .Type = RHI::QueryType::TimestampDisjoint,
                 .Count = 1,
             });
         } else {
@@ -1754,7 +1754,7 @@ void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
             return;
         }
 
-        luna::RHI::TimestampDisjointResult disjoint_result{};
+        RHI::TimestampDisjointResult disjoint_result{};
         if (!slot->disjoint_query_pool->GetTimestampDisjointResult(0, disjoint_result, false)) {
             LUNA_RENDERER_FRAME_TRACE("RenderGraph GPU timing disjoint result is not ready for frame {}", frame_index);
             return;
@@ -1851,10 +1851,10 @@ void Renderer::ensureScenePickReadbackBuffers()
         if (!slot) {
             continue;
         }
-        slot->buffer = m_device_context.device()->CreateBuffer(luna::RHI::BufferBuilder()
+        slot->buffer = m_device_context.device()->CreateBuffer(RHI::BufferBuilder()
                                                                   .SetSize(kScenePickReadbackBufferSize)
-                                                                  .SetUsage(luna::RHI::BufferUsageFlags::TransferDst)
-                                                                  .SetMemoryUsage(luna::RHI::BufferMemoryUsage::GpuToCpu)
+                                                                  .SetUsage(RHI::BufferUsageFlags::TransferDst)
+                                                                  .SetMemoryUsage(RHI::BufferMemoryUsage::GpuToCpu)
                                                                   .SetName("ScenePickReadback_" + std::to_string(frame_index))
                                                                   .Build());
         slot->pending = false;

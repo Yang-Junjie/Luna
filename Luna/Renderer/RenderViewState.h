@@ -43,7 +43,7 @@ struct RenderViewFrameState {
 class RenderViewHistory final {
 public:
     [[nodiscard]] RenderViewFrameState beginFrame(const Camera& camera,
-                                                  const luna::RHI::RHICapabilities& capabilities,
+                                                  const RHI::RHICapabilities& capabilities,
                                                   uint64_t frame_index,
                                                   uint32_t framebuffer_width,
                                                   uint32_t framebuffer_height,

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Main renderer framwork for the engine runtime.
 // Owns device-facing frame state, scene output targets, and the public frame loop,
@@ -65,17 +65,17 @@ public:
 
     struct InitializationOptions {
         InitializationOptions()
-            : backend(luna::RHI::BackendType::Auto),
-              present_mode(luna::RHI::PresentMode::Fifo)
+            : backend(RHI::BackendType::Auto),
+              present_mode(RHI::PresentMode::Fifo)
         {}
 
-        InitializationOptions(luna::RHI::BackendType backend_type, luna::RHI::PresentMode mode)
+        InitializationOptions(RHI::BackendType backend_type, RHI::PresentMode mode)
             : backend(backend_type),
               present_mode(mode)
         {}
 
-        luna::RHI::BackendType backend;
-        luna::RHI::PresentMode present_mode;
+        RHI::BackendType backend;
+        RHI::PresentMode present_mode;
     };
 
     enum class SceneOutputMode : uint8_t {
@@ -109,8 +109,8 @@ public:
     SceneOutputMode getSceneOutputMode() const;
     void setSceneOutputMode(SceneOutputMode mode);
     void setSceneOutputSize(uint32_t width, uint32_t height);
-    luna::RHI::Extent2D getSceneOutputSize() const;
-    const luna::RHI::Ref<luna::RHI::Texture>& getSceneOutputTexture() const;
+    RHI::Extent2D getSceneOutputSize() const;
+    const RHI::Ref<RHI::Texture>& getSceneOutputTexture() const;
 
     [[nodiscard]] SceneViewportHandle getDefaultSceneViewportHandle() const noexcept;
     [[nodiscard]] SceneViewportHandle createSceneViewportHandle();
@@ -118,8 +118,8 @@ public:
     [[nodiscard]] bool isSceneViewportHandleValid(SceneViewportHandle handle) const;
     void setSceneViewportOutputMode(SceneViewportHandle handle, SceneOutputMode mode);
     void setSceneViewportOutputSize(SceneViewportHandle handle, uint32_t width, uint32_t height);
-    [[nodiscard]] luna::RHI::Extent2D getSceneViewportOutputSize(SceneViewportHandle handle) const;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>&
+    [[nodiscard]] RHI::Extent2D getSceneViewportOutputSize(SceneViewportHandle handle) const;
+    [[nodiscard]] const RHI::Ref<RHI::Texture>&
         getSceneViewportOutputTexture(SceneViewportHandle handle) const;
     [[nodiscard]] RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle);
     [[nodiscard]] const RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle) const;
@@ -128,7 +128,7 @@ public:
     [[nodiscard]] RenderDebugViewMode getRenderDebugViewMode() const;
     void setRenderDebugVelocityScale(float scale);
     [[nodiscard]] float getRenderDebugVelocityScale() const;
-    const luna::RHI::Ref<luna::RHI::Texture>& getRenderDebugOutputTexture() const;
+    const RHI::Ref<RHI::Texture>& getRenderDebugOutputTexture() const;
 
     void setScenePickDebugVisualizationEnabled(bool enabled);
     bool isScenePickDebugVisualizationEnabled() const;
@@ -137,15 +137,15 @@ public:
 
     GLFWwindow* getNativeWindow() const;
 
-    const luna::RHI::Ref<luna::RHI::Instance>& getInstance() const;
-    const luna::RHI::Ref<luna::RHI::Adapter>& getAdapter() const;
-    [[nodiscard]] const luna::RHI::RHICapabilities& getCapabilities() const noexcept;
-    const luna::RHI::Ref<luna::RHI::Device>& getDevice() const;
-    const luna::RHI::Ref<luna::RHI::Queue>& getGraphicsQueue() const;
-    const luna::RHI::Ref<luna::RHI::Swapchain>& getSwapchain() const;
-    const luna::RHI::Ref<luna::RHI::Synchronization>& getSynchronization() const;
+    const RHI::Ref<RHI::Instance>& getInstance() const;
+    const RHI::Ref<RHI::Adapter>& getAdapter() const;
+    [[nodiscard]] const RHI::RHICapabilities& getCapabilities() const noexcept;
+    const RHI::Ref<RHI::Device>& getDevice() const;
+    const RHI::Ref<RHI::Queue>& getGraphicsQueue() const;
+    const RHI::Ref<RHI::Swapchain>& getSwapchain() const;
+    const RHI::Ref<RHI::Synchronization>& getSynchronization() const;
 
-    const luna::RHI::Ref<luna::RHI::ShaderCompiler>& getShaderCompiler() const
+    const RHI::Ref<RHI::ShaderCompiler>& getShaderCompiler() const
     {
         return m_device_context.shaderCompiler();
     }
@@ -189,15 +189,15 @@ private:
         };
 
         SceneOutputMode mode{SceneOutputMode::Swapchain};
-        luna::RHI::Extent2D extent{0, 0};
-        luna::RHI::Ref<luna::RHI::Texture> color;
-        luna::RHI::Ref<luna::RHI::Texture> depth;
-        luna::RHI::Ref<luna::RHI::Texture> pick;
-        luna::RHI::Ref<luna::RHI::Texture> debug_color;
-        luna::RHI::ResourceState color_state{luna::RHI::ResourceState::Undefined};
-        luna::RHI::ResourceState depth_state{luna::RHI::ResourceState::Undefined};
-        luna::RHI::ResourceState pick_state{luna::RHI::ResourceState::Undefined};
-        luna::RHI::ResourceState debug_color_state{luna::RHI::ResourceState::Undefined};
+        RHI::Extent2D extent{0, 0};
+        RHI::Ref<RHI::Texture> color;
+        RHI::Ref<RHI::Texture> depth;
+        RHI::Ref<RHI::Texture> pick;
+        RHI::Ref<RHI::Texture> debug_color;
+        RHI::ResourceState color_state{RHI::ResourceState::Undefined};
+        RHI::ResourceState depth_state{RHI::ResourceState::Undefined};
+        RHI::ResourceState pick_state{RHI::ResourceState::Undefined};
+        RHI::ResourceState debug_color_state{RHI::ResourceState::Undefined};
         RenderDebugViewMode debug_view_mode{RenderDebugViewMode::None};
         float debug_velocity_scale{20.0f};
         bool pick_debug_visualization_enabled{false};
@@ -218,8 +218,8 @@ private:
 
     struct RenderFeatureHistoryState {
         bool has_previous_frame{false};
-        luna::RHI::Device* device{nullptr};
-        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
+        RHI::Device* device{nullptr};
+        RHI::BackendType backend_type{RHI::BackendType::Auto};
         SceneOutputMode scene_output_mode{SceneOutputMode::Swapchain};
         uint32_t framebuffer_width{0};
         uint32_t framebuffer_height{0};
@@ -227,8 +227,8 @@ private:
         render_flow::RenderFeatureHistoryInvalidationFlags pending_flags{
             render_flow::RenderFeatureHistoryInvalidationFlags::None};
         bool has_pending_frame{false};
-        luna::RHI::Device* pending_device{nullptr};
-        luna::RHI::BackendType pending_backend_type{luna::RHI::BackendType::Auto};
+        RHI::Device* pending_device{nullptr};
+        RHI::BackendType pending_backend_type{RHI::BackendType::Auto};
         SceneOutputMode pending_scene_output_mode{SceneOutputMode::Swapchain};
         uint32_t pending_framebuffer_width{0};
         uint32_t pending_framebuffer_height{0};
@@ -253,9 +253,9 @@ private:
 
     struct SceneViewportRenderRequest {
         luna::RenderGraphTextureHandle back_buffer;
-        luna::RHI::Extent2D framebuffer_extent{0, 0};
-        luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
-        luna::RHI::BackendType backend_type{luna::RHI::BackendType::Auto};
+        RHI::Extent2D framebuffer_extent{0, 0};
+        RHI::Format surface_format{RHI::Format::UNDEFINED};
+        RHI::BackendType backend_type{RHI::BackendType::Auto};
         glm::vec4 clear_color{0.0f};
         uint64_t frame_index{0};
         bool pick_readback_supported{false};
@@ -276,7 +276,7 @@ private:
     [[nodiscard]] SwapchainCreateRequest makeSwapchainCreateRequest(uint32_t width, uint32_t height);
     void createSwapchain(uint32_t width, uint32_t height);
     void configureSwapchainFrameResources();
-    luna::RHI::Extent2D getFramebufferExtent() const;
+    RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
     SceneViewportId createSceneViewport();
     void destroySceneViewport(SceneViewportId id);
@@ -293,13 +293,13 @@ private:
                                         render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
     [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(
         const SceneViewportState& viewport,
-        luna::RHI::BackendType backend_type,
+        RHI::BackendType backend_type,
         SceneOutputMode scene_output_mode,
         uint64_t frame_index,
         uint32_t framebuffer_width,
         uint32_t framebuffer_height) const;
     void stageRenderFeatureFrameContext(SceneViewportState& viewport,
-                                        luna::RHI::BackendType backend_type,
+                                        RHI::BackendType backend_type,
                                         SceneOutputMode scene_output_mode,
                                         uint32_t framebuffer_width,
                                         uint32_t framebuffer_height) noexcept;

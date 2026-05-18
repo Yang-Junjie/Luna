@@ -134,7 +134,7 @@ bool isUsableEnvironmentTexture(const std::shared_ptr<Texture>& texture)
     return image.ImageFormat == render_flow::default_scene_detail::kEnvironmentFormat;
 }
 
-uint32_t mipLevelCount(const luna::RHI::Ref<luna::RHI::Texture>& texture)
+uint32_t mipLevelCount(const RHI::Ref<RHI::Texture>& texture)
 {
     if (!texture || texture->GetMipLevels() == 0) {
         return 1;
@@ -240,33 +240,33 @@ ImageData createProceduralSkyImageData(const EnvironmentResources::SourceSignatu
     };
 }
 
-luna::RHI::ImageSubresourceRange fullColorRange(const luna::RHI::Ref<luna::RHI::Texture>& texture)
+RHI::ImageSubresourceRange fullColorRange(const RHI::Ref<RHI::Texture>& texture)
 {
     if (!texture) {
         return {};
     }
 
-    return luna::RHI::ImageSubresourceRange{
+    return RHI::ImageSubresourceRange{
         .BaseMipLevel = 0,
         .LevelCount = texture->GetMipLevels(),
         .BaseArrayLayer = 0,
         .LayerCount = texture->GetArrayLayers(),
-        .AspectMask = luna::RHI::ImageAspectFlags::Color,
+        .AspectMask = RHI::ImageAspectFlags::Color,
     };
 }
 
-void transitionTexture(luna::RHI::CommandBufferEncoder& commands,
-                       const luna::RHI::Ref<luna::RHI::Texture>& texture,
-                       luna::RHI::ResourceState old_state,
-                       luna::RHI::ResourceState new_state)
+void transitionTexture(RHI::CommandBufferEncoder& commands,
+                       const RHI::Ref<RHI::Texture>& texture,
+                       RHI::ResourceState old_state,
+                       RHI::ResourceState new_state)
 {
     if (!texture || old_state == new_state) {
         return;
     }
 
-    commands.PipelineBarrier(luna::RHI::SyncScope::AllCommands,
-                             luna::RHI::SyncScope::AllCommands,
-                             std::array{luna::RHI::TextureBarrier{
+    commands.PipelineBarrier(RHI::SyncScope::AllCommands,
+                             RHI::SyncScope::AllCommands,
+                             std::array{RHI::TextureBarrier{
                                  .Texture = texture,
                                  .OldState = old_state,
                                  .NewState = new_state,
@@ -274,33 +274,33 @@ void transitionTexture(luna::RHI::CommandBufferEncoder& commands,
                              }});
 }
 
-luna::RHI::TextureViewDesc cubeStorageViewDesc(uint32_t mip_level, luna::RHI::Format format)
+RHI::TextureViewDesc cubeStorageViewDesc(uint32_t mip_level, RHI::Format format)
 {
-    return luna::RHI::TextureViewDesc{
-        .ViewType = luna::RHI::TextureType::Texture2DArray,
+    return RHI::TextureViewDesc{
+        .ViewType = RHI::TextureType::Texture2DArray,
         .FormatOverride = format,
         .BaseMipLevel = mip_level,
         .MipLevelCount = 1,
         .BaseArrayLayer = 0,
         .ArrayLayerCount = 6,
-        .Aspect = luna::RHI::AspectMask::Color,
+        .Aspect = RHI::AspectMask::Color,
     };
 }
 
-luna::RHI::TextureViewDesc texture2DStorageViewDesc(luna::RHI::Format format)
+RHI::TextureViewDesc texture2DStorageViewDesc(RHI::Format format)
 {
-    return luna::RHI::TextureViewDesc{
-        .ViewType = luna::RHI::TextureType::Texture2D,
+    return RHI::TextureViewDesc{
+        .ViewType = RHI::TextureType::Texture2D,
         .FormatOverride = format,
         .BaseMipLevel = 0,
         .MipLevelCount = 1,
         .BaseArrayLayer = 0,
         .ArrayLayerCount = 1,
-        .Aspect = luna::RHI::AspectMask::Color,
+        .Aspect = RHI::AspectMask::Color,
     };
 }
 
-luna::RHI::Ref<luna::RHI::Texture> createCubeTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+RHI::Ref<RHI::Texture> createCubeTexture(const RHI::Ref<RHI::Device>& device,
                                                      uint32_t size,
                                                      uint32_t mip_levels,
                                                      std::string_view name)
@@ -310,78 +310,78 @@ luna::RHI::Ref<luna::RHI::Texture> createCubeTexture(const luna::RHI::Ref<luna::
     }
 
     return device->CreateTexture(
-        luna::RHI::TextureBuilder()
-            .SetType(luna::RHI::TextureType::TextureCube)
+        RHI::TextureBuilder()
+            .SetType(RHI::TextureType::TextureCube)
             .SetSize(size, size)
             .SetArrayLayers(6)
             .SetMipLevels(mip_levels)
             .SetFormat(render_flow::default_scene_detail::kEnvironmentIblFormat)
-            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::Storage)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
+            .SetInitialState(RHI::ResourceState::Undefined)
             .SetName(std::string(name))
             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Texture> createBrdfLutTexture(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Texture> createBrdfLutTexture(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
     return device->CreateTexture(
-        luna::RHI::TextureBuilder()
+        RHI::TextureBuilder()
             .SetSize(render_flow::default_scene_detail::kEnvironmentBrdfLutSize,
                      render_flow::default_scene_detail::kEnvironmentBrdfLutSize)
             .SetFormat(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat)
-            .SetUsage(luna::RHI::TextureUsageFlags::Sampled | luna::RHI::TextureUsageFlags::Storage)
-            .SetInitialState(luna::RHI::ResourceState::Undefined)
+            .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
+            .SetInitialState(RHI::ResourceState::Undefined)
             .SetName("SceneEnvironmentBrdfLut")
             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Sampler> createIblSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Sampler> createIblSampler(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateSampler(luna::RHI::SamplerBuilder()
-                                     .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Linear)
-                                     .SetAddressModeU(luna::RHI::SamplerAddressMode::Repeat)
-                                     .SetAddressModeV(luna::RHI::SamplerAddressMode::ClampToEdge)
-                                     .SetAddressModeW(luna::RHI::SamplerAddressMode::ClampToEdge)
+    return device->CreateSampler(RHI::SamplerBuilder()
+                                     .SetFilter(RHI::Filter::Linear, RHI::Filter::Linear)
+                                     .SetMipmapMode(RHI::SamplerMipmapMode::Linear)
+                                     .SetAddressModeU(RHI::SamplerAddressMode::Repeat)
+                                     .SetAddressModeV(RHI::SamplerAddressMode::ClampToEdge)
+                                     .SetAddressModeW(RHI::SamplerAddressMode::ClampToEdge)
                                      .SetLodRange(0.0f, 16.0f)
                                      .SetAnisotropy(false)
                                      .SetName("SceneEnvironmentIblSampler")
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout>
-    createComputePipelineLayout(const luna::RHI::Ref<luna::RHI::Device>& device,
-                                const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout,
+RHI::Ref<RHI::PipelineLayout>
+    createComputePipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                const RHI::Ref<RHI::DescriptorSetLayout>& layout,
                                 uint32_t push_constant_size)
 {
     if (!device || !layout) {
         return {};
     }
 
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder()
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder()
                                             .AddSetLayout(layout)
-                                            .AddPushConstant(luna::RHI::ShaderStage::Compute, 0, push_constant_size)
+                                            .AddPushConstant(RHI::ShaderStage::Compute, 0, push_constant_size)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::ComputePipeline>
-    createComputePipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
-                          const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-                          const luna::RHI::Ref<luna::RHI::ShaderModule>& shader)
+RHI::Ref<RHI::ComputePipeline>
+    createComputePipeline(const RHI::Ref<RHI::Device>& device,
+                          const RHI::Ref<RHI::PipelineLayout>& layout,
+                          const RHI::Ref<RHI::ShaderModule>& shader)
 {
     if (!device || !layout || !shader) {
         return {};
     }
 
-    return device->CreateComputePipeline(luna::RHI::ComputePipelineBuilder().SetShader(shader).SetLayout(layout).Build());
+    return device->CreateComputePipeline(RHI::ComputePipelineBuilder().SetShader(shader).SetLayout(layout).Build());
 }
 
 } // namespace
@@ -389,7 +389,7 @@ luna::RHI::Ref<luna::RHI::ComputePipeline>
 void EnvironmentResources::reset()
 {
     m_device.reset();
-    m_backend_type = luna::RHI::BackendType::Auto;
+    m_backend_type = RHI::BackendType::Auto;
     m_source_signature = {};
     m_has_source_signature = false;
     m_source_texture = {};
@@ -475,8 +475,8 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (m_has_source_signature && !sameSourceSignature(m_source_signature, source_signature_to_prepare)) {
-        const luna::RHI::Ref<luna::RHI::Device> device = m_device;
-        const luna::RHI::BackendType backend_type = m_backend_type;
+        const RHI::Ref<RHI::Device> device = m_device;
+        const RHI::BackendType backend_type = m_backend_type;
         reset();
         m_device = device;
         m_backend_type = backend_type;
@@ -561,66 +561,66 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
 
     if (!m_equirect_to_cube_layout) {
         m_equirect_to_cube_layout =
-            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::SourceTexture,
-                                                                      luna::RHI::DescriptorType::SampledImage,
+                                                                      RHI::DescriptorType::SampledImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::Sampler,
-                                                                      luna::RHI::DescriptorType::Sampler,
+                                                                      RHI::DescriptorType::Sampler,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::OutputTexture,
-                                                                      luna::RHI::DescriptorType::StorageImage,
+                                                                      RHI::DescriptorType::StorageImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .Build());
         m_cube_filter_layout =
-            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::Sampler,
-                                                                      luna::RHI::DescriptorType::Sampler,
+                                                                      RHI::DescriptorType::Sampler,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::OutputTexture,
-                                                                      luna::RHI::DescriptorType::StorageImage,
+                                                                      RHI::DescriptorType::StorageImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::SourceCubeTexture,
-                                                                      luna::RHI::DescriptorType::SampledImage,
+                                                                      RHI::DescriptorType::SampledImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .Build());
         m_prefilter_layout =
-            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::SourceTexture,
-                                                                      luna::RHI::DescriptorType::SampledImage,
+                                                                      RHI::DescriptorType::SampledImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::Sampler,
-                                                                      luna::RHI::DescriptorType::Sampler,
+                                                                      RHI::DescriptorType::Sampler,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .AddBinding(environment_binding::OutputTexture,
-                                                                      luna::RHI::DescriptorType::StorageImage,
+                                                                      RHI::DescriptorType::StorageImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .Build());
         m_brdf_lut_layout =
-            context.device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::BrdfLutOutputTexture,
-                                                                      luna::RHI::DescriptorType::StorageImage,
+                                                                      RHI::DescriptorType::StorageImage,
                                                                       1,
-                                                                      luna::RHI::ShaderStage::Compute)
+                                                                      RHI::ShaderStage::Compute)
                                                           .Build());
     }
 
     if (!m_descriptor_pool) {
         m_descriptor_pool =
-            context.device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+            context.device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                                      .SetMaxSets(16)
-                                                     .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 16)
-                                                     .AddPoolSize(luna::RHI::DescriptorType::Sampler, 16)
-                                                     .AddPoolSize(luna::RHI::DescriptorType::StorageImage, 16)
+                                                     .AddPoolSize(RHI::DescriptorType::SampledImage, 16)
+                                                     .AddPoolSize(RHI::DescriptorType::Sampler, 16)
+                                                     .AddPoolSize(RHI::DescriptorType::StorageImage, 16)
                                                      .Build());
     }
 
@@ -654,22 +654,22 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                                                                       context.compiler,
                                                                       shader_paths.environment_ibl_path,
                                                                       "environmentEquirectToCubeMain",
-                                                                      luna::RHI::ShaderStage::Compute);
+                                                                      RHI::ShaderStage::Compute);
         m_irradiance_shader = renderer_detail::loadShaderModule(context.device,
                                                                 context.compiler,
                                                                 shader_paths.environment_ibl_path,
                                                                 "environmentIrradianceMain",
-                                                                luna::RHI::ShaderStage::Compute);
+                                                                RHI::ShaderStage::Compute);
         m_prefilter_shader = renderer_detail::loadShaderModule(context.device,
                                                                context.compiler,
                                                                shader_paths.environment_ibl_path,
                                                                "environmentPrefilterMain",
-                                                               luna::RHI::ShaderStage::Compute);
+                                                               RHI::ShaderStage::Compute);
         m_brdf_lut_shader = renderer_detail::loadShaderModule(context.device,
                                                               context.compiler,
                                                               shader_paths.environment_ibl_path,
                                                               "environmentBrdfLutMain",
-                                                              luna::RHI::ShaderStage::Compute);
+                                                              RHI::ShaderStage::Compute);
     }
 
     if (!m_equirect_to_cube_pipeline) {
@@ -682,18 +682,18 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 }
 
-void EnvironmentResources::uploadIfNeeded(luna::RHI::CommandBufferEncoder& commands)
+void EnvironmentResources::uploadIfNeeded(RHI::CommandBufferEncoder& commands)
 {
     if (!m_source_texture.uploaded) {
         LUNA_RENDERER_DEBUG("Uploading environment source texture '{}'", m_source_texture.debug_name);
     }
     renderer_detail::uploadTextureIfNeeded(commands,
                                            m_source_texture,
-                                           luna::RHI::ResourceState::ShaderRead,
-                                           luna::RHI::SyncScope::ComputeStage | luna::RHI::SyncScope::FragmentStage);
+                                           RHI::ResourceState::ShaderRead,
+                                           RHI::SyncScope::ComputeStage | RHI::SyncScope::FragmentStage);
 }
 
-void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& commands)
+void EnvironmentResources::precomputeIfNeeded(RHI::CommandBufferEncoder& commands)
 {
     if (m_precomputed) {
         return;
@@ -717,43 +717,43 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
     LUNA_RENDERER_INFO("Precomputing scene environment IBL maps on GPU");
     const uint32_t source_mip_levels = mipLevelCount(m_source_texture.texture);
 
-    auto dispatchCube = [&commands](const luna::RHI::Ref<luna::RHI::ComputePipeline>& pipeline,
-                                    const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set,
+    auto dispatchCube = [&commands](const RHI::Ref<RHI::ComputePipeline>& pipeline,
+                                    const RHI::Ref<RHI::DescriptorSet>& descriptor_set,
                                     const IblDispatchParams& params) {
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
         commands.BindComputePipeline(pipeline);
         commands.BindComputeDescriptorSets(pipeline, 0, descriptor_sets);
-        commands.ComputePushConstants(pipeline, luna::RHI::ShaderStage::Compute, 0, sizeof(IblDispatchParams), &params);
+        commands.ComputePushConstants(pipeline, RHI::ShaderStage::Compute, 0, sizeof(IblDispatchParams), &params);
         commands.Dispatch(divideRoundUp(params.output_size, 8u), divideRoundUp(params.output_size, 8u), 6);
     };
 
-    auto dispatch2D = [&commands](const luna::RHI::Ref<luna::RHI::ComputePipeline>& pipeline,
-                                  const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set,
+    auto dispatch2D = [&commands](const RHI::Ref<RHI::ComputePipeline>& pipeline,
+                                  const RHI::Ref<RHI::DescriptorSet>& descriptor_set,
                                   const IblDispatchParams& params) {
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
         commands.BindComputePipeline(pipeline);
         commands.BindComputeDescriptorSets(pipeline, 0, descriptor_sets);
-        commands.ComputePushConstants(pipeline, luna::RHI::ShaderStage::Compute, 0, sizeof(IblDispatchParams), &params);
+        commands.ComputePushConstants(pipeline, RHI::ShaderStage::Compute, 0, sizeof(IblDispatchParams), &params);
         commands.Dispatch(divideRoundUp(params.output_size, 8u), divideRoundUp(params.output_size, 8u), 1);
     };
 
     transitionTexture(commands,
                       m_environment_cube_texture,
-                      luna::RHI::ResourceState::Undefined,
-                      luna::RHI::ResourceState::UnorderedAccess);
-    m_equirect_to_cube_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+                      RHI::ResourceState::Undefined,
+                      RHI::ResourceState::UnorderedAccess);
+    m_equirect_to_cube_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::SourceTexture,
         .TextureView = m_source_texture.texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
     m_equirect_to_cube_descriptor_set->WriteSampler(
-        luna::RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
-    m_equirect_to_cube_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
+    m_equirect_to_cube_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::OutputTexture,
         .TextureView = m_environment_cube_uav,
-        .Layout = luna::RHI::ResourceState::UnorderedAccess,
-        .Type = luna::RHI::DescriptorType::StorageImage,
+        .Layout = RHI::ResourceState::UnorderedAccess,
+        .Type = RHI::DescriptorType::StorageImage,
     });
     m_equirect_to_cube_descriptor_set->Update();
     dispatchCube(m_equirect_to_cube_pipeline,
@@ -762,27 +762,27 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                                    .sample_count = 1,
                                    .roughness = 0.0f,
                                    .source_mip_levels = source_mip_levels});
-    commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
+    commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(commands,
                       m_environment_cube_texture,
-                      luna::RHI::ResourceState::UnorderedAccess,
-                      luna::RHI::ResourceState::ShaderRead);
+                      RHI::ResourceState::UnorderedAccess,
+                      RHI::ResourceState::ShaderRead);
 
     transitionTexture(
-        commands, m_irradiance_texture, luna::RHI::ResourceState::Undefined, luna::RHI::ResourceState::UnorderedAccess);
+        commands, m_irradiance_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
     m_irradiance_descriptor_set->WriteSampler(
-        luna::RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
-    m_irradiance_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
+    m_irradiance_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::OutputTexture,
         .TextureView = m_irradiance_uav,
-        .Layout = luna::RHI::ResourceState::UnorderedAccess,
-        .Type = luna::RHI::DescriptorType::StorageImage,
+        .Layout = RHI::ResourceState::UnorderedAccess,
+        .Type = RHI::DescriptorType::StorageImage,
     });
-    m_irradiance_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    m_irradiance_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::SourceCubeTexture,
         .TextureView = m_environment_cube_texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
     m_irradiance_descriptor_set->Update();
     dispatchCube(m_irradiance_pipeline,
@@ -793,16 +793,16 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                      .roughness = 0.0f,
                      .source_mip_levels = source_mip_levels,
                  });
-    commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
+    commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(commands,
                       m_irradiance_texture,
-                      luna::RHI::ResourceState::UnorderedAccess,
-                      luna::RHI::ResourceState::ShaderRead);
+                      RHI::ResourceState::UnorderedAccess,
+                      RHI::ResourceState::ShaderRead);
 
     transitionTexture(commands,
                       m_prefiltered_texture,
-                      luna::RHI::ResourceState::Undefined,
-                      luna::RHI::ResourceState::UnorderedAccess);
+                      RHI::ResourceState::Undefined,
+                      RHI::ResourceState::UnorderedAccess);
     for (uint32_t mip_level = 0; mip_level < render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels;
          ++mip_level) {
         const uint32_t mip_size =
@@ -815,18 +815,18 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
 
         const auto& prefilter_descriptor_set = m_prefilter_descriptor_sets[mip_level];
         prefilter_descriptor_set->WriteSampler(
-            luna::RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
-        prefilter_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+            RHI::SamplerWriteInfo{.Binding = environment_binding::Sampler, .Sampler = m_sampler});
+        prefilter_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = environment_binding::OutputTexture,
             .TextureView = m_prefiltered_uavs[mip_level],
-            .Layout = luna::RHI::ResourceState::UnorderedAccess,
-            .Type = luna::RHI::DescriptorType::StorageImage,
+            .Layout = RHI::ResourceState::UnorderedAccess,
+            .Type = RHI::DescriptorType::StorageImage,
         });
-        prefilter_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        prefilter_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = environment_binding::SourceTexture,
             .TextureView = m_source_texture.texture->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
         prefilter_descriptor_set->Update();
         dispatchCube(m_prefilter_pipeline,
@@ -837,20 +837,20 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                          .roughness = roughness,
                          .source_mip_levels = source_mip_levels,
                      });
-        commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
+        commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
     }
     transitionTexture(commands,
                       m_prefiltered_texture,
-                      luna::RHI::ResourceState::UnorderedAccess,
-                      luna::RHI::ResourceState::ShaderRead);
+                      RHI::ResourceState::UnorderedAccess,
+                      RHI::ResourceState::ShaderRead);
 
     transitionTexture(
-        commands, m_brdf_lut_texture, luna::RHI::ResourceState::Undefined, luna::RHI::ResourceState::UnorderedAccess);
-    m_brdf_lut_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        commands, m_brdf_lut_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
+    m_brdf_lut_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::BrdfLutOutputTexture,
         .TextureView = m_brdf_lut_uav,
-        .Layout = luna::RHI::ResourceState::UnorderedAccess,
-        .Type = luna::RHI::DescriptorType::StorageImage,
+        .Layout = RHI::ResourceState::UnorderedAccess,
+        .Type = RHI::DescriptorType::StorageImage,
     });
     m_brdf_lut_descriptor_set->Update();
     dispatch2D(m_brdf_lut_pipeline,
@@ -861,9 +861,9 @@ void EnvironmentResources::precomputeIfNeeded(luna::RHI::CommandBufferEncoder& c
                    .roughness = 0.0f,
                    .source_mip_levels = source_mip_levels,
                });
-    commands.MemoryBarrierFast(luna::RHI::MemoryTransition::AllWriteToAllRead);
+    commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
     transitionTexture(
-        commands, m_brdf_lut_texture, luna::RHI::ResourceState::UnorderedAccess, luna::RHI::ResourceState::ShaderRead);
+        commands, m_brdf_lut_texture, RHI::ResourceState::UnorderedAccess, RHI::ResourceState::ShaderRead);
 
     m_precomputed = true;
     LUNA_RENDERER_INFO("Scene environment IBL precompute complete");

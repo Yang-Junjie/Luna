@@ -54,9 +54,9 @@ void PostProcessPass::setup(RenderPassContext& context)
         [scene_color, output](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(scene_color);
             pass_builder.WriteColor(output,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
         },
         [this, scene_color](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, scene_color);
@@ -87,7 +87,7 @@ void PostProcessPass::execute(RenderGraphRasterPassContext& pass_context, Render
     auto& commands = pass_context.commandBuffer();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{
         pass_resources.descriptor_set,
     };
     commands.BindDescriptorSets(pass_resources.pipeline, 0, descriptor_sets);

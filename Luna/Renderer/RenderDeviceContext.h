@@ -23,29 +23,29 @@ public:
     void reset() noexcept;
     void waitForIdle() noexcept;
 
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Instance>& instance() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Instance>& instance() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Adapter>& adapter() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Adapter>& adapter() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Device>& device() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Surface>& surface() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Surface>& surface() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Queue>& graphicsQueue() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Queue>& graphicsQueue() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::ShaderCompiler>& shaderCompiler() noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::ShaderCompiler>& shaderCompiler() const noexcept;
-    [[nodiscard]] luna::RHI::RHICapabilities& capabilities() noexcept;
-    [[nodiscard]] const luna::RHI::RHICapabilities& capabilities() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Instance>& instance() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Instance>& instance() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Adapter>& adapter() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Adapter>& adapter() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Device>& device() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Device>& device() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Surface>& surface() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Surface>& surface() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Queue>& graphicsQueue() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Queue>& graphicsQueue() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::ShaderCompiler>& shaderCompiler() noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::ShaderCompiler>& shaderCompiler() const noexcept;
+    [[nodiscard]] RHI::RHICapabilities& capabilities() noexcept;
+    [[nodiscard]] const RHI::RHICapabilities& capabilities() const noexcept;
 
 private:
-    luna::RHI::Ref<luna::RHI::Instance> m_instance;
-    luna::RHI::Ref<luna::RHI::Adapter> m_adapter;
-    luna::RHI::Ref<luna::RHI::Device> m_device;
-    luna::RHI::Ref<luna::RHI::Surface> m_surface;
-    luna::RHI::Ref<luna::RHI::Queue> m_graphics_queue;
-    luna::RHI::Ref<luna::RHI::ShaderCompiler> m_shader_compiler;
-    luna::RHI::RHICapabilities m_capabilities{};
+    RHI::Ref<RHI::Instance> m_instance;
+    RHI::Ref<RHI::Adapter> m_adapter;
+    RHI::Ref<RHI::Device> m_device;
+    RHI::Ref<RHI::Surface> m_surface;
+    RHI::Ref<RHI::Queue> m_graphics_queue;
+    RHI::Ref<RHI::ShaderCompiler> m_shader_compiler;
+    RHI::RHICapabilities m_capabilities{};
 };
 
 } // namespace luna

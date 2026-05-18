@@ -7,9 +7,9 @@ namespace luna {
 
 namespace {
 
-const luna::RHI::Ref<luna::RHI::CommandBufferEncoder>& emptyCommandBufferRef()
+const RHI::Ref<RHI::CommandBufferEncoder>& emptyCommandBufferRef()
 {
-    static const luna::RHI::Ref<luna::RHI::CommandBufferEncoder> empty_ref{};
+    static const RHI::Ref<RHI::CommandBufferEncoder> empty_ref{};
     return empty_ref;
 }
 
@@ -63,12 +63,12 @@ void FrameResourceRing::releaseFrame(uint32_t frame_index)
     }
 }
 
-luna::RHI::CommandBufferEncoder* FrameResourceRing::currentCommandBuffer() const
+RHI::CommandBufferEncoder* FrameResourceRing::currentCommandBuffer() const
 {
     return m_current_command_buffer.get();
 }
 
-const luna::RHI::Ref<luna::RHI::CommandBufferEncoder>& FrameResourceRing::currentCommandBufferRef() const noexcept
+const RHI::Ref<RHI::CommandBufferEncoder>& FrameResourceRing::currentCommandBufferRef() const noexcept
 {
     return m_current_command_buffer ? m_current_command_buffer : emptyCommandBufferRef();
 }

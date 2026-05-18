@@ -11,7 +11,7 @@ namespace {
 constexpr float kFallbackAspectRatio = 1.0f;
 constexpr uint32_t kHaltonJitterSampleCount = 8;
 
-glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
+glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const RHI::RHIConventions& conventions)
 {
     return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
@@ -58,7 +58,7 @@ glm::mat4 applyProjectionJitter(glm::mat4 projection, glm::vec2 jitter_ndc)
 }
 
 RenderViewMatrices buildViewMatrices(const Camera& camera,
-                                     const luna::RHI::RHICapabilities& capabilities,
+                                     const RHI::RHICapabilities& capabilities,
                                      uint32_t framebuffer_width,
                                      uint32_t framebuffer_height,
                                      glm::vec2 jitter_ndc = glm::vec2(0.0f))
@@ -82,7 +82,7 @@ RenderViewMatrices buildViewMatrices(const Camera& camera,
 } // namespace
 
 RenderViewFrameState RenderViewHistory::beginFrame(const Camera& camera,
-                                                   const luna::RHI::RHICapabilities& capabilities,
+                                                   const RHI::RHICapabilities& capabilities,
                                                    uint64_t frame_index,
                                                    uint32_t framebuffer_width,
                                                    uint32_t framebuffer_height,

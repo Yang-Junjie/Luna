@@ -14,13 +14,13 @@
 
 namespace luna::render_flow::default_scene {
 
-void configureViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t width, uint32_t height)
+void configureViewportAndScissor(RHI::CommandBufferEncoder& commands, uint32_t width, uint32_t height)
 {
     commands.SetViewport({0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f});
     commands.SetScissor({0, 0, width, height});
 }
 
-size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
+size_t recordDrawCommands(RHI::CommandBufferEncoder& commands,
                           const DrawPassResources& pass_resources,
                           const std::vector<DrawCommand>& draw_commands,
                           const AssetCache& assets,
@@ -42,26 +42,26 @@ size_t recordDrawCommands(luna::RHI::CommandBufferEncoder& commands,
             .model = draw_command.transform,
             .picking_id = draw_command.picking_id,
         };
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 2> descriptor_sets{
             draw_resources.material_descriptor_set,
             pass_resources.scene_descriptor_set,
         };
 
         commands.BindDescriptorSets(pass_resources.pipeline, 0, descriptor_sets);
         commands.PushConstants(pass_resources.pipeline,
-                               luna::RHI::ShaderStage::Vertex,
+                               RHI::ShaderStage::Vertex,
                                0,
                                sizeof(render_flow::default_scene_detail::MeshPushConstants),
                                &push_constants);
         commands.BindVertexBuffer(0, draw_resources.vertex_buffer);
-        commands.BindIndexBuffer(draw_resources.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.BindIndexBuffer(draw_resources.index_buffer, 0, RHI::IndexType::UInt32);
         commands.DrawIndexed(draw_resources.index_count, 1, 0, 0, 0);
         ++recorded_count;
     }
     return recorded_count;
 }
 
-size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
+size_t recordShadowDrawCommands(RHI::CommandBufferEncoder& commands,
                                 const DrawPassResources& pass_resources,
                                 const std::vector<DrawCommand>& draw_commands,
                                 const AssetCache& assets,
@@ -84,18 +84,18 @@ size_t recordShadowDrawCommands(luna::RHI::CommandBufferEncoder& commands,
             .picking_id = draw_command.picking_id,
             .shadow_cascade_index = cascade_index,
         };
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{
             pass_resources.scene_descriptor_set,
         };
 
         commands.BindDescriptorSets(pass_resources.pipeline, 0, descriptor_sets);
         commands.PushConstants(pass_resources.pipeline,
-                               luna::RHI::ShaderStage::Vertex,
+                               RHI::ShaderStage::Vertex,
                                0,
                                sizeof(render_flow::default_scene_detail::MeshPushConstants),
                                &push_constants);
         commands.BindVertexBuffer(0, draw_resources.vertex_buffer);
-        commands.BindIndexBuffer(draw_resources.index_buffer, 0, luna::RHI::IndexType::UInt32);
+        commands.BindIndexBuffer(draw_resources.index_buffer, 0, RHI::IndexType::UInt32);
         commands.DrawIndexed(draw_resources.index_count, 1, 0, 0, 0);
         ++recorded_count;
     }

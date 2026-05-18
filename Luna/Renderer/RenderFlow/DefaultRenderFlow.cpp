@@ -503,7 +503,7 @@ void DefaultRenderFlow::render(RenderFlowContext& context)
         "Building default render flow: size={}x{} backend={} color_format={} ({}) draw_packets={} pick_debug={}",
         scene_context.framebuffer_width,
         scene_context.framebuffer_height,
-        luna::RHI::BackendTypeToString(scene_context.backend_type),
+        RHI::BackendTypeToString(scene_context.backend_type),
         renderer_detail::formatToString(scene_context.color_format),
         static_cast<int>(scene_context.color_format),
         world.drawPackets().size(),

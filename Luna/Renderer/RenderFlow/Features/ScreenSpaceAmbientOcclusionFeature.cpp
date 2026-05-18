@@ -47,7 +47,7 @@ void linkScreenSpaceAmbientOcclusionFeature() {}
 namespace {
 
 inline constexpr std::string_view kFeatureName = "ScreenSpaceAmbientOcclusion";
-constexpr luna::RHI::Format kAmbientOcclusionFormat = luna::RHI::Format::RGBA8_UNORM;
+constexpr RHI::Format kAmbientOcclusionFormat = RHI::Format::RGBA8_UNORM;
 
 constexpr std::array<RenderFeatureGraphResource, 3> kGraphInputs{{
     {blackboard::Depth.value()},
@@ -83,33 +83,33 @@ const std::array<RenderFeatureDescriptorBinding, 5> kSsaoBindings{{
     {"Depth",
      "gDepthTexture",
      ssao_binding::Depth,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"NormalMetallic",
      "gNormalMetallicTexture",
      ssao_binding::NormalMetallic,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"WorldPositionRoughness",
      "gWorldPositionRoughnessTexture",
      ssao_binding::WorldPositionRoughness,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Sampler",
      "gSsaoSampler",
      ssao_binding::Sampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Params",
      "gSsaoParams",
      ssao_binding::Params,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
 }};
 
 std::filesystem::path shaderPath()
@@ -118,7 +118,7 @@ std::filesystem::path shaderPath()
            "ScreenSpaceAmbientOcclusion.slang";
 }
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeSsaoDescriptorSetLayoutCreateInfo()
+RHI::DescriptorSetLayoutCreateInfo makeSsaoDescriptorSetLayoutCreateInfo()
 {
     return makeRenderFeatureDescriptorSetLayoutCreateInfo(kSsaoBindings);
 }
@@ -134,8 +134,8 @@ ShaderBindingContract makeSsaoShaderBindingContract()
     });
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createDescriptorSetLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout>
+    createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -144,62 +144,62 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
     return device->CreateDescriptorSetLayout(makeSsaoDescriptorSetLayoutCreateInfo());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                             .SetMaxSets(8)
-                                            .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 32)
-                                            .AddPoolSize(luna::RHI::DescriptorType::Sampler, 8)
-                                            .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 8)
+                                            .AddPoolSize(RHI::DescriptorType::SampledImage, 32)
+                                            .AddPoolSize(RHI::DescriptorType::Sampler, 8)
+                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 8)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateSampler(luna::RHI::SamplerBuilder()
-                                     .SetFilter(luna::RHI::Filter::Nearest, luna::RHI::Filter::Nearest)
-                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
-                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+    return device->CreateSampler(RHI::SamplerBuilder()
+                                     .SetFilter(RHI::Filter::Nearest, RHI::Filter::Nearest)
+                                     .SetMipmapMode(RHI::SamplerMipmapMode::Nearest)
+                                     .SetAddressMode(RHI::SamplerAddressMode::ClampToEdge)
                                      .SetAnisotropy(false)
                                      .SetName("ScreenSpaceAmbientOcclusionSampler")
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout>
-    createPipelineLayout(const luna::RHI::Ref<luna::RHI::Device>& device,
-                         const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout>
+    createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                         const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
     }
 
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline>
-    createPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
-                   const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-                   const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-                   const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline>
+    createPipeline(const RHI::Ref<RHI::Device>& device,
+                   const RHI::Ref<RHI::PipelineLayout>& layout,
+                   const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                   const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
     }
 
-    return device->CreateGraphicsPipeline(luna::RHI::GraphicsPipelineBuilder()
+    return device->CreateGraphicsPipeline(RHI::GraphicsPipelineBuilder()
                                               .SetShaders({vertex_shader, fragment_shader})
-                                              .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
-                                              .SetCullMode(luna::RHI::CullMode::None)
-                                              .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-                                              .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+                                              .SetTopology(RHI::PrimitiveTopology::TriangleList)
+                                              .SetCullMode(RHI::CullMode::None)
+                                              .SetFrontFace(RHI::FrontFace::CounterClockwise)
+                                              .SetDepthTest(false, false, RHI::CompareOp::Always)
                                               .AddColorAttachmentDefault(false)
                                               .AddColorFormat(kAmbientOcclusionFormat)
                                               .SetLayout(layout)
@@ -215,16 +215,16 @@ RenderGraphTextureDesc makeAmbientOcclusionGraphDesc(const SceneRenderContext& s
 {
     return RenderGraphTextureDesc{
         .Name = "ScreenSpaceAmbientOcclusion",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = scene_context.framebuffer_width,
         .Height = scene_context.framebuffer_height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = kAmbientOcclusionFormat,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -234,9 +234,9 @@ PersistentTexture2DDesc makeAmbientOcclusionPersistentDesc(const SceneRenderCont
         .width = scene_context.framebuffer_width,
         .height = scene_context.framebuffer_height,
         .format = kAmbientOcclusionFormat,
-        .usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .initial_state = luna::RHI::ResourceState::Undefined,
-        .sample_count = luna::RHI::SampleCount::Count1,
+        .usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .initial_state = RHI::ResourceState::Undefined,
+        .sample_count = RHI::SampleCount::Count1,
         .name = "ScreenSpaceAmbientOcclusion",
     };
 }
@@ -299,13 +299,13 @@ public:
         }
 
         releasePipelineResources();
-        const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
+        const RHI::Ref<RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
         m_state.vertex_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "ssaoVertexMain", luna::RHI::ShaderStage::Vertex);
+            device, context.compiler, path, "ssaoVertexMain", RHI::ShaderStage::Vertex);
         m_state.fragment_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "ssaoFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "ssaoFragmentMain", RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeSsaoShaderBindingContract();
         const std::array<RenderFeatureShaderBindingCheck, 2> binding_checks{{
@@ -320,10 +320,10 @@ public:
         m_state.pipeline =
             createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader);
         m_state.sampler = createSampler(device);
-        m_state.params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+        m_state.params_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                          .SetSize(sizeof(SsaoGpuParams))
-                                                         .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                         .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                         .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                         .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                          .SetName("ScreenSpaceAmbientOcclusionParams")
                                                          .Build());
 
@@ -349,7 +349,7 @@ public:
             m_ambient_occlusion,
             RenderFeatureTextureImportOptions{
                 .name = "ScreenSpaceAmbientOcclusion",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
+                .final_state = RHI::ResourceState::ShaderRead,
             });
     }
 
@@ -360,9 +360,9 @@ public:
                m_state.params_buffer && m_state.descriptor_set;
     }
 
-    void updateBindings(const luna::RHI::Ref<luna::RHI::Texture>& depth,
-                        const luna::RHI::Ref<luna::RHI::Texture>& normal_metallic,
-                        const luna::RHI::Ref<luna::RHI::Texture>& world_position_roughness,
+    void updateBindings(const RHI::Ref<RHI::Texture>& depth,
+                        const RHI::Ref<RHI::Texture>& normal_metallic,
+                        const RHI::Ref<RHI::Texture>& world_position_roughness,
                         uint32_t width,
                         uint32_t height,
                         const Options& options)
@@ -372,35 +372,35 @@ public:
         }
 
         updateParams(width, height, options);
-        m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = ssao_binding::Depth,
             .TextureView = depth->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = ssao_binding::NormalMetallic,
             .TextureView = normal_metallic->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = ssao_binding::WorldPositionRoughness,
             .TextureView = world_position_roughness->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        m_state.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
             .Binding = ssao_binding::Sampler,
             .Sampler = m_state.sampler,
         });
-        m_state.descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        m_state.descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
             .Binding = ssao_binding::Params,
             .Buffer = m_state.params_buffer,
             .Offset = 0,
             .Stride = sizeof(SsaoGpuParams),
             .Size = sizeof(SsaoGpuParams),
-            .Type = luna::RHI::DescriptorType::UniformBuffer,
+            .Type = RHI::DescriptorType::UniformBuffer,
         });
         m_state.descriptor_set->Update();
     }
@@ -422,7 +422,7 @@ public:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{m_state.descriptor_set};
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{m_state.descriptor_set};
         commands.BindDescriptorSets(m_state.pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
         pass_context.endRendering();
@@ -459,15 +459,15 @@ private:
     }
 
     struct State {
-        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> layout;
-        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-        luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-        luna::RHI::Ref<luna::RHI::Sampler> sampler;
-        luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-        luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> fragment_shader;
+        RHI::Ref<RHI::DescriptorSetLayout> layout;
+        RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+        RHI::Ref<RHI::PipelineLayout> pipeline_layout;
+        RHI::Ref<RHI::GraphicsPipeline> pipeline;
+        RHI::Ref<RHI::Sampler> sampler;
+        RHI::Ref<RHI::Buffer> params_buffer;
+        RHI::Ref<RHI::DescriptorSet> descriptor_set;
+        RHI::Ref<RHI::ShaderModule> vertex_shader;
+        RHI::Ref<RHI::ShaderModule> fragment_shader;
     };
 
     [[nodiscard]] std::array<RenderFeatureResourceStatus, 9> resourceStatus() const noexcept
@@ -566,9 +566,9 @@ public:
                     pass_builder.ReadTexture(*world_position_roughness);
                 }
                 pass_builder.WriteColor(ambient_occlusion,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
             },
             [this, options, resources_ready, depth, normal_metallic, world_position_roughness, scene_context](
                 RenderGraphRasterPassContext& pass_context) {

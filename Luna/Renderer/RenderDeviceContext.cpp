@@ -52,72 +52,72 @@ void RenderDeviceContext::waitForIdle() noexcept
     }
 }
 
-luna::RHI::Ref<luna::RHI::Instance>& RenderDeviceContext::instance() noexcept
+RHI::Ref<RHI::Instance>& RenderDeviceContext::instance() noexcept
 {
     return m_instance;
 }
 
-const luna::RHI::Ref<luna::RHI::Instance>& RenderDeviceContext::instance() const noexcept
+const RHI::Ref<RHI::Instance>& RenderDeviceContext::instance() const noexcept
 {
     return m_instance;
 }
 
-luna::RHI::Ref<luna::RHI::Adapter>& RenderDeviceContext::adapter() noexcept
+RHI::Ref<RHI::Adapter>& RenderDeviceContext::adapter() noexcept
 {
     return m_adapter;
 }
 
-const luna::RHI::Ref<luna::RHI::Adapter>& RenderDeviceContext::adapter() const noexcept
+const RHI::Ref<RHI::Adapter>& RenderDeviceContext::adapter() const noexcept
 {
     return m_adapter;
 }
 
-luna::RHI::Ref<luna::RHI::Device>& RenderDeviceContext::device() noexcept
+RHI::Ref<RHI::Device>& RenderDeviceContext::device() noexcept
 {
     return m_device;
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& RenderDeviceContext::device() const noexcept
+const RHI::Ref<RHI::Device>& RenderDeviceContext::device() const noexcept
 {
     return m_device;
 }
 
-luna::RHI::Ref<luna::RHI::Surface>& RenderDeviceContext::surface() noexcept
+RHI::Ref<RHI::Surface>& RenderDeviceContext::surface() noexcept
 {
     return m_surface;
 }
 
-const luna::RHI::Ref<luna::RHI::Surface>& RenderDeviceContext::surface() const noexcept
+const RHI::Ref<RHI::Surface>& RenderDeviceContext::surface() const noexcept
 {
     return m_surface;
 }
 
-luna::RHI::Ref<luna::RHI::Queue>& RenderDeviceContext::graphicsQueue() noexcept
+RHI::Ref<RHI::Queue>& RenderDeviceContext::graphicsQueue() noexcept
 {
     return m_graphics_queue;
 }
 
-const luna::RHI::Ref<luna::RHI::Queue>& RenderDeviceContext::graphicsQueue() const noexcept
+const RHI::Ref<RHI::Queue>& RenderDeviceContext::graphicsQueue() const noexcept
 {
     return m_graphics_queue;
 }
 
-luna::RHI::Ref<luna::RHI::ShaderCompiler>& RenderDeviceContext::shaderCompiler() noexcept
+RHI::Ref<RHI::ShaderCompiler>& RenderDeviceContext::shaderCompiler() noexcept
 {
     return m_shader_compiler;
 }
 
-const luna::RHI::Ref<luna::RHI::ShaderCompiler>& RenderDeviceContext::shaderCompiler() const noexcept
+const RHI::Ref<RHI::ShaderCompiler>& RenderDeviceContext::shaderCompiler() const noexcept
 {
     return m_shader_compiler;
 }
 
-luna::RHI::RHICapabilities& RenderDeviceContext::capabilities() noexcept
+RHI::RHICapabilities& RenderDeviceContext::capabilities() noexcept
 {
     return m_capabilities;
 }
 
-const luna::RHI::RHICapabilities& RenderDeviceContext::capabilities() const noexcept
+const RHI::RHICapabilities& RenderDeviceContext::capabilities() const noexcept
 {
     return m_capabilities;
 }

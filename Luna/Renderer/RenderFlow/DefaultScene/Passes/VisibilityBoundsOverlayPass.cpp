@@ -71,87 +71,87 @@ std::filesystem::path shaderPath()
            "VisibilityBoundsOverlay.slang";
 }
 
-luna::RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
+RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
 {
-    luna::RHI::ColorBlendAttachmentState blend_attachment{};
+    RHI::ColorBlendAttachmentState blend_attachment{};
     blend_attachment.BlendEnable = true;
-    blend_attachment.SrcColorBlendFactor = luna::RHI::BlendFactor::SrcAlpha;
-    blend_attachment.DstColorBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
-    blend_attachment.ColorBlendOp = luna::RHI::BlendOp::Add;
-    blend_attachment.SrcAlphaBlendFactor = luna::RHI::BlendFactor::One;
-    blend_attachment.DstAlphaBlendFactor = luna::RHI::BlendFactor::OneMinusSrcAlpha;
-    blend_attachment.AlphaBlendOp = luna::RHI::BlendOp::Add;
-    blend_attachment.ColorWriteMask = luna::RHI::ColorComponentFlags::All;
+    blend_attachment.SrcColorBlendFactor = RHI::BlendFactor::SrcAlpha;
+    blend_attachment.DstColorBlendFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.ColorBlendOp = RHI::BlendOp::Add;
+    blend_attachment.SrcAlphaBlendFactor = RHI::BlendFactor::One;
+    blend_attachment.DstAlphaBlendFactor = RHI::BlendFactor::OneMinusSrcAlpha;
+    blend_attachment.AlphaBlendOp = RHI::BlendOp::Add;
+    blend_attachment.ColorWriteMask = RHI::ColorComponentFlags::All;
     return blend_attachment;
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(
+    const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
-    return device->CreateDescriptorSetLayout(luna::RHI::DescriptorSetLayoutBuilder()
+    return device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                  .AddBinding(overlay_binding::Params,
-                                                             luna::RHI::DescriptorType::UniformBuffer,
+                                                             RHI::DescriptorType::UniformBuffer,
                                                              1,
-                                                             luna::RHI::ShaderStage::Vertex)
+                                                             RHI::ShaderStage::Vertex)
                                                  .Build());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
-    return device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                             .SetMaxSets(1)
-                                            .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 1)
+                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 1)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
     }
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline> createPipeline(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-    luna::RHI::Format color_format)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::PipelineLayout>& layout,
+    const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+    const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+    RHI::Format color_format)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader ||
-        color_format == luna::RHI::Format::UNDEFINED) {
+        color_format == RHI::Format::UNDEFINED) {
         return {};
     }
 
     return device->CreateGraphicsPipeline(
-        luna::RHI::GraphicsPipelineBuilder()
+        RHI::GraphicsPipelineBuilder()
             .SetShaders({vertex_shader, fragment_shader})
-            .AddVertexBinding(0, sizeof(VisibilityBoundsOverlayVertex), luna::RHI::VertexInputRate::Vertex)
+            .AddVertexBinding(0, sizeof(VisibilityBoundsOverlayVertex), RHI::VertexInputRate::Vertex)
             .AddVertexAttribute(0,
                                 0,
-                                luna::RHI::Format::RGB32_FLOAT,
+                                RHI::Format::RGB32_FLOAT,
                                 offsetof(VisibilityBoundsOverlayVertex, world_position),
                                 "POSITION",
                                 0)
             .AddVertexAttribute(1,
                                 0,
-                                luna::RHI::Format::RGBA32_FLOAT,
+                                RHI::Format::RGBA32_FLOAT,
                                 offsetof(VisibilityBoundsOverlayVertex, color),
                                 "COLOR",
                                 0)
-            .SetTopology(luna::RHI::PrimitiveTopology::LineList)
-            .SetCullMode(luna::RHI::CullMode::None)
-            .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-            .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+            .SetTopology(RHI::PrimitiveTopology::LineList)
+            .SetCullMode(RHI::CullMode::None)
+            .SetFrontFace(RHI::FrontFace::CounterClockwise)
+            .SetDepthTest(false, false, RHI::CompareOp::Always)
             .SetLineWidth(1.0f)
             .AddColorAttachment(makeAlphaBlendAttachment())
             .AddColorFormat(color_format)
@@ -246,17 +246,17 @@ VisibilityBoundsOverlayBuildStats buildVisibilityBoundsOverlayVertices(
 }
 
 struct VisibilityBoundsOverlayResources::State {
-    luna::RHI::Ref<luna::RHI::Device> device;
-    luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
-    luna::RHI::Ref<luna::RHI::ShaderModule> fragment_shader;
-    luna::RHI::Ref<luna::RHI::DescriptorSetLayout> descriptor_set_layout;
-    luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-    luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
-    luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
-    luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
+    RHI::Ref<RHI::Device> device;
+    RHI::Ref<RHI::ShaderModule> vertex_shader;
+    RHI::Ref<RHI::ShaderModule> fragment_shader;
+    RHI::Ref<RHI::DescriptorSetLayout> descriptor_set_layout;
+    RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+    RHI::Ref<RHI::DescriptorSet> descriptor_set;
+    RHI::Ref<RHI::PipelineLayout> pipeline_layout;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::Buffer> params_buffer;
+    RHI::Ref<RHI::Buffer> vertex_buffer;
+    RHI::Format color_format{RHI::Format::UNDEFINED};
     uint64_t vertex_buffer_bytes{0};
     uint32_t vertex_count{0};
     VisibilityBoundsOverlayBuildStats build_stats{};
@@ -265,7 +265,7 @@ struct VisibilityBoundsOverlayResources::State {
     {
         return device && vertex_shader && fragment_shader && pipeline_layout && pipeline &&
                descriptor_set_layout && descriptor_pool && descriptor_set && params_buffer &&
-               color_format != luna::RHI::Format::UNDEFINED;
+               color_format != RHI::Format::UNDEFINED;
     }
 };
 
@@ -288,7 +288,7 @@ void VisibilityBoundsOverlayResources::shutdown()
 
 bool VisibilityBoundsOverlayResources::ensurePipeline(const SceneRenderContext& context)
 {
-    if (!context.device || !context.compiler || context.color_format == luna::RHI::Format::UNDEFINED) {
+    if (!context.device || !context.compiler || context.color_format == RHI::Format::UNDEFINED) {
         return false;
     }
     if (m_state->pipelineReady() && m_state->device == context.device &&
@@ -309,12 +309,12 @@ bool VisibilityBoundsOverlayResources::ensurePipeline(const SceneRenderContext& 
                                                                context.compiler,
                                                                path,
                                                                "visibilityBoundsOverlayVertexMain",
-                                                               luna::RHI::ShaderStage::Vertex);
+                                                               RHI::ShaderStage::Vertex);
     m_state->fragment_shader = renderer_detail::loadShaderModule(context.device,
                                                                  context.compiler,
                                                                  path,
                                                                  "visibilityBoundsOverlayFragmentMain",
-                                                                 luna::RHI::ShaderStage::Fragment);
+                                                                 RHI::ShaderStage::Fragment);
     m_state->descriptor_set_layout = createDescriptorSetLayout(context.device);
     m_state->descriptor_pool = createDescriptorPool(context.device);
     if (m_state->descriptor_pool && m_state->descriptor_set_layout) {
@@ -326,10 +326,10 @@ bool VisibilityBoundsOverlayResources::ensurePipeline(const SceneRenderContext& 
                                        m_state->vertex_shader,
                                        m_state->fragment_shader,
                                        context.color_format);
-    m_state->params_buffer = context.device->CreateBuffer(luna::RHI::BufferBuilder()
+    m_state->params_buffer = context.device->CreateBuffer(RHI::BufferBuilder()
                                                               .SetSize(sizeof(VisibilityBoundsOverlayGpuParams))
-                                                              .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                              .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                              .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                               .SetName("VisibilityBoundsOverlayParams")
                                                               .Build());
 
@@ -352,8 +352,8 @@ bool VisibilityBoundsOverlayResources::ensurePipeline(const SceneRenderContext& 
     return true;
 }
 
-void updateOverlayParams(const luna::RHI::Ref<luna::RHI::Buffer>& params_buffer,
-                         const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set,
+void updateOverlayParams(const RHI::Ref<RHI::Buffer>& params_buffer,
+                         const RHI::Ref<RHI::DescriptorSet>& descriptor_set,
                          const glm::mat4& view_projection)
 {
     if (!params_buffer || !descriptor_set) {
@@ -369,13 +369,13 @@ void updateOverlayParams(const luna::RHI::Ref<luna::RHI::Buffer>& params_buffer,
         params_buffer->Unmap();
     }
 
-    descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+    descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
         .Binding = overlay_binding::Params,
         .Buffer = params_buffer,
         .Offset = 0,
         .Stride = sizeof(VisibilityBoundsOverlayGpuParams),
         .Size = sizeof(VisibilityBoundsOverlayGpuParams),
-        .Type = luna::RHI::DescriptorType::UniformBuffer,
+        .Type = RHI::DescriptorType::UniformBuffer,
     });
     descriptor_set->Update();
 }
@@ -391,10 +391,10 @@ bool VisibilityBoundsOverlayResources::ensureVertexBuffer(const SceneRenderConte
     }
 
     const uint64_t capacity = (std::max) (required_bytes, m_state->vertex_buffer_bytes * 2);
-    m_state->vertex_buffer = context.device->CreateBuffer(luna::RHI::BufferBuilder()
+    m_state->vertex_buffer = context.device->CreateBuffer(RHI::BufferBuilder()
                                                               .SetSize(capacity)
-                                                              .SetUsage(luna::RHI::BufferUsageFlags::VertexBuffer)
-                                                              .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                              .SetUsage(RHI::BufferUsageFlags::VertexBuffer)
+                                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                               .SetName("VisibilityBoundsOverlayVertices")
                                                               .Build());
     m_state->vertex_buffer_bytes = m_state->vertex_buffer ? capacity : 0;
@@ -450,7 +450,7 @@ void VisibilityBoundsOverlayResources::draw(RenderGraphRasterPassContext& pass_c
     auto& commands = pass_context.commandBuffer();
     commands.BindGraphicsPipeline(m_state->pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{m_state->descriptor_set};
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{m_state->descriptor_set};
     commands.BindDescriptorSets(m_state->pipeline, 0, descriptor_sets);
     commands.BindVertexBuffer(0, m_state->vertex_buffer);
     commands.Draw(vertex_count, 1, 0, 0);
@@ -531,8 +531,8 @@ void VisibilityBoundsOverlayPass::setup(RenderPassContext& context)
         name(),
         [scene_color = *scene_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.WriteColor(scene_color,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+                                    RHI::AttachmentLoadOp::Load,
+                                    RHI::AttachmentStoreOp::Store);
         },
         [this, vertex_count](RenderGraphRasterPassContext& pass_context) {
             if (m_resources == nullptr) {

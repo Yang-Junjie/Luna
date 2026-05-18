@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Builds a frame-local render graph from imported textures and declared passes.
 // Tracks temporary resources, access patterns, and exported states before
@@ -12,9 +12,9 @@ namespace luna::detail {
 
 struct RenderGraphTextureNode {
     RenderGraphTextureDesc Desc;
-    luna::RHI::Ref<luna::RHI::Texture> ImportedTexture;
-    luna::RHI::ResourceState InitialState{luna::RHI::ResourceState::Undefined};
-    luna::RHI::ResourceState FinalState{luna::RHI::ResourceState::Common};
+    RHI::Ref<RHI::Texture> ImportedTexture;
+    RHI::ResourceState InitialState{RHI::ResourceState::Undefined};
+    RHI::ResourceState FinalState{RHI::ResourceState::Common};
     bool Imported{false};
     bool Exported{false};
 };
@@ -29,16 +29,16 @@ struct RenderGraphTextureWriteDesc {
 
 struct RenderGraphColorAttachmentDesc {
     RenderGraphTextureHandle Handle{};
-    luna::RHI::AttachmentLoadOp LoadOp{luna::RHI::AttachmentLoadOp::Clear};
-    luna::RHI::AttachmentStoreOp StoreOp{luna::RHI::AttachmentStoreOp::Store};
-    luna::RHI::ClearValue ClearValue = luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f);
+    RHI::AttachmentLoadOp LoadOp{RHI::AttachmentLoadOp::Clear};
+    RHI::AttachmentStoreOp StoreOp{RHI::AttachmentStoreOp::Store};
+    RHI::ClearValue ClearValue = RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f);
 };
 
 struct RenderGraphDepthAttachmentDesc {
     RenderGraphTextureHandle Handle{};
-    luna::RHI::AttachmentLoadOp LoadOp{luna::RHI::AttachmentLoadOp::Clear};
-    luna::RHI::AttachmentStoreOp StoreOp{luna::RHI::AttachmentStoreOp::Store};
-    luna::RHI::ClearDepthStencilValue ClearValue{1.0f, 0};
+    RHI::AttachmentLoadOp LoadOp{RHI::AttachmentLoadOp::Clear};
+    RHI::AttachmentStoreOp StoreOp{RHI::AttachmentStoreOp::Store};
+    RHI::ClearDepthStencilValue ClearValue{1.0f, 0};
 };
 
 struct RenderGraphRasterPassNode {
@@ -76,13 +76,13 @@ namespace luna {
 class RenderGraphTransientTextureCache {
 public:
     void BeginFrame();
-    luna::RHI::Ref<luna::RHI::Texture> AcquireTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+    RHI::Ref<RHI::Texture> AcquireTexture(const RHI::Ref<RHI::Device>& device,
                                                       const RenderGraphTextureDesc& desc);
 
 private:
     struct TextureEntry {
         RenderGraphTextureDesc Desc;
-        luna::RHI::Ref<luna::RHI::Texture> Texture;
+        RHI::Ref<RHI::Texture> Texture;
         bool InUse{false};
     };
 
@@ -97,13 +97,13 @@ public:
     RenderGraphRasterPassBuilder& ReadTexture(RenderGraphTextureHandle handle);
     RenderGraphRasterPassBuilder& WriteColor(
         RenderGraphTextureHandle handle,
-        luna::RHI::AttachmentLoadOp load_op,
-        luna::RHI::AttachmentStoreOp store_op,
-        const luna::RHI::ClearValue& clear_value = luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+        RHI::AttachmentLoadOp load_op,
+        RHI::AttachmentStoreOp store_op,
+        const RHI::ClearValue& clear_value = RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
     RenderGraphRasterPassBuilder& WriteDepth(RenderGraphTextureHandle handle,
-                                             luna::RHI::AttachmentLoadOp load_op,
-                                             luna::RHI::AttachmentStoreOp store_op,
-                                             const luna::RHI::ClearDepthStencilValue& clear_value = {1.0f, 0});
+                                             RHI::AttachmentLoadOp load_op,
+                                             RHI::AttachmentStoreOp store_op,
+                                             const RHI::ClearDepthStencilValue& clear_value = {1.0f, 0});
 
 private:
     friend class RenderGraphBuilder;
@@ -138,11 +138,11 @@ public:
                                 RenderGraphTransientTextureCache* transient_texture_cache = nullptr);
 
     RenderGraphTextureHandle ImportTexture(std::string name,
-                                           luna::RHI::Ref<luna::RHI::Texture> texture,
-                                           luna::RHI::ResourceState initial_state,
-                                           luna::RHI::ResourceState final_state = luna::RHI::ResourceState::Common);
+                                           RHI::Ref<RHI::Texture> texture,
+                                           RHI::ResourceState initial_state,
+                                           RHI::ResourceState final_state = RHI::ResourceState::Common);
     RenderGraphTextureHandle CreateTexture(RenderGraphTextureDesc desc);
-    RenderGraphBuilder& ExportTexture(RenderGraphTextureHandle handle, luna::RHI::ResourceState final_state);
+    RenderGraphBuilder& ExportTexture(RenderGraphTextureHandle handle, RHI::ResourceState final_state);
     RenderGraphBuilder& AddRasterPass(const std::string& name,
                                       RasterPassSetupCallback setup,
                                       RasterPassExecuteCallback execute,

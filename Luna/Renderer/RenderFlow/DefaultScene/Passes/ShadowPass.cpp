@@ -55,18 +55,18 @@ ShadowResources createShadowResources(RenderGraphBuilder& graph, uint32_t shadow
             .Width = shadow_map_size,
             .Height = shadow_map_size,
             .Format = render_flow::default_scene_detail::kShadowMapFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .shadow_depth = graph.CreateTexture(RenderGraphTextureDesc{
             .Name = std::string(name) + "Depth",
             .Width = shadow_map_size,
             .Height = shadow_map_size,
-            .Format = luna::RHI::Format::D32_FLOAT,
-            .Usage = luna::RHI::TextureUsageFlags::DepthStencilAttachment,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Format = RHI::Format::D32_FLOAT,
+            .Usage = RHI::TextureUsageFlags::DepthStencilAttachment,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .render_params = {},
     };
@@ -105,9 +105,9 @@ ShadowResources createDisabledShadowResources(RenderGraphBuilder& graph)
             .Width = 1,
             .Height = 1,
             .Format = render_flow::default_scene_detail::kShadowMapFormat,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         }),
         .shadow_depth = {},
         .render_params = {},
@@ -120,7 +120,7 @@ glm::vec3 safeNormalize(const glm::vec3& value, const glm::vec3& fallback)
     return length_squared > 1.0e-6f ? glm::normalize(value) : fallback;
 }
 
-void configureCascadeViewportAndScissor(luna::RHI::CommandBufferEncoder& commands,
+void configureCascadeViewportAndScissor(RHI::CommandBufferEncoder& commands,
                                         uint32_t cascade_index,
                                         uint32_t cascade_size)
 {
@@ -139,7 +139,7 @@ void configureCascadeViewportAndScissor(luna::RHI::CommandBufferEncoder& command
     commands.SetScissor({static_cast<int32_t>(offset_x), static_cast<int32_t>(offset_y), cascade_size, cascade_size});
 }
 
-void configurePcfViewportAndScissor(luna::RHI::CommandBufferEncoder& commands, uint32_t shadow_map_size)
+void configurePcfViewportAndScissor(RHI::CommandBufferEncoder& commands, uint32_t shadow_map_size)
 {
     commands.SetViewport(
         {0.0f, 0.0f, static_cast<float>(shadow_map_size), static_cast<float>(shadow_map_size), 0.0f, 1.0f});
@@ -281,7 +281,7 @@ void collectShadowCasterDrawCommandsForCascade(const std::vector<DrawCommand>& s
 
 glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
                                      const glm::vec3& light_direction,
-                                     const luna::RHI::RHIConventions& conventions,
+                                     const RHI::RHIConventions& conventions,
                                      uint32_t shadow_map_size,
                                      const std::vector<DrawCommand>& shadow_draw_commands)
 {
@@ -417,13 +417,13 @@ void ShadowDepthPass::setup(RenderPassContext& context)
         name(),
         [shadow](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.WriteColor(shadow.shadow_map,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
             if (shadow.shadow_depth.isValid()) {
                 pass_builder.WriteDepth(shadow.shadow_depth,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
                                         {1.0f, 0});
             }
         },

@@ -59,7 +59,7 @@ struct RenderFeatureResourceReport {
 };
 
 struct RenderFeatureShaderBindingCheck {
-    luna::RHI::Ref<luna::RHI::ShaderModule> shader;
+    RHI::Ref<RHI::ShaderModule> shader;
     std::string_view entry_point;
 };
 
@@ -76,13 +76,13 @@ public:
     void reset() noexcept;
 
     [[nodiscard]] bool hasContext() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
-    [[nodiscard]] luna::RHI::BackendType backendType() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Device>& device() const noexcept;
+    [[nodiscard]] RHI::BackendType backendType() const noexcept;
 
 private:
     std::string m_feature_name;
-    luna::RHI::Ref<luna::RHI::Device> m_device;
-    luna::RHI::BackendType m_backend_type{luna::RHI::BackendType::Auto};
+    RHI::Ref<RHI::Device> m_device;
+    RHI::BackendType m_backend_type{RHI::BackendType::Auto};
 };
 
 [[nodiscard]] bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState& state,
@@ -97,44 +97,44 @@ enum class RenderFeatureResourceScope : uint8_t {
 struct PersistentTexture2DDesc {
     uint32_t width{0};
     uint32_t height{0};
-    luna::RHI::Format format{luna::RHI::Format::UNDEFINED};
-    luna::RHI::TextureUsageFlags usage{luna::RHI::TextureUsageFlags::Sampled};
-    luna::RHI::ResourceState initial_state{luna::RHI::ResourceState::Undefined};
-    luna::RHI::SampleCount sample_count{luna::RHI::SampleCount::Count1};
+    RHI::Format format{RHI::Format::UNDEFINED};
+    RHI::TextureUsageFlags usage{RHI::TextureUsageFlags::Sampled};
+    RHI::ResourceState initial_state{RHI::ResourceState::Undefined};
+    RHI::SampleCount sample_count{RHI::SampleCount::Count1};
     std::string name;
 };
 
 struct RenderFeatureTextureImportOptions {
     std::string name;
-    std::optional<luna::RHI::ResourceState> initial_state;
-    luna::RHI::ResourceState final_state{luna::RHI::ResourceState::Common};
+    std::optional<RHI::ResourceState> initial_state;
+    RHI::ResourceState final_state{RHI::ResourceState::Common};
     bool export_texture{true};
 };
 
 class PersistentTexture2D {
 public:
-    [[nodiscard]] bool ensure(const luna::RHI::Ref<luna::RHI::Device>& device, const PersistentTexture2DDesc& desc);
+    [[nodiscard]] bool ensure(const RHI::Ref<RHI::Device>& device, const PersistentTexture2DDesc& desc);
     void reset() noexcept;
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& texture() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& texture() const noexcept;
     [[nodiscard]] const PersistentTexture2DDesc& desc() const noexcept;
-    [[nodiscard]] luna::RHI::ResourceState knownState() const noexcept;
+    [[nodiscard]] RHI::ResourceState knownState() const noexcept;
     [[nodiscard]] bool isValid() const noexcept;
-    void setKnownState(luna::RHI::ResourceState state) noexcept;
+    void setKnownState(RHI::ResourceState state) noexcept;
 
 private:
-    [[nodiscard]] bool matches(const luna::RHI::Ref<luna::RHI::Device>& device,
+    [[nodiscard]] bool matches(const RHI::Ref<RHI::Device>& device,
                                const PersistentTexture2DDesc& desc) const noexcept;
 
-    luna::RHI::Ref<luna::RHI::Texture> m_texture;
-    std::weak_ptr<luna::RHI::Device> m_device;
+    RHI::Ref<RHI::Texture> m_texture;
+    std::weak_ptr<RHI::Device> m_device;
     PersistentTexture2DDesc m_desc;
-    luna::RHI::ResourceState m_known_state{luna::RHI::ResourceState::Undefined};
+    RHI::ResourceState m_known_state{RHI::ResourceState::Undefined};
 };
 
 class HistoryTexture2D {
 public:
-    [[nodiscard]] bool ensure(const luna::RHI::Ref<luna::RHI::Device>& device, const PersistentTexture2DDesc& desc);
+    [[nodiscard]] bool ensure(const RHI::Ref<RHI::Device>& device, const PersistentTexture2DDesc& desc);
     void beginFrame(const RenderFeatureFrameContext& frame_context) noexcept;
     void markFrameWritten() noexcept;
     void commitFrame() noexcept;
@@ -142,8 +142,8 @@ public:
     void invalidateHistory() noexcept;
     void reset() noexcept;
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& readTexture() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>& writeTexture() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& readTexture() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& writeTexture() const noexcept;
     [[nodiscard]] PersistentTexture2D& readResource() noexcept;
     [[nodiscard]] PersistentTexture2D& writeResource() noexcept;
     [[nodiscard]] const PersistentTexture2D& readResource() const noexcept;
@@ -178,8 +178,8 @@ public:
     void bindGpuContext(const SceneRenderContext& context) noexcept;
     void resetGpuContext() noexcept;
     [[nodiscard]] bool hasGpuContext() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
-    [[nodiscard]] luna::RHI::BackendType backendType() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Device>& device() const noexcept;
+    [[nodiscard]] RHI::BackendType backendType() const noexcept;
 
     [[nodiscard]] bool logGpuResourceBuildResult(std::span<const RenderFeatureResourceStatus> resources) const;
     void resetBindingContractDiagnostics() noexcept;
@@ -225,12 +225,12 @@ public:
     [[nodiscard]] RenderGraphTextureHandle importHistoryReadTexture2D(
         luna::RenderGraphBuilder& graph,
         HistoryTexture2D& history,
-        const RenderFeatureTextureImportOptions& options = {.final_state = luna::RHI::ResourceState::ShaderRead,
+        const RenderFeatureTextureImportOptions& options = {.final_state = RHI::ResourceState::ShaderRead,
                                                             .export_texture = false}) const;
     [[nodiscard]] RenderGraphTextureHandle importHistoryWriteTexture2D(
         luna::RenderGraphBuilder& graph,
         HistoryTexture2D& history,
-        const RenderFeatureTextureImportOptions& options = {.final_state = luna::RHI::ResourceState::ShaderRead}) const;
+        const RenderFeatureTextureImportOptions& options = {.final_state = RHI::ResourceState::ShaderRead}) const;
 
 private:
     RenderFeatureGpuResourceState m_gpu_resources;
@@ -245,10 +245,10 @@ private:
     importHistoryReadTexture2D(luna::RenderGraphBuilder& graph,
                                HistoryTexture2D& history,
                                const RenderFeatureTextureImportOptions& options = {
-                                   .final_state = luna::RHI::ResourceState::ShaderRead, .export_texture = false});
+                                   .final_state = RHI::ResourceState::ShaderRead, .export_texture = false});
 [[nodiscard]] RenderGraphTextureHandle importHistoryWriteTexture2D(
     luna::RenderGraphBuilder& graph,
     HistoryTexture2D& history,
-    const RenderFeatureTextureImportOptions& options = {.final_state = luna::RHI::ResourceState::ShaderRead});
+    const RenderFeatureTextureImportOptions& options = {.final_state = RHI::ResourceState::ShaderRead});
 
 } // namespace luna::render_flow

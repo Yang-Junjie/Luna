@@ -43,16 +43,16 @@ RenderGraphTextureDesc makeSceneHdrColorDesc(const SceneRenderContext& scene_con
 {
     return RenderGraphTextureDesc{
         .Name = "SceneHdrColor",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = scene_context.framebuffer_width,
         .Height = scene_context.framebuffer_height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = render_flow::default_scene_detail::kSceneHdrColorFormat,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -105,9 +105,9 @@ void LightingPass::setup(RenderPassContext& context)
             pass_builder.ReadTexture(pick_texture);
             readLightingExtensionInputTextures(pass_builder, extension_inputs);
             pass_builder.WriteColor(scene_hdr_color,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(scene_context.clear_color.r,
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(scene_context.clear_color.r,
                                                                      scene_context.clear_color.g,
                                                                      scene_context.clear_color.b,
                                                                      scene_context.clear_color.a));
@@ -127,9 +127,9 @@ void LightingPass::setup(RenderPassContext& context)
                 pass_builder.ReadTexture(gbuffer.velocity);
                 pass_builder.ReadTexture(pick_texture);
                 pass_builder.WriteColor(scene_context.debug_target,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, gbuffer, pick_texture](RenderGraphRasterPassContext& pass_context) {
                 executeDebugView(pass_context, gbuffer, pick_texture);
@@ -194,7 +194,7 @@ void LightingPass::execute(RenderGraphRasterPassContext& pass_context,
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 2> descriptor_sets{
         pass_resources.gbuffer_descriptor_set,
         pass_resources.scene_descriptor_set,
     };
@@ -244,7 +244,7 @@ void LightingPass::executeDebugView(RenderGraphRasterPassContext& pass_context,
     pass_context.beginRendering();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 2> descriptor_sets{
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 2> descriptor_sets{
         pass_resources.gbuffer_descriptor_set,
         pass_resources.scene_descriptor_set,
     };

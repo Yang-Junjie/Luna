@@ -84,27 +84,27 @@ constexpr std::array<RenderFeatureDescriptorBinding, 4> kBloomBindings{{
     {"SourceTexture",
      "gBloomSourceTexture",
      bloom_binding::SourceTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"BloomTexture",
      "gBloomTexture",
      bloom_binding::BloomTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Sampler",
      "gBloomSampler",
      bloom_binding::Sampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Params",
      "gBloomParams",
      bloom_binding::Params,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
 }};
 
 bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
@@ -133,7 +133,7 @@ bool isBloomDebugView(RenderDebugViewMode mode) noexcept
 bool requiresBloomDebugPipeline(const SceneRenderContext& context) noexcept
 {
     return isBloomDebugView(context.debug_view_mode) && context.debug_target.isValid() &&
-           context.debug_format != luna::RHI::Format::UNDEFINED;
+           context.debug_format != RHI::Format::UNDEFINED;
 }
 
 std::optional<uint32_t> bloomDebugMipIndex(RenderDebugViewMode mode) noexcept
@@ -166,7 +166,7 @@ std::filesystem::path shaderPath()
     return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" / "Bloom.slang";
 }
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeBloomDescriptorSetLayoutCreateInfo()
+RHI::DescriptorSetLayoutCreateInfo makeBloomDescriptorSetLayoutCreateInfo()
 {
     return makeRenderFeatureDescriptorSetLayoutCreateInfo(kBloomBindings);
 }
@@ -182,22 +182,22 @@ ShaderBindingContract makeBloomShaderBindingContract()
     });
 }
 
-luna::RHI::ColorBlendAttachmentState makeAdditiveBlendAttachment()
+RHI::ColorBlendAttachmentState makeAdditiveBlendAttachment()
 {
-    luna::RHI::ColorBlendAttachmentState blend_attachment{};
+    RHI::ColorBlendAttachmentState blend_attachment{};
     blend_attachment.BlendEnable = true;
-    blend_attachment.SrcColorBlendFactor = luna::RHI::BlendFactor::One;
-    blend_attachment.DstColorBlendFactor = luna::RHI::BlendFactor::One;
-    blend_attachment.ColorBlendOp = luna::RHI::BlendOp::Add;
-    blend_attachment.SrcAlphaBlendFactor = luna::RHI::BlendFactor::One;
-    blend_attachment.DstAlphaBlendFactor = luna::RHI::BlendFactor::One;
-    blend_attachment.AlphaBlendOp = luna::RHI::BlendOp::Add;
-    blend_attachment.ColorWriteMask = luna::RHI::ColorComponentFlags::All;
+    blend_attachment.SrcColorBlendFactor = RHI::BlendFactor::One;
+    blend_attachment.DstColorBlendFactor = RHI::BlendFactor::One;
+    blend_attachment.ColorBlendOp = RHI::BlendOp::Add;
+    blend_attachment.SrcAlphaBlendFactor = RHI::BlendFactor::One;
+    blend_attachment.DstAlphaBlendFactor = RHI::BlendFactor::One;
+    blend_attachment.AlphaBlendOp = RHI::BlendOp::Add;
+    blend_attachment.ColorWriteMask = RHI::ColorComponentFlags::All;
     return blend_attachment;
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createDescriptorSetLayout(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout>
+    createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -206,64 +206,64 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
     return device->CreateDescriptorSetLayout(makeBloomDescriptorSetLayoutCreateInfo());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                             .SetMaxSets(32)
-                                            .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 96)
-                                            .AddPoolSize(luna::RHI::DescriptorType::Sampler, 32)
-                                            .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 32)
+                                            .AddPoolSize(RHI::DescriptorType::SampledImage, 96)
+                                            .AddPoolSize(RHI::DescriptorType::Sampler, 32)
+                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 32)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateSampler(luna::RHI::SamplerBuilder()
-                                     .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
-                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+    return device->CreateSampler(RHI::SamplerBuilder()
+                                     .SetFilter(RHI::Filter::Linear, RHI::Filter::Linear)
+                                     .SetMipmapMode(RHI::SamplerMipmapMode::Nearest)
+                                     .SetAddressMode(RHI::SamplerAddressMode::ClampToEdge)
                                      .SetAnisotropy(false)
                                      .SetName("BloomSampler")
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout>
-    createPipelineLayout(const luna::RHI::Ref<luna::RHI::Device>& device,
-                         const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout>
+    createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                         const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
     }
 
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline>
-    createPipeline(const luna::RHI::Ref<luna::RHI::Device>& device,
-                   const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-                   const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-                   const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-                   luna::RHI::Format color_format,
+RHI::Ref<RHI::GraphicsPipeline>
+    createPipeline(const RHI::Ref<RHI::Device>& device,
+                   const RHI::Ref<RHI::PipelineLayout>& layout,
+                   const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                   const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+                   RHI::Format color_format,
                    bool additive_blend)
 {
-    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED) {
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
     }
 
-    luna::RHI::GraphicsPipelineBuilder builder;
+    RHI::GraphicsPipelineBuilder builder;
     builder.SetShaders({vertex_shader, fragment_shader})
-        .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
-        .SetCullMode(luna::RHI::CullMode::None)
-        .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-        .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+        .SetTopology(RHI::PrimitiveTopology::TriangleList)
+        .SetCullMode(RHI::CullMode::None)
+        .SetFrontFace(RHI::FrontFace::CounterClockwise)
+        .SetDepthTest(false, false, RHI::CompareOp::Always)
         .SetLayout(layout);
     if (additive_blend) {
         builder.AddColorAttachment(makeAdditiveBlendAttachment());
@@ -296,16 +296,16 @@ RenderGraphTextureDesc makeBloomTextureDesc(std::string name, uint32_t width, ui
 {
     return RenderGraphTextureDesc{
         .Name = std::move(name),
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = std::max(width, 1u),
         .Height = std::max(height, 1u),
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = default_scene_detail::kSceneHdrColorFormat,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -377,23 +377,23 @@ public:
         }
 
         releasePipelineResources();
-        const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
+        const RHI::Ref<RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
         const bool debug_required = requiresBloomDebugPipeline(context);
         m_state.vertex_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "bloomVertexMain", luna::RHI::ShaderStage::Vertex);
+            device, context.compiler, path, "bloomVertexMain", RHI::ShaderStage::Vertex);
         m_state.prefilter_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "bloomPrefilterFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "bloomPrefilterFragmentMain", RHI::ShaderStage::Fragment);
         m_state.downsample_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "bloomDownsampleFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "bloomDownsampleFragmentMain", RHI::ShaderStage::Fragment);
         m_state.upsample_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "bloomUpsampleFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "bloomUpsampleFragmentMain", RHI::ShaderStage::Fragment);
         m_state.composite_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "bloomCompositeFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "bloomCompositeFragmentMain", RHI::ShaderStage::Fragment);
         if (debug_required) {
             m_state.debug_shader = renderer_detail::loadShaderModule(
-                device, context.compiler, path, "bloomDebugFragmentMain", luna::RHI::ShaderStage::Fragment);
+                device, context.compiler, path, "bloomDebugFragmentMain", RHI::ShaderStage::Fragment);
         }
 
         const ShaderBindingContract contract = makeBloomShaderBindingContract();
@@ -457,10 +457,10 @@ public:
         m_state.sampler = createSampler(device);
         for (uint32_t index = 0; index < m_state.params_buffers.size(); ++index) {
             m_state.params_buffers[index] =
-                device->CreateBuffer(luna::RHI::BufferBuilder()
+                device->CreateBuffer(RHI::BufferBuilder()
                                          .SetSize(sizeof(BloomGpuParams))
-                                         .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                         .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                         .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                         .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                          .SetName("BloomParams" + std::to_string(index))
                                          .Build());
         }
@@ -495,8 +495,8 @@ public:
     }
 
     void updateBindings(uint32_t descriptor_set_index,
-                        const luna::RHI::Ref<luna::RHI::Texture>& source,
-                        const luna::RHI::Ref<luna::RHI::Texture>& bloom,
+                        const RHI::Ref<RHI::Texture>& source,
+                        const RHI::Ref<RHI::Texture>& bloom,
                         uint32_t width,
                         uint32_t height,
                         const Options& options,
@@ -507,38 +507,38 @@ public:
             return;
         }
 
-        const luna::RHI::Ref<luna::RHI::Texture>& bloom_texture = bloom ? bloom : source;
+        const RHI::Ref<RHI::Texture>& bloom_texture = bloom ? bloom : source;
         updateParams(descriptor_set_index, width, height, options, debug_view_mode);
         auto& descriptor_set = m_state.descriptor_sets[descriptor_set_index];
-        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = bloom_binding::SourceTexture,
             .TextureView = source->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = bloom_binding::BloomTexture,
             .TextureView = bloom_texture->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
             .Binding = bloom_binding::Sampler,
             .Sampler = m_state.sampler,
         });
-        descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
             .Binding = bloom_binding::Params,
             .Buffer = m_state.params_buffers[descriptor_set_index],
             .Offset = 0,
             .Stride = sizeof(BloomGpuParams),
             .Size = sizeof(BloomGpuParams),
-            .Type = luna::RHI::DescriptorType::UniformBuffer,
+            .Type = RHI::DescriptorType::UniformBuffer,
         });
         descriptor_set->Update();
     }
 
     void draw(RenderGraphRasterPassContext& pass_context,
-              const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
+              const RHI::Ref<RHI::GraphicsPipeline>& pipeline,
               uint32_t descriptor_set_index) const
     {
         if (!hasCoreResources() || !pipeline || descriptor_set_index >= m_state.descriptor_sets.size()) {
@@ -556,34 +556,34 @@ public:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{
             m_state.descriptor_sets[descriptor_set_index]};
         commands.BindDescriptorSets(pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
         pass_context.endRendering();
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& prefilterPipeline() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::GraphicsPipeline>& prefilterPipeline() const noexcept
     {
         return m_state.prefilter_pipeline;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& downsamplePipeline() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::GraphicsPipeline>& downsamplePipeline() const noexcept
     {
         return m_state.downsample_pipeline;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& upsamplePipeline() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::GraphicsPipeline>& upsamplePipeline() const noexcept
     {
         return m_state.upsample_pipeline;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& compositePipeline() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::GraphicsPipeline>& compositePipeline() const noexcept
     {
         return m_state.composite_pipeline;
     }
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& debugPipeline() const noexcept
+    [[nodiscard]] const RHI::Ref<RHI::GraphicsPipeline>& debugPipeline() const noexcept
     {
         return m_state.debug_pipeline;
     }
@@ -646,29 +646,29 @@ private:
     }
 
     struct State {
-        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> layout;
-        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-        luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> prefilter_pipeline;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> downsample_pipeline;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> upsample_pipeline;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> composite_pipeline;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> debug_pipeline;
-        luna::RHI::Ref<luna::RHI::Sampler> sampler;
-        luna::RHI::Format debug_format{luna::RHI::Format::UNDEFINED};
-        std::array<luna::RHI::Ref<luna::RHI::Buffer>, kBloomDescriptorSetCount> params_buffers;
-        std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, kBloomDescriptorSetCount> descriptor_sets;
-        luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> prefilter_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> downsample_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> upsample_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> composite_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> debug_shader;
+        RHI::Ref<RHI::DescriptorSetLayout> layout;
+        RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+        RHI::Ref<RHI::PipelineLayout> pipeline_layout;
+        RHI::Ref<RHI::GraphicsPipeline> prefilter_pipeline;
+        RHI::Ref<RHI::GraphicsPipeline> downsample_pipeline;
+        RHI::Ref<RHI::GraphicsPipeline> upsample_pipeline;
+        RHI::Ref<RHI::GraphicsPipeline> composite_pipeline;
+        RHI::Ref<RHI::GraphicsPipeline> debug_pipeline;
+        RHI::Ref<RHI::Sampler> sampler;
+        RHI::Format debug_format{RHI::Format::UNDEFINED};
+        std::array<RHI::Ref<RHI::Buffer>, kBloomDescriptorSetCount> params_buffers;
+        std::array<RHI::Ref<RHI::DescriptorSet>, kBloomDescriptorSetCount> descriptor_sets;
+        RHI::Ref<RHI::ShaderModule> vertex_shader;
+        RHI::Ref<RHI::ShaderModule> prefilter_shader;
+        RHI::Ref<RHI::ShaderModule> downsample_shader;
+        RHI::Ref<RHI::ShaderModule> upsample_shader;
+        RHI::Ref<RHI::ShaderModule> composite_shader;
+        RHI::Ref<RHI::ShaderModule> debug_shader;
     };
 
     [[nodiscard]] std::array<RenderFeatureResourceStatus, 17> resourceStatus() const noexcept
     {
-        const bool debug_requested = m_state.debug_format != luna::RHI::Format::UNDEFINED;
+        const bool debug_requested = m_state.debug_format != RHI::Format::UNDEFINED;
         return {{
             {"vertex_shader", static_cast<bool>(m_state.vertex_shader)},
             {"prefilter_shader", static_cast<bool>(m_state.prefilter_shader)},
@@ -798,9 +798,9 @@ private:
             [source, destination](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
                 pass_builder.WriteColor(destination,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, source, options](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);
@@ -830,9 +830,9 @@ private:
             [source, destination](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
                 pass_builder.WriteColor(destination,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, source, options, descriptor_set_index](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);
@@ -862,7 +862,7 @@ private:
             [source, destination](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
                 pass_builder.WriteColor(
-                    destination, luna::RHI::AttachmentLoadOp::Load, luna::RHI::AttachmentStoreOp::Store);
+                    destination, RHI::AttachmentLoadOp::Load, RHI::AttachmentStoreOp::Store);
             },
             [this, source, options, descriptor_set_index](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);
@@ -892,9 +892,9 @@ private:
                 pass_builder.ReadTexture(source);
                 pass_builder.ReadTexture(bloom);
                 pass_builder.WriteColor(destination,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, source, bloom, options](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);
@@ -928,9 +928,9 @@ private:
             [source, scene_context](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
                 pass_builder.WriteColor(scene_context.debug_target,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, source, options, debug_view_mode = scene_context.debug_view_mode](
                 RenderGraphRasterPassContext& pass_context) {

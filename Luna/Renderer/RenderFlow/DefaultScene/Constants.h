@@ -6,21 +6,21 @@
 
 namespace luna::render_flow::default_scene_detail {
 
-inline constexpr luna::RHI::Format kGBufferBaseColorFormat = luna::RHI::Format::RGBA8_UNORM;
-inline constexpr luna::RHI::Format kGBufferLightingFormat = luna::RHI::Format::RGBA16_FLOAT;
-inline constexpr luna::RHI::Format kSceneHdrColorFormat = luna::RHI::Format::RGBA16_FLOAT;
-inline constexpr luna::RHI::Format kVelocityFormat = luna::RHI::Format::RG16_FLOAT;
-inline constexpr luna::RHI::Format kScenePickingFormat = luna::RHI::Format::R32_UINT;
-inline constexpr luna::RHI::Format kShadowMapFormat = luna::RHI::Format::R32_FLOAT;
+inline constexpr RHI::Format kGBufferBaseColorFormat = RHI::Format::RGBA8_UNORM;
+inline constexpr RHI::Format kGBufferLightingFormat = RHI::Format::RGBA16_FLOAT;
+inline constexpr RHI::Format kSceneHdrColorFormat = RHI::Format::RGBA16_FLOAT;
+inline constexpr RHI::Format kVelocityFormat = RHI::Format::RG16_FLOAT;
+inline constexpr RHI::Format kScenePickingFormat = RHI::Format::R32_UINT;
+inline constexpr RHI::Format kShadowMapFormat = RHI::Format::R32_FLOAT;
 inline constexpr uint32_t kShadowCascadeCount = 4;
 inline constexpr uint32_t kShadowCascadeAtlasColumns = 2;
 inline constexpr uint32_t kShadowCascadeAtlasRows = 2;
 inline constexpr uint32_t kShadowCascadeTileSize = 2048;
 inline constexpr uint32_t kShadowCascadeAtlasSize = kShadowCascadeTileSize * kShadowCascadeAtlasColumns;
 
-inline constexpr luna::RHI::Format kEnvironmentFormat = luna::RHI::Format::RGBA32_FLOAT;
-inline constexpr luna::RHI::Format kEnvironmentIblFormat = luna::RHI::Format::RGBA16_FLOAT;
-inline constexpr luna::RHI::Format kEnvironmentBrdfLutFormat = luna::RHI::Format::RGBA16_FLOAT;
+inline constexpr RHI::Format kEnvironmentFormat = RHI::Format::RGBA32_FLOAT;
+inline constexpr RHI::Format kEnvironmentIblFormat = RHI::Format::RGBA16_FLOAT;
+inline constexpr RHI::Format kEnvironmentBrdfLutFormat = RHI::Format::RGBA16_FLOAT;
 inline constexpr uint32_t kEnvironmentCubeSize = 512;
 inline constexpr uint32_t kEnvironmentIrradianceCubeSize = 32;
 inline constexpr uint32_t kEnvironmentPrefilterCubeSize = 128;

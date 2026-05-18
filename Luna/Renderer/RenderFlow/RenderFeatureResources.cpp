@@ -19,7 +19,7 @@ namespace {
 
 bool isValidDesc(const PersistentTexture2DDesc& desc) noexcept
 {
-    return desc.width > 0 && desc.height > 0 && desc.format != luna::RHI::Format::UNDEFINED;
+    return desc.width > 0 && desc.height > 0 && desc.format != RHI::Format::UNDEFINED;
 }
 
 bool descsEqual(const PersistentTexture2DDesc& lhs, const PersistentTexture2DDesc& rhs) noexcept
@@ -125,7 +125,7 @@ void RenderFeatureGpuResourceState::bindContext(const SceneRenderContext& contex
 void RenderFeatureGpuResourceState::reset() noexcept
 {
     m_device.reset();
-    m_backend_type = luna::RHI::BackendType::Auto;
+    m_backend_type = RHI::BackendType::Auto;
 }
 
 bool RenderFeatureGpuResourceState::hasContext() const noexcept
@@ -133,12 +133,12 @@ bool RenderFeatureGpuResourceState::hasContext() const noexcept
     return m_device != nullptr;
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& RenderFeatureGpuResourceState::device() const noexcept
+const RHI::Ref<RHI::Device>& RenderFeatureGpuResourceState::device() const noexcept
 {
     return m_device;
 }
 
-luna::RHI::BackendType RenderFeatureGpuResourceState::backendType() const noexcept
+RHI::BackendType RenderFeatureGpuResourceState::backendType() const noexcept
 {
     return m_backend_type;
 }
@@ -156,7 +156,7 @@ bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState&
     if (complete) {
         LUNA_RENDERER_INFO("Created GPU resources for feature '{}' on backend '{}'",
                            feature_name,
-                           luna::RHI::BackendTypeToString(state.backendType()));
+                           RHI::BackendTypeToString(state.backendType()));
         return true;
     }
 
@@ -177,7 +177,7 @@ bool logRenderFeatureGpuResourceBuildResult(const RenderFeatureGpuResourceState&
     return false;
 }
 
-bool PersistentTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device,
+bool PersistentTexture2D::ensure(const RHI::Ref<RHI::Device>& device,
                                  const PersistentTexture2DDesc& desc)
 {
     if (!device || !isValidDesc(desc)) {
@@ -191,8 +191,8 @@ bool PersistentTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device
 
     reset();
 
-    m_texture = device->CreateTexture(luna::RHI::TextureBuilder()
-                                          .SetType(luna::RHI::TextureType::Texture2D)
+    m_texture = device->CreateTexture(RHI::TextureBuilder()
+                                          .SetType(RHI::TextureType::Texture2D)
                                           .SetSize(desc.width, desc.height)
                                           .SetFormat(desc.format)
                                           .SetUsage(desc.usage)
@@ -215,10 +215,10 @@ void PersistentTexture2D::reset() noexcept
     m_texture.reset();
     m_device.reset();
     m_desc = {};
-    m_known_state = luna::RHI::ResourceState::Undefined;
+    m_known_state = RHI::ResourceState::Undefined;
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& PersistentTexture2D::texture() const noexcept
+const RHI::Ref<RHI::Texture>& PersistentTexture2D::texture() const noexcept
 {
     return m_texture;
 }
@@ -228,7 +228,7 @@ const PersistentTexture2DDesc& PersistentTexture2D::desc() const noexcept
     return m_desc;
 }
 
-luna::RHI::ResourceState PersistentTexture2D::knownState() const noexcept
+RHI::ResourceState PersistentTexture2D::knownState() const noexcept
 {
     return m_known_state;
 }
@@ -238,25 +238,25 @@ bool PersistentTexture2D::isValid() const noexcept
     return m_texture != nullptr;
 }
 
-void PersistentTexture2D::setKnownState(luna::RHI::ResourceState state) noexcept
+void PersistentTexture2D::setKnownState(RHI::ResourceState state) noexcept
 {
     m_known_state = state;
 }
 
-bool PersistentTexture2D::matches(const luna::RHI::Ref<luna::RHI::Device>& device,
+bool PersistentTexture2D::matches(const RHI::Ref<RHI::Device>& device,
                                   const PersistentTexture2DDesc& desc) const noexcept
 {
     if (!m_texture || m_device.lock() != device || !descsEqual(m_desc, desc)) {
         return false;
     }
 
-    return m_texture->GetType() == luna::RHI::TextureType::Texture2D && m_texture->GetWidth() == desc.width &&
+    return m_texture->GetType() == RHI::TextureType::Texture2D && m_texture->GetWidth() == desc.width &&
            m_texture->GetHeight() == desc.height && m_texture->GetDepth() == 1 && m_texture->GetMipLevels() == 1 &&
            m_texture->GetArrayLayers() == 1 && m_texture->GetFormat() == desc.format &&
            m_texture->GetUsage() == desc.usage && m_texture->GetSampleCount() == desc.sample_count;
 }
 
-bool HistoryTexture2D::ensure(const luna::RHI::Ref<luna::RHI::Device>& device,
+bool HistoryTexture2D::ensure(const RHI::Ref<RHI::Device>& device,
                               const PersistentTexture2DDesc& desc)
 {
     if (!isValidDesc(desc)) {
@@ -340,12 +340,12 @@ void HistoryTexture2D::reset() noexcept
     m_frame_written = false;
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& HistoryTexture2D::readTexture() const noexcept
+const RHI::Ref<RHI::Texture>& HistoryTexture2D::readTexture() const noexcept
 {
     return m_textures[readIndex()].texture();
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& HistoryTexture2D::writeTexture() const noexcept
+const RHI::Ref<RHI::Texture>& HistoryTexture2D::writeTexture() const noexcept
 {
     return m_textures[m_write_index].texture();
 }
@@ -442,12 +442,12 @@ bool RenderFeatureResourceSet::hasGpuContext() const noexcept
     return m_gpu_resources.hasContext();
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& RenderFeatureResourceSet::device() const noexcept
+const RHI::Ref<RHI::Device>& RenderFeatureResourceSet::device() const noexcept
 {
     return m_gpu_resources.device();
 }
 
-luna::RHI::BackendType RenderFeatureResourceSet::backendType() const noexcept
+RHI::BackendType RenderFeatureResourceSet::backendType() const noexcept
 {
     return m_gpu_resources.backendType();
 }
@@ -660,7 +660,7 @@ RenderGraphTextureHandle importPersistentTexture2D(luna::RenderGraphBuilder& gra
         import_name = texture.desc().name.empty() ? "RenderFeaturePersistentTexture" : texture.desc().name;
     }
 
-    const luna::RHI::ResourceState initial_state = options.initial_state.value_or(texture.knownState());
+    const RHI::ResourceState initial_state = options.initial_state.value_or(texture.knownState());
     const RenderGraphTextureHandle handle =
         graph.ImportTexture(std::move(import_name), texture.texture(), initial_state, options.final_state);
     if (!handle.isValid()) {

@@ -95,7 +95,7 @@ RenderFeatureSupportResult evaluateRenderFeatureRequirements(const RenderFeature
                                                              const SceneRenderContext& scene_context)
 {
     RenderFeatureSupportResult result{};
-    const luna::RHI::RHICapabilities& capabilities = scene_context.capabilities;
+    const RHI::RHICapabilities& capabilities = scene_context.capabilities;
 
     if (requirements.requires_framebuffer_size) {
         require(scene_context.framebuffer_width > 0 && scene_context.framebuffer_height > 0,

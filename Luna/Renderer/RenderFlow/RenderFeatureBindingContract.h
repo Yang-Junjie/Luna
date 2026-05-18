@@ -16,9 +16,9 @@ struct RenderFeatureDescriptorBinding {
     std::string_view name;
     std::string_view shader_name;
     uint32_t binding{0};
-    luna::RHI::DescriptorType type{luna::RHI::DescriptorType::UniformBuffer};
+    RHI::DescriptorType type{RHI::DescriptorType::UniformBuffer};
     uint32_t count{1};
-    luna::RHI::ShaderStage stages{luna::RHI::ShaderStage::AllGraphics};
+    RHI::ShaderStage stages{RHI::ShaderStage::AllGraphics};
 };
 
 struct RenderFeatureDescriptorSetContract {
@@ -29,19 +29,19 @@ struct RenderFeatureDescriptorSetContract {
     std::span<const RenderFeatureDescriptorBinding> bindings;
 };
 
-[[nodiscard]] luna::RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
+[[nodiscard]] RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
     std::span<const RenderFeatureDescriptorBinding> bindings);
 
 [[nodiscard]] ShaderBindingContract makeRenderFeatureShaderBindingContract(
     const RenderFeatureDescriptorSetContract& descriptor_set);
 
 [[nodiscard]] ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+    const RHI::Ref<RHI::ShaderModule>& shader,
     const ShaderBindingContract& contract,
     const std::filesystem::path& shader_file,
     std::string_view entry_point);
 
-bool validateAndLogRenderFeatureShaderModuleBindings(const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+bool validateAndLogRenderFeatureShaderModuleBindings(const RHI::Ref<RHI::ShaderModule>& shader,
                                                      const ShaderBindingContract& contract,
                                                      const std::filesystem::path& shader_file,
                                                      std::string_view entry_point);

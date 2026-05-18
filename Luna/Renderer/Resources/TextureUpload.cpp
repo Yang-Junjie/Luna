@@ -13,49 +13,49 @@
 namespace luna::renderer_detail {
 namespace {
 
-luna::RHI::Filter toRhiFilter(luna::Texture::FilterMode filter_mode)
+RHI::Filter toRhiFilter(luna::Texture::FilterMode filter_mode)
 {
     switch (filter_mode) {
         case luna::Texture::FilterMode::Nearest:
-            return luna::RHI::Filter::Nearest;
+            return RHI::Filter::Nearest;
         case luna::Texture::FilterMode::Linear:
         default:
-            return luna::RHI::Filter::Linear;
+            return RHI::Filter::Linear;
     }
 }
 
-luna::RHI::SamplerMipmapMode toRhiMipmapMode(luna::Texture::MipFilterMode mip_filter_mode)
+RHI::SamplerMipmapMode toRhiMipmapMode(luna::Texture::MipFilterMode mip_filter_mode)
 {
     switch (mip_filter_mode) {
         case luna::Texture::MipFilterMode::Nearest:
-            return luna::RHI::SamplerMipmapMode::Nearest;
+            return RHI::SamplerMipmapMode::Nearest;
         case luna::Texture::MipFilterMode::None:
         case luna::Texture::MipFilterMode::Linear:
         default:
-            return luna::RHI::SamplerMipmapMode::Linear;
+            return RHI::SamplerMipmapMode::Linear;
     }
 }
 
-luna::RHI::SamplerAddressMode toRhiAddressMode(luna::Texture::WrapMode wrap_mode)
+RHI::SamplerAddressMode toRhiAddressMode(luna::Texture::WrapMode wrap_mode)
 {
     switch (wrap_mode) {
         case luna::Texture::WrapMode::MirroredRepeat:
-            return luna::RHI::SamplerAddressMode::MirroredRepeat;
+            return RHI::SamplerAddressMode::MirroredRepeat;
         case luna::Texture::WrapMode::ClampToEdge:
-            return luna::RHI::SamplerAddressMode::ClampToEdge;
+            return RHI::SamplerAddressMode::ClampToEdge;
         case luna::Texture::WrapMode::ClampToBorder:
-            return luna::RHI::SamplerAddressMode::ClampToBorder;
+            return RHI::SamplerAddressMode::ClampToBorder;
         case luna::Texture::WrapMode::MirrorClampToEdge:
-            return luna::RHI::SamplerAddressMode::MirrorClampToEdge;
+            return RHI::SamplerAddressMode::MirrorClampToEdge;
         case luna::Texture::WrapMode::Repeat:
         default:
-            return luna::RHI::SamplerAddressMode::Repeat;
+            return RHI::SamplerAddressMode::Repeat;
     }
 }
 
 } // namespace
 
-PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>& device,
+PendingTextureUpload createTextureUpload(const RHI::Ref<RHI::Device>& device,
                                          const luna::ImageData& image,
                                          const luna::Texture::SamplerSettings& sampler_settings,
                                          std::string_view debug_name)
@@ -83,20 +83,20 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
                         static_cast<int>(image.ImageFormat),
                         image.ByteData.size());
 
-    uploaded_texture.texture = device->CreateTexture(luna::RHI::TextureBuilder()
+    uploaded_texture.texture = device->CreateTexture(RHI::TextureBuilder()
                                                          .SetSize(image.Width, image.Height)
                                                          .SetMipLevels(mip_level_count)
                                                          .SetFormat(image.ImageFormat)
-                                                         .SetUsage(luna::RHI::TextureUsageFlags::Sampled |
-                                                                   luna::RHI::TextureUsageFlags::TransferDst)
-                                                         .SetInitialState(luna::RHI::ResourceState::Undefined)
+                                                         .SetUsage(RHI::TextureUsageFlags::Sampled |
+                                                                   RHI::TextureUsageFlags::TransferDst)
+                                                         .SetInitialState(RHI::ResourceState::Undefined)
                                                          .SetName(uploaded_texture.debug_name)
                                                          .Build());
 
     const float max_lod = sampler_settings.MipFilter == luna::Texture::MipFilterMode::None
                               ? 0.0f
                               : static_cast<float>((std::max)(mip_level_count, 1u) - 1u);
-    uploaded_texture.sampler = device->CreateSampler(luna::RHI::SamplerBuilder()
+    uploaded_texture.sampler = device->CreateSampler(RHI::SamplerBuilder()
                                                          .SetMinFilter(toRhiFilter(sampler_settings.MinFilter))
                                                          .SetMagFilter(toRhiFilter(sampler_settings.MagFilter))
                                                          .SetMipmapMode(toRhiMipmapMode(sampler_settings.MipFilter))
@@ -136,13 +136,13 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
         const uint32_t row_length_texels = bytes_per_texel > 0 ? aligned_row_pitch / bytes_per_texel : safe_width;
 
         buffer_offset = alignUp(buffer_offset, kTextureDataPlacementAlignment);
-        uploaded_texture.copy_regions.push_back(luna::RHI::BufferImageCopy{
+        uploaded_texture.copy_regions.push_back(RHI::BufferImageCopy{
             .BufferOffset = buffer_offset,
             .BufferRowLength = row_length_texels,
             .BufferImageHeight = 0,
             .ImageSubresource =
                 {
-                    .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                    .AspectMask = RHI::ImageAspectFlags::Color,
                     .MipLevel = mip_level,
                     .BaseArrayLayer = 0,
                     .LayerCount = 1,
@@ -179,10 +179,10 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
         return uploaded_texture;
     }
 
-    uploaded_texture.staging_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+    uploaded_texture.staging_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                                .SetSize(buffer_offset)
-                                                               .SetUsage(luna::RHI::BufferUsageFlags::TransferSrc)
-                                                               .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                               .SetUsage(RHI::BufferUsageFlags::TransferSrc)
+                                                               .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                                .SetName(uploaded_texture.debug_name + "_Staging")
                                                                .Build());
     if (!uploaded_texture.staging_buffer) {
@@ -215,10 +215,10 @@ PendingTextureUpload createTextureUpload(const luna::RHI::Ref<luna::RHI::Device>
     return uploaded_texture;
 }
 
-void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands,
+void uploadTextureIfNeeded(RHI::CommandBufferEncoder& commands,
                            PendingTextureUpload& uploaded_texture,
-                           luna::RHI::ResourceState final_state,
-                           luna::RHI::SyncScope final_stage)
+                           RHI::ResourceState final_state,
+                           RHI::SyncScope final_stage)
 {
     if (uploaded_texture.uploaded || !uploaded_texture.texture || !uploaded_texture.staging_buffer ||
         uploaded_texture.copy_regions.empty()) {
@@ -233,24 +233,24 @@ void uploadTextureIfNeeded(luna::RHI::CommandBufferEncoder& commands,
         return;
     }
 
-    const luna::RHI::ImageSubresourceRange full_range{
+    const RHI::ImageSubresourceRange full_range{
         .BaseMipLevel = 0,
         .LevelCount = uploaded_texture.texture->GetMipLevels(),
         .BaseArrayLayer = 0,
         .LayerCount = uploaded_texture.texture->GetArrayLayers(),
-        .AspectMask = luna::RHI::ImageAspectFlags::Color,
+        .AspectMask = RHI::ImageAspectFlags::Color,
     };
 
-    commands.TransitionImage(uploaded_texture.texture, luna::RHI::ImageTransition::UndefinedToTransferDst, full_range);
+    commands.TransitionImage(uploaded_texture.texture, RHI::ImageTransition::UndefinedToTransferDst, full_range);
     commands.CopyBufferToImage(uploaded_texture.staging_buffer,
                                uploaded_texture.texture,
-                               luna::RHI::ResourceState::CopyDest,
+                               RHI::ResourceState::CopyDest,
                                uploaded_texture.copy_regions);
-    commands.PipelineBarrier(luna::RHI::SyncScope::TransferStage,
+    commands.PipelineBarrier(RHI::SyncScope::TransferStage,
                              final_stage,
-                             std::array{luna::RHI::TextureBarrier{
+                             std::array{RHI::TextureBarrier{
                                  .Texture = uploaded_texture.texture,
-                                 .OldState = luna::RHI::ResourceState::CopyDest,
+                                 .OldState = RHI::ResourceState::CopyDest,
                                  .NewState = final_state,
                                  .SubresourceRange = full_range,
                              }});

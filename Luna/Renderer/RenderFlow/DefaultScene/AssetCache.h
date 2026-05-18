@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // Caches GPU-side scene assets needed by draw submission.
 // Converts meshes, materials, and textures into uploaded resources and descriptor sets,
@@ -25,9 +25,9 @@ namespace luna::render_flow::default_scene {
 class AssetCache final {
 public:
     struct Bindings {
-        luna::RHI::Ref<luna::RHI::Device> device;
-        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> material_layout;
+        RHI::Ref<RHI::Device> device;
+        RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+        RHI::Ref<RHI::DescriptorSetLayout> material_layout;
 
         [[nodiscard]] bool isValid() const noexcept
         {
@@ -36,9 +36,9 @@ public:
     };
 
     struct DrawResources {
-        luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
-        luna::RHI::Ref<luna::RHI::Buffer> index_buffer;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> material_descriptor_set;
+        RHI::Ref<RHI::Buffer> vertex_buffer;
+        RHI::Ref<RHI::Buffer> index_buffer;
+        RHI::Ref<RHI::DescriptorSet> material_descriptor_set;
         uint32_t index_count{0};
 
         [[nodiscard]] bool hasGeometry() const noexcept
@@ -58,7 +58,7 @@ public:
     };
 
     void clear(ClearMode mode);
-    void prepareDraws(luna::RHI::CommandBufferEncoder& commands,
+    void prepareDraws(RHI::CommandBufferEncoder& commands,
                       std::span<const DrawCommand> draw_commands,
                       const Material& default_material,
                       const Bindings& bindings);
@@ -67,8 +67,8 @@ public:
 
 private:
     struct UploadedSubMesh {
-        luna::RHI::Ref<luna::RHI::Buffer> vertex_buffer;
-        luna::RHI::Ref<luna::RHI::Buffer> index_buffer;
+        RHI::Ref<RHI::Buffer> vertex_buffer;
+        RHI::Ref<RHI::Buffer> index_buffer;
         uint32_t index_count{0};
     };
 
@@ -82,8 +82,8 @@ private:
         std::shared_ptr<renderer_detail::PendingTextureUpload> metallic_roughness_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> emissive_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> occlusion_texture;
-        luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
+        RHI::Ref<RHI::Buffer> params_buffer;
+        RHI::Ref<RHI::DescriptorSet> descriptor_set;
         uint64_t uploaded_version{0};
     };
 
@@ -92,7 +92,7 @@ private:
         getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings);
     static void uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material);
-    void uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
+    void uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
     [[nodiscard]] static const Material& resolveMaterial(const std::shared_ptr<Material>& material,
                                                          const Material& default_material);
 

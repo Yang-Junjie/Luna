@@ -36,7 +36,7 @@ void SwapchainFactory::reset() noexcept
     m_configured = false;
 }
 
-bool SwapchainFactory::create(luna::RHI::Extent2D requested_extent, SwapchainResources& resources) const
+bool SwapchainFactory::create(RHI::Extent2D requested_extent, SwapchainResources& resources) const
 {
     if (!m_configured || !m_request.device || !m_request.surface || !m_request.adapter) {
         LUNA_RENDERER_WARN("Cannot create swapchain because renderer device, surface, or adapter is missing");
@@ -50,7 +50,7 @@ bool SwapchainFactory::create(luna::RHI::Extent2D requested_extent, SwapchainRes
     const auto selected_present_mode =
         renderer_detail::choosePresentMode(supported_present_modes, m_request.present_mode);
 
-    const luna::RHI::Extent2D clamped_extent{
+    const RHI::Extent2D clamped_extent{
         std::clamp(requested_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
         std::clamp(requested_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
     };
@@ -78,15 +78,15 @@ bool SwapchainFactory::create(luna::RHI::Extent2D requested_extent, SwapchainRes
                            renderer_detail::describePresentModes(supported_present_modes));
     }
 
-    resources.swapchain = m_request.device->CreateSwapchain(luna::RHI::SwapchainBuilder()
+    resources.swapchain = m_request.device->CreateSwapchain(RHI::SwapchainBuilder()
                                                                .SetExtent(clamped_extent)
                                                                .SetFormat(surface_format.format)
                                                                .SetColorSpace(surface_format.colorSpace)
                                                                .SetPresentMode(selected_present_mode)
                                                                .SetMinImageCount(min_image_count)
                                                                .SetPreTransform(capabilities.currentTransform)
-                                                               .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment |
-                                                                         luna::RHI::SwapchainUsageFlags::TransferDst)
+                                                               .SetUsage(RHI::SwapchainUsageFlags::ColorAttachment |
+                                                                         RHI::SwapchainUsageFlags::TransferDst)
                                                                .SetSurface(m_request.surface)
                                                                .Build());
     if (!resources.swapchain) {

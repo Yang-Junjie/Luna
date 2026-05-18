@@ -13,10 +13,10 @@ class Texture;
 namespace luna {
 
 using FrameSyncHandle = uint32_t;
-using FramebufferExtentProvider = std::function<luna::RHI::Extent2D()>;
+using FramebufferExtentProvider = std::function<RHI::Extent2D()>;
 
 struct AcquireResult {
-    luna::RHI::Result result{luna::RHI::Result::Error};
+    RHI::Result result{RHI::Result::Error};
     int image_index{-1};
 
     [[nodiscard]] bool acquired() const noexcept;
@@ -24,7 +24,7 @@ struct AcquireResult {
 };
 
 struct PresentResult {
-    luna::RHI::Result result{luna::RHI::Result::Error};
+    RHI::Result result{RHI::Result::Error};
 
     [[nodiscard]] bool presented() const noexcept;
     [[nodiscard]] bool requiresRecreate() const noexcept;
@@ -44,13 +44,13 @@ public:
     void reset() noexcept;
     void waitForFrame(FrameSyncHandle frame);
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Swapchain>& swapchain() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Synchronization>& synchronization() const noexcept;
-    [[nodiscard]] luna::RHI::Format surfaceFormat() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Swapchain>& swapchain() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Synchronization>& synchronization() const noexcept;
+    [[nodiscard]] RHI::Format surfaceFormat() const noexcept;
     [[nodiscard]] uint32_t framesInFlight() const noexcept;
     [[nodiscard]] uint32_t imageCount() const noexcept;
-    [[nodiscard]] luna::RHI::Extent2D extent() const noexcept;
-    [[nodiscard]] luna::RHI::Ref<luna::RHI::Texture> backBuffer(uint32_t image_index) const;
+    [[nodiscard]] RHI::Extent2D extent() const noexcept;
+    [[nodiscard]] RHI::Ref<RHI::Texture> backBuffer(uint32_t image_index) const;
 
 private:
     void releaseSwapchain() noexcept;

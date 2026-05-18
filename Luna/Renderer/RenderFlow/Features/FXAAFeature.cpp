@@ -77,21 +77,21 @@ constexpr std::array<RenderFeatureDescriptorBinding, 3> kFXAABindings{{
     {"SourceColor",
      "gSourceColorTexture",
      FXAABinding::SourceColor,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"SourceSampler",
      "gSourceColorSampler",
      FXAABinding::SourceSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Params",
      "gFXAAParams",
      FXAABinding::Params,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
 }};
 
 bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
@@ -104,7 +104,7 @@ std::filesystem::path shaderPath()
     return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" / "FXAA.slang";
 }
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeFXAADescriptorSetLayoutCreateInfo()
+RHI::DescriptorSetLayoutCreateInfo makeFXAADescriptorSetLayoutCreateInfo()
 {
     return makeRenderFeatureDescriptorSetLayoutCreateInfo(kFXAABindings);
 }
@@ -120,8 +120,8 @@ ShaderBindingContract makeFXAAShaderBindingContract()
     });
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(
+    const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -130,63 +130,63 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
     return device->CreateDescriptorSetLayout(makeFXAADescriptorSetLayoutCreateInfo());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                             .SetMaxSets(2)
-                                            .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 2)
-                                            .AddPoolSize(luna::RHI::DescriptorType::Sampler, 2)
-                                            .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 2)
+                                            .AddPoolSize(RHI::DescriptorType::SampledImage, 2)
+                                            .AddPoolSize(RHI::DescriptorType::Sampler, 2)
+                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 2)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateSampler(luna::RHI::SamplerBuilder()
-                                     .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
-                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+    return device->CreateSampler(RHI::SamplerBuilder()
+                                     .SetFilter(RHI::Filter::Linear, RHI::Filter::Linear)
+                                     .SetMipmapMode(RHI::SamplerMipmapMode::Nearest)
+                                     .SetAddressMode(RHI::SamplerAddressMode::ClampToEdge)
                                      .SetAnisotropy(false)
                                      .SetName("FXAASampler")
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
     }
 
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline> createPipeline(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-    luna::RHI::Format color_format)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::PipelineLayout>& layout,
+    const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+    const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+    RHI::Format color_format)
 {
-    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED) {
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
     }
 
-    return device->CreateGraphicsPipeline(luna::RHI::GraphicsPipelineBuilder()
+    return device->CreateGraphicsPipeline(RHI::GraphicsPipelineBuilder()
                                               .SetShaders({vertex_shader, fragment_shader})
-                                              .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
-                                              .SetCullMode(luna::RHI::CullMode::None)
-                                              .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-                                              .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+                                              .SetTopology(RHI::PrimitiveTopology::TriangleList)
+                                              .SetCullMode(RHI::CullMode::None)
+                                              .SetFrontFace(RHI::FrontFace::CounterClockwise)
+                                              .SetDepthTest(false, false, RHI::CompareOp::Always)
                                               .AddColorAttachmentDefault(false)
                                               .AddColorFormat(color_format)
                                               .SetLayout(layout)
@@ -197,16 +197,16 @@ RenderGraphTextureDesc makeFXAAColorDesc(const SceneRenderContext& scene_context
 {
     return RenderGraphTextureDesc{
         .Name = "SceneFXAAColor",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = scene_context.framebuffer_width,
         .Height = scene_context.framebuffer_height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = scene_context.color_format,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -261,15 +261,15 @@ public:
         }
 
         releasePipelineResources();
-        const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
+        const RHI::Ref<RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
         m_state.vertex_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "FXAAVertexMain", luna::RHI::ShaderStage::Vertex);
+            device, context.compiler, path, "FXAAVertexMain", RHI::ShaderStage::Vertex);
         m_state.fragment_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "FXAAFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "FXAAFragmentMain", RHI::ShaderStage::Fragment);
         m_state.copy_fragment_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "FXAACopyFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "FXAACopyFragmentMain", RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeFXAAShaderBindingContract();
         const std::array<RenderFeatureShaderBindingCheck, 3> binding_checks{{
@@ -287,16 +287,16 @@ public:
         m_state.copy_pipeline = createPipeline(
             device, m_state.pipeline_layout, m_state.vertex_shader, m_state.copy_fragment_shader, context.color_format);
         m_state.sampler = createSampler(device);
-        m_state.params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+        m_state.params_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                          .SetSize(sizeof(FXAAGpuParams))
-                                                         .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                         .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                         .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                         .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                          .SetName("FXAAParams")
                                                          .Build());
-        m_state.copy_params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+        m_state.copy_params_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                               .SetSize(sizeof(FXAAGpuParams))
-                                                              .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                              .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                              .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                               .SetName("FXAACopyParams")
                                                               .Build());
 
@@ -315,7 +315,7 @@ public:
                m_state.copy_fragment_shader && m_state.layout && m_state.descriptor_pool &&
                m_state.pipeline_layout && m_state.pipeline && m_state.copy_pipeline && m_state.sampler &&
                m_state.params_buffer && m_state.copy_params_buffer && m_state.descriptor_set &&
-               m_state.copy_descriptor_set && m_state.color_format != luna::RHI::Format::UNDEFINED;
+               m_state.copy_descriptor_set && m_state.color_format != RHI::Format::UNDEFINED;
     }
 
     [[nodiscard]] bool isCompleteFor(const SceneRenderContext& context) const noexcept
@@ -324,14 +324,14 @@ public:
     }
 
     void updateBindings(const Options& options,
-                        const luna::RHI::Ref<luna::RHI::Texture>& source_color,
+                        const RHI::Ref<RHI::Texture>& source_color,
                         uint32_t width,
                         uint32_t height)
     {
         updateDescriptorSet(m_state.descriptor_set, m_state.params_buffer, options, source_color, width, height);
     }
 
-    void updateCopyBindings(const luna::RHI::Ref<luna::RHI::Texture>& source_color, uint32_t width, uint32_t height)
+    void updateCopyBindings(const RHI::Ref<RHI::Texture>& source_color, uint32_t width, uint32_t height)
     {
         updateDescriptorSet(m_state.copy_descriptor_set, m_state.copy_params_buffer, Options{}, source_color, width, height);
     }
@@ -355,10 +355,10 @@ public:
     }
 
 private:
-    void updateDescriptorSet(const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set,
-                             const luna::RHI::Ref<luna::RHI::Buffer>& params_buffer,
+    void updateDescriptorSet(const RHI::Ref<RHI::DescriptorSet>& descriptor_set,
+                             const RHI::Ref<RHI::Buffer>& params_buffer,
                              const Options& options,
-                             const luna::RHI::Ref<luna::RHI::Texture>& source_color,
+                             const RHI::Ref<RHI::Texture>& source_color,
                              uint32_t width,
                              uint32_t height)
     {
@@ -367,28 +367,28 @@ private:
         }
 
         updateParams(params_buffer, options, width, height);
-        descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = FXAABinding::SourceColor,
             .TextureView = source_color->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
             .Binding = FXAABinding::SourceSampler,
             .Sampler = m_state.sampler,
         });
-        descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
             .Binding = FXAABinding::Params,
             .Buffer = params_buffer,
             .Offset = 0,
             .Stride = sizeof(FXAAGpuParams),
             .Size = sizeof(FXAAGpuParams),
-            .Type = luna::RHI::DescriptorType::UniformBuffer,
+            .Type = RHI::DescriptorType::UniformBuffer,
         });
         descriptor_set->Update();
     }
 
-    void updateParams(const luna::RHI::Ref<luna::RHI::Buffer>& params_buffer,
+    void updateParams(const RHI::Ref<RHI::Buffer>& params_buffer,
                       const Options& options,
                       uint32_t width,
                       uint32_t height)
@@ -415,8 +415,8 @@ private:
     }
 
     void drawWithPipeline(RenderGraphRasterPassContext& pass_context,
-                          const luna::RHI::Ref<luna::RHI::GraphicsPipeline>& pipeline,
-                          const luna::RHI::Ref<luna::RHI::DescriptorSet>& descriptor_set) const
+                          const RHI::Ref<RHI::GraphicsPipeline>& pipeline,
+                          const RHI::Ref<RHI::DescriptorSet>& descriptor_set) const
     {
         if (!isComplete() || !pipeline || !descriptor_set) {
             clearFXAAPass(pass_context);
@@ -433,27 +433,27 @@ private:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{descriptor_set};
         commands.BindDescriptorSets(pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
         pass_context.endRendering();
     }
 
     struct State {
-        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> layout;
-        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-        luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> copy_pipeline;
-        luna::RHI::Ref<luna::RHI::Sampler> sampler;
-        luna::RHI::Ref<luna::RHI::Buffer> params_buffer;
-        luna::RHI::Ref<luna::RHI::Buffer> copy_params_buffer;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> copy_descriptor_set;
-        luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> fragment_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> copy_fragment_shader;
-        luna::RHI::Format color_format{luna::RHI::Format::UNDEFINED};
+        RHI::Ref<RHI::DescriptorSetLayout> layout;
+        RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+        RHI::Ref<RHI::PipelineLayout> pipeline_layout;
+        RHI::Ref<RHI::GraphicsPipeline> pipeline;
+        RHI::Ref<RHI::GraphicsPipeline> copy_pipeline;
+        RHI::Ref<RHI::Sampler> sampler;
+        RHI::Ref<RHI::Buffer> params_buffer;
+        RHI::Ref<RHI::Buffer> copy_params_buffer;
+        RHI::Ref<RHI::DescriptorSet> descriptor_set;
+        RHI::Ref<RHI::DescriptorSet> copy_descriptor_set;
+        RHI::Ref<RHI::ShaderModule> vertex_shader;
+        RHI::Ref<RHI::ShaderModule> fragment_shader;
+        RHI::Ref<RHI::ShaderModule> copy_fragment_shader;
+        RHI::Format color_format{RHI::Format::UNDEFINED};
     };
 
     [[nodiscard]] std::array<RenderFeatureResourceStatus, 13> resourceStatus() const noexcept
@@ -530,9 +530,9 @@ public:
             [source = *scene_color, resolved_color](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
                 pass_builder.WriteColor(resolved_color,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, source = *scene_color, options](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);
@@ -550,9 +550,9 @@ public:
             [resolved_color, destination = *scene_color](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(resolved_color);
                 pass_builder.WriteColor(destination,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, resolved_color](RenderGraphRasterPassContext& pass_context) {
                 const auto& resolved_texture = pass_context.getTexture(resolved_color);

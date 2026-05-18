@@ -21,7 +21,7 @@ luna::ImageData createFallbackColorImageData(const glm::vec4& color)
                      to_byte(clamped_color.g),
                      to_byte(clamped_color.b),
                      to_byte(clamped_color.a)},
-        .ImageFormat = luna::RHI::Format::RGBA8_UNORM,
+        .ImageFormat = RHI::Format::RGBA8_UNORM,
         .Width = 1,
         .Height = 1,
     };
@@ -32,7 +32,7 @@ luna::ImageData createFallbackMetallicRoughnessImageData(float roughness, float 
     return createFallbackColorImageData(glm::vec4(0.0f, roughness, metallic, 1.0f));
 }
 
-luna::ImageData createFallbackFloatImageData(const glm::vec4& value, luna::RHI::Format format)
+luna::ImageData createFallbackFloatImageData(const glm::vec4& value, RHI::Format format)
 {
     std::vector<uint8_t> bytes(sizeof(float) * 4u, 0);
     std::memcpy(bytes.data(), &value[0], bytes.size());
@@ -44,7 +44,7 @@ luna::ImageData createFallbackFloatImageData(const glm::vec4& value, luna::RHI::
     };
 }
 
-std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image, luna::RHI::Format expected_format)
+std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image, RHI::Format expected_format)
 {
     std::array<glm::vec4, 9> result{};
     if (!image.isValid() || image.ImageFormat != expected_format ||
@@ -125,7 +125,7 @@ std::array<glm::vec4, 9> computeDiffuseIrradianceSH(const luna::ImageData& image
     return result;
 }
 
-luna::ImageData generateEnvironmentMipChain(const luna::ImageData& source, luna::RHI::Format expected_format)
+luna::ImageData generateEnvironmentMipChain(const luna::ImageData& source, RHI::Format expected_format)
 {
     if (!source.isValid() || source.ImageFormat != expected_format ||
         source.ByteData.size() !=

@@ -10,24 +10,24 @@ namespace luna {
 
 bool AcquireResult::acquired() const noexcept
 {
-    return result == luna::RHI::Result::Success && image_index >= 0;
+    return result == RHI::Result::Success && image_index >= 0;
 }
 
 bool AcquireResult::requiresRecreate() const noexcept
 {
-    return result == luna::RHI::Result::OutOfDate || result == luna::RHI::Result::Suboptimal ||
-           result == luna::RHI::Result::DeviceLost;
+    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal ||
+           result == RHI::Result::DeviceLost;
 }
 
 bool PresentResult::presented() const noexcept
 {
-    return result == luna::RHI::Result::Success;
+    return result == RHI::Result::Success;
 }
 
 bool PresentResult::requiresRecreate() const noexcept
 {
-    return result == luna::RHI::Result::OutOfDate || result == luna::RHI::Result::Suboptimal ||
-           result == luna::RHI::Result::DeviceLost;
+    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal ||
+           result == RHI::Result::DeviceLost;
 }
 
 bool SwapchainManager::create(const SwapchainCreateRequest& request)
@@ -46,8 +46,8 @@ AcquireResult SwapchainManager::acquireNextImage(FrameSyncHandle frame)
     int acquired_image_index = -1;
     const auto result =
         m_resources.swapchain->AcquireNextImage(m_resources.synchronization, static_cast<int>(frame), acquired_image_index);
-    if (result != luna::RHI::Result::Success || acquired_image_index < 0) {
-        if (result == luna::RHI::Result::OutOfDate || result == luna::RHI::Result::Suboptimal) {
+    if (result != RHI::Result::Success || acquired_image_index < 0) {
+        if (result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal) {
             requestResize();
         }
         return AcquireResult{
@@ -71,7 +71,7 @@ PresentResult SwapchainManager::present(FrameSyncHandle frame)
     }
 
     const auto result = m_resources.swapchain->Present(request.graphics_queue, m_resources.synchronization, frame);
-    if (result == luna::RHI::Result::OutOfDate || result == luna::RHI::Result::Suboptimal) {
+    if (result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal) {
         requestResize();
     }
     return PresentResult{.result = result};
@@ -88,7 +88,7 @@ bool SwapchainManager::recreateIfRequested(const FramebufferExtentProvider& exte
         return false;
     }
 
-    const luna::RHI::Extent2D requested_extent = extent_provider ? extent_provider() : luna::RHI::Extent2D{0, 0};
+    const RHI::Extent2D requested_extent = extent_provider ? extent_provider() : RHI::Extent2D{0, 0};
     if (requested_extent.width == 0 || requested_extent.height == 0) {
         LUNA_RENDERER_DEBUG("Resize requested while framebuffer is minimized; delaying swapchain recreation");
         return false;
@@ -146,17 +146,17 @@ void SwapchainManager::waitForFrame(FrameSyncHandle frame)
     }
 }
 
-const luna::RHI::Ref<luna::RHI::Swapchain>& SwapchainManager::swapchain() const noexcept
+const RHI::Ref<RHI::Swapchain>& SwapchainManager::swapchain() const noexcept
 {
     return m_resources.swapchain;
 }
 
-const luna::RHI::Ref<luna::RHI::Synchronization>& SwapchainManager::synchronization() const noexcept
+const RHI::Ref<RHI::Synchronization>& SwapchainManager::synchronization() const noexcept
 {
     return m_resources.synchronization;
 }
 
-luna::RHI::Format SwapchainManager::surfaceFormat() const noexcept
+RHI::Format SwapchainManager::surfaceFormat() const noexcept
 {
     return m_resources.surface_format;
 }
@@ -171,12 +171,12 @@ uint32_t SwapchainManager::imageCount() const noexcept
     return m_resources.imageCount();
 }
 
-luna::RHI::Extent2D SwapchainManager::extent() const noexcept
+RHI::Extent2D SwapchainManager::extent() const noexcept
 {
     return m_resources.extent();
 }
 
-luna::RHI::Ref<luna::RHI::Texture> SwapchainManager::backBuffer(uint32_t image_index) const
+RHI::Ref<RHI::Texture> SwapchainManager::backBuffer(uint32_t image_index) const
 {
     return m_resources.backBuffer(image_index);
 }

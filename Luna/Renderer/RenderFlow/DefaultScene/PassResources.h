@@ -11,8 +11,8 @@ class Sampler;
 namespace luna::render_flow::default_scene {
 
 struct DrawPassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> scene_descriptor_set;
 
     [[nodiscard]] bool isValid() const
     {
@@ -21,10 +21,10 @@ struct DrawPassResources {
 };
 
 struct LightingPassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> gbuffer_descriptor_set;
+    RHI::Ref<RHI::DescriptorSet> scene_descriptor_set;
+    RHI::Ref<RHI::Sampler> gbuffer_sampler;
 
     [[nodiscard]] bool isValid() const
     {
@@ -33,10 +33,10 @@ struct LightingPassResources {
 };
 
 struct DebugViewPassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> gbuffer_descriptor_set;
+    RHI::Ref<RHI::DescriptorSet> scene_descriptor_set;
+    RHI::Ref<RHI::Sampler> gbuffer_sampler;
 
     [[nodiscard]] bool isValid() const
     {
@@ -45,10 +45,10 @@ struct DebugViewPassResources {
 };
 
 struct SkyPassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> gbuffer_descriptor_set;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> scene_descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> gbuffer_sampler;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> gbuffer_descriptor_set;
+    RHI::Ref<RHI::DescriptorSet> scene_descriptor_set;
+    RHI::Ref<RHI::Sampler> gbuffer_sampler;
 
     [[nodiscard]] bool isValid() const
     {
@@ -57,9 +57,9 @@ struct SkyPassResources {
 };
 
 struct TransparentCompositePassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> sampler;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> descriptor_set;
+    RHI::Ref<RHI::Sampler> sampler;
 
     [[nodiscard]] bool isValid() const
     {
@@ -68,9 +68,9 @@ struct TransparentCompositePassResources {
 };
 
 struct PostProcessPassResources {
-    luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-    luna::RHI::Ref<luna::RHI::DescriptorSet> descriptor_set;
-    luna::RHI::Ref<luna::RHI::Sampler> sampler;
+    RHI::Ref<RHI::GraphicsPipeline> pipeline;
+    RHI::Ref<RHI::DescriptorSet> descriptor_set;
+    RHI::Ref<RHI::Sampler> sampler;
 
     [[nodiscard]] bool isValid() const
     {

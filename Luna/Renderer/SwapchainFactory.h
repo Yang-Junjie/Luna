@@ -18,12 +18,12 @@ namespace luna {
 using SwapchainRecreateCallback = std::function<void()>;
 
 struct SwapchainCreateRequest {
-    luna::RHI::Ref<luna::RHI::Device> device;
-    luna::RHI::Ref<luna::RHI::Adapter> adapter;
-    luna::RHI::Ref<luna::RHI::Surface> surface;
-    luna::RHI::Ref<luna::RHI::Queue> graphics_queue;
-    luna::RHI::PresentMode present_mode{luna::RHI::PresentMode::Fifo};
-    luna::RHI::Extent2D extent{0, 0};
+    RHI::Ref<RHI::Device> device;
+    RHI::Ref<RHI::Adapter> adapter;
+    RHI::Ref<RHI::Surface> surface;
+    RHI::Ref<RHI::Queue> graphics_queue;
+    RHI::PresentMode present_mode{RHI::PresentMode::Fifo};
+    RHI::Extent2D extent{0, 0};
     SwapchainRecreateCallback before_recreate;
 };
 
@@ -34,7 +34,7 @@ public:
     [[nodiscard]] const SwapchainCreateRequest& request() const noexcept;
     void reset() noexcept;
 
-    [[nodiscard]] bool create(luna::RHI::Extent2D requested_extent, SwapchainResources& resources) const;
+    [[nodiscard]] bool create(RHI::Extent2D requested_extent, SwapchainResources& resources) const;
 
 private:
     SwapchainCreateRequest m_request{};

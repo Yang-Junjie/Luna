@@ -23,45 +23,45 @@ struct BindingKeyHash {
     }
 };
 
-const char* descriptorTypeName(luna::RHI::DescriptorType type)
+const char* descriptorTypeName(RHI::DescriptorType type)
 {
     switch (type) {
-        case luna::RHI::DescriptorType::Sampler:
+        case RHI::DescriptorType::Sampler:
             return "Sampler";
-        case luna::RHI::DescriptorType::CombinedImageSampler:
+        case RHI::DescriptorType::CombinedImageSampler:
             return "CombinedImageSampler";
-        case luna::RHI::DescriptorType::SampledImage:
+        case RHI::DescriptorType::SampledImage:
             return "SampledImage";
-        case luna::RHI::DescriptorType::StorageImage:
+        case RHI::DescriptorType::StorageImage:
             return "StorageImage";
-        case luna::RHI::DescriptorType::UniformBuffer:
+        case RHI::DescriptorType::UniformBuffer:
             return "UniformBuffer";
-        case luna::RHI::DescriptorType::StorageBuffer:
+        case RHI::DescriptorType::StorageBuffer:
             return "StorageBuffer";
-        case luna::RHI::DescriptorType::UniformBufferDynamic:
+        case RHI::DescriptorType::UniformBufferDynamic:
             return "UniformBufferDynamic";
-        case luna::RHI::DescriptorType::StorageBufferDynamic:
+        case RHI::DescriptorType::StorageBufferDynamic:
             return "StorageBufferDynamic";
-        case luna::RHI::DescriptorType::InputAttachment:
+        case RHI::DescriptorType::InputAttachment:
             return "InputAttachment";
-        case luna::RHI::DescriptorType::AccelerationStructure:
+        case RHI::DescriptorType::AccelerationStructure:
             return "AccelerationStructure";
         default:
             return "Unknown";
     }
 }
 
-std::string shaderStageNames(luna::RHI::ShaderStage stages)
+std::string shaderStageNames(RHI::ShaderStage stages)
 {
-    if (stages == luna::RHI::ShaderStage::None) {
+    if (stages == RHI::ShaderStage::None) {
         return "None";
     }
-    if (stages == luna::RHI::ShaderStage::All) {
+    if (stages == RHI::ShaderStage::All) {
         return "All";
     }
 
     std::string result;
-    auto append = [&result, stages](luna::RHI::ShaderStage stage, const char* name) {
+    auto append = [&result, stages](RHI::ShaderStage stage, const char* name) {
         if (!(stages & stage)) {
             return;
         }
@@ -71,20 +71,20 @@ std::string shaderStageNames(luna::RHI::ShaderStage stages)
         result += name;
     };
 
-    append(luna::RHI::ShaderStage::Vertex, "Vertex");
-    append(luna::RHI::ShaderStage::Fragment, "Fragment");
-    append(luna::RHI::ShaderStage::Compute, "Compute");
-    append(luna::RHI::ShaderStage::Geometry, "Geometry");
-    append(luna::RHI::ShaderStage::TessellationControl, "TessControl");
-    append(luna::RHI::ShaderStage::TessellationEvaluation, "TessEval");
-    append(luna::RHI::ShaderStage::RayGen, "RayGen");
-    append(luna::RHI::ShaderStage::RayAnyHit, "RayAnyHit");
-    append(luna::RHI::ShaderStage::RayClosestHit, "RayClosestHit");
-    append(luna::RHI::ShaderStage::RayMiss, "RayMiss");
-    append(luna::RHI::ShaderStage::RayIntersection, "RayIntersection");
-    append(luna::RHI::ShaderStage::Callable, "Callable");
-    append(luna::RHI::ShaderStage::Mesh, "Mesh");
-    append(luna::RHI::ShaderStage::Task, "Task");
+    append(RHI::ShaderStage::Vertex, "Vertex");
+    append(RHI::ShaderStage::Fragment, "Fragment");
+    append(RHI::ShaderStage::Compute, "Compute");
+    append(RHI::ShaderStage::Geometry, "Geometry");
+    append(RHI::ShaderStage::TessellationControl, "TessControl");
+    append(RHI::ShaderStage::TessellationEvaluation, "TessEval");
+    append(RHI::ShaderStage::RayGen, "RayGen");
+    append(RHI::ShaderStage::RayAnyHit, "RayAnyHit");
+    append(RHI::ShaderStage::RayClosestHit, "RayClosestHit");
+    append(RHI::ShaderStage::RayMiss, "RayMiss");
+    append(RHI::ShaderStage::RayIntersection, "RayIntersection");
+    append(RHI::ShaderStage::Callable, "Callable");
+    append(RHI::ShaderStage::Mesh, "Mesh");
+    append(RHI::ShaderStage::Task, "Task");
 
     return result.empty() ? "Unknown" : result;
 }
@@ -96,7 +96,7 @@ std::string bindingLabel(uint32_t set, uint32_t binding)
     return stream.str();
 }
 
-std::string usageLabel(const luna::RHI::ShaderResourceBinding& binding)
+std::string usageLabel(const RHI::ShaderResourceBinding& binding)
 {
     std::ostringstream stream;
     if (binding.EntryPointUsageKnown) {
@@ -127,7 +127,7 @@ std::string expectedBindingLabel(const ShaderBindingRequirement& expected)
     return stream.str();
 }
 
-std::string reflectedBindingLabel(const luna::RHI::ShaderResourceBinding& reflected)
+std::string reflectedBindingLabel(const RHI::ShaderResourceBinding& reflected)
 {
     std::ostringstream stream;
     stream << "name='" << reflected.Name << "' " << bindingLabel(reflected.Set, reflected.Binding)
@@ -153,10 +153,10 @@ ShaderBindingContract makeShaderBindingContract(std::string_view name)
 void addDescriptorSetRequirements(ShaderBindingContract& contract,
                                   uint32_t set_index,
                                   std::string_view set_name,
-                                  std::span<const luna::RHI::DescriptorSetLayoutBinding> bindings)
+                                  std::span<const RHI::DescriptorSetLayoutBinding> bindings)
 {
     contract.bindings.reserve(contract.bindings.size() + bindings.size());
-    for (const luna::RHI::DescriptorSetLayoutBinding& binding : bindings) {
+    for (const RHI::DescriptorSetLayoutBinding& binding : bindings) {
         contract.bindings.push_back(ShaderBindingRequirement{
             .name = {},
             .shader_name = {},
@@ -174,10 +174,10 @@ void addDescriptorSetRequirements(ShaderBindingContract& contract,
 
 void addPushConstantRequirements(ShaderBindingContract& contract,
                                  std::string_view name,
-                                 std::span<const luna::RHI::PushConstantRange> push_constants)
+                                 std::span<const RHI::PushConstantRange> push_constants)
 {
     contract.push_constants.reserve(contract.push_constants.size() + push_constants.size());
-    for (const luna::RHI::PushConstantRange& push_constant : push_constants) {
+    for (const RHI::PushConstantRange& push_constant : push_constants) {
         contract.push_constants.push_back(ShaderPushConstantRequirement{
             .name = std::string(name),
             .offset = push_constant.Offset,
@@ -189,7 +189,7 @@ void addPushConstantRequirements(ShaderBindingContract& contract,
 
 ShaderBindingValidationResult validateShaderBindingContract(const ShaderBindingValidationContext& context,
                                                             const ShaderBindingContract& contract,
-                                                            const luna::RHI::ShaderReflectionData& reflection)
+                                                            const RHI::ShaderReflectionData& reflection)
 {
     ShaderBindingValidationResult result;
     const std::string prefix = shaderPrefix(context, contract);
@@ -203,7 +203,7 @@ ShaderBindingValidationResult validateShaderBindingContract(const ShaderBindingV
     std::unordered_map<BindingKey, std::string, BindingKeyHash> reflected_bindings;
     reflected_bindings.reserve(reflection.ResourceBindings.size());
 
-    for (const luna::RHI::ShaderResourceBinding& reflected : reflection.ResourceBindings) {
+    for (const RHI::ShaderResourceBinding& reflected : reflection.ResourceBindings) {
         if (isPushConstantReflectionName(reflected.Name)) {
             continue;
         }

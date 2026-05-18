@@ -1,4 +1,4 @@
-﻿#include "Core/Log.h"
+#include "Core/Log.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -8,23 +8,23 @@
 namespace luna {
 namespace {
 
-bool isValidTextureRef(const luna::RHI::Ref<luna::RHI::Texture>& texture)
+bool isValidTextureRef(const RHI::Ref<RHI::Texture>& texture)
 {
     return texture != nullptr;
 }
 
-luna::RHI::ImageSubresourceRange fullSubresourceRangeForTexture(const luna::RHI::Texture& texture)
+RHI::ImageSubresourceRange fullSubresourceRangeForTexture(const RHI::Texture& texture)
 {
-    luna::RHI::ImageAspectFlags aspect_mask = luna::RHI::ImageAspectFlags::Color;
+    RHI::ImageAspectFlags aspect_mask = RHI::ImageAspectFlags::Color;
     if (texture.HasDepth() && texture.HasStencil()) {
-        aspect_mask = luna::RHI::ImageAspectFlags::Depth | luna::RHI::ImageAspectFlags::Stencil;
+        aspect_mask = RHI::ImageAspectFlags::Depth | RHI::ImageAspectFlags::Stencil;
     } else if (texture.HasDepth()) {
-        aspect_mask = luna::RHI::ImageAspectFlags::Depth;
+        aspect_mask = RHI::ImageAspectFlags::Depth;
     } else if (texture.HasStencil()) {
-        aspect_mask = luna::RHI::ImageAspectFlags::Stencil;
+        aspect_mask = RHI::ImageAspectFlags::Stencil;
     }
 
-    return luna::RHI::ImageSubresourceRange{
+    return RHI::ImageSubresourceRange{
         .BaseMipLevel = 0,
         .LevelCount = texture.GetMipLevels(),
         .BaseArrayLayer = 0,
@@ -33,10 +33,10 @@ luna::RHI::ImageSubresourceRange fullSubresourceRangeForTexture(const luna::RHI:
     };
 }
 
-luna::RHI::Ref<luna::RHI::Texture> createTransientTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+RHI::Ref<RHI::Texture> createTransientTexture(const RHI::Ref<RHI::Device>& device,
                                                           const RenderGraphTextureDesc& desc)
 {
-    if (!device || desc.Width == 0 || desc.Height == 0 || desc.Format == luna::RHI::Format::UNDEFINED) {
+    if (!device || desc.Width == 0 || desc.Height == 0 || desc.Format == RHI::Format::UNDEFINED) {
         LUNA_RENDERER_WARN(
             "Cannot create transient render graph texture '{}': device_available={} size={}x{} format={}",
             desc.Name,
@@ -47,7 +47,7 @@ luna::RHI::Ref<luna::RHI::Texture> createTransientTexture(const luna::RHI::Ref<l
         return {};
     }
 
-    auto texture = device->CreateTexture(luna::RHI::TextureBuilder()
+    auto texture = device->CreateTexture(RHI::TextureBuilder()
                                              .SetType(desc.Type)
                                              .SetSize(desc.Width, desc.Height)
                                              .SetDepth(desc.Depth)
@@ -79,11 +79,11 @@ luna::RHI::Ref<luna::RHI::Texture> createTransientTexture(const luna::RHI::Ref<l
     return texture;
 }
 
-void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
-                        std::vector<luna::RHI::ResourceState>& current_states,
-                        const std::vector<luna::RHI::Ref<luna::RHI::Texture>>& physical_textures,
+void addBarrierIfNeeded(std::vector<RHI::TextureBarrier>& barriers,
+                        std::vector<RHI::ResourceState>& current_states,
+                        const std::vector<RHI::Ref<RHI::Texture>>& physical_textures,
                         RenderGraphTextureHandle handle,
-                        luna::RHI::ResourceState desired_state)
+                        RHI::ResourceState desired_state)
 {
     if (!handle.isValid() || handle.Index >= current_states.size() || handle.Index >= physical_textures.size()) {
         return;
@@ -94,12 +94,12 @@ void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
         return;
     }
 
-    const luna::RHI::ResourceState current_state = current_states[handle.Index];
+    const RHI::ResourceState current_state = current_states[handle.Index];
     if (current_state == desired_state) {
         return;
     }
 
-    barriers.push_back(luna::RHI::TextureBarrier{
+    barriers.push_back(RHI::TextureBarrier{
         .Texture = texture,
         .OldState = current_state,
         .NewState = desired_state,
@@ -108,9 +108,9 @@ void addBarrierIfNeeded(std::vector<luna::RHI::TextureBarrier>& barriers,
     current_states[handle.Index] = desired_state;
 }
 
-luna::RHI::Extent2D
+RHI::Extent2D
     resolvePassFramebufferExtent(const detail::RenderGraphRasterPassNode& pass_node,
-                                 const std::vector<luna::RHI::Ref<luna::RHI::Texture>>& physical_textures,
+                                 const std::vector<RHI::Ref<RHI::Texture>>& physical_textures,
                                  uint32_t fallback_width,
                                  uint32_t fallback_height)
 {
@@ -144,8 +144,8 @@ void RenderGraphTransientTextureCache::BeginFrame()
     }
 }
 
-luna::RHI::Ref<luna::RHI::Texture>
-    RenderGraphTransientTextureCache::AcquireTexture(const luna::RHI::Ref<luna::RHI::Device>& device,
+RHI::Ref<RHI::Texture>
+    RenderGraphTransientTextureCache::AcquireTexture(const RHI::Ref<RHI::Device>& device,
                                                      const RenderGraphTextureDesc& desc)
 {
     for (auto& entry : m_entries) {
@@ -205,9 +205,9 @@ RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::ReadTexture(RenderGr
 }
 
 RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::WriteColor(RenderGraphTextureHandle handle,
-                                                                       luna::RHI::AttachmentLoadOp load_op,
-                                                                       luna::RHI::AttachmentStoreOp store_op,
-                                                                       const luna::RHI::ClearValue& clear_value)
+                                                                       RHI::AttachmentLoadOp load_op,
+                                                                       RHI::AttachmentStoreOp store_op,
+                                                                       const RHI::ClearValue& clear_value)
 {
     if (m_pass_node != nullptr && handle.isValid()) {
         m_pass_node->ColorAttachments.push_back(detail::RenderGraphColorAttachmentDesc{
@@ -222,9 +222,9 @@ RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::WriteColor(RenderGra
 
 RenderGraphRasterPassBuilder&
     RenderGraphRasterPassBuilder::WriteDepth(RenderGraphTextureHandle handle,
-                                             luna::RHI::AttachmentLoadOp load_op,
-                                             luna::RHI::AttachmentStoreOp store_op,
-                                             const luna::RHI::ClearDepthStencilValue& clear_value)
+                                             RHI::AttachmentLoadOp load_op,
+                                             RHI::AttachmentStoreOp store_op,
+                                             const RHI::ClearDepthStencilValue& clear_value)
 {
     if (m_pass_node != nullptr && handle.isValid()) {
         m_pass_node->DepthAttachment = detail::RenderGraphDepthAttachmentDesc{
@@ -264,9 +264,9 @@ RenderGraphBuilder::RenderGraphBuilder(FrameContext frame_context,
 {}
 
 RenderGraphTextureHandle RenderGraphBuilder::ImportTexture(std::string name,
-                                                           luna::RHI::Ref<luna::RHI::Texture> texture,
-                                                           luna::RHI::ResourceState initial_state,
-                                                           luna::RHI::ResourceState final_state)
+                                                           RHI::Ref<RHI::Texture> texture,
+                                                           RHI::ResourceState initial_state,
+                                                           RHI::ResourceState final_state)
 {
     if (!isValidTextureRef(texture)) {
         LUNA_RENDERER_WARN("Ignoring render graph import for '{}' because texture is null", name);
@@ -323,8 +323,8 @@ RenderGraphTextureHandle RenderGraphBuilder::CreateTexture(RenderGraphTextureDes
     m_texture_nodes.push_back(detail::RenderGraphTextureNode{
         .Desc = std::move(desc),
         .ImportedTexture = {},
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .FinalState = luna::RHI::ResourceState::Common,
+        .InitialState = RHI::ResourceState::Undefined,
+        .FinalState = RHI::ResourceState::Common,
         .Imported = false,
         .Exported = false,
     });
@@ -342,7 +342,7 @@ RenderGraphTextureHandle RenderGraphBuilder::CreateTexture(RenderGraphTextureDes
 }
 
 RenderGraphBuilder& RenderGraphBuilder::ExportTexture(RenderGraphTextureHandle handle,
-                                                      luna::RHI::ResourceState final_state)
+                                                      RHI::ResourceState final_state)
 {
     if (isHandleValid(handle, m_texture_nodes.size())) {
         auto& texture_node = m_texture_nodes[handle.Index];
@@ -562,8 +562,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
         }
     }
 
-    std::vector<luna::RHI::Ref<luna::RHI::Texture>> physical_textures(texture_count);
-    std::vector<luna::RHI::ResourceState> current_states(texture_count, luna::RHI::ResourceState::Undefined);
+    std::vector<RHI::Ref<RHI::Texture>> physical_textures(texture_count);
+    std::vector<RHI::ResourceState> current_states(texture_count, RHI::ResourceState::Undefined);
     for (size_t i = 0; i < texture_count; ++i) {
         const auto& texture_node = m_texture_nodes[i];
 
@@ -636,7 +636,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    current_states,
                                    physical_textures,
                                    read.Handle,
-                                   luna::RHI::ResourceState::ShaderRead);
+                                   RHI::ResourceState::ShaderRead);
             }
 
             for (const auto& attachment : pass_node.ColorAttachments) {
@@ -644,13 +644,13 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    current_states,
                                    physical_textures,
                                    attachment.Handle,
-                                   luna::RHI::ResourceState::RenderTarget);
+                                   RHI::ResourceState::RenderTarget);
 
                 if (!isHandleValid(attachment.Handle, physical_textures.size())) {
                     continue;
                 }
 
-                compiled_pass.RenderingInfo.ColorAttachments.push_back(luna::RHI::RenderingAttachmentInfo{
+                compiled_pass.RenderingInfo.ColorAttachments.push_back(RHI::RenderingAttachmentInfo{
                     .Texture = physical_textures[attachment.Handle.Index],
                     .LoadOp = attachment.LoadOp,
                     .StoreOp = attachment.StoreOp,
@@ -663,10 +663,10 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    current_states,
                                    physical_textures,
                                    pass_node.DepthAttachment->Handle,
-                                   luna::RHI::ResourceState::DepthWrite);
+                                   RHI::ResourceState::DepthWrite);
 
                 if (isHandleValid(pass_node.DepthAttachment->Handle, physical_textures.size())) {
-                    auto depth_attachment = luna::RHI::CreateRef<luna::RHI::RenderingAttachmentInfo>();
+                    auto depth_attachment = RHI::CreateRef<RHI::RenderingAttachmentInfo>();
                     depth_attachment->Texture = physical_textures[pass_node.DepthAttachment->Handle.Index];
                     depth_attachment->LoadOp = pass_node.DepthAttachment->LoadOp;
                     depth_attachment->StoreOp = pass_node.DepthAttachment->StoreOp;
@@ -699,7 +699,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    current_states,
                                    physical_textures,
                                    read.Handle,
-                                   luna::RHI::ResourceState::ShaderRead);
+                                   RHI::ResourceState::ShaderRead);
             }
 
             for (const auto& write : pass_node.Writes) {
@@ -707,7 +707,7 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                    current_states,
                                    physical_textures,
                                    write.Handle,
-                                   luna::RHI::ResourceState::UnorderedAccess);
+                                   RHI::ResourceState::UnorderedAccess);
             }
 
             pass_list.push_back(compiled_pass.Pass);
@@ -734,30 +734,30 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
                                current_states,
                                physical_textures,
                                pass_node.Source,
-                               luna::RHI::ResourceState::CopySource);
+                               RHI::ResourceState::CopySource);
             addBarrierIfNeeded(compiled_pass.PreTextureBarriers,
                                current_states,
                                physical_textures,
                                pass_node.Destination,
-                               luna::RHI::ResourceState::CopyDest);
+                               RHI::ResourceState::CopyDest);
 
             pass_list.push_back(compiled_pass.Pass);
             compiled_passes.push_back(std::move(compiled_pass));
         }
     }
 
-    std::vector<luna::RHI::TextureBarrier> final_texture_barriers;
+    std::vector<RHI::TextureBarrier> final_texture_barriers;
     for (size_t i = 0; i < texture_count; ++i) {
         if (!m_texture_nodes[i].Exported || !physical_textures[i]) {
             continue;
         }
 
-        const luna::RHI::ResourceState final_state = m_texture_nodes[i].FinalState;
+        const RHI::ResourceState final_state = m_texture_nodes[i].FinalState;
         if (current_states[i] == final_state) {
             continue;
         }
 
-        final_texture_barriers.push_back(luna::RHI::TextureBarrier{
+        final_texture_barriers.push_back(RHI::TextureBarrier{
             .Texture = physical_textures[i],
             .OldState = current_states[i],
             .NewState = final_state,

@@ -1,4 +1,4 @@
-﻿#include "Renderer/RendererUtilities.h"
+#include "Renderer/RendererUtilities.h"
 
 #include <algorithm>
 #include <array>
@@ -6,130 +6,130 @@
 
 namespace luna::renderer_detail {
 
-luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters)
+RHI::Ref<RHI::Adapter> selectAdapter(const std::vector<RHI::Ref<RHI::Adapter>>& adapters)
 {
     if (adapters.empty()) {
         return {};
     }
 
     const auto discrete_adapter =
-        std::find_if(adapters.begin(), adapters.end(), [](const luna::RHI::Ref<luna::RHI::Adapter>& adapter) {
-            return adapter && adapter->GetAdapterType() == luna::RHI::AdapterType::Discrete;
+        std::find_if(adapters.begin(), adapters.end(), [](const RHI::Ref<RHI::Adapter>& adapter) {
+            return adapter && adapter->GetAdapterType() == RHI::AdapterType::Discrete;
         });
     return discrete_adapter != adapters.end() ? *discrete_adapter : adapters.front();
 }
 
-luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats)
+RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<RHI::SurfaceFormat>& formats)
 {
-    const auto preferred = std::find_if(formats.begin(), formats.end(), [](const luna::RHI::SurfaceFormat& format) {
-        return format.format == luna::RHI::Format::BGRA8_UNORM &&
-               format.colorSpace == luna::RHI::ColorSpace::SRGB_NONLINEAR;
+    const auto preferred = std::find_if(formats.begin(), formats.end(), [](const RHI::SurfaceFormat& format) {
+        return format.format == RHI::Format::BGRA8_UNORM &&
+               format.colorSpace == RHI::ColorSpace::SRGB_NONLINEAR;
     });
     if (preferred != formats.end()) {
         return *preferred;
     }
 
-    const auto fallback = std::find_if(formats.begin(), formats.end(), [](const luna::RHI::SurfaceFormat& format) {
-        return format.format == luna::RHI::Format::RGBA8_UNORM || format.format == luna::RHI::Format::BGRA8_UNORM;
+    const auto fallback = std::find_if(formats.begin(), formats.end(), [](const RHI::SurfaceFormat& format) {
+        return format.format == RHI::Format::RGBA8_UNORM || format.format == RHI::Format::BGRA8_UNORM;
     });
     if (fallback != formats.end()) {
         return *fallback;
     }
 
     return formats.empty()
-               ? luna::RHI::SurfaceFormat{luna::RHI::Format::BGRA8_UNORM, luna::RHI::ColorSpace::SRGB_NONLINEAR}
+               ? RHI::SurfaceFormat{RHI::Format::BGRA8_UNORM, RHI::ColorSpace::SRGB_NONLINEAR}
                : formats.front();
 }
 
-const char* presentModeToString(luna::RHI::PresentMode mode)
+const char* presentModeToString(RHI::PresentMode mode)
 {
     switch (mode) {
-        case luna::RHI::PresentMode::Immediate:
+        case RHI::PresentMode::Immediate:
             return "Immediate";
-        case luna::RHI::PresentMode::Mailbox:
+        case RHI::PresentMode::Mailbox:
             return "Mailbox";
-        case luna::RHI::PresentMode::Fifo:
+        case RHI::PresentMode::Fifo:
             return "Fifo";
-        case luna::RHI::PresentMode::FifoRelaxed:
+        case RHI::PresentMode::FifoRelaxed:
             return "FifoRelaxed";
         default:
             return "Unknown";
     }
 }
 
-const char* swapchainResultToString(luna::RHI::Result result)
+const char* swapchainResultToString(RHI::Result result)
 {
     switch (result) {
-        case luna::RHI::Result::Success:
+        case RHI::Result::Success:
             return "Success";
-        case luna::RHI::Result::Timeout:
+        case RHI::Result::Timeout:
             return "Timeout";
-        case luna::RHI::Result::NotReady:
+        case RHI::Result::NotReady:
             return "NotReady";
-        case luna::RHI::Result::Suboptimal:
+        case RHI::Result::Suboptimal:
             return "Suboptimal";
-        case luna::RHI::Result::OutOfDate:
+        case RHI::Result::OutOfDate:
             return "OutOfDate";
-        case luna::RHI::Result::DeviceLost:
+        case RHI::Result::DeviceLost:
             return "DeviceLost";
-        case luna::RHI::Result::Error:
+        case RHI::Result::Error:
         default:
             return "Error";
     }
 }
 
-const char* adapterTypeToString(luna::RHI::AdapterType type)
+const char* adapterTypeToString(RHI::AdapterType type)
 {
     switch (type) {
-        case luna::RHI::AdapterType::Discrete:
+        case RHI::AdapterType::Discrete:
             return "Discrete";
-        case luna::RHI::AdapterType::Integrated:
+        case RHI::AdapterType::Integrated:
             return "Integrated";
-        case luna::RHI::AdapterType::Software:
+        case RHI::AdapterType::Software:
             return "Software";
-        case luna::RHI::AdapterType::Unknown:
+        case RHI::AdapterType::Unknown:
         default:
             return "Unknown";
     }
 }
 
-const char* formatToString(luna::RHI::Format format)
+const char* formatToString(RHI::Format format)
 {
     switch (format) {
-        case luna::RHI::Format::RGBA8_UNORM:
+        case RHI::Format::RGBA8_UNORM:
             return "RGBA8_UNORM";
-        case luna::RHI::Format::RGBA8_SRGB:
+        case RHI::Format::RGBA8_SRGB:
             return "RGBA8_SRGB";
-        case luna::RHI::Format::BGRA8_UNORM:
+        case RHI::Format::BGRA8_UNORM:
             return "BGRA8_UNORM";
-        case luna::RHI::Format::BGRA8_SRGB:
+        case RHI::Format::BGRA8_SRGB:
             return "BGRA8_SRGB";
-        case luna::RHI::Format::R32_UINT:
+        case RHI::Format::R32_UINT:
             return "R32_UINT";
-        case luna::RHI::Format::D32_FLOAT:
+        case RHI::Format::D32_FLOAT:
             return "D32_FLOAT";
-        case luna::RHI::Format::RGBA16_FLOAT:
+        case RHI::Format::RGBA16_FLOAT:
             return "RGBA16_FLOAT";
-        case luna::RHI::Format::RGBA32_FLOAT:
+        case RHI::Format::RGBA32_FLOAT:
             return "RGBA32_FLOAT";
-        case luna::RHI::Format::UNDEFINED:
+        case RHI::Format::UNDEFINED:
             return "UNDEFINED";
         default:
             return "Unknown";
     }
 }
 
-bool supportsDefaultRenderFlow(luna::RHI::BackendType type)
+bool supportsDefaultRenderFlow(RHI::BackendType type)
 {
-    return luna::RHI::makeCapabilitiesForBackend(type).supports_default_render_flow;
+    return RHI::makeCapabilitiesForBackend(type).supports_default_render_flow;
 }
 
-bool isPresentModeSupported(const std::vector<luna::RHI::PresentMode>& supported_modes, luna::RHI::PresentMode mode)
+bool isPresentModeSupported(const std::vector<RHI::PresentMode>& supported_modes, RHI::PresentMode mode)
 {
     return std::find(supported_modes.begin(), supported_modes.end(), mode) != supported_modes.end();
 }
 
-std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supported_modes)
+std::string describePresentModes(const std::vector<RHI::PresentMode>& supported_modes)
 {
     if (supported_modes.empty()) {
         return "<none>";
@@ -145,51 +145,51 @@ std::string describePresentModes(const std::vector<luna::RHI::PresentMode>& supp
     return result;
 }
 
-luna::RHI::PresentMode choosePresentMode(const std::vector<luna::RHI::PresentMode>& supported_modes,
-                                         luna::RHI::PresentMode requested_mode)
+RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supported_modes,
+                                         RHI::PresentMode requested_mode)
 {
     if (isPresentModeSupported(supported_modes, requested_mode)) {
         return requested_mode;
     }
 
     switch (requested_mode) {
-        case luna::RHI::PresentMode::Mailbox:
-            for (const auto fallback_mode : std::array{luna::RHI::PresentMode::Immediate,
-                                                       luna::RHI::PresentMode::FifoRelaxed,
-                                                       luna::RHI::PresentMode::Fifo}) {
+        case RHI::PresentMode::Mailbox:
+            for (const auto fallback_mode : std::array{RHI::PresentMode::Immediate,
+                                                       RHI::PresentMode::FifoRelaxed,
+                                                       RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case luna::RHI::PresentMode::Immediate:
-            for (const auto fallback_mode : std::array{luna::RHI::PresentMode::Mailbox,
-                                                       luna::RHI::PresentMode::FifoRelaxed,
-                                                       luna::RHI::PresentMode::Fifo}) {
+        case RHI::PresentMode::Immediate:
+            for (const auto fallback_mode : std::array{RHI::PresentMode::Mailbox,
+                                                       RHI::PresentMode::FifoRelaxed,
+                                                       RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case luna::RHI::PresentMode::FifoRelaxed:
-            for (const auto fallback_mode : std::array{luna::RHI::PresentMode::Fifo,
-                                                       luna::RHI::PresentMode::Immediate,
-                                                       luna::RHI::PresentMode::Mailbox}) {
+        case RHI::PresentMode::FifoRelaxed:
+            for (const auto fallback_mode : std::array{RHI::PresentMode::Fifo,
+                                                       RHI::PresentMode::Immediate,
+                                                       RHI::PresentMode::Mailbox}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
-        case luna::RHI::PresentMode::Fifo:
-            if (isPresentModeSupported(supported_modes, luna::RHI::PresentMode::FifoRelaxed)) {
-                return luna::RHI::PresentMode::FifoRelaxed;
+        case RHI::PresentMode::Fifo:
+            if (isPresentModeSupported(supported_modes, RHI::PresentMode::FifoRelaxed)) {
+                return RHI::PresentMode::FifoRelaxed;
             }
             break;
         default:
             break;
     }
 
-    return supported_modes.empty() ? luna::RHI::PresentMode::Fifo : supported_modes.front();
+    return supported_modes.empty() ? RHI::PresentMode::Fifo : supported_modes.front();
 }
 
 } // namespace luna::renderer_detail

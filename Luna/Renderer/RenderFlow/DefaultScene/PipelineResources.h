@@ -42,30 +42,30 @@ public:
     [[nodiscard]] Invalidation invalidationFor(const SceneRenderContext& context) const noexcept;
     void rebuild(const SceneRenderContext& context);
 
-    void updateSceneBindings(const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
-                             const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
-                             const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture);
+    void updateSceneBindings(const RHI::Ref<RHI::Texture>& environment_texture,
+                             const RHI::Ref<RHI::Texture>& prefiltered_environment_texture,
+                             const RHI::Ref<RHI::Texture>& brdf_lut_texture);
     void updateSceneParameters(const SceneRenderContext& context,
                                const RenderWorld& world,
                                const RenderFeatureFrameContext& frame_context,
                                float environment_mip_count,
                                const std::array<glm::vec4, 9>& irradiance_sh,
                                const render_flow::default_scene_detail::ShadowRenderParams& shadow_params);
-    void updateLightingResources(luna::RHI::CommandBufferEncoder& commands,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& velocity_texture,
-                                 const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
+    void updateLightingResources(RHI::CommandBufferEncoder& commands,
+                                 const RHI::Ref<RHI::Texture>& gbuffer_base_color,
+                                 const RHI::Ref<RHI::Texture>& gbuffer_normal_metallic,
+                                 const RHI::Ref<RHI::Texture>& gbuffer_world_position_roughness,
+                                 const RHI::Ref<RHI::Texture>& gbuffer_emissive_ao,
+                                 const RHI::Ref<RHI::Texture>& velocity_texture,
+                                 const RHI::Ref<RHI::Texture>& pick_texture,
                                  const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions);
-    void updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map);
-    void updateTransparentCompositeResources(const luna::RHI::Ref<luna::RHI::Texture>& transparent_color);
-    void updatePostProcessResources(const luna::RHI::Ref<luna::RHI::Texture>& scene_color);
+    void updateShadowResources(const RHI::Ref<RHI::Texture>& shadow_map);
+    void updateTransparentCompositeResources(const RHI::Ref<RHI::Texture>& transparent_color);
+    void updatePostProcessResources(const RHI::Ref<RHI::Texture>& scene_color);
 
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::Device>& device() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorPool>& descriptorPool() const noexcept;
-    [[nodiscard]] const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& materialLayout() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::Device>& device() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::DescriptorPool>& descriptorPool() const noexcept;
+    [[nodiscard]] const RHI::Ref<RHI::DescriptorSetLayout>& materialLayout() const noexcept;
     [[nodiscard]] DrawPassResources geometryPassResources() const noexcept;
     [[nodiscard]] DrawPassResources shadowPassResources() const noexcept;
     [[nodiscard]] DrawPassResources transparentPassResources() const noexcept;

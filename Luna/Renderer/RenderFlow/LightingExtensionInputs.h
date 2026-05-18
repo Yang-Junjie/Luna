@@ -46,10 +46,10 @@ struct LightingExtensionInputSet {
 };
 
 struct LightingExtensionTextureRefs {
-    luna::RHI::Ref<luna::RHI::Texture> ambient_occlusion;
-    luna::RHI::Ref<luna::RHI::Texture> reflection;
-    luna::RHI::Ref<luna::RHI::Texture> indirect_diffuse;
-    luna::RHI::Ref<luna::RHI::Texture> indirect_specular;
+    RHI::Ref<RHI::Texture> ambient_occlusion;
+    RHI::Ref<RHI::Texture> reflection;
+    RHI::Ref<RHI::Texture> indirect_diffuse;
+    RHI::Ref<RHI::Texture> indirect_specular;
 };
 
 void setLightingExtensionInput(RenderPassBlackboard& blackboard,

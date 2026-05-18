@@ -38,16 +38,16 @@ RenderGraphTextureDesc makeTransparentColorDesc(const SceneRenderContext& scene_
 {
     return RenderGraphTextureDesc{
         .Name = "SceneTransparentColor",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = scene_context.framebuffer_width,
         .Height = scene_context.framebuffer_height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = render_flow::default_scene_detail::kSceneHdrColorFormat,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -87,15 +87,15 @@ void TransparentPass::setup(RenderPassContext& context)
         "SceneTransparentDraw",
         [scene_context, transparent_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.WriteColor(transparent_color,
-                                    luna::RHI::AttachmentLoadOp::Clear,
-                                    luna::RHI::AttachmentStoreOp::Store,
-                                    luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
+                                    RHI::AttachmentLoadOp::Clear,
+                                    RHI::AttachmentStoreOp::Store,
+                                    RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 0.0f));
             pass_builder.WriteColor(scene_context.pick_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+                                    RHI::AttachmentLoadOp::Load,
+                                    RHI::AttachmentStoreOp::Store);
             pass_builder.WriteDepth(scene_context.depth_target,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+                                    RHI::AttachmentLoadOp::Load,
+                                    RHI::AttachmentStoreOp::Store);
         },
         [this, scene_context](RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, scene_context);
@@ -106,8 +106,8 @@ void TransparentPass::setup(RenderPassContext& context)
         [scene_color, transparent_color](RenderGraphRasterPassBuilder& pass_builder) {
             pass_builder.ReadTexture(transparent_color);
             pass_builder.WriteColor(scene_color,
-                                    luna::RHI::AttachmentLoadOp::Load,
-                                    luna::RHI::AttachmentStoreOp::Store);
+                                    RHI::AttachmentLoadOp::Load,
+                                    RHI::AttachmentStoreOp::Store);
         },
         [this, transparent_color](RenderGraphRasterPassContext& pass_context) {
             composite(pass_context, transparent_color);
@@ -176,7 +176,7 @@ void TransparentPass::composite(RenderGraphRasterPassContext& pass_context, Rend
     auto& commands = pass_context.commandBuffer();
     commands.BindGraphicsPipeline(pass_resources.pipeline);
     configureViewportAndScissor(commands, pass_context.framebufferWidth(), pass_context.framebufferHeight());
-    const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+    const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{
         pass_resources.descriptor_set,
     };
     commands.BindDescriptorSets(pass_resources.pipeline, 0, descriptor_sets);

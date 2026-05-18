@@ -48,16 +48,16 @@ public:
 
         RenderGraphTextureHandle ambient_occlusion = context.graph().CreateTexture(RenderGraphTextureDesc{
             .Name = "FeatureProbeAmbientOcclusion",
-            .Type = luna::RHI::TextureType::Texture2D,
+            .Type = RHI::TextureType::Texture2D,
             .Width = scene_context.framebuffer_width,
             .Height = scene_context.framebuffer_height,
             .Depth = 1,
             .ArrayLayers = 1,
             .MipLevels = 1,
-            .Format = luna::RHI::Format::RGBA8_UNORM,
-            .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-            .InitialState = luna::RHI::ResourceState::Undefined,
-            .SampleCount = luna::RHI::SampleCount::Count1,
+            .Format = RHI::Format::RGBA8_UNORM,
+            .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+            .InitialState = RHI::ResourceState::Undefined,
+            .SampleCount = RHI::SampleCount::Count1,
         });
         if (!ambient_occlusion.isValid()) {
             return;
@@ -68,9 +68,9 @@ public:
             name(),
             [ambient_occlusion](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.WriteColor(ambient_occlusion,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [](RenderGraphRasterPassContext& pass_context) {
                 pass_context.beginRendering();

@@ -18,7 +18,7 @@ namespace {
 constexpr float kCascadeBoundsPaddingScale = 1.08f;
 constexpr float kLightSpaceBoundsEpsilon = 0.001f;
 
-glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const luna::RHI::RHIConventions& conventions)
+glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const RHI::RHIConventions& conventions)
 {
     return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
@@ -129,7 +129,7 @@ void padShadowCascadeDepth(ShadowCascadeLightBounds& bounds, float depth_padding
 }
 
 glm::mat4 buildShadowCascadeViewProjection(const ShadowCascadeLightBounds& bounds,
-                                           const luna::RHI::RHIConventions& conventions)
+                                           const RHI::RHIConventions& conventions)
 {
     const glm::mat4 projection = glm::orthoRH_ZO(bounds.min_bounds.x,
                                                  bounds.max_bounds.x,

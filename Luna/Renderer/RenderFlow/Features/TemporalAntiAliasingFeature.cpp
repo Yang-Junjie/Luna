@@ -116,39 +116,39 @@ constexpr std::array<RenderFeatureDescriptorBinding, 6> kTaaBindings{{
     {"CurrentColor",
      "gCurrentColorTexture",
      taa_binding::CurrentColor,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"HistoryColor",
      "gHistoryColorTexture",
      taa_binding::HistoryColor,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Velocity",
      "gVelocityTexture",
      taa_binding::Velocity,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Depth",
      "gDepthTexture",
      taa_binding::Depth,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Sampler",
      "gTaaSampler",
      taa_binding::Sampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
     {"Params",
      "gTaaParams",
      taa_binding::Params,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
-     luna::RHI::ShaderStage::Fragment},
+     RHI::ShaderStage::Fragment},
 }};
 
 bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
@@ -162,7 +162,7 @@ std::filesystem::path shaderPath()
            "TemporalAntiAliasing.slang";
 }
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeTaaDescriptorSetLayoutCreateInfo()
+RHI::DescriptorSetLayoutCreateInfo makeTaaDescriptorSetLayoutCreateInfo()
 {
     return makeRenderFeatureDescriptorSetLayoutCreateInfo(kTaaBindings);
 }
@@ -178,8 +178,8 @@ ShaderBindingContract makeTaaShaderBindingContract()
     });
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(
+    const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -188,65 +188,65 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout> createDescriptorSetLayout(
     return device->CreateDescriptorSetLayout(makeTaaDescriptorSetLayoutCreateInfo());
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorPool> createDescriptorPool(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateDescriptorPool(luna::RHI::DescriptorPoolBuilder()
+    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
                                             .SetMaxSets(8)
-                                            .AddPoolSize(luna::RHI::DescriptorType::SampledImage, 24)
-                                            .AddPoolSize(luna::RHI::DescriptorType::Sampler, 8)
-                                            .AddPoolSize(luna::RHI::DescriptorType::UniformBuffer, 8)
+                                            .AddPoolSize(RHI::DescriptorType::SampledImage, 24)
+                                            .AddPoolSize(RHI::DescriptorType::Sampler, 8)
+                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 8)
                                             .Build());
 }
 
-luna::RHI::Ref<luna::RHI::Sampler> createSampler(const luna::RHI::Ref<luna::RHI::Device>& device)
+RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateSampler(luna::RHI::SamplerBuilder()
-                                     .SetFilter(luna::RHI::Filter::Linear, luna::RHI::Filter::Linear)
-                                     .SetMipmapMode(luna::RHI::SamplerMipmapMode::Nearest)
-                                     .SetAddressMode(luna::RHI::SamplerAddressMode::ClampToEdge)
+    return device->CreateSampler(RHI::SamplerBuilder()
+                                     .SetFilter(RHI::Filter::Linear, RHI::Filter::Linear)
+                                     .SetMipmapMode(RHI::SamplerMipmapMode::Nearest)
+                                     .SetAddressMode(RHI::SamplerAddressMode::ClampToEdge)
                                      .SetAnisotropy(false)
                                      .SetName("TemporalAntiAliasingSampler")
                                      .Build());
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout> createPipelineLayout(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
     }
 
-    return device->CreatePipelineLayout(luna::RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
+    return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-luna::RHI::Ref<luna::RHI::GraphicsPipeline> createPipeline(
-    const luna::RHI::Ref<luna::RHI::Device>& device,
-    const luna::RHI::Ref<luna::RHI::PipelineLayout>& layout,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& vertex_shader,
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& fragment_shader,
-    luna::RHI::Format color_format,
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(
+    const RHI::Ref<RHI::Device>& device,
+    const RHI::Ref<RHI::PipelineLayout>& layout,
+    const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+    const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+    RHI::Format color_format,
     uint32_t color_attachment_count)
 {
-    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == luna::RHI::Format::UNDEFINED ||
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED ||
         color_attachment_count == 0) {
         return {};
     }
 
-    luna::RHI::GraphicsPipelineBuilder builder;
+    RHI::GraphicsPipelineBuilder builder;
     builder.SetShaders({vertex_shader, fragment_shader})
-        .SetTopology(luna::RHI::PrimitiveTopology::TriangleList)
-        .SetCullMode(luna::RHI::CullMode::None)
-        .SetFrontFace(luna::RHI::FrontFace::CounterClockwise)
-        .SetDepthTest(false, false, luna::RHI::CompareOp::Always)
+        .SetTopology(RHI::PrimitiveTopology::TriangleList)
+        .SetCullMode(RHI::CullMode::None)
+        .SetFrontFace(RHI::FrontFace::CounterClockwise)
+        .SetDepthTest(false, false, RHI::CompareOp::Always)
         .SetLayout(layout);
     for (uint32_t index = 0; index < color_attachment_count; ++index) {
         builder.AddColorAttachmentDefault(false).AddColorFormat(color_format);
@@ -258,16 +258,16 @@ RenderGraphTextureDesc makeTemporalColorDesc(const SceneRenderContext& scene_con
 {
     return RenderGraphTextureDesc{
         .Name = "TemporalAntiAliasingColor",
-        .Type = luna::RHI::TextureType::Texture2D,
+        .Type = RHI::TextureType::Texture2D,
         .Width = scene_context.framebuffer_width,
         .Height = scene_context.framebuffer_height,
         .Depth = 1,
         .ArrayLayers = 1,
         .MipLevels = 1,
         .Format = default_scene_detail::kSceneHdrColorFormat,
-        .Usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .InitialState = luna::RHI::ResourceState::Undefined,
-        .SampleCount = luna::RHI::SampleCount::Count1,
+        .Usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .InitialState = RHI::ResourceState::Undefined,
+        .SampleCount = RHI::SampleCount::Count1,
     };
 }
 
@@ -277,9 +277,9 @@ PersistentTexture2DDesc makeTemporalHistoryDesc(const SceneRenderContext& scene_
         .width = scene_context.framebuffer_width,
         .height = scene_context.framebuffer_height,
         .format = default_scene_detail::kSceneHdrColorFormat,
-        .usage = luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled,
-        .initial_state = luna::RHI::ResourceState::Undefined,
-        .sample_count = luna::RHI::SampleCount::Count1,
+        .usage = RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled,
+        .initial_state = RHI::ResourceState::Undefined,
+        .sample_count = RHI::SampleCount::Count1,
         .name = "TemporalAntiAliasingColor",
     };
 }
@@ -319,15 +319,15 @@ public:
         }
 
         releasePipelineResources();
-        const luna::RHI::Ref<luna::RHI::Device>& device = m_resource_set.device();
+        const RHI::Ref<RHI::Device>& device = m_resource_set.device();
 
         const std::filesystem::path path = shaderPath();
         m_state.vertex_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "taaVertexMain", luna::RHI::ShaderStage::Vertex);
+            device, context.compiler, path, "taaVertexMain", RHI::ShaderStage::Vertex);
         m_state.fragment_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "taaFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "taaFragmentMain", RHI::ShaderStage::Fragment);
         m_state.copy_fragment_shader = renderer_detail::loadShaderModule(
-            device, context.compiler, path, "taaCopyFragmentMain", luna::RHI::ShaderStage::Fragment);
+            device, context.compiler, path, "taaCopyFragmentMain", RHI::ShaderStage::Fragment);
 
         const ShaderBindingContract contract = makeTaaShaderBindingContract();
         const std::array<RenderFeatureShaderBindingCheck, 3> binding_checks{{
@@ -354,16 +354,16 @@ public:
                                                default_scene_detail::kSceneHdrColorFormat,
                                                1);
         m_state.sampler = createSampler(device);
-        m_state.resolve_params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+        m_state.resolve_params_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                                  .SetSize(sizeof(TaaGpuParams))
-                                                                 .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                                 .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                                 .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                                 .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                                  .SetName("TemporalAntiAliasingResolveParams")
                                                                  .Build());
-        m_state.copy_params_buffer = device->CreateBuffer(luna::RHI::BufferBuilder()
+        m_state.copy_params_buffer = device->CreateBuffer(RHI::BufferBuilder()
                                                               .SetSize(sizeof(TaaGpuParams))
-                                                              .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                              .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                              .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                               .SetName("TemporalAntiAliasingCopyParams")
                                                               .Build());
 
@@ -393,7 +393,7 @@ public:
             m_history,
             RenderFeatureTextureImportOptions{
                 .name = "TemporalAntiAliasingHistoryRead",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
+                .final_state = RHI::ResourceState::ShaderRead,
                 .export_texture = false,
             });
     }
@@ -405,7 +405,7 @@ public:
             m_history,
             RenderFeatureTextureImportOptions{
                 .name = "TemporalAntiAliasingHistoryWrite",
-                .final_state = luna::RHI::ResourceState::ShaderRead,
+                .final_state = RHI::ResourceState::ShaderRead,
             });
     }
 
@@ -428,10 +428,10 @@ public:
                m_state.copy_params_buffer && m_state.resolve_descriptor_set && m_state.copy_descriptor_set;
     }
 
-    void updateBindings(const luna::RHI::Ref<luna::RHI::Texture>& current_color,
-                        const luna::RHI::Ref<luna::RHI::Texture>& history_color,
-                        const luna::RHI::Ref<luna::RHI::Texture>& velocity,
-                        const luna::RHI::Ref<luna::RHI::Texture>& depth,
+    void updateBindings(const RHI::Ref<RHI::Texture>& current_color,
+                        const RHI::Ref<RHI::Texture>& history_color,
+                        const RHI::Ref<RHI::Texture>& velocity,
+                        const RHI::Ref<RHI::Texture>& depth,
                         uint32_t width,
                         uint32_t height,
                         bool has_readable_history)
@@ -441,69 +441,69 @@ public:
         }
 
         updateParams(m_state.resolve_params_buffer, width, height, has_readable_history);
-        m_state.resolve_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.resolve_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = taa_binding::CurrentColor,
             .TextureView = current_color->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.resolve_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.resolve_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = taa_binding::HistoryColor,
             .TextureView = history_color->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.resolve_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.resolve_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = taa_binding::Velocity,
             .TextureView = velocity->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.resolve_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.resolve_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = taa_binding::Depth,
             .TextureView = depth->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.resolve_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        m_state.resolve_descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
             .Binding = taa_binding::Sampler,
             .Sampler = m_state.sampler,
         });
-        m_state.resolve_descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        m_state.resolve_descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
             .Binding = taa_binding::Params,
             .Buffer = m_state.resolve_params_buffer,
             .Offset = 0,
             .Stride = sizeof(TaaGpuParams),
             .Size = sizeof(TaaGpuParams),
-            .Type = luna::RHI::DescriptorType::UniformBuffer,
+            .Type = RHI::DescriptorType::UniformBuffer,
         });
         m_state.resolve_descriptor_set->Update();
     }
 
-    void updateCopyBindings(const luna::RHI::Ref<luna::RHI::Texture>& color, uint32_t width, uint32_t height)
+    void updateCopyBindings(const RHI::Ref<RHI::Texture>& color, uint32_t width, uint32_t height)
     {
         if (!isComplete() || !color || width == 0 || height == 0) {
             return;
         }
 
         updateParams(m_state.copy_params_buffer, width, height, false);
-        m_state.copy_descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+        m_state.copy_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
             .Binding = taa_binding::CurrentColor,
             .TextureView = color->GetDefaultView(),
-            .Layout = luna::RHI::ResourceState::ShaderRead,
-            .Type = luna::RHI::DescriptorType::SampledImage,
+            .Layout = RHI::ResourceState::ShaderRead,
+            .Type = RHI::DescriptorType::SampledImage,
         });
-        m_state.copy_descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+        m_state.copy_descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
             .Binding = taa_binding::Sampler,
             .Sampler = m_state.sampler,
         });
-        m_state.copy_descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+        m_state.copy_descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
             .Binding = taa_binding::Params,
             .Buffer = m_state.copy_params_buffer,
             .Offset = 0,
             .Stride = sizeof(TaaGpuParams),
             .Size = sizeof(TaaGpuParams),
-            .Type = luna::RHI::DescriptorType::UniformBuffer,
+            .Type = RHI::DescriptorType::UniformBuffer,
         });
         m_state.copy_descriptor_set->Update();
     }
@@ -526,7 +526,7 @@ public:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{
             m_state.resolve_descriptor_set};
         commands.BindDescriptorSets(m_state.pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
@@ -551,7 +551,7 @@ public:
                               0.0f,
                               1.0f});
         commands.SetScissor({0, 0, pass_context.framebufferWidth(), pass_context.framebufferHeight()});
-        const std::array<luna::RHI::Ref<luna::RHI::DescriptorSet>, 1> descriptor_sets{m_state.copy_descriptor_set};
+        const std::array<RHI::Ref<RHI::DescriptorSet>, 1> descriptor_sets{m_state.copy_descriptor_set};
         commands.BindDescriptorSets(m_state.copy_pipeline, 0, descriptor_sets);
         commands.Draw(3, 1, 0, 0);
         pass_context.endRendering();
@@ -567,7 +567,7 @@ public:
     }
 
 private:
-    void updateParams(const luna::RHI::Ref<luna::RHI::Buffer>& params_buffer,
+    void updateParams(const RHI::Ref<RHI::Buffer>& params_buffer,
                       uint32_t width,
                       uint32_t height,
                       bool has_readable_history)
@@ -599,19 +599,19 @@ private:
     }
 
     struct State {
-        luna::RHI::Ref<luna::RHI::DescriptorSetLayout> layout;
-        luna::RHI::Ref<luna::RHI::DescriptorPool> descriptor_pool;
-        luna::RHI::Ref<luna::RHI::PipelineLayout> pipeline_layout;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> pipeline;
-        luna::RHI::Ref<luna::RHI::Sampler> sampler;
-        luna::RHI::Ref<luna::RHI::Buffer> resolve_params_buffer;
-        luna::RHI::Ref<luna::RHI::Buffer> copy_params_buffer;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> resolve_descriptor_set;
-        luna::RHI::Ref<luna::RHI::DescriptorSet> copy_descriptor_set;
-        luna::RHI::Ref<luna::RHI::ShaderModule> vertex_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> fragment_shader;
-        luna::RHI::Ref<luna::RHI::ShaderModule> copy_fragment_shader;
-        luna::RHI::Ref<luna::RHI::GraphicsPipeline> copy_pipeline;
+        RHI::Ref<RHI::DescriptorSetLayout> layout;
+        RHI::Ref<RHI::DescriptorPool> descriptor_pool;
+        RHI::Ref<RHI::PipelineLayout> pipeline_layout;
+        RHI::Ref<RHI::GraphicsPipeline> pipeline;
+        RHI::Ref<RHI::Sampler> sampler;
+        RHI::Ref<RHI::Buffer> resolve_params_buffer;
+        RHI::Ref<RHI::Buffer> copy_params_buffer;
+        RHI::Ref<RHI::DescriptorSet> resolve_descriptor_set;
+        RHI::Ref<RHI::DescriptorSet> copy_descriptor_set;
+        RHI::Ref<RHI::ShaderModule> vertex_shader;
+        RHI::Ref<RHI::ShaderModule> fragment_shader;
+        RHI::Ref<RHI::ShaderModule> copy_fragment_shader;
+        RHI::Ref<RHI::GraphicsPipeline> copy_pipeline;
     };
 
     [[nodiscard]] std::array<RenderFeatureResourceStatus, 13> resourceStatus() const noexcept
@@ -724,13 +724,13 @@ public:
                     pass_builder.ReadTexture(history_read);
                 }
                 pass_builder.WriteColor(temporal_color,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
                 pass_builder.WriteColor(history_write,
-                                        luna::RHI::AttachmentLoadOp::Clear,
-                                        luna::RHI::AttachmentStoreOp::Store,
-                                        luna::RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+                                        RHI::AttachmentLoadOp::Clear,
+                                        RHI::AttachmentStoreOp::Store,
+                                        RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
             },
             [this, scene_color, history_read, depth, velocity, scene_context](
                 RenderGraphRasterPassContext& pass_context) {

@@ -66,9 +66,9 @@ void PipelineResources::rebuild(const SceneRenderContext& context)
 }
 
 void PipelineResources::updateSceneBindings(
-    const luna::RHI::Ref<luna::RHI::Texture>& environment_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& prefiltered_environment_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& brdf_lut_texture)
+    const RHI::Ref<RHI::Texture>& environment_texture,
+    const RHI::Ref<RHI::Texture>& prefiltered_environment_texture,
+    const RHI::Ref<RHI::Texture>& brdf_lut_texture)
 {
     m_pipeline_state.updateSceneBindings(environment_texture, prefiltered_environment_texture, brdf_lut_texture);
 }
@@ -86,13 +86,13 @@ void PipelineResources::updateSceneParameters(
 }
 
 void PipelineResources::updateLightingResources(
-    luna::RHI::CommandBufferEncoder& commands,
-    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_base_color,
-    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_normal_metallic,
-    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_world_position_roughness,
-    const luna::RHI::Ref<luna::RHI::Texture>& gbuffer_emissive_ao,
-    const luna::RHI::Ref<luna::RHI::Texture>& velocity_texture,
-    const luna::RHI::Ref<luna::RHI::Texture>& pick_texture,
+    RHI::CommandBufferEncoder& commands,
+    const RHI::Ref<RHI::Texture>& gbuffer_base_color,
+    const RHI::Ref<RHI::Texture>& gbuffer_normal_metallic,
+    const RHI::Ref<RHI::Texture>& gbuffer_world_position_roughness,
+    const RHI::Ref<RHI::Texture>& gbuffer_emissive_ao,
+    const RHI::Ref<RHI::Texture>& velocity_texture,
+    const RHI::Ref<RHI::Texture>& pick_texture,
     const luna::render_flow::LightingExtensionTextureRefs& lighting_extensions)
 {
     m_pipeline_state.updateLightingResources(
@@ -106,33 +106,33 @@ void PipelineResources::updateLightingResources(
         lighting_extensions);
 }
 
-void PipelineResources::updateShadowResources(const luna::RHI::Ref<luna::RHI::Texture>& shadow_map)
+void PipelineResources::updateShadowResources(const RHI::Ref<RHI::Texture>& shadow_map)
 {
     m_pipeline_state.updateShadowResources(shadow_map);
 }
 
 void PipelineResources::updateTransparentCompositeResources(
-    const luna::RHI::Ref<luna::RHI::Texture>& transparent_color)
+    const RHI::Ref<RHI::Texture>& transparent_color)
 {
     m_pipeline_state.updateTransparentCompositeResources(transparent_color);
 }
 
-void PipelineResources::updatePostProcessResources(const luna::RHI::Ref<luna::RHI::Texture>& scene_color)
+void PipelineResources::updatePostProcessResources(const RHI::Ref<RHI::Texture>& scene_color)
 {
     m_pipeline_state.updatePostProcessResources(scene_color);
 }
 
-const luna::RHI::Ref<luna::RHI::Device>& PipelineResources::device() const noexcept
+const RHI::Ref<RHI::Device>& PipelineResources::device() const noexcept
 {
     return m_pipeline_state.device();
 }
 
-const luna::RHI::Ref<luna::RHI::DescriptorPool>& PipelineResources::descriptorPool() const noexcept
+const RHI::Ref<RHI::DescriptorPool>& PipelineResources::descriptorPool() const noexcept
 {
     return m_pipeline_state.descriptorPool();
 }
 
-const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>& PipelineResources::materialLayout() const noexcept
+const RHI::Ref<RHI::DescriptorSetLayout>& PipelineResources::materialLayout() const noexcept
 {
     return m_pipeline_state.materialLayout();
 }

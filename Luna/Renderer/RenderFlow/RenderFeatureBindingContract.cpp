@@ -6,13 +6,13 @@
 
 namespace luna::render_flow {
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
+RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
     std::span<const RenderFeatureDescriptorBinding> bindings)
 {
-    luna::RHI::DescriptorSetLayoutCreateInfo create_info;
+    RHI::DescriptorSetLayoutCreateInfo create_info;
     create_info.Bindings.reserve(bindings.size());
     for (const RenderFeatureDescriptorBinding& binding : bindings) {
-        create_info.Bindings.push_back(luna::RHI::DescriptorSetLayoutBinding{
+        create_info.Bindings.push_back(RHI::DescriptorSetLayoutBinding{
             .Binding = binding.binding,
             .Type = binding.type,
             .Count = binding.count,
@@ -45,7 +45,7 @@ ShaderBindingContract makeRenderFeatureShaderBindingContract(
 }
 
 ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+    const RHI::Ref<RHI::ShaderModule>& shader,
     const ShaderBindingContract& contract,
     const std::filesystem::path& shader_file,
     std::string_view entry_point)
@@ -66,7 +66,7 @@ ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
 }
 
 bool validateAndLogRenderFeatureShaderModuleBindings(
-    const luna::RHI::Ref<luna::RHI::ShaderModule>& shader,
+    const RHI::Ref<RHI::ShaderModule>& shader,
     const ShaderBindingContract& contract,
     const std::filesystem::path& shader_file,
     std::string_view entry_point)

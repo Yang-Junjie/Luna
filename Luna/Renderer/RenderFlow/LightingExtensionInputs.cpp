@@ -39,7 +39,7 @@ constexpr RenderResourceKey<RenderGraphTextureHandle> inputKey(LightingExtension
     return {"Scene.LightingExtension.Invalid"};
 }
 
-[[nodiscard]] const luna::RHI::Ref<luna::RHI::Texture>&
+[[nodiscard]] const RHI::Ref<RHI::Texture>&
     optionalTexture(RenderGraphRasterPassContext& pass_context, RenderGraphTextureHandle handle)
 {
     return handle.isValid() ? pass_context.getTexture(handle) : pass_context.getTexture(RenderGraphTextureHandle{});

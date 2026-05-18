@@ -53,7 +53,7 @@ void AssetCache::clear(ClearMode mode)
     }
 }
 
-void AssetCache::prepareDraws(luna::RHI::CommandBufferEncoder& commands,
+void AssetCache::prepareDraws(RHI::CommandBufferEncoder& commands,
                               std::span<const DrawCommand> draw_commands,
                               const Material& default_material,
                               const Bindings& bindings)
@@ -153,17 +153,17 @@ AssetCache::UploadedMesh& AssetCache::getOrCreateUploadedMesh(const Mesh& mesh, 
         const std::string sub_mesh_name =
             sub_mesh.Name.empty() ? mesh.getName() + "_SubMesh_" + std::to_string(submesh_index) : sub_mesh.Name;
 
-        uploaded_sub_mesh.vertex_buffer = bindings.device->CreateBuffer(luna::RHI::BufferBuilder()
+        uploaded_sub_mesh.vertex_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
                                                                             .SetSize(sub_mesh.Vertices.size() *
                                                                                      sizeof(StaticMeshVertex))
-                                                                            .SetUsage(luna::RHI::BufferUsageFlags::VertexBuffer)
-                                                                            .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                                            .SetUsage(RHI::BufferUsageFlags::VertexBuffer)
+                                                                            .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                                             .SetName(sub_mesh_name + "_VertexBuffer")
                                                                             .Build());
-        uploaded_sub_mesh.index_buffer = bindings.device->CreateBuffer(luna::RHI::BufferBuilder()
+        uploaded_sub_mesh.index_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
                                                                            .SetSize(sub_mesh.Indices.size() * sizeof(uint32_t))
-                                                                           .SetUsage(luna::RHI::BufferUsageFlags::IndexBuffer)
-                                                                           .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                                           .SetUsage(RHI::BufferUsageFlags::IndexBuffer)
+                                                                           .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                                            .SetName(sub_mesh_name + "_IndexBuffer")
                                                                            .Build());
         uploaded_sub_mesh.index_count = static_cast<uint32_t>(sub_mesh.Indices.size());
@@ -271,10 +271,10 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
         create_material_texture(textures.Occlusion, renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "Occlusion");
 
     if (bindings.device) {
-        uploaded_material.params_buffer = bindings.device->CreateBuffer(luna::RHI::BufferBuilder()
+        uploaded_material.params_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
                                                                             .SetSize(sizeof(render_flow::default_scene_detail::MaterialGpuParams))
-                                                                            .SetUsage(luna::RHI::BufferUsageFlags::UniformBuffer)
-                                                                            .SetMemoryUsage(luna::RHI::BufferMemoryUsage::CpuToGpu)
+                                                                            .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                                            .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
                                                                             .SetName(material_name + "_Params")
                                                                             .Build());
     }
@@ -313,69 +313,69 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
         return uploaded_material;
     }
 
-    uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::BaseColorTexture,
         .TextureView = uploaded_material.base_color_texture->texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
-    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
         .Binding = material_binding::BaseColorSampler,
         .Sampler = uploaded_material.base_color_texture->sampler,
     });
-    uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::NormalTexture,
         .TextureView = uploaded_material.normal_texture->texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
-    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
         .Binding = material_binding::NormalSampler,
         .Sampler = uploaded_material.normal_texture->sampler,
     });
-    uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::MetallicRoughnessTexture,
         .TextureView = uploaded_material.metallic_roughness_texture->texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
-    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
         .Binding = material_binding::MetallicRoughnessSampler,
         .Sampler = uploaded_material.metallic_roughness_texture->sampler,
     });
-    uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::EmissiveTexture,
         .TextureView = uploaded_material.emissive_texture->texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
-    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
         .Binding = material_binding::EmissiveSampler,
         .Sampler = uploaded_material.emissive_texture->sampler,
     });
-    uploaded_material.descriptor_set->WriteTexture(luna::RHI::TextureWriteInfo{
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::OcclusionTexture,
         .TextureView = uploaded_material.occlusion_texture->texture->GetDefaultView(),
-        .Layout = luna::RHI::ResourceState::ShaderRead,
-        .Type = luna::RHI::DescriptorType::SampledImage,
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
     });
-    uploaded_material.descriptor_set->WriteSampler(luna::RHI::SamplerWriteInfo{
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
         .Binding = material_binding::OcclusionSampler,
         .Sampler = uploaded_material.occlusion_texture->sampler,
     });
-    uploaded_material.descriptor_set->WriteBuffer(luna::RHI::BufferWriteInfo{
+    uploaded_material.descriptor_set->WriteBuffer(RHI::BufferWriteInfo{
         .Binding = material_binding::MaterialParams,
         .Buffer = uploaded_material.params_buffer,
         .Offset = 0,
         .Stride = sizeof(render_flow::default_scene_detail::MaterialGpuParams),
         .Size = sizeof(render_flow::default_scene_detail::MaterialGpuParams),
-        .Type = luna::RHI::DescriptorType::UniformBuffer,
+        .Type = RHI::DescriptorType::UniformBuffer,
     });
     uploaded_material.descriptor_set->Update();
     return uploaded_material;
 }
 
-void AssetCache::uploadMaterialIfNeeded(luna::RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material)
+void AssetCache::uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material)
 {
     LUNA_RENDERER_FRAME_TRACE("Ensuring material textures are uploaded");
     if (uploaded_material.base_color_texture) {

@@ -1,4 +1,4 @@
-﻿#include "Core/Log.h"
+#include "Core/Log.h"
 #include "Renderer/RenderGraph.h"
 #include "Renderer/RendererUtilities.h"
 
@@ -9,9 +9,9 @@
 namespace luna {
 namespace {
 
-const luna::RHI::Ref<luna::RHI::Texture>& emptyTextureRef()
+const RHI::Ref<RHI::Texture>& emptyTextureRef()
 {
-    static const luna::RHI::Ref<luna::RHI::Texture> empty_ref{};
+    static const RHI::Ref<RHI::Texture> empty_ref{};
     return empty_ref;
 }
 
@@ -23,9 +23,9 @@ double elapsedMilliseconds(std::chrono::steady_clock::time_point begin,
 
 } // namespace
 
-RenderGraphPassContext::RenderGraphPassContext(luna::RHI::Ref<luna::RHI::Device> device,
-                                               luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer,
-                                               const std::vector<luna::RHI::Ref<luna::RHI::Texture>>* textures,
+RenderGraphPassContext::RenderGraphPassContext(RHI::Ref<RHI::Device> device,
+                                               RHI::Ref<RHI::CommandBufferEncoder> command_buffer,
+                                               const std::vector<RHI::Ref<RHI::Texture>>* textures,
                                                uint32_t framebuffer_width,
                                                uint32_t framebuffer_height)
     : m_device(std::move(device)),
@@ -35,17 +35,17 @@ RenderGraphPassContext::RenderGraphPassContext(luna::RHI::Ref<luna::RHI::Device>
       m_framebuffer_height(framebuffer_height)
 {}
 
-const luna::RHI::Ref<luna::RHI::Device>& RenderGraphPassContext::device() const
+const RHI::Ref<RHI::Device>& RenderGraphPassContext::device() const
 {
     return m_device;
 }
 
-luna::RHI::CommandBufferEncoder& RenderGraphPassContext::commandBuffer() const
+RHI::CommandBufferEncoder& RenderGraphPassContext::commandBuffer() const
 {
     return *m_command_buffer;
 }
 
-const luna::RHI::Ref<luna::RHI::Texture>& RenderGraphPassContext::getTexture(RenderGraphTextureHandle handle) const
+const RHI::Ref<RHI::Texture>& RenderGraphPassContext::getTexture(RenderGraphTextureHandle handle) const
 {
     if (m_textures == nullptr || !handle.isValid() || handle.Index >= m_textures->size()) {
         return emptyTextureRef();
@@ -65,20 +65,20 @@ uint32_t RenderGraphPassContext::framebufferHeight() const
 }
 
 RenderGraphRasterPassContext::RenderGraphRasterPassContext(
-    luna::RHI::Ref<luna::RHI::Device> device,
-    luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer,
-    const std::vector<luna::RHI::Ref<luna::RHI::Texture>>* textures,
+    RHI::Ref<RHI::Device> device,
+    RHI::Ref<RHI::CommandBufferEncoder> command_buffer,
+    const std::vector<RHI::Ref<RHI::Texture>>* textures,
     uint32_t framebuffer_width,
     uint32_t framebuffer_height,
-    const luna::RHI::RenderingInfo* rendering_info)
+    const RHI::RenderingInfo* rendering_info)
     : RenderGraphPassContext(
           std::move(device), std::move(command_buffer), textures, framebuffer_width, framebuffer_height),
       m_rendering_info(rendering_info)
 {}
 
-const luna::RHI::RenderingInfo& RenderGraphRasterPassContext::renderingInfo() const
+const RHI::RenderingInfo& RenderGraphRasterPassContext::renderingInfo() const
 {
-    static const luna::RHI::RenderingInfo empty_rendering_info{};
+    static const RHI::RenderingInfo empty_rendering_info{};
     return m_rendering_info != nullptr ? *m_rendering_info : empty_rendering_info;
 }
 
@@ -97,9 +97,9 @@ void RenderGraphRasterPassContext::endRendering()
 }
 
 RenderGraphComputePassContext::RenderGraphComputePassContext(
-    luna::RHI::Ref<luna::RHI::Device> device,
-    luna::RHI::Ref<luna::RHI::CommandBufferEncoder> command_buffer,
-    const std::vector<luna::RHI::Ref<luna::RHI::Texture>>* textures,
+    RHI::Ref<RHI::Device> device,
+    RHI::Ref<RHI::CommandBufferEncoder> command_buffer,
+    const std::vector<RHI::Ref<RHI::Texture>>* textures,
     uint32_t framebuffer_width,
     uint32_t framebuffer_height)
     : RenderGraphPassContext(
@@ -108,9 +108,9 @@ RenderGraphComputePassContext::RenderGraphComputePassContext(
 
 RenderGraph::RenderGraph(FrameContext frame_context,
                          PassList passes,
-                         std::vector<luna::RHI::Ref<luna::RHI::Texture>> textures,
+                         std::vector<RHI::Ref<RHI::Texture>> textures,
                          CompiledPassList compiled_passes,
-                         std::vector<luna::RHI::TextureBarrier> final_texture_barriers)
+                         std::vector<RHI::TextureBarrier> final_texture_barriers)
     : m_frame_context(std::move(frame_context)),
       m_passes(std::move(passes)),
       m_textures(std::move(textures)),
@@ -203,7 +203,7 @@ void RenderGraph::execute() const
                                       pass.Pass.Name,
                                       pass.PreTextureBarriers.size());
             command_buffer.PipelineBarrier(
-                luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, pass.PreTextureBarriers);
+                RHI::SyncScope::AllCommands, RHI::SyncScope::AllCommands, pass.PreTextureBarriers);
         }
 
         if (pass.Pass.Type == RenderGraphPassType::Raster) {
@@ -240,11 +240,11 @@ void RenderGraph::execute() const
                 pass.ExecuteCompute(pass_context);
             }
         } else {
-            const luna::RHI::Ref<luna::RHI::Texture>& source = pass.CopySource.isValid() &&
+            const RHI::Ref<RHI::Texture>& source = pass.CopySource.isValid() &&
                                                                       pass.CopySource.Index < m_textures.size()
                                                                   ? m_textures[pass.CopySource.Index]
                                                                   : emptyTextureRef();
-            const luna::RHI::Ref<luna::RHI::Texture>& destination =
+            const RHI::Ref<RHI::Texture>& destination =
                 pass.CopyDestination.isValid() && pass.CopyDestination.Index < m_textures.size()
                     ? m_textures[pass.CopyDestination.Index]
                     : emptyTextureRef();
@@ -271,7 +271,7 @@ void RenderGraph::execute() const
     if (!m_final_texture_barriers.empty()) {
         LUNA_RENDERER_FRAME_TRACE("Applying {} final render graph texture barrier(s)", m_final_texture_barriers.size());
         command_buffer.PipelineBarrier(
-            luna::RHI::SyncScope::AllCommands, luna::RHI::SyncScope::AllCommands, m_final_texture_barriers);
+            RHI::SyncScope::AllCommands, RHI::SyncScope::AllCommands, m_final_texture_barriers);
     }
     if (gpu_timing_enabled) {
         if (m_frame_context.timestamp_disjoint_query_pool) {

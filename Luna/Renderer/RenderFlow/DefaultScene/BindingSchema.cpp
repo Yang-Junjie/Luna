@@ -8,73 +8,73 @@
 namespace luna::render_flow::default_scene {
 namespace {
 
-const luna::RHI::ShaderStage kFragmentStage = luna::RHI::ShaderStage::Fragment;
-const luna::RHI::ShaderStage kVertexFragmentStages = luna::RHI::ShaderStage::Vertex | luna::RHI::ShaderStage::Fragment;
+const RHI::ShaderStage kFragmentStage = RHI::ShaderStage::Fragment;
+const RHI::ShaderStage kVertexFragmentStages = RHI::ShaderStage::Vertex | RHI::ShaderStage::Fragment;
 
 const std::array<DescriptorBindingSchema, 11> kMaterialBindings{{
     {"BaseColorTexture",
      material_binding::BaseColorTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gBaseColorTexture"},
     {"BaseColorSampler",
      material_binding::BaseColorSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gBaseColorSampler"},
     {"NormalTexture",
      material_binding::NormalTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gNormalTexture"},
     {"NormalSampler",
      material_binding::NormalSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gNormalSampler"},
     {"MetallicRoughnessTexture",
      material_binding::MetallicRoughnessTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gMetallicRoughnessTexture"},
     {"MetallicRoughnessSampler",
      material_binding::MetallicRoughnessSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gMetallicRoughnessSampler"},
     {"EmissiveTexture",
      material_binding::EmissiveTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gEmissiveTexture"},
     {"EmissiveSampler",
      material_binding::EmissiveSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gEmissiveSampler"},
     {"OcclusionTexture",
      material_binding::OcclusionTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gOcclusionTexture"},
     {"OcclusionSampler",
      material_binding::OcclusionSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gOcclusionSampler"},
     {"MaterialParams",
      material_binding::MaterialParams,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
      kFragmentStage,
      "gMaterialParams"},
@@ -83,62 +83,62 @@ const std::array<DescriptorBindingSchema, 11> kMaterialBindings{{
 const std::array<DescriptorBindingSchema, 11> kGBufferBindings{{
     {"GBufferBaseColor",
      gbuffer_binding::BaseColor,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gGBufferBaseColor"},
     {"GBufferNormalMetallic",
      gbuffer_binding::NormalMetallic,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gGBufferNormalMetallic"},
     {"GBufferWorldPositionRoughness",
      gbuffer_binding::WorldPositionRoughness,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gGBufferWorldPositionRoughness"},
     {"GBufferEmissiveAo",
      gbuffer_binding::EmissiveAo,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gGBufferEmissiveAo"},
     {"GBufferSampler",
      gbuffer_binding::Sampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gGBufferSampler"},
-    {"PickBuffer", gbuffer_binding::Pick, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gPickBuffer"},
+    {"PickBuffer", gbuffer_binding::Pick, RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gPickBuffer"},
     {"AmbientOcclusion",
      gbuffer_binding::AmbientOcclusion,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gAmbientOcclusionTexture"},
     {"Reflection",
      gbuffer_binding::Reflection,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gReflectionTexture"},
     {"IndirectDiffuse",
      gbuffer_binding::IndirectDiffuse,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gIndirectDiffuseTexture"},
     {"IndirectSpecular",
      gbuffer_binding::IndirectSpecular,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gIndirectSpecularTexture"},
     {"Velocity",
      gbuffer_binding::Velocity,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gVelocityTexture"},
@@ -147,38 +147,38 @@ const std::array<DescriptorBindingSchema, 11> kGBufferBindings{{
 const std::array<DescriptorBindingSchema, 7> kSceneBindings{{
     {"SceneParams",
      scene_binding::SceneParams,
-     luna::RHI::DescriptorType::UniformBuffer,
+     RHI::DescriptorType::UniformBuffer,
      1,
      kVertexFragmentStages,
      "gSceneParams"},
     {"EnvironmentTexture",
      scene_binding::EnvironmentTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gEnvironmentTexture"},
     {"EnvironmentSampler",
      scene_binding::EnvironmentSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gEnvironmentSampler"},
-    {"ShadowMap", scene_binding::ShadowMap, luna::RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gShadowMap"},
+    {"ShadowMap", scene_binding::ShadowMap, RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gShadowMap"},
     {"ShadowSampler",
      scene_binding::ShadowSampler,
-     luna::RHI::DescriptorType::Sampler,
+     RHI::DescriptorType::Sampler,
      1,
      kFragmentStage,
      "gShadowSampler"},
     {"EnvironmentPrefilterTexture",
      scene_binding::EnvironmentPrefilterTexture,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gEnvironmentPrefilterTexture"},
     {"EnvironmentBrdfLut",
      scene_binding::EnvironmentBrdfLut,
-     luna::RHI::DescriptorType::SampledImage,
+     RHI::DescriptorType::SampledImage,
      1,
      kFragmentStage,
      "gEnvironmentBrdfLut"},
@@ -215,7 +215,7 @@ const std::array<PipelineLayoutSetSchema, 2> kLightingSets{{
 
 const std::array<PushConstantSchema, 1> kMeshPushConstants{{
     {"MeshPushConstants",
-     luna::RHI::ShaderStage::Vertex,
+     RHI::ShaderStage::Vertex,
      0,
      sizeof(render_flow::default_scene_detail::MeshPushConstants)},
 }};
@@ -294,12 +294,12 @@ const PipelineLayoutSchema& transparentPipelineLayoutSchema() noexcept
     return kTransparentPipelineLayout;
 }
 
-luna::RHI::DescriptorSetLayoutCreateInfo makeDescriptorSetLayoutCreateInfo(const DescriptorSetSchema& schema)
+RHI::DescriptorSetLayoutCreateInfo makeDescriptorSetLayoutCreateInfo(const DescriptorSetSchema& schema)
 {
-    luna::RHI::DescriptorSetLayoutCreateInfo create_info;
+    RHI::DescriptorSetLayoutCreateInfo create_info;
     create_info.Bindings.reserve(schema.bindings.size());
     for (const DescriptorBindingSchema& binding : schema.bindings) {
-        create_info.Bindings.push_back(luna::RHI::DescriptorSetLayoutBinding{
+        create_info.Bindings.push_back(RHI::DescriptorSetLayoutBinding{
             .Binding = binding.binding,
             .Type = binding.type,
             .Count = binding.count,
@@ -311,7 +311,7 @@ luna::RHI::DescriptorSetLayoutCreateInfo makeDescriptorSetLayoutCreateInfo(const
 
 namespace {
 
-const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>&
+const RHI::Ref<RHI::DescriptorSetLayout>&
     descriptorSetLayoutForSchema(DescriptorSetSchemaId schema_id, const DescriptorSetLayoutRefs& layouts) noexcept
 {
     switch (schema_id) {
@@ -327,10 +327,10 @@ const luna::RHI::Ref<luna::RHI::DescriptorSetLayout>&
 
 } // namespace
 
-luna::RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
+RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
                                                                  const DescriptorSetLayoutRefs& layouts)
 {
-    luna::RHI::PipelineLayoutCreateInfo create_info;
+    RHI::PipelineLayoutCreateInfo create_info;
     uint32_t set_count = 0;
     for (const PipelineLayoutSetSchema& set : schema.sets) {
         set_count = std::max(set_count, set.set_index + 1u);
@@ -345,7 +345,7 @@ luna::RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineL
 
     create_info.PushConstantRanges.reserve(schema.push_constants.size());
     for (const PushConstantSchema& push_constant : schema.push_constants) {
-        create_info.PushConstantRanges.push_back(luna::RHI::PushConstantRange{
+        create_info.PushConstantRanges.push_back(RHI::PushConstantRange{
             .StageFlags = push_constant.stages,
             .Offset = push_constant.offset,
             .Size = push_constant.size,
@@ -412,8 +412,8 @@ luna::render_flow::ShaderBindingContract
     return contract;
 }
 
-luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
-    createDescriptorSetLayoutFromSchema(const luna::RHI::Ref<luna::RHI::Device>& device,
+RHI::Ref<RHI::DescriptorSetLayout>
+    createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
                                         const DescriptorSetSchema& schema)
 {
     if (!device) {
@@ -423,8 +423,8 @@ luna::RHI::Ref<luna::RHI::DescriptorSetLayout>
     return device->CreateDescriptorSetLayout(makeDescriptorSetLayoutCreateInfo(schema));
 }
 
-luna::RHI::Ref<luna::RHI::PipelineLayout>
-    createPipelineLayoutFromSchema(const luna::RHI::Ref<luna::RHI::Device>& device,
+RHI::Ref<RHI::PipelineLayout>
+    createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
                                    const PipelineLayoutSchema& schema,
                                    const DescriptorSetLayoutRefs& layouts)
 {
