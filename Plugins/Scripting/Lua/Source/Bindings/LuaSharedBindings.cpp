@@ -66,6 +66,7 @@ void bindLuaInputConstants(sol::state& lua_state)
         {"Down", static_cast<int>(LunaScriptKeyCode_Down)},
         {"Left", static_cast<int>(LunaScriptKeyCode_Left)},
         {"Right", static_cast<int>(LunaScriptKeyCode_Right)},
+        {"Backspace", static_cast<int>(LunaScriptKeyCode_Backspace)},
         {"A", static_cast<int>(LunaScriptKeyCode_A)},
         {"B", static_cast<int>(LunaScriptKeyCode_B)},
         {"C", static_cast<int>(LunaScriptKeyCode_C)},

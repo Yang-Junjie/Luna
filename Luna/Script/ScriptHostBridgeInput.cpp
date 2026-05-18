@@ -21,6 +21,7 @@ static_assert(static_cast<int>(LunaScriptKeyCode_Up) == static_cast<int>(luna::K
 static_assert(static_cast<int>(LunaScriptKeyCode_Down) == static_cast<int>(luna::KeyCode::Down));
 static_assert(static_cast<int>(LunaScriptKeyCode_Left) == static_cast<int>(luna::KeyCode::Left));
 static_assert(static_cast<int>(LunaScriptKeyCode_Right) == static_cast<int>(luna::KeyCode::Right));
+static_assert(static_cast<int>(LunaScriptKeyCode_Backspace) == static_cast<int>(luna::KeyCode::Backspace));
 static_assert(static_cast<int>(LunaScriptKeyCode_A) == static_cast<int>(luna::KeyCode::A));
 static_assert(static_cast<int>(LunaScriptKeyCode_B) == static_cast<int>(luna::KeyCode::B));
 static_assert(static_cast<int>(LunaScriptKeyCode_C) == static_cast<int>(luna::KeyCode::C));

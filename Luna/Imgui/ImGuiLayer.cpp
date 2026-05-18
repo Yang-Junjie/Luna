@@ -98,6 +98,8 @@ ImGuiKey toImGuiKey(KeyCode key)
             return ImGuiKey_Enter;
         case KeyCode::Delete:
             return ImGuiKey_Delete;
+        case KeyCode::Backspace:
+            return ImGuiKey_Backspace;
         case KeyCode::Escape:
             return ImGuiKey_Escape;
         case KeyCode::Up:

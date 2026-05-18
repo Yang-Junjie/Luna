@@ -50,6 +50,7 @@ typedef enum LunaScriptKeyCode {
     LunaScriptKeyCode_Down = 12,
     LunaScriptKeyCode_Left = 13,
     LunaScriptKeyCode_Right = 14,
+    LunaScriptKeyCode_Backspace = 15,
     LunaScriptKeyCode_A = 65,
     LunaScriptKeyCode_B = 66,
     LunaScriptKeyCode_C = 67,

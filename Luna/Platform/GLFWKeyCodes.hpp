@@ -67,6 +67,8 @@ inline KeyCode glfwKeyCodeToLunaKeyCode(int key_code)
             return KeyCode::Enter;
         case GLFW_KEY_DELETE:
             return KeyCode::Delete;
+        case GLFW_KEY_BACKSPACE:
+            return KeyCode::Backspace;
         case GLFW_KEY_ESCAPE:
             return KeyCode::Escape;
         case GLFW_KEY_UP:
@@ -221,6 +223,8 @@ inline int lunaKeyCodeToGlfwKeyCode(KeyCode key_code)
             return GLFW_KEY_ENTER;
         case KeyCode::Delete:
             return GLFW_KEY_DELETE;
+        case KeyCode::Backspace:
+            return GLFW_KEY_BACKSPACE;
         case KeyCode::Escape:
             return GLFW_KEY_ESCAPE;
         case KeyCode::Up:

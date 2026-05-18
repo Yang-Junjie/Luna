@@ -20,6 +20,7 @@ enum class KeyCode : int {
     Down = 12,
     Left = 13,
     Right = 14,
+    Backspace = 15,
 
     A = 65,
     B = 66,

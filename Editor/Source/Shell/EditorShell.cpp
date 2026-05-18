@@ -398,6 +398,8 @@ ImGuiKey toShortcutImGuiKey(luna::KeyCode key)
             return ImGuiKey_Enter;
         case luna::KeyCode::Delete:
             return ImGuiKey_Delete;
+        case luna::KeyCode::Backspace:
+            return ImGuiKey_Backspace;
         case luna::KeyCode::Escape:
             return ImGuiKey_Escape;
         case luna::KeyCode::Up:
@@ -436,6 +438,8 @@ std::string shortcutKeyText(luna::KeyCode key)
             return "Enter";
         case luna::KeyCode::Delete:
             return "Delete";
+        case luna::KeyCode::Backspace:
+            return "Backspace";
         case luna::KeyCode::Escape:
             return "Escape";
         case luna::KeyCode::Up:
