@@ -24,6 +24,8 @@ struct ShadowCascadeLightBounds {
 [[nodiscard]] bool expandShadowCascadeDepthForCaster(ShadowCascadeLightBounds& bounds,
                                                      const MeshBounds& caster_world_bounds);
 
+[[nodiscard]] float shadowCascadeWorldTexelSize(const ShadowCascadeLightBounds& bounds, uint32_t shadow_map_size);
+
 void padShadowCascadeDepth(ShadowCascadeLightBounds& bounds, float depth_padding);
 
 [[nodiscard]] glm::mat4 buildShadowCascadeViewProjection(const ShadowCascadeLightBounds& bounds,

@@ -40,6 +40,7 @@ struct SceneParams
     float4x4 shadowViewProjections[kShadowCascadeCount];
     float4 shadowParams;
     float4 shadowCascadeSplits;
+    float4 shadowCascadeTexelSizes;
     float4 shadowAtlasParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];
@@ -343,9 +344,45 @@ float shadowCascadeBiasScale(uint cascadeIndex)
     return sqrt(max(cascadeSpan / firstCascadeSpan, 1.0));
 }
 
+float shadowCascadeTexelSize(uint cascadeIndex)
+{
+    if (cascadeIndex == 0u)
+    {
+        return max(gSceneParams.shadowCascadeTexelSizes.x, 0.0);
+    }
+    if (cascadeIndex == 1u)
+    {
+        return max(gSceneParams.shadowCascadeTexelSizes.y, 0.0);
+    }
+    if (cascadeIndex == 2u)
+    {
+        return max(gSceneParams.shadowCascadeTexelSizes.z, 0.0);
+    }
+    return max(gSceneParams.shadowCascadeTexelSizes.w, 0.0);
+}
+
+float shadowNormalBiasWorld(uint cascadeIndex, float nDotL)
+{
+    static const float kMinNormalBiasTexels = 0.75;
+    static const float kSlopeNormalBiasTexels = 1.25;
+    static const float kMaxNormalBiasTexels = 6.0;
+    const float sinTheta = sqrt(saturate(1.0 - nDotL * nDotL));
+    const float slopeFactor = sinTheta / max(nDotL, 0.20);
+    const float normalBiasTexels =
+        min(kMinNormalBiasTexels + slopeFactor * kSlopeNormalBiasTexels, kMaxNormalBiasTexels);
+    return shadowCascadeTexelSize(cascadeIndex) * normalBiasTexels;
+}
+
 float sampleDirectionalShadowCascade(uint cascadeIndex, float3 worldPosition, float3 normalWS, float3 lightDirection)
 {
-    const float4 shadowClip = mul(gSceneParams.shadowViewProjections[cascadeIndex], float4(worldPosition, 1.0));
+    const float3 N = safeNormalize(normalWS, float3(0.0, 0.0, 1.0));
+    const float3 L = safeNormalize(lightDirection, float3(0.0, 1.0, 0.0));
+    const float dotNL = dot(N, L);
+    const float nDotL = saturate(dotNL);
+    const float normalOffset = dotNL > 0.0 ? shadowNormalBiasWorld(cascadeIndex, nDotL) : 0.0;
+    const float3 shadowWorldPosition = worldPosition + N * normalOffset;
+    const float4 shadowClip =
+        mul(gSceneParams.shadowViewProjections[cascadeIndex], float4(shadowWorldPosition, 1.0));
     if (abs(shadowClip.w) <= 1e-6)
     {
         return -1.0;
@@ -359,8 +396,7 @@ float sampleDirectionalShadowCascade(uint cascadeIndex, float3 worldPosition, fl
         return -1.0;
     }
 
-    const float normalLightFactor = 1.0 - saturate(dot(safeNormalize(normalWS, float3(0.0, 0.0, 1.0)),
-                                                       safeNormalize(lightDirection, float3(0.0, 1.0, 0.0))));
+    const float normalLightFactor = 1.0 - nDotL;
     const float cascadeBiasScale = shadowCascadeBiasScale(cascadeIndex);
     const float bias =
         max(gSceneParams.shadowParams.y * normalLightFactor, gSceneParams.shadowParams.y * 0.25) * cascadeBiasScale;

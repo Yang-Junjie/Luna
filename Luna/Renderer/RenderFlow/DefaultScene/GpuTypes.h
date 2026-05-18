@@ -47,6 +47,7 @@ struct SceneGpuParams {
     glm::vec4 shadow_params{
         0.0f, 0.0015f, static_cast<float>(kShadowCascadeCount), 1.0f / static_cast<float>(kShadowCascadeTileSize)};
     glm::vec4 shadow_cascade_splits{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 shadow_cascade_texel_sizes{0.0f, 0.0f, 0.0f, 0.0f};
     glm::vec4 shadow_atlas_params{static_cast<float>(kShadowCascadeAtlasColumns),
                                   static_cast<float>(kShadowCascadeAtlasRows),
                                   1.0f / static_cast<float>(kShadowCascadeAtlasColumns),
@@ -76,6 +77,7 @@ struct ShadowRenderParams {
     glm::vec4 params{
         0.0f, 0.0015f, static_cast<float>(kShadowCascadeCount), 1.0f / static_cast<float>(kShadowCascadeTileSize)};
     glm::vec4 cascade_splits{0.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec4 cascade_texel_sizes{0.0f, 0.0f, 0.0f, 0.0f};
     glm::vec4 atlas_params{static_cast<float>(kShadowCascadeAtlasColumns),
                            static_cast<float>(kShadowCascadeAtlasRows),
                            1.0f / static_cast<float>(kShadowCascadeAtlasColumns),

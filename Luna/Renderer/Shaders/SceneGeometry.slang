@@ -86,6 +86,7 @@ struct SceneParams
     float4x4 shadowViewProjections[kShadowCascadeCount];
     float4 shadowParams;
     float4 shadowCascadeSplits;
+    float4 shadowCascadeTexelSizes;
     float4 shadowAtlasParams;
     float4 lightCounts;
     float4 pointLightPositionIntensity[kMaxPointLights];

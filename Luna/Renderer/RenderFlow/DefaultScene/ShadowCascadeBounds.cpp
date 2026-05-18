@@ -116,6 +116,13 @@ bool expandShadowCascadeDepthForCaster(ShadowCascadeLightBounds& bounds, const M
     return true;
 }
 
+float shadowCascadeWorldTexelSize(const ShadowCascadeLightBounds& bounds, uint32_t shadow_map_size)
+{
+    const float width = std::max(bounds.max_bounds.x - bounds.min_bounds.x, kLightSpaceBoundsEpsilon);
+    const float height = std::max(bounds.max_bounds.y - bounds.min_bounds.y, kLightSpaceBoundsEpsilon);
+    return std::max(width, height) / static_cast<float>(std::max(shadow_map_size, 1u));
+}
+
 void padShadowCascadeDepth(ShadowCascadeLightBounds& bounds, float depth_padding)
 {
     const float padding = std::max(depth_padding, kLightSpaceBoundsEpsilon);

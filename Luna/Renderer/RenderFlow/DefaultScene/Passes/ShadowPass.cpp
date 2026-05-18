@@ -279,19 +279,29 @@ void collectShadowCasterDrawCommandsForCascade(const std::vector<DrawCommand>& s
     }
 }
 
-glm::mat4 buildCascadeViewProjection(const std::array<glm::vec3, 8>& corners,
-                                     const glm::vec3& light_direction,
-                                     const RHI::RHIConventions& conventions,
-                                     uint32_t shadow_map_size,
-                                     const std::vector<DrawCommand>& shadow_draw_commands)
+struct CascadeShadowProjection {
+    glm::mat4 view_projection{1.0f};
+    float world_texel_size{0.0f};
+};
+
+CascadeShadowProjection buildCascadeShadowProjection(const std::array<glm::vec3, 8>& corners,
+                                                     const glm::vec3& light_direction,
+                                                     const RHI::RHIConventions& conventions,
+                                                     uint32_t shadow_map_size,
+                                                     const std::vector<DrawCommand>& shadow_draw_commands)
 {
     render_flow::default_scene_detail::ShadowCascadeLightBounds bounds =
         render_flow::default_scene_detail::buildShadowCascadeReceiverBounds(corners, light_direction, shadow_map_size);
+    const float world_texel_size =
+        render_flow::default_scene_detail::shadowCascadeWorldTexelSize(bounds, shadow_map_size);
     for (const DrawCommand& draw_command : shadow_draw_commands) {
         (void)render_flow::default_scene_detail::expandShadowCascadeDepthForCaster(bounds, draw_command.world_bounds);
     }
     render_flow::default_scene_detail::padShadowCascadeDepth(bounds, kCascadeLightDepthPadding);
-    return render_flow::default_scene_detail::buildShadowCascadeViewProjection(bounds, conventions);
+    return CascadeShadowProjection{
+        .view_projection = render_flow::default_scene_detail::buildShadowCascadeViewProjection(bounds, conventions),
+        .world_texel_size = world_texel_size,
+    };
 }
 
 render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowParams(const RenderWorld* world,
@@ -336,8 +346,10 @@ render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowPara
                                    : std::min(perspective.far_clip, kCascadeShadowDistance);
         if (shadow_mode == RenderShadowMode::PcfShadowMap) {
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, near_clip, far_clip);
-            params.view_projections[0] = buildCascadeViewProjection(
+            const CascadeShadowProjection shadow_projection = buildCascadeShadowProjection(
                 corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
+            params.view_projections[0] = shadow_projection.view_projection;
+            params.cascade_texel_sizes[0] = shadow_projection.world_texel_size;
             params.cascade_splits[0] = far_clip;
             params.params.y = kShadowDepthBias * calculatePcfBiasScale(near_clip, far_clip);
             params.params.x = 1.0f;
@@ -355,17 +367,20 @@ render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowPara
             const float shadow_far =
                 cascade_index + 1u >= shadow_count ? cascade_far : std::min(far_clip, cascade_far + overlap);
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, shadow_near, shadow_far);
-            params.view_projections[cascade_index] = buildCascadeViewProjection(
+            const CascadeShadowProjection shadow_projection = buildCascadeShadowProjection(
                 corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
+            params.view_projections[cascade_index] = shadow_projection.view_projection;
+            params.cascade_texel_sizes[cascade_index] = shadow_projection.world_texel_size;
             params.cascade_splits[cascade_index] = cascade_far;
             cascade_near = cascade_far;
         }
     } else {
         const auto corners = orthographicFrustumCorners(camera, aspect_ratio);
-        const glm::mat4 view_projection = buildCascadeViewProjection(
+        const CascadeShadowProjection shadow_projection = buildCascadeShadowProjection(
             corners, light_direction, context.capabilities.conventions, shadow_map_size, shadow_draw_commands);
         for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
-            params.view_projections[cascade_index] = view_projection;
+            params.view_projections[cascade_index] = shadow_projection.view_projection;
+            params.cascade_texel_sizes[cascade_index] = shadow_projection.world_texel_size;
             params.cascade_splits[cascade_index] = shadow_mode == RenderShadowMode::PcfShadowMap
                                                        ? std::max(camera.getOrthographicSettings().far_clip, 0.001f)
                                                        : static_cast<float>(cascade_index + 1u);

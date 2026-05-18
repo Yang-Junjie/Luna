@@ -1028,6 +1028,7 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
     params.shadow_view_projections = shadow_params.view_projections;
     params.shadow_params = shadow_params.params;
     params.shadow_cascade_splits = shadow_params.cascade_splits;
+    params.shadow_cascade_texel_sizes = shadow_params.cascade_texel_sizes;
     params.shadow_atlas_params = shadow_params.atlas_params;
     params.irradiance_sh = irradiance_sh;
 
