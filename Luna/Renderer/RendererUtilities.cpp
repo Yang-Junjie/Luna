@@ -57,6 +57,27 @@ const char* presentModeToString(luna::RHI::PresentMode mode)
     }
 }
 
+const char* swapchainResultToString(luna::RHI::Result result)
+{
+    switch (result) {
+        case luna::RHI::Result::Success:
+            return "Success";
+        case luna::RHI::Result::Timeout:
+            return "Timeout";
+        case luna::RHI::Result::NotReady:
+            return "NotReady";
+        case luna::RHI::Result::Suboptimal:
+            return "Suboptimal";
+        case luna::RHI::Result::OutOfDate:
+            return "OutOfDate";
+        case luna::RHI::Result::DeviceLost:
+            return "DeviceLost";
+        case luna::RHI::Result::Error:
+        default:
+            return "Error";
+    }
+}
+
 const char* adapterTypeToString(luna::RHI::AdapterType type)
 {
     switch (type) {

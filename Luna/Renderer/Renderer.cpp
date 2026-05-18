@@ -13,8 +13,6 @@
 #include <Device.h>
 #include <QueryPool.h>
 #include <Queue.h>
-#include <Swapchain.h>
-#include <Synchronization.h>
 
 #include <cstring>
 
@@ -111,27 +109,6 @@ const char* renderDebugViewModeToString(RenderDebugViewMode mode)
             return "BloomComposite";
         default:
             return "Unknown";
-    }
-}
-
-const char* swapchainResultToString(luna::RHI::Result result)
-{
-    switch (result) {
-        case luna::RHI::Result::Success:
-            return "Success";
-        case luna::RHI::Result::Timeout:
-            return "Timeout";
-        case luna::RHI::Result::NotReady:
-            return "NotReady";
-        case luna::RHI::Result::Suboptimal:
-            return "Suboptimal";
-        case luna::RHI::Result::OutOfDate:
-            return "OutOfDate";
-        case luna::RHI::Result::DeviceLost:
-            return "DeviceLost";
-        case luna::RHI::Result::Error:
-        default:
-            return "Error";
     }
 }
 
@@ -271,30 +248,30 @@ bool Renderer::init(Window& window, InitializationOptions options)
         instance_info.enabledFeatures.push_back(luna::RHI::InstanceFeature::ValidationLayer);
 #endif
 
-        device_context.instance = luna::RHI::Instance::Create(instance_info);
-        device_context.capabilities = luna::RHI::makeCapabilitiesForBackend(device_context.instance->GetType());
+        device_context.instance() = luna::RHI::Instance::Create(instance_info);
+        device_context.capabilities() = luna::RHI::makeCapabilitiesForBackend(device_context.instance()->GetType());
         LUNA_RENDERER_DEBUG("Created RHI instance for backend '{}'",
-                            luna::RHI::BackendTypeToString(device_context.instance->GetType()));
+                            luna::RHI::BackendTypeToString(device_context.instance()->GetType()));
         LUNA_RENDERER_DEBUG("RHI capabilities: default_flow={} imgui={} scene_pick_readback={} gpu_timestamp={} "
                             "gpu_timestamp_disjoint={} "
                             "projection_y_flip={} imgui_uv_y_flip={} pick_y_matches_display={}",
-                            device_context.capabilities.supports_default_render_flow,
-                            device_context.capabilities.supports_imgui,
-                            device_context.capabilities.supports_scene_pick_readback,
-                            device_context.capabilities.supports_gpu_timestamp,
-                            device_context.capabilities.gpu_timestamp_uses_disjoint_query,
-                            device_context.capabilities.conventions.requires_projection_y_flip,
-                            device_context.capabilities.conventions.imgui_render_target_requires_uv_y_flip,
-                            device_context.capabilities.conventions.scene_pick_y_matches_display_y);
-        device_context.shader_compiler = device_context.instance->CreateShaderCompiler();
-        device_context.surface = device_context.instance->CreateSurface(window_handle);
-        if (!device_context.surface) {
+                            device_context.capabilities().supports_default_render_flow,
+                            device_context.capabilities().supports_imgui,
+                            device_context.capabilities().supports_scene_pick_readback,
+                            device_context.capabilities().supports_gpu_timestamp,
+                            device_context.capabilities().gpu_timestamp_uses_disjoint_query,
+                            device_context.capabilities().conventions.requires_projection_y_flip,
+                            device_context.capabilities().conventions.imgui_render_target_requires_uv_y_flip,
+                            device_context.capabilities().conventions.scene_pick_y_matches_display_y);
+        device_context.shaderCompiler() = device_context.instance()->CreateShaderCompiler();
+        device_context.surface() = device_context.instance()->CreateSurface(window_handle);
+        if (!device_context.surface()) {
             throw std::runtime_error(
                 "Failed to create surface for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
+                std::string(luna::RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
 
-        const auto adapters = device_context.instance->EnumerateAdapters();
+        const auto adapters = device_context.instance()->EnumerateAdapters();
         LUNA_RENDERER_INFO("Enumerated {} renderer adapter(s)", adapters.size());
         for (size_t adapter_index = 0; adapter_index < adapters.size(); ++adapter_index) {
             if (!adapters[adapter_index]) {
@@ -311,13 +288,13 @@ bool Renderer::init(Window& window, InitializationOptions options)
                                 properties.deviceID,
                                 properties.dedicatedVideoMemory / (1'024ull * 1'024ull));
         }
-        device_context.adapter = renderer_detail::selectAdapter(adapters);
-        if (!device_context.adapter) {
+        device_context.adapter() = renderer_detail::selectAdapter(adapters);
+        if (!device_context.adapter()) {
             throw std::runtime_error(
                 "No compatible adapter available for backend '" +
-                std::string(luna::RHI::BackendTypeToString(device_context.instance->GetType())) + "'");
+                std::string(luna::RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
-        const auto selected_adapter_properties = device_context.adapter->GetProperties();
+        const auto selected_adapter_properties = device_context.adapter()->GetProperties();
         LUNA_RENDERER_INFO("Selected renderer adapter '{}' ({}, {} MiB dedicated VRAM)",
                            selected_adapter_properties.name,
                            renderer_detail::adapterTypeToString(selected_adapter_properties.type),
@@ -325,11 +302,11 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
         luna::RHI::DeviceCreateInfo device_info;
         device_info.QueueRequests = {{luna::RHI::QueueType::Graphics, 1, 1.0f}};
-        device_info.CompatibleSurface = device_context.surface;
+        device_info.CompatibleSurface = device_context.surface();
         const bool sampler_anisotropy_supported =
-            device_context.adapter->IsFeatureSupported(luna::RHI::DeviceFeature::SamplerAnisotropy);
+            device_context.adapter()->IsFeatureSupported(luna::RHI::DeviceFeature::SamplerAnisotropy);
         const bool independent_blending_supported =
-            device_context.adapter->IsFeatureSupported(luna::RHI::DeviceFeature::IndependentBlending);
+            device_context.adapter()->IsFeatureSupported(luna::RHI::DeviceFeature::IndependentBlending);
         if (sampler_anisotropy_supported) {
             device_info.EnabledFeatures.push_back(luna::RHI::DeviceFeature::SamplerAnisotropy);
         }
@@ -340,14 +317,14 @@ bool Renderer::init(Window& window, InitializationOptions options)
                             sampler_anisotropy_supported,
                             independent_blending_supported);
 
-        device_context.device = device_context.adapter->CreateDevice(device_info);
-        device_context.graphics_queue = device_context.device->GetQueue(luna::RHI::QueueType::Graphics, 0);
+        device_context.device() = device_context.adapter()->CreateDevice(device_info);
+        device_context.graphicsQueue() = device_context.device()->GetQueue(luna::RHI::QueueType::Graphics, 0);
 
         const auto extent = getFramebufferExtent();
         createSwapchain(extent.width, extent.height);
         LUNA_RENDERER_INFO("Initialized renderer backend '{}' with {} frame(s) in flight",
-                           luna::RHI::BackendTypeToString(device_context.instance->GetType()),
-                           m_frame_resources.frames_in_flight);
+                           luna::RHI::BackendTypeToString(device_context.instance()->GetType()),
+                           m_swapchain_manager.framesInFlight());
         default_viewport.render_flow = std::make_unique<DefaultRenderFlow>();
     } catch (const std::exception& error) {
         LUNA_RENDERER_ERROR("Failed to initialize Renderer: {}", error.what());
@@ -355,18 +332,16 @@ bool Renderer::init(Window& window, InitializationOptions options)
         return false;
     }
 
-    runtime.initialized = device_context.instance && device_context.adapter && device_context.device &&
-                          device_context.surface && device_context.swapchain && device_context.graphics_queue &&
-                          device_context.synchronization;
-    runtime.resize_requested = false;
+    runtime.initialized = device_context.isInitialized() && m_swapchain_manager.isReady();
     runtime.frame_started = false;
     return runtime.initialized;
 }
 
 void Renderer::shutdown()
 {
-    const bool had_renderer_state = m_runtime.initialized || m_device_context.device || m_device_context.swapchain ||
-                                    m_device_context.instance || !m_frame_resources.command_buffers.empty() ||
+    const bool had_renderer_state = m_runtime.initialized || m_device_context.hasResources() ||
+                                    m_swapchain_manager.hasResources() ||
+                                    m_frame_resources.framesInFlight() > 0 ||
                                     std::any_of(m_scene_viewports.begin(),
                                                 m_scene_viewports.end(),
                                                 [](const SceneViewportSlot& slot) {
@@ -393,21 +368,13 @@ void Renderer::shutdown()
         slot.state->view_history.reset();
         slot.state->output = {};
     }
-    m_frame_resources.current_command_buffer.reset();
-    m_frame_resources.render_graphs.clear();
-    m_frame_resources.transient_texture_caches.clear();
-    m_device_context.synchronization.reset();
-    m_device_context.swapchain.reset();
-    m_device_context.graphics_queue.reset();
-    m_device_context.shader_compiler.reset();
-    m_device_context.device.reset();
-    m_device_context.surface.reset();
-    m_device_context.adapter.reset();
-    m_device_context.instance.reset();
-    m_device_context.surface_format = luna::RHI::Format::UNDEFINED;
-    m_device_context.capabilities = {};
+    m_swapchain_manager.reset();
+    m_swapchain_image_history.clear();
+    m_device_context.reset();
     m_window_context = {};
-    m_frame_resources = {};
+    m_frame_resources = FrameResourceRing{};
+    m_frame_index = 0;
+    m_image_index = 0;
     m_runtime = {};
     m_scene_viewports.clear();
     m_default_scene_viewport_id = kInvalidSceneViewportId;
@@ -433,67 +400,50 @@ void Renderer::startFrame()
         return;
     }
 
-    auto& device_context = m_device_context;
     auto& frame_resources = m_frame_resources;
     auto& runtime = m_runtime;
 
     try {
-        device_context.synchronization->WaitForFrame(frame_resources.frame_index);
-        collectCompletedGpuTiming(frame_resources.frame_index);
+        m_swapchain_manager.waitForFrame(m_frame_index);
+        collectCompletedGpuTiming(m_frame_index);
         if (SceneViewportState* viewport = findSceneViewport(m_default_scene_viewport_id)) {
-            collectCompletedScenePickResult(*viewport, frame_resources.frame_index);
+            collectCompletedScenePickResult(*viewport, m_frame_index);
         }
 
-        if (frame_resources.frame_index < frame_resources.command_buffers.size() &&
-            frame_resources.command_buffers[frame_resources.frame_index]) {
-            frame_resources.command_buffers[frame_resources.frame_index]->ReturnToPool();
-            frame_resources.command_buffers[frame_resources.frame_index].reset();
-        }
-        if (frame_resources.frame_index < frame_resources.render_graphs.size()) {
-            frame_resources.render_graphs[frame_resources.frame_index].reset();
-        }
-        if (frame_resources.frame_index < frame_resources.transient_texture_caches.size()) {
-            frame_resources.transient_texture_caches[frame_resources.frame_index].BeginFrame();
-        }
+        frame_resources.releaseFrame(m_frame_index);
 
-        int acquired_image_index = -1;
-        const auto acquire_result = device_context.swapchain->AcquireNextImage(
-            device_context.synchronization, static_cast<int>(frame_resources.frame_index), acquired_image_index);
-        if (acquire_result != luna::RHI::Result::Success || acquired_image_index < 0) {
+        const AcquireResult acquire_result = m_swapchain_manager.acquireNextImage(m_frame_index);
+        if (!acquire_result.acquired()) {
             LUNA_RENDERER_WARN("AcquireNextImage failed for frame {}: result={} image_index={}",
-                               frame_resources.frame_index,
-                               swapchainResultToString(acquire_result),
-                               acquired_image_index);
+                               m_frame_index,
+                               renderer_detail::swapchainResultToString(acquire_result.result),
+                               acquire_result.image_index);
             throw std::runtime_error("Failed to acquire a swapchain image");
         }
 
-        frame_resources.image_index = static_cast<uint32_t>(acquired_image_index);
-        device_context.synchronization->ResetFrameFence(frame_resources.frame_index);
+        m_image_index = static_cast<uint32_t>(acquire_result.image_index);
         LUNA_RENDERER_FRAME_DEBUG(
-            "Started frame {} using swapchain image {}", frame_resources.frame_index, frame_resources.image_index);
+            "Started frame {} using swapchain image {}", m_frame_index, m_image_index);
 
-        frame_resources.current_command_buffer = device_context.device->CreateCommandBufferEncoder();
-        frame_resources.current_command_buffer->Begin();
-        if (frame_resources.frame_index >= frame_resources.command_buffers.size()) {
-            frame_resources.command_buffers.resize(frame_resources.frames_in_flight);
+        frame_resources.beginFrame(m_frame_index, BeginFrameDesc{.device = m_device_context.device()});
+        if (!frame_resources.currentCommandBuffer()) {
+            throw std::runtime_error("Failed to create frame command buffer");
         }
-        frame_resources.command_buffers[frame_resources.frame_index] = frame_resources.current_command_buffer;
         runtime.frame_started = true;
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("StartFrame failed, swapchain will be recreated: {}", error.what());
         runtime.frame_started = false;
-        frame_resources.current_command_buffer.reset();
-        runtime.resize_requested = true;
+        frame_resources.releaseFrame(m_frame_index);
+        m_swapchain_manager.requestResize();
         invalidateRenderFeatureHistory(defaultSceneViewport(), render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     }
 }
 
 void Renderer::renderFrame()
 {
-    auto& device_context = m_device_context;
     auto& frame_resources = m_frame_resources;
     auto& runtime = m_runtime;
-    if (!runtime.frame_started || !frame_resources.current_command_buffer || !device_context.swapchain) {
+    if (!runtime.frame_started || !frame_resources.currentCommandBuffer() || !m_swapchain_manager.isReady()) {
         LUNA_RENDERER_FRAME_TRACE(
             "Skipping RenderFrame because the frame has not started or swapchain state is incomplete");
         return;
@@ -511,17 +461,15 @@ void Renderer::renderFrame()
     auto& scene_output = viewport.output;
     viewport.feature_history.has_pending_frame = false;
 
-    const auto extent = device_context.swapchain->GetExtent();
-    const auto back_buffer = device_context.swapchain->GetBackBuffer(frame_resources.image_index);
-    const bool was_presented = frame_resources.image_index < frame_resources.swapchain_images_presented.size()
-                                   ? frame_resources.swapchain_images_presented[frame_resources.image_index]
-                                   : false;
+    const auto extent = m_swapchain_manager.extent();
+    const auto back_buffer = m_swapchain_manager.backBuffer(m_image_index);
+    const bool was_presented = m_swapchain_image_history.wasPresented(m_image_index);
     const auto backend_type =
-        device_context.instance ? device_context.instance->GetType() : runtime.initialization_options.backend;
-    const auto& capabilities = device_context.capabilities;
+        m_device_context.instance() ? m_device_context.instance()->GetType() : runtime.initialization_options.backend;
+    const auto& capabilities = m_device_context.capabilities();
     LUNA_RENDERER_FRAME_DEBUG(
         "Building frame {} render graph: swapchain_extent={}x{} backend={} scene_output_mode={} imgui={}",
-        frame_resources.frame_index,
+        m_frame_index,
         extent.width,
         extent.height,
         luna::RHI::BackendTypeToString(backend_type),
@@ -529,24 +477,19 @@ void Renderer::renderFrame()
         runtime.imgui_enabled);
 
     luna::RenderGraphTransientTextureCache* transient_texture_cache =
-        (frame_resources.frame_index < frame_resources.transient_texture_caches.size())
-            ? &frame_resources.transient_texture_caches[frame_resources.frame_index]
-            : nullptr;
-    FrameResources::GpuTimingSlot* gpu_timing_slot =
-        (frame_resources.frame_index < frame_resources.gpu_timing_slots.size())
-            ? &frame_resources.gpu_timing_slots[frame_resources.frame_index]
-            : nullptr;
+        frame_resources.transientTextureCache(m_frame_index);
+    GpuTimingSlot* gpu_timing_slot = frame_resources.gpuTimingSlot(m_frame_index);
 
     luna::RenderGraphBuilder graph_builder(
         luna::RenderGraphBuilder::FrameContext{
-            .device = device_context.device,
-            .command_buffer = frame_resources.current_command_buffer,
+            .device = m_device_context.device(),
+            .command_buffer = frame_resources.currentCommandBufferRef(),
             .timestamp_query_pool = gpu_timing_slot != nullptr ? gpu_timing_slot->query_pool : nullptr,
             .timestamp_disjoint_query_pool =
                 gpu_timing_slot != nullptr ? gpu_timing_slot->disjoint_query_pool : nullptr,
             .timestamp_query_capacity =
                 gpu_timing_slot != nullptr && gpu_timing_slot->query_pool ? gpu_timing_slot->query_pool->GetCount() : 0,
-            .frame_index = frame_resources.frame_index,
+            .frame_index = m_frame_index,
             .profiling_enabled = runtime.render_graph_profiling_enabled,
             .framebuffer_width = extent.width,
             .framebuffer_height = extent.height,
@@ -558,19 +501,18 @@ void Renderer::renderFrame()
         back_buffer,
         was_presented ? luna::RHI::ResourceState::Present : luna::RHI::ResourceState::Undefined,
         luna::RHI::ResourceState::Present);
-    const bool pick_readback_slot_available =
-        frame_resources.frame_index < frame_resources.scene_pick_readback_slots.size() &&
-        frame_resources.scene_pick_readback_slots[frame_resources.frame_index].buffer;
+    const ScenePickReadbackSlot* pick_readback_slot = frame_resources.pickReadbackSlot(m_frame_index);
+    const bool pick_readback_slot_available = pick_readback_slot != nullptr && pick_readback_slot->buffer;
     const SceneViewportRenderResult scene_result = renderSceneViewport(
         viewport,
         graph_builder,
         SceneViewportRenderRequest{
             .back_buffer = back_buffer_handle,
             .framebuffer_extent = extent,
-            .surface_format = device_context.surface_format,
+            .surface_format = m_swapchain_manager.surfaceFormat(),
             .backend_type = backend_type,
             .clear_color = runtime.clear_color,
-            .frame_index = frame_resources.frame_index,
+            .frame_index = m_frame_index,
             .pick_readback_supported = capabilities.supports_scene_pick_readback,
             .pick_readback_slot_available = pick_readback_slot_available,
         });
@@ -600,10 +542,10 @@ void Renderer::renderFrame()
             SceneViewportRenderRequest{
                 .back_buffer = {},
                 .framebuffer_extent = extra_output.extent,
-                .surface_format = device_context.surface_format,
+                .surface_format = m_swapchain_manager.surfaceFormat(),
                 .backend_type = backend_type,
                 .clear_color = runtime.clear_color,
-                .frame_index = frame_resources.frame_index,
+                .frame_index = m_frame_index,
                 .pick_readback_supported = false,
                 .pick_readback_slot_available = false,
             });
@@ -645,7 +587,7 @@ void Renderer::renderFrame()
                                                       pass_context.getTexture(back_buffer_handle),
                                                       pass_context.framebufferWidth(),
                                                       pass_context.framebufferHeight(),
-                                                      m_frame_resources.frame_index);
+                                                      m_frame_index);
                 pass_context.endRendering();
             });
     } else if (!scene_result.render_to_swapchain) {
@@ -666,15 +608,12 @@ void Renderer::renderFrame()
 
     graph_builder.ExportTexture(back_buffer_handle, luna::RHI::ResourceState::Present);
 
-    if (frame_resources.frame_index >= frame_resources.render_graphs.size()) {
-        frame_resources.render_graphs.resize(frame_resources.frames_in_flight);
-    }
-    frame_resources.render_graphs[frame_resources.frame_index] = graph_builder.Build();
-    if (frame_resources.render_graphs[frame_resources.frame_index]) {
+    frame_resources.setRenderGraph(m_frame_index, graph_builder.Build());
+    if (luna::RenderGraph* render_graph = frame_resources.renderGraph(m_frame_index)) {
         LUNA_RENDERER_FRAME_DEBUG("Executing frame {} render graph with {} compiled pass(es)",
-                                  frame_resources.frame_index,
-                                  frame_resources.render_graphs[frame_resources.frame_index]->passes().size());
-        frame_resources.render_graphs[frame_resources.frame_index]->execute();
+                                  m_frame_index,
+                                  render_graph->passes().size());
+        render_graph->execute();
         for (const RenderedSceneViewport& rendered_viewport : rendered_viewports) {
             if (rendered_viewport.viewport == nullptr || !rendered_viewport.result.output_valid ||
                 !rendered_viewport.viewport->render_flow) {
@@ -686,9 +625,9 @@ void Renderer::renderFrame()
                 commitStagedRenderFeatureFrameContext(*rendered_viewport.viewport);
             }
         }
-        const RenderGraphProfileSnapshot& profile = frame_resources.render_graphs[frame_resources.frame_index]->profile();
+        const RenderGraphProfileSnapshot& profile = render_graph->profile();
         if (runtime.render_graph_profiling_enabled) {
-            if (!storePendingGpuTimingProfile(frame_resources.frame_index, profile)) {
+            if (!storePendingGpuTimingProfile(m_frame_index, profile)) {
                 m_last_render_graph_profile = profile;
             } else if (m_last_render_graph_profile.Passes.empty()) {
                 m_last_render_graph_profile = profile;
@@ -698,7 +637,7 @@ void Renderer::renderFrame()
         if (runtime.render_graph_profiling_enabled) {
             m_last_render_graph_profile = {};
         }
-        LUNA_RENDERER_WARN("Render graph build returned null for frame {}", frame_resources.frame_index);
+        LUNA_RENDERER_WARN("Render graph build returned null for frame {}", m_frame_index);
     }
 
     if (scene_result.render_to_offscreen && scene_result.output_valid && scene_output.queued_pick_request.has_value() &&
@@ -709,35 +648,40 @@ void Renderer::renderFrame()
     }
 
     if (scene_result.issue_pick_readback) {
-        auto& readback_slot = frame_resources.scene_pick_readback_slots[frame_resources.frame_index];
-        const auto pick_request = *scene_output.queued_pick_request;
-        LUNA_RENDERER_DEBUG("Queued scene pick readback at ({}, {}) on frame {}",
-                            pick_request.x,
-                            pick_request.y,
-                            frame_resources.frame_index);
-        const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{luna::RHI::BufferImageCopy{
-            .BufferOffset = 0,
-            .BufferRowLength = 0,
-            .BufferImageHeight = 0,
-            .ImageSubresource =
-                {
-                    .AspectMask = luna::RHI::ImageAspectFlags::Color,
-                    .MipLevel = 0,
-                    .BaseArrayLayer = 0,
-                    .LayerCount = 1,
-                },
-            .ImageOffsetX = static_cast<int32_t>(pick_request.x),
-            .ImageOffsetY = static_cast<int32_t>(pick_request.y),
-            .ImageOffsetZ = 0,
-            .ImageExtentWidth = 1,
-            .ImageExtentHeight = 1,
-            .ImageExtentDepth = 1,
-        }};
+        ScenePickReadbackSlot* readback_slot = frame_resources.pickReadbackSlot(m_frame_index);
+        if (readback_slot == nullptr) {
+            LUNA_RENDERER_WARN("Cannot queue scene pick readback because the frame slot is unavailable");
+            scene_output.queued_pick_request.reset();
+        } else {
+            const auto pick_request = *scene_output.queued_pick_request;
+            LUNA_RENDERER_DEBUG("Queued scene pick readback at ({}, {}) on frame {}",
+                                pick_request.x,
+                                pick_request.y,
+                                m_frame_index);
+            const std::array<luna::RHI::BufferImageCopy, 1> copy_regions{luna::RHI::BufferImageCopy{
+                .BufferOffset = 0,
+                .BufferRowLength = 0,
+                .BufferImageHeight = 0,
+                .ImageSubresource =
+                    {
+                        .AspectMask = luna::RHI::ImageAspectFlags::Color,
+                        .MipLevel = 0,
+                        .BaseArrayLayer = 0,
+                        .LayerCount = 1,
+                    },
+                .ImageOffsetX = static_cast<int32_t>(pick_request.x),
+                .ImageOffsetY = static_cast<int32_t>(pick_request.y),
+                .ImageOffsetZ = 0,
+                .ImageExtentWidth = 1,
+                .ImageExtentHeight = 1,
+                .ImageExtentDepth = 1,
+            }};
 
-        frame_resources.current_command_buffer->CopyImageToBuffer(
-            scene_output.pick, luna::RHI::ResourceState::CopySource, readback_slot.buffer, copy_regions);
-        readback_slot.pending = true;
-        scene_output.queued_pick_request.reset();
+            frame_resources.currentCommandBuffer()->CopyImageToBuffer(
+                scene_output.pick, luna::RHI::ResourceState::CopySource, readback_slot->buffer, copy_regions);
+            readback_slot->pending = true;
+            scene_output.queued_pick_request.reset();
+        }
     }
 
     for (const RenderedSceneViewport& rendered_viewport : rendered_viewports) {
@@ -760,60 +704,55 @@ void Renderer::renderFrame()
                                        : luna::RHI::ResourceState::Undefined;
     }
 
-    if (frame_resources.image_index < frame_resources.swapchain_images_presented.size()) {
-        frame_resources.swapchain_images_presented[frame_resources.image_index] = true;
-    }
+    m_swapchain_image_history.markPresented(m_image_index);
 }
 
 void Renderer::endFrame()
 {
-    auto& device_context = m_device_context;
     auto& frame_resources = m_frame_resources;
     auto& runtime = m_runtime;
 
-    if (!runtime.frame_started || !frame_resources.current_command_buffer) {
+    if (!runtime.frame_started || !frame_resources.currentCommandBuffer()) {
         LUNA_RENDERER_FRAME_TRACE("Skipping EndFrame because no frame is active");
         return;
     }
 
     try {
-        frame_resources.current_command_buffer->End();
-        device_context.graphics_queue->Submit(
-            frame_resources.current_command_buffer, device_context.synchronization, frame_resources.frame_index);
-        const auto present_result = device_context.swapchain->Present(
-            device_context.graphics_queue, device_context.synchronization, frame_resources.frame_index);
-        if (present_result == luna::RHI::Result::OutOfDate || present_result == luna::RHI::Result::Suboptimal) {
+        frame_resources.currentCommandBuffer()->End();
+        m_device_context.graphicsQueue()->Submit(frame_resources.currentCommandBufferRef(),
+                                                 m_swapchain_manager.synchronization(),
+                                                 m_frame_index);
+        const PresentResult present_result = m_swapchain_manager.present(m_frame_index);
+        if (present_result.requiresRecreate()) {
             LUNA_RENDERER_WARN("Present returned {}; scheduling swapchain recreation",
-                               swapchainResultToString(present_result));
-            runtime.resize_requested = true;
+                               renderer_detail::swapchainResultToString(present_result.result));
             invalidateRenderFeatureHistory(defaultSceneViewport(),
                                            render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
-        } else if (present_result != luna::RHI::Result::Success) {
-            LUNA_RENDERER_WARN("Present returned {}", swapchainResultToString(present_result));
+        } else if (!present_result.presented()) {
+            LUNA_RENDERER_WARN("Present returned {}", renderer_detail::swapchainResultToString(present_result.result));
         } else {
             LUNA_RENDERER_FRAME_DEBUG("Presented frame {} using swapchain image {}",
-                                      frame_resources.frame_index,
-                                      frame_resources.image_index);
+                                      m_frame_index,
+                                      m_image_index);
         }
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
-        runtime.resize_requested = true;
+        m_swapchain_manager.requestResize();
         invalidateRenderFeatureHistory(defaultSceneViewport(),
                                        render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     }
 
-    frame_resources.current_command_buffer.reset();
+    frame_resources.resetCurrentCommandBuffer();
     runtime.frame_started = false;
-    if (frame_resources.frames_in_flight > 0) {
-        frame_resources.frame_index = (frame_resources.frame_index + 1) % frame_resources.frames_in_flight;
+    if (frame_resources.framesInFlight() > 0) {
+        m_frame_index = (m_frame_index + 1) % frame_resources.framesInFlight();
     }
-    LUNA_RENDERER_FRAME_TRACE("Advanced to frame index {}", frame_resources.frame_index);
+    LUNA_RENDERER_FRAME_TRACE("Advanced to frame index {}", m_frame_index);
 }
 
 bool Renderer::isInitialized() const
 {
-    return m_runtime.initialized && m_device_context.device && m_device_context.swapchain &&
-           m_device_context.graphics_queue && m_device_context.synchronization;
+    return m_runtime.initialized && m_device_context.isReady() && m_swapchain_manager.isReady();
 }
 
 bool Renderer::isRenderingEnabled() const
@@ -829,14 +768,14 @@ bool Renderer::isImGuiEnabled() const
 
 void Renderer::requestResize()
 {
-    m_runtime.resize_requested = true;
+    m_swapchain_manager.requestResize();
     invalidateRenderFeatureHistory(defaultSceneViewport(), render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     LUNA_RENDERER_DEBUG("Renderer resize requested");
 }
 
 bool Renderer::isResizeRequested() const
 {
-    return m_runtime.resize_requested;
+    return m_swapchain_manager.isResizeRequested();
 }
 
 void Renderer::notifyCameraCut()
@@ -1118,42 +1057,42 @@ GLFWwindow* Renderer::getNativeWindow() const
 
 const luna::RHI::Ref<luna::RHI::Instance>& Renderer::getInstance() const
 {
-    return m_device_context.instance;
+    return m_device_context.instance();
 }
 
 const luna::RHI::Ref<luna::RHI::Adapter>& Renderer::getAdapter() const
 {
-    return m_device_context.adapter;
+    return m_device_context.adapter();
 }
 
 const luna::RHI::RHICapabilities& Renderer::getCapabilities() const noexcept
 {
-    return m_device_context.capabilities;
+    return m_device_context.capabilities();
 }
 
 const luna::RHI::Ref<luna::RHI::Device>& Renderer::getDevice() const
 {
-    return m_device_context.device;
+    return m_device_context.device();
 }
 
 const luna::RHI::Ref<luna::RHI::Queue>& Renderer::getGraphicsQueue() const
 {
-    return m_device_context.graphics_queue;
+    return m_device_context.graphicsQueue();
 }
 
 const luna::RHI::Ref<luna::RHI::Swapchain>& Renderer::getSwapchain() const
 {
-    return m_device_context.swapchain;
+    return m_swapchain_manager.swapchain();
 }
 
 const luna::RHI::Ref<luna::RHI::Synchronization>& Renderer::getSynchronization() const
 {
-    return m_device_context.synchronization;
+    return m_swapchain_manager.synchronization();
 }
 
 uint32_t Renderer::getFramesInFlight() const
 {
-    return m_frame_resources.frames_in_flight;
+    return m_swapchain_manager.framesInFlight();
 }
 
 RenderWorld& Renderer::getRenderWorld()
@@ -1184,10 +1123,15 @@ void Renderer::setRenderGraphProfilingEnabled(bool enabled)
         return;
     }
 
-    for (auto& slot : m_frame_resources.gpu_timing_slots) {
-        slot.pending = false;
-        slot.query_count = 0;
+    for (uint32_t frame_index = 0; frame_index < m_frame_resources.gpuTimingSlotCount(); ++frame_index) {
+        auto* slot = m_frame_resources.gpuTimingSlot(frame_index);
+        if (!slot) {
+            continue;
+        }
+        slot->pending = false;
+        slot->query_count = 0;
     }
+    m_frame_resources.clearGpuTimingSlots();
     LUNA_RENDERER_INFO("RenderGraph profiling disabled");
 }
 
@@ -1272,104 +1216,53 @@ const glm::vec4& Renderer::getClearColor() const
     return m_runtime.clear_color;
 }
 
+SwapchainCreateRequest Renderer::makeSwapchainCreateRequest(uint32_t width, uint32_t height)
+{
+    return SwapchainCreateRequest{
+        .device = m_device_context.device(),
+        .adapter = m_device_context.adapter(),
+        .surface = m_device_context.surface(),
+        .graphics_queue = m_device_context.graphicsQueue(),
+        .present_mode = m_runtime.initialization_options.present_mode,
+        .extent = {width, height},
+        .before_recreate =
+            [this]() {
+                releaseFrameCommandBuffers();
+            },
+    };
+}
+
 void Renderer::createSwapchain(uint32_t width, uint32_t height)
 {
-    auto& device_context = m_device_context;
-    auto& frame_resources = m_frame_resources;
-    auto& runtime = m_runtime;
-
-    if (!device_context.device || !device_context.surface || !device_context.adapter) {
-        LUNA_RENDERER_WARN("Cannot create swapchain because renderer device, surface, or adapter is missing");
+    if (!m_swapchain_manager.create(makeSwapchainCreateRequest(width, height))) {
         return;
     }
 
-    const auto capabilities = device_context.surface->GetCapabilities(device_context.adapter);
-    const auto formats = device_context.surface->GetSupportedFormats(device_context.adapter);
-    const auto supported_present_modes = device_context.surface->GetSupportedPresentModes(device_context.adapter);
-    const auto surface_format = renderer_detail::chooseSurfaceFormat(formats);
-    const auto requested_present_mode = runtime.initialization_options.present_mode;
-    const auto selected_present_mode =
-        renderer_detail::choosePresentMode(supported_present_modes, requested_present_mode);
+    configureSwapchainFrameResources();
+}
 
-    const luna::RHI::Extent2D clamped_extent{
-        std::clamp(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-        std::clamp(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
-    };
-    LUNA_RENDERER_INFO("Creating swapchain: requested={}x{} clamped={}x{} surface_format={} ({})",
-                       width,
-                       height,
-                       clamped_extent.width,
-                       clamped_extent.height,
-                       renderer_detail::formatToString(surface_format.format),
-                       static_cast<int>(surface_format.format));
+void Renderer::configureSwapchainFrameResources()
+{
+    auto& frame_resources = m_frame_resources;
+    auto& runtime = m_runtime;
 
-    uint32_t min_image_count = (std::max) (2u, capabilities.minImageCount);
-    if (capabilities.maxImageCount != 0) {
-        min_image_count = (std::min) (min_image_count, capabilities.maxImageCount);
-    }
-
-    if (selected_present_mode != requested_present_mode) {
-        LUNA_RENDERER_WARN("Requested present mode '{}' is unsupported; falling back to '{}'. Supported modes: {}",
-                           renderer_detail::presentModeToString(requested_present_mode),
-                           renderer_detail::presentModeToString(selected_present_mode),
-                           renderer_detail::describePresentModes(supported_present_modes));
-    } else {
-        LUNA_RENDERER_INFO("Using present mode '{}' (supported: {})",
-                           renderer_detail::presentModeToString(selected_present_mode),
-                           renderer_detail::describePresentModes(supported_present_modes));
-    }
-
-    device_context.swapchain =
-        device_context.device->CreateSwapchain(luna::RHI::SwapchainBuilder()
-                                                   .SetExtent(clamped_extent)
-                                                   .SetFormat(surface_format.format)
-                                                   .SetColorSpace(surface_format.colorSpace)
-                                                   .SetPresentMode(selected_present_mode)
-                                                   .SetMinImageCount(min_image_count)
-                                                   .SetPreTransform(capabilities.currentTransform)
-                                                   .SetUsage(luna::RHI::SwapchainUsageFlags::ColorAttachment |
-                                                             luna::RHI::SwapchainUsageFlags::TransferDst)
-                                                   .SetSurface(device_context.surface)
-                                                   .Build());
-    if (!device_context.swapchain) {
-        throw std::runtime_error("Failed to create swapchain");
-    }
-
-    device_context.surface_format = surface_format.format;
-    frame_resources.frames_in_flight =
-        (std::max) (1u,
-                    device_context.swapchain->GetImageCount() > 1 ? device_context.swapchain->GetImageCount() - 1 : 1u);
-    device_context.synchronization = device_context.device->CreateSynchronization(frame_resources.frames_in_flight);
-    if (!device_context.synchronization) {
-        throw std::runtime_error("Failed to create frame synchronization objects");
-    }
-    frame_resources.command_buffers.assign(frame_resources.frames_in_flight, {});
-    frame_resources.render_graphs.clear();
-    frame_resources.render_graphs.resize(frame_resources.frames_in_flight);
-    frame_resources.transient_texture_caches.clear();
-    frame_resources.transient_texture_caches.resize(frame_resources.frames_in_flight);
+    frame_resources.resize(m_swapchain_manager.framesInFlight());
+    m_swapchain_image_history.resize(m_swapchain_manager.imageCount());
     if (runtime.render_graph_profiling_enabled) {
         ensureGpuTimingResources();
     } else {
-        frame_resources.gpu_timing_slots.clear();
+        frame_resources.clearGpuTimingSlots();
     }
     ensureScenePickReadbackBuffers();
-    frame_resources.swapchain_images_presented.assign(device_context.swapchain->GetImageCount(), false);
-    if (frame_resources.frames_in_flight > 0) {
-        frame_resources.frame_index %= frame_resources.frames_in_flight;
+    if (frame_resources.framesInFlight() > 0) {
+        m_frame_index %= frame_resources.framesInFlight();
     } else {
-        frame_resources.frame_index = 0;
+        m_frame_index = 0;
     }
 
     if (runtime.imgui_enabled) {
-        luna::ImGuiRhiContext::NotifyFrameResourcesChanged(frame_resources.frames_in_flight);
+        luna::ImGuiRhiContext::NotifyFrameResourcesChanged(frame_resources.framesInFlight());
     }
-
-    LUNA_RENDERER_INFO("Created swapchain {}x{} with {} image(s), {} frame(s) in flight",
-                       clamped_extent.width,
-                       clamped_extent.height,
-                       device_context.swapchain->GetImageCount(),
-                       frame_resources.frames_in_flight);
 }
 
 luna::RHI::Extent2D Renderer::getFramebufferExtent() const
@@ -1386,33 +1279,18 @@ luna::RHI::Extent2D Renderer::getFramebufferExtent() const
 
 void Renderer::handlePendingResize()
 {
-    auto& device_context = m_device_context;
-    auto& frame_resources = m_frame_resources;
-    auto& runtime = m_runtime;
-
-    if (!runtime.resize_requested || !device_context.device || !device_context.graphics_queue) {
-        return;
-    }
-
-    const auto extent = getFramebufferExtent();
-    if (extent.width == 0 || extent.height == 0) {
-        LUNA_RENDERER_DEBUG("Resize requested while framebuffer is minimized; delaying swapchain recreation");
+    if (!m_swapchain_manager.isResizeRequested()) {
         return;
     }
 
     try {
-        LUNA_RENDERER_INFO("Recreating swapchain for framebuffer resize to {}x{}", extent.width, extent.height);
-        device_context.graphics_queue->WaitIdle();
-        releaseFrameCommandBuffers();
-        frame_resources.current_command_buffer.reset();
-        frame_resources.render_graphs.clear();
-        frame_resources.transient_texture_caches.clear();
-        device_context.swapchain.reset();
-        device_context.synchronization.reset();
-        createSwapchain(extent.width, extent.height);
-        runtime.resize_requested = false;
-        invalidateRenderFeatureHistory(defaultSceneViewport(), render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
-        LUNA_RENDERER_INFO("Swapchain recreation complete");
+        if (m_swapchain_manager.recreateIfRequested([this]() {
+                return getFramebufferExtent();
+            })) {
+            configureSwapchainFrameResources();
+            invalidateRenderFeatureHistory(defaultSceneViewport(),
+                                           render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
+        }
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("Swapchain recreation failed: {}", error.what());
     }
@@ -1423,7 +1301,7 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                                                                   const SceneViewportRenderRequest& request)
 {
     auto& output = viewport.output;
-    const auto& capabilities = m_device_context.capabilities;
+    const auto& capabilities = m_device_context.capabilities();
     const bool render_to_offscreen = output.mode == SceneOutputMode::OffscreenTexture && output.extent.width > 0 &&
                                      output.extent.height > 0 && output.color && output.depth && output.pick;
     const bool render_to_swapchain = output.mode == SceneOutputMode::Swapchain;
@@ -1501,8 +1379,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
     if (result.output_valid) {
         if (capabilities.supports_default_render_flow && result.depth.isValid() && viewport.render_flow) {
             SceneRenderContext scene_context{
-                .device = m_device_context.device,
-                .compiler = m_device_context.shader_compiler,
+                .device = m_device_context.device(),
+                .compiler = m_device_context.shaderCompiler(),
                 .backend_type = request.backend_type,
                 .capabilities = capabilities,
                 .color_target = result.color,
@@ -1606,7 +1484,7 @@ render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
     if (!viewport.feature_history.has_previous_frame) {
         invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::FirstFrame;
     } else {
-        if (viewport.feature_history.device != m_device_context.device.get()) {
+        if (viewport.feature_history.device != m_device_context.device().get()) {
             invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::DeviceChanged;
         }
         if (viewport.feature_history.backend_type != backend_type) {
@@ -1623,9 +1501,9 @@ render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
     }
 
     return render_flow::RenderFeatureFrameContext{
-        .device = m_device_context.device,
+        .device = m_device_context.device(),
         .backend_type = backend_type,
-        .capabilities = m_device_context.capabilities,
+        .capabilities = m_device_context.capabilities(),
         .frame_index = frame_index,
         .framebuffer_width = framebuffer_width,
         .framebuffer_height = framebuffer_height,
@@ -1640,7 +1518,7 @@ void Renderer::stageRenderFeatureFrameContext(SceneViewportState& viewport,
                                               uint32_t framebuffer_height) noexcept
 {
     viewport.feature_history.has_pending_frame = true;
-    viewport.feature_history.pending_device = m_device_context.device.get();
+    viewport.feature_history.pending_device = m_device_context.device().get();
     viewport.feature_history.pending_backend_type = backend_type;
     viewport.feature_history.pending_scene_output_mode = scene_output_mode;
     viewport.feature_history.pending_framebuffer_width = framebuffer_width;
@@ -1673,19 +1551,19 @@ bool Renderer::hasMatchingSceneOutputTargets(const SceneViewportState& viewport,
            output.depth->GetWidth() == width && output.depth->GetHeight() == height &&
            output.pick->GetWidth() == width && output.pick->GetHeight() == height &&
            output.debug_color->GetWidth() == width && output.debug_color->GetHeight() == height &&
-           output.color->GetFormat() == m_device_context.surface_format &&
+           output.color->GetFormat() == m_swapchain_manager.surfaceFormat() &&
            output.depth->GetFormat() == luna::RHI::Format::D32_FLOAT &&
            output.pick->GetFormat() == luna::RHI::Format::R32_UINT &&
-           output.debug_color->GetFormat() == m_device_context.surface_format;
+           output.debug_color->GetFormat() == m_swapchain_manager.surfaceFormat();
 }
 
 void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t width, uint32_t height)
 {
     auto& output = viewport.output;
 
-    if (!m_device_context.device || width == 0 || height == 0) {
+    if (!m_device_context.device() || width == 0 || height == 0) {
         LUNA_RENDERER_WARN("Cannot create scene output targets: device_available={} size={}x{}",
-                           static_cast<bool>(m_device_context.device),
+                           static_cast<bool>(m_device_context.device()),
                            width,
                            height);
         return;
@@ -1699,22 +1577,22 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
     LUNA_RENDERER_INFO("Creating scene output targets {}x{} using color format {} ({})",
                        width,
                        height,
-                       renderer_detail::formatToString(m_device_context.surface_format),
-                       static_cast<int>(m_device_context.surface_format));
+                       renderer_detail::formatToString(m_swapchain_manager.surfaceFormat()),
+                       static_cast<int>(m_swapchain_manager.surfaceFormat()));
     waitForGpuIdle();
     releaseSceneOutputTargets(viewport);
 
-    output.color = m_device_context.device->CreateTexture(
+    output.color = m_device_context.device()->CreateTexture(
         luna::RHI::TextureBuilder()
             .SetSize(width, height)
-            .SetFormat(m_device_context.surface_format)
+            .SetFormat(m_swapchain_manager.surfaceFormat())
             .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled)
             .SetInitialState(luna::RHI::ResourceState::Undefined)
             .SetName("SceneOutputColor")
             .Build());
 
     output.depth =
-        m_device_context.device->CreateTexture(luna::RHI::TextureBuilder()
+        m_device_context.device()->CreateTexture(luna::RHI::TextureBuilder()
                                                    .SetSize(width, height)
                                                    .SetFormat(luna::RHI::Format::D32_FLOAT)
                                                    .SetUsage(luna::RHI::TextureUsageFlags::DepthStencilAttachment |
@@ -1723,7 +1601,7 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
                                                    .SetName("SceneOutputDepth")
                                                    .Build());
 
-    output.pick = m_device_context.device->CreateTexture(
+    output.pick = m_device_context.device()->CreateTexture(
         luna::RHI::TextureBuilder()
             .SetSize(width, height)
             .SetFormat(luna::RHI::Format::R32_UINT)
@@ -1733,10 +1611,10 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
             .SetName("SceneOutputPick")
             .Build());
 
-    output.debug_color = m_device_context.device->CreateTexture(
+    output.debug_color = m_device_context.device()->CreateTexture(
         luna::RHI::TextureBuilder()
             .SetSize(width, height)
-            .SetFormat(m_device_context.surface_format)
+            .SetFormat(m_swapchain_manager.surfaceFormat())
             .SetUsage(luna::RHI::TextureUsageFlags::ColorAttachment | luna::RHI::TextureUsageFlags::Sampled)
             .SetInitialState(luna::RHI::ResourceState::Undefined)
             .SetName("SceneDebugOutput")
@@ -1784,123 +1662,110 @@ void Renderer::releaseSceneOutputTargets(SceneViewportState& viewport)
 
 void Renderer::releaseFrameCommandBuffers()
 {
-    size_t released_count = 0;
-    for (auto& command_buffer : m_frame_resources.command_buffers) {
-        if (command_buffer) {
-            command_buffer->ReturnToPool();
-            command_buffer.reset();
-            ++released_count;
-        }
-    }
-    if (released_count > 0 || !m_frame_resources.scene_pick_readback_slots.empty() ||
-        !m_frame_resources.gpu_timing_slots.empty() || !m_frame_resources.transient_texture_caches.empty()) {
+    const FrameResourceReleaseStats stats = m_frame_resources.releaseAll();
+    if (stats.command_buffer_count > 0 || stats.scene_pick_readback_slot_count > 0 ||
+        stats.gpu_timing_slot_count > 0 || stats.transient_texture_cache_count > 0) {
         LUNA_RENDERER_DEBUG(
             "Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback slot(s), {} GPU timing slot(s)",
-            released_count,
-            m_frame_resources.transient_texture_caches.size(),
-            m_frame_resources.scene_pick_readback_slots.size(),
-            m_frame_resources.gpu_timing_slots.size());
+            stats.command_buffer_count,
+            stats.transient_texture_cache_count,
+            stats.scene_pick_readback_slot_count,
+            stats.gpu_timing_slot_count);
     }
-    m_frame_resources.command_buffers.clear();
-    m_frame_resources.transient_texture_caches.clear();
-    m_frame_resources.scene_pick_readback_slots.clear();
-    m_frame_resources.gpu_timing_slots.clear();
 }
 
 void Renderer::ensureGpuTimingResources()
 {
     auto& frame_resources = m_frame_resources;
-    if (!m_device_context.device || !m_device_context.graphics_queue || frame_resources.frames_in_flight == 0) {
-        frame_resources.gpu_timing_slots.clear();
+    if (!m_device_context.device() || !m_device_context.graphicsQueue() || frame_resources.framesInFlight() == 0) {
+        frame_resources.clearGpuTimingSlots();
         return;
     }
-    if (!m_device_context.capabilities.supports_gpu_timestamp) {
-        frame_resources.gpu_timing_slots.clear();
+    if (!m_device_context.capabilities().supports_gpu_timestamp) {
+        frame_resources.clearGpuTimingSlots();
         LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on backend '{}'",
-                           luna::RHI::BackendTypeToString(m_device_context.capabilities.backend_type));
+                           luna::RHI::BackendTypeToString(m_device_context.capabilities().backend_type));
         return;
     }
 
-    const double timestamp_period_ns = m_device_context.graphics_queue->GetTimestampPeriodNs();
+    const double timestamp_period_ns = m_device_context.graphicsQueue()->GetTimestampPeriodNs();
     const bool use_disjoint_timestamps =
-        timestamp_period_ns <= 0.0 && m_device_context.capabilities.gpu_timestamp_uses_disjoint_query;
+        timestamp_period_ns <= 0.0 && m_device_context.capabilities().gpu_timestamp_uses_disjoint_query;
     if (timestamp_period_ns <= 0.0 && !use_disjoint_timestamps) {
-        frame_resources.gpu_timing_slots.clear();
+        frame_resources.clearGpuTimingSlots();
         LUNA_RENDERER_INFO("RenderGraph GPU timing is unavailable on this RHI backend");
         return;
     }
 
-    frame_resources.gpu_timing_slots.clear();
-    frame_resources.gpu_timing_slots.resize(frame_resources.frames_in_flight);
+    frame_resources.resizeGpuTimingSlots(frame_resources.framesInFlight());
     LUNA_RENDERER_INFO("Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
-                       frame_resources.frames_in_flight,
+                       frame_resources.framesInFlight(),
                        kRenderGraphGpuTimestampQueryCount,
                        use_disjoint_timestamps ? "disjoint" : "fixed-period",
                        timestamp_period_ns);
-    for (uint32_t frame_index = 0; frame_index < frame_resources.frames_in_flight; ++frame_index) {
-        auto& slot = frame_resources.gpu_timing_slots[frame_index];
-        slot.query_pool = m_device_context.device->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
+    for (uint32_t frame_index = 0; frame_index < frame_resources.framesInFlight(); ++frame_index) {
+        auto* slot = frame_resources.gpuTimingSlot(frame_index);
+        if (!slot) {
+            continue;
+        }
+        slot->query_pool = m_device_context.device()->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
             .Type = luna::RHI::QueryType::Timestamp,
             .Count = kRenderGraphGpuTimestampQueryCount,
         });
         if (use_disjoint_timestamps) {
-            slot.disjoint_query_pool = m_device_context.device->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
+            slot->disjoint_query_pool = m_device_context.device()->CreateQueryPool(luna::RHI::QueryPoolCreateInfo{
                 .Type = luna::RHI::QueryType::TimestampDisjoint,
                 .Count = 1,
             });
         } else {
-            slot.disjoint_query_pool.reset();
+            slot->disjoint_query_pool.reset();
         }
-        slot.profile = {};
-        slot.query_count = 0;
-        slot.pending = false;
-        slot.uses_disjoint_timestamps = use_disjoint_timestamps;
-        if (!slot.query_pool || (use_disjoint_timestamps && !slot.disjoint_query_pool)) {
+        slot->profile = {};
+        slot->query_count = 0;
+        slot->pending = false;
+        slot->uses_disjoint_timestamps = use_disjoint_timestamps;
+        if (!slot->query_pool || (use_disjoint_timestamps && !slot->disjoint_query_pool)) {
             LUNA_RENDERER_WARN("Failed to create RenderGraph GPU timing query pool for frame {}", frame_index);
-            slot.query_pool.reset();
-            slot.disjoint_query_pool.reset();
-            slot.uses_disjoint_timestamps = false;
+            slot->query_pool.reset();
+            slot->disjoint_query_pool.reset();
+            slot->uses_disjoint_timestamps = false;
         }
     }
 }
 
 void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
 {
-    if (frame_index >= m_frame_resources.gpu_timing_slots.size()) {
-        return;
-    }
-
-    auto& slot = m_frame_resources.gpu_timing_slots[frame_index];
-    if (!slot.pending || !slot.query_pool || slot.query_count == 0) {
+    auto* slot = m_frame_resources.gpuTimingSlot(frame_index);
+    if (!slot || !slot->pending || !slot->query_pool || slot->query_count == 0) {
         return;
     }
 
     std::vector<uint64_t> timestamps;
-    if (!slot.query_pool->GetResults(0, slot.query_count, timestamps, false)) {
+    if (!slot->query_pool->GetResults(0, slot->query_count, timestamps, false)) {
         LUNA_RENDERER_FRAME_TRACE("RenderGraph GPU timing results are not ready for frame {}", frame_index);
         return;
     }
 
     double timestamp_period_ns =
-        m_device_context.graphics_queue ? m_device_context.graphics_queue->GetTimestampPeriodNs() : 0.0;
-    if (slot.uses_disjoint_timestamps) {
-        if (!slot.disjoint_query_pool) {
-            slot.pending = false;
+        m_device_context.graphicsQueue() ? m_device_context.graphicsQueue()->GetTimestampPeriodNs() : 0.0;
+    if (slot->uses_disjoint_timestamps) {
+        if (!slot->disjoint_query_pool) {
+            slot->pending = false;
             return;
         }
 
         luna::RHI::TimestampDisjointResult disjoint_result{};
-        if (!slot.disjoint_query_pool->GetTimestampDisjointResult(0, disjoint_result, false)) {
+        if (!slot->disjoint_query_pool->GetTimestampDisjointResult(0, disjoint_result, false)) {
             LUNA_RENDERER_FRAME_TRACE("RenderGraph GPU timing disjoint result is not ready for frame {}", frame_index);
             return;
         }
 
         if (disjoint_result.Disjoint || disjoint_result.Frequency == 0) {
-            RenderGraphProfileSnapshot completed_profile = slot.profile;
+            RenderGraphProfileSnapshot completed_profile = slot->profile;
             completed_profile.TotalGpuTimeMs = 0.0;
             completed_profile.GpuTimingSupported = true;
             completed_profile.GpuTimingPending = false;
-            slot.pending = false;
+            slot->pending = false;
             m_last_render_graph_profile = std::move(completed_profile);
             LUNA_RENDERER_FRAME_TRACE("Discarded D3D11 GPU timing for frame {} because timestamp disjoint was reported",
                                       frame_index);
@@ -1911,11 +1776,11 @@ void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
     }
 
     if (timestamp_period_ns <= 0.0) {
-        slot.pending = false;
+        slot->pending = false;
         return;
     }
 
-    RenderGraphProfileSnapshot completed_profile = slot.profile;
+    RenderGraphProfileSnapshot completed_profile = slot->profile;
     completed_profile.TotalGpuTimeMs = 0.0;
     completed_profile.GpuTimingSupported = true;
     completed_profile.GpuTimingPending = false;
@@ -1940,59 +1805,60 @@ void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
         completed_profile.TotalGpuTimeMs += gpu_time_ms;
     }
 
-    slot.pending = false;
+    slot->pending = false;
     m_last_render_graph_profile = std::move(completed_profile);
 }
 
 bool Renderer::storePendingGpuTimingProfile(uint32_t frame_index, const RenderGraphProfileSnapshot& profile)
 {
-    if (frame_index >= m_frame_resources.gpu_timing_slots.size() || !profile.GpuTimingSupported ||
-        !profile.GpuTimingPending) {
+    auto* slot = m_frame_resources.gpuTimingSlot(frame_index);
+    if (!slot || !profile.GpuTimingSupported || !profile.GpuTimingPending) {
         return false;
     }
 
-    auto& slot = m_frame_resources.gpu_timing_slots[frame_index];
-    if (!slot.query_pool) {
+    if (!slot->query_pool) {
         return false;
     }
 
     const uint32_t query_count = static_cast<uint32_t>(profile.Passes.size() * 2);
-    if (query_count == 0 || query_count > slot.query_pool->GetCount()) {
-        slot.pending = false;
-        slot.query_count = 0;
+    if (query_count == 0 || query_count > slot->query_pool->GetCount()) {
+        slot->pending = false;
+        slot->query_count = 0;
         return false;
     }
 
-    slot.profile = profile;
-    slot.query_count = query_count;
-    slot.pending = true;
+    slot->profile = profile;
+    slot->query_count = query_count;
+    slot->pending = true;
     return true;
 }
 
 void Renderer::ensureScenePickReadbackBuffers()
 {
     auto& frame_resources = m_frame_resources;
-    if (!m_device_context.device || frame_resources.frames_in_flight == 0) {
-        if (!frame_resources.scene_pick_readback_slots.empty()) {
+    if (!m_device_context.device() || frame_resources.framesInFlight() == 0) {
+        if (frame_resources.pickReadbackSlotCount() > 0) {
             LUNA_RENDERER_DEBUG("Clearing scene-pick readback buffers because frame resources are unavailable");
         }
-        frame_resources.scene_pick_readback_slots.clear();
+        frame_resources.clearPickReadbackSlots();
         return;
     }
 
-    frame_resources.scene_pick_readback_slots.clear();
-    frame_resources.scene_pick_readback_slots.resize(frame_resources.frames_in_flight);
-    LUNA_RENDERER_DEBUG("Creating {} scene-pick readback buffer(s)", frame_resources.frames_in_flight);
-    for (uint32_t frame_index = 0; frame_index < frame_resources.frames_in_flight; ++frame_index) {
-        frame_resources.scene_pick_readback_slots[frame_index].buffer =
-            m_device_context.device->CreateBuffer(luna::RHI::BufferBuilder()
-                                                      .SetSize(kScenePickReadbackBufferSize)
-                                                      .SetUsage(luna::RHI::BufferUsageFlags::TransferDst)
-                                                      .SetMemoryUsage(luna::RHI::BufferMemoryUsage::GpuToCpu)
-                                                      .SetName("ScenePickReadback_" + std::to_string(frame_index))
-                                                      .Build());
-        frame_resources.scene_pick_readback_slots[frame_index].pending = false;
-        if (!frame_resources.scene_pick_readback_slots[frame_index].buffer) {
+    frame_resources.resizePickReadbackSlots(frame_resources.framesInFlight());
+    LUNA_RENDERER_DEBUG("Creating {} scene-pick readback buffer(s)", frame_resources.framesInFlight());
+    for (uint32_t frame_index = 0; frame_index < frame_resources.framesInFlight(); ++frame_index) {
+        auto* slot = frame_resources.pickReadbackSlot(frame_index);
+        if (!slot) {
+            continue;
+        }
+        slot->buffer = m_device_context.device()->CreateBuffer(luna::RHI::BufferBuilder()
+                                                                  .SetSize(kScenePickReadbackBufferSize)
+                                                                  .SetUsage(luna::RHI::BufferUsageFlags::TransferDst)
+                                                                  .SetMemoryUsage(luna::RHI::BufferMemoryUsage::GpuToCpu)
+                                                                  .SetName("ScenePickReadback_" + std::to_string(frame_index))
+                                                                  .Build());
+        slot->pending = false;
+        if (!slot->buffer) {
             LUNA_RENDERER_WARN("Failed to create scene-pick readback buffer for frame {}", frame_index);
         }
     }
@@ -2000,47 +1866,27 @@ void Renderer::ensureScenePickReadbackBuffers()
 
 void Renderer::collectCompletedScenePickResult(SceneViewportState& viewport, uint32_t frame_index)
 {
-    if (frame_index >= m_frame_resources.scene_pick_readback_slots.size()) {
-        return;
-    }
-
-    auto& slot = m_frame_resources.scene_pick_readback_slots[frame_index];
-    if (!slot.pending || !slot.buffer) {
+    auto* slot = m_frame_resources.pickReadbackSlot(frame_index);
+    if (!slot || !slot->pending || !slot->buffer) {
         return;
     }
 
     uint32_t picked_id = 0;
-    if (void* mapped = slot.buffer->Map()) {
+    if (void* mapped = slot->buffer->Map()) {
         std::memcpy(&picked_id, mapped, sizeof(picked_id));
-        slot.buffer->Unmap();
+        slot->buffer->Unmap();
     } else {
         LUNA_RENDERER_WARN("Failed to map scene-pick readback buffer for frame {}", frame_index);
     }
 
-    slot.pending = false;
+    slot->pending = false;
     viewport.output.completed_pick_id = picked_id;
     LUNA_RENDERER_DEBUG("Completed scene pick readback on frame {} with entity id {}", frame_index, picked_id);
 }
 
 void Renderer::waitForGpuIdle() noexcept
 {
-    if (!m_device_context.device) {
-        return;
-    }
-
-    try {
-        if (m_device_context.graphics_queue) {
-            LUNA_RENDERER_TRACE("Waiting for graphics queue idle");
-            m_device_context.graphics_queue->WaitIdle();
-        } else if (m_device_context.synchronization) {
-            LUNA_RENDERER_TRACE("Waiting for renderer synchronization idle");
-            m_device_context.synchronization->WaitIdle();
-        }
-    } catch (const std::exception& error) {
-        LUNA_RENDERER_WARN("Ignoring GPU idle wait failure during renderer teardown: {}", error.what());
-    } catch (...) {
-        LUNA_RENDERER_WARN("Ignoring unknown GPU idle wait failure during renderer teardown");
-    }
+    m_device_context.waitForIdle();
 }
 
 } // namespace luna

@@ -7,6 +7,7 @@
 #include <Adapter.h>
 #include <Instance.h>
 #include <Surface.h>
+#include <Swapchain.h>
 
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ namespace luna::renderer_detail {
 luna::RHI::Ref<luna::RHI::Adapter> selectAdapter(const std::vector<luna::RHI::Ref<luna::RHI::Adapter>>& adapters);
 luna::RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<luna::RHI::SurfaceFormat>& formats);
 const char* presentModeToString(luna::RHI::PresentMode mode);
+const char* swapchainResultToString(luna::RHI::Result result);
 const char* adapterTypeToString(luna::RHI::AdapterType type);
 const char* formatToString(luna::RHI::Format format);
 bool supportsDefaultRenderFlow(luna::RHI::BackendType type);

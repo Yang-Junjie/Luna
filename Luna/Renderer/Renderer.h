@@ -5,11 +5,15 @@
 // while delegating scene-specific drawing to RenderFlow.
 
 #include "Renderer/RenderGraphBuilder.h"
+#include "Renderer/FrameResourceRing.h"
+#include "Renderer/RenderDeviceContext.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
 #include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderViewState.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
+#include "Renderer/SwapchainImageHistory.h"
+#include "Renderer/SwapchainManager.h"
 
 #include <cstdint>
 #include <functional>
@@ -21,7 +25,6 @@
 #include <Instance.h>
 #include <memory>
 #include <optional>
-#include <Surface.h>
 #include <string_view>
 #include <vector>
 
@@ -144,7 +147,7 @@ public:
 
     const luna::RHI::Ref<luna::RHI::ShaderCompiler>& getShaderCompiler() const
     {
-        return m_device_context.shader_compiler;
+        return m_device_context.shaderCompiler();
     }
 
     uint32_t getFramesInFlight() const;
@@ -171,19 +174,6 @@ private:
     struct WindowContext {
         Window* window{nullptr};
         GLFWwindow* native_window{nullptr};
-    };
-
-    struct DeviceContext {
-        luna::RHI::Ref<luna::RHI::Instance> instance;
-        luna::RHI::Ref<luna::RHI::Adapter> adapter;
-        luna::RHI::Ref<luna::RHI::Device> device;
-        luna::RHI::Ref<luna::RHI::Surface> surface;
-        luna::RHI::Ref<luna::RHI::Swapchain> swapchain;
-        luna::RHI::Ref<luna::RHI::Queue> graphics_queue;
-        luna::RHI::Ref<luna::RHI::ShaderCompiler> shader_compiler;
-        luna::RHI::Ref<luna::RHI::Synchronization> synchronization;
-        luna::RHI::Format surface_format{luna::RHI::Format::UNDEFINED};
-        luna::RHI::RHICapabilities capabilities{};
     };
 
     struct SceneOutputState {
@@ -217,39 +207,11 @@ private:
         uint64_t generation{0};
     };
 
-    struct FrameResources {
-        struct ScenePickReadbackSlot {
-            luna::RHI::Ref<luna::RHI::Buffer> buffer;
-            bool pending{false};
-        };
-
-        struct GpuTimingSlot {
-            luna::RHI::Ref<luna::RHI::QueryPool> query_pool;
-            luna::RHI::Ref<luna::RHI::QueryPool> disjoint_query_pool;
-            RenderGraphProfileSnapshot profile;
-            uint32_t query_count{0};
-            bool pending{false};
-            bool uses_disjoint_timestamps{false};
-        };
-
-        luna::RHI::Ref<luna::RHI::CommandBufferEncoder> current_command_buffer;
-        std::vector<luna::RHI::Ref<luna::RHI::CommandBufferEncoder>> command_buffers;
-        std::vector<std::unique_ptr<luna::RenderGraph>> render_graphs;
-        std::vector<luna::RenderGraphTransientTextureCache> transient_texture_caches;
-        std::vector<ScenePickReadbackSlot> scene_pick_readback_slots;
-        std::vector<GpuTimingSlot> gpu_timing_slots;
-        uint32_t frames_in_flight{0};
-        uint32_t frame_index{0};
-        uint32_t image_index{0};
-        std::vector<bool> swapchain_images_presented;
-    };
-
     struct RuntimeState {
         InitializationOptions initialization_options{};
         glm::vec4 clear_color{0.10f, 0.10f, 0.12f, 1.0f};
         bool initialized{false};
         bool imgui_enabled{false};
-        bool resize_requested{false};
         bool frame_started{false};
         bool render_graph_profiling_enabled{false};
     };
@@ -311,7 +273,9 @@ private:
         bool issue_pick_readback{false};
     };
 
+    [[nodiscard]] SwapchainCreateRequest makeSwapchainCreateRequest(uint32_t width, uint32_t height);
     void createSwapchain(uint32_t width, uint32_t height);
+    void configureSwapchainFrameResources();
     luna::RHI::Extent2D getFramebufferExtent() const;
     void handlePendingResize();
     SceneViewportId createSceneViewport();
@@ -352,11 +316,15 @@ private:
 
 private:
     WindowContext m_window_context{};
-    DeviceContext m_device_context{};
+    RenderDeviceContext m_device_context{};
+    SwapchainManager m_swapchain_manager{};
+    SwapchainImageHistory m_swapchain_image_history{};
     std::vector<SceneViewportSlot> m_scene_viewports{};
     SceneViewportId m_default_scene_viewport_id{kInvalidSceneViewportId};
     SceneViewportId m_next_scene_viewport_id{1};
-    FrameResources m_frame_resources{};
+    FrameResourceRing m_frame_resources{};
+    uint32_t m_frame_index{0};
+    uint32_t m_image_index{0};
     RuntimeState m_runtime{};
     RenderGraphProfileSnapshot m_last_render_graph_profile{};
 };

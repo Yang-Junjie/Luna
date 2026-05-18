@@ -118,6 +118,18 @@ set(RENDERER_SOURCE
     Renderer/RenderWorld/RenderTypes.h
     Renderer/RenderWorld/RenderWorldExtractor.h
     Renderer/RenderWorld/RenderWorldExtractor.cpp
+    Renderer/FrameResourceRing.h
+    Renderer/FrameResourceRing.cpp
+    Renderer/RenderDeviceContext.h
+    Renderer/RenderDeviceContext.cpp
+    Renderer/SwapchainFactory.h
+    Renderer/SwapchainFactory.cpp
+    Renderer/SwapchainImageHistory.h
+    Renderer/SwapchainImageHistory.cpp
+    Renderer/SwapchainManager.h
+    Renderer/SwapchainManager.cpp
+    Renderer/SwapchainResources.h
+    Renderer/SwapchainResources.cpp
     Renderer/RendererUtilities.h
     Renderer/RendererUtilities.cpp
     Renderer/Visibility/Frustum.h
