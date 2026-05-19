@@ -37,6 +37,7 @@ struct Extent2D;
 namespace luna {
 
 class LunaEditorApplication;
+class Renderer;
 class SceneViewportInstance;
 
 namespace editor {
@@ -116,6 +117,8 @@ public:
     editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id,
                                                    uint32_t framebuffer_width,
                                                    uint32_t framebuffer_height);
+    bool setSceneViewportPreview(editor::ViewportId viewport_id, const editor::SceneViewportPreviewState& state);
+    void clearSceneViewportPreview(editor::ViewportId viewport_id);
     editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
     editor::TextureView getSceneTextureView(editor::ViewportId viewport_id) const;
     editor::TextureView getSceneTextureView() const;
@@ -203,6 +206,11 @@ private:
     SceneViewportInstance& activeSceneViewportInstance() noexcept;
     const SceneViewportInstance& activeSceneViewportInstance() const noexcept;
     editor::ViewportId allocateViewportId() noexcept;
+    struct PreviewSceneViewport;
+    bool syncPreviewSceneViewport(editor::ViewportId viewport_id,
+                                  Renderer& renderer,
+                                  SceneViewportInstance& viewport);
+    void rebuildPreviewScene(PreviewSceneViewport& preview);
     void processAuthoringEvents();
 
     bool syncProjectAssets();
@@ -251,6 +259,7 @@ private:
     ViewportInteractionTracker m_viewport_interactions;
     editor::ViewportId m_next_viewport_id{editor::kDefaultViewportId + 1u};
     std::unordered_map<editor::ViewportId, std::string> m_viewport_owner_by_id;
+    std::unordered_map<editor::ViewportId, std::unique_ptr<PreviewSceneViewport>> m_preview_scene_viewports;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
     std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };

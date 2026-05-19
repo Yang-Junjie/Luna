@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <span>
+#include <string_view>
 #include <unordered_map>
 
 namespace luna::RHI {
@@ -84,6 +85,7 @@ private:
         std::shared_ptr<renderer_detail::PendingTextureUpload> occlusion_texture;
         RHI::Ref<RHI::Buffer> params_buffer;
         RHI::Ref<RHI::DescriptorSet> descriptor_set;
+        uint64_t bound_version{0};
         uint64_t uploaded_version{0};
     };
 
@@ -91,6 +93,12 @@ private:
     std::shared_ptr<renderer_detail::PendingTextureUpload>
         getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings);
+    std::shared_ptr<renderer_detail::PendingTextureUpload> createMaterialTexture(const Material& material,
+                                                                                 const std::shared_ptr<Texture>& texture,
+                                                                                 const ImageData& fallback_image,
+                                                                                 std::string_view suffix,
+                                                                                 const Bindings& bindings);
+    void bindMaterialResources(const Material& material, UploadedMaterial& uploaded_material, const Bindings& bindings);
     static void uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material);
     void uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
     [[nodiscard]] static const Material& resolveMaterial(const std::shared_ptr<Material>& material,

@@ -28,6 +28,7 @@ const char* blendModeToString(Material::BlendMode blend_mode)
 Material::Material(std::string name, TextureSet textures, SurfaceProperties surface)
     : m_name(std::move(name)),
       m_textures(std::move(textures)),
+      m_default_textures(m_textures),
       m_surface(surface),
       m_default_surface(surface),
       m_blend_mode(surface.BlendModeValue)
@@ -58,6 +59,11 @@ const Material::TextureSet& Material::getTextures() const
     return m_textures;
 }
 
+const Material::TextureSet& Material::getDefaultTextures() const
+{
+    return m_default_textures;
+}
+
 const Material::SurfaceProperties& Material::getSurface() const
 {
     return m_surface;
@@ -73,6 +79,17 @@ uint64_t Material::getVersion() const
     return m_version;
 }
 
+void Material::setTextures(TextureSet textures)
+{
+    m_textures = std::move(textures);
+    ++m_version;
+}
+
+void Material::resetTextures()
+{
+    setTextures(m_default_textures);
+}
+
 void Material::setSurface(const SurfaceProperties& surface)
 {
     m_surface = surface;
@@ -83,6 +100,14 @@ void Material::setSurface(const SurfaceProperties& surface)
 void Material::resetSurface()
 {
     setSurface(m_default_surface);
+}
+
+void Material::reset()
+{
+    m_textures = m_default_textures;
+    m_surface = m_default_surface;
+    m_blend_mode = m_surface.BlendModeValue;
+    ++m_version;
 }
 
 Material::BlendMode Material::getBlendMode() const

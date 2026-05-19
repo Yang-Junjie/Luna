@@ -2,6 +2,7 @@
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorHistoryService.h"
+#include "EditorApi/EditorMaterialService.h"
 #include "EditorApi/EditorMenuService.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "EditorApi/EditorPluginAssetService.h"
@@ -297,9 +298,20 @@ public:
         return true;
     }
 
+    bool registerDockspaceWindow(luna::editor::DockspaceWindowDescriptor descriptor) override
+    {
+        if (descriptor.id.empty()) {
+            return false;
+        }
+        open_state[descriptor.id] = descriptor.default_open;
+        dockspaces[descriptor.id] = std::move(descriptor);
+        return true;
+    }
+
     void unregisterWindow(std::string_view id) override
     {
         windows.erase(std::string(id));
+        dockspaces.erase(std::string(id));
         open_state.erase(std::string(id));
     }
 
@@ -311,8 +323,9 @@ public:
 
     void setWindowOpen(std::string_view id, bool open) override
     {
-        if (windows.contains(std::string(id))) {
-            open_state[std::string(id)] = open;
+        const std::string key(id);
+        if (windows.contains(key) || dockspaces.contains(key)) {
+            open_state[key] = open;
         }
     }
 
@@ -337,9 +350,18 @@ public:
                 ++it;
             }
         }
+        for (auto it = dockspaces.begin(); it != dockspaces.end();) {
+            if (it->second.owner_id == owner_id) {
+                open_state.erase(it->first);
+                it = dockspaces.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     std::unordered_map<std::string, luna::editor::WindowDescriptor> windows;
+    std::unordered_map<std::string, luna::editor::DockspaceWindowDescriptor> dockspaces;
     std::unordered_map<std::string, bool> open_state;
 };
 
@@ -460,6 +482,23 @@ public:
 
     luna::editor::AssetInfo asset;
     uint64_t revision{7u};
+};
+
+class ManagerSmokeMaterialService final : public luna::editor::MaterialService {
+public:
+    luna::editor::MaterialCreateResult createMaterial(const luna::editor::MaterialCreateRequest&) override { return {}; }
+    bool canEditMaterial(luna::AssetHandle) const override { return false; }
+    std::optional<luna::editor::MaterialDocument> readMaterial(luna::AssetHandle) override { return std::nullopt; }
+    bool setMaterialTextures(luna::AssetHandle, const luna::editor::MaterialTextureSet&) override { return false; }
+    bool setMaterialSurface(luna::AssetHandle, const luna::editor::MaterialSurfaceProperties&) override { return false; }
+    luna::editor::MetallicRoughnessSynthesisResult
+        synthesizeMetallicRoughness(const luna::editor::MetallicRoughnessSynthesisRequest&) override
+    {
+        return {};
+    }
+    luna::editor::MaterialEditResult saveMaterial(luna::AssetHandle) override { return {}; }
+    luna::editor::MaterialEditResult revertMaterial(luna::AssetHandle) override { return {}; }
+    bool isMaterialDirty(luna::AssetHandle) const override { return false; }
 };
 
 class ManagerSmokePluginAssetService final : public luna::editor::PluginAssetService {
@@ -793,6 +832,12 @@ public:
             .y_flip = false,
         };
     }
+    bool setSceneViewportPreview(luna::editor::ViewportId viewport_id,
+                                 const luna::editor::SceneViewportPreviewState&) override
+    {
+        return isSceneViewportValid(viewport_id);
+    }
+    void clearSceneViewportPreview(luna::editor::ViewportId) override {}
     luna::editor::ViewportPresentation syncSceneViewport(luna::editor::UVec2 framebuffer_size) override
     {
         return syncSceneViewport(luna::editor::kDefaultViewportId, framebuffer_size);
@@ -1035,6 +1080,7 @@ public:
     luna::editor::WindowService& windows() override { return window_service; }
     luna::editor::CommandService& commands() override { return command_service; }
     luna::editor::HistoryService& history() override { return history_service; }
+    luna::editor::MaterialService& materials() override { return material_service; }
     luna::editor::MenuService& menus() override { return menu_service; }
     luna::editor::PluginAssetService& pluginAssets() override { return plugin_asset_service; }
     luna::editor::PluginService& plugins() override { return plugin_service; }
@@ -1107,6 +1153,7 @@ public:
 
     ManagerSmokeUi ui_service;
     ManagerSmokeAssetService asset_service;
+    ManagerSmokeMaterialService material_service;
     ManagerSmokeWindowService window_service;
     ManagerSmokeCommandService command_service;
     ManagerSmokeHistoryService history_service;

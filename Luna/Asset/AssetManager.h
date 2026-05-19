@@ -34,6 +34,7 @@ public:
     std::shared_ptr<Asset> loadAsset(AssetHandle handle);
     std::shared_ptr<Asset> requestAsset(AssetHandle handle);
     void registerMemoryAsset(AssetHandle handle, const std::shared_ptr<Asset>& asset);
+    void invalidateAsset(AssetHandle handle);
     bool isAssetLoading(AssetHandle handle);
     bool isAssetLoaded(AssetHandle handle);
     std::vector<LoadingAssetInfo> getLoadingAssetsSnapshot();

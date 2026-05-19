@@ -1,0 +1,14 @@
+Asset:
+  Name: sloppy-mortar-stone-wall_ao
+  Handle: 13276841899520761186
+  Type: Texture
+  FilePath: Assets/Materials/sloppy-mortar-stone-wall-bl/sloppy-mortar-stone-wall_ao.png
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

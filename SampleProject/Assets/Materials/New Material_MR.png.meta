@@ -1,0 +1,14 @@
+Asset:
+  Name: New Material_MR
+  Handle: 400996520457938526
+  Type: Texture
+  FilePath: Assets/Materials/New Material_MR.png
+  Config:
+    GenerateMipmaps: true
+    SRGB: false
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

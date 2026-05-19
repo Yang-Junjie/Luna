@@ -5,6 +5,7 @@ namespace luna::editor {
 class AssetService;
 class CommandService;
 class HistoryService;
+class MaterialService;
 class MenuService;
 class PluginAssetService;
 class PluginService;
@@ -30,6 +31,7 @@ public:
     virtual WindowService& windows() = 0;
     virtual CommandService& commands() = 0;
     virtual HistoryService& history() = 0;
+    virtual MaterialService& materials() = 0;
     virtual MenuService& menus() = 0;
     virtual PluginAssetService& pluginAssets() = 0;
     virtual PluginService& plugins() = 0;

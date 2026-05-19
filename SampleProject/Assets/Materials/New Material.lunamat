@@ -1,0 +1,19 @@
+Material:
+  Name: New Material
+  Textures:
+    BaseColor: 10826163629313751484
+    Normal: 9017375577210318925
+    MetallicRoughness: 400996520457938526
+    Emissive: 0
+    Occlusion: 13276841899520761186
+  Surface:
+    BaseColorFactor: [1, 1, 1, 1]
+    EmissiveFactor: [0, 0, 0]
+    MetallicFactor: 0
+    RoughnessFactor: 1
+    NormalScale: 2.83
+    OcclusionStrength: 1
+    AlphaCutoff: 0.6
+    DoubleSided: false
+    Unlit: false
+    BlendMode: Opaque

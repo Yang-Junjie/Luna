@@ -61,12 +61,16 @@ public:
     const std::string& getName() const;
 
     const TextureSet& getTextures() const;
+    const TextureSet& getDefaultTextures() const;
     const SurfaceProperties& getSurface() const;
     const SurfaceProperties& getDefaultSurface() const;
     uint64_t getVersion() const;
 
+    void setTextures(TextureSet textures);
+    void resetTextures();
     void setSurface(const SurfaceProperties& surface);
     void resetSurface();
+    void reset();
 
     AssetType getAssetsType() const override
     {
@@ -88,6 +92,7 @@ private:
     std::string m_name;
 
     TextureSet m_textures;
+    TextureSet m_default_textures;
     SurfaceProperties m_surface;
     SurfaceProperties m_default_surface;
 

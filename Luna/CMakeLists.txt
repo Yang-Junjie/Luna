@@ -247,6 +247,7 @@ set(EDITOR_API_SOURCE
     EditorApi/EditorCommandService.h
     EditorApi/EditorHistoryService.h
     EditorApi/EditorHost.h
+    EditorApi/EditorMaterialService.h
     EditorApi/EditorMenuService.h
     EditorApi/EditorNativePluginApi.h
     EditorApi/EditorPlugin.h

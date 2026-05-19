@@ -1,0 +1,14 @@
+Asset:
+  Name: sloppy-mortar-stone-wall_albedo
+  Handle: 10826163629313751484
+  Type: Texture
+  FilePath: Assets/Materials/sloppy-mortar-stone-wall-bl/sloppy-mortar-stone-wall_albedo.png
+  Config:
+    GenerateMipmaps: true
+    SRGB: true
+    MinFilter: Linear
+    MagFilter: Linear
+    MipFilter: Linear
+    WrapU: Repeat
+    WrapV: Repeat
+    WrapW: Repeat

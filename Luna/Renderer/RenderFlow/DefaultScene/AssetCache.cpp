@@ -15,6 +15,7 @@
 #include <Device.h>
 
 #include <cstring>
+#include <string_view>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -232,43 +233,18 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
     if (it != m_uploaded_materials.end()) {
         LUNA_RENDERER_FRAME_TRACE("Reusing uploaded material '{}'",
                                   material.getName().empty() ? "Material" : material.getName());
+        if (it->second.bound_version != material.getVersion()) {
+            bindMaterialResources(material, it->second, bindings);
+        }
         uploadMaterialParamsIfNeeded(material, it->second);
         return it->second;
     }
 
-    const auto& textures = material.getTextures();
     const std::string material_name = material.getName().empty() ? "Material" : material.getName();
-    const Texture::SamplerSettings default_sampler_settings{};
 
     auto [inserted_it, _] = m_uploaded_materials.emplace(&material, UploadedMaterial{});
     auto& uploaded_material = inserted_it->second;
     LUNA_RENDERER_DEBUG("Uploading material '{}'", material_name);
-
-    const auto create_material_texture =
-        [&](const std::shared_ptr<Texture>& texture,
-            const ImageData& fallback_image,
-            std::string_view suffix) -> std::shared_ptr<renderer_detail::PendingTextureUpload> {
-        if (texture != nullptr && texture->isValid()) {
-            return getOrCreateUploadedTexture(texture, bindings);
-        }
-
-        const std::string texture_name = material_name + "_" + std::string(suffix);
-        return std::make_shared<renderer_detail::PendingTextureUpload>(
-            renderer_detail::createTextureUpload(bindings.device, fallback_image, default_sampler_settings, texture_name));
-    };
-
-    uploaded_material.base_color_texture =
-        create_material_texture(textures.BaseColor, renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "BaseColor");
-    uploaded_material.normal_texture = create_material_texture(
-        textures.Normal, renderer_detail::createFallbackColorImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)), "Normal");
-    uploaded_material.metallic_roughness_texture = create_material_texture(
-        textures.MetallicRoughness,
-        renderer_detail::createFallbackMetallicRoughnessImageData(1.0f, 0.0f),
-        "MetallicRoughness");
-    uploaded_material.emissive_texture = create_material_texture(
-        textures.Emissive, renderer_detail::createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)), "Emissive");
-    uploaded_material.occlusion_texture =
-        create_material_texture(textures.Occlusion, renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "Occlusion");
 
     if (bindings.device) {
         uploaded_material.params_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
@@ -278,7 +254,61 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
                                                                             .SetName(material_name + "_Params")
                                                                             .Build());
     }
+    bindMaterialResources(material, uploaded_material, bindings);
     uploadMaterialParamsIfNeeded(material, uploaded_material);
+
+    return uploaded_material;
+}
+
+std::shared_ptr<renderer_detail::PendingTextureUpload>
+AssetCache::createMaterialTexture(const Material& material,
+                                  const std::shared_ptr<Texture>& texture,
+                                  const ImageData& fallback_image,
+                                  std::string_view suffix,
+                                  const Bindings& bindings)
+{
+    if (texture != nullptr && texture->isValid()) {
+        return getOrCreateUploadedTexture(texture, bindings);
+    }
+
+    const Texture::SamplerSettings default_sampler_settings{};
+    const std::string material_name = material.getName().empty() ? "Material" : material.getName();
+    const std::string texture_name = material_name + "_" + std::string(suffix);
+    return std::make_shared<renderer_detail::PendingTextureUpload>(
+        renderer_detail::createTextureUpload(bindings.device, fallback_image, default_sampler_settings, texture_name));
+}
+
+void AssetCache::bindMaterialResources(const Material& material, UploadedMaterial& uploaded_material, const Bindings& bindings)
+{
+    const auto& textures = material.getTextures();
+    const std::string material_name = material.getName().empty() ? "Material" : material.getName();
+
+    uploaded_material.base_color_texture = createMaterialTexture(
+        material, textures.BaseColor, renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "BaseColor", bindings);
+    uploaded_material.normal_texture =
+        createMaterialTexture(material,
+                              textures.Normal,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(0.5f, 0.5f, 1.0f, 1.0f)),
+                              "Normal",
+                              bindings);
+    uploaded_material.metallic_roughness_texture =
+        createMaterialTexture(material,
+                              textures.MetallicRoughness,
+                              renderer_detail::createFallbackMetallicRoughnessImageData(1.0f, 0.0f),
+                              "MetallicRoughness",
+                              bindings);
+    uploaded_material.emissive_texture =
+        createMaterialTexture(material,
+                              textures.Emissive,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)),
+                              "Emissive",
+                              bindings);
+    uploaded_material.occlusion_texture =
+        createMaterialTexture(material,
+                              textures.Occlusion,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)),
+                              "Occlusion",
+                              bindings);
 
     if (!bindings.isValid() || !uploaded_material.base_color_texture || !uploaded_material.normal_texture ||
         !uploaded_material.metallic_roughness_texture || !uploaded_material.emissive_texture ||
@@ -304,13 +334,14 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
             static_cast<bool>(uploaded_material.occlusion_texture && uploaded_material.occlusion_texture->texture &&
                               uploaded_material.occlusion_texture->sampler),
             static_cast<bool>(uploaded_material.params_buffer));
-        return uploaded_material;
+        uploaded_material.descriptor_set = {};
+        return;
     }
 
     uploaded_material.descriptor_set = bindings.descriptor_pool->AllocateDescriptorSet(bindings.material_layout);
     if (!uploaded_material.descriptor_set) {
         LUNA_RENDERER_WARN("Failed to allocate descriptor set for material '{}'", material_name);
-        return uploaded_material;
+        return;
     }
 
     uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
@@ -372,7 +403,7 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
         .Type = RHI::DescriptorType::UniformBuffer,
     });
     uploaded_material.descriptor_set->Update();
-    return uploaded_material;
+    uploaded_material.bound_version = material.getVersion();
 }
 
 void AssetCache::uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material)

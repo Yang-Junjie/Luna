@@ -1,5 +1,6 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Asset/BuiltinAssets.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
@@ -35,6 +36,7 @@
 #include <exception>
 #include <filesystem>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/trigonometric.hpp>
 #include <ImGuizmo.h>
 #include <imgui.h>
 #include <limits>
@@ -102,6 +104,11 @@ luna::editor::Vec2 toEditorVec2(const ImVec2& value) noexcept
     return luna::editor::Vec2{.x = value.x, .y = value.y};
 }
 
+glm::vec3 toGlmVec3(luna::editor::Vec3 value) noexcept
+{
+    return glm::vec3{value.x, value.y, value.z};
+}
+
 luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexcept
 {
     if constexpr (std::is_pointer_v<ImTextureID>) {
@@ -119,6 +126,91 @@ luna::editor::TextureViewportPresentation toEditorTextureViewportPresentation(
         .framebuffer_size = presentation.framebuffer_size,
         .presentable = presentation.presentable,
     };
+}
+
+luna::AssetHandle previewMeshHandle(const luna::editor::SceneViewportPreviewState& state)
+{
+    if (state.mesh.isValid()) {
+        return state.mesh;
+    }
+
+    switch (state.mesh_kind) {
+        case luna::editor::SceneViewportPreviewMesh::Cube:
+            return luna::BuiltinMeshes::Cube;
+        case luna::editor::SceneViewportPreviewMesh::Plane:
+            return luna::BuiltinMeshes::Plane;
+        case luna::editor::SceneViewportPreviewMesh::Sphere:
+            return luna::BuiltinMeshes::Sphere;
+    }
+
+    return luna::BuiltinMeshes::Sphere;
+}
+
+luna::SceneBackgroundMode toSceneBackgroundMode(luna::editor::SceneViewportPreviewBackground background)
+{
+    switch (background) {
+        case luna::editor::SceneViewportPreviewBackground::SolidColor:
+            return luna::SceneBackgroundMode::SolidColor;
+        case luna::editor::SceneViewportPreviewBackground::EnvironmentMap:
+            return luna::SceneBackgroundMode::EnvironmentMap;
+        case luna::editor::SceneViewportPreviewBackground::ProceduralSky:
+            return luna::SceneBackgroundMode::ProceduralSky;
+    }
+
+    return luna::SceneBackgroundMode::ProceduralSky;
+}
+
+luna::SceneEnvironmentSettings toSceneEnvironmentSettings(
+    const luna::editor::SceneViewportPreviewEnvironment& environment)
+{
+    luna::SceneEnvironmentSettings settings{};
+    settings.backgroundMode = toSceneBackgroundMode(environment.background);
+    settings.backgroundColor = toGlmVec3(environment.background_color);
+    settings.enabled = settings.backgroundMode != luna::SceneBackgroundMode::SolidColor;
+    settings.iblEnabled = environment.ibl_enabled;
+    settings.environmentMapHandle = environment.environment_map;
+    settings.intensity = (std::max)(environment.intensity, 0.0f);
+    settings.skyIntensity = (std::max)(environment.sky_intensity, 0.0f);
+    settings.diffuseIntensity = (std::max)(environment.diffuse_intensity, 0.0f);
+    settings.specularIntensity = (std::max)(environment.specular_intensity, 0.0f);
+    const glm::vec3 sun_direction = toGlmVec3(environment.procedural_sun_direction);
+    settings.proceduralSunDirection =
+        glm::dot(sun_direction, sun_direction) > 0.0001f ? glm::normalize(sun_direction) : glm::vec3{0.4f, 0.6f, 0.3f};
+    settings.proceduralSunIntensity = (std::max)(environment.procedural_sun_intensity, 0.0f);
+    settings.proceduralSunAngularRadius = (std::max)(environment.procedural_sun_angular_radius, 0.0f);
+    settings.proceduralSkyColorZenith = toGlmVec3(environment.procedural_sky_color_zenith);
+    settings.proceduralSkyColorHorizon = toGlmVec3(environment.procedural_sky_color_horizon);
+    settings.proceduralGroundColor = toGlmVec3(environment.procedural_ground_color);
+    settings.proceduralSkyExposure = (std::max)(environment.procedural_sky_exposure, 0.0f);
+    return settings;
+}
+
+bool sameVec3(luna::editor::Vec3 lhs, luna::editor::Vec3 rhs) noexcept
+{
+    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+}
+
+bool samePreviewEnvironment(const luna::editor::SceneViewportPreviewEnvironment& lhs,
+                            const luna::editor::SceneViewportPreviewEnvironment& rhs) noexcept
+{
+    return lhs.background == rhs.background && sameVec3(lhs.background_color, rhs.background_color) &&
+           lhs.ibl_enabled == rhs.ibl_enabled && lhs.environment_map == rhs.environment_map &&
+           lhs.intensity == rhs.intensity && lhs.sky_intensity == rhs.sky_intensity &&
+           lhs.diffuse_intensity == rhs.diffuse_intensity && lhs.specular_intensity == rhs.specular_intensity &&
+           sameVec3(lhs.procedural_sun_direction, rhs.procedural_sun_direction) &&
+           lhs.procedural_sun_intensity == rhs.procedural_sun_intensity &&
+           lhs.procedural_sun_angular_radius == rhs.procedural_sun_angular_radius &&
+           sameVec3(lhs.procedural_sky_color_zenith, rhs.procedural_sky_color_zenith) &&
+           sameVec3(lhs.procedural_sky_color_horizon, rhs.procedural_sky_color_horizon) &&
+           sameVec3(lhs.procedural_ground_color, rhs.procedural_ground_color) &&
+           lhs.procedural_sky_exposure == rhs.procedural_sky_exposure;
+}
+
+bool samePreviewState(const luna::editor::SceneViewportPreviewState& lhs,
+                      const luna::editor::SceneViewportPreviewState& rhs) noexcept
+{
+    return lhs.material == rhs.material && lhs.mesh == rhs.mesh && lhs.mesh_kind == rhs.mesh_kind &&
+           samePreviewEnvironment(lhs.environment, rhs.environment);
 }
 
 const char* gizmoOperationToString(luna::GizmoOperation operation)
@@ -589,6 +681,13 @@ luna::RenderDebugViewMode toEngineRenderDebugViewMode(luna::editor::RenderDebugV
 
 namespace luna {
 
+struct LunaEditorLayer::PreviewSceneViewport {
+    editor::SceneViewportPreviewState state{};
+    Scene scene;
+    Camera camera;
+    bool dirty{true};
+};
+
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
       m_application(&application)
@@ -641,6 +740,7 @@ void LunaEditorLayer::onDetach()
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
     endRuntimeViewport();
+    m_preview_scene_viewports.clear();
     m_viewport_instances.clearPluginViewports(m_application->getRenderer());
     m_texture_viewport_instances.clearViewports();
     m_viewport_interactions.clear();
@@ -1468,6 +1568,7 @@ void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
     if (m_viewport_instances.destroyViewport(viewport_id, m_application->getRenderer())) {
         m_viewport_owner_by_id.erase(viewport_id);
         m_viewport_interactions.clearViewport(viewport_id);
+        m_preview_scene_viewports.erase(viewport_id);
     }
 }
 
@@ -1497,9 +1598,12 @@ editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::Viewport
 
     const SceneViewportInstanceState& state = viewport->sync(renderer, framebuffer_width, framebuffer_height);
     if (viewport_id != defaultSceneViewportId()) {
-        RenderWorldExtractor{}.extract(activeRenderScene(),
-                                       m_editor_camera.getCamera(),
-                                       renderer.getSceneViewportRenderWorld(viewport->rendererViewportHandle(renderer)));
+        if (!syncPreviewSceneViewport(viewport_id, renderer, *viewport)) {
+            RenderWorldExtractor{}.extract(
+                activeRenderScene(),
+                m_editor_camera.getCamera(),
+                renderer.getSceneViewportRenderWorld(viewport->rendererViewportHandle(renderer)));
+        }
     }
     editor::TextureView texture = getSceneTextureView(viewport_id);
     return editor::ViewportPresentation{
@@ -1507,6 +1611,32 @@ editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::Viewport
         .framebuffer_size = editor::UVec2{.x = state.width, .y = state.height},
         .presentable = state.presentable && texture.valid(),
     };
+}
+
+bool LunaEditorLayer::setSceneViewportPreview(editor::ViewportId viewport_id,
+                                              const editor::SceneViewportPreviewState& state)
+{
+    if (viewport_id == defaultSceneViewportId() || !isSceneViewportValid(viewport_id)) {
+        return false;
+    }
+
+    auto& preview = m_preview_scene_viewports[viewport_id];
+    if (!preview) {
+        preview = std::make_unique<PreviewSceneViewport>();
+    }
+
+    if (!preview->dirty && samePreviewState(preview->state, state)) {
+        return true;
+    }
+
+    preview->state = state;
+    preview->dirty = true;
+    return true;
+}
+
+void LunaEditorLayer::clearSceneViewportPreview(editor::ViewportId viewport_id)
+{
+    m_preview_scene_viewports.erase(viewport_id);
 }
 
 editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height)
@@ -2074,6 +2204,61 @@ SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() noexcept
 const SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() const noexcept
 {
     return m_runtime_viewport_enabled ? m_viewport_instances.runtimeViewport() : m_viewport_instances.defaultViewport();
+}
+
+bool LunaEditorLayer::syncPreviewSceneViewport(editor::ViewportId viewport_id,
+                                               Renderer& renderer,
+                                               SceneViewportInstance& viewport)
+{
+    const auto preview_it = m_preview_scene_viewports.find(viewport_id);
+    if (preview_it == m_preview_scene_viewports.end() || !preview_it->second) {
+        return false;
+    }
+
+    PreviewSceneViewport& preview = *preview_it->second;
+    if (preview.dirty) {
+        rebuildPreviewScene(preview);
+    }
+
+    RenderWorldExtractor{}.extract(preview.scene,
+                                   preview.camera,
+                                   renderer.getSceneViewportRenderWorld(viewport.rendererViewportHandle(renderer)));
+    return true;
+}
+
+void LunaEditorLayer::rebuildPreviewScene(PreviewSceneViewport& preview)
+{
+    Scene& scene = preview.scene;
+    scene.entityManager().clear();
+    scene.setName("Editor Preview");
+    scene.setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
+    scene.environmentSettings() = toSceneEnvironmentSettings(preview.state.environment);
+    scene.shadowSettings().mode = SceneShadowMode::PcfShadowMap;
+    scene.shadowSettings().pcfShadowDistance = 12.0f;
+    scene.shadowSettings().pcfMapSize = 1024;
+    scene.shadowSettings().csmCascadeSize = 1024;
+
+    Entity material_entity = scene.entityManager().createEntity("Preview Mesh");
+    material_entity.transform().translation = glm::vec3{0.0f, 0.0f, 0.0f};
+    material_entity.transform().rotation = glm::vec3{0.0f, glm::radians(25.0f), 0.0f};
+    material_entity.transform().scale = glm::vec3{1.0f};
+    auto& mesh_component = material_entity.addComponent<MeshComponent>();
+    mesh_component.meshHandle = previewMeshHandle(preview.state);
+    if (preview.state.material.isValid()) {
+        mesh_component.setSubmeshMaterial(0, preview.state.material);
+    }
+
+    Entity key_light = scene.entityManager().createEntity("Preview Key Light");
+    key_light.transform().rotation = glm::vec3{glm::radians(-45.0f), glm::radians(35.0f), 0.0f};
+    auto& light_component = key_light.addComponent<LightComponent>();
+    light_component.type = LightComponent::Type::Directional;
+    light_component.intensity = 3.0f;
+    light_component.color = glm::vec3{1.0f, 0.96f, 0.90f};
+
+    preview.camera.setPerspective(glm::radians(45.0f), 0.05f, 100.0f);
+    preview.camera.setPosition(glm::vec3{0.0f, 0.35f, 3.1f});
+    preview.camera.lookAt(glm::vec3{0.0f, 0.0f, 0.0f});
+    preview.dirty = false;
 }
 
 editor::ViewportId LunaEditorLayer::allocateViewportId() noexcept

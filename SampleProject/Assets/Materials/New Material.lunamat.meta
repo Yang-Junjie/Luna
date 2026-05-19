@@ -1,0 +1,7 @@
+Asset:
+  Name: New Material
+  Handle: 3559980054986949092
+  Type: Material
+  FilePath: Assets/Materials/New Material.lunamat
+  Config:
+    UseMaterialFileParameters: true

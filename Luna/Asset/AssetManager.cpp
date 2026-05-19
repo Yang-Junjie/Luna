@@ -158,6 +158,18 @@ void AssetManager::registerMemoryAsset(AssetHandle handle, const std::shared_ptr
     AssetDatabase::set(handle, metadata);
 }
 
+void AssetManager::invalidateAsset(AssetHandle handle)
+{
+    if (!handle.isValid()) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_loaded_assets.erase(handle);
+    m_failed_assets.erase(handle);
+    m_pending_asset_loads.erase(handle);
+}
+
 std::shared_ptr<Asset> AssetManager::loadAsset(AssetHandle handle)
 {
     return loadAssetInternal(handle, false);

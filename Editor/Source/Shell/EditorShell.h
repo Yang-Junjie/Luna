@@ -25,6 +25,7 @@ class Ui;
 class WindowService;
 class CommandService;
 class HistoryService;
+class MaterialService;
 class MenuService;
 class PluginAssetService;
 class PluginService;
@@ -49,6 +50,7 @@ public:
     WindowService& windows() override;
     CommandService& commands() override;
     HistoryService& history() override;
+    MaterialService& materials() override;
     MenuService& menus() override;
     PluginAssetService& pluginAssets() override;
     PluginService& plugins() override;

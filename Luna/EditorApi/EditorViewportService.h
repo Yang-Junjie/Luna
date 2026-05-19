@@ -31,6 +31,43 @@ struct SceneViewportDrawResult {
     bool double_clicked{false};
 };
 
+enum class SceneViewportPreviewMesh : uint32_t {
+    Sphere,
+    Cube,
+    Plane,
+};
+
+enum class SceneViewportPreviewBackground : uint32_t {
+    SolidColor,
+    ProceduralSky,
+    EnvironmentMap,
+};
+
+struct SceneViewportPreviewEnvironment {
+    SceneViewportPreviewBackground background{SceneViewportPreviewBackground::ProceduralSky};
+    Vec3 background_color{0.10f, 0.10f, 0.12f};
+    bool ibl_enabled{true};
+    AssetHandle environment_map{0};
+    float intensity{1.0f};
+    float sky_intensity{1.0f};
+    float diffuse_intensity{1.0f};
+    float specular_intensity{1.0f};
+    Vec3 procedural_sun_direction{0.4f, 0.6f, 0.3f};
+    float procedural_sun_intensity{20.0f};
+    float procedural_sun_angular_radius{0.02f};
+    Vec3 procedural_sky_color_zenith{0.16f, 0.32f, 0.65f};
+    Vec3 procedural_sky_color_horizon{0.55f, 0.70f, 0.95f};
+    Vec3 procedural_ground_color{0.18f, 0.17f, 0.15f};
+    float procedural_sky_exposure{1.5f};
+};
+
+struct SceneViewportPreviewState {
+    AssetHandle material{0};
+    AssetHandle mesh{0};
+    SceneViewportPreviewMesh mesh_kind{SceneViewportPreviewMesh::Sphere};
+    SceneViewportPreviewEnvironment environment{};
+};
+
 struct TextureViewportPresentation {
     TextureView texture;
     UVec2 framebuffer_size{};
@@ -61,6 +98,8 @@ public:
     virtual bool isSceneViewportValid(ViewportId viewport_id) const noexcept = 0;
     virtual ViewportPresentation syncSceneViewport(ViewportId viewport_id, UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView(ViewportId viewport_id) const = 0;
+    virtual bool setSceneViewportPreview(ViewportId viewport_id, const SceneViewportPreviewState& state) = 0;
+    virtual void clearSceneViewportPreview(ViewportId viewport_id) = 0;
 
     virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView() const = 0;

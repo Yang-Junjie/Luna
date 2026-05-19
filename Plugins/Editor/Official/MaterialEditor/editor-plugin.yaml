@@ -1,0 +1,9 @@
+EditorPlugin:
+  Id: luna.editor.material-editor
+  DisplayName: Material Editor
+  Runtime: BuiltinNative
+  Category: Tool
+  Version: 0.1.0
+  Enabled: true
+  Dependencies:
+    - luna.editor.core-commands

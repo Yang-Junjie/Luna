@@ -2,6 +2,7 @@
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
 #include "EditorApi/EditorHistoryService.h"
+#include "EditorApi/EditorMaterialService.h"
 #include "EditorApi/EditorMenuService.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "EditorApi/EditorPluginAssetService.h"
@@ -1590,9 +1591,19 @@ public:
         windows[descriptor.id] = std::move(descriptor);
         return true;
     }
+    bool registerDockspaceWindow(luna::editor::DockspaceWindowDescriptor descriptor) override
+    {
+        if (descriptor.id.empty()) {
+            return false;
+        }
+        open[descriptor.id] = descriptor.default_open;
+        dockspaces[descriptor.id] = std::move(descriptor);
+        return true;
+    }
     void unregisterWindow(std::string_view id) override
     {
         windows.erase(std::string(id));
+        dockspaces.erase(std::string(id));
         open.erase(std::string(id));
     }
     bool isWindowOpen(std::string_view id) const override
@@ -1602,8 +1613,9 @@ public:
     }
     void setWindowOpen(std::string_view id, bool value) override
     {
-        if (windows.contains(std::string(id))) {
-            open[std::string(id)] = value;
+        const std::string key(id);
+        if (windows.contains(key) || dockspaces.contains(key)) {
+            open[key] = value;
         }
     }
     bool drawWindow(std::string_view id, luna::editor::Host& host, luna::editor::Ui& ui)
@@ -1626,9 +1638,18 @@ public:
                 ++it;
             }
         }
+        for (auto it = dockspaces.begin(); it != dockspaces.end();) {
+            if (it->second.owner_id == owner_id) {
+                open.erase(it->first);
+                it = dockspaces.erase(it);
+            } else {
+                ++it;
+            }
+        }
     }
 
     std::unordered_map<std::string, luna::editor::WindowDescriptor> windows;
+    std::unordered_map<std::string, luna::editor::DockspaceWindowDescriptor> dockspaces;
     std::unordered_map<std::string, bool> open;
 };
 
@@ -1732,6 +1753,23 @@ public:
     luna::editor::AssetInfo asset;
     uint64_t revision{9u};
     mutable int list_count{};
+};
+
+class TemplateManagerMaterialService final : public luna::editor::MaterialService {
+public:
+    luna::editor::MaterialCreateResult createMaterial(const luna::editor::MaterialCreateRequest&) override { return {}; }
+    bool canEditMaterial(luna::AssetHandle) const override { return false; }
+    std::optional<luna::editor::MaterialDocument> readMaterial(luna::AssetHandle) override { return std::nullopt; }
+    bool setMaterialTextures(luna::AssetHandle, const luna::editor::MaterialTextureSet&) override { return false; }
+    bool setMaterialSurface(luna::AssetHandle, const luna::editor::MaterialSurfaceProperties&) override { return false; }
+    luna::editor::MetallicRoughnessSynthesisResult
+        synthesizeMetallicRoughness(const luna::editor::MetallicRoughnessSynthesisRequest&) override
+    {
+        return {};
+    }
+    luna::editor::MaterialEditResult saveMaterial(luna::AssetHandle) override { return {}; }
+    luna::editor::MaterialEditResult revertMaterial(luna::AssetHandle) override { return {}; }
+    bool isMaterialDirty(luna::AssetHandle) const override { return false; }
 };
 
 class TemplateManagerPluginAssetService final : public luna::editor::PluginAssetService {
@@ -1993,6 +2031,12 @@ public:
         }
         return {.id = static_cast<luna::editor::TextureHandle>(0x700u + viewport_id), .size = {.x = 320u, .y = 180u}, .y_flip = false};
     }
+    bool setSceneViewportPreview(luna::editor::ViewportId viewport_id,
+                                 const luna::editor::SceneViewportPreviewState&) override
+    {
+        return isSceneViewportValid(viewport_id);
+    }
+    void clearSceneViewportPreview(luna::editor::ViewportId) override {}
     luna::editor::ViewportPresentation syncSceneViewport(luna::editor::UVec2 framebuffer_size) override
     {
         return syncSceneViewport(luna::editor::kDefaultViewportId, framebuffer_size);
@@ -2171,6 +2215,7 @@ public:
     luna::editor::WindowService& windows() override { return window_service; }
     luna::editor::CommandService& commands() override { return command_service; }
     luna::editor::HistoryService& history() override { return history_service; }
+    luna::editor::MaterialService& materials() override { return material_service; }
     luna::editor::MenuService& menus() override { return menu_service; }
     luna::editor::PluginAssetService& pluginAssets() override { return plugin_asset_service; }
     luna::editor::PluginService& plugins() override { return plugin_service; }
@@ -2210,6 +2255,7 @@ public:
 
     TemplateManagerUi ui_service;
     TemplateManagerAssetService asset_service;
+    TemplateManagerMaterialService material_service;
     TemplateManagerWindowService window_service;
     TemplateManagerCommandService command_service;
     TemplateManagerHistoryService history_service;

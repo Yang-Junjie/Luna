@@ -3,6 +3,8 @@
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Editor/ImageLoader.h"
 #include "Asset/Editor/ImporterManager.h"
+#include "Asset/Editor/MaterialFactory.h"
+#include "Asset/Editor/TextureImporter.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorApi.h"
@@ -13,6 +15,8 @@
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/Material.h"
+#include "Renderer/Texture.h"
 #include "Scene/Scene.h"
 #include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
@@ -27,6 +31,7 @@
 #include <algorithm>
 #include <array>
 #include <Builders.h>
+#include <charconv>
 #include <CommandBufferEncoder.h>
 #include <Device.h>
 #include <filesystem>
@@ -47,6 +52,9 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include <yaml-cpp/yaml.h>
+#include <stb_image_write.h>
 
 namespace {
 
@@ -1000,6 +1008,235 @@ bool toAuthoringComponentKind(luna::editor::SceneComponentKind component_kind,
     }
 
     return false;
+}
+
+struct SynthesizedTexture {
+    uint32_t width{0};
+    uint32_t height{0};
+    std::vector<uint8_t> pixels;
+};
+
+uint8_t normalizedByte(float value) noexcept
+{
+    const float clamped = std::clamp(value, 0.0f, 1.0f);
+    return static_cast<uint8_t>(std::round(clamped * 255.0f));
+}
+
+bool isMetallicRoughnessSynthesisFormat(luna::RHI::Format format) noexcept
+{
+    using Format = luna::RHI::Format;
+    switch (format) {
+        case Format::R8_UNORM:
+        case Format::RG8_UNORM:
+        case Format::RGBA8_UNORM:
+        case Format::RGBA8_SRGB:
+        case Format::BGRA8_UNORM:
+        case Format::BGRA8_SRGB:
+        case Format::RGBA32_FLOAT:
+            return true;
+        default:
+            return false;
+    }
+}
+
+uint8_t sampleSynthesisSourceChannel(const luna::ImageData& image,
+                                     uint32_t output_x,
+                                     uint32_t output_y,
+                                     uint32_t output_width,
+                                     uint32_t output_height,
+                                     uint8_t fallback) noexcept
+{
+    if (!image.isValid() || output_width == 0u || output_height == 0u) {
+        return fallback;
+    }
+
+    const uint32_t source_x =
+        (std::min)(image.Width - 1u, static_cast<uint32_t>((static_cast<uint64_t>(output_x) * image.Width) / output_width));
+    const uint32_t source_y = (std::min)(
+        image.Height - 1u, static_cast<uint32_t>((static_cast<uint64_t>(output_y) * image.Height) / output_height));
+    const size_t pixel_index = static_cast<size_t>(source_y) * image.Width + source_x;
+
+    using Format = luna::RHI::Format;
+    switch (image.ImageFormat) {
+        case Format::R8_UNORM:
+            if (pixel_index < image.ByteData.size()) {
+                return image.ByteData[pixel_index];
+            }
+            break;
+        case Format::RG8_UNORM: {
+            const size_t byte_index = pixel_index * 2u;
+            if (byte_index < image.ByteData.size()) {
+                return image.ByteData[byte_index];
+            }
+            break;
+        }
+        case Format::RGBA8_UNORM:
+        case Format::RGBA8_SRGB: {
+            const size_t byte_index = pixel_index * 4u;
+            if (byte_index < image.ByteData.size()) {
+                return image.ByteData[byte_index];
+            }
+            break;
+        }
+        case Format::BGRA8_UNORM:
+        case Format::BGRA8_SRGB: {
+            const size_t byte_index = pixel_index * 4u + 2u;
+            if (byte_index < image.ByteData.size()) {
+                return image.ByteData[byte_index];
+            }
+            break;
+        }
+        case Format::RGBA32_FLOAT: {
+            const size_t byte_index = pixel_index * 4u * sizeof(float);
+            if (byte_index + sizeof(float) <= image.ByteData.size()) {
+                float value = 0.0f;
+                std::memcpy(&value, image.ByteData.data() + byte_index, sizeof(float));
+                return normalizedByte(value);
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    return fallback;
+}
+
+std::optional<luna::ImageData> loadSynthesisSourceImage(luna::editor::AssetService& asset_service,
+                                                        luna::AssetHandle texture_handle,
+                                                        std::string_view usage)
+{
+    const std::optional<luna::editor::AssetInfo> info = asset_service.assetInfo(texture_handle);
+    if (!info || info->type != luna::AssetType::Texture || !info->exists || info->memory_only) {
+        LUNA_EDITOR_WARN("Cannot use {} source because the asset is not a file-backed texture.", usage);
+        return std::nullopt;
+    }
+
+    std::filesystem::path texture_path = info->absolute_path;
+    if (texture_path.empty() && !info->project_path.empty()) {
+        if (const std::optional<std::filesystem::path> resolved_path =
+                asset_service.resolveProjectAssetPath(info->project_path)) {
+            texture_path = *resolved_path;
+        }
+    }
+
+    if (texture_path.empty()) {
+        LUNA_EDITOR_WARN("Cannot resolve {} source texture path for handle {}.", usage, texture_handle.toString());
+        return std::nullopt;
+    }
+
+    luna::ImageData image = luna::ImageLoader::LoadImageFromFile(texture_path.string());
+    if (!image.isValid() || !isMetallicRoughnessSynthesisFormat(image.ImageFormat)) {
+        LUNA_EDITOR_WARN("Cannot load {} source texture '{}' for metallic/roughness synthesis.",
+                         usage,
+                         texture_path.string());
+        return std::nullopt;
+    }
+
+    return image;
+}
+
+SynthesizedTexture synthesizePackedMetallicRoughness(const luna::ImageData* metallic_image,
+                                                     const luna::ImageData* roughness_image,
+                                                     float metallic_fallback,
+                                                     float roughness_fallback)
+{
+    const uint32_t width =
+        (std::max)({metallic_image != nullptr ? metallic_image->Width : 0u,
+                    roughness_image != nullptr ? roughness_image->Width : 0u,
+                    1u});
+    const uint32_t height =
+        (std::max)({metallic_image != nullptr ? metallic_image->Height : 0u,
+                    roughness_image != nullptr ? roughness_image->Height : 0u,
+                    1u});
+
+    SynthesizedTexture result{
+        .width = width,
+        .height = height,
+        .pixels = std::vector<uint8_t>(static_cast<size_t>(width) * height * 4u, 255u),
+    };
+
+    const uint8_t metallic_byte = normalizedByte(metallic_fallback);
+    const uint8_t roughness_byte = normalizedByte(roughness_fallback);
+
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            const size_t offset = (static_cast<size_t>(y) * width + x) * 4u;
+            result.pixels[offset + 0u] = 0u;
+            result.pixels[offset + 1u] = roughness_image != nullptr
+                                             ? sampleSynthesisSourceChannel(*roughness_image, x, y, width, height, roughness_byte)
+                                             : roughness_byte;
+            result.pixels[offset + 2u] = metallic_image != nullptr
+                                             ? sampleSynthesisSourceChannel(*metallic_image, x, y, width, height, metallic_byte)
+                                             : metallic_byte;
+            result.pixels[offset + 3u] = 255u;
+        }
+    }
+
+    return result;
+}
+
+std::filesystem::path defaultMetallicRoughnessOutputPath(const luna::editor::MaterialDocument& document)
+{
+    const std::string stem = document.project_path.empty() ? std::string("Material") : document.project_path.stem().string();
+    std::filesystem::path parent_path = document.project_path.parent_path();
+    if (parent_path.empty()) {
+        parent_path = std::filesystem::path("Assets") / "Materials";
+    }
+    return parent_path / (stem + "_MR.png");
+}
+
+std::optional<std::filesystem::path> normalizeTextureProjectPath(luna::editor::AssetService& asset_service,
+                                                                 const std::filesystem::path& path)
+{
+    std::optional<std::filesystem::path> normalized_path = asset_service.makeProjectRelativeAssetPath(path);
+    if (!normalized_path) {
+        return std::nullopt;
+    }
+
+    std::filesystem::path result = normalized_path->lexically_normal();
+    std::string extension = result.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    if (extension != ".png") {
+        result.replace_extension(".png");
+    }
+
+    return result.lexically_normal();
+}
+
+luna::AssetHandle importSynthesizedTexture(const std::filesystem::path& absolute_path,
+                                           const std::filesystem::path& project_path)
+{
+    luna::TextureImporter importer;
+    luna::AssetMetadata metadata;
+
+    const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(project_path);
+    if (existing_handle.isValid() && luna::AssetDatabase::exists(existing_handle)) {
+        metadata = luna::AssetDatabase::getAssetMetadata(existing_handle);
+    } else {
+        metadata = importer.import(absolute_path);
+    }
+
+    if (!metadata.Handle.isValid()) {
+        metadata.Handle = luna::UUID();
+        if (!metadata.Handle.isValid()) {
+            metadata.Handle = luna::UUID(1);
+        }
+    }
+
+    metadata.Name = absolute_path.stem().string();
+    metadata.Type = luna::AssetType::Texture;
+    metadata.FilePath = project_path.lexically_normal();
+    metadata.MemoryOnly = false;
+    metadata.SpecializedConfig = luna::texture_importer_detail::makeDefaultTextureConfig(project_path);
+    metadata.SpecializedConfig["SRGB"] = false;
+    metadata.SpecializedConfig["GenerateMipmaps"] = true;
+
+    importer.serializeMetadata(metadata);
+    luna::AssetDatabase::set(metadata.Handle, metadata);
+    return metadata.Handle;
 }
 
 } // namespace
@@ -2225,6 +2462,614 @@ private:
     uint64_t m_asset_revision{0};
 };
 
+class EditorMaterialService final : public MaterialService {
+public:
+    explicit EditorMaterialService(Host& host)
+        : m_host(&host)
+    {}
+
+    MaterialCreateResult createMaterial(const MaterialCreateRequest& request) override
+    {
+        MaterialCreateResult result{
+            .project_loaded = hasProjectLoaded(),
+        };
+        if (!result.project_loaded) {
+            result.message = "Cannot create material because no project is loaded.";
+            return result;
+        }
+
+        const std::optional<std::filesystem::path> normalized_project_path =
+            normalizeMaterialProjectPath(request.project_path, request.name);
+        if (!normalized_project_path) {
+            result.message = "Material path is invalid.";
+            return result;
+        }
+
+        const AssetService* asset_service = assets();
+        if (asset_service == nullptr) {
+            result.message = "Asset service is unavailable.";
+            return result;
+        }
+
+        const std::optional<std::filesystem::path> absolute_path =
+            asset_service->resolveProjectAssetPath(*normalized_project_path);
+        if (!absolute_path) {
+            result.message = "Material path cannot be resolved in the current project.";
+            return result;
+        }
+
+        result.project_path = *normalized_project_path;
+        result.absolute_path = *absolute_path;
+
+        std::error_code ec;
+        const bool file_exists = std::filesystem::exists(*absolute_path, ec) && !ec;
+        if (file_exists && !request.overwrite) {
+            result.message = "Material file already exists.";
+            return result;
+        }
+
+        MaterialAssetDescriptor descriptor;
+        descriptor.Name = request.name.empty() ? normalized_project_path->stem().string() : request.name;
+        descriptor.Textures = toRuntimeTextureHandles(request.textures);
+        descriptor.Surface = toRuntimeSurface(request.surface);
+
+        if (!MaterialFactory::createMaterialFile(*absolute_path, descriptor, true)) {
+            result.message = "Failed to create material file.";
+            return result;
+        }
+
+        result.handle = AssetDatabase::findHandleByFilePath(*normalized_project_path);
+        if (!result.handle.isValid()) {
+            result.message = "Material file was created, but metadata handle could not be resolved.";
+            return result;
+        }
+
+        m_dirty_documents.erase(result.handle);
+        result.success = true;
+        result.message = "Material created.";
+        return result;
+    }
+
+    bool canEditMaterial(AssetHandle handle) const override
+    {
+        const MaterialDocument document = readMaterialDocument(handle);
+        return document.exists && document.editable;
+    }
+
+    std::optional<MaterialDocument> readMaterial(AssetHandle handle) override
+    {
+        MaterialDocument document = readMaterialDocument(handle);
+        if (!document.exists) {
+            return std::nullopt;
+        }
+        return document;
+    }
+
+    bool setMaterialTextures(AssetHandle handle, const MaterialTextureSet& textures) override
+    {
+        MaterialDocument document = readMaterialDocument(handle);
+        if (!document.exists || !document.editable) {
+            return false;
+        }
+
+        document.textures = textures;
+        if (std::shared_ptr<Material> material = AssetManager::get().loadAssetAs<Material>(handle)) {
+            material->setTextures(toRuntimeTextures(textures));
+            document.version = material->getVersion();
+        }
+        markDirty(std::move(document));
+        return true;
+    }
+
+    bool setMaterialSurface(AssetHandle handle, const MaterialSurfaceProperties& surface) override
+    {
+        MaterialDocument document = readMaterialDocument(handle);
+        if (!document.exists || !document.editable) {
+            return false;
+        }
+
+        document.surface = surface;
+        if (std::shared_ptr<Material> material = AssetManager::get().loadAssetAs<Material>(handle)) {
+            material->setSurface(toRuntimeSurface(surface));
+            document.version = material->getVersion();
+        }
+        markDirty(std::move(document));
+        return true;
+    }
+
+    MetallicRoughnessSynthesisResult
+        synthesizeMetallicRoughness(const MetallicRoughnessSynthesisRequest& request) override
+    {
+        MetallicRoughnessSynthesisResult result{
+            .project_loaded = hasProjectLoaded(),
+        };
+        if (!result.project_loaded) {
+            result.message = "Cannot synthesize metallic/roughness because no project is loaded.";
+            return result;
+        }
+
+        AssetService* asset_service = assets();
+        if (asset_service == nullptr) {
+            result.message = "Asset service is unavailable.";
+            return result;
+        }
+
+        MaterialDocument document = readMaterialDocument(request.material);
+        if (!document.exists || !document.editable) {
+            result.message = "Material is not editable.";
+            return result;
+        }
+
+        std::optional<ImageData> metallic_image;
+        std::optional<ImageData> roughness_image;
+        if (request.metallic_texture.isValid()) {
+            metallic_image = loadSynthesisSourceImage(*asset_service, request.metallic_texture, "metallic");
+            if (!metallic_image) {
+                result.message = "Failed to load metallic source texture.";
+                return result;
+            }
+        }
+        if (request.roughness_texture.isValid()) {
+            roughness_image = loadSynthesisSourceImage(*asset_service, request.roughness_texture, "roughness");
+            if (!roughness_image) {
+                result.message = "Failed to load roughness source texture.";
+                return result;
+            }
+        }
+
+        std::filesystem::path output_project_path =
+            request.output_project_path.empty() ? defaultMetallicRoughnessOutputPath(document)
+                                                : request.output_project_path;
+        const std::optional<std::filesystem::path> normalized_output_path =
+            normalizeTextureProjectPath(*asset_service, output_project_path);
+        if (!normalized_output_path) {
+            result.message = "Output texture path is invalid.";
+            return result;
+        }
+
+        const std::optional<std::filesystem::path> absolute_output_path =
+            asset_service->resolveProjectAssetPath(*normalized_output_path);
+        if (!absolute_output_path) {
+            result.message = "Output texture path cannot be resolved in the current project.";
+            return result;
+        }
+
+        result.project_path = *normalized_output_path;
+        result.absolute_path = *absolute_output_path;
+
+        std::error_code ec;
+        const bool output_exists = std::filesystem::exists(*absolute_output_path, ec) && !ec;
+        if (output_exists && !request.overwrite) {
+            result.message = "Output texture already exists.";
+            return result;
+        }
+
+        const SynthesizedTexture synthesized = synthesizePackedMetallicRoughness(
+            metallic_image ? &*metallic_image : nullptr,
+            roughness_image ? &*roughness_image : nullptr,
+            request.metallic_fallback,
+            request.roughness_fallback);
+        if (synthesized.pixels.empty() || synthesized.width == 0u || synthesized.height == 0u) {
+            result.message = "Failed to synthesize metallic/roughness texture.";
+            return result;
+        }
+
+        std::filesystem::create_directories(absolute_output_path->parent_path(), ec);
+        if (ec) {
+            result.message = "Failed to create output texture directory.";
+            return result;
+        }
+
+        const std::string output_path_string = absolute_output_path->string();
+        const int written = stbi_write_png(output_path_string.c_str(),
+                                           static_cast<int>(synthesized.width),
+                                           static_cast<int>(synthesized.height),
+                                           4,
+                                           synthesized.pixels.data(),
+                                           static_cast<int>(synthesized.width * 4u));
+        if (written == 0) {
+            result.message = "Failed to write synthesized texture.";
+            return result;
+        }
+
+        AssetHandle texture_handle = importSynthesizedTexture(*absolute_output_path, *normalized_output_path);
+        if (!texture_handle.isValid()) {
+            result.message = "Synthesized texture was written, but could not be imported.";
+            return result;
+        }
+
+        const AssetRefreshResult refresh_result = asset_service->refreshAssets();
+        const AssetHandle refreshed_handle = asset_service->findAssetHandleByPath(*normalized_output_path);
+        if (refreshed_handle.isValid()) {
+            texture_handle = refreshed_handle;
+        } else if (!refresh_result.success) {
+            LUNA_EDITOR_WARN("Asset refresh after metallic/roughness synthesis reported: {}", refresh_result.message);
+        }
+
+        AssetManager::get().invalidateAsset(texture_handle);
+        MaterialTextureSet textures = document.textures;
+        textures.metallic_roughness = texture_handle;
+        if (!setMaterialTextures(document.handle, textures)) {
+            result.message = "Synthesized texture was imported, but material assignment failed.";
+            return result;
+        }
+
+        result.texture = texture_handle;
+        result.dirty = isMaterialDirty(document.handle);
+        result.success = true;
+        result.message = "Metallic/roughness texture synthesized and assigned.";
+        return result;
+    }
+
+    MaterialEditResult saveMaterial(AssetHandle handle) override
+    {
+        const auto dirty_it = m_dirty_documents.find(handle);
+        if (dirty_it == m_dirty_documents.end()) {
+            return MaterialEditResult{
+                .success = true,
+                .project_loaded = hasProjectLoaded(),
+                .message = "Material has no pending changes.",
+            };
+        }
+
+        MaterialDocument document = dirty_it->second;
+        if (!document.editable || document.absolute_path.empty()) {
+            return MaterialEditResult{
+                .success = false,
+                .project_loaded = hasProjectLoaded(),
+                .dirty = true,
+                .message = "Material is not editable.",
+            };
+        }
+
+        MaterialAssetDescriptor descriptor;
+        descriptor.Name = document.name.empty() ? document.absolute_path.stem().string() : document.name;
+        descriptor.Textures = toRuntimeTextureHandles(document.textures);
+        descriptor.Surface = toRuntimeSurface(document.surface);
+
+        const bool saved = MaterialFactory::createMaterialFile(document.absolute_path, descriptor, false);
+        if (!saved) {
+            return MaterialEditResult{
+                .success = false,
+                .project_loaded = hasProjectLoaded(),
+                .dirty = true,
+                .message = "Failed to save material file.",
+            };
+        }
+
+        m_dirty_documents.erase(dirty_it);
+        if (std::shared_ptr<Material> material = AssetManager::get().loadAssetAs<Material>(handle)) {
+            material->setTextures(toRuntimeTextures(document.textures));
+            material->setSurface(descriptor.Surface);
+        }
+
+        return MaterialEditResult{
+            .success = true,
+            .project_loaded = hasProjectLoaded(),
+            .message = "Material saved.",
+        };
+    }
+
+    MaterialEditResult revertMaterial(AssetHandle handle) override
+    {
+        m_dirty_documents.erase(handle);
+
+        if (std::shared_ptr<Material> material = AssetManager::get().loadAssetAs<Material>(handle)) {
+            const MaterialDocument document = readMaterialDocument(handle);
+            if (document.exists) {
+                material->setTextures(toRuntimeTextures(document.textures));
+                material->setSurface(toRuntimeSurface(document.surface));
+            }
+        }
+
+        return MaterialEditResult{
+            .success = true,
+            .project_loaded = hasProjectLoaded(),
+            .message = "Material changes reverted.",
+        };
+    }
+
+    bool isMaterialDirty(AssetHandle handle) const override
+    {
+        return m_dirty_documents.contains(handle);
+    }
+
+private:
+    static MaterialBlendMode toEditorBlendMode(Material::BlendMode value) noexcept
+    {
+        switch (value) {
+            case Material::BlendMode::Masked:
+                return MaterialBlendMode::Masked;
+            case Material::BlendMode::Transparent:
+                return MaterialBlendMode::Transparent;
+            case Material::BlendMode::Additive:
+                return MaterialBlendMode::Additive;
+            case Material::BlendMode::Opaque:
+            default:
+                return MaterialBlendMode::Opaque;
+        }
+    }
+
+    static Material::BlendMode toRuntimeBlendMode(MaterialBlendMode value) noexcept
+    {
+        switch (value) {
+            case MaterialBlendMode::Masked:
+                return Material::BlendMode::Masked;
+            case MaterialBlendMode::Transparent:
+                return Material::BlendMode::Transparent;
+            case MaterialBlendMode::Additive:
+                return Material::BlendMode::Additive;
+            case MaterialBlendMode::Opaque:
+            default:
+                return Material::BlendMode::Opaque;
+        }
+    }
+
+    static MaterialSurfaceProperties toEditorSurface(const Material::SurfaceProperties& surface) noexcept
+    {
+        return MaterialSurfaceProperties{
+            .base_color_factor = Vec4{surface.BaseColorFactor.x,
+                                      surface.BaseColorFactor.y,
+                                      surface.BaseColorFactor.z,
+                                      surface.BaseColorFactor.w},
+            .emissive_factor = Vec3{surface.EmissiveFactor.x, surface.EmissiveFactor.y, surface.EmissiveFactor.z},
+            .metallic_factor = surface.MetallicFactor,
+            .roughness_factor = surface.RoughnessFactor,
+            .normal_scale = surface.NormalScale,
+            .occlusion_strength = surface.OcclusionStrength,
+            .alpha_cutoff = surface.AlphaCutoff,
+            .blend_mode = toEditorBlendMode(surface.BlendModeValue),
+            .double_sided = surface.DoubleSided,
+            .unlit = surface.Unlit,
+        };
+    }
+
+    static Material::SurfaceProperties toRuntimeSurface(const MaterialSurfaceProperties& surface) noexcept
+    {
+        Material::SurfaceProperties result;
+        result.BaseColorFactor =
+            glm::vec4(surface.base_color_factor.x,
+                      surface.base_color_factor.y,
+                      surface.base_color_factor.z,
+                      surface.base_color_factor.w);
+        result.EmissiveFactor = glm::vec3(surface.emissive_factor.x, surface.emissive_factor.y, surface.emissive_factor.z);
+        result.MetallicFactor = surface.metallic_factor;
+        result.RoughnessFactor = surface.roughness_factor;
+        result.NormalScale = surface.normal_scale;
+        result.OcclusionStrength = surface.occlusion_strength;
+        result.AlphaCutoff = surface.alpha_cutoff;
+        result.BlendModeValue = toRuntimeBlendMode(surface.blend_mode);
+        result.DoubleSided = surface.double_sided;
+        result.Unlit = surface.unlit;
+        return result;
+    }
+
+    static MaterialTextureHandleSet toRuntimeTextureHandles(const MaterialTextureSet& textures) noexcept
+    {
+        return MaterialTextureHandleSet{
+            .BaseColor = textures.base_color,
+            .Normal = textures.normal,
+            .MetallicRoughness = textures.metallic_roughness,
+            .Emissive = textures.emissive,
+            .Occlusion = textures.occlusion,
+        };
+    }
+
+    static Material::TextureSet toRuntimeTextures(const MaterialTextureSet& textures)
+    {
+        return Material::TextureSet{
+            .BaseColor = textures.base_color.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.base_color)
+                                                       : std::shared_ptr<Texture>{},
+            .Normal = textures.normal.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.normal)
+                                                : std::shared_ptr<Texture>{},
+            .MetallicRoughness = textures.metallic_roughness.isValid()
+                                      ? AssetManager::get().loadAssetAs<Texture>(textures.metallic_roughness)
+                                      : std::shared_ptr<Texture>{},
+            .Emissive = textures.emissive.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.emissive)
+                                                    : std::shared_ptr<Texture>{},
+            .Occlusion = textures.occlusion.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.occlusion)
+                                                      : std::shared_ptr<Texture>{},
+        };
+    }
+
+    static AssetHandle readHandle(const YAML::Node& node)
+    {
+        if (!node || !node.IsScalar()) {
+            return AssetHandle(0);
+        }
+
+        const std::string value = node.Scalar();
+        uint64_t handle_value = 0;
+        const char* begin = value.data();
+        const char* end = begin + value.size();
+        const auto [ptr, ec] = std::from_chars(begin, end, handle_value);
+        return ec == std::errc{} && ptr == end ? AssetHandle(handle_value) : AssetHandle(0);
+    }
+
+    static Vec3 readVec3(const YAML::Node& node, Vec3 fallback)
+    {
+        if (!node || !node.IsSequence() || node.size() < 3) {
+            return fallback;
+        }
+        return Vec3{node[0].as<float>(), node[1].as<float>(), node[2].as<float>()};
+    }
+
+    static Vec4 readVec4(const YAML::Node& node, Vec4 fallback)
+    {
+        if (!node || !node.IsSequence() || node.size() < 4) {
+            return fallback;
+        }
+        return Vec4{node[0].as<float>(), node[1].as<float>(), node[2].as<float>(), node[3].as<float>()};
+    }
+
+    static MaterialBlendMode parseBlendMode(const YAML::Node& node, MaterialBlendMode fallback)
+    {
+        if (!node || !node.IsScalar()) {
+            return fallback;
+        }
+
+        const std::string value = node.as<std::string>();
+        if (value == "Masked") {
+            return MaterialBlendMode::Masked;
+        }
+        if (value == "Transparent") {
+            return MaterialBlendMode::Transparent;
+        }
+        if (value == "Additive") {
+            return MaterialBlendMode::Additive;
+        }
+        return MaterialBlendMode::Opaque;
+    }
+
+    static std::optional<std::filesystem::path> normalizeMaterialProjectPath(std::filesystem::path project_path,
+                                                                             std::string_view name)
+    {
+        if (project_path.empty()) {
+            const std::string filename = name.empty() ? std::string("New Material") : toString(name);
+            project_path = std::filesystem::path("Assets") / "Materials" / filename;
+        }
+
+        project_path = project_path.lexically_normal();
+        if (project_path.empty() || project_path.is_absolute()) {
+            return std::nullopt;
+        }
+
+        const std::string path_string = project_path.generic_string();
+        if (path_string == "." || path_string == ".." || path_string.starts_with("../")) {
+            return std::nullopt;
+        }
+
+        if (project_path.extension() != ".lunamat") {
+            project_path.replace_extension(".lunamat");
+        }
+
+        return project_path.lexically_normal();
+    }
+
+    void readMaterialFile(MaterialDocument& document) const
+    {
+        if (document.absolute_path.empty()) {
+            return;
+        }
+
+        try {
+            const YAML::Node data = YAML::LoadFile(document.absolute_path.string());
+            const YAML::Node material_node = data["Material"] ? data["Material"] : data;
+            if (!material_node) {
+                return;
+            }
+
+            if (material_node["Name"]) {
+                document.name = material_node["Name"].as<std::string>();
+            }
+
+            const YAML::Node textures_node = material_node["Textures"];
+            if (textures_node) {
+                document.textures.base_color = readHandle(textures_node["BaseColor"]);
+                document.textures.normal = readHandle(textures_node["Normal"]);
+                document.textures.metallic_roughness = readHandle(textures_node["MetallicRoughness"]);
+                document.textures.emissive = readHandle(textures_node["Emissive"]);
+                document.textures.occlusion = readHandle(textures_node["Occlusion"]);
+            }
+
+            const YAML::Node surface_node = material_node["Surface"] ? material_node["Surface"] : material_node;
+            document.surface.base_color_factor =
+                readVec4(surface_node["BaseColorFactor"], document.surface.base_color_factor);
+            document.surface.emissive_factor = readVec3(surface_node["EmissiveFactor"], document.surface.emissive_factor);
+            if (surface_node["MetallicFactor"]) {
+                document.surface.metallic_factor = surface_node["MetallicFactor"].as<float>();
+            }
+            if (surface_node["RoughnessFactor"]) {
+                document.surface.roughness_factor = surface_node["RoughnessFactor"].as<float>();
+            }
+            if (surface_node["NormalScale"]) {
+                document.surface.normal_scale = surface_node["NormalScale"].as<float>();
+            }
+            if (surface_node["OcclusionStrength"]) {
+                document.surface.occlusion_strength = surface_node["OcclusionStrength"].as<float>();
+            }
+            if (surface_node["AlphaCutoff"]) {
+                document.surface.alpha_cutoff = surface_node["AlphaCutoff"].as<float>();
+            }
+            if (surface_node["DoubleSided"]) {
+                document.surface.double_sided = surface_node["DoubleSided"].as<bool>();
+            }
+            if (surface_node["Unlit"]) {
+                document.surface.unlit = surface_node["Unlit"].as<bool>();
+            }
+            const YAML::Node blend_mode_node =
+                surface_node["BlendMode"] ? surface_node["BlendMode"] : material_node["BlendMode"];
+            document.surface.blend_mode = parseBlendMode(blend_mode_node, document.surface.blend_mode);
+        } catch (const YAML::Exception& error) {
+            LUNA_EDITOR_WARN("Failed to read material document '{}': {}", document.absolute_path.string(), error.what());
+        }
+    }
+
+    MaterialDocument readMaterialDocument(AssetHandle handle) const
+    {
+        if (const auto dirty_it = m_dirty_documents.find(handle); dirty_it != m_dirty_documents.end()) {
+            return dirty_it->second;
+        }
+
+        MaterialDocument document;
+        document.handle = handle;
+        document.dirty = false;
+
+        const AssetService* asset_service = assets();
+        const std::optional<AssetInfo> asset_info = asset_service != nullptr ? asset_service->assetInfo(handle) : std::nullopt;
+        if (!asset_info || asset_info->type != AssetType::Material || !asset_info->exists) {
+            return document;
+        }
+
+        document.name = asset_info->label;
+        document.project_path = asset_info->project_path;
+        document.absolute_path = asset_info->absolute_path;
+        document.exists = true;
+        document.builtin = asset_info->builtin;
+        document.memory_only = asset_info->memory_only;
+        document.editable = !asset_info->builtin && !asset_info->memory_only && !asset_info->absolute_path.empty();
+
+        if (std::shared_ptr<Material> material = AssetManager::get().loadAssetAs<Material>(handle)) {
+            document.surface = toEditorSurface(material->getSurface());
+            document.version = material->getVersion();
+        }
+
+        readMaterialFile(document);
+        return document;
+    }
+
+    void markDirty(MaterialDocument document)
+    {
+        document.dirty = true;
+        m_dirty_documents[document.handle] = std::move(document);
+    }
+
+    bool hasProjectLoaded() const
+    {
+        const ProjectService* project_service = project();
+        return project_service != nullptr && project_service->hasProjectLoaded();
+    }
+
+    const AssetService* assets() const
+    {
+        return m_host != nullptr ? &m_host->assets() : nullptr;
+    }
+
+    AssetService* assets()
+    {
+        return m_host != nullptr ? &m_host->assets() : nullptr;
+    }
+
+    const ProjectService* project() const
+    {
+        return m_host != nullptr ? &m_host->project() : nullptr;
+    }
+
+private:
+    Host* m_host{nullptr};
+    std::unordered_map<AssetHandle, MaterialDocument> m_dirty_documents;
+};
+
 class EditorSceneService final : public SceneService {
 public:
     explicit EditorSceneService(LunaEditorLayer& editor_layer)
@@ -2867,6 +3712,18 @@ public:
     TextureView sceneTextureView(ViewportId viewport_id) const override
     {
         return m_editor_layer != nullptr ? m_editor_layer->getSceneTextureView(viewport_id) : TextureView{};
+    }
+
+    bool setSceneViewportPreview(ViewportId viewport_id, const SceneViewportPreviewState& state) override
+    {
+        return m_editor_layer != nullptr && m_editor_layer->setSceneViewportPreview(viewport_id, state);
+    }
+
+    void clearSceneViewportPreview(ViewportId viewport_id) override
+    {
+        if (m_editor_layer != nullptr) {
+            m_editor_layer->clearSceneViewportPreview(viewport_id);
+        }
     }
 
     TextureView sceneTextureView() const override
@@ -4349,6 +5206,29 @@ public:
         return true;
     }
 
+    bool registerDockspaceWindow(DockspaceWindowDescriptor descriptor) override
+    {
+        if (descriptor.id.empty() || descriptor.title.empty()) {
+            return false;
+        }
+        if (descriptor.owner_id.empty() && m_current_owner_id != nullptr) {
+            descriptor.owner_id = *m_current_owner_id;
+        }
+
+        const std::string id = descriptor.id;
+        const bool inserted = m_dockspace_order_by_id.find(id) == m_dockspace_order_by_id.end();
+        RegisteredDockspaceWindow registered_dockspace{};
+        registered_dockspace.descriptor = std::move(descriptor);
+        registered_dockspace.open = registered_dockspace.descriptor.default_open;
+        m_dockspace_windows[id] = std::move(registered_dockspace);
+
+        if (inserted) {
+            m_dockspace_order_by_id.emplace(id, m_dockspace_order.size());
+            m_dockspace_order.push_back(id);
+        }
+        return true;
+    }
+
     void unregisterWindowsForOwner(std::string_view owner_id)
     {
         if (owner_id.empty()) {
@@ -4364,6 +5244,14 @@ public:
             }
         }
 
+        for (auto it = m_dockspace_windows.begin(); it != m_dockspace_windows.end();) {
+            if (it->second.descriptor.owner_id == owner_key) {
+                it = m_dockspace_windows.erase(it);
+            } else {
+                ++it;
+            }
+        }
+
         m_order.erase(std::remove_if(m_order.begin(),
                                      m_order.end(),
                                      [&](const std::string& id) {
@@ -4371,32 +5259,73 @@ public:
                                      }),
                       m_order.end());
         rebuildOrderMap();
+
+        m_dockspace_order.erase(std::remove_if(m_dockspace_order.begin(),
+                                               m_dockspace_order.end(),
+                                               [&](const std::string& id) {
+                                                   return m_dockspace_windows.find(id) == m_dockspace_windows.end();
+                                               }),
+                                m_dockspace_order.end());
+        rebuildDockspaceOrderMap();
     }
 
     void unregisterWindow(std::string_view id) override
     {
         const std::string key = toString(id);
-        m_windows.erase(key);
-        const auto order_it = m_order_by_id.find(key);
-        if (order_it == m_order_by_id.end()) {
-            return;
+        const bool erased_window = m_windows.erase(key) > 0;
+        const bool erased_dockspace = m_dockspace_windows.erase(key) > 0;
+        if (erased_dockspace) {
+            for (auto& [window_id, window] : m_windows) {
+                (void) window_id;
+                if (window.descriptor.dockspace_id == key) {
+                    window.descriptor.dockspace_id.clear();
+                }
+            }
         }
 
-        m_order.erase(m_order.begin() + static_cast<std::ptrdiff_t>(order_it->second));
-        rebuildOrderMap();
+        const auto order_it = m_order_by_id.find(key);
+        if (order_it != m_order_by_id.end()) {
+            m_order.erase(m_order.begin() + static_cast<std::ptrdiff_t>(order_it->second));
+            rebuildOrderMap();
+        }
+
+        const auto dockspace_order_it = m_dockspace_order_by_id.find(key);
+        if (dockspace_order_it != m_dockspace_order_by_id.end()) {
+            m_dockspace_order.erase(m_dockspace_order.begin() + static_cast<std::ptrdiff_t>(dockspace_order_it->second));
+            rebuildDockspaceOrderMap();
+        }
+
+        if (!erased_window && !erased_dockspace) {
+            return;
+        }
     }
 
     bool isWindowOpen(std::string_view id) const override
     {
-        const auto it = m_windows.find(toString(id));
-        return it != m_windows.end() && it->second.open;
+        const std::string key = toString(id);
+        const auto window_it = m_windows.find(key);
+        if (window_it != m_windows.end()) {
+            return window_it->second.open;
+        }
+        const auto dockspace_it = m_dockspace_windows.find(key);
+        return dockspace_it != m_dockspace_windows.end() && dockspace_it->second.open;
     }
 
     void setWindowOpen(std::string_view id, bool open) override
     {
-        const auto it = m_windows.find(toString(id));
-        if (it != m_windows.end()) {
-            it->second.open = open;
+        const std::string key = toString(id);
+        const auto window_it = m_windows.find(key);
+        if (window_it != m_windows.end()) {
+            window_it->second.open = open;
+            return;
+        }
+
+        const auto dockspace_it = m_dockspace_windows.find(key);
+        if (dockspace_it != m_dockspace_windows.end()) {
+            dockspace_it->second.open = open;
+            if (open) {
+                openDockedWindows(dockspace_it->second.descriptor);
+            }
         }
     }
 
@@ -4407,10 +5336,28 @@ public:
             if (it == m_windows.end()) {
                 continue;
             }
+            if (!it->second.descriptor.show_in_window_menu || !it->second.descriptor.dockspace_id.empty()) {
+                continue;
+            }
 
             bool open = it->second.open;
             if (ImGui::MenuItem(it->second.descriptor.title.c_str(), nullptr, &open)) {
                 it->second.open = open;
+            }
+        }
+
+        for (const std::string& id : m_dockspace_order) {
+            auto it = m_dockspace_windows.find(id);
+            if (it == m_dockspace_windows.end() || !it->second.descriptor.show_in_window_menu) {
+                continue;
+            }
+
+            bool open = it->second.open;
+            if (ImGui::MenuItem(it->second.descriptor.title.c_str(), nullptr, &open)) {
+                it->second.open = open;
+                if (open) {
+                    openDockedWindows(it->second.descriptor);
+                }
             }
         }
     }
@@ -4422,30 +5369,14 @@ public:
         }
 
         WindowDrawContext context(*m_host, *m_ui);
+        drawDockspaceWindows();
         for (const std::string& id : m_order) {
             auto it = m_windows.find(id);
-            if (it == m_windows.end() || !it->second.open) {
+            if (it == m_windows.end() || !it->second.open || !it->second.descriptor.dockspace_id.empty()) {
                 continue;
             }
 
-            WindowDescriptor& descriptor = it->second.descriptor;
-            if (descriptor.default_size.x > 0.0f || descriptor.default_size.y > 0.0f) {
-                const Vec2 default_size = m_ui->scaled(descriptor.default_size);
-                ImGui::SetNextWindowSize(ImVec2{default_size.x, default_size.y}, ImGuiCond_FirstUseEver);
-            }
-
-            const bool no_padding = hasWindowFlag(descriptor.flags, WindowFlag::NoPadding);
-            if (no_padding) {
-                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
-            }
-            if (m_ui->beginWindow(descriptor.id, descriptor.title, &it->second.open, descriptor.flags)) {
-                EditorPluginOwnerScope owner_scope(*m_current_owner_id, descriptor.owner_id);
-                descriptor.draw(context);
-            }
-            m_ui->endWindow();
-            if (no_padding) {
-                ImGui::PopStyleVar();
-            }
+            drawRegisteredWindow(it->second, context);
         }
     }
 
@@ -4453,6 +5384,12 @@ private:
     struct RegisteredWindow {
         WindowDescriptor descriptor;
         bool open{false};
+    };
+
+    struct RegisteredDockspaceWindow {
+        DockspaceWindowDescriptor descriptor;
+        bool open{false};
+        bool layout_built{false};
     };
 
     void rebuildOrderMap()
@@ -4463,6 +5400,167 @@ private:
         }
     }
 
+    void rebuildDockspaceOrderMap()
+    {
+        m_dockspace_order_by_id.clear();
+        for (size_t index = 0; index < m_dockspace_order.size(); ++index) {
+            m_dockspace_order_by_id.emplace(m_dockspace_order[index], index);
+        }
+    }
+
+    void openDockedWindows(const DockspaceWindowDescriptor& descriptor)
+    {
+        for (const DockedWindowDescriptor& docked_window : descriptor.docked_windows) {
+            const auto window_it = m_windows.find(docked_window.window_id);
+            if (window_it != m_windows.end()) {
+                window_it->second.open = true;
+            }
+        }
+    }
+
+    static ImGuiDir toImGuiDir(DockSplitDirection direction) noexcept
+    {
+        switch (direction) {
+            case DockSplitDirection::Left:
+                return ImGuiDir_Left;
+            case DockSplitDirection::Right:
+                return ImGuiDir_Right;
+            case DockSplitDirection::Up:
+                return ImGuiDir_Up;
+            case DockSplitDirection::Down:
+                return ImGuiDir_Down;
+        }
+        return ImGuiDir_Right;
+    }
+
+    static std::string imguiWindowLabel(const std::string& id, const std::string& title)
+    {
+        return title + "###" + id;
+    }
+
+    static std::string dockspaceIdForWindow(const DockspaceWindowDescriptor& descriptor)
+    {
+        return descriptor.id + ".DockSpace";
+    }
+
+    void drawRegisteredWindow(RegisteredWindow& window, WindowDrawContext& context)
+    {
+        WindowDescriptor& descriptor = window.descriptor;
+        if (descriptor.default_size.x > 0.0f || descriptor.default_size.y > 0.0f) {
+            const Vec2 default_size = m_ui->scaled(descriptor.default_size);
+            ImGui::SetNextWindowSize(ImVec2{default_size.x, default_size.y}, ImGuiCond_FirstUseEver);
+        }
+
+        const bool no_padding = hasWindowFlag(descriptor.flags, WindowFlag::NoPadding);
+        if (no_padding) {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+        }
+        if (m_ui->beginWindow(descriptor.id, descriptor.title, &window.open, descriptor.flags)) {
+            EditorPluginOwnerScope owner_scope(*m_current_owner_id, descriptor.owner_id);
+            descriptor.draw(context);
+        }
+        m_ui->endWindow();
+        if (no_padding) {
+            ImGui::PopStyleVar();
+        }
+    }
+
+    void drawDockspaceWindows()
+    {
+        for (const std::string& id : m_dockspace_order) {
+            auto it = m_dockspace_windows.find(id);
+            if (it == m_dockspace_windows.end() || !it->second.open) {
+                continue;
+            }
+
+            drawDockspaceWindow(it->second);
+        }
+    }
+
+    void drawDockspaceWindow(RegisteredDockspaceWindow& dockspace)
+    {
+        DockspaceWindowDescriptor& descriptor = dockspace.descriptor;
+        if (descriptor.default_size.x > 0.0f || descriptor.default_size.y > 0.0f) {
+            const Vec2 default_size = m_ui->scaled(descriptor.default_size);
+            ImGui::SetNextWindowSize(ImVec2{default_size.x, default_size.y}, ImGuiCond_FirstUseEver);
+        }
+
+        const bool no_padding = hasWindowFlag(descriptor.flags, WindowFlag::NoPadding);
+        if (no_padding) {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
+        }
+
+        const std::string label = imguiWindowLabel(descriptor.id, descriptor.title);
+        const ImGuiWindowFlags window_flags = toImGuiWindowFlags(descriptor.flags) | ImGuiWindowFlags_NoScrollbar |
+                                              ImGuiWindowFlags_NoScrollWithMouse;
+        const bool visible = ImGui::Begin(label.c_str(), &dockspace.open, window_flags);
+        if (no_padding) {
+            ImGui::PopStyleVar();
+        }
+
+        const ImGuiID dockspace_id = ImGui::GetID(dockspaceIdForWindow(descriptor).c_str());
+        if (visible) {
+            const ImVec2 available = ImGui::GetContentRegionAvail();
+            ImGui::DockSpace(dockspace_id, available, ImGuiDockNodeFlags_None);
+            buildDockspaceLayout(dockspace, dockspace_id, available);
+        }
+        ImGui::End();
+
+        if (visible) {
+            drawDockedWindows(descriptor);
+        }
+    }
+
+    void buildDockspaceLayout(RegisteredDockspaceWindow& dockspace, ImGuiID dockspace_id, ImVec2 available_size)
+    {
+        if (dockspace.layout_built || dockspace.descriptor.docked_windows.empty() || available_size.x <= 0.0f ||
+            available_size.y <= 0.0f) {
+            return;
+        }
+
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, available_size);
+
+        ImGuiID remaining_node = dockspace_id;
+        for (const DockedWindowDescriptor& docked_window : dockspace.descriptor.docked_windows) {
+            ImGuiID dock_node = remaining_node;
+            if (&docked_window != &dockspace.descriptor.docked_windows.back()) {
+                const float ratio = std::clamp(docked_window.ratio, 0.1f, 0.9f);
+                dock_node = ImGui::DockBuilderSplitNode(
+                    remaining_node, toImGuiDir(docked_window.direction), ratio, nullptr, &remaining_node);
+            }
+
+            const auto window_it = m_windows.find(docked_window.window_id);
+            if (window_it == m_windows.end()) {
+                continue;
+            }
+            ImGui::DockBuilderDockWindow(
+                imguiWindowLabel(window_it->second.descriptor.id, window_it->second.descriptor.title).c_str(),
+                dock_node);
+            window_it->second.open = true;
+        }
+
+        ImGui::DockBuilderFinish(dockspace_id);
+        dockspace.layout_built = true;
+    }
+
+    void drawDockedWindows(const DockspaceWindowDescriptor& dockspace)
+    {
+        if (m_host == nullptr || m_ui == nullptr) {
+            return;
+        }
+
+        WindowDrawContext context(*m_host, *m_ui);
+        for (const DockedWindowDescriptor& docked_window : dockspace.docked_windows) {
+            const auto window_it = m_windows.find(docked_window.window_id);
+            if (window_it == m_windows.end() || !window_it->second.open) {
+                continue;
+            }
+            drawRegisteredWindow(window_it->second, context);
+        }
+    }
+
 private:
     Host* m_host{nullptr};
     Ui* m_ui{nullptr};
@@ -4470,6 +5568,9 @@ private:
     std::unordered_map<std::string, RegisteredWindow> m_windows;
     std::vector<std::string> m_order;
     std::unordered_map<std::string, size_t> m_order_by_id;
+    std::unordered_map<std::string, RegisteredDockspaceWindow> m_dockspace_windows;
+    std::vector<std::string> m_dockspace_order;
+    std::unordered_map<std::string, size_t> m_dockspace_order_by_id;
 };
 
 class EditorSettingsService final : public SettingsService {
@@ -4557,6 +5658,7 @@ struct EditorShell::Impl {
     Impl(EditorShell& shell, LunaEditorLayer& editor_layer, EditorSettingsStore& settings_store)
         : ui(),
           asset_service(shell),
+          material_service(shell),
           project_service(),
           scene_service(editor_layer),
           selection_service(editor_layer),
@@ -4578,6 +5680,7 @@ struct EditorShell::Impl {
 
     EditorUi ui;
     EditorAssetService asset_service;
+    EditorMaterialService material_service;
     EditorProjectService project_service;
     EditorSceneService scene_service;
     EditorSelectionService selection_service;
@@ -4635,6 +5738,11 @@ CommandService& EditorShell::commands()
 HistoryService& EditorShell::history()
 {
     return m_impl->history_service;
+}
+
+MaterialService& EditorShell::materials()
+{
+    return m_impl->material_service;
 }
 
 MenuService& EditorShell::menus()
