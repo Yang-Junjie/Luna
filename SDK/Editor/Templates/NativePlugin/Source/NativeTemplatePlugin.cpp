@@ -69,8 +69,11 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
         return;
     }
 
-    ui.text("Native editor plugin template");
-    ui.textDisabled("This window uses only the Luna editor native SDK wrapper.");
+    ui.heading("Native Template", "Native editor plugin template");
+    ui.beginPanel("NativeTemplateSummary");
+    ui.keyValue("Boundary", "Luna editor native SDK wrapper only");
+    ui.badge("Styled UI ABI", LunaEditorStatusVariant_Success);
+    ui.endPanel();
     ui.separator();
 
     ui.checkbox("Enabled", &state->enabled);
@@ -164,9 +167,25 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
     const std::vector<native::AssetInfo> assets = host.assets().list(LunaEditorAssetType_None, false);
     char asset_count_text[96]{};
     std::snprintf(asset_count_text, sizeof(asset_count_text), "Project assets visible to SDK: %zu", assets.size());
-    ui.text(asset_count_text);
+    ui.metric("Project Assets",
+              asset_count_text,
+              "Enumerated through host.assets()",
+              assets.empty() ? LunaEditorStatusVariant_Warning : LunaEditorStatusVariant_Info,
+              native::vec2(-1.0f, 0.0f));
     if (!assets.empty()) {
-        ui.textDisabled(("First asset: " + assets.front().label).c_str());
+        const native::AssetInfo& first_asset = assets.front();
+        const std::string asset_detail =
+            first_asset.detail.empty() ? first_asset.project_path : first_asset.detail + " / " + first_asset.project_path;
+        (void) ui.assetField("NativeTemplateFirstAsset",
+                             first_asset.label.empty() ? first_asset.project_path.c_str() : first_asset.label.c_str(),
+                             asset_detail.c_str(),
+                             first_asset.loading ? LunaEditorStatusVariant_Warning : LunaEditorStatusVariant_Info,
+                             native::vec2(-1.0f, 0.0f));
+        if (ui.isItemHovered()) {
+            ui.setTooltip("Styled asset field from the native UI ABI.");
+        }
+    } else {
+        ui.emptyState("No project assets", "No project assets are visible to this SDK template.");
     }
 
     ui.separatorText("Viewport");

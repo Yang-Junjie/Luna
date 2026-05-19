@@ -113,6 +113,12 @@ struct TemplateHost {
     int drag_drop_source_count{};
     int drag_drop_target_count{};
     int tooltip_count{};
+    int heading_count{};
+    int key_value_count{};
+    int badge_count{};
+    int metric_count{};
+    int asset_field_count{};
+    int panel_depth{};
     bool next_button_pressed{};
 
     TemplateHost()
@@ -194,6 +200,14 @@ struct TemplateHost {
             .table_headers_row = &tableHeadersRow,
             .table_next_row = &tableNextRow,
             .table_next_column = &tableNextColumn,
+            .heading = &heading,
+            .key_value = &keyValue,
+            .badge = &badge,
+            .metric = &metric,
+            .empty_state = &emptyState,
+            .begin_panel = &beginPanel,
+            .end_panel = &endPanel,
+            .asset_field = &assetField,
         };
         api.commands = LunaEditorCommandApi{
             .struct_size = sizeof(LunaEditorCommandApi),
@@ -623,6 +637,67 @@ struct TemplateHost {
     static int tableNextColumn(void*)
     {
         return 1;
+    }
+
+    static void heading(void* api_user_data, const char*, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->heading_count;
+            ++host->text_count;
+        }
+    }
+
+    static void keyValue(void* api_user_data, const char*, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->key_value_count;
+            ++host->text_count;
+        }
+    }
+
+    static void badge(void* api_user_data, const char*, uint32_t)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->badge_count;
+            ++host->text_count;
+        }
+    }
+
+    static void metric(void* api_user_data, const char*, const char*, const char*, uint32_t, const LunaEditorVec2*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->metric_count;
+            ++host->text_count;
+        }
+    }
+
+    static void emptyState(void* api_user_data, const char*, const char*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->text_count;
+        }
+    }
+
+    static void beginPanel(void* api_user_data, const char*, const LunaEditorVec2*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->panel_depth;
+        }
+    }
+
+    static void endPanel(void* api_user_data)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            --host->panel_depth;
+        }
+    }
+
+    static int assetField(void* api_user_data, const char*, const char*, const char*, uint32_t, const LunaEditorVec2*)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->asset_field_count;
+        }
+        return 0;
     }
 
     static int registerCommand(void* api_user_data, const LunaEditorCommandDescriptor* descriptor)
@@ -1257,13 +1332,29 @@ public:
     void setNextItemWidth(float) override {}
     [[nodiscard]] luna::editor::Vec2 contentRegionAvail() const noexcept override { return {.x = 320.0f, .y = 180.0f}; }
     [[nodiscard]] luna::editor::Vec2 windowFramebufferScale() const noexcept override { return {.x = 1.0f, .y = 1.0f}; }
-    void heading(std::string_view, std::string_view = {}) override { ++text_count; }
-    void keyValue(std::string_view, std::string_view) override { ++text_count; }
-    void badge(std::string_view, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral) override { ++text_count; }
-    void metric(std::string_view, std::string_view, std::string_view = {}, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral, luna::editor::Vec2 = {}) override { ++text_count; }
+    void heading(std::string_view, std::string_view = {}) override
+    {
+        ++heading_count;
+        ++text_count;
+    }
+    void keyValue(std::string_view, std::string_view) override
+    {
+        ++key_value_count;
+        ++text_count;
+    }
+    void badge(std::string_view, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral) override
+    {
+        ++badge_count;
+        ++text_count;
+    }
+    void metric(std::string_view, std::string_view, std::string_view = {}, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral, luna::editor::Vec2 = {}) override
+    {
+        ++metric_count;
+        ++text_count;
+    }
     void emptyState(std::string_view, std::string_view = {}) override { ++text_count; }
-    void beginPanel(std::string_view, luna::editor::Vec2 = {}) override {}
-    void endPanel() override {}
+    void beginPanel(std::string_view, luna::editor::Vec2 = {}) override { ++panel_depth; }
+    void endPanel() override { --panel_depth; }
     bool button(std::string_view, luna::editor::Vec2 = {}, luna::editor::ButtonVariant = luna::editor::ButtonVariant::Default) override
     {
         const bool pressed = next_button_pressed;
@@ -1359,6 +1450,11 @@ public:
     void tableHeadersRow() override {}
     void tableNextRow() override {}
     bool tableNextColumn() override { return true; }
+    bool assetField(std::string_view, std::string_view, std::string_view = {}, luna::editor::StatusVariant = luna::editor::StatusVariant::Neutral, luna::editor::Vec2 = {}) override
+    {
+        ++asset_field_count;
+        return false;
+    }
 
     bool next_button_pressed{};
     int text_count{};
@@ -1372,6 +1468,12 @@ public:
     int drag_drop_target_count{};
     int image_count{};
     int tooltip_count{};
+    int heading_count{};
+    int key_value_count{};
+    int badge_count{};
+    int metric_count{};
+    int asset_field_count{};
+    int panel_depth{};
 };
 
 class TemplateManagerCommandService final : public luna::editor::CommandService {
@@ -2178,6 +2280,12 @@ void testTemplateEditorPluginManagerLoad(TestContext& context,
                    "manager-loaded SDK template should draw drag/drop wrappers");
     context.expect(host.ui_service.tooltip_count > 0, "manager-loaded SDK template should use item tooltip wrapper");
     context.expect(host.ui_service.image_count > 0, "manager-loaded SDK template should draw viewport image");
+    context.expect(host.ui_service.heading_count > 0, "manager-loaded SDK template should draw styled heading UI");
+    context.expect(host.ui_service.key_value_count > 0, "manager-loaded SDK template should draw styled key/value UI");
+    context.expect(host.ui_service.badge_count > 0, "manager-loaded SDK template should draw styled badge UI");
+    context.expect(host.ui_service.metric_count > 0, "manager-loaded SDK template should draw styled metric UI");
+    context.expect(host.ui_service.asset_field_count > 0, "manager-loaded SDK template should draw styled asset field UI");
+    context.expect(host.ui_service.panel_depth == 0, "manager-loaded SDK template should balance styled panel scopes");
     context.expect(!host.viewport_service.viewports.empty(),
                    "manager-loaded SDK template should create an independent scene viewport");
 
@@ -2264,6 +2372,12 @@ int main(int argc, char** argv)
     context.expect(host.drag_drop_target_count > 0, "SDK template should draw through drag/drop target wrapper");
     context.expect(host.tooltip_count > 0, "SDK template should draw through item hover/tooltip wrappers");
     context.expect(host.image_count > 0, "SDK template should draw a scene viewport texture");
+    context.expect(host.heading_count > 0, "SDK template should draw through styled heading UI wrapper");
+    context.expect(host.key_value_count > 0, "SDK template should draw through styled key/value UI wrapper");
+    context.expect(host.badge_count > 0, "SDK template should draw through styled badge UI wrapper");
+    context.expect(host.metric_count > 0, "SDK template should draw through styled metric UI wrapper");
+    context.expect(host.asset_field_count > 0, "SDK template should draw through styled asset field UI wrapper");
+    context.expect(host.panel_depth == 0, "SDK template should balance styled panel scopes");
     context.expect(host.created_viewport_id != 0u, "SDK template should create an independent scene viewport");
 
     host.next_button_pressed = true;

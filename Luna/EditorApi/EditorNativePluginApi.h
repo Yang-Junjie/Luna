@@ -79,6 +79,14 @@ typedef enum LunaEditorButtonVariant {
     LunaEditorButtonVariant_Subtle = 3,
 } LunaEditorButtonVariant;
 
+typedef enum LunaEditorStatusVariant {
+    LunaEditorStatusVariant_Neutral = 0,
+    LunaEditorStatusVariant_Info = 1,
+    LunaEditorStatusVariant_Success = 2,
+    LunaEditorStatusVariant_Warning = 3,
+    LunaEditorStatusVariant_Danger = 4,
+} LunaEditorStatusVariant;
+
 typedef enum LunaEditorWindowFlag {
     LunaEditorWindowFlag_None = 0,
     LunaEditorWindowFlag_NoSavedSettings = 1u << 0,
@@ -284,6 +292,25 @@ typedef struct LunaEditorUiApi {
     void (*table_headers_row)(void* api_user_data);
     void (*table_next_row)(void* api_user_data);
     int (*table_next_column)(void* api_user_data);
+
+    void (*heading)(void* api_user_data, const char* title, const char* detail);
+    void (*key_value)(void* api_user_data, const char* label, const char* value);
+    void (*badge)(void* api_user_data, const char* label, uint32_t variant);
+    void (*metric)(void* api_user_data,
+                   const char* label,
+                   const char* value,
+                   const char* detail,
+                   uint32_t variant,
+                   const LunaEditorVec2* size);
+    void (*empty_state)(void* api_user_data, const char* title, const char* detail);
+    void (*begin_panel)(void* api_user_data, const char* id, const LunaEditorVec2* size);
+    void (*end_panel)(void* api_user_data);
+    int (*asset_field)(void* api_user_data,
+                       const char* id,
+                       const char* label,
+                       const char* detail,
+                       uint32_t variant,
+                       const LunaEditorVec2* size);
 } LunaEditorUiApi;
 
 typedef struct LunaEditorCommandDescriptor {

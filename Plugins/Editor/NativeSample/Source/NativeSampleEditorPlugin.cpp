@@ -230,29 +230,43 @@ void drawAssetSection(const native::Host& host, const native::Ui& ui, NativeSamp
     }
 
     const std::vector<native::AssetInfo> assets = host.assets().list(LunaEditorAssetType_None, false);
-    ui.text(("Project Assets: " + std::to_string(assets.size())).c_str());
+    ui.metric("Project Assets",
+              std::to_string(assets.size()).c_str(),
+              "Enumerated through host.assets()",
+              assets.empty() ? LunaEditorStatusVariant_Warning : LunaEditorStatusVariant_Info,
+              native::vec2(-1.0f, 0.0f));
     if (assets.empty()) {
-        ui.textDisabled("No project assets are visible to the native plugin API.");
+        ui.emptyState("No project assets", "No project assets are visible to the native plugin API.");
         return;
     }
 
     const native::AssetInfo& first = assets.front();
     const std::string first_asset_name =
         first.label.empty() ? (first.project_path.empty() ? std::string("-") : first.project_path) : first.label;
-    ui.textWrapped(("First Asset: " + first_asset_name).c_str());
-    ui.textWrapped(("Project Path: " + (first.project_path.empty() ? std::string("-") : first.project_path)).c_str());
-    ui.textWrapped(("Absolute Path: " + (first.absolute_path.empty() ? std::string("-") : first.absolute_path)).c_str());
+    const std::string first_asset_detail =
+        first.detail.empty() ? assetTypeLabel(first.type) : first.detail + " / " + assetTypeLabel(first.type);
+    (void) ui.assetField("NativeSampleFirstAsset",
+                         first_asset_name.c_str(),
+                         first_asset_detail.c_str(),
+                         first.loading ? LunaEditorStatusVariant_Warning : LunaEditorStatusVariant_Info,
+                         native::vec2(-1.0f, 0.0f));
+    if (ui.isItemHovered()) {
+        ui.setTooltip("Styled asset field from the native UI ABI.");
+    }
+    ui.keyValue("Project Path", first.project_path.empty() ? "-" : first.project_path.c_str());
+    ui.keyValue("Absolute Path", first.absolute_path.empty() ? "-" : first.absolute_path.c_str());
     if (!first.project_path.empty()) {
-        ui.text(("Handle by Path: " + std::to_string(host.assets().findHandleByPath(first.project_path.c_str()))).c_str());
+        const std::string handle_text = std::to_string(host.assets().findHandleByPath(first.project_path.c_str()));
+        ui.keyValue("Handle by Path", handle_text.c_str());
         const std::string resolved_path = host.assets().resolveProjectPath(first.project_path.c_str());
         if (!resolved_path.empty()) {
-            ui.textWrapped(("Resolved Path: " + resolved_path).c_str());
+            ui.keyValue("Resolved Path", resolved_path.c_str());
         }
     }
     if (!first.absolute_path.empty()) {
         const std::string relative_path = host.assets().makeProjectRelativePath(first.absolute_path.c_str());
         if (!relative_path.empty()) {
-            ui.textWrapped(("Relative From Absolute: " + relative_path).c_str());
+            ui.keyValue("Relative From Absolute", relative_path.c_str());
         }
     }
 
@@ -502,8 +516,11 @@ void drawNativeSampleWindow(void* window_user_data, const LunaEditorHostApi* hos
         return;
     }
 
-    ui.text("Native editor plugin mainline sample.");
-    ui.textDisabled("This window uses only the Luna editor native SDK wrapper and public host APIs.");
+    ui.heading("Native Sample", "Native editor plugin mainline sample.");
+    ui.beginPanel("NativeSampleSummary");
+    ui.keyValue("Boundary", "Luna native editor SDK and public host APIs only");
+    ui.badge("Styled UI ABI", LunaEditorStatusVariant_Success);
+    ui.endPanel();
     ui.separator();
 
     ui.separatorText("State");

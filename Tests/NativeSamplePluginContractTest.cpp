@@ -1206,6 +1206,14 @@ struct NativeSampleHost {
             .table_headers_row = &tableHeadersRow,
             .table_next_row = &tableNextRow,
             .table_next_column = &tableNextColumn,
+            .heading = &heading,
+            .key_value = &keyValue,
+            .badge = &badge,
+            .metric = &metric,
+            .empty_state = &emptyState,
+            .begin_panel = &beginPanel,
+            .end_panel = &endPanel,
+            .asset_field = &assetField,
         };
         api.commands = LunaEditorCommandApi{
             .struct_size = sizeof(LunaEditorCommandApi),
@@ -1366,6 +1374,12 @@ struct NativeSampleHost {
     int viewport_sync_count{};
     int image_count{};
     int tooltip_count{};
+    int heading_count{};
+    int key_value_count{};
+    int badge_count{};
+    int metric_count{};
+    int panel_depth{};
+    int asset_field_count{};
 
 private:
     static NativeSampleHost* self(void* api_user_data)
@@ -1519,6 +1533,67 @@ private:
     static void tableHeadersRow(void*) {}
     static void tableNextRow(void*) {}
     static int tableNextColumn(void*) { return 1; }
+
+    static void heading(void* api_user_data, const char*, const char*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->heading_count;
+            ++host->text_count;
+        }
+    }
+
+    static void keyValue(void* api_user_data, const char*, const char*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->key_value_count;
+            ++host->text_count;
+        }
+    }
+
+    static void badge(void* api_user_data, const char*, uint32_t)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->badge_count;
+            ++host->text_count;
+        }
+    }
+
+    static void metric(void* api_user_data, const char*, const char*, const char*, uint32_t, const LunaEditorVec2*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->metric_count;
+            ++host->text_count;
+        }
+    }
+
+    static void emptyState(void* api_user_data, const char*, const char*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->text_count;
+        }
+    }
+
+    static void beginPanel(void* api_user_data, const char*, const LunaEditorVec2*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->panel_depth;
+        }
+    }
+
+    static void endPanel(void* api_user_data)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            --host->panel_depth;
+        }
+    }
+
+    static int assetField(void* api_user_data, const char*, const char*, const char*, uint32_t, const LunaEditorVec2*)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->asset_field_count;
+        }
+        return 0;
+    }
 
     static int registerCommand(void* api_user_data, const LunaEditorCommandDescriptor* descriptor)
     {
@@ -2669,6 +2744,12 @@ int main()
     context.expect(host.viewport_sync_count > 0, "native sample should sync its independent viewport");
     context.expect(host.image_count > 0, "native sample should draw the viewport texture through UI image");
     context.expect(host.tooltip_count > 0, "native sample should use tooltip wrapper for hovered viewport image");
+    context.expect(host.heading_count > 0, "native sample should draw through styled heading UI ABI");
+    context.expect(host.key_value_count > 0, "native sample should draw through styled key/value UI ABI");
+    context.expect(host.badge_count > 0, "native sample should draw through styled badge UI ABI");
+    context.expect(host.metric_count > 0, "native sample should draw through styled metric UI ABI");
+    context.expect(host.asset_field_count > 0, "native sample should draw through styled asset field UI ABI");
+    context.expect(host.panel_depth == 0, "native sample should balance styled panel scopes");
     context.expect(host.disabled_depth == 0, "native sample draw should balance disabled scopes");
 
     host.can_edit_scene = false;

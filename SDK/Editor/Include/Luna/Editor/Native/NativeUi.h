@@ -2,6 +2,9 @@
 
 #include "Luna/Editor/Native/NativeTypes.h"
 
+#include <cstddef>
+#include <cstdio>
+
 namespace luna::editor::native {
 
 class Ui final {
@@ -20,6 +23,11 @@ public:
     [[nodiscard]] bool canDrawText() const noexcept
     {
         return api_ != nullptr && api_->text != nullptr;
+    }
+
+    [[nodiscard]] bool hasField(size_t offset, size_t size) const noexcept
+    {
+        return api_ != nullptr && api_->struct_size >= offset + size;
     }
 
     [[nodiscard]] bool beginWindow(const char* id,
@@ -127,6 +135,129 @@ public:
         if (api_ != nullptr && api_->set_next_item_width != nullptr) {
             api_->set_next_item_width(api_->api_user_data, width);
         }
+    }
+
+    void heading(const char* title, const char* detail = nullptr) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, heading), sizeof(api_->heading)) && api_->heading != nullptr) {
+            api_->heading(api_->api_user_data, title != nullptr ? title : "", detail != nullptr ? detail : "");
+            return;
+        }
+
+        text(title != nullptr ? title : "");
+        if (detail != nullptr && detail[0] != '\0') {
+            textDisabled(detail);
+        }
+    }
+
+    void keyValue(const char* label, const char* value) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, key_value), sizeof(api_->key_value)) && api_->key_value != nullptr) {
+            api_->key_value(api_->api_user_data, label != nullptr ? label : "", value != nullptr ? value : "");
+            return;
+        }
+
+        text(label != nullptr ? label : "");
+        textWrapped(value != nullptr ? value : "");
+    }
+
+    void badge(const char* label,
+               LunaEditorStatusVariant variant = LunaEditorStatusVariant_Neutral) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, badge), sizeof(api_->badge)) && api_->badge != nullptr) {
+            api_->badge(api_->api_user_data, label != nullptr ? label : "", variant);
+            return;
+        }
+
+        (void) variant;
+        text(label != nullptr ? label : "");
+    }
+
+    void metric(const char* label,
+                const char* value,
+                const char* detail = nullptr,
+                LunaEditorStatusVariant variant = LunaEditorStatusVariant_Neutral,
+                Vec2 size = {}) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, metric), sizeof(api_->metric)) && api_->metric != nullptr) {
+            api_->metric(api_->api_user_data,
+                         label != nullptr ? label : "",
+                         value != nullptr ? value : "",
+                         detail != nullptr ? detail : "",
+                         variant,
+                         &size);
+            return;
+        }
+
+        (void) variant;
+        (void) size;
+        text(label != nullptr ? label : "");
+        text(value != nullptr ? value : "");
+        if (detail != nullptr && detail[0] != '\0') {
+            textDisabled(detail);
+        }
+    }
+
+    void emptyState(const char* title, const char* detail = nullptr) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, empty_state), sizeof(api_->empty_state)) &&
+            api_->empty_state != nullptr) {
+            api_->empty_state(api_->api_user_data, title != nullptr ? title : "", detail != nullptr ? detail : "");
+            return;
+        }
+
+        text(title != nullptr ? title : "");
+        if (detail != nullptr && detail[0] != '\0') {
+            textDisabled(detail);
+        }
+    }
+
+    void beginPanel(const char* id, Vec2 size = {}) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, begin_panel), sizeof(api_->begin_panel)) &&
+            api_->begin_panel != nullptr) {
+            api_->begin_panel(api_->api_user_data, id != nullptr ? id : "", &size);
+        }
+    }
+
+    void endPanel() const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, end_panel), sizeof(api_->end_panel)) && api_->end_panel != nullptr) {
+            api_->end_panel(api_->api_user_data);
+        }
+    }
+
+    [[nodiscard]] bool assetField(const char* id,
+                                  const char* label,
+                                  const char* detail = nullptr,
+                                  LunaEditorStatusVariant variant = LunaEditorStatusVariant_Neutral,
+                                  Vec2 size = {}) const noexcept
+    {
+        if (hasField(offsetof(LunaEditorUiApi, asset_field), sizeof(api_->asset_field)) &&
+            api_->asset_field != nullptr) {
+            return api_->asset_field(api_->api_user_data,
+                                     id != nullptr ? id : "",
+                                     label != nullptr ? label : "",
+                                     detail != nullptr ? detail : "",
+                                     variant,
+                                     &size) != 0;
+        }
+
+        char fallback_label[512]{};
+        const char* safe_label = label != nullptr ? label : "";
+        const char* safe_id = id != nullptr ? id : "";
+        int written = 0;
+        if (detail != nullptr && detail[0] != '\0') {
+            written = std::snprintf(fallback_label, sizeof(fallback_label), "%s  %s##%s", safe_label, detail, safe_id);
+        } else {
+            written = std::snprintf(fallback_label, sizeof(fallback_label), "%s##%s", safe_label, safe_id);
+        }
+        if (written < 0 || static_cast<size_t>(written) >= sizeof(fallback_label)) {
+            fallback_label[sizeof(fallback_label) - 1u] = '\0';
+        }
+        return button(fallback_label,
+                      size.x != 0.0f || size.y != 0.0f ? size : fillWidth(),
+                      LunaEditorButtonVariant_Subtle);
     }
 
     [[nodiscard]] bool button(const char* label,

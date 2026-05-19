@@ -518,6 +518,23 @@ ButtonVariant toEditorButtonVariant(uint32_t value) noexcept
     }
 }
 
+StatusVariant toEditorStatusVariant(uint32_t value) noexcept
+{
+    switch (value) {
+        case LunaEditorStatusVariant_Info:
+            return StatusVariant::Info;
+        case LunaEditorStatusVariant_Success:
+            return StatusVariant::Success;
+        case LunaEditorStatusVariant_Warning:
+            return StatusVariant::Warning;
+        case LunaEditorStatusVariant_Danger:
+            return StatusVariant::Danger;
+        case LunaEditorStatusVariant_Neutral:
+        default:
+            return StatusVariant::Neutral;
+    }
+}
+
 MouseButton toEditorMouseButton(int button) noexcept
 {
     switch (button) {
@@ -1229,6 +1246,82 @@ int nativeUiTableNextColumn(void* api_user_data)
 {
     Ui* ui = nativeUi(api_user_data);
     return ui != nullptr && ui->tableNextColumn() ? 1 : 0;
+}
+
+void nativeUiHeading(void* api_user_data, const char* title, const char* detail)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->heading(nativeString(title), nativeString(detail));
+    }
+}
+
+void nativeUiKeyValue(void* api_user_data, const char* label, const char* value)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->keyValue(nativeString(label), nativeString(value));
+    }
+}
+
+void nativeUiBadge(void* api_user_data, const char* label, uint32_t variant)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->badge(nativeString(label), toEditorStatusVariant(variant));
+    }
+}
+
+void nativeUiMetric(void* api_user_data,
+                    const char* label,
+                    const char* value,
+                    const char* detail,
+                    uint32_t variant,
+                    const LunaEditorVec2* size)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->metric(nativeString(label),
+                   nativeString(value),
+                   nativeString(detail),
+                   toEditorStatusVariant(variant),
+                   toEditorVec2(size));
+    }
+}
+
+void nativeUiEmptyState(void* api_user_data, const char* title, const char* detail)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->emptyState(nativeString(title), nativeString(detail));
+    }
+}
+
+void nativeUiBeginPanel(void* api_user_data, const char* id, const LunaEditorVec2* size)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->beginPanel(nativeString(id), toEditorVec2(size));
+    }
+}
+
+void nativeUiEndPanel(void* api_user_data)
+{
+    if (Ui* ui = nativeUi(api_user_data)) {
+        ui->endPanel();
+    }
+}
+
+int nativeUiAssetField(void* api_user_data,
+                       const char* id,
+                       const char* label,
+                       const char* detail,
+                       uint32_t variant,
+                       const LunaEditorVec2* size)
+{
+    Ui* ui = nativeUi(api_user_data);
+    return ui != nullptr && id != nullptr &&
+                   ui->assetField(nativeString(id),
+                                  nativeString(label),
+                                  nativeString(detail),
+                                  toEditorStatusVariant(variant),
+                                  toEditorVec2(size))
+               ? 1
+               : 0;
 }
 
 int nativeRegisterCommand(void* api_user_data, const LunaEditorCommandDescriptor* descriptor)
@@ -2350,6 +2443,14 @@ LunaEditorUiApi makeNativeUiApi(NativePluginContext& context)
         .table_headers_row = &nativeUiTableHeadersRow,
         .table_next_row = &nativeUiTableNextRow,
         .table_next_column = &nativeUiTableNextColumn,
+        .heading = &nativeUiHeading,
+        .key_value = &nativeUiKeyValue,
+        .badge = &nativeUiBadge,
+        .metric = &nativeUiMetric,
+        .empty_state = &nativeUiEmptyState,
+        .begin_panel = &nativeUiBeginPanel,
+        .end_panel = &nativeUiEndPanel,
+        .asset_field = &nativeUiAssetField,
     };
 }
 
