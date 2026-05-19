@@ -1200,6 +1200,8 @@ struct NativeSampleHost {
             .is_item_hovered = &isItemHovered,
             .is_item_deactivated_after_edit = &isItemDeactivatedAfterEdit,
             .set_tooltip = &setTooltip,
+            .begin_drag_drop_target = &beginDragDropTarget,
+            .end_drag_drop_target = &endDragDropTarget,
             .begin_table = &beginTable,
             .end_table = &endTable,
             .table_setup_column = &tableSetupColumn,
@@ -1214,6 +1216,7 @@ struct NativeSampleHost {
             .begin_panel = &beginPanel,
             .end_panel = &endPanel,
             .asset_field = &assetField,
+            .accept_asset_drag_drop_payload = &acceptAssetDragDropPayload,
         };
         api.commands = LunaEditorCommandApi{
             .struct_size = sizeof(LunaEditorCommandApi),
@@ -1380,6 +1383,7 @@ struct NativeSampleHost {
     int metric_count{};
     int panel_depth{};
     int asset_field_count{};
+    int asset_drop_count{};
 
 private:
     static NativeSampleHost* self(void* api_user_data)
@@ -1594,6 +1598,28 @@ private:
         }
         return 0;
     }
+
+    static int beginDragDropTarget(void*)
+    {
+        return 1;
+    }
+
+    static int acceptAssetDragDropPayload(void* api_user_data,
+                                          LunaEditorAssetDropPayload* out_payload,
+                                          const uint32_t*,
+                                          size_t)
+    {
+        if (NativeSampleHost* host = self(api_user_data)) {
+            ++host->asset_drop_count;
+        }
+        if (out_payload != nullptr) {
+            out_payload->handle = 42u;
+            out_payload->type = LunaEditorAssetType_Material;
+        }
+        return 1;
+    }
+
+    static void endDragDropTarget(void*) {}
 
     static int registerCommand(void* api_user_data, const LunaEditorCommandDescriptor* descriptor)
     {
@@ -2749,6 +2775,7 @@ int main()
     context.expect(host.badge_count > 0, "native sample should draw through styled badge UI ABI");
     context.expect(host.metric_count > 0, "native sample should draw through styled metric UI ABI");
     context.expect(host.asset_field_count > 0, "native sample should draw through styled asset field UI ABI");
+    context.expect(host.asset_drop_count > 0, "native sample should accept asset drops through semantic UI ABI");
     context.expect(host.panel_depth == 0, "native sample should balance styled panel scopes");
     context.expect(host.disabled_depth == 0, "native sample draw should balance disabled scopes");
 

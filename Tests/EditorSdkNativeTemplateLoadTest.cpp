@@ -118,6 +118,7 @@ struct TemplateHost {
     int badge_count{};
     int metric_count{};
     int asset_field_count{};
+    int asset_drop_count{};
     int panel_depth{};
     bool next_button_pressed{};
 
@@ -208,6 +209,7 @@ struct TemplateHost {
             .begin_panel = &beginPanel,
             .end_panel = &endPanel,
             .asset_field = &assetField,
+            .accept_asset_drag_drop_payload = &acceptAssetDragDropPayload,
         };
         api.commands = LunaEditorCommandApi{
             .struct_size = sizeof(LunaEditorCommandApi),
@@ -606,6 +608,21 @@ struct TemplateHost {
         if (out_data != nullptr && size == sizeof(uint64_t)) {
             uint64_t value = 0u;
             std::memcpy(out_data, &value, sizeof(value));
+        }
+        return 1;
+    }
+
+    static int acceptAssetDragDropPayload(void* api_user_data,
+                                          LunaEditorAssetDropPayload* out_payload,
+                                          const uint32_t*,
+                                          size_t)
+    {
+        if (TemplateHost* host = self(api_user_data)) {
+            ++host->asset_drop_count;
+        }
+        if (out_payload != nullptr) {
+            out_payload->handle = 42u;
+            out_payload->type = LunaEditorAssetType_Texture;
         }
         return 1;
     }
@@ -1440,7 +1457,25 @@ public:
         return true;
     }
     bool acceptDragDropPayload(std::string_view, void*, std::size_t) override { return true; }
-    bool acceptAssetDragDropPayload(luna::editor::AssetDropPayload&, const luna::AssetType*, std::size_t) override { return false; }
+    bool acceptAssetDragDropPayload(luna::editor::AssetDropPayload& out_payload,
+                                    const luna::AssetType* accepted_types,
+                                    std::size_t accepted_type_count) override
+    {
+        ++asset_drop_count;
+        const luna::AssetType dropped_type = luna::AssetType::Texture;
+        bool accepted = accepted_type_count == 0u;
+        for (std::size_t index = 0u; index < accepted_type_count && !accepted; ++index) {
+            accepted = accepted_types != nullptr && accepted_types[index] == dropped_type;
+        }
+        if (!accepted) {
+            return false;
+        }
+        out_payload = luna::editor::AssetDropPayload{
+            .handle = luna::AssetHandle(42u),
+            .type = dropped_type,
+        };
+        return true;
+    }
     void endDragDropTarget() override {}
     [[nodiscard]] float scale(float value) const noexcept override { return value; }
     [[nodiscard]] luna::editor::Vec2 scaled(luna::editor::Vec2 value) const noexcept override { return value; }
@@ -1473,6 +1508,7 @@ public:
     int badge_count{};
     int metric_count{};
     int asset_field_count{};
+    int asset_drop_count{};
     int panel_depth{};
 };
 
@@ -2285,6 +2321,8 @@ void testTemplateEditorPluginManagerLoad(TestContext& context,
     context.expect(host.ui_service.badge_count > 0, "manager-loaded SDK template should draw styled badge UI");
     context.expect(host.ui_service.metric_count > 0, "manager-loaded SDK template should draw styled metric UI");
     context.expect(host.ui_service.asset_field_count > 0, "manager-loaded SDK template should draw styled asset field UI");
+    context.expect(host.ui_service.asset_drop_count > 0,
+                   "manager-loaded SDK template should accept asset drops through semantic UI ABI");
     context.expect(host.ui_service.panel_depth == 0, "manager-loaded SDK template should balance styled panel scopes");
     context.expect(!host.viewport_service.viewports.empty(),
                    "manager-loaded SDK template should create an independent scene viewport");
@@ -2377,6 +2415,7 @@ int main(int argc, char** argv)
     context.expect(host.badge_count > 0, "SDK template should draw through styled badge UI wrapper");
     context.expect(host.metric_count > 0, "SDK template should draw through styled metric UI wrapper");
     context.expect(host.asset_field_count > 0, "SDK template should draw through styled asset field UI wrapper");
+    context.expect(host.asset_drop_count > 0, "SDK template should accept asset drops through semantic UI wrapper");
     context.expect(host.panel_depth == 0, "SDK template should balance styled panel scopes");
     context.expect(host.created_viewport_id != 0u, "SDK template should create an independent scene viewport");
 

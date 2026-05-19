@@ -253,6 +253,13 @@ void drawAssetSection(const native::Host& host, const native::Ui& ui, NativeSamp
     if (ui.isItemHovered()) {
         ui.setTooltip("Styled asset field from the native UI ABI.");
     }
+    if (ui.beginDragDropTarget()) {
+        native::AssetDropPayload dropped_asset{};
+        if (ui.acceptAssetDragDropPayload(&dropped_asset)) {
+            state.refresh_note = "Dropped asset handle: " + std::to_string(dropped_asset.handle);
+        }
+        ui.endDragDropTarget();
+    }
     ui.keyValue("Project Path", first.project_path.empty() ? "-" : first.project_path.c_str());
     ui.keyValue("Absolute Path", first.absolute_path.empty() ? "-" : first.absolute_path.c_str());
     if (!first.project_path.empty()) {

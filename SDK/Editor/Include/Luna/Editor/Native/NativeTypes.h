@@ -16,6 +16,7 @@ using TextureView = LunaEditorTextureView;
 using AssetHandle = uint64_t;
 using EntityId = uint64_t;
 using ViewportId = uint64_t;
+using AssetDropPayload = LunaEditorAssetDropPayload;
 
 [[nodiscard]] constexpr Vec2 vec2(float x, float y) noexcept
 {

@@ -184,6 +184,12 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
         if (ui.isItemHovered()) {
             ui.setTooltip("Styled asset field from the native UI ABI.");
         }
+        if (ui.beginDragDropTarget()) {
+            native::AssetDropPayload dropped_asset{};
+            const uint32_t accepted_types[] = {static_cast<uint32_t>(first_asset.type)};
+            (void) ui.acceptAssetDragDropPayload(&dropped_asset, accepted_types);
+            ui.endDragDropTarget();
+        }
     } else {
         ui.emptyState("No project assets", "No project assets are visible to this SDK template.");
     }

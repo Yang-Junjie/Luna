@@ -1179,6 +1179,32 @@ int nativeUiAcceptDragDropPayload(void* api_user_data, const char* type, void* o
     return ui != nullptr && type != nullptr && ui->acceptDragDropPayload(nativeString(type), out_data, size) ? 1 : 0;
 }
 
+int nativeUiAcceptAssetDragDropPayload(void* api_user_data,
+                                       LunaEditorAssetDropPayload* out_payload,
+                                       const uint32_t* accepted_types,
+                                       size_t accepted_type_count)
+{
+    Ui* ui = nativeUi(api_user_data);
+    if (ui == nullptr || out_payload == nullptr || (accepted_type_count > 0u && accepted_types == nullptr)) {
+        return 0;
+    }
+
+    std::vector<AssetType> editor_accepted_types;
+    editor_accepted_types.reserve(accepted_type_count);
+    for (size_t index = 0u; index < accepted_type_count; ++index) {
+        editor_accepted_types.push_back(toEditorAssetType(accepted_types[index]));
+    }
+
+    AssetDropPayload payload{};
+    if (!ui->acceptAssetDragDropPayload(payload, editor_accepted_types.data(), editor_accepted_types.size())) {
+        return 0;
+    }
+
+    out_payload->handle = static_cast<uint64_t>(payload.handle);
+    out_payload->type = toNativeAssetType(payload.type);
+    return 1;
+}
+
 void nativeUiEndDragDropTarget(void* api_user_data)
 {
     if (Ui* ui = nativeUi(api_user_data)) {
@@ -2451,6 +2477,7 @@ LunaEditorUiApi makeNativeUiApi(NativePluginContext& context)
         .begin_panel = &nativeUiBeginPanel,
         .end_panel = &nativeUiEndPanel,
         .asset_field = &nativeUiAssetField,
+        .accept_asset_drag_drop_payload = &nativeUiAcceptAssetDragDropPayload,
     };
 }
 

@@ -560,6 +560,29 @@ public:
                api_->accept_drag_drop_payload(api_->api_user_data, type, out_data, size) != 0;
     }
 
+    [[nodiscard]] bool acceptAssetDragDropPayload(AssetDropPayload* out_payload,
+                                                  const uint32_t* accepted_types = nullptr,
+                                                  size_t accepted_type_count = 0u) const noexcept
+    {
+        if (!hasField(offsetof(LunaEditorUiApi, accept_asset_drag_drop_payload),
+                      sizeof(api_->accept_asset_drag_drop_payload)) ||
+            api_->accept_asset_drag_drop_payload == nullptr || out_payload == nullptr) {
+            return false;
+        }
+
+        return api_->accept_asset_drag_drop_payload(api_->api_user_data,
+                                                   out_payload,
+                                                   accepted_types,
+                                                   accepted_type_count) != 0;
+    }
+
+    template <size_t Count>
+    [[nodiscard]] bool acceptAssetDragDropPayload(AssetDropPayload* out_payload,
+                                                  const uint32_t (&accepted_types)[Count]) const noexcept
+    {
+        return acceptAssetDragDropPayload(out_payload, accepted_types, Count);
+    }
+
     void endDragDropTarget() const noexcept
     {
         if (api_ != nullptr && api_->end_drag_drop_target != nullptr) {

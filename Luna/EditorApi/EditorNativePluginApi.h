@@ -65,6 +65,11 @@ typedef struct LunaEditorTextureView {
     int32_t y_flip;
 } LunaEditorTextureView;
 
+typedef struct LunaEditorAssetDropPayload {
+    uint64_t handle;
+    uint32_t type;
+} LunaEditorAssetDropPayload;
+
 typedef enum LunaEditorLogLevel {
     LunaEditorLogLevel_Trace = 0,
     LunaEditorLogLevel_Info = 1,
@@ -311,6 +316,10 @@ typedef struct LunaEditorUiApi {
                        const char* detail,
                        uint32_t variant,
                        const LunaEditorVec2* size);
+    int (*accept_asset_drag_drop_payload)(void* api_user_data,
+                                          LunaEditorAssetDropPayload* out_payload,
+                                          const uint32_t* accepted_types,
+                                          size_t accepted_type_count);
 } LunaEditorUiApi;
 
 typedef struct LunaEditorCommandDescriptor {
