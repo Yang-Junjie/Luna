@@ -8,6 +8,7 @@
 #include "EditorApi/EditorMaterialService.h"
 #include "EditorApi/EditorMenuService.h"
 #include "EditorApi/EditorNativePluginApi.h"
+#include "EditorApi/EditorOrbitCamera.h"
 #include "EditorApi/EditorProjectService.h"
 #include "EditorApi/EditorPlugin.h"
 #include "EditorApi/EditorPluginAssetService.h"

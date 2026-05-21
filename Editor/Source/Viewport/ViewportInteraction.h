@@ -15,20 +15,29 @@ struct ViewportSurfaceRect {
 
 struct ViewportInteractionInput {
     ViewportSurfaceRect rect{};
+    editor::Vec2 mouse_delta{};
+    editor::Vec2 mouse_wheel_delta{};
     bool hovered{false};
     bool active{false};
     bool clicked{false};
     bool double_clicked{false};
+    bool left_mouse_down{false};
+    bool left_mouse_released{false};
+    bool dragging{false};
 };
 
 struct ViewportInteractionState {
     editor::ViewportId viewport_id{editor::kInvalidViewportId};
     std::string owner_id;
     ViewportSurfaceRect rect{};
+    editor::Vec2 mouse_delta{};
+    editor::Vec2 mouse_drag_delta{};
+    editor::Vec2 mouse_wheel_delta{};
     bool hovered{false};
     bool active{false};
     bool clicked{false};
     bool double_clicked{false};
+    bool dragging{false};
     bool mouse_captured{false};
 };
 

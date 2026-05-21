@@ -30,6 +30,8 @@ public:
         std::shared_ptr<Texture> BaseColor;
         std::shared_ptr<Texture> Normal;
         std::shared_ptr<Texture> MetallicRoughness;
+        std::shared_ptr<Texture> Metallic;
+        std::shared_ptr<Texture> Roughness;
         std::shared_ptr<Texture> Emissive;
         std::shared_ptr<Texture> Occlusion;
     };
@@ -85,6 +87,8 @@ public:
     bool hasBaseColorTexture() const;
     bool hasNormalTexture() const;
     bool hasMetallicRoughnessTexture() const;
+    bool hasMetallicTexture() const;
+    bool hasRoughnessTexture() const;
     bool hasEmissiveTexture() const;
     bool hasOcclusionTexture() const;
 

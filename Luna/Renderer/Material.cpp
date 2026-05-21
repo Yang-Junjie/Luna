@@ -34,12 +34,14 @@ Material::Material(std::string name, TextureSet textures, SurfaceProperties surf
       m_blend_mode(surface.BlendModeValue)
 {
     LUNA_RENDERER_DEBUG("Created material '{}' blend={} textures: base_color={} normal={} metallic_roughness={} "
-                        "emissive={} occlusion={}",
+                        "metallic={} roughness={} emissive={} occlusion={}",
                         m_name.empty() ? "<unnamed>" : m_name,
                         blendModeToString(m_blend_mode),
                         static_cast<bool>(m_textures.BaseColor),
                         static_cast<bool>(m_textures.Normal),
                         static_cast<bool>(m_textures.MetallicRoughness),
+                        static_cast<bool>(m_textures.Metallic),
+                        static_cast<bool>(m_textures.Roughness),
                         static_cast<bool>(m_textures.Emissive),
                         static_cast<bool>(m_textures.Occlusion));
 }
@@ -138,6 +140,16 @@ bool Material::hasNormalTexture() const
 bool Material::hasMetallicRoughnessTexture() const
 {
     return m_textures.MetallicRoughness != nullptr;
+}
+
+bool Material::hasMetallicTexture() const
+{
+    return m_textures.Metallic != nullptr;
+}
+
+bool Material::hasRoughnessTexture() const
+{
+    return m_textures.Roughness != nullptr;
 }
 
 bool Material::hasEmissiveTexture() const

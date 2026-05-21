@@ -111,13 +111,13 @@ struct SampledMaterial
 
 #if defined(LUNA_BACKEND_D3D11)
 [[vk::push_constant]]
-cbuffer PushConstants : register(b13)
+cbuffer PushConstants : register(b22)
 {
     MeshPushConstants gPushConstants;
 }
 #elif defined(LUNA_BACKEND_D3D12)
 [[vk::push_constant]]
-cbuffer PushConstants : register(b15)
+cbuffer PushConstants : register(b22)
 {
     MeshPushConstants gPushConstants;
 }
@@ -148,34 +148,46 @@ Texture2D<float4> gMetallicRoughnessTexture : register(t4);
 SamplerState gMetallicRoughnessSampler : register(s5);
 
 [[vk::binding(6, 0)]]
-Texture2D<float4> gEmissiveTexture : register(t6);
+Texture2D<float4> gMetallicTexture : register(t6);
 
 [[vk::binding(7, 0)]]
-SamplerState gEmissiveSampler : register(s7);
+SamplerState gMetallicSampler : register(s7);
 
 [[vk::binding(8, 0)]]
-Texture2D<float4> gOcclusionTexture : register(t8);
+Texture2D<float4> gRoughnessTexture : register(t8);
 
 [[vk::binding(9, 0)]]
-SamplerState gOcclusionSampler : register(s9);
+SamplerState gRoughnessSampler : register(s9);
 
 [[vk::binding(10, 0)]]
-ConstantBuffer<MaterialParams> gMaterialParams : register(b10);
+Texture2D<float4> gEmissiveTexture : register(t10);
+
+[[vk::binding(11, 0)]]
+SamplerState gEmissiveSampler : register(s11);
+
+[[vk::binding(12, 0)]]
+Texture2D<float4> gOcclusionTexture : register(t12);
+
+[[vk::binding(13, 0)]]
+SamplerState gOcclusionSampler : register(s13);
+
+[[vk::binding(14, 0)]]
+ConstantBuffer<MaterialParams> gMaterialParams : register(b14);
 
 [[vk::binding(0, 1)]]
-ConstantBuffer<SceneParams> gSceneParams : register(b11);
+ConstantBuffer<SceneParams> gSceneParams : register(b15);
 
 [[vk::binding(1, 1)]]
-Texture2D<float4> gEnvironmentTexture : register(t12);
+Texture2D<float4> gEnvironmentTexture : register(t16);
 
 [[vk::binding(2, 1)]]
-SamplerState gEnvironmentSampler : register(s13);
+SamplerState gEnvironmentSampler : register(s17);
 
 [[vk::binding(5, 1)]]
-TextureCube<float4> gEnvironmentPrefilterTexture : register(t16);
+TextureCube<float4> gEnvironmentPrefilterTexture : register(t20);
 
 [[vk::binding(6, 1)]]
-Texture2D<float4> gEnvironmentBrdfLut : register(t17);
+Texture2D<float4> gEnvironmentBrdfLut : register(t21);
 
 float3 safeNormalize(float3 value, float3 fallbackValue)
 {
@@ -494,8 +506,14 @@ SampledMaterial sampleMaterial(SceneVertexOutput input)
     material.normalWS = safeNormalize(mul(scaledTangentNormal, tbn), safeNormalize(input.worldNormal, float3(0.0, 0.0, 1.0)));
 
     const float4 metallicRoughnessSample = gMetallicRoughnessTexture.Sample(gMetallicRoughnessSampler, input.uv);
-    material.metallic = saturate(metallicRoughnessSample.b * gMaterialParams.materialFactors.x);
-    material.roughness = clamp(metallicRoughnessSample.g * gMaterialParams.materialFactors.y, kMinRoughness, 1.0);
+    const float metallicSample = gMetallicTexture.Sample(gMetallicSampler, input.uv).r;
+    const float roughnessSample = gRoughnessTexture.Sample(gRoughnessSampler, input.uv).r;
+    const bool hasMetallicTexture = gMaterialParams.materialFlags.z > 0.5;
+    const bool hasRoughnessTexture = gMaterialParams.materialFlags.w > 0.5;
+    const float metallicSource = hasMetallicTexture ? metallicSample : metallicRoughnessSample.b;
+    const float roughnessSource = hasRoughnessTexture ? roughnessSample : metallicRoughnessSample.g;
+    material.metallic = saturate(metallicSource * gMaterialParams.materialFactors.x);
+    material.roughness = clamp(roughnessSource * gMaterialParams.materialFactors.y, kMinRoughness, 1.0);
 
     const float4 emissiveSample = gEmissiveTexture.Sample(gEmissiveSampler, input.uv);
     material.emissive = emissiveSample.rgb * gMaterialParams.emissiveFactorNormalScale.rgb;

@@ -268,15 +268,6 @@ std::string materialPathForName(std::string_view name)
     return "Assets/Materials/" + safe_name + ".lunamat";
 }
 
-std::string defaultMetallicRoughnessPath(const luna::editor::MaterialDocument& document)
-{
-    const std::string stem = document.project_path.empty() ? std::string("Material") : document.project_path.stem().string();
-    const std::filesystem::path parent_path =
-        document.project_path.parent_path().empty() ? std::filesystem::path("Assets") / "Materials"
-                                                    : document.project_path.parent_path();
-    return (parent_path / (stem + "_MR.png")).generic_string();
-}
-
 } // namespace
 
 namespace luna::editor {
@@ -385,9 +376,6 @@ void MaterialEditorPlugin::selectMaterial(Host& host, AssetHandle handle)
 {
     if (!handle.isValid()) {
         m_selected_material = AssetHandle{0};
-        m_synthesis_metallic_texture = AssetHandle{0};
-        m_synthesis_roughness_texture = AssetHandle{0};
-        m_synthesis_output_path.clear();
         return;
     }
 
@@ -398,9 +386,6 @@ void MaterialEditorPlugin::selectMaterial(Host& host, AssetHandle handle)
     }
 
     m_selected_material = handle;
-    m_synthesis_metallic_texture = AssetHandle{0};
-    m_synthesis_roughness_texture = AssetHandle{0};
-    m_synthesis_output_path.clear();
     m_status.clear();
 }
 
@@ -615,6 +600,9 @@ void MaterialEditorPlugin::drawPreviewControls(Host& host, Ui& ui)
 
     (void) ui.sliderFloat("Sky Intensity", m_preview_sky_intensity, 0.0f, 8.0f, "%.2f");
     (void) ui.sliderFloat("Light Intensity", m_preview_light_intensity, 0.0f, 8.0f, "%.2f");
+    if (ui.button("Reset Camera", Vec2{.x = -1.0f, .y = 0.0f}, ButtonVariant::Subtle)) {
+        resetPreviewCamera();
+    }
     ui.endSection();
 }
 
@@ -637,6 +625,7 @@ void MaterialEditorPlugin::drawPreviewViewport(Host& host, Ui& ui, const Materia
     preview_state.environment.diffuse_intensity = std::max(m_preview_light_intensity, 0.0f);
     preview_state.environment.specular_intensity = std::max(m_preview_light_intensity, 0.0f);
     preview_state.environment.procedural_sun_intensity = 18.0f * std::max(m_preview_light_intensity, 0.0f);
+    preview_state = m_preview_camera.applyTo(preview_state);
 
     const bool preview_ready =
         m_preview_viewport != kInvalidViewportId && host.viewport().setSceneViewportPreview(m_preview_viewport, preview_state);
@@ -649,12 +638,18 @@ void MaterialEditorPlugin::drawPreviewViewport(Host& host, Ui& ui, const Materia
                 .fill_available = true,
                 .requested_size = Vec2{.x = 0.0f, .y = 0.0f},
             });
+        (void) m_preview_camera.updateFromViewport(draw_result);
         if (!draw_result.drawn) {
             ui.emptyState("Preview warming up", "The preview render target is not ready yet.");
         }
     } else {
         ui.emptyState("Preview unavailable", "The preview viewport could not be created.");
     }
+}
+
+void MaterialEditorPlugin::resetPreviewCamera()
+{
+    m_preview_camera.reset();
 }
 
 void MaterialEditorPlugin::drawMaterialBody(Host& host, Ui& ui, MaterialDocument document)
@@ -674,7 +669,8 @@ void MaterialEditorPlugin::drawMaterialBody(Host& host, Ui& ui, MaterialDocument
         textures_changed |= drawTextureSlot(host, ui, "##MaterialEditorNormal", "Normal", textures.normal);
         textures_changed |= drawTextureSlot(
             host, ui, "##MaterialEditorMetallicRoughness", "Packed Metallic Roughness", textures.metallic_roughness);
-        drawMetallicRoughnessSynthesis(host, ui, document, textures);
+        textures_changed |= drawTextureSlot(host, ui, "##MaterialEditorMetallic", "Metallic", textures.metallic);
+        textures_changed |= drawTextureSlot(host, ui, "##MaterialEditorRoughness", "Roughness", textures.roughness);
         textures_changed |= drawTextureSlot(host, ui, "##MaterialEditorEmissive", "Emissive", textures.emissive);
         textures_changed |= drawTextureSlot(host, ui, "##MaterialEditorOcclusion", "Occlusion", textures.occlusion);
         if (textures_changed) {
@@ -690,8 +686,14 @@ void MaterialEditorPlugin::drawMaterialBody(Host& host, Ui& ui, MaterialDocument
         surface_changed |= ui.colorEdit4("Base Color Factor", surface.base_color_factor);
         surface_changed |= ui.colorEdit3("Emissive Factor", surface.emissive_factor);
 
-        const char* metallic_label = document.textures.metallic_roughness.isValid() ? "Metallic Multiplier" : "Metallic";
-        const char* roughness_label = document.textures.metallic_roughness.isValid() ? "Roughness Multiplier" : "Roughness";
+        const char* metallic_label =
+            (document.textures.metallic.isValid() || document.textures.metallic_roughness.isValid())
+                ? "Metallic Multiplier"
+                : "Metallic";
+        const char* roughness_label =
+            (document.textures.roughness.isValid() || document.textures.metallic_roughness.isValid())
+                ? "Roughness Multiplier"
+                : "Roughness";
         surface_changed |= ui.sliderFloat(metallic_label, surface.metallic_factor, 0.0f, 1.0f, "%.3f");
         surface_changed |= ui.sliderFloat(roughness_label, surface.roughness_factor, 0.0f, 1.0f, "%.3f");
         surface_changed |= ui.sliderFloat("Normal Scale", surface.normal_scale, 0.0f, 4.0f, "%.3f");
@@ -712,65 +714,6 @@ void MaterialEditorPlugin::drawMaterialBody(Host& host, Ui& ui, MaterialDocument
     if (!document.editable) {
         ui.endDisabled();
     }
-}
-
-void MaterialEditorPlugin::drawMetallicRoughnessSynthesis(Host& host,
-                                                          Ui& ui,
-                                                          const MaterialDocument& document,
-                                                          MaterialTextureSet& textures)
-{
-    ui.spacing();
-    if (!ui.beginSection("##MaterialEditorMRSynthesis", "Metallic / Roughness Sources", true)) {
-        return;
-    }
-
-    (void) textures;
-    (void) drawTextureSlot(
-        host, ui, "##MaterialEditorMetallicSource", "Metallic Source", m_synthesis_metallic_texture);
-    (void) drawTextureSlot(
-        host, ui, "##MaterialEditorRoughnessSource", "Roughness Source", m_synthesis_roughness_texture);
-
-    if (m_synthesis_output_path.empty()) {
-        m_synthesis_output_path = defaultMetallicRoughnessPath(document);
-    }
-    ui.inputText("Output", m_synthesis_output_path, 256);
-
-    const bool has_texture_source = m_synthesis_metallic_texture.isValid() || m_synthesis_roughness_texture.isValid();
-    if (!has_texture_source || !document.editable) {
-        ui.beginDisabled();
-    }
-
-    const bool synthesize_clicked =
-        ui.button("Synthesize Packed MR", Vec2{.x = -1.0f, .y = 0.0f}, ButtonVariant::Primary);
-    if (ui.isItemHovered()) {
-        ui.setTooltip("Writes roughness to G and metallic to B. Missing sources use scalar values.");
-    }
-
-    if (synthesize_clicked) {
-        MetallicRoughnessSynthesisRequest request{};
-        request.material = document.handle;
-        request.metallic_texture = m_synthesis_metallic_texture;
-        request.roughness_texture = m_synthesis_roughness_texture;
-        request.output_project_path = std::filesystem::path(m_synthesis_output_path);
-        request.metallic_fallback = document.surface.metallic_factor;
-        request.roughness_fallback = document.surface.roughness_factor;
-        request.overwrite = true;
-
-        const MetallicRoughnessSynthesisResult result = host.materials().synthesizeMetallicRoughness(request);
-        m_status = result.message;
-        if (result.success) {
-            textures.metallic_roughness = result.texture;
-            if (!result.project_path.empty()) {
-                m_synthesis_output_path = result.project_path.generic_string();
-            }
-        }
-    }
-
-    if (!has_texture_source || !document.editable) {
-        ui.endDisabled();
-    }
-
-    ui.endSection();
 }
 
 void MaterialEditorPlugin::applyTextureChanges(Host& host, const MaterialTextureSet& textures)

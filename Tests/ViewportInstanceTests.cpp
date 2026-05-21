@@ -102,6 +102,7 @@ void testViewportInteractionTopmostHover(TestContext& context)
             },
         .hovered = true,
         .clicked = true,
+        .left_mouse_down = true,
     };
 
     tracker.recordSurface(10u, "base", base_input);
@@ -118,6 +119,7 @@ void testViewportInteractionTopmostHover(TestContext& context)
                                   },
                               .hovered = true,
                               .clicked = true,
+                              .left_mouse_down = true,
                           });
 
     context.expect(!tracker.isHovered(10u), "later hovered viewport should block lower hover");
@@ -148,6 +150,41 @@ void testViewportInteractionCapture(TestContext& context)
     context.expect(!tracker.allowsInput(30u), "released non-hovered viewport should stop accepting input");
 }
 
+void testViewportInteractionCapturedDrag(TestContext& context)
+{
+    luna::ViewportInteractionTracker tracker;
+    tracker.recordSurface(31u,
+                          "viewport",
+                          luna::ViewportInteractionInput{
+                              .mouse_delta = luna::editor::Vec2{.x = 0.0f, .y = 0.0f},
+                              .hovered = true,
+                              .clicked = true,
+                              .left_mouse_down = true,
+                          });
+
+    tracker.recordSurface(31u,
+                          "viewport",
+                          luna::ViewportInteractionInput{
+                              .mouse_delta = luna::editor::Vec2{.x = 7.0f, .y = -3.0f},
+                              .left_mouse_down = true,
+                              .dragging = true,
+                          });
+
+    const luna::ViewportInteractionState* captured_state = tracker.find(31u);
+    context.expect(captured_state != nullptr && captured_state->dragging,
+                   "captured viewport should keep dragging after hover leaves");
+    context.expect(captured_state != nullptr && captured_state->mouse_drag_delta.x == 7.0f &&
+                       captured_state->mouse_drag_delta.y == -3.0f,
+                   "captured viewport should expose drag delta after hover leaves");
+
+    tracker.recordSurface(31u,
+                          "viewport",
+                          luna::ViewportInteractionInput{
+                              .left_mouse_released = true,
+                          });
+    context.expect(!tracker.hasMouseCapture(31u), "mouse release should clear viewport capture");
+}
+
 void testViewportInteractionOwnerCleanup(TestContext& context)
 {
     luna::ViewportInteractionTracker tracker;
@@ -170,6 +207,7 @@ int main()
     testTextureViewportPresentation(context);
     testViewportInteractionTopmostHover(context);
     testViewportInteractionCapture(context);
+    testViewportInteractionCapturedDrag(context);
     testViewportInteractionOwnerCleanup(context);
     return context.result();
 }

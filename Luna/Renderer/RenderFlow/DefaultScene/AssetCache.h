@@ -81,6 +81,8 @@ private:
         std::shared_ptr<renderer_detail::PendingTextureUpload> base_color_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> normal_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> metallic_roughness_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> metallic_texture;
+        std::shared_ptr<renderer_detail::PendingTextureUpload> roughness_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> emissive_texture;
         std::shared_ptr<renderer_detail::PendingTextureUpload> occlusion_texture;
         RHI::Ref<RHI::Buffer> params_buffer;

@@ -22,6 +22,10 @@ void ViewportInteractionTracker::beginFrame() noexcept
         state.active = false;
         state.clicked = false;
         state.double_clicked = false;
+        state.dragging = false;
+        state.mouse_delta = {};
+        state.mouse_drag_delta = {};
+        state.mouse_wheel_delta = {};
     }
 }
 
@@ -84,10 +88,20 @@ const ViewportInteractionState& ViewportInteractionTracker::recordSurface(editor
     ViewportInteractionState& state = stateFor(viewport_id);
     state.owner_id = toOwnedString(owner_id);
     state.rect = input.rect;
+    state.mouse_delta = input.mouse_delta;
+    state.mouse_wheel_delta = input.hovered || state.mouse_captured ? input.mouse_wheel_delta : editor::Vec2{};
     state.hovered = input.hovered;
     state.active = input.active;
     state.clicked = input.clicked;
     state.double_clicked = input.double_clicked;
+    if (input.clicked && input.left_mouse_down) {
+        setMouseCapture(viewport_id, true);
+    } else if (input.left_mouse_released) {
+        setMouseCapture(viewport_id, false);
+    }
+
+    state.dragging = state.mouse_captured && input.dragging;
+    state.mouse_drag_delta = state.dragging ? input.mouse_delta : editor::Vec2{};
 
     if (state.hovered) {
         if (m_hovered_viewport != editor::kInvalidViewportId && m_hovered_viewport != viewport_id) {

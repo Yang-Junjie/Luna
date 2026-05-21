@@ -20,6 +20,8 @@ struct MaterialTextureSet {
     AssetHandle base_color{0};
     AssetHandle normal{0};
     AssetHandle metallic_roughness{0};
+    AssetHandle metallic{0};
+    AssetHandle roughness{0};
     AssetHandle emissive{0};
     AssetHandle occlusion{0};
 };
@@ -76,26 +78,6 @@ struct MaterialCreateResult {
     std::string message;
 };
 
-struct MetallicRoughnessSynthesisRequest {
-    AssetHandle material{0};
-    AssetHandle metallic_texture{0};
-    AssetHandle roughness_texture{0};
-    std::filesystem::path output_project_path;
-    float metallic_fallback{0.0f};
-    float roughness_fallback{1.0f};
-    bool overwrite{true};
-};
-
-struct MetallicRoughnessSynthesisResult {
-    bool success{false};
-    bool project_loaded{false};
-    bool dirty{false};
-    AssetHandle texture{0};
-    std::filesystem::path project_path;
-    std::filesystem::path absolute_path;
-    std::string message;
-};
-
 class MaterialService {
 public:
     virtual ~MaterialService() = default;
@@ -105,8 +87,6 @@ public:
     virtual std::optional<MaterialDocument> readMaterial(AssetHandle handle) = 0;
     virtual bool setMaterialTextures(AssetHandle handle, const MaterialTextureSet& textures) = 0;
     virtual bool setMaterialSurface(AssetHandle handle, const MaterialSurfaceProperties& surface) = 0;
-    virtual MetallicRoughnessSynthesisResult
-        synthesizeMetallicRoughness(const MetallicRoughnessSynthesisRequest& request) = 0;
     virtual MaterialEditResult saveMaterial(AssetHandle handle) = 0;
     virtual MaterialEditResult revertMaterial(AssetHandle handle) = 0;
     virtual bool isMaterialDirty(AssetHandle handle) const = 0;

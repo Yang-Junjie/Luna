@@ -4,7 +4,6 @@
 #include "Asset/Editor/ImageLoader.h"
 #include "Asset/Editor/ImporterManager.h"
 #include "Asset/Editor/MaterialFactory.h"
-#include "Asset/Editor/TextureImporter.h"
 #include "Core/Application.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorApi.h"
@@ -54,7 +53,6 @@
 #include <vector>
 
 #include <yaml-cpp/yaml.h>
-#include <stb_image_write.h>
 
 namespace {
 
@@ -1008,235 +1006,6 @@ bool toAuthoringComponentKind(luna::editor::SceneComponentKind component_kind,
     }
 
     return false;
-}
-
-struct SynthesizedTexture {
-    uint32_t width{0};
-    uint32_t height{0};
-    std::vector<uint8_t> pixels;
-};
-
-uint8_t normalizedByte(float value) noexcept
-{
-    const float clamped = std::clamp(value, 0.0f, 1.0f);
-    return static_cast<uint8_t>(std::round(clamped * 255.0f));
-}
-
-bool isMetallicRoughnessSynthesisFormat(luna::RHI::Format format) noexcept
-{
-    using Format = luna::RHI::Format;
-    switch (format) {
-        case Format::R8_UNORM:
-        case Format::RG8_UNORM:
-        case Format::RGBA8_UNORM:
-        case Format::RGBA8_SRGB:
-        case Format::BGRA8_UNORM:
-        case Format::BGRA8_SRGB:
-        case Format::RGBA32_FLOAT:
-            return true;
-        default:
-            return false;
-    }
-}
-
-uint8_t sampleSynthesisSourceChannel(const luna::ImageData& image,
-                                     uint32_t output_x,
-                                     uint32_t output_y,
-                                     uint32_t output_width,
-                                     uint32_t output_height,
-                                     uint8_t fallback) noexcept
-{
-    if (!image.isValid() || output_width == 0u || output_height == 0u) {
-        return fallback;
-    }
-
-    const uint32_t source_x =
-        (std::min)(image.Width - 1u, static_cast<uint32_t>((static_cast<uint64_t>(output_x) * image.Width) / output_width));
-    const uint32_t source_y = (std::min)(
-        image.Height - 1u, static_cast<uint32_t>((static_cast<uint64_t>(output_y) * image.Height) / output_height));
-    const size_t pixel_index = static_cast<size_t>(source_y) * image.Width + source_x;
-
-    using Format = luna::RHI::Format;
-    switch (image.ImageFormat) {
-        case Format::R8_UNORM:
-            if (pixel_index < image.ByteData.size()) {
-                return image.ByteData[pixel_index];
-            }
-            break;
-        case Format::RG8_UNORM: {
-            const size_t byte_index = pixel_index * 2u;
-            if (byte_index < image.ByteData.size()) {
-                return image.ByteData[byte_index];
-            }
-            break;
-        }
-        case Format::RGBA8_UNORM:
-        case Format::RGBA8_SRGB: {
-            const size_t byte_index = pixel_index * 4u;
-            if (byte_index < image.ByteData.size()) {
-                return image.ByteData[byte_index];
-            }
-            break;
-        }
-        case Format::BGRA8_UNORM:
-        case Format::BGRA8_SRGB: {
-            const size_t byte_index = pixel_index * 4u + 2u;
-            if (byte_index < image.ByteData.size()) {
-                return image.ByteData[byte_index];
-            }
-            break;
-        }
-        case Format::RGBA32_FLOAT: {
-            const size_t byte_index = pixel_index * 4u * sizeof(float);
-            if (byte_index + sizeof(float) <= image.ByteData.size()) {
-                float value = 0.0f;
-                std::memcpy(&value, image.ByteData.data() + byte_index, sizeof(float));
-                return normalizedByte(value);
-            }
-            break;
-        }
-        default:
-            break;
-    }
-
-    return fallback;
-}
-
-std::optional<luna::ImageData> loadSynthesisSourceImage(luna::editor::AssetService& asset_service,
-                                                        luna::AssetHandle texture_handle,
-                                                        std::string_view usage)
-{
-    const std::optional<luna::editor::AssetInfo> info = asset_service.assetInfo(texture_handle);
-    if (!info || info->type != luna::AssetType::Texture || !info->exists || info->memory_only) {
-        LUNA_EDITOR_WARN("Cannot use {} source because the asset is not a file-backed texture.", usage);
-        return std::nullopt;
-    }
-
-    std::filesystem::path texture_path = info->absolute_path;
-    if (texture_path.empty() && !info->project_path.empty()) {
-        if (const std::optional<std::filesystem::path> resolved_path =
-                asset_service.resolveProjectAssetPath(info->project_path)) {
-            texture_path = *resolved_path;
-        }
-    }
-
-    if (texture_path.empty()) {
-        LUNA_EDITOR_WARN("Cannot resolve {} source texture path for handle {}.", usage, texture_handle.toString());
-        return std::nullopt;
-    }
-
-    luna::ImageData image = luna::ImageLoader::LoadImageFromFile(texture_path.string());
-    if (!image.isValid() || !isMetallicRoughnessSynthesisFormat(image.ImageFormat)) {
-        LUNA_EDITOR_WARN("Cannot load {} source texture '{}' for metallic/roughness synthesis.",
-                         usage,
-                         texture_path.string());
-        return std::nullopt;
-    }
-
-    return image;
-}
-
-SynthesizedTexture synthesizePackedMetallicRoughness(const luna::ImageData* metallic_image,
-                                                     const luna::ImageData* roughness_image,
-                                                     float metallic_fallback,
-                                                     float roughness_fallback)
-{
-    const uint32_t width =
-        (std::max)({metallic_image != nullptr ? metallic_image->Width : 0u,
-                    roughness_image != nullptr ? roughness_image->Width : 0u,
-                    1u});
-    const uint32_t height =
-        (std::max)({metallic_image != nullptr ? metallic_image->Height : 0u,
-                    roughness_image != nullptr ? roughness_image->Height : 0u,
-                    1u});
-
-    SynthesizedTexture result{
-        .width = width,
-        .height = height,
-        .pixels = std::vector<uint8_t>(static_cast<size_t>(width) * height * 4u, 255u),
-    };
-
-    const uint8_t metallic_byte = normalizedByte(metallic_fallback);
-    const uint8_t roughness_byte = normalizedByte(roughness_fallback);
-
-    for (uint32_t y = 0; y < height; ++y) {
-        for (uint32_t x = 0; x < width; ++x) {
-            const size_t offset = (static_cast<size_t>(y) * width + x) * 4u;
-            result.pixels[offset + 0u] = 0u;
-            result.pixels[offset + 1u] = roughness_image != nullptr
-                                             ? sampleSynthesisSourceChannel(*roughness_image, x, y, width, height, roughness_byte)
-                                             : roughness_byte;
-            result.pixels[offset + 2u] = metallic_image != nullptr
-                                             ? sampleSynthesisSourceChannel(*metallic_image, x, y, width, height, metallic_byte)
-                                             : metallic_byte;
-            result.pixels[offset + 3u] = 255u;
-        }
-    }
-
-    return result;
-}
-
-std::filesystem::path defaultMetallicRoughnessOutputPath(const luna::editor::MaterialDocument& document)
-{
-    const std::string stem = document.project_path.empty() ? std::string("Material") : document.project_path.stem().string();
-    std::filesystem::path parent_path = document.project_path.parent_path();
-    if (parent_path.empty()) {
-        parent_path = std::filesystem::path("Assets") / "Materials";
-    }
-    return parent_path / (stem + "_MR.png");
-}
-
-std::optional<std::filesystem::path> normalizeTextureProjectPath(luna::editor::AssetService& asset_service,
-                                                                 const std::filesystem::path& path)
-{
-    std::optional<std::filesystem::path> normalized_path = asset_service.makeProjectRelativeAssetPath(path);
-    if (!normalized_path) {
-        return std::nullopt;
-    }
-
-    std::filesystem::path result = normalized_path->lexically_normal();
-    std::string extension = result.extension().string();
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    if (extension != ".png") {
-        result.replace_extension(".png");
-    }
-
-    return result.lexically_normal();
-}
-
-luna::AssetHandle importSynthesizedTexture(const std::filesystem::path& absolute_path,
-                                           const std::filesystem::path& project_path)
-{
-    luna::TextureImporter importer;
-    luna::AssetMetadata metadata;
-
-    const luna::AssetHandle existing_handle = luna::AssetDatabase::findHandleByFilePath(project_path);
-    if (existing_handle.isValid() && luna::AssetDatabase::exists(existing_handle)) {
-        metadata = luna::AssetDatabase::getAssetMetadata(existing_handle);
-    } else {
-        metadata = importer.import(absolute_path);
-    }
-
-    if (!metadata.Handle.isValid()) {
-        metadata.Handle = luna::UUID();
-        if (!metadata.Handle.isValid()) {
-            metadata.Handle = luna::UUID(1);
-        }
-    }
-
-    metadata.Name = absolute_path.stem().string();
-    metadata.Type = luna::AssetType::Texture;
-    metadata.FilePath = project_path.lexically_normal();
-    metadata.MemoryOnly = false;
-    metadata.SpecializedConfig = luna::texture_importer_detail::makeDefaultTextureConfig(project_path);
-    metadata.SpecializedConfig["SRGB"] = false;
-    metadata.SpecializedConfig["GenerateMipmaps"] = true;
-
-    importer.serializeMetadata(metadata);
-    luna::AssetDatabase::set(metadata.Handle, metadata);
-    return metadata.Handle;
 }
 
 } // namespace
@@ -2577,130 +2346,6 @@ public:
         return true;
     }
 
-    MetallicRoughnessSynthesisResult
-        synthesizeMetallicRoughness(const MetallicRoughnessSynthesisRequest& request) override
-    {
-        MetallicRoughnessSynthesisResult result{
-            .project_loaded = hasProjectLoaded(),
-        };
-        if (!result.project_loaded) {
-            result.message = "Cannot synthesize metallic/roughness because no project is loaded.";
-            return result;
-        }
-
-        AssetService* asset_service = assets();
-        if (asset_service == nullptr) {
-            result.message = "Asset service is unavailable.";
-            return result;
-        }
-
-        MaterialDocument document = readMaterialDocument(request.material);
-        if (!document.exists || !document.editable) {
-            result.message = "Material is not editable.";
-            return result;
-        }
-
-        std::optional<ImageData> metallic_image;
-        std::optional<ImageData> roughness_image;
-        if (request.metallic_texture.isValid()) {
-            metallic_image = loadSynthesisSourceImage(*asset_service, request.metallic_texture, "metallic");
-            if (!metallic_image) {
-                result.message = "Failed to load metallic source texture.";
-                return result;
-            }
-        }
-        if (request.roughness_texture.isValid()) {
-            roughness_image = loadSynthesisSourceImage(*asset_service, request.roughness_texture, "roughness");
-            if (!roughness_image) {
-                result.message = "Failed to load roughness source texture.";
-                return result;
-            }
-        }
-
-        std::filesystem::path output_project_path =
-            request.output_project_path.empty() ? defaultMetallicRoughnessOutputPath(document)
-                                                : request.output_project_path;
-        const std::optional<std::filesystem::path> normalized_output_path =
-            normalizeTextureProjectPath(*asset_service, output_project_path);
-        if (!normalized_output_path) {
-            result.message = "Output texture path is invalid.";
-            return result;
-        }
-
-        const std::optional<std::filesystem::path> absolute_output_path =
-            asset_service->resolveProjectAssetPath(*normalized_output_path);
-        if (!absolute_output_path) {
-            result.message = "Output texture path cannot be resolved in the current project.";
-            return result;
-        }
-
-        result.project_path = *normalized_output_path;
-        result.absolute_path = *absolute_output_path;
-
-        std::error_code ec;
-        const bool output_exists = std::filesystem::exists(*absolute_output_path, ec) && !ec;
-        if (output_exists && !request.overwrite) {
-            result.message = "Output texture already exists.";
-            return result;
-        }
-
-        const SynthesizedTexture synthesized = synthesizePackedMetallicRoughness(
-            metallic_image ? &*metallic_image : nullptr,
-            roughness_image ? &*roughness_image : nullptr,
-            request.metallic_fallback,
-            request.roughness_fallback);
-        if (synthesized.pixels.empty() || synthesized.width == 0u || synthesized.height == 0u) {
-            result.message = "Failed to synthesize metallic/roughness texture.";
-            return result;
-        }
-
-        std::filesystem::create_directories(absolute_output_path->parent_path(), ec);
-        if (ec) {
-            result.message = "Failed to create output texture directory.";
-            return result;
-        }
-
-        const std::string output_path_string = absolute_output_path->string();
-        const int written = stbi_write_png(output_path_string.c_str(),
-                                           static_cast<int>(synthesized.width),
-                                           static_cast<int>(synthesized.height),
-                                           4,
-                                           synthesized.pixels.data(),
-                                           static_cast<int>(synthesized.width * 4u));
-        if (written == 0) {
-            result.message = "Failed to write synthesized texture.";
-            return result;
-        }
-
-        AssetHandle texture_handle = importSynthesizedTexture(*absolute_output_path, *normalized_output_path);
-        if (!texture_handle.isValid()) {
-            result.message = "Synthesized texture was written, but could not be imported.";
-            return result;
-        }
-
-        const AssetRefreshResult refresh_result = asset_service->refreshAssets();
-        const AssetHandle refreshed_handle = asset_service->findAssetHandleByPath(*normalized_output_path);
-        if (refreshed_handle.isValid()) {
-            texture_handle = refreshed_handle;
-        } else if (!refresh_result.success) {
-            LUNA_EDITOR_WARN("Asset refresh after metallic/roughness synthesis reported: {}", refresh_result.message);
-        }
-
-        AssetManager::get().invalidateAsset(texture_handle);
-        MaterialTextureSet textures = document.textures;
-        textures.metallic_roughness = texture_handle;
-        if (!setMaterialTextures(document.handle, textures)) {
-            result.message = "Synthesized texture was imported, but material assignment failed.";
-            return result;
-        }
-
-        result.texture = texture_handle;
-        result.dirty = isMaterialDirty(document.handle);
-        result.success = true;
-        result.message = "Metallic/roughness texture synthesized and assigned.";
-        return result;
-    }
-
     MaterialEditResult saveMaterial(AssetHandle handle) override
     {
         const auto dirty_it = m_dirty_documents.find(handle);
@@ -2850,6 +2495,8 @@ private:
             .BaseColor = textures.base_color,
             .Normal = textures.normal,
             .MetallicRoughness = textures.metallic_roughness,
+            .Metallic = textures.metallic,
+            .Roughness = textures.roughness,
             .Emissive = textures.emissive,
             .Occlusion = textures.occlusion,
         };
@@ -2865,6 +2512,10 @@ private:
             .MetallicRoughness = textures.metallic_roughness.isValid()
                                       ? AssetManager::get().loadAssetAs<Texture>(textures.metallic_roughness)
                                       : std::shared_ptr<Texture>{},
+            .Metallic = textures.metallic.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.metallic)
+                                                     : std::shared_ptr<Texture>{},
+            .Roughness = textures.roughness.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.roughness)
+                                                       : std::shared_ptr<Texture>{},
             .Emissive = textures.emissive.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.emissive)
                                                     : std::shared_ptr<Texture>{},
             .Occlusion = textures.occlusion.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.occlusion)
@@ -2968,6 +2619,8 @@ private:
                 document.textures.base_color = readHandle(textures_node["BaseColor"]);
                 document.textures.normal = readHandle(textures_node["Normal"]);
                 document.textures.metallic_roughness = readHandle(textures_node["MetallicRoughness"]);
+                document.textures.metallic = readHandle(textures_node["Metallic"]);
+                document.textures.roughness = readHandle(textures_node["Roughness"]);
                 document.textures.emissive = readHandle(textures_node["Emissive"]);
                 document.textures.occlusion = readHandle(textures_node["Occlusion"]);
             }
@@ -3760,27 +3413,8 @@ public:
         }
 
         result.drawn = ui.image(result.presentation.scene_texture, result.drawn_size);
-        if (result.drawn && m_editor_layer != nullptr) {
-            const ImVec2 item_min = ImGui::GetItemRectMin();
-            const ImVec2 item_max = ImGui::GetItemRectMax();
-            const bool item_hovered = ImGui::IsItemHovered();
-            const ViewportInteractionState& interaction = m_editor_layer->recordViewportSurfaceInteraction(
-                viewport_id,
-                currentOwnerId(),
-                ViewportInteractionInput{
-                    .rect =
-                        ViewportSurfaceRect{
-                            .min = toEditorVec2(item_min),
-                            .max = toEditorVec2(item_max),
-                        },
-                    .hovered = item_hovered,
-                    .active = ImGui::IsItemActive(),
-                    .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
-                    .double_clicked = item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
-                });
-            result.hovered = interaction.hovered;
-            result.clicked = interaction.clicked;
-            result.double_clicked = interaction.double_clicked;
+        if (result.drawn) {
+            applyViewportInteraction(result, recordDrawnViewportInteraction(viewport_id));
         }
         return result;
     }
@@ -3848,26 +3482,7 @@ public:
 
         result.drawn = ui.image(result.presentation.texture, result.drawn_size);
         if (result.drawn) {
-            const ImVec2 item_min = ImGui::GetItemRectMin();
-            const ImVec2 item_max = ImGui::GetItemRectMax();
-            const bool item_hovered = ImGui::IsItemHovered();
-            const ViewportInteractionState& interaction = m_editor_layer->recordViewportSurfaceInteraction(
-                viewport_id,
-                currentOwnerId(),
-                ViewportInteractionInput{
-                    .rect =
-                        ViewportSurfaceRect{
-                            .min = toEditorVec2(item_min),
-                            .max = toEditorVec2(item_max),
-                        },
-                    .hovered = item_hovered,
-                    .active = ImGui::IsItemActive(),
-                    .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
-                    .double_clicked = item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
-                });
-            result.hovered = interaction.hovered;
-            result.clicked = interaction.clicked;
-            result.double_clicked = interaction.double_clicked;
+            applyViewportInteraction(result, recordDrawnViewportInteraction(viewport_id));
         }
         return result;
     }
@@ -3921,6 +3536,52 @@ public:
     }
 
 private:
+    ViewportInteractionState recordDrawnViewportInteraction(ViewportId viewport_id) const
+    {
+        ViewportInteractionState fallback{};
+        fallback.viewport_id = viewport_id;
+        if (m_editor_layer == nullptr) {
+            return fallback;
+        }
+
+        const ImVec2 item_min = ImGui::GetItemRectMin();
+        const ImVec2 item_max = ImGui::GetItemRectMax();
+        const bool item_hovered = ImGui::IsItemHovered();
+        const bool item_active = ImGui::IsItemActive();
+        const ImGuiIO& io = ImGui::GetIO();
+
+        return m_editor_layer->recordViewportSurfaceInteraction(
+            viewport_id,
+            currentOwnerId(),
+            ViewportInteractionInput{
+                .rect =
+                    ViewportSurfaceRect{
+                        .min = toEditorVec2(item_min),
+                        .max = toEditorVec2(item_max),
+                    },
+                .mouse_delta = Vec2{.x = io.MouseDelta.x, .y = io.MouseDelta.y},
+                .mouse_wheel_delta = Vec2{.x = io.MouseWheelH, .y = io.MouseWheel},
+                .hovered = item_hovered,
+                .active = item_active,
+                .clicked = item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
+                .double_clicked = item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
+                .left_mouse_down = ImGui::IsMouseDown(ImGuiMouseButton_Left),
+                .left_mouse_released = ImGui::IsMouseReleased(ImGuiMouseButton_Left),
+                .dragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left),
+            });
+    }
+
+    template <typename DrawResult>
+    static void applyViewportInteraction(DrawResult& result, const ViewportInteractionState& interaction) noexcept
+    {
+        result.hovered = interaction.hovered;
+        result.clicked = interaction.clicked;
+        result.double_clicked = interaction.double_clicked;
+        result.dragging = interaction.dragging;
+        result.mouse_drag_delta = interaction.mouse_drag_delta;
+        result.mouse_wheel_delta = interaction.mouse_wheel_delta;
+    }
+
     std::string_view currentOwnerId() const noexcept
     {
         return m_current_owner_id != nullptr ? std::string_view(*m_current_owner_id) : std::string_view{};

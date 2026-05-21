@@ -49,6 +49,10 @@ void emitTextureHandles(YAML::Emitter& out, const MaterialTextureHandleSet& text
     emitHandle(out, textures.Normal);
     out << YAML::Key << "MetallicRoughness" << YAML::Value;
     emitHandle(out, textures.MetallicRoughness);
+    out << YAML::Key << "Metallic" << YAML::Value;
+    emitHandle(out, textures.Metallic);
+    out << YAML::Key << "Roughness" << YAML::Value;
+    emitHandle(out, textures.Roughness);
     out << YAML::Key << "Emissive" << YAML::Value;
     emitHandle(out, textures.Emissive);
     out << YAML::Key << "Occlusion" << YAML::Value;

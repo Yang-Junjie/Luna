@@ -213,6 +213,19 @@ bool samePreviewState(const luna::editor::SceneViewportPreviewState& lhs,
            samePreviewEnvironment(lhs.environment, rhs.environment);
 }
 
+void applyPreviewCamera(luna::Camera& camera, const luna::editor::SceneViewportPreviewState& state)
+{
+    const glm::vec3 position = state.override_camera ? toGlmVec3(state.camera_position) : glm::vec3{0.0f, 0.35f, 3.1f};
+    const glm::vec3 target = state.override_camera ? toGlmVec3(state.camera_target) : glm::vec3{0.0f, 0.0f, 0.0f};
+    const float fov_degrees = state.override_camera ? state.camera_vertical_fov_degrees : 45.0f;
+    const float near_clip = state.override_camera ? state.camera_near_clip : 0.05f;
+    const float far_clip = state.override_camera ? state.camera_far_clip : 100.0f;
+
+    camera.setPerspective(glm::radians(std::clamp(fov_degrees, 1.0f, 120.0f)), near_clip, far_clip);
+    camera.setPosition(position);
+    camera.lookAt(target);
+}
+
 const char* gizmoOperationToString(luna::GizmoOperation operation)
 {
     switch (operation) {
@@ -1626,6 +1639,7 @@ bool LunaEditorLayer::setSceneViewportPreview(editor::ViewportId viewport_id,
     }
 
     if (!preview->dirty && samePreviewState(preview->state, state)) {
+        preview->state = state;
         return true;
     }
 
@@ -2218,6 +2232,8 @@ bool LunaEditorLayer::syncPreviewSceneViewport(editor::ViewportId viewport_id,
     PreviewSceneViewport& preview = *preview_it->second;
     if (preview.dirty) {
         rebuildPreviewScene(preview);
+    } else {
+        applyPreviewCamera(preview.camera, preview.state);
     }
 
     RenderWorldExtractor{}.extract(preview.scene,
@@ -2255,9 +2271,7 @@ void LunaEditorLayer::rebuildPreviewScene(PreviewSceneViewport& preview)
     light_component.intensity = 3.0f;
     light_component.color = glm::vec3{1.0f, 0.96f, 0.90f};
 
-    preview.camera.setPerspective(glm::radians(45.0f), 0.05f, 100.0f);
-    preview.camera.setPosition(glm::vec3{0.0f, 0.35f, 3.1f});
-    preview.camera.lookAt(glm::vec3{0.0f, 0.0f, 0.0f});
+    applyPreviewCamera(preview.camera, preview.state);
     preview.dirty = false;
 }
 

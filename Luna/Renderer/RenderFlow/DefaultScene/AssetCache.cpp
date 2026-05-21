@@ -294,8 +294,20 @@ void AssetCache::bindMaterialResources(const Material& material, UploadedMateria
     uploaded_material.metallic_roughness_texture =
         createMaterialTexture(material,
                               textures.MetallicRoughness,
-                              renderer_detail::createFallbackMetallicRoughnessImageData(1.0f, 0.0f),
+                              renderer_detail::createFallbackMetallicRoughnessImageData(1.0f, 1.0f),
                               "MetallicRoughness",
+                              bindings);
+    uploaded_material.metallic_texture =
+        createMaterialTexture(material,
+                              textures.Metallic,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)),
+                              "Metallic",
+                              bindings);
+    uploaded_material.roughness_texture =
+        createMaterialTexture(material,
+                              textures.Roughness,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)),
+                              "Roughness",
                               bindings);
     uploaded_material.emissive_texture =
         createMaterialTexture(material,
@@ -311,15 +323,18 @@ void AssetCache::bindMaterialResources(const Material& material, UploadedMateria
                               bindings);
 
     if (!bindings.isValid() || !uploaded_material.base_color_texture || !uploaded_material.normal_texture ||
-        !uploaded_material.metallic_roughness_texture || !uploaded_material.emissive_texture ||
+        !uploaded_material.metallic_roughness_texture || !uploaded_material.metallic_texture ||
+        !uploaded_material.roughness_texture || !uploaded_material.emissive_texture ||
         !uploaded_material.occlusion_texture || !uploaded_material.base_color_texture->texture ||
         !uploaded_material.normal_texture->texture || !uploaded_material.metallic_roughness_texture->texture ||
+        !uploaded_material.metallic_texture->texture || !uploaded_material.roughness_texture->texture ||
         !uploaded_material.emissive_texture->texture || !uploaded_material.occlusion_texture->texture ||
         !uploaded_material.base_color_texture->sampler || !uploaded_material.normal_texture->sampler ||
-        !uploaded_material.metallic_roughness_texture->sampler || !uploaded_material.emissive_texture->sampler ||
+        !uploaded_material.metallic_roughness_texture->sampler || !uploaded_material.metallic_texture->sampler ||
+        !uploaded_material.roughness_texture->sampler || !uploaded_material.emissive_texture->sampler ||
         !uploaded_material.occlusion_texture->sampler || !uploaded_material.params_buffer) {
         LUNA_RENDERER_WARN(
-            "Material '{}' upload is incomplete: bindings={} base={} normal={} metallic_roughness={} emissive={} occlusion={} params_buffer={}",
+            "Material '{}' upload is incomplete: bindings={} base={} normal={} metallic_roughness={} metallic={} roughness={} emissive={} occlusion={} params_buffer={}",
             material_name,
             bindings.isValid(),
             static_cast<bool>(uploaded_material.base_color_texture && uploaded_material.base_color_texture->texture &&
@@ -329,6 +344,10 @@ void AssetCache::bindMaterialResources(const Material& material, UploadedMateria
             static_cast<bool>(uploaded_material.metallic_roughness_texture &&
                               uploaded_material.metallic_roughness_texture->texture &&
                               uploaded_material.metallic_roughness_texture->sampler),
+            static_cast<bool>(uploaded_material.metallic_texture && uploaded_material.metallic_texture->texture &&
+                              uploaded_material.metallic_texture->sampler),
+            static_cast<bool>(uploaded_material.roughness_texture && uploaded_material.roughness_texture->texture &&
+                              uploaded_material.roughness_texture->sampler),
             static_cast<bool>(uploaded_material.emissive_texture && uploaded_material.emissive_texture->texture &&
                               uploaded_material.emissive_texture->sampler),
             static_cast<bool>(uploaded_material.occlusion_texture && uploaded_material.occlusion_texture->texture &&
@@ -375,6 +394,26 @@ void AssetCache::bindMaterialResources(const Material& material, UploadedMateria
         .Sampler = uploaded_material.metallic_roughness_texture->sampler,
     });
     uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
+        .Binding = material_binding::MetallicTexture,
+        .TextureView = uploaded_material.metallic_texture->texture->GetDefaultView(),
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
+    });
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
+        .Binding = material_binding::MetallicSampler,
+        .Sampler = uploaded_material.metallic_texture->sampler,
+    });
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
+        .Binding = material_binding::RoughnessTexture,
+        .TextureView = uploaded_material.roughness_texture->texture->GetDefaultView(),
+        .Layout = RHI::ResourceState::ShaderRead,
+        .Type = RHI::DescriptorType::SampledImage,
+    });
+    uploaded_material.descriptor_set->WriteSampler(RHI::SamplerWriteInfo{
+        .Binding = material_binding::RoughnessSampler,
+        .Sampler = uploaded_material.roughness_texture->sampler,
+    });
+    uploaded_material.descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = material_binding::EmissiveTexture,
         .TextureView = uploaded_material.emissive_texture->texture->GetDefaultView(),
         .Layout = RHI::ResourceState::ShaderRead,
@@ -418,6 +457,12 @@ void AssetCache::uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, Upl
     if (uploaded_material.metallic_roughness_texture) {
         renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.metallic_roughness_texture);
     }
+    if (uploaded_material.metallic_texture) {
+        renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.metallic_texture);
+    }
+    if (uploaded_material.roughness_texture) {
+        renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.roughness_texture);
+    }
     if (uploaded_material.emissive_texture) {
         renderer_detail::uploadTextureIfNeeded(commands, *uploaded_material.emissive_texture);
     }
@@ -448,8 +493,8 @@ void AssetCache::uploadMaterialParamsIfNeeded(const Material& material, Uploaded
                 surface.MetallicFactor, surface.RoughnessFactor, surface.OcclusionStrength, surface.AlphaCutoff),
             .material_flags = glm::vec4(materialBlendModeToFloat(material.getBlendMode()),
                                         surface.Unlit ? 1.0f : 0.0f,
-                                        surface.DoubleSided ? 1.0f : 0.0f,
-                                        0.0f),
+                                        material.hasMetallicTexture() ? 1.0f : 0.0f,
+                                        material.hasRoughnessTexture() ? 1.0f : 0.0f),
         };
         std::memcpy(mapped, &params, sizeof(params));
         uploaded_material.params_buffer->Flush();

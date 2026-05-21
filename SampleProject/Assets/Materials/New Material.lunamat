@@ -4,6 +4,8 @@ Material:
     BaseColor: 10826163629313751484
     Normal: 9017375577210318925
     MetallicRoughness: 400996520457938526
+    Metallic: 8771007007127755519
+    Roughness: 11298441229906634346
     Emissive: 0
     Occlusion: 13276841899520761186
   Surface:

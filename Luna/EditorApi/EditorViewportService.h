@@ -25,10 +25,13 @@ struct SceneViewportDrawOptions {
 struct SceneViewportDrawResult {
     ViewportPresentation presentation;
     Vec2 drawn_size{};
+    Vec2 mouse_drag_delta{};
+    Vec2 mouse_wheel_delta{};
     bool drawn{false};
     bool hovered{false};
     bool clicked{false};
     bool double_clicked{false};
+    bool dragging{false};
 };
 
 enum class SceneViewportPreviewMesh : uint32_t {
@@ -66,6 +69,12 @@ struct SceneViewportPreviewState {
     AssetHandle mesh{0};
     SceneViewportPreviewMesh mesh_kind{SceneViewportPreviewMesh::Sphere};
     SceneViewportPreviewEnvironment environment{};
+    bool override_camera{false};
+    Vec3 camera_position{0.0f, 0.35f, 3.1f};
+    Vec3 camera_target{0.0f, 0.0f, 0.0f};
+    float camera_vertical_fov_degrees{45.0f};
+    float camera_near_clip{0.05f};
+    float camera_far_clip{100.0f};
 };
 
 struct TextureViewportPresentation {
@@ -82,10 +91,13 @@ struct TextureViewportDrawOptions {
 struct TextureViewportDrawResult {
     TextureViewportPresentation presentation;
     Vec2 drawn_size{};
+    Vec2 mouse_drag_delta{};
+    Vec2 mouse_wheel_delta{};
     bool drawn{false};
     bool hovered{false};
     bool clicked{false};
     bool double_clicked{false};
+    bool dragging{false};
 };
 
 class ViewportService {

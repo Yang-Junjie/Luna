@@ -26,11 +26,15 @@ inline constexpr uint32_t NormalTexture = 2;
 inline constexpr uint32_t NormalSampler = 3;
 inline constexpr uint32_t MetallicRoughnessTexture = 4;
 inline constexpr uint32_t MetallicRoughnessSampler = 5;
-inline constexpr uint32_t EmissiveTexture = 6;
-inline constexpr uint32_t EmissiveSampler = 7;
-inline constexpr uint32_t OcclusionTexture = 8;
-inline constexpr uint32_t OcclusionSampler = 9;
-inline constexpr uint32_t MaterialParams = 10;
+inline constexpr uint32_t MetallicTexture = 6;
+inline constexpr uint32_t MetallicSampler = 7;
+inline constexpr uint32_t RoughnessTexture = 8;
+inline constexpr uint32_t RoughnessSampler = 9;
+inline constexpr uint32_t EmissiveTexture = 10;
+inline constexpr uint32_t EmissiveSampler = 11;
+inline constexpr uint32_t OcclusionTexture = 12;
+inline constexpr uint32_t OcclusionSampler = 13;
+inline constexpr uint32_t MaterialParams = 14;
 } // namespace material_binding
 
 namespace gbuffer_binding {

@@ -12,6 +12,8 @@ struct MaterialTextureHandleSet {
     AssetHandle BaseColor{0};
     AssetHandle Normal{0};
     AssetHandle MetallicRoughness{0};
+    AssetHandle Metallic{0};
+    AssetHandle Roughness{0};
     AssetHandle Emissive{0};
     AssetHandle Occlusion{0};
 };

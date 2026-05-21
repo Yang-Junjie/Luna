@@ -491,11 +491,6 @@ public:
     std::optional<luna::editor::MaterialDocument> readMaterial(luna::AssetHandle) override { return std::nullopt; }
     bool setMaterialTextures(luna::AssetHandle, const luna::editor::MaterialTextureSet&) override { return false; }
     bool setMaterialSurface(luna::AssetHandle, const luna::editor::MaterialSurfaceProperties&) override { return false; }
-    luna::editor::MetallicRoughnessSynthesisResult
-        synthesizeMetallicRoughness(const luna::editor::MetallicRoughnessSynthesisRequest&) override
-    {
-        return {};
-    }
     luna::editor::MaterialEditResult saveMaterial(luna::AssetHandle) override { return {}; }
     luna::editor::MaterialEditResult revertMaterial(luna::AssetHandle) override { return {}; }
     bool isMaterialDirty(luna::AssetHandle) const override { return false; }

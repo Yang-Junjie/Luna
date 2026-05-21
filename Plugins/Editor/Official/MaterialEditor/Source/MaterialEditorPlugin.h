@@ -23,21 +23,19 @@ private:
     void drawNewMaterialPopup(Host& host, Ui& ui);
     void drawPreviewControls(Host& host, Ui& ui);
     void drawPreviewViewport(Host& host, Ui& ui, const MaterialDocument& document);
+    void resetPreviewCamera();
     void drawMaterialBody(Host& host, Ui& ui, MaterialDocument document);
-    void drawMetallicRoughnessSynthesis(Host& host, Ui& ui, const MaterialDocument& document, MaterialTextureSet& textures);
     void applyTextureChanges(Host& host, const MaterialTextureSet& textures);
     void applySurfaceChanges(Host& host, const MaterialSurfaceProperties& surface);
 
     AssetHandle m_selected_material{0};
-    AssetHandle m_synthesis_metallic_texture{0};
-    AssetHandle m_synthesis_roughness_texture{0};
     ViewportId m_preview_viewport{kInvalidViewportId};
     AssetHandle m_preview_environment_map{0};
     int m_preview_background{0};
     float m_preview_sky_intensity{1.0f};
     float m_preview_light_intensity{1.0f};
+    OrbitCameraController m_preview_camera;
     std::string m_status;
-    std::string m_synthesis_output_path;
     std::string m_new_material_name{"New Material"};
     std::string m_new_material_path{"Assets/Materials/New Material.lunamat"};
     int m_new_material_template{0};
