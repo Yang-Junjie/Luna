@@ -10,12 +10,26 @@ add_executable(
     Source/EditorSettings.h
     Source/EditorSettings.cpp
     Source/EditorAssetDragDrop.h
+    Source/Authoring/EditorAuthoringController.h
+    Source/Authoring/EditorAuthoringController.cpp
+    Source/Authoring/EditorSceneFileController.h
+    Source/Authoring/EditorSceneFileController.cpp
     Source/EditorRuntime.h
     Source/EditorRuntime.cpp
+    Source/EditorRuntimeViewportController.h
+    Source/EditorRuntimeViewportController.cpp
+    Source/EditorStateLifecycleController.h
+    Source/EditorStateLifecycleController.cpp
     Source/EditorStyle.h
     Source/EditorStyle.cpp
     Source/EditorUI.h
     Source/EditorUI.cpp
+    Source/Project/EditorProjectSessionController.h
+    Source/Project/EditorProjectSessionController.cpp
+    Source/Rendering/EditorRenderingController.h
+    Source/Rendering/EditorRenderingController.cpp
+    Source/UI/EditorMainMenuController.h
+    Source/UI/EditorMainMenuController.cpp
     Source/Shell/EditorShell.h
     Source/Shell/EditorShell.cpp
     Source/Shell/EditorBuiltinPluginRegistry.h
@@ -35,6 +49,16 @@ add_executable(
     Source/Viewport/TextureViewportInstance.cpp
     Source/Viewport/TextureViewportInstanceManager.h
     Source/Viewport/TextureViewportInstanceManager.cpp
+    Source/Viewport/EditorDefaultSceneViewportController.h
+    Source/Viewport/EditorDefaultSceneViewportController.cpp
+    Source/Viewport/EditorViewportCoordinator.h
+    Source/Viewport/EditorViewportCoordinator.cpp
+    Source/Viewport/EditorViewportGizmoController.h
+    Source/Viewport/EditorViewportGizmoController.cpp
+    Source/Viewport/PreviewSceneViewport.h
+    Source/Viewport/PreviewSceneViewport.cpp
+    Source/Viewport/PreviewSceneViewportManager.h
+    Source/Viewport/PreviewSceneViewportManager.cpp
     Source/Viewport/ViewportInteraction.h
     Source/Viewport/ViewportInteraction.cpp
     Source/Viewport/ViewportSurface.h

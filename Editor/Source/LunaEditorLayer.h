@@ -1,9 +1,11 @@
 #pragma once
 
 #include "EditorCamera.h"
-#include "EditorDocumentContext.h"
+#include "Authoring/EditorAuthoringController.h"
+#include "Authoring/EditorSceneFileController.h"
 #include "EditorDocumentHost.h"
-#include "EditorRuntime.h"
+#include "EditorRuntimeViewportController.h"
+#include "EditorStateLifecycleController.h"
 #include "EditorApi/EditorRenderingService.h"
 #include "EditorApi/EditorSettingsService.h"
 #include "EditorApi/EditorViewportService.h"
@@ -11,11 +13,14 @@
 #include "Events/Event.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
-#include "Scene/SceneRuntime.h"
-#include "Viewport/ViewportInteraction.h"
-#include "Viewport/SceneViewportInstanceManager.h"
-#include "Viewport/TextureViewportInstanceManager.h"
 #include "Script/ScriptPluginManifest.h"
+#include "Project/EditorProjectSessionController.h"
+#include "Rendering/EditorRenderingController.h"
+#include "UI/EditorMainMenuController.h"
+#include "Viewport/EditorDefaultSceneViewportController.h"
+#include "Viewport/EditorViewportCoordinator.h"
+#include "Viewport/EditorViewportGizmoController.h"
+#include "Viewport/PreviewSceneViewportManager.h"
 
 #include <array>
 #include <cstddef>
@@ -25,7 +30,6 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 struct ImVec2;
@@ -45,17 +49,6 @@ class EditorPluginManager;
 class EditorShell;
 class Ui;
 }
-
-enum class GizmoOperation : uint8_t {
-    Translate,
-    Rotate,
-    Scale,
-};
-
-enum class GizmoMode : uint8_t {
-    Local,
-    World,
-};
 
 class LunaEditorLayer final : public Layer, public EditorDocumentHost {
 public:
@@ -188,30 +181,14 @@ private:
     void syncEditorUiScale();
     void syncPickDebugVisualizationState() const;
     void syncEditorGridFeatureState() const;
-    void requestViewportPick(const ImVec2& image_min,
-                             const ImVec2& image_max,
-                             const ImVec2& uv0,
-                             const ImVec2& uv1,
-                             const luna::RHI::Extent2D& texture_extent) const;
-    void drawDockSpace();
-    void onImGuiMenuBar();
-    void updateEditorShortcuts();
-    void updateGizmoShortcuts();
-    bool drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size, bool allow_interaction);
     void resetEditorState();
     void setRuntimeViewportEnabled(bool enabled);
-    void beginRuntimeViewport();
-    void endRuntimeViewport();
     Scene& activeRenderScene();
     SceneViewportInstance& activeSceneViewportInstance() noexcept;
     const SceneViewportInstance& activeSceneViewportInstance() const noexcept;
-    editor::ViewportId allocateViewportId() noexcept;
-    struct PreviewSceneViewport;
     bool syncPreviewSceneViewport(editor::ViewportId viewport_id,
                                   Renderer& renderer,
                                   SceneViewportInstance& viewport);
-    void rebuildPreviewScene(PreviewSceneViewport& preview);
-    void processAuthoringEvents();
 
     bool syncProjectAssets();
     bool openProject(const std::filesystem::path& project_file_path);
@@ -226,40 +203,26 @@ private:
     bool redo();
     void syncDefaultViewportMouseCapture() noexcept;
 
-    std::filesystem::path sceneDialogDefaultPath() const;
-    void updateSceneLabel();
-    void syncProjectStartScene(const std::filesystem::path& scene_file_path);
-
 private:
     LunaEditorApplication* m_application{nullptr};
     EditorCamera m_editor_camera;
-    EditorRuntime m_editor_runtime;
-    EditorDocumentContext m_authoring_document_context{"luna.document.authoring.scene",
-                                                       EditorDocumentKind::AuthoringScene,
-                                                       true};
-    EditorDocumentContext m_runtime_document_context{"luna.document.runtime.scene",
-                                                     EditorDocumentKind::RuntimeSceneSnapshot,
-                                                     false};
-    std::unique_ptr<Scene> m_runtime_scene;
-    std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
-    std::string m_asset_label{"No scene loaded"};
+    EditorAuthoringController m_authoring;
+    EditorSceneFileController m_scene_files;
+    EditorRuntimeViewportController m_runtime_viewport;
+    EditorStateLifecycleController m_lifecycle;
+    EditorProjectSessionController m_project_session;
+    EditorRenderingController m_rendering;
+    EditorMainMenuController m_main_menu;
+    EditorDefaultSceneViewportController m_default_scene_viewport;
     bool m_show_pick_debug_visualization{false};
     bool m_viewport_focused{false};
     bool m_show_editor_grid{true};
-    bool m_gizmo_transform_transaction_active{false};
     float m_editor_ui_scale{0.0f};
     editor::EditorThemePreset m_editor_theme_preset{editor::EditorThemePreset::ModernLightweight};
 
-    bool m_runtime_viewport_enabled{false};
-    bool m_runtime_viewport_requested{false};
-    GizmoOperation m_gizmo_operation{GizmoOperation::Translate};
-    GizmoMode m_gizmo_mode{GizmoMode::Local};
-    SceneViewportInstanceManager m_viewport_instances;
-    TextureViewportInstanceManager m_texture_viewport_instances;
-    ViewportInteractionTracker m_viewport_interactions;
-    editor::ViewportId m_next_viewport_id{editor::kDefaultViewportId + 1u};
-    std::unordered_map<editor::ViewportId, std::string> m_viewport_owner_by_id;
-    std::unordered_map<editor::ViewportId, std::unique_ptr<PreviewSceneViewport>> m_preview_scene_viewports;
+    EditorViewportCoordinator m_viewports;
+    EditorViewportGizmoController m_gizmo;
+    PreviewSceneViewportManager m_preview_scene_viewports;
     std::unique_ptr<editor::EditorShell> m_editor_shell;
     std::unique_ptr<editor::EditorPluginManager> m_editor_plugin_manager;
 };

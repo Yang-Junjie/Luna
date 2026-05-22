@@ -1,6 +1,4 @@
-#include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
-#include "Asset/BuiltinAssets.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
@@ -14,100 +12,28 @@
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
-#include "Platform/Common/FileDialogs.h"
-#include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectInfo.h"
-#include "Project/ProjectManager.h"
 #include "Scene/Components.h"
-#include "Scene/SceneSerializer.h"
 #include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Script/ScriptPluginManager.h"
-#include "Renderer/RenderFlow/RenderFeature.h"
-#include "Renderer/RenderProfileExporter.h"
 #include "Shell/EditorPluginManager.h"
 #include "Shell/EditorShell.h"
-
-#include <Backend.h>
-#include <Instance.h>
 
 #include <algorithm>
 #include <cctype>
 #include <cmath>
-#include <exception>
 #include <filesystem>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/trigonometric.hpp>
 #include <ImGuizmo.h>
 #include <imgui.h>
-#include <limits>
-#include <optional>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 namespace {
 
-constexpr const char* kProjectFileFilter = "Luna Project (*.lunaproj)\0*.lunaproj\0";
-constexpr const char* kSceneFileFilter = "Luna Scene (*.lunascene)\0*.lunascene\0";
 constexpr float kUiScaleChangeThreshold = 0.01f;
-constexpr luna::editor::ViewportId kRuntimeSceneViewportId =
-    (std::numeric_limits<luna::editor::ViewportId>::max)();
-
-struct RenderDebugModeItem {
-    luna::RenderDebugViewMode engine_mode;
-    luna::editor::RenderDebugViewMode editor_mode;
-    const char* label;
-};
-
-constexpr std::array<RenderDebugModeItem, 19> kRenderDebugModes{{
-    {luna::RenderDebugViewMode::None, luna::editor::RenderDebugViewMode::None, "None"},
-    {luna::RenderDebugViewMode::Velocity, luna::editor::RenderDebugViewMode::Velocity, "Velocity"},
-    {luna::RenderDebugViewMode::HistoryValidity,
-     luna::editor::RenderDebugViewMode::HistoryValidity,
-     "History Validity"},
-    {luna::RenderDebugViewMode::ShadowCascades,
-     luna::editor::RenderDebugViewMode::ShadowCascades,
-     "Shadow Cascades"},
-    {luna::RenderDebugViewMode::BaseColor, luna::editor::RenderDebugViewMode::BaseColor, "Base Color"},
-    {luna::RenderDebugViewMode::Normal, luna::editor::RenderDebugViewMode::Normal, "Normal"},
-    {luna::RenderDebugViewMode::Metallic, luna::editor::RenderDebugViewMode::Metallic, "Metallic"},
-    {luna::RenderDebugViewMode::Roughness, luna::editor::RenderDebugViewMode::Roughness, "Roughness"},
-    {luna::RenderDebugViewMode::DirectLighting,
-     luna::editor::RenderDebugViewMode::DirectLighting,
-     "Direct Lighting"},
-    {luna::RenderDebugViewMode::SpecularIbl, luna::editor::RenderDebugViewMode::SpecularIbl, "Specular IBL"},
-    {luna::RenderDebugViewMode::BloomInput, luna::editor::RenderDebugViewMode::BloomInput, "Bloom Input HDR"},
-    {luna::RenderDebugViewMode::BloomPrefilter,
-     luna::editor::RenderDebugViewMode::BloomPrefilter,
-     "Bloom Prefilter"},
-    {luna::RenderDebugViewMode::BloomMip0, luna::editor::RenderDebugViewMode::BloomMip0, "Bloom Mip 0"},
-    {luna::RenderDebugViewMode::BloomMip1, luna::editor::RenderDebugViewMode::BloomMip1, "Bloom Mip 1"},
-    {luna::RenderDebugViewMode::BloomMip2, luna::editor::RenderDebugViewMode::BloomMip2, "Bloom Mip 2"},
-    {luna::RenderDebugViewMode::BloomMip3, luna::editor::RenderDebugViewMode::BloomMip3, "Bloom Mip 3"},
-    {luna::RenderDebugViewMode::BloomMip4, luna::editor::RenderDebugViewMode::BloomMip4, "Bloom Mip 4"},
-    {luna::RenderDebugViewMode::BloomMip5, luna::editor::RenderDebugViewMode::BloomMip5, "Bloom Mip 5"},
-    {luna::RenderDebugViewMode::BloomComposite,
-     luna::editor::RenderDebugViewMode::BloomComposite,
-     "Bloom Composite HDR"},
-}};
-
-std::string toOwnedString(std::string_view value)
-{
-    return std::string(value.data(), value.size());
-}
-
-luna::editor::Vec2 toEditorVec2(const ImVec2& value) noexcept
-{
-    return luna::editor::Vec2{.x = value.x, .y = value.y};
-}
-
-glm::vec3 toGlmVec3(luna::editor::Vec3 value) noexcept
-{
-    return glm::vec3{value.x, value.y, value.z};
-}
 
 luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexcept
 {
@@ -118,592 +44,37 @@ luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexce
     }
 }
 
-luna::editor::TextureViewportPresentation toEditorTextureViewportPresentation(
-    const luna::TextureViewportPresentation& presentation)
-{
-    return luna::editor::TextureViewportPresentation{
-        .texture = presentation.texture,
-        .framebuffer_size = presentation.framebuffer_size,
-        .presentable = presentation.presentable,
-    };
-}
-
-luna::AssetHandle previewMeshHandle(const luna::editor::SceneViewportPreviewState& state)
-{
-    if (state.mesh.isValid()) {
-        return state.mesh;
-    }
-
-    switch (state.mesh_kind) {
-        case luna::editor::SceneViewportPreviewMesh::Cube:
-            return luna::BuiltinMeshes::Cube;
-        case luna::editor::SceneViewportPreviewMesh::Plane:
-            return luna::BuiltinMeshes::Plane;
-        case luna::editor::SceneViewportPreviewMesh::Sphere:
-            return luna::BuiltinMeshes::Sphere;
-    }
-
-    return luna::BuiltinMeshes::Sphere;
-}
-
-luna::SceneBackgroundMode toSceneBackgroundMode(luna::editor::SceneViewportPreviewBackground background)
-{
-    switch (background) {
-        case luna::editor::SceneViewportPreviewBackground::SolidColor:
-            return luna::SceneBackgroundMode::SolidColor;
-        case luna::editor::SceneViewportPreviewBackground::EnvironmentMap:
-            return luna::SceneBackgroundMode::EnvironmentMap;
-        case luna::editor::SceneViewportPreviewBackground::ProceduralSky:
-            return luna::SceneBackgroundMode::ProceduralSky;
-    }
-
-    return luna::SceneBackgroundMode::ProceduralSky;
-}
-
-luna::SceneEnvironmentSettings toSceneEnvironmentSettings(
-    const luna::editor::SceneViewportPreviewEnvironment& environment)
-{
-    luna::SceneEnvironmentSettings settings{};
-    settings.backgroundMode = toSceneBackgroundMode(environment.background);
-    settings.backgroundColor = toGlmVec3(environment.background_color);
-    settings.enabled = settings.backgroundMode != luna::SceneBackgroundMode::SolidColor;
-    settings.iblEnabled = environment.ibl_enabled;
-    settings.environmentMapHandle = environment.environment_map;
-    settings.intensity = (std::max)(environment.intensity, 0.0f);
-    settings.skyIntensity = (std::max)(environment.sky_intensity, 0.0f);
-    settings.diffuseIntensity = (std::max)(environment.diffuse_intensity, 0.0f);
-    settings.specularIntensity = (std::max)(environment.specular_intensity, 0.0f);
-    const glm::vec3 sun_direction = toGlmVec3(environment.procedural_sun_direction);
-    settings.proceduralSunDirection =
-        glm::dot(sun_direction, sun_direction) > 0.0001f ? glm::normalize(sun_direction) : glm::vec3{0.4f, 0.6f, 0.3f};
-    settings.proceduralSunIntensity = (std::max)(environment.procedural_sun_intensity, 0.0f);
-    settings.proceduralSunAngularRadius = (std::max)(environment.procedural_sun_angular_radius, 0.0f);
-    settings.proceduralSkyColorZenith = toGlmVec3(environment.procedural_sky_color_zenith);
-    settings.proceduralSkyColorHorizon = toGlmVec3(environment.procedural_sky_color_horizon);
-    settings.proceduralGroundColor = toGlmVec3(environment.procedural_ground_color);
-    settings.proceduralSkyExposure = (std::max)(environment.procedural_sky_exposure, 0.0f);
-    return settings;
-}
-
-bool sameVec3(luna::editor::Vec3 lhs, luna::editor::Vec3 rhs) noexcept
-{
-    return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
-}
-
-bool samePreviewEnvironment(const luna::editor::SceneViewportPreviewEnvironment& lhs,
-                            const luna::editor::SceneViewportPreviewEnvironment& rhs) noexcept
-{
-    return lhs.background == rhs.background && sameVec3(lhs.background_color, rhs.background_color) &&
-           lhs.ibl_enabled == rhs.ibl_enabled && lhs.environment_map == rhs.environment_map &&
-           lhs.intensity == rhs.intensity && lhs.sky_intensity == rhs.sky_intensity &&
-           lhs.diffuse_intensity == rhs.diffuse_intensity && lhs.specular_intensity == rhs.specular_intensity &&
-           sameVec3(lhs.procedural_sun_direction, rhs.procedural_sun_direction) &&
-           lhs.procedural_sun_intensity == rhs.procedural_sun_intensity &&
-           lhs.procedural_sun_angular_radius == rhs.procedural_sun_angular_radius &&
-           sameVec3(lhs.procedural_sky_color_zenith, rhs.procedural_sky_color_zenith) &&
-           sameVec3(lhs.procedural_sky_color_horizon, rhs.procedural_sky_color_horizon) &&
-           sameVec3(lhs.procedural_ground_color, rhs.procedural_ground_color) &&
-           lhs.procedural_sky_exposure == rhs.procedural_sky_exposure;
-}
-
-bool samePreviewState(const luna::editor::SceneViewportPreviewState& lhs,
-                      const luna::editor::SceneViewportPreviewState& rhs) noexcept
-{
-    return lhs.material == rhs.material && lhs.mesh == rhs.mesh && lhs.mesh_kind == rhs.mesh_kind &&
-           samePreviewEnvironment(lhs.environment, rhs.environment);
-}
-
-void applyPreviewCamera(luna::Camera& camera, const luna::editor::SceneViewportPreviewState& state)
-{
-    const glm::vec3 position = state.override_camera ? toGlmVec3(state.camera_position) : glm::vec3{0.0f, 0.35f, 3.1f};
-    const glm::vec3 target = state.override_camera ? toGlmVec3(state.camera_target) : glm::vec3{0.0f, 0.0f, 0.0f};
-    const float fov_degrees = state.override_camera ? state.camera_vertical_fov_degrees : 45.0f;
-    const float near_clip = state.override_camera ? state.camera_near_clip : 0.05f;
-    const float far_clip = state.override_camera ? state.camera_far_clip : 100.0f;
-
-    camera.setPerspective(glm::radians(std::clamp(fov_degrees, 1.0f, 120.0f)), near_clip, far_clip);
-    camera.setPosition(position);
-    camera.lookAt(target);
-}
-
-const char* gizmoOperationToString(luna::GizmoOperation operation)
-{
-    switch (operation) {
-        case luna::GizmoOperation::Translate:
-            return "Translate";
-        case luna::GizmoOperation::Rotate:
-            return "Rotate";
-        case luna::GizmoOperation::Scale:
-            return "Scale";
-    }
-    return "Unknown";
-}
-
-ImGuizmo::OPERATION toImGuizmoOperation(luna::GizmoOperation operation)
-{
-    switch (operation) {
-        case luna::GizmoOperation::Translate:
-            return ImGuizmo::TRANSLATE;
-        case luna::GizmoOperation::Rotate:
-            return ImGuizmo::ROTATE;
-        case luna::GizmoOperation::Scale:
-            return ImGuizmo::SCALE;
-    }
-    return ImGuizmo::TRANSLATE;
-}
-
-ImGuizmo::MODE toImGuizmoMode(luna::GizmoMode mode)
-{
-    return mode == luna::GizmoMode::World ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
-}
-
-std::filesystem::path projectDialogDefaultPath()
-{
-    if (const auto project_root = luna::ProjectManager::instance().getProjectRootPath()) {
-        return *project_root;
-    }
-
-    return std::filesystem::current_path();
-}
-
-std::optional<std::filesystem::path> makeScenePathRelativeToProject(const std::filesystem::path& scene_file_path)
-{
-    const auto project_root = luna::ProjectManager::instance().getProjectRootPath();
-    if (!project_root || scene_file_path.empty()) {
-        return std::nullopt;
-    }
-
-    std::error_code ec;
-    std::filesystem::path relative_path = std::filesystem::relative(scene_file_path, *project_root, ec);
-    if (ec) {
-        return std::nullopt;
-    }
-
-    relative_path = relative_path.lexically_normal();
-    if (relative_path.empty() || relative_path.is_absolute()) {
-        return std::nullopt;
-    }
-
-    const std::string relative_string = relative_path.generic_string();
-    if (relative_string == "." || relative_string.starts_with("..")) {
-        return std::nullopt;
-    }
-
-    return relative_path;
-}
-
-std::optional<luna::RHI::BackendType> tryGetDefaultBackend()
-{
-    try {
-        return luna::RHI::Instance::GetDefaultBackend();
-    } catch (const std::exception&) {
-        return std::nullopt;
-    }
-}
-
-std::string backendStatusText(luna::RHI::BackendType backend,
-                              luna::RHI::BackendType current_backend,
-                              std::optional<luna::RHI::BackendType> default_backend)
-{
-    std::string status;
-    if (backend == current_backend) {
-        status = "Current";
-    }
-    if (default_backend && backend == *default_backend) {
-        if (!status.empty()) {
-            status += ", ";
-        }
-        status += "Default";
-    }
-    return status.empty() ? "Available" : status;
-}
-
-const char* renderGraphPassTypeToString(luna::RenderGraphPassType type)
-{
-    switch (type) {
-        case luna::RenderGraphPassType::Raster:
-            return "Raster";
-        case luna::RenderGraphPassType::Compute:
-            return "Compute";
-        default:
-            return "Unknown";
-    }
-}
-
-luna::editor::RenderGraphProfileSnapshot toEditorRenderGraphProfile(
-    const luna::RenderGraphProfileSnapshot& profile)
-{
-    luna::editor::RenderGraphProfileSnapshot result{};
-    result.frame_index = profile.FrameIndex;
-    result.total_cpu_time_ms = profile.TotalCpuTimeMs;
-    result.total_gpu_time_ms = profile.TotalGpuTimeMs;
-    result.gpu_timing_supported = profile.GpuTimingSupported;
-    result.gpu_timing_pending = profile.GpuTimingPending;
-    result.texture_count = profile.TextureCount;
-    result.final_barrier_count = profile.FinalBarrierCount;
-    result.passes.reserve(profile.Passes.size());
-    for (const auto& pass : profile.Passes) {
-        result.passes.push_back(luna::editor::RenderGraphPassProfile{
-            .name = pass.Name,
-            .type = renderGraphPassTypeToString(pass.Type),
-            .cpu_time_ms = pass.CpuTimeMs,
-            .gpu_time_ms = pass.GpuTimeMs,
-            .has_gpu_time = pass.HasGpuTime,
-            .framebuffer_width = pass.FramebufferWidth,
-            .framebuffer_height = pass.FramebufferHeight,
-            .read_texture_count = pass.ReadTextureCount,
-            .write_texture_count = pass.WriteTextureCount,
-            .color_attachment_count = pass.ColorAttachmentCount,
-            .has_depth_attachment = pass.HasDepthAttachment,
-            .pre_barrier_count = pass.PreBarrierCount,
-        });
-    }
-    return result;
-}
-
-luna::RenderGraphProfileSnapshot toEngineRenderGraphProfile(const luna::editor::RenderGraphProfileSnapshot& profile)
-{
-    luna::RenderGraphProfileSnapshot result{};
-    result.FrameIndex = profile.frame_index;
-    result.TotalCpuTimeMs = profile.total_cpu_time_ms;
-    result.TotalGpuTimeMs = profile.total_gpu_time_ms;
-    result.GpuTimingSupported = profile.gpu_timing_supported;
-    result.GpuTimingPending = profile.gpu_timing_pending;
-    result.TextureCount = profile.texture_count;
-    result.FinalBarrierCount = profile.final_barrier_count;
-    result.Passes.reserve(profile.passes.size());
-    for (const auto& pass : profile.passes) {
-        result.Passes.push_back(luna::RenderGraphPassProfile{
-            .Name = pass.name,
-            .Type = pass.type == "Compute" ? luna::RenderGraphPassType::Compute : luna::RenderGraphPassType::Raster,
-            .CpuTimeMs = pass.cpu_time_ms,
-            .GpuTimeMs = pass.gpu_time_ms,
-            .HasGpuTime = pass.has_gpu_time,
-            .FramebufferWidth = pass.framebuffer_width,
-            .FramebufferHeight = pass.framebuffer_height,
-            .ReadTextureCount = pass.read_texture_count,
-            .WriteTextureCount = pass.write_texture_count,
-            .ColorAttachmentCount = pass.color_attachment_count,
-            .HasDepthAttachment = pass.has_depth_attachment,
-            .PreBarrierCount = pass.pre_barrier_count,
-        });
-    }
-    return result;
-}
-
-luna::editor::RenderFeatureGraphResourceKind toEditorRenderFeatureGraphResourceKind(
-    luna::render_flow::RenderFeatureGraphResourceKind kind)
-{
-    switch (kind) {
-        case luna::render_flow::RenderFeatureGraphResourceKind::Texture:
-            return luna::editor::RenderFeatureGraphResourceKind::Texture;
-        case luna::render_flow::RenderFeatureGraphResourceKind::Buffer:
-            return luna::editor::RenderFeatureGraphResourceKind::Buffer;
-    }
-    return luna::editor::RenderFeatureGraphResourceKind::Texture;
-}
-
-luna::editor::RenderFeatureGraphResourceFlags toEditorRenderFeatureGraphResourceFlags(
-    luna::render_flow::RenderFeatureGraphResourceFlags flags)
-{
-    using EditorFlags = luna::editor::RenderFeatureGraphResourceFlags;
-    using EngineFlags = luna::render_flow::RenderFeatureGraphResourceFlags;
-
-    EditorFlags result = EditorFlags::None;
-    if (flags & EngineFlags::Optional) {
-        result |= EditorFlags::Optional;
-    }
-    if (flags & EngineFlags::External) {
-        result |= EditorFlags::External;
-    }
-    return result;
-}
-
-luna::editor::RenderFeatureGraphResource toEditorRenderFeatureGraphResource(
-    const luna::render_flow::RenderFeatureGraphResource& resource)
-{
-    return luna::editor::RenderFeatureGraphResource{
-        .name = toOwnedString(resource.name),
-        .kind = toEditorRenderFeatureGraphResourceKind(resource.kind),
-        .flags = toEditorRenderFeatureGraphResourceFlags(resource.flags),
-    };
-}
-
-luna::editor::RenderPassResourceAccess toEditorRenderPassResourceAccess(
-    luna::render_flow::RenderPassResourceAccess access)
-{
-    switch (access) {
-        case luna::render_flow::RenderPassResourceAccess::Read:
-            return luna::editor::RenderPassResourceAccess::Read;
-        case luna::render_flow::RenderPassResourceAccess::Write:
-            return luna::editor::RenderPassResourceAccess::Write;
-        case luna::render_flow::RenderPassResourceAccess::ReadWrite:
-            return luna::editor::RenderPassResourceAccess::ReadWrite;
-    }
-    return luna::editor::RenderPassResourceAccess::Read;
-}
-
-luna::editor::RenderPassResourceUsage toEditorRenderPassResourceUsage(
-    const luna::render_flow::RenderPassResourceUsage& resource)
-{
-    return luna::editor::RenderPassResourceUsage{
-        .name = toOwnedString(resource.name),
-        .kind = toEditorRenderFeatureGraphResourceKind(resource.kind),
-        .access = toEditorRenderPassResourceAccess(resource.access),
-        .flags = toEditorRenderFeatureGraphResourceFlags(resource.flags),
-    };
-}
-
-std::vector<luna::editor::RenderFeatureGraphResource> toEditorRenderFeatureGraphResources(
-    const std::vector<luna::render_flow::RenderFeatureGraphResource>& resources)
-{
-    std::vector<luna::editor::RenderFeatureGraphResource> result;
-    result.reserve(resources.size());
-    for (const auto& resource : resources) {
-        result.push_back(toEditorRenderFeatureGraphResource(resource));
-    }
-    return result;
-}
-
-std::vector<luna::editor::RenderPassResourceUsage> toEditorRenderPassResourceUsages(
-    const std::vector<luna::render_flow::RenderPassResourceUsage>& resources)
-{
-    std::vector<luna::editor::RenderPassResourceUsage> result;
-    result.reserve(resources.size());
-    for (const auto& resource : resources) {
-        result.push_back(toEditorRenderPassResourceUsage(resource));
-    }
-    return result;
-}
-
-luna::editor::RenderFeaturePassInfo toEditorRenderFeaturePassInfo(
-    const luna::render_flow::RenderFeaturePassInfo& pass)
-{
-    return luna::editor::RenderFeaturePassInfo{
-        .name = pass.name,
-        .resources = toEditorRenderPassResourceUsages(pass.resources),
-    };
-}
-
-std::vector<luna::editor::RenderFeaturePassInfo> toEditorRenderFeaturePassInfos(
-    const std::vector<luna::render_flow::RenderFeaturePassInfo>& passes)
-{
-    std::vector<luna::editor::RenderFeaturePassInfo> result;
-    result.reserve(passes.size());
-    for (const auto& pass : passes) {
-        result.push_back(toEditorRenderFeaturePassInfo(pass));
-    }
-    return result;
-}
-
-luna::editor::RenderFeatureStatusEntry toEditorRenderFeatureStatusEntry(
-    const luna::render_flow::RenderFeatureStatusEntry& entry)
-{
-    return luna::editor::RenderFeatureStatusEntry{
-        .name = entry.name,
-        .ready = entry.ready,
-    };
-}
-
-std::vector<luna::editor::RenderFeatureStatusEntry> toEditorRenderFeatureStatusEntries(
-    const std::vector<luna::render_flow::RenderFeatureStatusEntry>& entries)
-{
-    std::vector<luna::editor::RenderFeatureStatusEntry> result;
-    result.reserve(entries.size());
-    for (const auto& entry : entries) {
-        result.push_back(toEditorRenderFeatureStatusEntry(entry));
-    }
-    return result;
-}
-
-luna::editor::RenderFeatureRuntimeStatType toEditorRenderFeatureRuntimeStatType(
-    luna::render_flow::RenderFeatureRuntimeStatType type)
-{
-    switch (type) {
-        case luna::render_flow::RenderFeatureRuntimeStatType::UnsignedInteger:
-            return luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger;
-        case luna::render_flow::RenderFeatureRuntimeStatType::Float:
-            return luna::editor::RenderFeatureRuntimeStatType::Float;
-        case luna::render_flow::RenderFeatureRuntimeStatType::Bool:
-            return luna::editor::RenderFeatureRuntimeStatType::Bool;
-    }
-    return luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger;
-}
-
-luna::editor::RenderFeatureRuntimeStat toEditorRenderFeatureRuntimeStat(
-    const luna::render_flow::RenderFeatureRuntimeStat& stat)
-{
-    return luna::editor::RenderFeatureRuntimeStat{
-        .name = stat.name,
-        .type = toEditorRenderFeatureRuntimeStatType(stat.type),
-        .uint_value = stat.uint_value,
-        .float_value = stat.float_value,
-        .bool_value = stat.bool_value,
-    };
-}
-
-std::vector<luna::editor::RenderFeatureRuntimeStat> toEditorRenderFeatureRuntimeStats(
-    const std::vector<luna::render_flow::RenderFeatureRuntimeStat>& stats)
-{
-    std::vector<luna::editor::RenderFeatureRuntimeStat> result;
-    result.reserve(stats.size());
-    for (const auto& stat : stats) {
-        result.push_back(toEditorRenderFeatureRuntimeStat(stat));
-    }
-    return result;
-}
-
-luna::editor::RenderFeatureDiagnostics toEditorRenderFeatureDiagnostics(
-    const luna::render_flow::RenderFeatureDiagnostics& diagnostics)
-{
-    return luna::editor::RenderFeatureDiagnostics{
-        .binding_contract_valid = diagnostics.binding_contract_valid,
-        .binding_contract_summary = diagnostics.binding_contract_summary,
-        .pipeline_resources_valid = diagnostics.pipeline_resources_valid,
-        .pipeline_resources_summary = diagnostics.pipeline_resources_summary,
-        .pipeline_resources = toEditorRenderFeatureStatusEntries(diagnostics.pipeline_resources),
-        .persistent_resources_valid = diagnostics.persistent_resources_valid,
-        .persistent_resources_summary = diagnostics.persistent_resources_summary,
-        .persistent_resources = toEditorRenderFeatureStatusEntries(diagnostics.persistent_resources),
-        .history_resources_valid = diagnostics.history_resources_valid,
-        .history_resources_summary = diagnostics.history_resources_summary,
-        .history_resources = toEditorRenderFeatureStatusEntries(diagnostics.history_resources),
-        .runtime_stats = toEditorRenderFeatureRuntimeStats(diagnostics.runtime_stats),
-    };
-}
-
-luna::editor::RenderFeatureInfo toEditorRenderFeatureInfo(const luna::render_flow::RenderFeatureInfo& feature)
-{
-    return luna::editor::RenderFeatureInfo{
-        .name = toOwnedString(feature.name),
-        .display_name = toOwnedString(feature.display_name),
-        .category = toOwnedString(feature.category),
-        .enabled = feature.enabled,
-        .runtime_toggleable = feature.runtime_toggleable,
-        .supported = feature.supported,
-        .active = feature.active,
-        .support_summary = feature.support_summary,
-        .graph_contract_valid = feature.graph_contract_valid,
-        .graph_contract_summary = feature.graph_contract_summary,
-        .pass_contract_valid = feature.pass_contract_valid,
-        .pass_contract_summary = feature.pass_contract_summary,
-        .graph_inputs = toEditorRenderFeatureGraphResources(feature.graph_inputs),
-        .graph_outputs = toEditorRenderFeatureGraphResources(feature.graph_outputs),
-        .passes = toEditorRenderFeaturePassInfos(feature.passes),
-        .diagnostics = toEditorRenderFeatureDiagnostics(feature.diagnostics),
-    };
-}
-
-luna::editor::RenderFeatureParameterType toEditorRenderFeatureParameterType(
-    luna::render_flow::RenderFeatureParameterType type)
-{
-    switch (type) {
-        case luna::render_flow::RenderFeatureParameterType::Bool:
-            return luna::editor::RenderFeatureParameterType::Bool;
-        case luna::render_flow::RenderFeatureParameterType::Int:
-            return luna::editor::RenderFeatureParameterType::Int;
-        case luna::render_flow::RenderFeatureParameterType::Float:
-            return luna::editor::RenderFeatureParameterType::Float;
-        case luna::render_flow::RenderFeatureParameterType::Color:
-            return luna::editor::RenderFeatureParameterType::Color;
-    }
-    return luna::editor::RenderFeatureParameterType::Float;
-}
-
-luna::render_flow::RenderFeatureParameterType toEngineRenderFeatureParameterType(
-    luna::editor::RenderFeatureParameterType type)
-{
-    switch (type) {
-        case luna::editor::RenderFeatureParameterType::Bool:
-            return luna::render_flow::RenderFeatureParameterType::Bool;
-        case luna::editor::RenderFeatureParameterType::Int:
-            return luna::render_flow::RenderFeatureParameterType::Int;
-        case luna::editor::RenderFeatureParameterType::Float:
-            return luna::render_flow::RenderFeatureParameterType::Float;
-        case luna::editor::RenderFeatureParameterType::Color:
-            return luna::render_flow::RenderFeatureParameterType::Color;
-    }
-    return luna::render_flow::RenderFeatureParameterType::Float;
-}
-
-luna::editor::RenderFeatureParameterValue toEditorRenderFeatureParameterValue(
-    const luna::render_flow::RenderFeatureParameterValue& value)
-{
-    return luna::editor::RenderFeatureParameterValue{
-        .type = toEditorRenderFeatureParameterType(value.type),
-        .bool_value = value.bool_value,
-        .int_value = value.int_value,
-        .float_value = value.float_value,
-        .color_value =
-            luna::editor::Vec4{.x = value.color_value.x,
-                               .y = value.color_value.y,
-                               .z = value.color_value.z,
-                               .w = value.color_value.w},
-    };
-}
-
-luna::render_flow::RenderFeatureParameterValue toEngineRenderFeatureParameterValue(
-    const luna::editor::RenderFeatureParameterValue& value)
-{
-    luna::render_flow::RenderFeatureParameterValue result{};
-    result.type = toEngineRenderFeatureParameterType(value.type);
-    result.bool_value = value.bool_value;
-    result.int_value = value.int_value;
-    result.float_value = value.float_value;
-    result.color_value =
-        glm::vec4{value.color_value.x, value.color_value.y, value.color_value.z, value.color_value.w};
-    return result;
-}
-
-luna::editor::RenderFeatureParameterInfo toEditorRenderFeatureParameterInfo(
-    const luna::render_flow::RenderFeatureParameterInfo& parameter)
-{
-    return luna::editor::RenderFeatureParameterInfo{
-        .name = toOwnedString(parameter.name),
-        .display_name = toOwnedString(parameter.display_name),
-        .type = toEditorRenderFeatureParameterType(parameter.type),
-        .value = toEditorRenderFeatureParameterValue(parameter.value),
-        .min = toEditorRenderFeatureParameterValue(parameter.min),
-        .max = toEditorRenderFeatureParameterValue(parameter.max),
-        .step = parameter.step,
-        .read_only = parameter.read_only,
-    };
-}
-
-luna::editor::RenderDebugViewMode toEditorRenderDebugViewMode(luna::RenderDebugViewMode mode) noexcept
-{
-    for (const RenderDebugModeItem& item : kRenderDebugModes) {
-        if (item.engine_mode == mode) {
-            return item.editor_mode;
-        }
-    }
-    return luna::editor::RenderDebugViewMode::None;
-}
-
-luna::RenderDebugViewMode toEngineRenderDebugViewMode(luna::editor::RenderDebugViewMode mode) noexcept
-{
-    for (const RenderDebugModeItem& item : kRenderDebugModes) {
-        if (item.editor_mode == mode) {
-            return item.engine_mode;
-        }
-    }
-    return luna::RenderDebugViewMode::None;
-}
-
 } // namespace
 
 namespace luna {
 
-struct LunaEditorLayer::PreviewSceneViewport {
-    editor::SceneViewportPreviewState state{};
-    Scene scene;
-    Camera camera;
-    bool dirty{true};
-};
-
 LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
     : Layer("LunaEditorLayer"),
-      m_application(&application)
+      m_application(&application),
+      m_rendering(application.getRenderer()),
+      m_main_menu(EditorMainMenuController::Actions{
+          .has_project_loaded = [this]() {
+              return hasProjectLoaded();
+          },
+          .open_project = [this](const std::filesystem::path& project_file_path) {
+              (void) openProject(project_file_path);
+          },
+          .sync_project_assets = [this]() {
+              (void) syncProjectAssets();
+          },
+          .refresh_project_script_plugins = [this]() {
+              refreshProjectScriptPlugins();
+          },
+          .create_scene = [this]() {
+              createScene();
+          },
+          .open_scene = [this]() {
+              (void) openScene();
+          },
+          .save_scene = [this]() {
+              (void) saveScene();
+          },
+      })
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this, application.editorSettings());
     m_editor_plugin_manager = std::make_unique<editor::EditorPluginManager>(*m_editor_shell);
@@ -724,11 +95,11 @@ void LunaEditorLayer::onAttach()
         return;
     }
 
-    m_editor_runtime.scene().setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
-    m_authoring_document_context.bindScene(&m_editor_runtime.scene());
-    m_authoring_document_context.setRunning(false);
-    m_runtime_document_context.bindScene(nullptr);
-    m_runtime_document_context.setRunning(false);
+    m_authoring.scene().setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
+    m_authoring.documentContext().bindScene(&m_authoring.scene());
+    m_authoring.documentContext().setRunning(false);
+    m_runtime_viewport.runtimeDocumentContext().bindScene(nullptr);
+    m_runtime_viewport.runtimeDocumentContext().setRunning(false);
     createScene();
 
     if (m_application->getImGuiLayer() != nullptr) {
@@ -752,11 +123,11 @@ void LunaEditorLayer::onDetach()
 
     m_editor_camera.releaseMouseCapture();
     m_editor_camera.setInputEnabled(false);
-    endRuntimeViewport();
-    m_preview_scene_viewports.clear();
-    m_viewport_instances.clearPluginViewports(m_application->getRenderer());
-    m_texture_viewport_instances.clearViewports();
-    m_viewport_interactions.clear();
+    m_lifecycle.resetRuntimeViewportState(m_runtime_viewport, m_viewports);
+    m_preview_scene_viewports.clearPreviews();
+    m_viewports.clearPluginSceneViewports(m_application->getRenderer());
+    m_viewports.clearTextureViewports();
+    m_viewports.clearInteractions();
     activeSceneViewportInstance().resetRenderer(m_application->getRenderer());
     m_application->getRenderer().setRenderGraphProfilingEnabled(false);
 }
@@ -764,19 +135,20 @@ void LunaEditorLayer::onDetach()
 void LunaEditorLayer::onUpdate(Timestep dt)
 {
     AssetManager::get().updateAsyncLoads();
-    processAuthoringEvents();
+    m_authoring.processEvents();
     if (m_editor_shell) {
         m_editor_shell->update(dt.getSeconds());
     }
     consumePendingScenePick();
-    setRuntimeViewportEnabled(m_runtime_viewport_requested);
+    setRuntimeViewportEnabled(m_runtime_viewport.isRuntimeViewportRequested());
     syncDefaultViewportMouseCapture();
 
-    const bool allow_editor_camera = !m_runtime_viewport_enabled &&
+    const bool runtime_viewport_enabled = m_runtime_viewport.isRuntimeViewportEnabled();
+    const bool allow_editor_camera = !runtime_viewport_enabled &&
                                      isViewportInputAllowed(defaultSceneViewportId()) &&
                                      !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
-    if (!m_runtime_viewport_enabled) {
+    if (!runtime_viewport_enabled) {
         m_editor_camera.onUpdate(dt);
         syncDefaultViewportMouseCapture();
         activeRenderScene().renderFromEditorCamera(m_editor_camera.getCamera());
@@ -784,9 +156,7 @@ void LunaEditorLayer::onUpdate(Timestep dt)
         m_editor_camera.releaseMouseCapture();
         m_editor_camera.setInputEnabled(false);
         syncDefaultViewportMouseCapture();
-        if (m_runtime_scene_runtime) {
-            m_runtime_scene_runtime->update(dt);
-        }
+        m_runtime_viewport.update(dt);
     }
 }
 
@@ -810,10 +180,10 @@ void LunaEditorLayer::onImGuiRender()
 
     syncEditorUiScale();
     ImGuizmo::BeginFrame();
-    m_viewport_interactions.beginFrame();
-    updateEditorShortcuts();
+    m_viewports.beginFrameInteractions();
+    m_main_menu.dispatchShortcuts(m_editor_shell.get());
 
-    drawDockSpace();
+    m_main_menu.drawDockSpace(m_project_session, m_editor_shell.get());
 
     m_viewport_focused = false;
     if (m_editor_shell) {
@@ -843,144 +213,6 @@ void LunaEditorLayer::syncEditorUiScale()
     m_editor_ui_scale = editor::getEditorUiScale();
 }
 
-void LunaEditorLayer::drawDockSpace()
-{
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Pos);
-    ImGui::SetNextWindowSize(ImGui::GetMainViewport()->Size);
-    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
-
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
-
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
-    ImGui::Begin("##EditorDockSpace", nullptr, window_flags);
-    ImGui::PopStyleVar(3);
-
-    const ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
-    ImGui::DockSpace(ImGui::GetID("EditorDockSpace"), ImVec2(0.0f, 0.0f), dockspace_flags);
-
-    if (ImGui::BeginMainMenuBar()) {
-        onImGuiMenuBar();
-        ImGui::EndMainMenuBar();
-    }
-
-    ImGui::End();
-}
-
-void LunaEditorLayer::onImGuiMenuBar()
-{
-    const bool project_loaded = hasProjectLoaded();
-
-    if (ImGui::BeginMenu("Project")) {
-        if (ImGui::MenuItem("Open Project")) {
-            const std::filesystem::path project_file_path =
-                FileDialogs::openFile(kProjectFileFilter, projectDialogDefaultPath().string());
-            if (!project_file_path.empty()) {
-                openProject(project_file_path);
-            }
-        }
-
-        if (ImGui::MenuItem("Create New Project")) {
-            const std::filesystem::path project_root_path =
-                FileDialogs::selectDirectory(projectDialogDefaultPath().string());
-            if (!project_root_path.empty()) {
-                ProjectInfo project_info{.Name = "New Project",
-                                         .Version = "0.1.0",
-                                         .Author = "Junjie Yang",
-                                         .Description = "A simple Luna project.",
-                                         .StartScene = "./Assets/Scenes/Main.lunascene",
-                                         .AssetsPath = "./Assets/"};
-
-                if (ProjectManager::instance().createProject(project_root_path, project_info)) {
-                    std::error_code ec;
-                    if (!project_info.AssetsPath.empty()) {
-                        std::filesystem::create_directories(
-                            (project_root_path / project_info.AssetsPath).lexically_normal(), ec);
-                    }
-
-                    ec.clear();
-                    if (!project_info.StartScene.empty()) {
-                        const auto scene_directory =
-                            (project_root_path / project_info.StartScene).lexically_normal().parent_path();
-                        if (!scene_directory.empty()) {
-                            std::filesystem::create_directories(scene_directory, ec);
-                        }
-                    }
-
-                    openProject(project_root_path / (project_info.Name + ".lunaproj"));
-                }
-            }
-        }
-
-        if (ImGui::MenuItem("Sync Assets", nullptr, false, project_loaded)) {
-            syncProjectAssets();
-        }
-        if (ImGui::MenuItem("Refresh Script Plugins", nullptr, false, project_loaded)) {
-            refreshProjectScriptPlugins();
-        }
-        if (m_editor_shell) {
-            m_editor_shell->drawMenuItems("Project");
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu("Scene", project_loaded)) {
-        if (ImGui::MenuItem("Create Scene")) {
-            createScene();
-        }
-
-        if (ImGui::MenuItem("Open Scene")) {
-            openScene();
-        }
-
-        if (ImGui::MenuItem("Save Scene")) {
-            saveScene();
-        }
-        if (m_editor_shell) {
-            m_editor_shell->drawMenuItems("Scene");
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu("Edit")) {
-        if (m_editor_shell) {
-            m_editor_shell->drawMenuItems("Edit");
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu("Viewport")) {
-        if (m_editor_shell) {
-            m_editor_shell->drawMenuItems("Viewport");
-        }
-        ImGui::EndMenu();
-    }
-
-    if (ImGui::BeginMenu("Window")) {
-        if (m_editor_shell) {
-            ImGui::Separator();
-            m_editor_shell->drawWindowMenuItems();
-            m_editor_shell->drawMenuItems("Window");
-        }
-        ImGui::EndMenu();
-    }
-
-    if (m_editor_shell) {
-        m_editor_shell->drawMenuBarItems({"Project", "Scene", "Edit", "Viewport", "Window"});
-    }
-}
-
-void LunaEditorLayer::updateEditorShortcuts()
-{
-    if (m_editor_shell) {
-        (void) m_editor_shell->dispatchShortcuts();
-    }
-}
-
 void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui, std::string_view owner_id)
 {
     if (m_application == nullptr) {
@@ -988,146 +220,19 @@ void LunaEditorLayer::drawDefaultSceneViewport(editor::Ui& ui, std::string_view 
     }
 
     auto& renderer = m_application->getRenderer();
-
-    m_viewport_focused = ImGui::IsWindowFocused();
-    updateGizmoShortcuts();
-
-    const editor::Vec2 available = ui.contentRegionAvail();
-    const editor::Vec2 framebuffer_scale = ui.windowFramebufferScale();
-    const float viewport_scale_x =
-        std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
-    const float viewport_scale_y =
-        std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
-    const uint32_t viewport_width = static_cast<uint32_t>((std::max) (available.x * viewport_scale_x, 0.0f));
-    const uint32_t viewport_height = static_cast<uint32_t>((std::max) (available.y * viewport_scale_y, 0.0f));
-    if (!m_runtime_viewport_enabled) {
-        m_editor_camera.setViewportSize(static_cast<float>(viewport_width), static_cast<float>(viewport_height));
-    }
-    SceneViewportInstance& active_viewport = activeSceneViewportInstance();
-    const editor::ViewportId active_viewport_id = activeSceneViewportId();
-    const auto& viewport_state = active_viewport.sync(renderer, viewport_width, viewport_height);
-
-    const auto& scene_texture = renderer.getSceneViewportOutputTexture(active_viewport.rendererViewportHandle(renderer));
-    const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
-    if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
-        const bool flip_uv_y = viewport_state.y_flip;
-        const ImVec2 uv0(0.0f, flip_uv_y ? 1.0f : 0.0f);
-        const ImVec2 uv1(1.0f, flip_uv_y ? 0.0f : 1.0f);
-
-        ImGui::Image(texture_id, ImVec2{available.x, available.y}, uv0, uv1);
-        const ImVec2 viewport_min = ImGui::GetItemRectMin();
-        const ImVec2 viewport_max = ImGui::GetItemRectMax();
-        const ImVec2 viewport_size = ImGui::GetItemRectSize();
-        const bool viewport_item_hovered = ImGui::IsItemHovered();
-        const ViewportInteractionState& interaction = recordViewportSurfaceInteraction(
-            active_viewport_id,
-            owner_id,
-            ViewportInteractionInput{
-                .rect = ViewportSurfaceRect{
-                    .min = toEditorVec2(viewport_min),
-                    .max = toEditorVec2(viewport_max),
-                },
-                .hovered = viewport_item_hovered,
-                .active = ImGui::IsItemActive(),
-                .clicked = viewport_item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
-                .double_clicked = viewport_item_hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left),
-            });
-
-        const bool allow_gizmo_interaction =
-            isViewportInputAllowed(active_viewport_id) || m_gizmo_transform_transaction_active;
-        const bool gizmo_active = !m_runtime_viewport_enabled &&
-                                  drawViewportGizmo(viewport_min, viewport_size, allow_gizmo_interaction);
-        if (interaction.clicked && !gizmo_active) {
-            if (!m_runtime_viewport_enabled) {
-                requestViewportPick(
-                    viewport_min,
-                    viewport_max,
-                    uv0,
-                    uv1,
-                    scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
-                                  : luna::RHI::Extent2D{0, 0});
-            }
-        }
-    } else if (available.x > 0.0f && available.y > 0.0f) {
-        ImGui::SetCursorPos(editor::scaleEditorUi(16.0f, 16.0f));
-        ui.text("Viewport texture will appear after the first rendered frame.");
-    }
-}
-
-void LunaEditorLayer::updateGizmoShortcuts()
-{
-    if (!m_viewport_focused || m_editor_camera.isMouseCaptured() || ImGui::GetIO().WantTextInput ||
-        !m_editor_runtime.selectedEntityId().isValid()) {
-        return;
-    }
-
-    if (ImGui::IsKeyPressed(ImGuiKey_W, false)) {
-        m_gizmo_operation = GizmoOperation::Translate;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_E, false)) {
-        m_gizmo_operation = GizmoOperation::Rotate;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_R, false)) {
-        m_gizmo_operation = GizmoOperation::Scale;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
-        m_gizmo_mode = m_gizmo_mode == GizmoMode::Local ? GizmoMode::World : GizmoMode::Local;
-    }
-}
-
-bool LunaEditorLayer::drawViewportGizmo(const ImVec2& viewport_min, const ImVec2& viewport_size, bool allow_interaction)
-{
-    Entity selected_entity = getSelectedEntity();
-    if (!selected_entity || !selected_entity.isValid() || !selected_entity.hasComponent<TransformComponent>()) {
-        if (m_gizmo_transform_transaction_active) {
-            (void) m_editor_runtime.commitTransaction();
-            m_gizmo_transform_transaction_active = false;
-            processAuthoringEvents();
-        }
-        return false;
-    }
-
-    if (viewport_size.x <= 0.0f || viewport_size.y <= 0.0f) {
-        return false;
-    }
-
-    const auto& camera = m_editor_camera.getCamera();
-    const float aspect_ratio = viewport_size.x / viewport_size.y;
-    glm::mat4 view = camera.getViewMatrix();
-    glm::mat4 projection = camera.getProjectionMatrix(aspect_ratio);
-    projection[1][1] *= -1.0f;
-    glm::mat4 transform = m_editor_runtime.scene().entityManager().getWorldSpaceTransformMatrix(selected_entity);
-
-    ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
-    ImGuizmo::SetDrawlist();
-    ImGuizmo::SetRect(viewport_min.x, viewport_min.y, viewport_size.x, viewport_size.y);
-    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7fffffff));
-    ImGuizmo::Enable(allow_interaction);
-
-    const ImGuizmo::MODE mode = m_gizmo_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_gizmo_mode);
-    ImGuizmo::Manipulate(glm::value_ptr(view),
-                         glm::value_ptr(projection),
-                         toImGuizmoOperation(m_gizmo_operation),
-                         mode,
-                         glm::value_ptr(transform));
-
-    const bool gizmo_using = ImGuizmo::IsUsing();
-    if (gizmo_using) {
-        if (!m_gizmo_transform_transaction_active) {
-            m_gizmo_transform_transaction_active = m_editor_runtime.beginTransaction("Transform Entity");
-        }
-        m_editor_runtime.scene().entityManager().setWorldSpaceTransform(selected_entity, transform);
-        m_editor_runtime.markSceneDirty();
-    } else if (m_gizmo_transform_transaction_active) {
-        (void) m_editor_runtime.commitTransaction();
-        m_gizmo_transform_transaction_active = false;
-        processAuthoringEvents();
-    }
-
-    const bool gizmo_active = ImGuizmo::IsOver() || gizmo_using;
-    ImGuizmo::Enable(true);
-    ImGuizmo::PopID();
-    return gizmo_active;
+    const EditorDefaultSceneViewportController::DrawResult draw_result =
+        m_default_scene_viewport.draw(ui,
+                                      owner_id,
+                                      renderer,
+                                      m_editor_camera,
+                                      m_authoring,
+                                      m_runtime_viewport,
+                                      m_viewports,
+                                      m_gizmo,
+                                      activeSceneViewportInstance(),
+                                      activeSceneViewportId(),
+                                      getSelectedEntity());
+    m_viewport_focused = draw_result.focused;
 }
 
 void LunaEditorLayer::consumePendingScenePick()
@@ -1159,154 +264,52 @@ void LunaEditorLayer::consumePendingScenePick()
 
 void LunaEditorLayer::syncPickDebugVisualizationState() const
 {
-    if (m_application == nullptr) {
-        return;
-    }
-
-    activeSceneViewportInstance().setPickDebugVisualization(m_application->getRenderer(), m_show_pick_debug_visualization);
+    m_lifecycle.syncPickDebugVisualization(activeSceneViewportInstance(),
+                                           m_application != nullptr ? &m_application->getRenderer() : nullptr,
+                                           m_show_pick_debug_visualization);
 }
 
 void LunaEditorLayer::syncEditorGridFeatureState() const
 {
-    if (m_application == nullptr) {
-        return;
-    }
-
-    activeSceneViewportInstance().setEditorGrid(m_application->getRenderer(),
-                                                m_show_editor_grid,
-                                                m_runtime_viewport_enabled);
-}
-
-void LunaEditorLayer::requestViewportPick(const ImVec2& image_min,
-                                          const ImVec2& image_max,
-                                          const ImVec2& uv0,
-                                          const ImVec2& uv1,
-                                          const luna::RHI::Extent2D& texture_extent) const
-{
-    if (m_application == nullptr || texture_extent.width == 0 || texture_extent.height == 0 ||
-        m_editor_camera.isMouseCaptured() || ImGuizmo::IsOver() || ImGuizmo::IsUsing() ||
-        !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        return;
-    }
-
-    const ImVec2 mouse_position = ImGui::GetMousePos();
-    const float image_width = image_max.x - image_min.x;
-    const float image_height = image_max.y - image_min.y;
-    if (image_width <= 0.0f || image_height <= 0.0f) {
-        return;
-    }
-
-    if (mouse_position.x < image_min.x || mouse_position.x >= image_max.x || mouse_position.y < image_min.y ||
-        mouse_position.y >= image_max.y) {
-        return;
-    }
-
-    const float local_x = std::clamp((mouse_position.x - image_min.x) / image_width, 0.0f, 0.999999f);
-    const float local_y = std::clamp((mouse_position.y - image_min.y) / image_height, 0.0f, 0.999999f);
-
-    const float texture_u = std::clamp(uv0.x + (uv1.x - uv0.x) * local_x, 0.0f, 0.999999f);
-    const float texture_v = std::clamp(uv0.y + (uv1.y - uv0.y) * local_y, 0.0f, 0.999999f);
-
-    const uint32_t pixel_x = static_cast<uint32_t>(texture_u * static_cast<float>(texture_extent.width));
-    const uint32_t color_pixel_y = (std::min) (
-        static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
-
-    (void) activeSceneViewportInstance().requestScenePick(
-        m_application->getRenderer(), (std::min) (pixel_x, texture_extent.width - 1), color_pixel_y);
+    m_lifecycle.syncEditorGrid(activeSceneViewportInstance(),
+                               m_application != nullptr ? &m_application->getRenderer() : nullptr,
+                               m_show_editor_grid,
+                               m_runtime_viewport);
 }
 
 const std::string& LunaEditorLayer::getAssetLabel() const
 {
-    return m_asset_label;
+    return m_authoring.assetLabel();
 }
 
 std::string LunaEditorLayer::getRenderingBackendName() const
 {
-    if (m_application == nullptr) {
-        return "Unknown";
-    }
-
-    return luna::RHI::BackendTypeToString(m_application->getRenderer().getCapabilities().backend_type);
+    return m_rendering.backendName();
 }
 
 editor::RenderingBackendCapabilities LunaEditorLayer::getRenderingBackendCapabilities() const
 {
-    editor::RenderingBackendCapabilities result{};
-    if (m_application == nullptr) {
-        result.active_backend_name = "Unknown";
-        return result;
-    }
-
-    const auto& renderer_capabilities = m_application->getRenderer().getCapabilities();
-    const luna::RHI::BackendType current_backend = renderer_capabilities.backend_type;
-    const std::vector<luna::RHI::BackendType> compiled_backends = luna::RHI::Instance::GetCompiledBackends();
-    const std::optional<luna::RHI::BackendType> default_backend = tryGetDefaultBackend();
-
-    result.active_backend_name = luna::RHI::BackendTypeToString(current_backend);
-    result.compiled_backend_names = luna::RHI::DescribeBackendTypes(compiled_backends);
-    result.compiled_backends.reserve(compiled_backends.size());
-    for (const luna::RHI::BackendType backend : compiled_backends) {
-        result.compiled_backends.push_back(editor::RenderingBackendEntry{
-            .name = luna::RHI::BackendTypeToString(backend),
-            .status = backendStatusText(backend, current_backend, default_backend),
-            .current = backend == current_backend,
-            .default_backend = default_backend && backend == *default_backend,
-        });
-    }
-
-    result.supports_default_render_flow = renderer_capabilities.supports_default_render_flow;
-    result.supports_imgui = renderer_capabilities.supports_imgui;
-    result.supports_scene_pick_readback = renderer_capabilities.supports_scene_pick_readback;
-    result.supports_gpu_timestamp = renderer_capabilities.supports_gpu_timestamp;
-    result.gpu_timestamp_uses_disjoint_query = renderer_capabilities.gpu_timestamp_uses_disjoint_query;
-    result.supports_graphics_pipeline = renderer_capabilities.supports_graphics_pipeline;
-    result.supports_compute_pipeline = renderer_capabilities.supports_compute_pipeline;
-    result.supports_sampled_texture = renderer_capabilities.supports_sampled_texture;
-    result.supports_storage_texture = renderer_capabilities.supports_storage_texture;
-    result.supports_color_attachment = renderer_capabilities.supports_color_attachment;
-    result.supports_depth_attachment = renderer_capabilities.supports_depth_attachment;
-    result.supports_uniform_buffer = renderer_capabilities.supports_uniform_buffer;
-    result.supports_storage_buffer = renderer_capabilities.supports_storage_buffer;
-    result.supports_sampler = renderer_capabilities.supports_sampler;
-
-    result.conventions.requires_projection_y_flip =
-        renderer_capabilities.conventions.requires_projection_y_flip;
-    result.conventions.imgui_clip_top_y_is_negative_one =
-        renderer_capabilities.conventions.imgui_clip_top_y_is_negative_one;
-    result.conventions.imgui_render_target_requires_uv_y_flip =
-        renderer_capabilities.conventions.imgui_render_target_requires_uv_y_flip;
-    result.conventions.scene_pick_y_matches_display_y =
-        renderer_capabilities.conventions.scene_pick_y_matches_display_y;
-
-    return result;
+    return m_rendering.backendCapabilities();
 }
 
 editor::RenderGraphProfileSnapshot LunaEditorLayer::getRenderGraphProfileSnapshot() const
 {
-    if (m_application == nullptr) {
-        return {};
-    }
-
-    return toEditorRenderGraphProfile(m_application->getRenderer().getLastRenderGraphProfile());
+    return m_rendering.renderGraphProfile();
 }
 
 bool LunaEditorLayer::isRenderGraphProfilingEnabled() const noexcept
 {
-    return m_application != nullptr && m_application->getRenderer().isRenderGraphProfilingEnabled();
+    return m_rendering.isRenderGraphProfilingEnabled();
 }
 
 void LunaEditorLayer::setRenderGraphProfilingEnabled(bool enabled)
 {
-    if (m_application != nullptr) {
-        m_application->getRenderer().setRenderGraphProfilingEnabled(enabled);
-    }
+    m_rendering.setRenderGraphProfilingEnabled(enabled);
 }
 
 std::filesystem::path LunaEditorLayer::defaultRenderProfileExportPath(std::string_view backend_name) const
 {
-    const std::string backend_label =
-        backend_name.empty() ? getRenderingBackendName() : std::string(backend_name);
-    return luna::makeDefaultRenderProfileExportPath(backend_label);
+    return m_rendering.defaultRenderProfileExportPath(backend_name);
 }
 
 bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(
@@ -1314,157 +317,85 @@ bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(
     const std::filesystem::path& output_path,
     std::string* error_message) const
 {
-    const luna::RenderGraphProfileSnapshot engine_profile = toEngineRenderGraphProfile(profile);
-    const RenderProfileExportOptions options{
-        .trace_name = "Luna RenderGraph",
-        .backend_name = getRenderingBackendName(),
-        .frame_index = profile.frame_index,
-    };
-    return luna::exportRenderGraphProfileChromeTraceJson(engine_profile, output_path, options, error_message);
+    return m_rendering.exportRenderGraphProfileChromeTraceJson(profile, output_path, error_message);
 }
 
 std::vector<editor::RenderFeatureInfo> LunaEditorLayer::getDefaultRenderFeatureInfos() const
 {
-    if (m_application == nullptr) {
-        return {};
-    }
-
-    const auto engine_features = m_application->getRenderer().getDefaultRenderFeatureInfos();
-    std::vector<editor::RenderFeatureInfo> result;
-    result.reserve(engine_features.size());
-    for (const auto& feature : engine_features) {
-        result.push_back(toEditorRenderFeatureInfo(feature));
-    }
-    return result;
+    return m_rendering.defaultRenderFeatureInfos();
 }
 
 std::vector<editor::RenderFeatureParameterInfo>
 LunaEditorLayer::getDefaultRenderFeatureParameters(std::string_view feature_name) const
 {
-    if (m_application == nullptr) {
-        return {};
-    }
-
-    const auto engine_parameters = m_application->getRenderer().getDefaultRenderFeatureParameters(feature_name);
-    std::vector<editor::RenderFeatureParameterInfo> result;
-    result.reserve(engine_parameters.size());
-    for (const auto& parameter : engine_parameters) {
-        result.push_back(toEditorRenderFeatureParameterInfo(parameter));
-    }
-    return result;
+    return m_rendering.defaultRenderFeatureParameters(feature_name);
 }
 
 bool LunaEditorLayer::setDefaultRenderFeatureEnabled(std::string_view feature_name, bool enabled)
 {
-    return m_application != nullptr &&
-           m_application->getRenderer().setDefaultRenderFeatureEnabled(feature_name, enabled);
+    return m_rendering.setDefaultRenderFeatureEnabled(feature_name, enabled);
 }
 
 bool LunaEditorLayer::setDefaultRenderFeatureParameter(std::string_view feature_name,
                                                        std::string_view parameter_name,
                                                        const editor::RenderFeatureParameterValue& value)
 {
-    if (m_application == nullptr) {
-        return false;
-    }
-
-    const render_flow::RenderFeatureParameterValue engine_value = toEngineRenderFeatureParameterValue(value);
-    return m_application->getRenderer().setDefaultRenderFeatureParameter(feature_name, parameter_name, engine_value);
+    return m_rendering.setDefaultRenderFeatureParameter(feature_name, parameter_name, value);
 }
 
 std::vector<editor::RenderDebugViewModeInfo> LunaEditorLayer::getRenderDebugViewModes() const
 {
-    std::vector<editor::RenderDebugViewModeInfo> result;
-    result.reserve(kRenderDebugModes.size());
-    for (const RenderDebugModeItem& item : kRenderDebugModes) {
-        result.push_back(editor::RenderDebugViewModeInfo{
-            .mode = item.editor_mode,
-            .label = item.label,
-        });
-    }
-    return result;
+    return m_rendering.renderDebugViewModes();
 }
 
 editor::RenderDebugViewMode LunaEditorLayer::getRenderDebugViewMode() const noexcept
 {
-    if (m_application == nullptr) {
-        return editor::RenderDebugViewMode::None;
-    }
-
-    return toEditorRenderDebugViewMode(m_application->getRenderer().getRenderDebugViewMode());
+    return m_rendering.renderDebugViewMode();
 }
 
 void LunaEditorLayer::setRenderDebugViewMode(editor::RenderDebugViewMode mode)
 {
-    if (m_application != nullptr) {
-        m_application->getRenderer().setRenderDebugViewMode(toEngineRenderDebugViewMode(mode));
-    }
+    m_rendering.setRenderDebugViewMode(mode);
 }
 
 float LunaEditorLayer::getRenderDebugVelocityScale() const noexcept
 {
-    return m_application != nullptr ? m_application->getRenderer().getRenderDebugVelocityScale() : 0.0f;
+    return m_rendering.renderDebugVelocityScale();
 }
 
 void LunaEditorLayer::setRenderDebugVelocityScale(float scale)
 {
-    if (m_application != nullptr) {
-        m_application->getRenderer().setRenderDebugVelocityScale(scale);
-    }
+    m_rendering.setRenderDebugVelocityScale(scale);
 }
 
 editor::TextureView LunaEditorLayer::getRenderDebugTextureView() const
 {
-    if (m_application == nullptr) {
-        return {};
-    }
-
-    const auto& renderer = m_application->getRenderer();
-    const auto& debug_texture = renderer.getRenderDebugOutputTexture();
-    if (!debug_texture) {
-        return {};
-    }
-
-    const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(debug_texture);
-    return editor::TextureView{
-        .id = toEditorTextureHandle(texture_id),
-        .size = editor::UVec2{.x = debug_texture->GetWidth(), .y = debug_texture->GetHeight()},
-        .y_flip = renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip,
-    };
+    return m_rendering.renderDebugTextureView();
 }
 
 float LunaEditorLayer::getFrameTimeMilliseconds() const noexcept
 {
-    return Application::get().getTimestep().getSeconds() * 1000.0f;
+    return m_rendering.frameTimeMilliseconds();
 }
 
 float LunaEditorLayer::getFramesPerSecond() const noexcept
 {
-    const float delta_seconds = Application::get().getTimestep().getSeconds();
-    return 1.0f / (std::max)(delta_seconds, 0.0001f);
+    return m_rendering.framesPerSecond();
 }
 
 uint32_t LunaEditorLayer::getSceneOutputWidth() const noexcept
 {
-    if (m_application == nullptr) {
-        return 0;
-    }
-
-    return m_application->getRenderer().getSceneOutputSize().width;
+    return m_rendering.sceneOutputSize().x;
 }
 
 uint32_t LunaEditorLayer::getSceneOutputHeight() const noexcept
 {
-    if (m_application == nullptr) {
-        return 0;
-    }
-
-    return m_application->getRenderer().getSceneOutputSize().height;
+    return m_rendering.sceneOutputSize().y;
 }
 
 size_t LunaEditorLayer::getRuntimeEntityCount() const noexcept
 {
-    return m_runtime_scene != nullptr ? m_runtime_scene->entityManager().entityCount() : 0u;
+    return m_runtime_viewport.runtimeEntityCount();
 }
 
 std::array<float, 3> LunaEditorLayer::getEditorCameraPosition() const noexcept
@@ -1475,12 +406,12 @@ std::array<float, 3> LunaEditorLayer::getEditorCameraPosition() const noexcept
 
 std::string LunaEditorLayer::getGizmoOperationName() const
 {
-    return gizmoOperationToString(m_gizmo_operation);
+    return m_gizmo.operationName();
 }
 
 std::string LunaEditorLayer::getGizmoModeName() const
 {
-    return m_gizmo_mode == GizmoMode::World ? "World" : "Local";
+    return m_gizmo.modeName();
 }
 
 bool LunaEditorLayer::isPickDebugVisualizationEnabled() const noexcept
@@ -1515,40 +446,38 @@ void LunaEditorLayer::setEditorGridEnabled(bool enabled)
 
 Scene& LunaEditorLayer::getScene()
 {
-    Scene* scene = m_authoring_document_context.scene();
-    return scene != nullptr ? *scene : m_editor_runtime.scene();
+    return m_authoring.documentScene();
 }
 
 Scene& LunaEditorLayer::getInspectionScene()
 {
-    if (m_runtime_viewport_enabled) {
-        if (Scene* runtime_scene = m_runtime_document_context.scene(); runtime_scene != nullptr) {
+    if (m_runtime_viewport.isRuntimeViewportEnabled()) {
+        if (Scene* runtime_scene = m_runtime_viewport.runtimeDocumentContext().scene(); runtime_scene != nullptr) {
             return *runtime_scene;
         }
     }
 
-    Scene* scene = m_authoring_document_context.scene();
-    return scene != nullptr ? *scene : m_editor_runtime.scene();
+    return m_authoring.documentScene();
 }
 
 bool LunaEditorLayer::isRuntimeViewportEnabled() const noexcept
 {
-    return m_runtime_viewport_enabled;
+    return m_runtime_viewport.isRuntimeViewportEnabled();
 }
 
 bool LunaEditorLayer::isRuntimeViewportRequested() const noexcept
 {
-    return m_runtime_viewport_requested;
+    return m_runtime_viewport.isRuntimeViewportRequested();
 }
 
 void LunaEditorLayer::setRuntimeViewportRequested(bool enabled)
 {
-    m_runtime_viewport_requested = enabled;
+    m_runtime_viewport.setRuntimeViewportRequested(enabled);
 }
 
 editor::ViewportId LunaEditorLayer::defaultSceneViewportId() const noexcept
 {
-    return editor::kDefaultViewportId;
+    return m_viewports.defaultSceneViewportId();
 }
 
 editor::ViewportId LunaEditorLayer::createSceneViewport(std::string_view)
@@ -1562,14 +491,7 @@ editor::ViewportId LunaEditorLayer::createSceneViewport(std::string_view, std::s
         return editor::kInvalidViewportId;
     }
 
-    const editor::ViewportId viewport_id = allocateViewportId();
-    if (!m_viewport_instances.createViewport(viewport_id)) {
-        return editor::kInvalidViewportId;
-    }
-    if (!owner_id.empty()) {
-        m_viewport_owner_by_id[viewport_id] = toOwnedString(owner_id);
-    }
-    return viewport_id;
+    return m_viewports.createSceneViewport(owner_id);
 }
 
 void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
@@ -1578,16 +500,14 @@ void LunaEditorLayer::destroySceneViewport(editor::ViewportId viewport_id)
         return;
     }
 
-    if (m_viewport_instances.destroyViewport(viewport_id, m_application->getRenderer())) {
-        m_viewport_owner_by_id.erase(viewport_id);
-        m_viewport_interactions.clearViewport(viewport_id);
-        m_preview_scene_viewports.erase(viewport_id);
+    if (m_viewports.destroySceneViewport(viewport_id, m_application->getRenderer())) {
+        m_preview_scene_viewports.clearPreview(viewport_id);
     }
 }
 
 bool LunaEditorLayer::isSceneViewportValid(editor::ViewportId viewport_id) const noexcept
 {
-    return m_viewport_instances.isViewportValid(viewport_id);
+    return m_viewports.isSceneViewportValid(viewport_id);
 }
 
 editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::ViewportId viewport_id, editor::UVec2 framebuffer_size)
@@ -1604,7 +524,7 @@ editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::Viewport
     }
 
     Renderer& renderer = m_application->getRenderer();
-    SceneViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
+    SceneViewportInstance* viewport = m_viewports.findSceneViewport(viewport_id);
     if (viewport == nullptr) {
         return {};
     }
@@ -1633,24 +553,12 @@ bool LunaEditorLayer::setSceneViewportPreview(editor::ViewportId viewport_id,
         return false;
     }
 
-    auto& preview = m_preview_scene_viewports[viewport_id];
-    if (!preview) {
-        preview = std::make_unique<PreviewSceneViewport>();
-    }
-
-    if (!preview->dirty && samePreviewState(preview->state, state)) {
-        preview->state = state;
-        return true;
-    }
-
-    preview->state = state;
-    preview->dirty = true;
-    return true;
+    return m_preview_scene_viewports.setPreview(viewport_id, state);
 }
 
 void LunaEditorLayer::clearSceneViewportPreview(editor::ViewportId viewport_id)
 {
-    m_preview_scene_viewports.erase(viewport_id);
+    m_preview_scene_viewports.clearPreview(viewport_id);
 }
 
 editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height)
@@ -1665,7 +573,7 @@ editor::TextureView LunaEditorLayer::getSceneTextureView(editor::ViewportId view
     }
 
     const auto& renderer = m_application->getRenderer();
-    const SceneViewportInstance* viewport = m_viewport_instances.findViewport(viewport_id);
+    const SceneViewportInstance* viewport = m_viewports.findSceneViewport(viewport_id);
     if (viewport == nullptr) {
         return {};
     }
@@ -1691,7 +599,7 @@ editor::TextureView LunaEditorLayer::getSceneTextureView() const
 
 editor::ViewportId LunaEditorLayer::activeSceneViewportId() const noexcept
 {
-    return m_runtime_viewport_enabled ? kRuntimeSceneViewportId : defaultSceneViewportId();
+    return m_viewports.activeSceneViewportId(m_runtime_viewport.isRuntimeViewportEnabled());
 }
 
 editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view)
@@ -1701,72 +609,42 @@ editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view)
 
 editor::ViewportId LunaEditorLayer::createTextureViewport(std::string_view, std::string_view owner_id)
 {
-    const editor::ViewportId viewport_id = allocateViewportId();
-    if (!m_texture_viewport_instances.createViewport(viewport_id)) {
-        return editor::kInvalidViewportId;
-    }
-    if (!owner_id.empty()) {
-        m_viewport_owner_by_id[viewport_id] = toOwnedString(owner_id);
-    }
-    return viewport_id;
+    return m_viewports.createTextureViewport(owner_id);
 }
 
 void LunaEditorLayer::destroyTextureViewport(editor::ViewportId viewport_id)
 {
-    if (m_texture_viewport_instances.destroyViewport(viewport_id)) {
-        m_viewport_owner_by_id.erase(viewport_id);
-        m_viewport_interactions.clearViewport(viewport_id);
-    }
+    (void) m_viewports.destroyTextureViewport(viewport_id);
 }
 
 bool LunaEditorLayer::isTextureViewportValid(editor::ViewportId viewport_id) const noexcept
 {
-    return m_texture_viewport_instances.isViewportValid(viewport_id);
+    return m_viewports.isTextureViewportValid(viewport_id);
 }
 
 editor::TextureViewportPresentation LunaEditorLayer::syncTextureViewport(editor::ViewportId viewport_id,
                                                                          editor::TextureView texture,
                                                                          editor::UVec2 framebuffer_size)
 {
-    TextureViewportInstance* viewport = m_texture_viewport_instances.findViewport(viewport_id);
-    if (viewport == nullptr) {
-        return {};
-    }
-
-    return toEditorTextureViewportPresentation(viewport->sync(texture, framebuffer_size));
+    return m_viewports.syncTextureViewport(viewport_id, texture, framebuffer_size);
 }
 
 editor::TextureViewportPresentation LunaEditorLayer::textureViewportPresentation(editor::ViewportId viewport_id) const
 {
-    const TextureViewportInstance* viewport = m_texture_viewport_instances.findViewport(viewport_id);
-    return viewport != nullptr ? toEditorTextureViewportPresentation(viewport->presentation())
-                               : editor::TextureViewportPresentation{};
+    return m_viewports.textureViewportPresentation(viewport_id);
 }
 
 void LunaEditorLayer::destroyViewportsForOwner(std::string_view owner_id)
 {
-    if (owner_id.empty()) {
+    if (m_application == nullptr) {
         return;
     }
 
-    std::vector<editor::ViewportId> viewports_to_destroy;
-    const std::string owner_key = toOwnedString(owner_id);
-    for (const auto& [viewport_id, viewport_owner] : m_viewport_owner_by_id) {
-        if (viewport_owner == owner_key) {
-            viewports_to_destroy.push_back(viewport_id);
-        }
+    const std::vector<editor::ViewportId> destroyed_scene_viewports =
+        m_viewports.destroyViewportsForOwner(owner_id, m_application->getRenderer());
+    for (const editor::ViewportId viewport_id : destroyed_scene_viewports) {
+        m_preview_scene_viewports.clearPreview(viewport_id);
     }
-
-    for (const editor::ViewportId viewport_id : viewports_to_destroy) {
-        if (isTextureViewportValid(viewport_id)) {
-            destroyTextureViewport(viewport_id);
-            continue;
-        }
-        if (isSceneViewportValid(viewport_id)) {
-            destroySceneViewport(viewport_id);
-        }
-    }
-    m_viewport_interactions.clearOwner(owner_id);
 }
 
 const ViewportInteractionState& LunaEditorLayer::recordViewportSurfaceInteraction(
@@ -1774,69 +652,47 @@ const ViewportInteractionState& LunaEditorLayer::recordViewportSurfaceInteractio
     std::string_view owner_id,
     const ViewportInteractionInput& input)
 {
-    return m_viewport_interactions.recordSurface(viewport_id, owner_id, input);
+    return m_viewports.recordViewportSurfaceInteraction(viewport_id, owner_id, input);
 }
 
 bool LunaEditorLayer::isViewportInputAllowed(editor::ViewportId viewport_id) const noexcept
 {
-    return m_viewport_interactions.allowsInput(viewport_id);
+    return m_viewports.isViewportInputAllowed(viewport_id);
 }
 
 void LunaEditorLayer::syncDefaultViewportMouseCapture() noexcept
 {
-    m_viewport_interactions.setMouseCapture(defaultSceneViewportId(), m_editor_camera.isMouseCaptured());
+    m_viewports.setDefaultViewportMouseCaptured(m_editor_camera.isMouseCaptured());
 }
 
 UUID LunaEditorLayer::getSelectedEntityId() const noexcept
 {
-    return m_editor_runtime.selectedEntityId();
+    return m_authoring.selectedEntityId();
 }
 
 Entity LunaEditorLayer::getSelectedEntity()
 {
-    return m_editor_runtime.selectedEntity(getInspectionScene());
+    return m_authoring.selectedEntity(getInspectionScene());
 }
 
 void LunaEditorLayer::setSelectedEntity(Entity entity)
 {
-    m_editor_runtime.setSelectedEntity(entity);
+    m_authoring.setSelectedEntity(entity);
 }
 
 void LunaEditorLayer::setSelectedEntityId(UUID entity_id)
 {
-    m_editor_runtime.setSelectedEntityId(entity_id);
+    m_authoring.setSelectedEntityId(entity_id);
 }
 
 void LunaEditorLayer::markSceneDirty()
 {
-    m_editor_runtime.markSceneDirty();
-    processAuthoringEvents();
+    m_authoring.markSceneDirty();
 }
 
 void LunaEditorLayer::patchRuntimeScriptProperty(UUID entity_id, size_t script_index, size_t property_index)
 {
-    if (!m_runtime_viewport_enabled || !m_runtime_scene || !m_runtime_scene_runtime ||
-        !m_runtime_scene_runtime->isRunning()) {
-        return;
-    }
-
-    Entity runtime_entity = m_runtime_scene->entityManager().findEntityByUUID(entity_id);
-    if (!runtime_entity || !runtime_entity.hasComponent<ScriptComponent>()) {
-        return;
-    }
-
-    const ScriptComponent& runtime_script_component = runtime_entity.getComponent<ScriptComponent>();
-    if (script_index >= runtime_script_component.scripts.size()) {
-        return;
-    }
-
-    const ScriptEntry& runtime_script = runtime_script_component.scripts[script_index];
-    if (property_index >= runtime_script.properties.size()) {
-        return;
-    }
-
-    const ScriptProperty& runtime_property = runtime_script.properties[property_index];
-    m_runtime_scene_runtime->setScriptProperty(entity_id, runtime_script.id, runtime_property, property_index);
+    m_runtime_viewport.patchRuntimeScriptProperty(entity_id, script_index, property_index);
 }
 
 bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path)
@@ -1846,208 +702,107 @@ bool LunaEditorLayer::openSceneFile(const std::filesystem::path& scene_file_path
 
 Entity LunaEditorLayer::createEntity(const std::string& name, Entity parent)
 {
-    Entity entity = m_editor_runtime.createEntity(name, parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createEntity(name, parent);
 }
 
 Entity LunaEditorLayer::createEntityFromModelAsset(AssetHandle model_handle, Entity parent)
 {
-    Entity root = m_editor_runtime.createEntityFromModelAsset(model_handle, parent);
-    if (!root) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return root;
+    return m_authoring.createEntityFromModelAsset(model_handle, parent);
 }
 
 Entity LunaEditorLayer::createEntityFromMeshAsset(AssetHandle mesh_handle, Entity parent)
 {
-    Entity entity = m_editor_runtime.createEntityFromMeshAsset(mesh_handle, parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createEntityFromMeshAsset(mesh_handle, parent);
 }
 
 Entity LunaEditorLayer::createPrimitiveEntity(AssetHandle mesh_handle, Entity parent)
 {
-    Entity entity = m_editor_runtime.createPrimitiveEntity(mesh_handle, parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createPrimitiveEntity(mesh_handle, parent);
 }
 
 Entity LunaEditorLayer::createCameraEntity(Entity parent)
 {
-    Entity entity = m_editor_runtime.createCameraEntity(parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createCameraEntity(parent);
 }
 
 Entity LunaEditorLayer::createDirectionalLightEntity(Entity parent)
 {
-    Entity entity = m_editor_runtime.createDirectionalLightEntity(parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createDirectionalLightEntity(parent);
 }
 
 Entity LunaEditorLayer::createPointLightEntity(Entity parent)
 {
-    Entity entity = m_editor_runtime.createPointLightEntity(parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createPointLightEntity(parent);
 }
 
 Entity LunaEditorLayer::createSpotLightEntity(Entity parent)
 {
-    Entity entity = m_editor_runtime.createSpotLightEntity(parent);
-    if (!entity) {
-        return {};
-    }
-
-    processAuthoringEvents();
-    return entity;
+    return m_authoring.createSpotLightEntity(parent);
 }
 
 bool LunaEditorLayer::destroyEntity(Entity entity)
 {
-    const bool destroyed = m_editor_runtime.destroyEntity(entity);
-    if (!destroyed) {
-        return false;
-    }
-
-    processAuthoringEvents();
-    return true;
+    return m_authoring.destroyEntity(entity);
 }
 
 bool LunaEditorLayer::reparentEntity(Entity entity, Entity parent, bool preserve_world_transform)
 {
-    const bool changed = m_editor_runtime.reparentEntity(entity, parent, preserve_world_transform);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.reparentEntity(entity, parent, preserve_world_transform);
 }
 
 bool LunaEditorLayer::addComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
 {
-    const bool changed = m_editor_runtime.addComponent(entity, component_kind);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.addComponent(entity, component_kind);
 }
 
 bool LunaEditorLayer::removeComponent(Entity entity, authoring::AuthoringComponentKind component_kind)
 {
-    const bool changed = m_editor_runtime.removeComponent(entity, component_kind);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.removeComponent(entity, component_kind);
 }
 
 void LunaEditorLayer::applyMeshAssetToEntity(Entity entity, AssetHandle mesh_handle)
 {
-    if (m_editor_runtime.applyMeshAssetToEntity(entity, mesh_handle)) {
-        processAuthoringEvents();
-    }
+    (void) m_authoring.applyMeshAssetToEntity(entity, mesh_handle);
 }
 
 bool LunaEditorLayer::setEntityName(Entity entity, std::string name)
 {
-    const bool changed = m_editor_runtime.setEntityName(entity, std::move(name));
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setEntityName(entity, std::move(name));
 }
 
 bool LunaEditorLayer::setEntityTransform(Entity entity, const TransformComponent& transform)
 {
-    const bool defer_events = m_editor_runtime.hasOpenTransaction();
-    const bool changed = m_editor_runtime.setEntityTransform(entity, transform);
-    if (changed && !defer_events) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setEntityTransform(entity, transform);
 }
 
 bool LunaEditorLayer::setCameraComponent(Entity entity, const CameraComponent& camera_component)
 {
-    const bool changed = m_editor_runtime.setCameraComponent(entity, camera_component);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setCameraComponent(entity, camera_component);
 }
 
 bool LunaEditorLayer::setLightComponent(Entity entity, const LightComponent& light_component)
 {
-    const bool changed = m_editor_runtime.setLightComponent(entity, light_component);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setLightComponent(entity, light_component);
 }
 
 bool LunaEditorLayer::setMeshComponent(Entity entity, const MeshComponent& mesh_component)
 {
-    const bool changed = m_editor_runtime.setMeshComponent(entity, mesh_component);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setMeshComponent(entity, mesh_component);
 }
 
 bool LunaEditorLayer::setScriptComponent(Entity entity, const ScriptComponent& script_component)
 {
-    const bool changed = m_editor_runtime.setScriptComponent(entity, script_component);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setScriptComponent(entity, script_component);
 }
 
 bool LunaEditorLayer::setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings)
 {
-    const bool changed = m_editor_runtime.setSceneEnvironmentSettings(settings);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setSceneEnvironmentSettings(settings);
 }
 
 bool LunaEditorLayer::setSceneShadowSettings(const SceneShadowSettings& settings)
 {
-    const bool changed = m_editor_runtime.setSceneShadowSettings(settings);
-    if (changed) {
-        processAuthoringEvents();
-    }
-    return changed;
+    return m_authoring.setSceneShadowSettings(settings);
 }
 
 void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
@@ -2063,27 +818,22 @@ void LunaEditorLayer::openBuiltinMaterialsPanel(AssetHandle material_handle)
 
 std::filesystem::path LunaEditorLayer::getProjectRootPath() const
 {
-    const auto project_root = ProjectManager::instance().getProjectRootPath();
-    return project_root ? *project_root : std::filesystem::path{};
+    return m_project_session.projectRootPath();
 }
 
 const ProjectInfo* LunaEditorLayer::getProjectInfo() const
 {
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    return project_info ? &*project_info : nullptr;
+    return m_project_session.projectInfo();
 }
 
 bool LunaEditorLayer::hasProjectLoaded() const
 {
-    return ProjectManager::instance().getProjectRootPath().has_value() &&
-           ProjectManager::instance().getProjectInfo().has_value();
+    return m_project_session.hasProjectLoaded();
 }
 
 void LunaEditorLayer::refreshProjectScriptPlugins()
 {
-    if (m_editor_shell) {
-        m_editor_shell->scriptPlugins().refreshProjectScriptPlugins();
-    }
+    m_project_session.refreshScriptPlugins(m_editor_shell.get());
 }
 
 const std::vector<ScriptPluginCandidate>& LunaEditorLayer::getDiscoveredScriptPlugins() const
@@ -2113,435 +863,181 @@ bool LunaEditorLayer::selectScriptPlugin(const ScriptPluginCandidate* candidate)
 
 void LunaEditorLayer::resetEditorState()
 {
-    endRuntimeViewport();
-    m_runtime_viewport_requested = false;
-    m_editor_runtime.resetScene();
-    m_authoring_document_context.bindScene(&m_editor_runtime.scene());
-    m_authoring_document_context.setRunning(false);
-    m_asset_label = "No scene loaded";
-    m_show_pick_debug_visualization = false;
-    syncPickDebugVisualizationState();
-    syncEditorGridFeatureState();
+    m_lifecycle.resetEditorDocumentState(m_runtime_viewport,
+                                         m_viewports,
+                                         m_authoring,
+                                         m_show_pick_debug_visualization,
+                                         m_viewports.activeSceneViewport(false),
+                                         m_application != nullptr ? &m_application->getRenderer() : nullptr,
+                                         m_show_editor_grid);
 }
 
 void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
 {
-    if (enabled == m_runtime_viewport_enabled) {
+    if (enabled == m_runtime_viewport.isRuntimeViewportEnabled()) {
         return;
     }
 
-    if (m_gizmo_transform_transaction_active) {
-        (void) m_editor_runtime.commitTransaction();
-        m_gizmo_transform_transaction_active = false;
-        processAuthoringEvents();
+    m_gizmo.commitActiveTransformTransaction(m_authoring);
+
+    std::unique_ptr<IScriptRuntime> script_runtime;
+    if (enabled) {
+        script_runtime = ScriptPluginManager::instance().createRuntimeForProject(m_project_session.projectInfo());
     }
 
-    if (enabled) {
-        beginRuntimeViewport();
-    } else {
-        endRuntimeViewport();
+    const bool changed = m_runtime_viewport.setRuntimeViewportEnabled(enabled,
+                                                                      m_authoring.scene(),
+                                                                      std::move(script_runtime));
+    if (!enabled) {
+        m_lifecycle.resetRuntimeViewportState(m_runtime_viewport, m_viewports);
+    }
+    if (changed && m_runtime_viewport.isRuntimeViewportEnabled()) {
+        m_editor_camera.releaseMouseCapture();
+        m_editor_camera.setInputEnabled(false);
     }
     syncEditorGridFeatureState();
 }
 
-void LunaEditorLayer::beginRuntimeViewport()
-{
-    const std::string runtime_scene_snapshot = SceneSerializer::serializeToString(m_editor_runtime.scene());
-    if (runtime_scene_snapshot.empty()) {
-        LUNA_EDITOR_WARN("Failed to serialize current editor scene for runtime viewport");
-        m_runtime_viewport_enabled = false;
-        m_runtime_viewport_requested = false;
-        return;
-    }
-
-    m_runtime_scene = std::make_unique<Scene>();
-    if (!SceneSerializer::deserializeFromString(*m_runtime_scene, runtime_scene_snapshot, "runtime viewport snapshot")) {
-        LUNA_EDITOR_WARN("Failed to create runtime scene snapshot for runtime viewport");
-        m_runtime_scene.reset();
-        m_runtime_viewport_enabled = false;
-        m_runtime_viewport_requested = false;
-        return;
-    }
-
-    m_runtime_scene->setAssetLoadBehavior(m_editor_runtime.scene().getAssetLoadBehavior());
-    m_runtime_document_context.bindScene(m_runtime_scene.get());
-    m_runtime_document_context.setRunning(false);
-    m_runtime_scene_runtime = std::make_unique<SceneRuntime>(*m_runtime_scene);
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    m_runtime_scene_runtime->setScriptRuntime(
-        ScriptPluginManager::instance().createRuntimeForProject(project_info ? &*project_info : nullptr));
-    if (!m_runtime_scene_runtime->start()) {
-        LUNA_EDITOR_WARN("Failed to start runtime viewport scene");
-        m_runtime_scene_runtime.reset();
-        m_runtime_scene.reset();
-        m_runtime_viewport_enabled = false;
-        m_runtime_viewport_requested = false;
-        return;
-    }
-
-    m_runtime_viewport_enabled = true;
-    m_runtime_document_context.setRunning(true);
-    m_editor_camera.releaseMouseCapture();
-    m_editor_camera.setInputEnabled(false);
-    LUNA_EDITOR_INFO("Runtime viewport started with {} entities", m_runtime_scene->entityManager().entityCount());
-}
-
-void LunaEditorLayer::endRuntimeViewport()
-{
-    if (!m_runtime_viewport_enabled && !m_runtime_scene && !m_runtime_scene_runtime) {
-        return;
-    }
-
-    if (m_runtime_scene_runtime) {
-        m_runtime_scene_runtime->stop();
-        m_runtime_scene_runtime.reset();
-    }
-
-    m_runtime_document_context.bindScene(nullptr);
-    m_runtime_document_context.setRunning(false);
-    m_runtime_scene.reset();
-    m_runtime_viewport_enabled = false;
-    m_viewport_interactions.clearViewport(kRuntimeSceneViewportId);
-    LUNA_EDITOR_INFO("Runtime viewport stopped");
-}
-
 Scene& LunaEditorLayer::activeRenderScene()
 {
-    return m_runtime_viewport_enabled && m_runtime_scene ? *m_runtime_scene : m_editor_runtime.scene();
+    return m_runtime_viewport.activeRenderScene(m_authoring.scene());
 }
 
 SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() noexcept
 {
-    return m_runtime_viewport_enabled ? m_viewport_instances.runtimeViewport() : m_viewport_instances.defaultViewport();
+    return m_viewports.activeSceneViewport(m_runtime_viewport.isRuntimeViewportEnabled());
 }
 
 const SceneViewportInstance& LunaEditorLayer::activeSceneViewportInstance() const noexcept
 {
-    return m_runtime_viewport_enabled ? m_viewport_instances.runtimeViewport() : m_viewport_instances.defaultViewport();
+    return m_viewports.activeSceneViewport(m_runtime_viewport.isRuntimeViewportEnabled());
 }
 
 bool LunaEditorLayer::syncPreviewSceneViewport(editor::ViewportId viewport_id,
                                                Renderer& renderer,
                                                SceneViewportInstance& viewport)
 {
-    const auto preview_it = m_preview_scene_viewports.find(viewport_id);
-    if (preview_it == m_preview_scene_viewports.end() || !preview_it->second) {
-        return false;
-    }
-
-    PreviewSceneViewport& preview = *preview_it->second;
-    if (preview.dirty) {
-        rebuildPreviewScene(preview);
-    } else {
-        applyPreviewCamera(preview.camera, preview.state);
-    }
-
-    RenderWorldExtractor{}.extract(preview.scene,
-                                   preview.camera,
-                                   renderer.getSceneViewportRenderWorld(viewport.rendererViewportHandle(renderer)));
-    return true;
-}
-
-void LunaEditorLayer::rebuildPreviewScene(PreviewSceneViewport& preview)
-{
-    Scene& scene = preview.scene;
-    scene.entityManager().clear();
-    scene.setName("Editor Preview");
-    scene.setAssetLoadBehavior(Scene::AssetLoadBehavior::NonBlocking);
-    scene.environmentSettings() = toSceneEnvironmentSettings(preview.state.environment);
-    scene.shadowSettings().mode = SceneShadowMode::PcfShadowMap;
-    scene.shadowSettings().pcfShadowDistance = 12.0f;
-    scene.shadowSettings().pcfMapSize = 1024;
-    scene.shadowSettings().csmCascadeSize = 1024;
-
-    Entity material_entity = scene.entityManager().createEntity("Preview Mesh");
-    material_entity.transform().translation = glm::vec3{0.0f, 0.0f, 0.0f};
-    material_entity.transform().rotation = glm::vec3{0.0f, glm::radians(25.0f), 0.0f};
-    material_entity.transform().scale = glm::vec3{1.0f};
-    auto& mesh_component = material_entity.addComponent<MeshComponent>();
-    mesh_component.meshHandle = previewMeshHandle(preview.state);
-    if (preview.state.material.isValid()) {
-        mesh_component.setSubmeshMaterial(0, preview.state.material);
-    }
-
-    Entity key_light = scene.entityManager().createEntity("Preview Key Light");
-    key_light.transform().rotation = glm::vec3{glm::radians(-45.0f), glm::radians(35.0f), 0.0f};
-    auto& light_component = key_light.addComponent<LightComponent>();
-    light_component.type = LightComponent::Type::Directional;
-    light_component.intensity = 3.0f;
-    light_component.color = glm::vec3{1.0f, 0.96f, 0.90f};
-
-    applyPreviewCamera(preview.camera, preview.state);
-    preview.dirty = false;
-}
-
-editor::ViewportId LunaEditorLayer::allocateViewportId() noexcept
-{
-    editor::ViewportId viewport_id = m_next_viewport_id++;
-    while (viewport_id == editor::kInvalidViewportId || viewport_id == editor::kDefaultViewportId ||
-           viewport_id == kRuntimeSceneViewportId ||
-           m_viewport_instances.isViewportValid(viewport_id) ||
-           m_texture_viewport_instances.isViewportValid(viewport_id)) {
-        viewport_id = m_next_viewport_id++;
-    }
-    return viewport_id;
-}
-
-void LunaEditorLayer::processAuthoringEvents()
-{
-    const std::vector<authoring::AuthoringEvent> events = m_editor_runtime.consumeAuthoringEvents();
-    if (events.empty()) {
-        return;
-    }
-
-    bool update_scene_label = false;
-    bool validate_selection = false;
-
-    for (const auto& event : events) {
-        switch (event.type) {
-            case authoring::AuthoringEventType::SceneReset:
-            case authoring::AuthoringEventType::SceneCreated:
-            case authoring::AuthoringEventType::SceneLoaded:
-            case authoring::AuthoringEventType::HistoryChanged:
-                update_scene_label = true;
-                validate_selection = true;
-                break;
-            case authoring::AuthoringEventType::SceneSaved:
-            case authoring::AuthoringEventType::SceneDirtyChanged:
-            case authoring::AuthoringEventType::EntityCreated:
-            case authoring::AuthoringEventType::EntityModified:
-            case authoring::AuthoringEventType::EntityDestroyed:
-            case authoring::AuthoringEventType::EntityReparented:
-            case authoring::AuthoringEventType::ComponentAdded:
-            case authoring::AuthoringEventType::ComponentRemoved:
-                update_scene_label = true;
-                validate_selection = true;
-                break;
-            case authoring::AuthoringEventType::SceneSettingsChanged:
-                update_scene_label = true;
-                break;
-        }
-    }
-
-    if (validate_selection) {
-        m_editor_runtime.validateSelection();
-    }
-
-    if (update_scene_label) {
-        updateSceneLabel();
-    }
+    return m_preview_scene_viewports.syncPreview(viewport_id, renderer, viewport);
 }
 
 void LunaEditorLayer::createScene()
 {
-    endRuntimeViewport();
-    m_runtime_viewport_requested = false;
-    m_editor_runtime.clearSelection();
-    m_show_pick_debug_visualization = false;
-    syncPickDebugVisualizationState();
-    syncEditorGridFeatureState();
+    m_lifecycle.resetAuthoringViewportState(m_runtime_viewport,
+                                            m_viewports,
+                                            m_show_pick_debug_visualization,
+                                            m_viewports.activeSceneViewport(false),
+                                            m_application != nullptr ? &m_application->getRenderer() : nullptr,
+                                            m_show_editor_grid);
 
-    const auto bootstrap = m_editor_runtime.createScene();
+    const auto bootstrap = m_authoring.createScene();
     if (bootstrap.directional_light) {
         setSelectedEntity(bootstrap.directional_light);
     } else if (bootstrap.camera) {
         setSelectedEntity(bootstrap.camera);
     }
-    processAuthoringEvents();
     LUNA_EDITOR_INFO("Created a new scene with a primary camera and directional light");
 }
 
 bool LunaEditorLayer::syncProjectAssets()
 {
-    if (!hasProjectLoaded()) {
-        LUNA_EDITOR_WARN("Cannot sync assets because no project is currently loaded");
-        return false;
-    }
-
-    if (!m_editor_shell) {
-        LUNA_EDITOR_WARN("Cannot sync assets because the editor shell is not available");
-        return false;
-    }
-
-    const editor::AssetRefreshResult result = m_editor_shell->assets().refreshAssets();
-    return result.success;
+    return m_project_session.refreshAssets(m_editor_shell.get());
 }
 
 bool LunaEditorLayer::openProject(const std::filesystem::path& project_file_path)
 {
-    if (project_file_path.empty()) {
-        return false;
-    }
-
-    if (!ProjectManager::instance().loadProject(project_file_path)) {
-        LUNA_EDITOR_WARN("Failed to load project '{}'", project_file_path.string());
+    if (!m_project_session.loadProject(project_file_path)) {
         return false;
     }
 
     resetEditorState();
 
-    AssetManager::get().clear();
-    AssetDatabase::clear();
-    syncProjectAssets();
-    AssetManager::get().init();
-    BuiltinMaterialOverrides::load();
-    refreshProjectScriptPlugins();
+    m_project_session.reloadProjectAssets(m_editor_shell.get());
+    m_project_session.refreshScriptPlugins(m_editor_shell.get());
 
     createScene();
 
-    const auto project_root = ProjectManager::instance().getProjectRootPath();
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (project_root && project_info && !project_info->StartScene.empty()) {
-        const std::filesystem::path start_scene_path =
-            SceneSerializer::normalizeScenePath((*project_root / project_info->StartScene).lexically_normal());
-        if (std::filesystem::exists(start_scene_path)) {
-            if (!openScene(start_scene_path, false)) {
+    if (const auto start_scene_path = m_project_session.configuredStartScenePath()) {
+        if (std::filesystem::exists(*start_scene_path)) {
+            if (!openScene(*start_scene_path, false)) {
                 createScene();
-                m_editor_runtime.setSceneFilePath(start_scene_path);
-                updateSceneLabel();
+                m_authoring.setSceneFilePath(*start_scene_path);
             }
         } else {
-            m_editor_runtime.setSceneFilePath(start_scene_path);
-            updateSceneLabel();
+            m_authoring.setSceneFilePath(*start_scene_path);
             LUNA_EDITOR_WARN("Configured StartScene '{}' does not exist. Saving will create it at that location.",
-                             start_scene_path.string());
+                             start_scene_path->string());
         }
     } else {
-        updateSceneLabel();
+        m_authoring.updateAssetLabel();
         LUNA_EDITOR_INFO("Project '{}' does not define a StartScene. Using an empty scene.",
                          project_file_path.string());
     }
 
     LUNA_EDITOR_INFO("Loaded project '{}' with {} scene entities",
                      project_file_path.string(),
-                     m_editor_runtime.scene().entityManager().entityCount());
+                     m_authoring.scene().entityManager().entityCount());
     return true;
 }
 
 bool LunaEditorLayer::openScene()
 {
-    const std::filesystem::path scene_file_path =
-        FileDialogs::openFile(kSceneFileFilter, sceneDialogDefaultPath().string());
-    if (scene_file_path.empty()) {
-        return false;
-    }
-
-    return openScene(scene_file_path, true);
+    m_lifecycle.resetRuntimeViewportState(m_runtime_viewport, m_viewports);
+    return m_scene_files.openSceneDialog(m_authoring, m_project_session, true);
 }
 
 bool LunaEditorLayer::openScene(const std::filesystem::path& scene_file_path, bool update_project_start_scene)
 {
-    const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_file_path);
-    if (normalized_scene_path.empty()) {
-        return false;
-    }
-
-    endRuntimeViewport();
-    m_runtime_viewport_requested = false;
-
-    if (!m_editor_runtime.openScene(normalized_scene_path)) {
-        LUNA_EDITOR_WARN("Failed to open scene '{}'", normalized_scene_path.string());
-        return false;
-    }
-
-    processAuthoringEvents();
-
-    if (update_project_start_scene) {
-        syncProjectStartScene(normalized_scene_path);
-    }
-
-    LUNA_EDITOR_INFO(
-        "Opened scene '{}' with {} entities",
-        normalized_scene_path.string(),
-        m_editor_runtime.scene().entityManager().entityCount());
-    return true;
+    m_lifecycle.resetRuntimeViewportState(m_runtime_viewport, m_viewports);
+    return m_scene_files.openScene(scene_file_path, m_authoring, m_project_session, update_project_start_scene);
 }
 
 bool LunaEditorLayer::saveScene()
 {
-    if (m_editor_runtime.sceneFilePath().empty()) {
-        return saveSceneAs();
-    }
-
-    return saveSceneAs(m_editor_runtime.sceneFilePath());
+    return m_scene_files.saveScene(m_authoring, m_project_session);
 }
 
 bool LunaEditorLayer::saveSceneAs()
 {
-    const std::filesystem::path scene_file_path =
-        FileDialogs::saveFile(kSceneFileFilter, sceneDialogDefaultPath().string());
-    if (scene_file_path.empty()) {
-        return false;
-    }
-
-    return saveSceneAs(scene_file_path);
+    return m_scene_files.saveSceneAsDialog(m_authoring, m_project_session);
 }
 
 bool LunaEditorLayer::saveSceneAs(const std::filesystem::path& scene_file_path)
 {
-    const std::filesystem::path normalized_scene_path = SceneSerializer::normalizeScenePath(scene_file_path);
-    if (normalized_scene_path.empty()) {
-        return false;
-    }
-
-    if (!m_editor_runtime.saveSceneAs(normalized_scene_path)) {
-        LUNA_EDITOR_WARN("Failed to save scene '{}'", normalized_scene_path.string());
-        return false;
-    }
-
-    processAuthoringEvents();
-    syncProjectStartScene(normalized_scene_path);
-
-    LUNA_EDITOR_INFO("Saved scene '{}' to '{}'", m_editor_runtime.scene().getName(), normalized_scene_path.string());
-    return true;
+    return m_scene_files.saveSceneAs(scene_file_path, m_authoring, m_project_session);
 }
 
 bool LunaEditorLayer::canUndo() const noexcept
 {
-    return !m_runtime_viewport_enabled && m_editor_runtime.canUndo();
+    return !m_runtime_viewport.isRuntimeViewportEnabled() && m_authoring.canUndo();
 }
 
 bool LunaEditorLayer::canRedo() const noexcept
 {
-    return !m_runtime_viewport_enabled && m_editor_runtime.canRedo();
+    return !m_runtime_viewport.isRuntimeViewportEnabled() && m_authoring.canRedo();
 }
 
 bool LunaEditorLayer::hasOpenEditorTransaction() const noexcept
 {
-    return m_editor_runtime.hasOpenTransaction();
+    return m_authoring.hasOpenTransaction();
 }
 
 bool LunaEditorLayer::beginEditorTransaction(std::string name)
 {
-    if (m_runtime_viewport_enabled) {
+    if (m_runtime_viewport.isRuntimeViewportEnabled()) {
         return false;
     }
 
-    return m_editor_runtime.beginTransaction(std::move(name));
+    return m_authoring.beginTransaction(std::move(name));
 }
 
 bool LunaEditorLayer::commitEditorTransaction()
 {
-    if (!m_editor_runtime.hasOpenTransaction()) {
-        return false;
-    }
-
-    const bool committed = m_editor_runtime.commitTransaction();
-    processAuthoringEvents();
-    return committed;
+    return m_authoring.commitTransaction();
 }
 
 bool LunaEditorLayer::rollbackEditorTransaction()
 {
-    if (!m_editor_runtime.hasOpenTransaction()) {
-        return false;
-    }
-
-    const bool rolled_back = m_editor_runtime.rollbackTransaction();
-    if (rolled_back) {
-        processAuthoringEvents();
-    }
-    return rolled_back;
+    return m_authoring.rollbackTransaction();
 }
 
 bool LunaEditorLayer::undoEditorCommand()
@@ -2556,98 +1052,20 @@ bool LunaEditorLayer::redoEditorCommand()
 
 bool LunaEditorLayer::undo()
 {
-    if (m_runtime_viewport_enabled || !m_editor_runtime.undo()) {
+    if (m_runtime_viewport.isRuntimeViewportEnabled() || !m_authoring.undo()) {
         return false;
     }
 
-    processAuthoringEvents();
     return true;
 }
 
 bool LunaEditorLayer::redo()
 {
-    if (m_runtime_viewport_enabled || !m_editor_runtime.redo()) {
+    if (m_runtime_viewport.isRuntimeViewportEnabled() || !m_authoring.redo()) {
         return false;
     }
 
-    processAuthoringEvents();
     return true;
-}
-
-std::filesystem::path LunaEditorLayer::sceneDialogDefaultPath() const
-{
-    if (!m_editor_runtime.sceneFilePath().empty()) {
-        const std::filesystem::path parent_path = m_editor_runtime.sceneFilePath().parent_path();
-        if (!parent_path.empty() && std::filesystem::exists(parent_path)) {
-            return parent_path;
-        }
-    }
-
-    const auto project_root = ProjectManager::instance().getProjectRootPath();
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (project_root && project_info) {
-        const std::filesystem::path scenes_directory =
-            (*project_root / project_info->AssetsPath / "Scenes").lexically_normal();
-        if (std::filesystem::exists(scenes_directory)) {
-            return scenes_directory;
-        }
-
-        const std::filesystem::path assets_directory = (*project_root / project_info->AssetsPath).lexically_normal();
-        if (std::filesystem::exists(assets_directory)) {
-            return assets_directory;
-        }
-
-        return *project_root;
-    }
-
-    return projectDialogDefaultPath();
-}
-
-void LunaEditorLayer::updateSceneLabel()
-{
-    const char* dirty_suffix = m_editor_runtime.isSceneDirty() ? " *" : "";
-    if (!m_editor_runtime.sceneFilePath().empty()) {
-        if (const auto relative_path = makeScenePathRelativeToProject(m_editor_runtime.sceneFilePath())) {
-            m_asset_label = relative_path->generic_string() + dirty_suffix;
-            return;
-        }
-
-        m_asset_label = m_editor_runtime.sceneFilePath().lexically_normal().string() + dirty_suffix;
-        return;
-    }
-
-    const std::string scene_name =
-        m_editor_runtime.scene().getName().empty() ? "Untitled" : m_editor_runtime.scene().getName();
-    m_asset_label = scene_name + SceneSerializer::FileExtension + std::string(" (unsaved)");
-}
-
-void LunaEditorLayer::syncProjectStartScene(const std::filesystem::path& scene_file_path)
-{
-    const auto relative_scene_path = makeScenePathRelativeToProject(scene_file_path);
-    if (!relative_scene_path) {
-        LUNA_EDITOR_WARN("Scene '{}' is outside the current project root. StartScene was not updated.",
-                         scene_file_path.string());
-        return;
-    }
-
-    const auto project_info = ProjectManager::instance().getProjectInfo();
-    if (!project_info) {
-        return;
-    }
-
-    if (project_info->StartScene.lexically_normal() == relative_scene_path->lexically_normal()) {
-        return;
-    }
-
-    ProjectInfo updated_project_info = *project_info;
-    updated_project_info.StartScene = *relative_scene_path;
-    ProjectManager::instance().setProjectInfo(updated_project_info);
-
-    if (ProjectManager::instance().saveProject()) {
-        LUNA_EDITOR_INFO("Updated project StartScene to '{}'", relative_scene_path->generic_string());
-    } else {
-        LUNA_EDITOR_WARN("Failed to persist updated StartScene '{}'", relative_scene_path->generic_string());
-    }
 }
 
 } // namespace luna
