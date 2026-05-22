@@ -18,6 +18,8 @@ add_executable(
     Source/EditorRuntime.cpp
     Source/EditorRuntimeViewportController.h
     Source/EditorRuntimeViewportController.cpp
+    Source/EditorRuntimeSessionController.h
+    Source/EditorRuntimeSessionController.cpp
     Source/EditorStateLifecycleController.h
     Source/EditorStateLifecycleController.cpp
     Source/EditorStyle.h

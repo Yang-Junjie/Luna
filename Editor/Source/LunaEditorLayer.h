@@ -4,6 +4,7 @@
 #include "Authoring/EditorAuthoringController.h"
 #include "Authoring/EditorSceneFileController.h"
 #include "EditorDocumentHost.h"
+#include "EditorRuntimeSessionController.h"
 #include "EditorRuntimeViewportController.h"
 #include "EditorStateLifecycleController.h"
 #include "EditorApi/EditorRenderingService.h"
@@ -208,6 +209,7 @@ private:
     EditorCamera m_editor_camera;
     EditorAuthoringController m_authoring;
     EditorSceneFileController m_scene_files;
+    EditorRuntimeSessionController m_runtime_session;
     EditorRuntimeViewportController m_runtime_viewport;
     EditorStateLifecycleController m_lifecycle;
     EditorProjectSessionController m_project_session;

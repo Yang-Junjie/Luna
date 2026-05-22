@@ -15,7 +15,6 @@
 #include "Project/ProjectInfo.h"
 #include "Scene/Components.h"
 #include "Renderer/RenderWorld/RenderWorldExtractor.h"
-#include "Script/ScriptPluginManager.h"
 #include "Shell/EditorPluginManager.h"
 #include "Shell/EditorShell.h"
 
@@ -874,28 +873,17 @@ void LunaEditorLayer::resetEditorState()
 
 void LunaEditorLayer::setRuntimeViewportEnabled(bool enabled)
 {
-    if (enabled == m_runtime_viewport.isRuntimeViewportEnabled()) {
-        return;
-    }
-
-    m_gizmo.commitActiveTransformTransaction(m_authoring);
-
-    std::unique_ptr<IScriptRuntime> script_runtime;
-    if (enabled) {
-        script_runtime = ScriptPluginManager::instance().createRuntimeForProject(m_project_session.projectInfo());
-    }
-
-    const bool changed = m_runtime_viewport.setRuntimeViewportEnabled(enabled,
-                                                                      m_authoring.scene(),
-                                                                      std::move(script_runtime));
-    if (!enabled) {
-        m_lifecycle.resetRuntimeViewportState(m_runtime_viewport, m_viewports);
-    }
-    if (changed && m_runtime_viewport.isRuntimeViewportEnabled()) {
-        m_editor_camera.releaseMouseCapture();
-        m_editor_camera.setInputEnabled(false);
-    }
-    syncEditorGridFeatureState();
+    (void) m_runtime_session.setRuntimeViewportEnabled(enabled,
+                                                       m_runtime_viewport,
+                                                       m_authoring,
+                                                       m_project_session,
+                                                       m_viewports,
+                                                       m_gizmo,
+                                                       m_lifecycle,
+                                                       m_editor_camera,
+                                                       m_application != nullptr ? &m_application->getRenderer()
+                                                                                : nullptr,
+                                                       m_show_editor_grid);
 }
 
 Scene& LunaEditorLayer::activeRenderScene()

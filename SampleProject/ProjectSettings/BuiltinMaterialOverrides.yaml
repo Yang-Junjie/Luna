@@ -2,8 +2,8 @@ BuiltinMaterialOverrides:
   2001:
     BaseColorFactor: [1, 1, 1, 1]
     EmissiveFactor: [0, 0, 0]
-    MetallicFactor: 0
-    RoughnessFactor: 1
+    MetallicFactor: 0.451
+    RoughnessFactor: 0.884
     AlphaCutoff: 0.5
     Unlit: false
   2002:
