@@ -1,6 +1,5 @@
-#include "EditorRuntimeViewportController.h"
-
 #include "Core/Log.h"
+#include "EditorRuntimeViewportController.h"
 #include "Scene/Components/ScriptComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
@@ -129,7 +128,8 @@ bool EditorRuntimeViewportController::beginRuntimeViewport(const Scene& authorin
     }
 
     m_runtime_scene = std::make_unique<Scene>();
-    if (!SceneSerializer::deserializeFromString(*m_runtime_scene, runtime_scene_snapshot, "runtime viewport snapshot")) {
+    if (!SceneSerializer::deserializeFromString(
+            *m_runtime_scene, runtime_scene_snapshot, "runtime viewport snapshot")) {
         LUNA_EDITOR_WARN("Failed to create runtime scene snapshot for runtime viewport");
         m_runtime_scene.reset();
         m_runtime_viewport_enabled = false;

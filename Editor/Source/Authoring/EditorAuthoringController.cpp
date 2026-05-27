@@ -1,5 +1,4 @@
 #include "Authoring/EditorAuthoringController.h"
-
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
 
@@ -434,8 +433,8 @@ void EditorAuthoringController::updateAssetLabel()
     m_asset_label = makeAssetLabel(m_runtime);
 }
 
-std::filesystem::path EditorAuthoringController::relativeScenePathToProject(
-    const std::filesystem::path& scene_file_path)
+std::filesystem::path
+    EditorAuthoringController::relativeScenePathToProject(const std::filesystem::path& scene_file_path)
 {
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     if (!project_root || scene_file_path.empty()) {

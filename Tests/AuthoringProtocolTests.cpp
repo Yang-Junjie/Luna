@@ -4,8 +4,6 @@
 #include "Authoring/AuthoringPlanJson.h"
 #include "Authoring/AuthoringProtocol.h"
 
-#include <yaml-cpp/yaml.h>
-
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -15,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <yaml-cpp/yaml.h>
 
 namespace {
 
@@ -137,8 +136,7 @@ void testCommandTokenParseErrors(TestContext& context)
                        "token parse diagnostic should use parse phase");
         context.expect(diagnostics.front().has_command_index && diagnostics.front().command_index == 0,
                        "token parse diagnostic should include command index");
-        context.expect(diagnostics.front().command == "verify",
-                       "token parse diagnostic should include command name");
+        context.expect(diagnostics.front().command == "verify", "token parse diagnostic should include command name");
         context.expect(diagnostics.front().recoverable, "token parse diagnostic should be recoverable");
     }
 }
@@ -471,14 +469,11 @@ void testAuthoringPlanJsonRoundTrip(TestContext& context)
                    "authoring plan JSON should preserve save path");
     context.expect(parsed_plan.commands[3].alias == "Root" && parsed_plan.commands[3].name == "Root Entity",
                    "authoring plan JSON should preserve entity command");
-    context.expect(parsed_plan.commands[4].alias == "MainCamera",
-                   "authoring plan JSON should preserve camera alias");
+    context.expect(parsed_plan.commands[4].alias == "MainCamera", "authoring plan JSON should preserve camera alias");
     context.expect(parsed_plan.commands[5].alias == "Sun",
                    "authoring plan JSON should preserve directional light alias");
-    context.expect(parsed_plan.commands[6].alias == "Lamp",
-                   "authoring plan JSON should preserve point light alias");
-    context.expect(parsed_plan.commands[7].alias == "Spot",
-                   "authoring plan JSON should preserve spot light alias");
+    context.expect(parsed_plan.commands[6].alias == "Lamp", "authoring plan JSON should preserve point light alias");
+    context.expect(parsed_plan.commands[7].alias == "Spot", "authoring plan JSON should preserve spot light alias");
     context.expect(parsed_plan.commands[8].alias == "Box" && parsed_plan.commands[8].mesh == "Cube",
                    "authoring plan JSON should preserve primitive command");
     context.expect(parsed_plan.commands[9].child.value == "Box" && parsed_plan.commands[9].parent.value == "Root",
@@ -498,14 +493,11 @@ void testAuthoringPlanJsonRoundTrip(TestContext& context)
                        sameVec3(parsed_plan.commands[14].color, {0.5f, 0.25f, 0.75f}),
                    "authoring plan JSON should preserve light color command");
     context.expect(parsed_plan.commands[15].entity.value == "MainCamera" &&
-                       parsed_plan.commands[15].fov_degrees == 60.0f &&
-                       parsed_plan.commands[15].near_plane == 0.125f &&
+                       parsed_plan.commands[15].fov_degrees == 60.0f && parsed_plan.commands[15].near_plane == 0.125f &&
                        parsed_plan.commands[15].far_plane == 1024.0f,
                    "authoring plan JSON should preserve camera perspective command");
-    context.expect(parsed_plan.commands[16].entity.value == "MainCamera" &&
-                       parsed_plan.commands[16].size == 12.0f &&
-                       parsed_plan.commands[16].near_plane == 0.25f &&
-                       parsed_plan.commands[16].far_plane == 512.0f,
+    context.expect(parsed_plan.commands[16].entity.value == "MainCamera" && parsed_plan.commands[16].size == 12.0f &&
+                       parsed_plan.commands[16].near_plane == 0.25f && parsed_plan.commands[16].far_plane == 512.0f,
                    "authoring plan JSON should preserve camera orthographic command");
     context.expect(parsed_plan.commands[18].entity.value == "Box",
                    "authoring plan JSON should preserve inspect entity command");
@@ -513,8 +505,7 @@ void testAuthoringPlanJsonRoundTrip(TestContext& context)
                    "authoring plan JSON should preserve verify entity command");
     context.expect(parsed_plan.commands[22].entity.value == "Box" && parsed_plan.commands[22].component == "Mesh",
                    "authoring plan JSON should preserve verify component command");
-    context.expect(parsed_plan.commands[23].count == 5,
-                   "authoring plan JSON should preserve verify count command");
+    context.expect(parsed_plan.commands[23].count == 5, "authoring plan JSON should preserve verify count command");
     context.expect(parsed_plan.commands[24].kind == AuthoringCommandKind::Snapshot,
                    "authoring plan JSON should preserve snapshot command");
 }
@@ -685,8 +676,7 @@ void expectAuthoringPlanJsonFailure(TestContext& context,
                        "invalid authoring plan JSON should report stable field");
         context.expect(diagnostics.front().has_command_index && diagnostics.front().command_index == 0,
                        "invalid authoring plan JSON should include command index");
-        context.expect(diagnostics.front().recoverable,
-                       "invalid authoring plan JSON diagnostic should be recoverable");
+        context.expect(diagnostics.front().recoverable, "invalid authoring plan JSON diagnostic should be recoverable");
     }
 }
 
@@ -706,12 +696,13 @@ void testAuthoringPlanJsonParseDiagnostics(TestContext& context)
                                    "commands[0].translation",
                                    "missing authoring plan vec3 field should fail");
 
-    expectAuthoringPlanJsonFailure(context,
-                                   R"({ "commands": [ { "op": "light-intensity", "entity": "Sun", "value": "bright" } ] })",
-                                   luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
-                                   luna::authoring::AuthoringDiagnosticPhase::Validate,
-                                   "commands[0].value",
-                                   "invalid authoring plan number should fail");
+    expectAuthoringPlanJsonFailure(
+        context,
+        R"({ "commands": [ { "op": "light-intensity", "entity": "Sun", "value": "bright" } ] })",
+        luna::authoring::AuthoringDiagnosticCode::InvalidNumber,
+        luna::authoring::AuthoringDiagnosticPhase::Validate,
+        "commands[0].value",
+        "invalid authoring plan number should fail");
 
     expectAuthoringPlanJsonFailure(context,
                                    R"({ "commands": [ { "op": "verify", "check": "selected" } ] })",
@@ -757,14 +748,13 @@ void testAuthoringCapabilities(TestContext& context)
     for (const luna::authoring::AuthoringCapability& capability : capabilities) {
         if (capability.op == "primitive") {
             has_primitive = true;
-            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
-                                                                      luna::authoring::AuthoringCommandEffect::MutatesScene),
+            context.expect(luna::authoring::hasAuthoringCommandEffect(
+                               capability.effects, luna::authoring::AuthoringCommandEffect::MutatesScene),
                            "primitive capability should declare scene mutation");
             bool has_mesh_enum = false;
             for (const luna::authoring::AuthoringCapabilityParameter& parameter : capability.parameters) {
                 if (parameter.name == "mesh") {
-                    has_mesh_enum = parameter.enum_values.size() == 5 &&
-                                    parameter.enum_values.front() == "Cube" &&
+                    has_mesh_enum = parameter.enum_values.size() == 5 && parameter.enum_values.front() == "Cube" &&
                                     parameter.enum_values.back() == "Cone";
                 }
             }
@@ -772,10 +762,9 @@ void testAuthoringCapabilities(TestContext& context)
         }
         if (capability.op == "save") {
             has_save = true;
-            context.expect(capability.requires_confirmation,
-                           "save capability should require confirmation");
-            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
-                                                                      luna::authoring::AuthoringCommandEffect::WritesFileSystem),
+            context.expect(capability.requires_confirmation, "save capability should require confirmation");
+            context.expect(luna::authoring::hasAuthoringCommandEffect(
+                               capability.effects, luna::authoring::AuthoringCommandEffect::WritesFileSystem),
                            "save capability should declare filesystem write");
         }
         if (capability.op == "verify") {
@@ -783,19 +772,18 @@ void testAuthoringCapabilities(TestContext& context)
             bool has_check_enum = false;
             for (const luna::authoring::AuthoringCapabilityParameter& parameter : capability.parameters) {
                 if (parameter.name == "check") {
-                    has_check_enum = parameter.enum_values.size() == 4 &&
-                                     parameter.enum_values.front() == "sceneSaved";
+                    has_check_enum = parameter.enum_values.size() == 4 && parameter.enum_values.front() == "sceneSaved";
                 }
             }
             context.expect(has_check_enum, "verify capability should expose check enum");
         }
         if (capability.op == "snapshot") {
             has_snapshot = true;
-            context.expect(luna::authoring::hasAuthoringCommandEffect(capability.effects,
-                                                                      luna::authoring::AuthoringCommandEffect::ReadsScene),
+            context.expect(luna::authoring::hasAuthoringCommandEffect(
+                               capability.effects, luna::authoring::AuthoringCommandEffect::ReadsScene),
                            "snapshot capability should declare scene read");
-            context.expect(!luna::authoring::hasAuthoringCommandEffect(capability.effects,
-                                                                       luna::authoring::AuthoringCommandEffect::MutatesScene),
+            context.expect(!luna::authoring::hasAuthoringCommandEffect(
+                               capability.effects, luna::authoring::AuthoringCommandEffect::MutatesScene),
                            "snapshot capability should not declare scene mutation");
         }
     }
@@ -829,11 +817,11 @@ void testAuthoringCapabilitiesJson(TestContext& context)
         if (capability["op"].get<std::string>() == "primitive") {
             found_primitive = true;
             context.expect(capability["parameters"]["mesh"]["enum"].is_array() &&
-                                capability["parameters"]["mesh"]["enum"].size() == 5,
-                            "primitive capability JSON should include mesh enum");
+                               capability["parameters"]["mesh"]["enum"].size() == 5,
+                           "primitive capability JSON should include mesh enum");
             context.expect(capability["effects"].is_array() && capability["effects"].size() == 1 &&
-                                capability["effects"][0].get<std::string>() == "mutatesScene",
-                            "primitive capability JSON should include effects");
+                               capability["effects"][0].get<std::string>() == "mutatesScene",
+                           "primitive capability JSON should include effects");
         }
     }
     context.expect(found_primitive, "capabilities JSON should include primitive capability");
@@ -845,7 +833,8 @@ void testAuthoringProtocolDiscoveryContract(TestContext& context)
     try {
         plan_schema = YAML::LoadFile(authoringSchemaPath("authoring-plan.schema.json").string());
     } catch (const YAML::Exception& error) {
-        context.expect(false, std::string("authoring plan schema should parse for discovery contract: ") + error.what());
+        context.expect(false,
+                       std::string("authoring plan schema should parse for discovery contract: ") + error.what());
         return;
     }
 
@@ -857,8 +846,7 @@ void testAuthoringProtocolDiscoveryContract(TestContext& context)
 
     context.expect(command_names.size() == 21,
                    "unique C++ authoring command names should match current protocol op count");
-    context.expect(schema_ops == command_names,
-                   "plan schema command ops should match C++ authoring command names");
+    context.expect(schema_ops == command_names, "plan schema command ops should match C++ authoring command names");
     context.expect(discovered_ops == command_names,
                    "default capabilities should expose every C++ authoring command op");
 
@@ -953,10 +941,8 @@ void testAuthoringHostWireContract(TestContext& context)
     context.expect(wire_schema["properties"]["rpcVersion"]["const"].as<std::string>() == "2.0",
                    "host wire schema should declare JSON-RPC 2.0");
     context.expect(schema_methods.size() == 13, "host wire schema should list the current method count");
-    context.expect(schema_methods == manifest_methods,
-                   "host wire schema method names should match the C++ manifest");
-    context.expect(schema_method_order == expected_methods,
-                   "host wire schema should preserve a stable method order");
+    context.expect(schema_methods == manifest_methods, "host wire schema method names should match the C++ manifest");
+    context.expect(schema_method_order == expected_methods, "host wire schema should preserve a stable method order");
     context.expect(manifest["protocol"]["name"].get<std::string>() == "luna.authoring.host",
                    "host wire manifest should declare the host protocol name");
     context.expect(manifest["protocol"]["version"].get<uint32_t>() == 1,
@@ -1022,14 +1008,11 @@ void testAuthoringPlanJsonFixtures(TestContext& context)
         std::vector<std::string> reparse_errors;
         std::vector<luna::authoring::AuthoringDiagnostic> reparse_diagnostics;
         std::istringstream input(stream.str());
-        context.expect(luna::authoring::loadAuthoringPlanJson(input,
-                                                              reparsed_plan,
-                                                              reparse_errors,
-                                                              &reparse_diagnostics),
-                       "valid authoring fixture should round-trip through the shared writer");
+        context.expect(
+            luna::authoring::loadAuthoringPlanJson(input, reparsed_plan, reparse_errors, &reparse_diagnostics),
+            "valid authoring fixture should round-trip through the shared writer");
         context.expect(reparse_errors.empty(), "round-tripped authoring fixture should not report errors");
-        context.expect(reparse_diagnostics.empty(),
-                       "round-tripped authoring fixture should not report diagnostics");
+        context.expect(reparse_diagnostics.empty(), "round-tripped authoring fixture should not report diagnostics");
         context.expect(reparsed_plan.commands.size() == plan.commands.size(),
                        "round-tripped authoring fixture should preserve command count");
     }
@@ -1130,8 +1113,7 @@ void testAuthoringReportJson(TestContext& context)
     context.expect(root["protocol"]["version"].get<uint32_t>() == luna::authoring::kAuthoringProtocolVersion,
                    "report JSON should include protocol version");
     context.expect(!root["ok"].get<bool>(), "report JSON should include ok flag");
-    context.expect(root["scene"]["entityCount"].get<size_t>() == 3,
-                   "report JSON should include scene entity count");
+    context.expect(root["scene"]["entityCount"].get<size_t>() == 3, "report JSON should include scene entity count");
     context.expect(root["entities"].is_array() && root["entities"].size() == 1,
                    "report JSON should include entity bindings");
     context.expect(root["verifications"].is_array() && root["verifications"].size() == 1,
@@ -1142,12 +1124,9 @@ void testAuthoringReportJson(TestContext& context)
         const auto diagnostic = root["diagnostics"][0];
         context.expect(diagnostic["code"].get<std::string>() == "MissingComponent",
                        "diagnostic JSON should include stable code");
-        context.expect(diagnostic["phase"].get<std::string>() == "execute",
-                       "diagnostic JSON should include phase");
-        context.expect(diagnostic["severity"].get<std::string>() == "error",
-                       "diagnostic JSON should include severity");
-        context.expect(diagnostic["commandIndex"].get<size_t>() == 2,
-                       "diagnostic JSON should include command index");
+        context.expect(diagnostic["phase"].get<std::string>() == "execute", "diagnostic JSON should include phase");
+        context.expect(diagnostic["severity"].get<std::string>() == "error", "diagnostic JSON should include severity");
+        context.expect(diagnostic["commandIndex"].get<size_t>() == 2, "diagnostic JSON should include command index");
         context.expect(diagnostic["entityRef"].get<std::string>() == "Box",
                        "diagnostic JSON should include entity ref");
         context.expect(diagnostic["component"].get<std::string>() == "Transform",

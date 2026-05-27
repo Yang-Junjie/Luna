@@ -1,10 +1,9 @@
+#include "Renderer/Camera.h"
 #include "Renderer/Visibility/Frustum.h"
 
-#include "Renderer/Camera.h"
-
-#include <algorithm>
 #include <cmath>
 
+#include <algorithm>
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 #include <glm/vec4.hpp>

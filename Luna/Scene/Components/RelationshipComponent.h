@@ -12,6 +12,7 @@ struct RelationshipComponent {
 
     RelationshipComponent() = default;
     RelationshipComponent(const RelationshipComponent&) = default;
+
     explicit RelationshipComponent(UUID parent)
         : parentHandle(parent)
     {}

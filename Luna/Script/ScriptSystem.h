@@ -4,6 +4,7 @@
 #include "Core/UUID.h"
 
 #include <cstddef>
+
 #include <memory>
 
 namespace luna {
@@ -26,11 +27,8 @@ public:
     void onRuntimeStart(Scene& scene);
     void onRuntimeStop(Scene& scene);
     void onUpdate(Scene& scene, Timestep timestep);
-    void setScriptProperty(Scene& scene,
-                           UUID entity_id,
-                           UUID script_id,
-                           const ScriptProperty& property,
-                           size_t property_index);
+    void setScriptProperty(
+        Scene& scene, UUID entity_id, UUID script_id, const ScriptProperty& property, size_t property_index);
 
 private:
     std::unique_ptr<IScriptRuntime> m_runtime;

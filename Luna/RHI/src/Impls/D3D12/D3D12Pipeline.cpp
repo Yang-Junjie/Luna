@@ -152,14 +152,14 @@ D3D12_PRIMITIVE_TOPOLOGY ToD3D12PrimitiveTopology(const luna::RHI::InputAssembly
         case PrimitiveTopology::TriangleStrip:
             return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
         case PrimitiveTopology::PatchList:
-            return static_cast<D3D12_PRIMITIVE_TOPOLOGY>(
-                D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST + input_assembly.PatchControlPoints - 1);
+            return static_cast<D3D12_PRIMITIVE_TOPOLOGY>(D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST +
+                                                         input_assembly.PatchControlPoints - 1);
         case PrimitiveTopology::TriangleFan:
         default:
             return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     }
 }
-}
+} // namespace
 
 namespace luna::RHI {
 D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const GraphicsPipelineCreateInfo& info)
@@ -324,7 +324,8 @@ D3D12GraphicsPipeline::D3D12GraphicsPipeline(const Ref<Device>& device, const Gr
                         continue;
                     }
 
-                    if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) && message->pDescription != nullptr) {
+                    if (SUCCEEDED(infoQueue->GetMessage(i, message, &messageSize)) &&
+                        message->pDescription != nullptr) {
                         error << (appendedMessage ? " | " : " [");
                         error << message->pDescription;
                         appendedMessage = true;

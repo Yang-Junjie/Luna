@@ -1,11 +1,9 @@
-#include "UI/EditorMainMenuController.h"
-
 #include "Platform/Common/FileDialogs.h"
 #include "Project/EditorProjectSessionController.h"
 #include "Shell/EditorShell.h"
+#include "UI/EditorMainMenuController.h"
 
 #include <imgui.h>
-
 #include <string_view>
 
 namespace {
@@ -35,9 +33,9 @@ void EditorMainMenuController::drawDockSpace(EditorProjectSessionController& pro
     ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoTitleBar |
-                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                                    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_MenuBar;
+                                    ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                                    ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
+                                    ImGuiWindowFlags_MenuBar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);

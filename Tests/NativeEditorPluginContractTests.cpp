@@ -1,15 +1,16 @@
 #include "Core/Log.h"
-#include "EditorEnginePaths.h"
 #include "EditorApi/EditorNativePluginApi.h"
+#include "EditorEnginePaths.h"
 #include "Platform/Common/DynamicLibrary.h"
 #include "Shell/EditorPluginDependencyResolver.h"
 #include "Shell/EditorPluginManager.h"
 #include "Shell/EditorPluginManifest.h"
 
+#include <cstring>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -428,7 +429,7 @@ struct TestNativeHost {
     uint64_t selected_entity_id{0};
     uint64_t next_entity_id{100};
     LunaEditorTextureView scene_texture_view{
-        .texture_id = 0x1234u,
+        .texture_id = 0x12'34u,
         .width = 960u,
         .height = 540u,
         .y_flip = 0,
@@ -671,11 +672,8 @@ private:
         return describeAsset(api_user_data, handle, out_info);
     }
 
-    static size_t listAssets(void* api_user_data,
-                             uint32_t,
-                             int,
-                             void* user_data,
-                             LunaEditorEnumerateAssetFn enumerate_fn)
+    static size_t
+        listAssets(void* api_user_data, uint32_t, int, void* user_data, LunaEditorEnumerateAssetFn enumerate_fn)
     {
         TestNativeHost* host = self(api_user_data);
         if (host == nullptr) {
@@ -875,9 +873,8 @@ private:
         copyToBuffer(out_info->start_scene, out_info->start_scene_size, "Assets/Fake.lunascene");
         copyToBuffer(out_info->assets_path, out_info->assets_path_size, "Assets");
         copyToBuffer(out_info->selected_script_plugin_id, out_info->selected_script_plugin_id_size, "luna.test.script");
-        copyToBuffer(out_info->selected_script_backend_name,
-                     out_info->selected_script_backend_name_size,
-                     "ContractScript");
+        copyToBuffer(
+            out_info->selected_script_backend_name, out_info->selected_script_backend_name_size, "ContractScript");
         return 1;
     }
 
@@ -903,7 +900,8 @@ private:
         return 0u;
     }
 
-    static bool fillSceneEntityInfo(TestNativeHost& host, const SceneEntityRecord& entity, LunaEditorSceneEntityInfo* out_info)
+    static bool
+        fillSceneEntityInfo(TestNativeHost& host, const SceneEntityRecord& entity, LunaEditorSceneEntityInfo* out_info)
     {
         if (out_info == nullptr || out_info->struct_size < sizeof(LunaEditorSceneEntityInfo) ||
             out_info->api_version != LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION) {
@@ -990,12 +988,12 @@ private:
         }
 
         const uint64_t entity_id = host->next_entity_id++;
-        host->entities.emplace(entity_id,
-                               SceneEntityRecord{
-                                   .id = entity_id,
-                                   .name = name != nullptr && name[0] != '\0' ? std::string(name)
-                                                                              : std::string("Entity"),
-                               });
+        host->entities.emplace(
+            entity_id,
+            SceneEntityRecord{
+                .id = entity_id,
+                .name = name != nullptr && name[0] != '\0' ? std::string(name) : std::string("Entity"),
+            });
         ++host->created_entity_count;
         return entity_id;
     }
@@ -1045,10 +1043,12 @@ private:
         return 1;
     }
 
-    static int getCameraComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneCameraComponent* out_component)
+    static int
+        getCameraComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneCameraComponent* out_component)
     {
         TestNativeHost* host = self(api_user_data);
-        if (host == nullptr || out_component == nullptr || out_component->struct_size < sizeof(LunaEditorSceneCameraComponent) ||
+        if (host == nullptr || out_component == nullptr ||
+            out_component->struct_size < sizeof(LunaEditorSceneCameraComponent) ||
             out_component->api_version != LUNA_EDITOR_SCENE_CAMERA_COMPONENT_API_VERSION) {
             return 0;
         }
@@ -1064,9 +1064,8 @@ private:
         return 1;
     }
 
-    static int setCameraComponent(void* api_user_data,
-                                  uint64_t entity_id,
-                                  const LunaEditorSceneCameraComponent* component)
+    static int
+        setCameraComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneCameraComponent* component)
     {
         TestNativeHost* host = self(api_user_data);
         if (host == nullptr || component == nullptr) {
@@ -1089,7 +1088,8 @@ private:
     static int getLightComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneLightComponent* out_component)
     {
         TestNativeHost* host = self(api_user_data);
-        if (host == nullptr || out_component == nullptr || out_component->struct_size < sizeof(LunaEditorSceneLightComponent) ||
+        if (host == nullptr || out_component == nullptr ||
+            out_component->struct_size < sizeof(LunaEditorSceneLightComponent) ||
             out_component->api_version != LUNA_EDITOR_SCENE_LIGHT_COMPONENT_API_VERSION) {
             return 0;
         }
@@ -1105,9 +1105,8 @@ private:
         return 1;
     }
 
-    static int setLightComponent(void* api_user_data,
-                                 uint64_t entity_id,
-                                 const LunaEditorSceneLightComponent* component)
+    static int
+        setLightComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneLightComponent* component)
     {
         TestNativeHost* host = self(api_user_data);
         if (host == nullptr || component == nullptr) {
@@ -1130,7 +1129,8 @@ private:
     static int getMeshComponent(void* api_user_data, uint64_t entity_id, LunaEditorSceneMeshComponent* out_component)
     {
         TestNativeHost* host = self(api_user_data);
-        if (host == nullptr || out_component == nullptr || out_component->struct_size < sizeof(LunaEditorSceneMeshComponent) ||
+        if (host == nullptr || out_component == nullptr ||
+            out_component->struct_size < sizeof(LunaEditorSceneMeshComponent) ||
             out_component->api_version != LUNA_EDITOR_SCENE_MESH_COMPONENT_API_VERSION) {
             return 0;
         }
@@ -1159,9 +1159,7 @@ private:
         return copy_count == it->second.mesh_submesh_material_handles.size() ? 1 : 0;
     }
 
-    static int setMeshComponent(void* api_user_data,
-                                uint64_t entity_id,
-                                const LunaEditorSceneMeshComponent* component)
+    static int setMeshComponent(void* api_user_data, uint64_t entity_id, const LunaEditorSceneMeshComponent* component)
     {
         TestNativeHost* host = self(api_user_data);
         if (host == nullptr || component == nullptr) {
@@ -1535,8 +1533,7 @@ void testSuccessfulNativePluginLoad(TestContext& context)
     context.expect(result.host->pick_debug_visualization_enabled,
                    "native plugin should be able to enable pick debug visualization");
     context.expect(!result.host->editor_grid_enabled, "native plugin should be able to disable editor grid");
-    context.expect(result.host->runtime_viewport_requested,
-                   "native plugin should be able to request runtime viewport");
+    context.expect(result.host->runtime_viewport_requested, "native plugin should be able to request runtime viewport");
     context.expect(result.host->runtime_entity_count_value == 17u,
                    "native plugin should read runtime entity count through host API");
 
@@ -1576,8 +1573,7 @@ void testSuccessfulNativePluginLoad(TestContext& context)
     light.api_version = LUNA_EDITOR_SCENE_LIGHT_COMPONENT_API_VERSION;
     context.expect(result.host->api.scene.get_light_component(result.host->api.scene.api_user_data, 1u, &light) == 1,
                    "native host should return light component");
-    context.expect(light.enabled == 1 && light.intensity == 3.0f,
-                   "light component should round-trip through host API");
+    context.expect(light.enabled == 1 && light.intensity == 3.0f, "light component should round-trip through host API");
 
     uint64_t mesh_materials[4]{};
     LunaEditorSceneMeshComponent mesh{};
@@ -1601,8 +1597,7 @@ void testSuccessfulNativePluginLoad(TestContext& context)
                    "registered native command should execute through host API");
     context.expect(result.host->api.windows.is_window_open(result.host->api.windows.api_user_data, kWindowId) == 1,
                    "native command should open registered window");
-    context.expect(result.host->created_entity_count == 1,
-                   "native command should create an entity through scene API");
+    context.expect(result.host->created_entity_count == 1, "native command should create an entity through scene API");
     context.expect(result.host->selected_entity_id == 100u,
                    "native command should select created entity through selection API");
     context.expect(result.host->api.commands.is_command_checked(result.host->api.commands.api_user_data, kCommandId) ==
@@ -1629,7 +1624,8 @@ void testSuccessfulNativePluginLoad(TestContext& context)
     context.expect(result.host->commands.empty(), "native plugin unload should clean command contributions");
     context.expect(result.host->windows.empty(), "native plugin unload should clean window contributions");
     context.expect(result.host->menus.empty(), "native plugin unload should clean menu contributions");
-    context.expect(result.host->scene_viewport_owners.empty(), "native plugin unload should clean viewport contributions");
+    context.expect(result.host->scene_viewport_owners.empty(),
+                   "native plugin unload should clean viewport contributions");
 }
 
 void testNativePluginViewportOwnerCleanup(TestContext& context)
@@ -1755,8 +1751,7 @@ void testEditorEnginePathParsingContract(TestContext& context)
     }
 
     const std::string list_value =
-        std::string("One") + luna::editor::editorPathListSeparator() + "Two" +
-        luna::editor::editorPathListSeparator();
+        std::string("One") + luna::editor::editorPathListSeparator() + "Two" + luna::editor::editorPathListSeparator();
     const std::vector<std::filesystem::path> split_paths = luna::editor::splitEditorPathList(list_value);
     context.expect(split_paths.size() == 2u, "editor plugin path list should skip empty entries");
     if (split_paths.size() == 2u) {
@@ -1773,12 +1768,8 @@ void testEditorPluginPackageRootContract(TestContext& context)
     const std::filesystem::path dev_root = temp.path() / "DevPlugins";
     const std::filesystem::path good_entry = testPluginBinaryPath("LunaTestEditorPluginGood");
 
-    writeEditorPluginManifest(installed_root,
-                              "InstalledNative",
-                              "luna.test.installed-native",
-                              "Installed Native",
-                              good_entry,
-                              {});
+    writeEditorPluginManifest(
+        installed_root, "InstalledNative", "luna.test.installed-native", "Installed Native", good_entry, {});
     writeEditorPluginManifest(dev_root, "DevNative", "luna.test.dev-native", "Dev Native", good_entry, {});
 
     writeEditorPluginManifest(dev_root,
@@ -1799,8 +1790,7 @@ void testEditorPluginPackageRootContract(TestContext& context)
     const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
     const luna::editor::EditorPluginPackage* installed_package = findPackage(packages, "luna.test.installed-native");
     const luna::editor::EditorPluginPackage* development_package = findPackage(packages, "luna.test.dev-native");
-    const luna::editor::EditorPluginPackage* diagnostic_package =
-        findPackage(packages, "luna.test.diagnostic-native");
+    const luna::editor::EditorPluginPackage* diagnostic_package = findPackage(packages, "luna.test.diagnostic-native");
     context.expect(installed_package != nullptr, "installed editor plugin root should contribute packages");
     context.expect(development_package != nullptr, "development editor plugin root should contribute packages");
     context.expect(diagnostic_package != nullptr, "development diagnostics editor plugin should contribute packages");
@@ -1827,18 +1817,10 @@ void testEditorStartupDiscoveryPathContract(TestContext& context)
     const std::filesystem::path dev_direct_root = temp.path() / "DirectNative";
     const std::filesystem::path good_entry = testPluginBinaryPath("LunaTestEditorPluginGood");
 
-    writeEditorPluginManifest(installed_root,
-                              "InstalledNative",
-                              "luna.test.startup-installed",
-                              "Startup Installed Native",
-                              good_entry,
-                              {});
-    writeEditorPluginManifest(dev_parent_root,
-                              "DevNative",
-                              "luna.test.startup-dev-parent",
-                              "Startup Dev Parent Native",
-                              good_entry,
-                              {});
+    writeEditorPluginManifest(
+        installed_root, "InstalledNative", "luna.test.startup-installed", "Startup Installed Native", good_entry, {});
+    writeEditorPluginManifest(
+        dev_parent_root, "DevNative", "luna.test.startup-dev-parent", "Startup Dev Parent Native", good_entry, {});
     writeEditorPluginManifest(dev_direct_root.parent_path(),
                               dev_direct_root.filename().generic_string(),
                               "luna.test.startup-dev-direct",
@@ -1872,15 +1854,11 @@ void testEditorStartupDiscoveryPathContract(TestContext& context)
                    "startup paths should include CLI direct development plugin package root");
 
     const std::vector<luna::editor::EditorPluginPackage> packages = luna::editor::createEditorPluginPackages(paths);
-    const luna::editor::EditorPluginPackage* installed_package =
-        findPackage(packages, "luna.test.startup-installed");
-    const luna::editor::EditorPluginPackage* dev_parent_package =
-        findPackage(packages, "luna.test.startup-dev-parent");
-    const luna::editor::EditorPluginPackage* dev_direct_package =
-        findPackage(packages, "luna.test.startup-dev-direct");
+    const luna::editor::EditorPluginPackage* installed_package = findPackage(packages, "luna.test.startup-installed");
+    const luna::editor::EditorPluginPackage* dev_parent_package = findPackage(packages, "luna.test.startup-dev-parent");
+    const luna::editor::EditorPluginPackage* dev_direct_package = findPackage(packages, "luna.test.startup-dev-direct");
 
-    context.expect(installed_package != nullptr,
-                   "startup package discovery should find installed engine data plugins");
+    context.expect(installed_package != nullptr, "startup package discovery should find installed engine data plugins");
     context.expect(dev_parent_package != nullptr,
                    "startup package discovery should find plugins under a development parent root");
     context.expect(dev_direct_package != nullptr,

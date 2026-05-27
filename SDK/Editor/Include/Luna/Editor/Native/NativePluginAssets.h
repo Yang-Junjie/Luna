@@ -12,10 +12,10 @@ namespace luna::editor::native {
 class PluginAssets final {
 public:
     constexpr PluginAssets() noexcept = default;
+
     explicit constexpr PluginAssets(const LunaEditorPluginAssetApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -56,7 +56,7 @@ public:
             return {};
         }
 
-        std::array<char, 1024> buffer{};
+        std::array<char, 1'024> buffer{};
         if (api_->resolve_path(api_->api_user_data, relative_asset_path, buffer.data(), buffer.size()) == 0) {
             return {};
         }
@@ -75,11 +75,8 @@ public:
                                 size_t* out_required_size = nullptr) const noexcept
     {
         return api_ != nullptr && api_->read_text != nullptr &&
-               api_->read_text(api_->api_user_data,
-                               relative_asset_path,
-                               out_text,
-                               out_text_size,
-                               out_required_size) != 0;
+               api_->read_text(api_->api_user_data, relative_asset_path, out_text, out_text_size, out_required_size) !=
+                   0;
     }
 
     [[nodiscard]] std::string readText(const char* relative_asset_path) const
@@ -108,11 +105,8 @@ public:
                                  size_t* out_required_size = nullptr) const noexcept
     {
         return api_ != nullptr && api_->read_bytes != nullptr &&
-               api_->read_bytes(api_->api_user_data,
-                                relative_asset_path,
-                                out_data,
-                                out_data_size,
-                                out_required_size) != 0;
+               api_->read_bytes(api_->api_user_data, relative_asset_path, out_data, out_data_size, out_required_size) !=
+                   0;
     }
 
     [[nodiscard]] std::vector<uint8_t> readBytes(const char* relative_asset_path) const
@@ -153,7 +147,7 @@ private:
             return {};
         }
 
-        std::array<char, 1024> buffer{};
+        std::array<char, 1'024> buffer{};
         if ((api_->*read_fn)(api_->api_user_data, buffer.data(), buffer.size()) == 0) {
             return {};
         }

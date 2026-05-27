@@ -48,9 +48,8 @@ public:
     void clearViewport(editor::ViewportId viewport_id);
     void clearOwner(std::string_view owner_id);
 
-    const ViewportInteractionState& recordSurface(editor::ViewportId viewport_id,
-                                                  std::string_view owner_id,
-                                                  const ViewportInteractionInput& input);
+    const ViewportInteractionState&
+        recordSurface(editor::ViewportId viewport_id, std::string_view owner_id, const ViewportInteractionInput& input);
 
     void setMouseCapture(editor::ViewportId viewport_id, bool captured);
 

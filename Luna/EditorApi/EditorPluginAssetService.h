@@ -3,6 +3,7 @@
 #include "EditorApi/EditorTypes.h"
 
 #include <cstdint>
+
 #include <filesystem>
 #include <optional>
 #include <string>

@@ -1,6 +1,6 @@
 #include "Core/Log.h"
-#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderGraphBuilder.h"
 
 #include <Builders.h>
 #include <Device.h>
@@ -33,8 +33,7 @@ RHI::ImageSubresourceRange fullSubresourceRangeForTexture(const RHI::Texture& te
     };
 }
 
-RHI::Ref<RHI::Texture> createTransientTexture(const RHI::Ref<RHI::Device>& device,
-                                                          const RenderGraphTextureDesc& desc)
+RHI::Ref<RHI::Texture> createTransientTexture(const RHI::Ref<RHI::Device>& device, const RenderGraphTextureDesc& desc)
 {
     if (!device || desc.Width == 0 || desc.Height == 0 || desc.Format == RHI::Format::UNDEFINED) {
         LUNA_RENDERER_WARN(
@@ -108,11 +107,10 @@ void addBarrierIfNeeded(std::vector<RHI::TextureBarrier>& barriers,
     current_states[handle.Index] = desired_state;
 }
 
-RHI::Extent2D
-    resolvePassFramebufferExtent(const detail::RenderGraphRasterPassNode& pass_node,
-                                 const std::vector<RHI::Ref<RHI::Texture>>& physical_textures,
-                                 uint32_t fallback_width,
-                                 uint32_t fallback_height)
+RHI::Extent2D resolvePassFramebufferExtent(const detail::RenderGraphRasterPassNode& pass_node,
+                                           const std::vector<RHI::Ref<RHI::Texture>>& physical_textures,
+                                           uint32_t fallback_width,
+                                           uint32_t fallback_height)
 {
     for (const auto& attachment : pass_node.ColorAttachments) {
         if (attachment.Handle.isValid() && attachment.Handle.Index < physical_textures.size()) {
@@ -144,9 +142,8 @@ void RenderGraphTransientTextureCache::BeginFrame()
     }
 }
 
-RHI::Ref<RHI::Texture>
-    RenderGraphTransientTextureCache::AcquireTexture(const RHI::Ref<RHI::Device>& device,
-                                                     const RenderGraphTextureDesc& desc)
+RHI::Ref<RHI::Texture> RenderGraphTransientTextureCache::AcquireTexture(const RHI::Ref<RHI::Device>& device,
+                                                                        const RenderGraphTextureDesc& desc)
 {
     for (auto& entry : m_entries) {
         if (!entry.InUse && IsCompatible(entry, desc) && entry.Texture) {
@@ -220,11 +217,10 @@ RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::WriteColor(RenderGra
     return *this;
 }
 
-RenderGraphRasterPassBuilder&
-    RenderGraphRasterPassBuilder::WriteDepth(RenderGraphTextureHandle handle,
-                                             RHI::AttachmentLoadOp load_op,
-                                             RHI::AttachmentStoreOp store_op,
-                                             const RHI::ClearDepthStencilValue& clear_value)
+RenderGraphRasterPassBuilder& RenderGraphRasterPassBuilder::WriteDepth(RenderGraphTextureHandle handle,
+                                                                       RHI::AttachmentLoadOp load_op,
+                                                                       RHI::AttachmentStoreOp store_op,
+                                                                       const RHI::ClearDepthStencilValue& clear_value)
 {
     if (m_pass_node != nullptr && handle.isValid()) {
         m_pass_node->DepthAttachment = detail::RenderGraphDepthAttachmentDesc{
@@ -341,8 +337,7 @@ RenderGraphTextureHandle RenderGraphBuilder::CreateTexture(RenderGraphTextureDes
     return RenderGraphTextureHandle{index};
 }
 
-RenderGraphBuilder& RenderGraphBuilder::ExportTexture(RenderGraphTextureHandle handle,
-                                                      RHI::ResourceState final_state)
+RenderGraphBuilder& RenderGraphBuilder::ExportTexture(RenderGraphTextureHandle handle, RHI::ResourceState final_state)
 {
     if (isHandleValid(handle, m_texture_nodes.size())) {
         auto& texture_node = m_texture_nodes[handle.Index];
@@ -437,10 +432,8 @@ RenderGraphBuilder& RenderGraphBuilder::AddCopyPass(const std::string& name,
         .Index = pass_index,
     });
 
-    LUNA_RENDERER_FRAME_DEBUG("Added copy render graph pass '{}' (source={} destination={})",
-                              name,
-                              source.Index,
-                              destination.Index);
+    LUNA_RENDERER_FRAME_DEBUG(
+        "Added copy render graph pass '{}' (source={} destination={})", name, source.Index, destination.Index);
     return *this;
 }
 
@@ -546,8 +539,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             }
 
             const auto& pass_node = m_copy_pass_nodes[pass_entry.Index];
-            const bool is_live = isHandleValid(pass_node.Destination, texture_count) &&
-                                 live_resources[pass_node.Destination.Index];
+            const bool is_live =
+                isHandleValid(pass_node.Destination, texture_count) && live_resources[pass_node.Destination.Index];
             if (!is_live) {
                 continue;
             }
@@ -626,8 +619,8 @@ std::unique_ptr<RenderGraph> RenderGraphBuilder::Build()
             compiled_pass.FramebufferWidth = pass_extent.width;
             compiled_pass.FramebufferHeight = pass_extent.height;
             compiled_pass.ReadTextureCount = static_cast<uint32_t>(pass_node.Reads.size());
-            compiled_pass.WriteTextureCount = static_cast<uint32_t>(
-                pass_node.ColorAttachments.size() + (pass_node.DepthAttachment.has_value() ? 1u : 0u));
+            compiled_pass.WriteTextureCount = static_cast<uint32_t>(pass_node.ColorAttachments.size() +
+                                                                    (pass_node.DepthAttachment.has_value() ? 1u : 0u));
             compiled_pass.RenderingInfo.RenderArea = {0, 0, pass_extent.width, pass_extent.height};
             compiled_pass.RenderingInfo.LayerCount = 1;
 
@@ -791,7 +784,3 @@ bool RenderGraphBuilder::isHandleValid(RenderGraphTextureHandle handle, size_t r
 }
 
 } // namespace luna
-
-
-
-

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Authoring/AuthoringJsonTypes.h"
 #include "Authoring/AuthoringHost.h"
+#include "Authoring/AuthoringJsonTypes.h"
 
 #include <string_view>
 #include <vector>

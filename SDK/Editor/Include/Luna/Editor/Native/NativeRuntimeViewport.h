@@ -7,10 +7,10 @@ namespace luna::editor::native {
 class RuntimeViewport final {
 public:
     constexpr RuntimeViewport() noexcept = default;
+
     explicit constexpr RuntimeViewport(const LunaEditorRuntimeViewportApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {

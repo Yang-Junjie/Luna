@@ -5,6 +5,7 @@
 #include "Core/UUID.h"
 
 #include <cstdint>
+
 #include <string>
 
 namespace luna::editor {

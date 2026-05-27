@@ -11,10 +11,10 @@ namespace luna::editor::native {
 class Viewport final {
 public:
     constexpr Viewport() noexcept = default;
+
     explicit constexpr Viewport(const LunaEditorViewportApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -26,10 +26,8 @@ public:
                                                 LunaEditorViewportPresentation* out_presentation) const noexcept
     {
         return api_ != nullptr && api_->sync_scene_viewport != nullptr && out_presentation != nullptr &&
-               api_->sync_scene_viewport(api_->api_user_data,
-                                         framebuffer_width,
-                                         framebuffer_height,
-                                         out_presentation) != 0;
+               api_->sync_scene_viewport(
+                   api_->api_user_data, framebuffer_width, framebuffer_height, out_presentation) != 0;
     }
 
     [[nodiscard]] bool sceneTextureView(TextureView* out_texture) const noexcept
@@ -135,11 +133,8 @@ public:
                                          LunaEditorViewportPresentation* out_presentation) const noexcept
     {
         return api_ != nullptr && api_->sync_scene_viewport_ex != nullptr && out_presentation != nullptr &&
-               api_->sync_scene_viewport_ex(api_->api_user_data,
-                                            viewport_id,
-                                            framebuffer_width,
-                                            framebuffer_height,
-                                            out_presentation) != 0;
+               api_->sync_scene_viewport_ex(
+                   api_->api_user_data, viewport_id, framebuffer_width, framebuffer_height, out_presentation) != 0;
     }
 
     [[nodiscard]] bool sceneTextureView(uint64_t viewport_id, TextureView* out_texture) const noexcept

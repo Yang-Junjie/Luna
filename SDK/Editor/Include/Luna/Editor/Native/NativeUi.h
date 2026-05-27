@@ -10,10 +10,10 @@ namespace luna::editor::native {
 class Ui final {
 public:
     constexpr Ui() noexcept = default;
+
     explicit constexpr Ui(const LunaEditorUiApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -161,8 +161,7 @@ public:
         textWrapped(value != nullptr ? value : "");
     }
 
-    void badge(const char* label,
-               LunaEditorStatusVariant variant = LunaEditorStatusVariant_Neutral) const noexcept
+    void badge(const char* label, LunaEditorStatusVariant variant = LunaEditorStatusVariant_Neutral) const noexcept
     {
         if (hasField(offsetof(LunaEditorUiApi, badge), sizeof(api_->badge)) && api_->badge != nullptr) {
             api_->badge(api_->api_user_data, label != nullptr ? label : "", variant);
@@ -255,9 +254,8 @@ public:
         if (written < 0 || static_cast<size_t>(written) >= sizeof(fallback_label)) {
             fallback_label[sizeof(fallback_label) - 1u] = '\0';
         }
-        return button(fallback_label,
-                      size.x != 0.0f || size.y != 0.0f ? size : fillWidth(),
-                      LunaEditorButtonVariant_Subtle);
+        return button(
+            fallback_label, size.x != 0.0f || size.y != 0.0f ? size : fillWidth(), LunaEditorButtonVariant_Subtle);
     }
 
     [[nodiscard]] bool button(const char* label,
@@ -280,11 +278,8 @@ public:
                api_->slider_int(api_->api_user_data, label != nullptr ? label : "", value, min_value, max_value) != 0;
     }
 
-    bool sliderFloat(const char* label,
-                     float* value,
-                     float min_value,
-                     float max_value,
-                     const char* format = "%.3f") const noexcept
+    bool sliderFloat(
+        const char* label, float* value, float min_value, float max_value, const char* format = "%.3f") const noexcept
     {
         return api_ != nullptr && api_->slider_float != nullptr &&
                api_->slider_float(api_->api_user_data,
@@ -298,12 +293,8 @@ public:
     bool dragInt(const char* label, int* value, float speed, int min_value, int max_value) const noexcept
     {
         return api_ != nullptr && api_->drag_int != nullptr &&
-               api_->drag_int(api_->api_user_data,
-                              label != nullptr ? label : "",
-                              value,
-                              speed,
-                              min_value,
-                              max_value) != 0;
+               api_->drag_int(api_->api_user_data, label != nullptr ? label : "", value, speed, min_value, max_value) !=
+                   0;
     }
 
     bool dragFloat(const char* label,
@@ -374,10 +365,12 @@ public:
                api_->tree_node(api_->api_user_data, label != nullptr ? label : "") != 0;
     }
 
-    [[nodiscard]] bool treeNodeEx(const char* id, const char* label, uint32_t flags = LunaEditorTreeNodeFlag_None) const noexcept
+    [[nodiscard]] bool
+        treeNodeEx(const char* id, const char* label, uint32_t flags = LunaEditorTreeNodeFlag_None) const noexcept
     {
         return api_ != nullptr && api_->tree_node_ex != nullptr &&
-               api_->tree_node_ex(api_->api_user_data, id != nullptr ? id : "", label != nullptr ? label : "", flags) != 0;
+               api_->tree_node_ex(api_->api_user_data, id != nullptr ? id : "", label != nullptr ? label : "", flags) !=
+                   0;
     }
 
     void treePop() const noexcept
@@ -422,8 +415,7 @@ public:
 
     [[nodiscard]] bool isItemHovered() const noexcept
     {
-        return api_ != nullptr && api_->is_item_hovered != nullptr &&
-               api_->is_item_hovered(api_->api_user_data) != 0;
+        return api_ != nullptr && api_->is_item_hovered != nullptr && api_->is_item_hovered(api_->api_user_data) != 0;
     }
 
     [[nodiscard]] bool isItemClicked(LunaEditorMouseButton button = LunaEditorMouseButton_Left) const noexcept
@@ -460,10 +452,9 @@ public:
     [[nodiscard]] bool beginSection(const char* id, const char* label, bool default_open = true) const noexcept
     {
         return api_ != nullptr && api_->begin_section != nullptr &&
-               api_->begin_section(api_->api_user_data,
-                                   id != nullptr ? id : "",
-                                   label != nullptr ? label : "",
-                                   default_open ? 1 : 0) != 0;
+               api_->begin_section(
+                   api_->api_user_data, id != nullptr ? id : "", label != nullptr ? label : "", default_open ? 1 : 0) !=
+                   0;
     }
 
     void endSection() const noexcept
@@ -489,10 +480,8 @@ public:
     [[nodiscard]] bool menuItem(const char* label, bool selected = false, bool enabled = true) const noexcept
     {
         return api_ != nullptr && api_->menu_item != nullptr &&
-               api_->menu_item(api_->api_user_data,
-                               label != nullptr ? label : "",
-                               selected ? 1 : 0,
-                               enabled ? 1 : 0) != 0;
+               api_->menu_item(api_->api_user_data, label != nullptr ? label : "", selected ? 1 : 0, enabled ? 1 : 0) !=
+                   0;
     }
 
     void openPopup(const char* id) const noexcept
@@ -570,10 +559,8 @@ public:
             return false;
         }
 
-        return api_->accept_asset_drag_drop_payload(api_->api_user_data,
-                                                   out_payload,
-                                                   accepted_types,
-                                                   accepted_type_count) != 0;
+        return api_->accept_asset_drag_drop_payload(
+                   api_->api_user_data, out_payload, accepted_types, accepted_type_count) != 0;
     }
 
     template <size_t Count>
@@ -646,10 +633,7 @@ public:
                           float init_width_or_weight = 0.0f) const noexcept
     {
         if (api_ != nullptr && api_->table_setup_column != nullptr) {
-            api_->table_setup_column(api_->api_user_data,
-                                     label != nullptr ? label : "",
-                                     flags,
-                                     init_width_or_weight);
+            api_->table_setup_column(api_->api_user_data, label != nullptr ? label : "", flags, init_width_or_weight);
         }
     }
 

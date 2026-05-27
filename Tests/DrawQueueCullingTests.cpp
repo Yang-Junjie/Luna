@@ -3,8 +3,9 @@
 #include "Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.h"
 #include "Renderer/Visibility/Frustum.h"
 
-#include <glm/geometric.hpp>
 #include <cmath>
+
+#include <glm/geometric.hpp>
 #include <iostream>
 #include <memory>
 #include <string_view>
@@ -222,9 +223,8 @@ void testDrawQueueUsesSeparateCullingCamera(TestContext& context)
                               .culling_frustum_frozen = true,
                           });
 
-    draw_queue.submitDrawPacket(makePacket(mesh,
-                                           makeBounds({0.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}),
-                                           luna::renderPhaseBit(luna::RenderPhase::GBuffer)));
+    draw_queue.submitDrawPacket(makePacket(
+        mesh, makeBounds({0.0f, 0.0f, -5.0f}, {0.5f, 0.5f, 0.5f}), luna::renderPhaseBit(luna::RenderPhase::GBuffer)));
 
     const auto& stats = draw_queue.stats();
     const auto& debug_stats = draw_queue.visibilityDebugStats();
@@ -252,12 +252,12 @@ void testCameraFrustumCorners(TestContext& context)
     const float perspective_far_half_height = std::tan(0.5f) * 10.0f;
     const float perspective_far_half_width = perspective_far_half_height * 2.0f;
 
-    context.expect(sameVec3(perspective_corners[0],
-                            glm::vec3{-perspective_near_half_width, -perspective_near_half_height, -0.1f}),
-                   "perspective frustum near-min corner should match camera settings");
-    context.expect(sameVec3(perspective_corners[6],
-                            glm::vec3{perspective_far_half_width, perspective_far_half_height, -10.0f}),
-                   "perspective frustum far-max corner should match camera settings");
+    context.expect(
+        sameVec3(perspective_corners[0], glm::vec3{-perspective_near_half_width, -perspective_near_half_height, -0.1f}),
+        "perspective frustum near-min corner should match camera settings");
+    context.expect(
+        sameVec3(perspective_corners[6], glm::vec3{perspective_far_half_width, perspective_far_half_height, -10.0f}),
+        "perspective frustum far-max corner should match camera settings");
 
     luna::Camera orthographic_camera;
     orthographic_camera.setOrthographic(4.0f, 0.5f, 8.0f);
@@ -286,23 +286,24 @@ void testVisibilityBoundsOverlayBuildsLineVertices(TestContext& context)
 
     std::vector<luna::render_flow::default_scene::VisibilityDebugFrustumItem> frustums;
     frustums.push_back(luna::render_flow::default_scene::VisibilityDebugFrustumItem{
-        .corners = {
-            glm::vec3{-1.0f, -1.0f, -1.0f},
-            glm::vec3{1.0f, -1.0f, -1.0f},
-            glm::vec3{1.0f, 1.0f, -1.0f},
-            glm::vec3{-1.0f, 1.0f, -1.0f},
-            glm::vec3{-2.0f, -2.0f, -2.0f},
-            glm::vec3{2.0f, -2.0f, -2.0f},
-            glm::vec3{2.0f, 2.0f, -2.0f},
-            glm::vec3{-2.0f, 2.0f, -2.0f},
-        },
+        .corners =
+            {
+                glm::vec3{-1.0f, -1.0f, -1.0f},
+                glm::vec3{1.0f, -1.0f, -1.0f},
+                glm::vec3{1.0f, 1.0f, -1.0f},
+                glm::vec3{-1.0f, 1.0f, -1.0f},
+                glm::vec3{-2.0f, -2.0f, -2.0f},
+                glm::vec3{2.0f, -2.0f, -2.0f},
+                glm::vec3{2.0f, 2.0f, -2.0f},
+                glm::vec3{-2.0f, 2.0f, -2.0f},
+            },
         .color = {0.25f, 0.50f, 1.0f, 1.0f},
         .frozen = true,
     });
 
     std::vector<luna::render_flow::default_scene::VisibilityBoundsOverlayVertex> vertices;
-    const auto stats = luna::render_flow::default_scene::buildVisibilityBoundsOverlayVertices(
-        items, frustums, vertices);
+    const auto stats =
+        luna::render_flow::default_scene::buildVisibilityBoundsOverlayVertices(items, frustums, vertices);
 
     context.expect(stats.items == 2, "overlay builder should count source debug items");
     context.expect(stats.bounds == 1, "overlay builder should count valid bounds");
@@ -313,12 +314,9 @@ void testVisibilityBoundsOverlayBuildsLineVertices(TestContext& context)
     if (vertices.size() == 72) {
         context.expect(sameVec3(vertices.front().world_position, glm::vec3(-1.0f, -2.0f, -3.0f)),
                        "first overlay vertex should be the valid bounds minimum corner in world space");
-        const float marker_extent =
-            luna::render_flow::default_scene::kVisibilityBoundsInvalidMarkerHalfExtent;
+        const float marker_extent = luna::render_flow::default_scene::kVisibilityBoundsInvalidMarkerHalfExtent;
         context.expect(sameVec3(vertices[24].world_position,
-                                glm::vec3(10.0f - marker_extent,
-                                          20.0f - marker_extent,
-                                          30.0f - marker_extent)),
+                                glm::vec3(10.0f - marker_extent, 20.0f - marker_extent, 30.0f - marker_extent)),
                        "invalid bounds marker should be centered on the draw origin");
         context.expect(sameVec3(vertices[48].world_position, glm::vec3(-1.0f, -1.0f, -1.0f)),
                        "frustum line vertices should be appended after bounds markers");

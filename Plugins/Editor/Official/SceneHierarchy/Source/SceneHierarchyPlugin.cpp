@@ -1,11 +1,10 @@
-#include "SceneHierarchyPlugin.h"
-
+#include "Asset/BuiltinAssets.h"
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
-
-#include "Asset/BuiltinAssets.h"
+#include "SceneHierarchyPlugin.h"
 
 #include <cstdint>
+
 #include <string>
 #include <unordered_map>
 #include <unordered_set>

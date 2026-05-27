@@ -6,12 +6,12 @@
 #include "Imgui/ImGuiContext.h"
 #include "Imgui/ImGuiLayer.hpp"
 
-#include <algorithm>
 #include <cmath>
-#include <filesystem>
-#include <utility>
 
+#include <algorithm>
+#include <filesystem>
 #include <imgui.h>
+#include <utility>
 
 namespace luna {
 

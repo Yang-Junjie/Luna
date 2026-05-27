@@ -115,23 +115,20 @@ struct PipelineLayoutSchema {
 [[nodiscard]] const PipelineLayoutSchema& lightingPipelineLayoutSchema() noexcept;
 [[nodiscard]] const PipelineLayoutSchema& transparentPipelineLayoutSchema() noexcept;
 
-[[nodiscard]] RHI::DescriptorSetLayoutCreateInfo
-    makeDescriptorSetLayoutCreateInfo(const DescriptorSetSchema& schema);
+[[nodiscard]] RHI::DescriptorSetLayoutCreateInfo makeDescriptorSetLayoutCreateInfo(const DescriptorSetSchema& schema);
 
 [[nodiscard]] RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
-                                                                               const DescriptorSetLayoutRefs& layouts);
+                                                                         const DescriptorSetLayoutRefs& layouts);
 
 [[nodiscard]] luna::render_flow::ShaderBindingContract
     makePipelineShaderBindingContract(const PipelineLayoutSchema& schema,
                                       luna::render_flow::ShaderBindingAddressMode address_mode);
 
 [[nodiscard]] RHI::Ref<RHI::DescriptorSetLayout>
-    createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
-                                        const DescriptorSetSchema& schema);
+    createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device, const DescriptorSetSchema& schema);
 
-[[nodiscard]] RHI::Ref<RHI::PipelineLayout>
-    createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
-                                   const PipelineLayoutSchema& schema,
-                                   const DescriptorSetLayoutRefs& layouts);
+[[nodiscard]] RHI::Ref<RHI::PipelineLayout> createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
+                                                                           const PipelineLayoutSchema& schema,
+                                                                           const DescriptorSetLayoutRefs& layouts);
 
 } // namespace luna::render_flow::default_scene

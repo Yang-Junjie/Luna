@@ -30,9 +30,7 @@ public:
                     uint32_t queryCount,
                     std::vector<uint64_t>& outResults,
                     bool wait = true) override;
-    bool GetTimestampDisjointResult(uint32_t queryIndex,
-                                    TimestampDisjointResult& outResult,
-                                    bool wait = true) override;
+    bool GetTimestampDisjointResult(uint32_t queryIndex, TimestampDisjointResult& outResult, bool wait = true) override;
 
     ID3D11Query* GetQuery(uint32_t index) const
     {

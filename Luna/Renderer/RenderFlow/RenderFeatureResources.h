@@ -123,8 +123,7 @@ public:
     void setKnownState(RHI::ResourceState state) noexcept;
 
 private:
-    [[nodiscard]] bool matches(const RHI::Ref<RHI::Device>& device,
-                               const PersistentTexture2DDesc& desc) const noexcept;
+    [[nodiscard]] bool matches(const RHI::Ref<RHI::Device>& device, const PersistentTexture2DDesc& desc) const noexcept;
 
     RHI::Ref<RHI::Texture> m_texture;
     std::weak_ptr<RHI::Device> m_device;
@@ -222,11 +221,11 @@ public:
     void invalidateHistoryTexture2D(HistoryTexture2D& history) const noexcept;
     void commitHistoryTexture2D(HistoryTexture2D& history) const noexcept;
     void resetHistoryTexture2D(HistoryTexture2D& history) const noexcept;
-    [[nodiscard]] RenderGraphTextureHandle importHistoryReadTexture2D(
-        luna::RenderGraphBuilder& graph,
-        HistoryTexture2D& history,
-        const RenderFeatureTextureImportOptions& options = {.final_state = RHI::ResourceState::ShaderRead,
-                                                            .export_texture = false}) const;
+    [[nodiscard]] RenderGraphTextureHandle
+        importHistoryReadTexture2D(luna::RenderGraphBuilder& graph,
+                                   HistoryTexture2D& history,
+                                   const RenderFeatureTextureImportOptions& options = {
+                                       .final_state = RHI::ResourceState::ShaderRead, .export_texture = false}) const;
     [[nodiscard]] RenderGraphTextureHandle importHistoryWriteTexture2D(
         luna::RenderGraphBuilder& graph,
         HistoryTexture2D& history,
@@ -241,14 +240,14 @@ private:
 [[nodiscard]] RenderGraphTextureHandle importPersistentTexture2D(luna::RenderGraphBuilder& graph,
                                                                  PersistentTexture2D& texture,
                                                                  const RenderFeatureTextureImportOptions& options = {});
-[[nodiscard]] RenderGraphTextureHandle
-    importHistoryReadTexture2D(luna::RenderGraphBuilder& graph,
-                               HistoryTexture2D& history,
-                               const RenderFeatureTextureImportOptions& options = {
-                                   .final_state = RHI::ResourceState::ShaderRead, .export_texture = false});
-[[nodiscard]] RenderGraphTextureHandle importHistoryWriteTexture2D(
-    luna::RenderGraphBuilder& graph,
-    HistoryTexture2D& history,
-    const RenderFeatureTextureImportOptions& options = {.final_state = RHI::ResourceState::ShaderRead});
+[[nodiscard]] RenderGraphTextureHandle importHistoryReadTexture2D(luna::RenderGraphBuilder& graph,
+                                                                  HistoryTexture2D& history,
+                                                                  const RenderFeatureTextureImportOptions& options = {
+                                                                      .final_state = RHI::ResourceState::ShaderRead,
+                                                                      .export_texture = false});
+[[nodiscard]] RenderGraphTextureHandle importHistoryWriteTexture2D(luna::RenderGraphBuilder& graph,
+                                                                   HistoryTexture2D& history,
+                                                                   const RenderFeatureTextureImportOptions& options = {
+                                                                       .final_state = RHI::ResourceState::ShaderRead});
 
 } // namespace luna::render_flow

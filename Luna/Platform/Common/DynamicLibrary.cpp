@@ -1,20 +1,19 @@
-#include "Platform/Common/DynamicLibrary.h"
-
 #include "Core/Log.h"
+#include "Platform/Common/DynamicLibrary.h"
 
 #include <string>
 #include <utility>
 
 #if defined(_WIN32)
-#    if !defined(WIN32_LEAN_AND_MEAN)
-#        define WIN32_LEAN_AND_MEAN
-#    endif
-#    if !defined(NOMINMAX)
-#        define NOMINMAX
-#    endif
-#    include <Windows.h>
+#if !defined(WIN32_LEAN_AND_MEAN)
+#define WIN32_LEAN_AND_MEAN
+#endif
+#if !defined(NOMINMAX)
+#define NOMINMAX
+#endif
+#include <Windows.h>
 #else
-#    include <dlfcn.h>
+#include <dlfcn.h>
 #endif
 
 namespace {
@@ -23,14 +22,14 @@ namespace {
 std::string formatWindowsError(DWORD error)
 {
     LPSTR buffer = nullptr;
-    const DWORD length = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                                            FORMAT_MESSAGE_IGNORE_INSERTS,
-                                        nullptr,
-                                        error,
-                                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                                        reinterpret_cast<LPSTR>(&buffer),
-                                        0,
-                                        nullptr);
+    const DWORD length =
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                       nullptr,
+                       error,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       reinterpret_cast<LPSTR>(&buffer),
+                       0,
+                       nullptr);
 
     std::string message = (length > 0 && buffer != nullptr) ? std::string(buffer, length) : "unknown error";
     if (buffer != nullptr) {
@@ -67,9 +66,8 @@ std::shared_ptr<DynamicLibrary> DynamicLibrary::load(const std::filesystem::path
     void* module = ::dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
     if (module == nullptr) {
         const char* error = dlerror();
-        LUNA_CORE_ERROR("Failed to load dynamic library '{}': {}",
-                        path.string(),
-                        error != nullptr ? error : "unknown error");
+        LUNA_CORE_ERROR(
+            "Failed to load dynamic library '{}': {}", path.string(), error != nullptr ? error : "unknown error");
         return {};
     }
 

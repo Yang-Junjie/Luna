@@ -7,10 +7,10 @@ namespace luna::editor::native {
 class Selection final {
 public:
     constexpr Selection() noexcept = default;
+
     explicit constexpr Selection(const LunaEditorSelectionApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {

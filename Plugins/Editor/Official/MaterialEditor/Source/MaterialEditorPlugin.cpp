@@ -1,10 +1,10 @@
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 #include "MaterialEditorPlugin.h"
 
-#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
+#include <cstdint>
 
 #include <algorithm>
 #include <array>
-#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -137,12 +137,12 @@ bool drawTextureSlot(luna::editor::Host& host,
     ui.text(label);
 
     bool changed = false;
-    const bool clicked = ui.assetField(id,
-                                      assetLabel(host, handle, "None"),
-                                      assetDetail(host, handle),
-                                      handle.isValid() ? luna::editor::StatusVariant::Info
-                                                       : luna::editor::StatusVariant::Neutral,
-                                      luna::editor::Vec2{.x = -1.0f, .y = 0.0f});
+    const bool clicked =
+        ui.assetField(id,
+                      assetLabel(host, handle, "None"),
+                      assetDetail(host, handle),
+                      handle.isValid() ? luna::editor::StatusVariant::Info : luna::editor::StatusVariant::Neutral,
+                      luna::editor::Vec2{.x = -1.0f, .y = 0.0f});
     (void) clicked;
 
     const bool hovered = ui.isItemHovered();
@@ -181,12 +181,12 @@ bool drawAssetSlot(luna::editor::Host& host,
     ui.text(label);
 
     bool changed = false;
-    const bool clicked = ui.assetField(id,
-                                      assetLabel(host, handle, "None"),
-                                      assetDetail(host, handle),
-                                      handle.isValid() ? luna::editor::StatusVariant::Info
-                                                       : luna::editor::StatusVariant::Neutral,
-                                      luna::editor::Vec2{.x = -1.0f, .y = 0.0f});
+    const bool clicked =
+        ui.assetField(id,
+                      assetLabel(host, handle, "None"),
+                      assetDetail(host, handle),
+                      handle.isValid() ? luna::editor::StatusVariant::Info : luna::editor::StatusVariant::Neutral,
+                      luna::editor::Vec2{.x = -1.0f, .y = 0.0f});
     (void) clicked;
 
     const bool hovered = ui.isItemHovered();
@@ -255,8 +255,7 @@ std::string materialPathForName(std::string_view name)
     std::string safe_name;
     safe_name.reserve(name.size());
     for (char c : name) {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' ||
-            c == '|') {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
             safe_name.push_back('_');
         } else {
             safe_name.push_back(c);
@@ -483,12 +482,13 @@ void MaterialEditorPlugin::drawToolbar(Host& host, Ui& ui, const std::optional<M
     }
 
     const std::string selected_label = document ? assetLabel(host, document->handle, "No Material") : "No Material";
-    const std::string selected_detail = document ? document->project_path.generic_string() : "Drop a material asset here";
+    const std::string selected_detail =
+        document ? document->project_path.generic_string() : "Drop a material asset here";
     const bool clicked = ui.assetField("##MaterialEditorSelectedMaterial",
-                                      selected_label,
-                                      selected_detail,
-                                      document ? StatusVariant::Info : StatusVariant::Neutral,
-                                      Vec2{.x = -1.0f, .y = 0.0f});
+                                       selected_label,
+                                       selected_detail,
+                                       document ? StatusVariant::Info : StatusVariant::Neutral,
+                                       Vec2{.x = -1.0f, .y = 0.0f});
     (void) clicked;
 
     if (ui.beginDragDropTarget()) {
@@ -627,17 +627,17 @@ void MaterialEditorPlugin::drawPreviewViewport(Host& host, Ui& ui, const Materia
     preview_state.environment.procedural_sun_intensity = 18.0f * std::max(m_preview_light_intensity, 0.0f);
     preview_state = m_preview_camera.applyTo(preview_state);
 
-    const bool preview_ready =
-        m_preview_viewport != kInvalidViewportId && host.viewport().setSceneViewportPreview(m_preview_viewport, preview_state);
+    const bool preview_ready = m_preview_viewport != kInvalidViewportId &&
+                               host.viewport().setSceneViewportPreview(m_preview_viewport, preview_state);
     if (preview_ready) {
-        const SceneViewportDrawResult draw_result = host.viewport().drawSceneViewport(
-            ui,
-            m_preview_viewport,
-            SceneViewportDrawOptions{
-                .preserve_aspect = true,
-                .fill_available = true,
-                .requested_size = Vec2{.x = 0.0f, .y = 0.0f},
-            });
+        const SceneViewportDrawResult draw_result =
+            host.viewport().drawSceneViewport(ui,
+                                              m_preview_viewport,
+                                              SceneViewportDrawOptions{
+                                                  .preserve_aspect = true,
+                                                  .fill_available = true,
+                                                  .requested_size = Vec2{.x = 0.0f, .y = 0.0f},
+                                              });
         (void) m_preview_camera.updateFromViewport(draw_result);
         if (!draw_result.drawn) {
             ui.emptyState("Preview warming up", "The preview render target is not ready yet.");

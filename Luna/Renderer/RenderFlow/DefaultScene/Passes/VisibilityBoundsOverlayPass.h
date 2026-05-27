@@ -5,13 +5,13 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
-#include <span>
-#include <vector>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+#include <memory>
+#include <span>
+#include <vector>
 
 namespace luna::render_flow::default_scene {
 
@@ -40,10 +40,10 @@ struct VisibilityBoundsOverlayStats {
 
 [[nodiscard]] glm::vec4 visibilityBoundsOverlayColor(VisibilityDebugClassification classification) noexcept;
 
-[[nodiscard]] VisibilityBoundsOverlayBuildStats buildVisibilityBoundsOverlayVertices(
-    std::span<const VisibilityDebugItem> items,
-    std::span<const VisibilityDebugFrustumItem> frustums,
-    std::vector<VisibilityBoundsOverlayVertex>& vertices);
+[[nodiscard]] VisibilityBoundsOverlayBuildStats
+    buildVisibilityBoundsOverlayVertices(std::span<const VisibilityDebugItem> items,
+                                         std::span<const VisibilityDebugFrustumItem> frustums,
+                                         std::vector<VisibilityBoundsOverlayVertex>& vertices);
 
 class VisibilityBoundsOverlayResources final {
 public:

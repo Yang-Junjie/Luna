@@ -24,9 +24,7 @@ public:
     bool setPreview(editor::ViewportId viewport_id, const editor::SceneViewportPreviewState& state);
     void clearPreview(editor::ViewportId viewport_id);
     void clearPreviews() noexcept;
-    [[nodiscard]] bool syncPreview(editor::ViewportId viewport_id,
-                                   Renderer& renderer,
-                                   SceneViewportInstance& viewport);
+    [[nodiscard]] bool syncPreview(editor::ViewportId viewport_id, Renderer& renderer, SceneViewportInstance& viewport);
 
 private:
     std::unordered_map<editor::ViewportId, std::unique_ptr<PreviewSceneViewport>> m_previews;

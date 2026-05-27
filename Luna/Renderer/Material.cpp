@@ -163,7 +163,3 @@ bool Material::hasOcclusionTexture() const
 }
 
 } // namespace luna
-
-
-
-

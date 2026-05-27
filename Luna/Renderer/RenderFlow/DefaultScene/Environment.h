@@ -6,8 +6,8 @@
 
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/Resources/TextureUpload.h"
 #include "Renderer/RenderWorld/RenderTypes.h"
+#include "Renderer/Resources/TextureUpload.h"
 
 #include <array>
 
@@ -72,6 +72,7 @@ public:
     }
 
     [[nodiscard]] float prefilteredMaxMipLevel() const noexcept;
+
     [[nodiscard]] bool hasPrecomputedIbl() const noexcept
     {
         return m_precomputed;
@@ -92,8 +93,7 @@ private:
 
     RHI::Ref<RHI::TextureView> m_environment_cube_uav;
     RHI::Ref<RHI::TextureView> m_irradiance_uav;
-    std::array<RHI::Ref<RHI::TextureView>,
-               render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
+    std::array<RHI::Ref<RHI::TextureView>, render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
         m_prefiltered_uavs{};
     RHI::Ref<RHI::TextureView> m_brdf_lut_uav;
 
@@ -108,8 +108,7 @@ private:
     RHI::Ref<RHI::DescriptorPool> m_descriptor_pool;
     RHI::Ref<RHI::DescriptorSet> m_equirect_to_cube_descriptor_set;
     RHI::Ref<RHI::DescriptorSet> m_irradiance_descriptor_set;
-    std::array<RHI::Ref<RHI::DescriptorSet>,
-               render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
+    std::array<RHI::Ref<RHI::DescriptorSet>, render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels>
         m_prefilter_descriptor_sets{};
     RHI::Ref<RHI::DescriptorSet> m_brdf_lut_descriptor_set;
     RHI::Ref<RHI::Sampler> m_sampler;
@@ -127,8 +126,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

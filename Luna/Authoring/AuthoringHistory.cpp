@@ -1,5 +1,4 @@
 #include "AuthoringHistory.h"
-
 #include "Scene/SceneSerializer.h"
 
 #include <utility>
@@ -123,9 +122,8 @@ size_t AuthoringHistory::redoDepth() const noexcept
     return m_redo_stack.size();
 }
 
-AuthoringSceneState AuthoringHistory::captureState(const Scene& scene,
-                                                   const std::filesystem::path& scene_file_path,
-                                                   bool scene_dirty)
+AuthoringSceneState
+    AuthoringHistory::captureState(const Scene& scene, const std::filesystem::path& scene_file_path, bool scene_dirty)
 {
     return {
         .scene = scene.clone(),

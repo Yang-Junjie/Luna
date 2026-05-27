@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdio>
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -174,8 +175,9 @@ void drawWindow(void* window_user_data, const LunaEditorHostApi* host_api)
               native::vec2(-1.0f, 0.0f));
     if (!assets.empty()) {
         const native::AssetInfo& first_asset = assets.front();
-        const std::string asset_detail =
-            first_asset.detail.empty() ? first_asset.project_path : first_asset.detail + " / " + first_asset.project_path;
+        const std::string asset_detail = first_asset.detail.empty()
+                                             ? first_asset.project_path
+                                             : first_asset.detail + " / " + first_asset.project_path;
         (void) ui.assetField("NativeTemplateFirstAsset",
                              first_asset.label.empty() ? first_asset.project_path.c_str() : first_asset.label.c_str(),
                              asset_detail.c_str(),

@@ -1,16 +1,14 @@
+#include "../LuaPluginRuntime.h"
 #include "LuaSceneBindings.h"
-
 #include "LuaSharedBindings.h"
 
-#include "../LuaPluginRuntime.h"
+#include <cstdint>
 
-#include <glm/vec3.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <sol/sol.hpp>
-
-#include <cstdint>
+#include <glm/vec3.hpp>
 #include <limits>
+#include <sol/sol.hpp>
 #include <string>
 #include <utility>
 
@@ -319,51 +317,52 @@ void bindLuaSceneApi(LuaPluginRuntime& runtime)
                                       &LuaCamera::orthographic_near,
                                       "orthographic_far",
                                       &LuaCamera::orthographic_far);
-    lua_state.new_usertype<LuaEntity>("Entity",
-                                      "is_valid",
-                                      &LuaEntity::isValid,
-                                      "name",
-                                      sol::property(&LuaEntity::getName),
-                                      "uuid",
-                                      sol::property(&LuaEntity::getUuidString),
-                                      "translation",
-                                      sol::property(&LuaEntity::getTranslation, &LuaEntity::setTranslation),
-                                      "rotation",
-                                      sol::property(&LuaEntity::getRotation, &LuaEntity::setRotation),
-                                      "scale",
-                                      sol::property(&LuaEntity::getScale, &LuaEntity::setScale),
-                                      "forward",
-                                      sol::property(&LuaEntity::getForwardDirection),
-                                      "right",
-                                      sol::property(&LuaEntity::getRightDirection),
-                                      "up",
-                                      sol::property(&LuaEntity::getUpDirection),
-                                      "translate_world",
-                                      &LuaEntity::translateWorld,
-                                      "translate_local",
-                                      &LuaEntity::translateLocal,
-                                      "look_at",
-                                      sol::overload(
-                                          [](LuaEntity& entity, const glm::vec3& target) {
-                                              return entity.lookAt(target);
-                                          },
-                                          [](LuaEntity& entity, const glm::vec3& target, const glm::vec3& up) {
-                                              return entity.lookAt(target, up);
-                                          }),
-                                      "has_camera",
-                                      &LuaEntity::hasCamera,
-                                      "get_camera",
-                                      [](const LuaEntity& entity, sol::this_state state) {
-                                          return entity.getCamera(state);
-                                      },
-                                      "set_camera",
-                                      &LuaEntity::setCamera,
-                                      "set_primary_camera",
-                                      &LuaEntity::setPrimaryCamera,
-                                      "set_perspective_camera",
-                                      &LuaEntity::setPerspectiveCamera,
-                                      "set_orthographic_camera",
-                                      &LuaEntity::setOrthographicCamera);
+    lua_state.new_usertype<LuaEntity>(
+        "Entity",
+        "is_valid",
+        &LuaEntity::isValid,
+        "name",
+        sol::property(&LuaEntity::getName),
+        "uuid",
+        sol::property(&LuaEntity::getUuidString),
+        "translation",
+        sol::property(&LuaEntity::getTranslation, &LuaEntity::setTranslation),
+        "rotation",
+        sol::property(&LuaEntity::getRotation, &LuaEntity::setRotation),
+        "scale",
+        sol::property(&LuaEntity::getScale, &LuaEntity::setScale),
+        "forward",
+        sol::property(&LuaEntity::getForwardDirection),
+        "right",
+        sol::property(&LuaEntity::getRightDirection),
+        "up",
+        sol::property(&LuaEntity::getUpDirection),
+        "translate_world",
+        &LuaEntity::translateWorld,
+        "translate_local",
+        &LuaEntity::translateLocal,
+        "look_at",
+        sol::overload(
+            [](LuaEntity& entity, const glm::vec3& target) {
+                return entity.lookAt(target);
+            },
+            [](LuaEntity& entity, const glm::vec3& target, const glm::vec3& up) {
+                return entity.lookAt(target, up);
+            }),
+        "has_camera",
+        &LuaEntity::hasCamera,
+        "get_camera",
+        [](const LuaEntity& entity, sol::this_state state) {
+            return entity.getCamera(state);
+        },
+        "set_camera",
+        &LuaEntity::setCamera,
+        "set_primary_camera",
+        &LuaEntity::setPrimaryCamera,
+        "set_perspective_camera",
+        &LuaEntity::setPerspectiveCamera,
+        "set_orthographic_camera",
+        &LuaEntity::setOrthographicCamera);
 }
 
 void assignLuaScriptProperty(LuaPluginRuntime& runtime,

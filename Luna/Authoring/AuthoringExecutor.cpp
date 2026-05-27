@@ -1,22 +1,21 @@
-#include "AuthoringExecutor.h"
-
 #include "Asset/BuiltinAssets.h"
 #include "Authoring/AuthoringInspection.h"
 #include "Authoring/AuthoringSession.h"
 #include "Authoring/AuthoringValidator.h"
+#include "AuthoringExecutor.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
-#include <glm/trigonometric.hpp>
-
-#include <algorithm>
-#include <charconv>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
+#include <charconv>
 #include <filesystem>
 #include <fstream>
+#include <glm/trigonometric.hpp>
 #include <iterator>
 #include <optional>
 #include <string>
@@ -111,8 +110,7 @@ public:
                 return false;
             }
 
-            snapshot.contents.assign(std::istreambuf_iterator<char>(input_stream),
-                                     std::istreambuf_iterator<char>());
+            snapshot.contents.assign(std::istreambuf_iterator<char>(input_stream), std::istreambuf_iterator<char>());
             if (input_stream.bad()) {
                 error_message = "Failed to read existing scene file '" + path.string() + "'.";
                 return false;
@@ -246,32 +244,25 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
 
 bool sameTransformComponent(const TransformComponent& lhs, const TransformComponent& rhs)
 {
-    return sameVec3(lhs.translation, rhs.translation) &&
-           sameVec3(lhs.rotation, rhs.rotation) &&
+    return sameVec3(lhs.translation, rhs.translation) && sameVec3(lhs.rotation, rhs.rotation) &&
            sameVec3(lhs.scale, rhs.scale);
 }
 
 bool sameLightComponent(const LightComponent& lhs, const LightComponent& rhs)
 {
-    return lhs.type == rhs.type &&
-           lhs.enabled == rhs.enabled &&
-           sameVec3(lhs.color, rhs.color) &&
-           lhs.intensity == rhs.intensity &&
-           lhs.range == rhs.range &&
+    return lhs.type == rhs.type && lhs.enabled == rhs.enabled && sameVec3(lhs.color, rhs.color) &&
+           lhs.intensity == rhs.intensity && lhs.range == rhs.range &&
            lhs.innerConeAngleRadians == rhs.innerConeAngleRadians &&
            lhs.outerConeAngleRadians == rhs.outerConeAngleRadians;
 }
 
 bool sameCameraComponent(const CameraComponent& lhs, const CameraComponent& rhs)
 {
-    return lhs.primary == rhs.primary &&
-           lhs.fixedAspectRatio == rhs.fixedAspectRatio &&
+    return lhs.primary == rhs.primary && lhs.fixedAspectRatio == rhs.fixedAspectRatio &&
            lhs.projectionType == rhs.projectionType &&
            lhs.perspectiveVerticalFovRadians == rhs.perspectiveVerticalFovRadians &&
-           lhs.perspectiveNear == rhs.perspectiveNear &&
-           lhs.perspectiveFar == rhs.perspectiveFar &&
-           lhs.orthographicSize == rhs.orthographicSize &&
-           lhs.orthographicNear == rhs.orthographicNear &&
+           lhs.perspectiveNear == rhs.perspectiveNear && lhs.perspectiveFar == rhs.perspectiveFar &&
+           lhs.orthographicSize == rhs.orthographicSize && lhs.orthographicNear == rhs.orthographicNear &&
            lhs.orthographicFar == rhs.orthographicFar;
 }
 
@@ -554,7 +545,8 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
             }
 
             case AuthoringCommandKind::CreateEntity:
-                if (!rememberAlias(command.alias, m_session.createEntity(command.name), report, command_index, command)) {
+                if (!rememberAlias(
+                        command.alias, m_session.createEntity(command.name), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -568,11 +560,8 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                 break;
 
             case AuthoringCommandKind::CreateDirectionalLight:
-                if (!rememberAlias(command.alias,
-                                   m_session.createDirectionalLightEntity(),
-                                   report,
-                                   command_index,
-                                   command)) {
+                if (!rememberAlias(
+                        command.alias, m_session.createDirectionalLightEntity(), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
@@ -608,11 +597,8 @@ bool AuthoringExecutor::execute(const AuthoringPlan& plan, AuthoringReport& repo
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }
-                if (!rememberAlias(command.alias,
-                                   m_session.createPrimitiveEntity(*mesh_handle),
-                                   report,
-                                   command_index,
-                                   command)) {
+                if (!rememberAlias(
+                        command.alias, m_session.createPrimitiveEntity(*mesh_handle), report, command_index, command)) {
                     report.scene = captureAuthoringSceneSnapshot(m_session);
                     return false;
                 }

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+
 #include <filesystem>
 #include <initializer_list>
 #include <optional>
@@ -63,11 +64,13 @@ public:
     virtual std::optional<std::filesystem::path> assetsRootPath() const = 0;
     virtual std::optional<std::filesystem::path>
         resolveProjectAssetPath(const std::filesystem::path& project_relative_path) const = 0;
-    virtual std::optional<std::filesystem::path> makeProjectRelativeAssetPath(const std::filesystem::path& path) const = 0;
+    virtual std::optional<std::filesystem::path>
+        makeProjectRelativeAssetPath(const std::filesystem::path& path) const = 0;
     virtual AssetRefreshResult refreshAssets() = 0;
     virtual uint64_t assetRevision() const noexcept = 0;
     virtual bool isAssetLoading(AssetHandle handle) const = 0;
-    virtual bool acceptsAssetType(AssetType type, const AssetType* accepted_types, std::size_t accepted_type_count) const = 0;
+    virtual bool
+        acceptsAssetType(AssetType type, const AssetType* accepted_types, std::size_t accepted_type_count) const = 0;
     virtual std::optional<std::size_t> meshSubmeshCount(AssetHandle mesh_handle) const = 0;
     virtual bool beginAssetDragDropSource(AssetHandle handle, std::string_view label = {}) = 0;
 

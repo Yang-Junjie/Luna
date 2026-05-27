@@ -49,8 +49,7 @@ RHI::Ref<RHI::DescriptorSetLayout> createSceneLayout(const RHI::Ref<RHI::Device>
     return createDescriptorSetLayoutFromSchema(device, sceneDescriptorSetSchema());
 }
 
-RHI::Ref<RHI::DescriptorSetLayout>
-    createTransparentCompositeLayout(const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createTransparentCompositeLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -69,8 +68,7 @@ RHI::Ref<RHI::DescriptorSetLayout>
             .Build());
 }
 
-RHI::Ref<RHI::DescriptorSetLayout>
-    createPostProcessLayout(const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createPostProcessLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -283,7 +281,7 @@ renderer_detail::PendingTextureUpload createDefaultLightingInputTexture(const RH
 }
 
 const RHI::Ref<RHI::Texture>& textureOrFallback(const RHI::Ref<RHI::Texture>& texture,
-                                                            const renderer_detail::PendingTextureUpload& fallback)
+                                                const renderer_detail::PendingTextureUpload& fallback)
 {
     return texture ? texture : fallback.texture;
 }
@@ -293,14 +291,12 @@ glm::mat4 adjustProjectionForConventions(glm::mat4 projection, const RHI::RHICon
     return conventions.requires_projection_y_flip ? luna::flipProjectionY(projection) : projection;
 }
 
-RenderViewMatrices buildViewMatrices(const Camera& camera,
-                                     float aspect_ratio,
-                                     const RHI::RHICapabilities& capabilities)
+RenderViewMatrices buildViewMatrices(const Camera& camera, float aspect_ratio, const RHI::RHICapabilities& capabilities)
 {
     RenderViewMatrices matrices{};
     matrices.view = camera.getViewMatrix();
-    matrices.projection = adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio),
-                                                         capabilities.conventions);
+    matrices.projection =
+        adjustProjectionForConventions(camera.getProjectionMatrix(aspect_ratio), capabilities.conventions);
     matrices.view_projection = matrices.projection * matrices.view;
     matrices.inverse_view = glm::inverse(matrices.view);
     matrices.inverse_projection = glm::inverse(matrices.projection);
@@ -407,11 +403,10 @@ void addStaticMeshPositionOnlyVertexLayout(RHI::GraphicsPipelineBuilder& builder
         .SetFrontFace(RHI::FrontFace::CounterClockwise);
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createShadowPipeline(const RHI::Ref<RHI::Device>& device,
-                         const RHI::Ref<RHI::PipelineLayout>& layout,
-                         const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                         const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createShadowPipeline(const RHI::Ref<RHI::Device>& device,
+                                                     const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                     const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                                     const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
@@ -430,11 +425,10 @@ RHI::Ref<RHI::GraphicsPipeline>
     return device->CreateGraphicsPipeline(builder.Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createGeometryPipeline(const RHI::Ref<RHI::Device>& device,
-                           const RHI::Ref<RHI::PipelineLayout>& layout,
-                           const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                           const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createGeometryPipeline(const RHI::Ref<RHI::Device>& device,
+                                                       const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                       const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                                       const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
@@ -462,12 +456,11 @@ RHI::Ref<RHI::GraphicsPipeline>
     return device->CreateGraphicsPipeline(builder.Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createLightingPipeline(const RHI::Ref<RHI::Device>& device,
-                           const RHI::Ref<RHI::PipelineLayout>& layout,
-                           RHI::Format color_format,
-                           const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                           const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createLightingPipeline(const RHI::Ref<RHI::Device>& device,
+                                                       const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                       RHI::Format color_format,
+                                                       const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                                       const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
@@ -485,12 +478,11 @@ RHI::Ref<RHI::GraphicsPipeline>
                                               .Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createTransparentPipeline(const RHI::Ref<RHI::Device>& device,
-                              const RHI::Ref<RHI::PipelineLayout>& layout,
-                              RHI::Format color_format,
-                              const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                              const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createTransparentPipeline(const RHI::Ref<RHI::Device>& device,
+                                                          const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                          RHI::Format color_format,
+                                                          const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                                          const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
@@ -510,12 +502,11 @@ RHI::Ref<RHI::GraphicsPipeline>
     return device->CreateGraphicsPipeline(builder.Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createTransparentCompositePipeline(const RHI::Ref<RHI::Device>& device,
-                                       const RHI::Ref<RHI::PipelineLayout>& layout,
-                                       RHI::Format color_format,
-                                       const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                                       const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createTransparentCompositePipeline(const RHI::Ref<RHI::Device>& device,
+                                                                   const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                                   RHI::Format color_format,
+                                                                   const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                                                   const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
@@ -550,11 +541,10 @@ bool PipelineState::hasCompleteState(const SceneRenderContext& context) const no
     return m_state.device == context.device && m_state.backend_type == context.backend_type &&
            m_state.surface_format == context.color_format && m_state.geometry_pipeline && m_state.shadow_pipeline &&
            m_state.lighting_pipeline && m_state.debug_view_pipeline && m_state.sky_pipeline &&
-           m_state.transparent_pipeline && m_state.transparent_composite_pipeline &&
-           m_state.post_process_pipeline &&
+           m_state.transparent_pipeline && m_state.transparent_composite_pipeline && m_state.post_process_pipeline &&
            m_state.material_layout && m_state.descriptor_pool && m_state.gbuffer_descriptor_set &&
-           m_state.transparent_composite_descriptor_set && m_state.post_process_descriptor_set && m_state.scene_descriptor_set &&
-           m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
+           m_state.transparent_composite_descriptor_set && m_state.post_process_descriptor_set &&
+           m_state.scene_descriptor_set && m_state.lighting_scene_descriptor_set && m_state.scene_params_buffer &&
            m_state.gbuffer_sampler && m_state.transparent_composite_sampler && m_state.post_process_sampler &&
            m_state.environment_source_sampler && m_state.shadow_sampler;
 }
@@ -644,15 +634,15 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
                                           "transparentCompositeFragmentMain",
                                           RHI::ShaderStage::Fragment);
     m_state.post_process_vertex_shader = renderer_detail::loadShaderModule(m_state.device,
-                                                                            context.compiler,
-                                                                            shader_paths.post_process_path,
-                                                                            "postProcessVertexMain",
-                                                                            RHI::ShaderStage::Vertex);
+                                                                           context.compiler,
+                                                                           shader_paths.post_process_path,
+                                                                           "postProcessVertexMain",
+                                                                           RHI::ShaderStage::Vertex);
     m_state.post_process_fragment_shader = renderer_detail::loadShaderModule(m_state.device,
-                                                                              context.compiler,
-                                                                              shader_paths.post_process_path,
-                                                                              "postProcessFragmentMain",
-                                                                              RHI::ShaderStage::Fragment);
+                                                                             context.compiler,
+                                                                             shader_paths.post_process_path,
+                                                                             "postProcessFragmentMain",
+                                                                             RHI::ShaderStage::Fragment);
 
     if (!m_state.geometry_vertex_shader || !m_state.transparent_vertex_shader || !m_state.geometry_fragment_shader ||
         !m_state.shadow_vertex_shader || !m_state.shadow_fragment_shader || !m_state.lighting_vertex_shader ||
@@ -673,18 +663,17 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
         makePipelineShaderBindingContract(lightingPipelineLayoutSchema(), binding_address_mode);
     const ShaderBindingContract transparent_contract =
         makePipelineShaderBindingContract(transparentPipelineLayoutSchema(), binding_address_mode);
-    const ShaderBindingContract transparent_composite_contract =
-        makeTransparentCompositeShaderBindingContract();
+    const ShaderBindingContract transparent_composite_contract = makeTransparentCompositeShaderBindingContract();
     const ShaderBindingContract post_process_contract = makePostProcessShaderBindingContract();
 
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_vertex_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_vertex_path,
-                                 "sceneGeometryVertexMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_vertex_path,
+                                                    "sceneGeometryVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.geometry_fragment_shader,
-                                 geometry_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneGeometryFragmentMain");
+                                                    geometry_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneGeometryFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_vertex_shader,
                                                     transparent_contract,
                                                     shader_paths.geometry_vertex_path,
@@ -694,25 +683,23 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
     validateAndLogRenderFeatureShaderModuleBindings(
         m_state.shadow_fragment_shader, shadow_contract, shader_paths.shadow_fragment_path, "sceneShadowFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_vertex_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_vertex_path,
-                                 "sceneLightingVertexMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_vertex_path,
+                                                    "sceneLightingVertexMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.lighting_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneLightingFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneLightingFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.debug_view_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneDebugFragmentMain");
-    validateAndLogRenderFeatureShaderModuleBindings(m_state.sky_fragment_shader,
-                                 lighting_contract,
-                                 shader_paths.lighting_fragment_path,
-                                 "sceneSkyFragmentMain");
+                                                    lighting_contract,
+                                                    shader_paths.lighting_fragment_path,
+                                                    "sceneDebugFragmentMain");
+    validateAndLogRenderFeatureShaderModuleBindings(
+        m_state.sky_fragment_shader, lighting_contract, shader_paths.lighting_fragment_path, "sceneSkyFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_fragment_shader,
-                                 transparent_contract,
-                                 shader_paths.geometry_fragment_path,
-                                 "sceneTransparentFragmentMain");
+                                                    transparent_contract,
+                                                    shader_paths.geometry_fragment_path,
+                                                    "sceneTransparentFragmentMain");
     validateAndLogRenderFeatureShaderModuleBindings(m_state.transparent_composite_vertex_shader,
                                                     transparent_composite_contract,
                                                     shader_paths.transparent_composite_path,
@@ -758,7 +745,8 @@ void PipelineState::rebuild(const SceneRenderContext& context, const SceneShader
             m_state.descriptor_pool->AllocateDescriptorSet(m_state.transparent_composite_layout);
     }
     if (m_state.descriptor_pool && m_state.post_process_layout) {
-        m_state.post_process_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.post_process_layout);
+        m_state.post_process_descriptor_set =
+            m_state.descriptor_pool->AllocateDescriptorSet(m_state.post_process_layout);
     }
     if (m_state.descriptor_pool && m_state.scene_layout) {
         m_state.scene_descriptor_set = m_state.descriptor_pool->AllocateDescriptorSet(m_state.scene_layout);
@@ -977,10 +965,10 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
         params.light_color_exposure = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 
-    const uint32_t point_light_count = (std::min) (static_cast<uint32_t>(lights.point_lights.size()),
-                                                   render_flow::default_scene_detail::kMaxPointLights);
-    const uint32_t spot_light_count = (std::min) (static_cast<uint32_t>(lights.spot_lights.size()),
-                                                  render_flow::default_scene_detail::kMaxSpotLights);
+    const uint32_t point_light_count = (std::min)(static_cast<uint32_t>(lights.point_lights.size()),
+                                                  render_flow::default_scene_detail::kMaxPointLights);
+    const uint32_t spot_light_count =
+        (std::min)(static_cast<uint32_t>(lights.spot_lights.size()), render_flow::default_scene_detail::kMaxSpotLights);
     params.light_counts =
         glm::vec4(static_cast<float>(point_light_count), static_cast<float>(spot_light_count), 0.0f, 0.0f);
 
@@ -1000,22 +988,22 @@ void updateSceneParameterBuffer(const SceneRenderContext& context,
     const bool ibl_enabled = environment == nullptr || environment->ibl_enabled;
     const float environment_intensity = environment != nullptr ? (std::max)(environment->intensity, 0.0f) : 1.0f;
     const float ibl_environment_intensity = ibl_enabled ? environment_intensity : 0.0f;
-    const float diffuse_intensity =
-        ibl_enabled && environment != nullptr ? (std::max)(environment->diffuse_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
-    const float specular_intensity =
-        ibl_enabled && environment != nullptr ? (std::max)(environment->specular_intensity, 0.0f) : (ibl_enabled ? 1.0f : 0.0f);
+    const float diffuse_intensity = ibl_enabled && environment != nullptr
+                                        ? (std::max)(environment->diffuse_intensity, 0.0f)
+                                        : (ibl_enabled ? 1.0f : 0.0f);
+    const float specular_intensity = ibl_enabled && environment != nullptr
+                                         ? (std::max)(environment->specular_intensity, 0.0f)
+                                         : (ibl_enabled ? 1.0f : 0.0f);
     const float sky_intensity = environment != nullptr ? (std::max)(environment->sky_intensity, 0.0f) : 1.0f;
-    params.ibl_factors = glm::vec4(diffuse_intensity,
-                                   specular_intensity,
-                                   ibl_environment_intensity,
-                                   sky_intensity * environment_intensity);
+    params.ibl_factors = glm::vec4(
+        diffuse_intensity, specular_intensity, ibl_environment_intensity, sky_intensity * environment_intensity);
     const RenderBackgroundMode background_mode =
         environment != nullptr ? environment->background_mode : RenderBackgroundMode::SolidColor;
     const glm::vec3 background_color =
         environment != nullptr ? environment->background_color
                                : glm::vec3(context.clear_color.r, context.clear_color.g, context.clear_color.b);
-    params.background_color_mode = glm::vec4(background_color,
-                                             static_cast<float>(static_cast<uint32_t>(background_mode)));
+    params.background_color_mode =
+        glm::vec4(background_color, static_cast<float>(static_cast<uint32_t>(background_mode)));
     params.debug_overlay_params = glm::vec4(context.show_pick_debug_visualization ? 1.0f : 0.0f,
                                             0.65f,
                                             static_cast<float>(context.debug_view_mode),
@@ -1212,11 +1200,9 @@ void PipelineState::updateShadowResources(const RHI::Ref<RHI::Texture>& shadow_m
     m_state.shadow_bindings_valid = true;
 }
 
-void PipelineState::updateTransparentCompositeResources(
-    const RHI::Ref<RHI::Texture>& transparent_color)
+void PipelineState::updateTransparentCompositeResources(const RHI::Ref<RHI::Texture>& transparent_color)
 {
-    if (!m_state.transparent_composite_descriptor_set || !m_state.transparent_composite_sampler ||
-        !transparent_color) {
+    if (!m_state.transparent_composite_descriptor_set || !m_state.transparent_composite_sampler || !transparent_color) {
         LUNA_RENDERER_WARN("Cannot update transparent composite resources: descriptor_set={} sampler={} color={}",
                            static_cast<bool>(m_state.transparent_composite_descriptor_set),
                            static_cast<bool>(m_state.transparent_composite_sampler),
@@ -1224,8 +1210,7 @@ void PipelineState::updateTransparentCompositeResources(
         return;
     }
 
-    if (m_state.transparent_composite_bindings_valid &&
-        m_state.bound_transparent_color_texture == transparent_color) {
+    if (m_state.transparent_composite_bindings_valid && m_state.bound_transparent_color_texture == transparent_color) {
         return;
     }
 
@@ -1249,11 +1234,12 @@ void PipelineState::updatePostProcessResources(const RHI::Ref<RHI::Texture>& sce
 {
     if (!m_state.post_process_descriptor_set || !m_state.post_process_sampler || !m_state.scene_params_buffer ||
         !scene_color) {
-        LUNA_RENDERER_WARN("Cannot update post process resources: descriptor_set={} sampler={} scene_params={} color={}",
-                           static_cast<bool>(m_state.post_process_descriptor_set),
-                           static_cast<bool>(m_state.post_process_sampler),
-                           static_cast<bool>(m_state.scene_params_buffer),
-                           static_cast<bool>(scene_color));
+        LUNA_RENDERER_WARN(
+            "Cannot update post process resources: descriptor_set={} sampler={} scene_params={} color={}",
+            static_cast<bool>(m_state.post_process_descriptor_set),
+            static_cast<bool>(m_state.post_process_sampler),
+            static_cast<bool>(m_state.scene_params_buffer),
+            static_cast<bool>(scene_color));
         return;
     }
 

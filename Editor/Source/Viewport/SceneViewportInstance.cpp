@@ -1,9 +1,8 @@
+#include "Renderer/Renderer.h"
 #include "Viewport/SceneViewportInstance.h"
 
-#include "Renderer/Renderer.h"
-
-#include <Swapchain.h>
 #include <algorithm>
+#include <Swapchain.h>
 #include <utility>
 
 namespace luna {
@@ -110,17 +109,16 @@ const SceneViewportInstanceState& SceneViewportInstance::sync(Renderer& renderer
 
     const auto& scene_texture = renderer.getSceneViewportOutputTexture(handle);
     const auto& swapchain = renderer.getSwapchain();
-    const bool offscreen =
-        m_renderer_viewport_kind == RendererViewportKind::Owned ||
-        renderer.getSceneOutputMode() == Renderer::SceneOutputMode::OffscreenTexture;
+    const bool offscreen = m_renderer_viewport_kind == RendererViewportKind::Owned ||
+                           renderer.getSceneOutputMode() == Renderer::SceneOutputMode::OffscreenTexture;
     const bool texture_ready = offscreen ? static_cast<bool>(scene_texture) : static_cast<bool>(swapchain);
     const luna::RHI::Extent2D viewport_extent = renderer.getSceneViewportOutputSize(handle);
 
-    m_surface.setPresentation(
-        viewport_extent.width,
-        viewport_extent.height,
-        offscreen && renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip,
-        texture_ready && viewport_extent.width > 0 && viewport_extent.height > 0);
+    m_surface.setPresentation(viewport_extent.width,
+                              viewport_extent.height,
+                              offscreen &&
+                                  renderer.getCapabilities().conventions.imgui_render_target_requires_uv_y_flip,
+                              texture_ready && viewport_extent.width > 0 && viewport_extent.height > 0);
     return m_surface.state();
 }
 
@@ -145,8 +143,7 @@ bool SceneViewportInstance::requestScenePick(Renderer& renderer, uint32_t pixel_
     const uint32_t clamped_x = (std::min)(pixel_x, texture_width - 1);
     const uint32_t clamped_color_y = (std::min)(pixel_y, texture_height - 1);
     const bool pick_y_matches_display_y = renderer.getCapabilities().conventions.scene_pick_y_matches_display_y;
-    const uint32_t pick_pixel_y =
-        pick_y_matches_display_y ? clamped_color_y : (texture_height - 1) - clamped_color_y;
+    const uint32_t pick_pixel_y = pick_y_matches_display_y ? clamped_color_y : (texture_height - 1) - clamped_color_y;
 
     renderer.requestScenePick(clamped_x, pick_pixel_y);
     return true;
@@ -165,13 +162,13 @@ const SceneViewportInstanceState& SceneViewportInstance::state() const noexcept
 Renderer::SceneViewportHandle SceneViewportInstance::rendererViewportHandle(Renderer& renderer)
 {
     return m_renderer_viewport_kind == RendererViewportKind::Default ? renderer.getDefaultSceneViewportHandle()
-                                                                    : ensureRendererViewport(renderer);
+                                                                     : ensureRendererViewport(renderer);
 }
 
 Renderer::SceneViewportHandle SceneViewportInstance::rendererViewportHandle(const Renderer& renderer) const
 {
     return m_renderer_viewport_kind == RendererViewportKind::Default ? renderer.getDefaultSceneViewportHandle()
-                                                                    : m_renderer_viewport;
+                                                                     : m_renderer_viewport;
 }
 
 bool SceneViewportInstance::ownsRendererViewport() const noexcept

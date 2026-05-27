@@ -1,15 +1,13 @@
-#include "Renderer/SwapchainFactory.h"
-
 #include "Core/Log.h"
 #include "Renderer/RendererUtilities.h"
-
-#include <Builders.h>
-#include <Device.h>
-#include <Surface.h>
-#include <Synchronization.h>
+#include "Renderer/SwapchainFactory.h"
 
 #include <algorithm>
+#include <Builders.h>
+#include <Device.h>
 #include <stdexcept>
+#include <Surface.h>
+#include <Synchronization.h>
 
 namespace luna {
 
@@ -62,9 +60,9 @@ bool SwapchainFactory::create(RHI::Extent2D requested_extent, SwapchainResources
                        renderer_detail::formatToString(surface_format.format),
                        static_cast<int>(surface_format.format));
 
-    uint32_t min_image_count = (std::max) (2u, capabilities.minImageCount);
+    uint32_t min_image_count = (std::max)(2u, capabilities.minImageCount);
     if (capabilities.maxImageCount != 0) {
-        min_image_count = (std::min) (min_image_count, capabilities.maxImageCount);
+        min_image_count = (std::min)(min_image_count, capabilities.maxImageCount);
     }
 
     if (selected_present_mode != m_request.present_mode) {
@@ -78,24 +76,24 @@ bool SwapchainFactory::create(RHI::Extent2D requested_extent, SwapchainResources
                            renderer_detail::describePresentModes(supported_present_modes));
     }
 
-    resources.swapchain = m_request.device->CreateSwapchain(RHI::SwapchainBuilder()
-                                                               .SetExtent(clamped_extent)
-                                                               .SetFormat(surface_format.format)
-                                                               .SetColorSpace(surface_format.colorSpace)
-                                                               .SetPresentMode(selected_present_mode)
-                                                               .SetMinImageCount(min_image_count)
-                                                               .SetPreTransform(capabilities.currentTransform)
-                                                               .SetUsage(RHI::SwapchainUsageFlags::ColorAttachment |
-                                                                         RHI::SwapchainUsageFlags::TransferDst)
-                                                               .SetSurface(m_request.surface)
-                                                               .Build());
+    resources.swapchain = m_request.device->CreateSwapchain(
+        RHI::SwapchainBuilder()
+            .SetExtent(clamped_extent)
+            .SetFormat(surface_format.format)
+            .SetColorSpace(surface_format.colorSpace)
+            .SetPresentMode(selected_present_mode)
+            .SetMinImageCount(min_image_count)
+            .SetPreTransform(capabilities.currentTransform)
+            .SetUsage(RHI::SwapchainUsageFlags::ColorAttachment | RHI::SwapchainUsageFlags::TransferDst)
+            .SetSurface(m_request.surface)
+            .Build());
     if (!resources.swapchain) {
         throw std::runtime_error("Failed to create swapchain");
     }
 
     resources.surface_format = surface_format.format;
     resources.frames_in_flight =
-        (std::max) (1u, resources.swapchain->GetImageCount() > 1 ? resources.swapchain->GetImageCount() - 1 : 1u);
+        (std::max)(1u, resources.swapchain->GetImageCount() > 1 ? resources.swapchain->GetImageCount() - 1 : 1u);
     resources.synchronization = m_request.device->CreateSynchronization(resources.frames_in_flight);
     if (!resources.synchronization) {
         throw std::runtime_error("Failed to create frame synchronization objects");

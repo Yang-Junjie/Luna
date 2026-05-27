@@ -1,6 +1,5 @@
-#include "Shell/EditorPluginManager.h"
-
 #include "Shell/EditorBuiltinPluginRegistry.h"
+#include "Shell/EditorPluginManager.h"
 #include "Shell/EditorPluginManifest.h"
 
 #include <algorithm>
@@ -35,8 +34,7 @@ void attachBuiltinFactories(std::vector<luna::editor::EditorPluginPackage>& pack
     }
 }
 
-void setPackageSource(std::vector<luna::editor::EditorPluginPackage>& packages,
-                      luna::editor::EditorPluginSource source)
+void setPackageSource(std::vector<luna::editor::EditorPluginPackage>& packages, luna::editor::EditorPluginSource source)
 {
     for (luna::editor::EditorPluginPackage& package : packages) {
         package.source = source;
@@ -46,9 +44,8 @@ void setPackageSource(std::vector<luna::editor::EditorPluginPackage>& packages,
 void appendPackages(std::vector<luna::editor::EditorPluginPackage>& packages,
                     std::vector<luna::editor::EditorPluginPackage> discovered)
 {
-    packages.insert(packages.end(),
-                    std::make_move_iterator(discovered.begin()),
-                    std::make_move_iterator(discovered.end()));
+    packages.insert(
+        packages.end(), std::make_move_iterator(discovered.begin()), std::make_move_iterator(discovered.end()));
 }
 
 } // namespace

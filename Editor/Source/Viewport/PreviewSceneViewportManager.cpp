@@ -1,14 +1,12 @@
-#include "Viewport/PreviewSceneViewportManager.h"
-
 #include "Viewport/PreviewSceneViewport.h"
+#include "Viewport/PreviewSceneViewportManager.h"
 
 namespace luna {
 
 PreviewSceneViewportManager::PreviewSceneViewportManager() = default;
 PreviewSceneViewportManager::~PreviewSceneViewportManager() = default;
 PreviewSceneViewportManager::PreviewSceneViewportManager(PreviewSceneViewportManager&&) noexcept = default;
-PreviewSceneViewportManager&
-    PreviewSceneViewportManager::operator=(PreviewSceneViewportManager&&) noexcept = default;
+PreviewSceneViewportManager& PreviewSceneViewportManager::operator=(PreviewSceneViewportManager&&) noexcept = default;
 
 bool PreviewSceneViewportManager::setPreview(editor::ViewportId viewport_id,
                                              const editor::SceneViewportPreviewState& state)

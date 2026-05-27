@@ -93,12 +93,7 @@ constexpr std::array<RenderFeatureDescriptorBinding, 4> kBloomBindings{{
      RHI::DescriptorType::SampledImage,
      1,
      RHI::ShaderStage::Fragment},
-    {"Sampler",
-     "gBloomSampler",
-     bloom_binding::Sampler,
-     RHI::DescriptorType::Sampler,
-     1,
-     RHI::ShaderStage::Fragment},
+    {"Sampler", "gBloomSampler", bloom_binding::Sampler, RHI::DescriptorType::Sampler, 1, RHI::ShaderStage::Fragment},
     {"Params",
      "gBloomParams",
      bloom_binding::Params,
@@ -196,8 +191,7 @@ RHI::ColorBlendAttachmentState makeAdditiveBlendAttachment()
     return blend_attachment;
 }
 
-RHI::Ref<RHI::DescriptorSetLayout>
-    createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -235,9 +229,8 @@ RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
                                      .Build());
 }
 
-RHI::Ref<RHI::PipelineLayout>
-    createPipelineLayout(const RHI::Ref<RHI::Device>& device,
-                         const RHI::Ref<RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                                   const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -246,13 +239,12 @@ RHI::Ref<RHI::PipelineLayout>
     return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createPipeline(const RHI::Ref<RHI::Device>& device,
-                   const RHI::Ref<RHI::PipelineLayout>& layout,
-                   const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                   const RHI::Ref<RHI::ShaderModule>& fragment_shader,
-                   RHI::Format color_format,
-                   bool additive_blend)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(const RHI::Ref<RHI::Device>& device,
+                                               const RHI::Ref<RHI::PipelineLayout>& layout,
+                                               const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                               const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+                                               RHI::Format color_format,
+                                               bool additive_blend)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
@@ -456,13 +448,12 @@ public:
         }
         m_state.sampler = createSampler(device);
         for (uint32_t index = 0; index < m_state.params_buffers.size(); ++index) {
-            m_state.params_buffers[index] =
-                device->CreateBuffer(RHI::BufferBuilder()
-                                         .SetSize(sizeof(BloomGpuParams))
-                                         .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
-                                         .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
-                                         .SetName("BloomParams" + std::to_string(index))
-                                         .Build());
+            m_state.params_buffers[index] = device->CreateBuffer(RHI::BufferBuilder()
+                                                                     .SetSize(sizeof(BloomGpuParams))
+                                                                     .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                                                     .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
+                                                                     .SetName("BloomParams" + std::to_string(index))
+                                                                     .Build());
         }
 
         if (m_state.descriptor_pool && m_state.layout) {
@@ -861,8 +852,7 @@ private:
             "BloomUpsample" + std::to_string(mip_index),
             [source, destination](RenderGraphRasterPassBuilder& pass_builder) {
                 pass_builder.ReadTexture(source);
-                pass_builder.WriteColor(
-                    destination, RHI::AttachmentLoadOp::Load, RHI::AttachmentStoreOp::Store);
+                pass_builder.WriteColor(destination, RHI::AttachmentLoadOp::Load, RHI::AttachmentStoreOp::Store);
             },
             [this, source, options, descriptor_set_index](RenderGraphRasterPassContext& pass_context) {
                 const auto& source_texture = pass_context.getTexture(source);

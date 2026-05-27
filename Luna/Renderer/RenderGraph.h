@@ -199,7 +199,3 @@ private:
 };
 
 } // namespace luna
-
-
-
-

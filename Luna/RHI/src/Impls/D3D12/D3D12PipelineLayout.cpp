@@ -2,9 +2,9 @@
 #include "Impls/D3D12/D3D12Device.h"
 #include "Impls/D3D12/D3D12PipelineLayout.h"
 
-#include <algorithm>
 #include <cstdio>
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 

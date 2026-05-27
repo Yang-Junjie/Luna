@@ -1,11 +1,9 @@
-#include "BuiltinMaterialsPlugin.h"
-
-#include "EditorApi/EditorApi.h"
-#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
+#include "BuiltinMaterialsPlugin.h"
+#include "EditorApi/EditorApi.h"
+#include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 #include "Project/BuiltinMaterialOverrides.h"
 #include "Renderer/Material.h"
 
@@ -127,9 +125,9 @@ bool BuiltinMaterialsPlugin::onLoad(Host& host)
                 ui.textDisabled(std::string("Version: ") + std::to_string(material->getVersion()));
 
                 const std::filesystem::path overrides_path = BuiltinMaterialOverrides::getOverridesPath();
-                ui.textDisabled(std::string("Overrides: ") +
-                                (overrides_path.empty() ? std::string("No project loaded")
-                                                        : overrides_path.generic_string()));
+                ui.textDisabled(std::string("Overrides: ") + (overrides_path.empty()
+                                                                  ? std::string("No project loaded")
+                                                                  : overrides_path.generic_string()));
 
                 ui.separator();
                 ui.separatorText("Surface");
@@ -191,15 +189,11 @@ bool BuiltinMaterialsPlugin::onLoad(Host& host)
                     BuiltinMaterialOverrides::load();
                 }
 
-                if (ui.button("Clear Selected Override",
-                              Vec2{.x = -1.0f, .y = 0.0f},
-                              ButtonVariant::Danger)) {
+                if (ui.button("Clear Selected Override", Vec2{.x = -1.0f, .y = 0.0f}, ButtonVariant::Danger)) {
                     BuiltinMaterialOverrides::clearSelected(m_selected_material);
                 }
 
-                if (ui.button("Clear All Overrides",
-                              Vec2{.x = -1.0f, .y = 0.0f},
-                              ButtonVariant::Danger)) {
+                if (ui.button("Clear All Overrides", Vec2{.x = -1.0f, .y = 0.0f}, ButtonVariant::Danger)) {
                     BuiltinMaterialOverrides::clearAll();
                 }
             },

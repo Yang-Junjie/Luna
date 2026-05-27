@@ -1,6 +1,5 @@
-#include "AuthoringHost.h"
-
 #include "Authoring/AuthoringSession.h"
+#include "AuthoringHost.h"
 
 namespace luna::authoring {
 

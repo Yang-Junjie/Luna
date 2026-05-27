@@ -16,7 +16,3 @@ public:
 };
 
 } // namespace luna
-
-
-
-

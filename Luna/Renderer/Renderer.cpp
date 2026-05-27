@@ -2,25 +2,24 @@
 #include "Core/Window.h"
 #include "Imgui/ImGuiContext.h"
 #include "Platform/Common/NativeWindowHandle.h"
-#include "Renderer/RenderFlow/DefaultRenderFlow.h"
-#include "Renderer/RenderFlow/RenderFlow.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererUtilities.h"
-
-#include <Buffer.h>
-#include <Builders.h>
-#include <CommandBufferEncoder.h>
-#include <Device.h>
-#include <QueryPool.h>
-#include <Queue.h>
+#include "Renderer/RenderFlow/DefaultRenderFlow.h"
+#include "Renderer/RenderFlow/RenderFlow.h"
 
 #include <cstring>
 
 #include <algorithm>
 #include <array>
+#include <Buffer.h>
+#include <Builders.h>
+#include <CommandBufferEncoder.h>
+#include <Device.h>
 #include <GLFW/glfw3.h>
 #include <glm/common.hpp>
 #include <glm/trigonometric.hpp>
+#include <QueryPool.h>
+#include <Queue.h>
 #include <stdexcept>
 
 namespace luna {
@@ -141,11 +140,10 @@ void Renderer::destroySceneViewport(SceneViewportId id)
         return;
     }
 
-    const auto slot_it = std::find_if(m_scene_viewports.begin(),
-                                      m_scene_viewports.end(),
-                                      [id](const SceneViewportSlot& slot) {
-                                          return slot.id == id;
-                                      });
+    const auto slot_it =
+        std::find_if(m_scene_viewports.begin(), m_scene_viewports.end(), [id](const SceneViewportSlot& slot) {
+            return slot.id == id;
+        });
     if (slot_it == m_scene_viewports.end()) {
         return;
     }
@@ -161,11 +159,10 @@ void Renderer::destroySceneViewport(SceneViewportId id)
 
 Renderer::SceneViewportState* Renderer::findSceneViewport(SceneViewportId id)
 {
-    const auto slot_it = std::find_if(m_scene_viewports.begin(),
-                                      m_scene_viewports.end(),
-                                      [id](const SceneViewportSlot& slot) {
-                                          return slot.id == id;
-                                      });
+    const auto slot_it =
+        std::find_if(m_scene_viewports.begin(), m_scene_viewports.end(), [id](const SceneViewportSlot& slot) {
+            return slot.id == id;
+        });
     if (slot_it == m_scene_viewports.end()) {
         return nullptr;
     }
@@ -174,11 +171,10 @@ Renderer::SceneViewportState* Renderer::findSceneViewport(SceneViewportId id)
 
 const Renderer::SceneViewportState* Renderer::findSceneViewport(SceneViewportId id) const
 {
-    const auto slot_it = std::find_if(m_scene_viewports.begin(),
-                                      m_scene_viewports.end(),
-                                      [id](const SceneViewportSlot& slot) {
-                                          return slot.id == id;
-                                      });
+    const auto slot_it =
+        std::find_if(m_scene_viewports.begin(), m_scene_viewports.end(), [id](const SceneViewportSlot& slot) {
+            return slot.id == id;
+        });
     if (slot_it == m_scene_viewports.end()) {
         return nullptr;
     }
@@ -266,9 +262,8 @@ bool Renderer::init(Window& window, InitializationOptions options)
         device_context.shaderCompiler() = device_context.instance()->CreateShaderCompiler();
         device_context.surface() = device_context.instance()->CreateSurface(window_handle);
         if (!device_context.surface()) {
-            throw std::runtime_error(
-                "Failed to create surface for backend '" +
-                std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
+            throw std::runtime_error("Failed to create surface for backend '" +
+                                     std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
 
         const auto adapters = device_context.instance()->EnumerateAdapters();
@@ -290,9 +285,8 @@ bool Renderer::init(Window& window, InitializationOptions options)
         }
         device_context.adapter() = renderer_detail::selectAdapter(adapters);
         if (!device_context.adapter()) {
-            throw std::runtime_error(
-                "No compatible adapter available for backend '" +
-                std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
+            throw std::runtime_error("No compatible adapter available for backend '" +
+                                     std::string(RHI::BackendTypeToString(device_context.instance()->GetType())) + "'");
         }
         const auto selected_adapter_properties = device_context.adapter()->GetProperties();
         LUNA_RENDERER_INFO("Selected renderer adapter '{}' ({}, {} MiB dedicated VRAM)",
@@ -339,17 +333,14 @@ bool Renderer::init(Window& window, InitializationOptions options)
 
 void Renderer::shutdown()
 {
-    const bool had_renderer_state = m_runtime.initialized || m_device_context.hasResources() ||
-                                    m_swapchain_manager.hasResources() ||
-                                    m_frame_resources.framesInFlight() > 0 ||
-                                    std::any_of(m_scene_viewports.begin(),
-                                                m_scene_viewports.end(),
-                                                [](const SceneViewportSlot& slot) {
-                                                    const auto* viewport = slot.state.get();
-                                                    return viewport != nullptr &&
-                                                           (viewport->output.color || viewport->output.depth ||
-                                                            viewport->output.pick || viewport->output.debug_color);
-                                                });
+    const bool had_renderer_state =
+        m_runtime.initialized || m_device_context.hasResources() || m_swapchain_manager.hasResources() ||
+        m_frame_resources.framesInFlight() > 0 ||
+        std::any_of(m_scene_viewports.begin(), m_scene_viewports.end(), [](const SceneViewportSlot& slot) {
+            const auto* viewport = slot.state.get();
+            return viewport != nullptr && (viewport->output.color || viewport->output.depth || viewport->output.pick ||
+                                           viewport->output.debug_color);
+        });
     if (had_renderer_state) {
         LUNA_RENDERER_INFO("Shutting down renderer");
     }
@@ -422,8 +413,7 @@ void Renderer::startFrame()
         }
 
         m_image_index = static_cast<uint32_t>(acquire_result.image_index);
-        LUNA_RENDERER_FRAME_DEBUG(
-            "Started frame {} using swapchain image {}", m_frame_index, m_image_index);
+        LUNA_RENDERER_FRAME_DEBUG("Started frame {} using swapchain image {}", m_frame_index, m_image_index);
 
         frame_resources.beginFrame(m_frame_index, BeginFrameDesc{.device = m_device_context.device()});
         if (!frame_resources.currentCommandBuffer()) {
@@ -435,7 +425,8 @@ void Renderer::startFrame()
         runtime.frame_started = false;
         frame_resources.releaseFrame(m_frame_index);
         m_swapchain_manager.requestResize();
-        invalidateRenderFeatureHistory(defaultSceneViewport(), render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
+        invalidateRenderFeatureHistory(defaultSceneViewport(),
+                                       render_flow::RenderFeatureHistoryInvalidationFlags::Resize);
     }
 }
 
@@ -496,26 +487,26 @@ void Renderer::renderFrame()
         },
         transient_texture_cache);
 
-    const auto back_buffer_handle = graph_builder.ImportTexture(
-        "SwapchainBackBuffer",
-        back_buffer,
-        was_presented ? RHI::ResourceState::Present : RHI::ResourceState::Undefined,
-        RHI::ResourceState::Present);
+    const auto back_buffer_handle =
+        graph_builder.ImportTexture("SwapchainBackBuffer",
+                                    back_buffer,
+                                    was_presented ? RHI::ResourceState::Present : RHI::ResourceState::Undefined,
+                                    RHI::ResourceState::Present);
     const ScenePickReadbackSlot* pick_readback_slot = frame_resources.pickReadbackSlot(m_frame_index);
     const bool pick_readback_slot_available = pick_readback_slot != nullptr && pick_readback_slot->buffer;
-    const SceneViewportRenderResult scene_result = renderSceneViewport(
-        viewport,
-        graph_builder,
-        SceneViewportRenderRequest{
-            .back_buffer = back_buffer_handle,
-            .framebuffer_extent = extent,
-            .surface_format = m_swapchain_manager.surfaceFormat(),
-            .backend_type = backend_type,
-            .clear_color = runtime.clear_color,
-            .frame_index = m_frame_index,
-            .pick_readback_supported = capabilities.supports_scene_pick_readback,
-            .pick_readback_slot_available = pick_readback_slot_available,
-        });
+    const SceneViewportRenderResult scene_result =
+        renderSceneViewport(viewport,
+                            graph_builder,
+                            SceneViewportRenderRequest{
+                                .back_buffer = back_buffer_handle,
+                                .framebuffer_extent = extent,
+                                .surface_format = m_swapchain_manager.surfaceFormat(),
+                                .backend_type = backend_type,
+                                .clear_color = runtime.clear_color,
+                                .frame_index = m_frame_index,
+                                .pick_readback_supported = capabilities.supports_scene_pick_readback,
+                                .pick_readback_slot_available = pick_readback_slot_available,
+                            });
     rendered_viewports.push_back(RenderedSceneViewport{
         .viewport = &viewport,
         .result = scene_result,
@@ -536,19 +527,19 @@ void Renderer::renderFrame()
             continue;
         }
 
-        SceneViewportRenderResult extra_result = renderSceneViewport(
-            extra_viewport,
-            graph_builder,
-            SceneViewportRenderRequest{
-                .back_buffer = {},
-                .framebuffer_extent = extra_output.extent,
-                .surface_format = m_swapchain_manager.surfaceFormat(),
-                .backend_type = backend_type,
-                .clear_color = runtime.clear_color,
-                .frame_index = m_frame_index,
-                .pick_readback_supported = false,
-                .pick_readback_slot_available = false,
-            });
+        SceneViewportRenderResult extra_result =
+            renderSceneViewport(extra_viewport,
+                                graph_builder,
+                                SceneViewportRenderRequest{
+                                    .back_buffer = {},
+                                    .framebuffer_extent = extra_output.extent,
+                                    .surface_format = m_swapchain_manager.surfaceFormat(),
+                                    .backend_type = backend_type,
+                                    .clear_color = runtime.clear_color,
+                                    .frame_index = m_frame_index,
+                                    .pick_readback_supported = false,
+                                    .pick_readback_slot_available = false,
+                                });
         rendered_viewports.push_back(RenderedSceneViewport{
             .viewport = &extra_viewport,
             .result = extra_result,
@@ -558,7 +549,7 @@ void Renderer::renderFrame()
     if (runtime.imgui_enabled) {
         graph_builder.AddRasterPass(
             "ImGui",
-             [back_buffer_handle,
+            [back_buffer_handle,
              render_scene_to_swapchain = scene_result.render_to_swapchain,
              scene_output_valid = scene_result.output_valid,
              rendered_viewports,
@@ -610,9 +601,8 @@ void Renderer::renderFrame()
 
     frame_resources.setRenderGraph(m_frame_index, graph_builder.Build());
     if (luna::RenderGraph* render_graph = frame_resources.renderGraph(m_frame_index)) {
-        LUNA_RENDERER_FRAME_DEBUG("Executing frame {} render graph with {} compiled pass(es)",
-                                  m_frame_index,
-                                  render_graph->passes().size());
+        LUNA_RENDERER_FRAME_DEBUG(
+            "Executing frame {} render graph with {} compiled pass(es)", m_frame_index, render_graph->passes().size());
         render_graph->execute();
         for (const RenderedSceneViewport& rendered_viewport : rendered_viewports) {
             if (rendered_viewport.viewport == nullptr || !rendered_viewport.result.output_valid ||
@@ -654,10 +644,8 @@ void Renderer::renderFrame()
             scene_output.queued_pick_request.reset();
         } else {
             const auto pick_request = *scene_output.queued_pick_request;
-            LUNA_RENDERER_DEBUG("Queued scene pick readback at ({}, {}) on frame {}",
-                                pick_request.x,
-                                pick_request.y,
-                                m_frame_index);
+            LUNA_RENDERER_DEBUG(
+                "Queued scene pick readback at ({}, {}) on frame {}", pick_request.x, pick_request.y, m_frame_index);
             const std::array<RHI::BufferImageCopy, 1> copy_regions{RHI::BufferImageCopy{
                 .BufferOffset = 0,
                 .BufferRowLength = 0,
@@ -694,14 +682,12 @@ void Renderer::renderFrame()
         output.color_state = RHI::ResourceState::ShaderRead;
         output.depth_state =
             rendered_viewport.result.depth.isValid() ? RHI::ResourceState::Common : RHI::ResourceState::Undefined;
-        output.pick_state =
-            rendered_viewport.result.pick.isValid()
-                ? (rendered_viewport.result.issue_pick_readback ? RHI::ResourceState::CopySource
-                                                                : RHI::ResourceState::Common)
-                : RHI::ResourceState::Undefined;
-        output.debug_color_state = rendered_viewport.result.debug.isValid()
-                                       ? RHI::ResourceState::ShaderRead
-                                       : RHI::ResourceState::Undefined;
+        output.pick_state = rendered_viewport.result.pick.isValid()
+                                ? (rendered_viewport.result.issue_pick_readback ? RHI::ResourceState::CopySource
+                                                                                : RHI::ResourceState::Common)
+                                : RHI::ResourceState::Undefined;
+        output.debug_color_state =
+            rendered_viewport.result.debug.isValid() ? RHI::ResourceState::ShaderRead : RHI::ResourceState::Undefined;
     }
 
     m_swapchain_image_history.markPresented(m_image_index);
@@ -719,9 +705,8 @@ void Renderer::endFrame()
 
     try {
         frame_resources.currentCommandBuffer()->End();
-        m_device_context.graphicsQueue()->Submit(frame_resources.currentCommandBufferRef(),
-                                                 m_swapchain_manager.synchronization(),
-                                                 m_frame_index);
+        m_device_context.graphicsQueue()->Submit(
+            frame_resources.currentCommandBufferRef(), m_swapchain_manager.synchronization(), m_frame_index);
         const PresentResult present_result = m_swapchain_manager.present(m_frame_index);
         if (present_result.requiresRecreate()) {
             LUNA_RENDERER_WARN("Present returned {}; scheduling swapchain recreation",
@@ -731,9 +716,7 @@ void Renderer::endFrame()
         } else if (!present_result.presented()) {
             LUNA_RENDERER_WARN("Present returned {}", renderer_detail::swapchainResultToString(present_result.result));
         } else {
-            LUNA_RENDERER_FRAME_DEBUG("Presented frame {} using swapchain image {}",
-                                      m_frame_index,
-                                      m_image_index);
+            LUNA_RENDERER_FRAME_DEBUG("Presented frame {} using swapchain image {}", m_frame_index, m_image_index);
         }
     } catch (const std::exception& error) {
         LUNA_RENDERER_WARN("EndFrame failed, swapchain will be recreated: {}", error.what());
@@ -905,7 +888,7 @@ void Renderer::setSceneViewportOutputSize(SceneViewportHandle handle, uint32_t w
         ++output.generation;
         invalidateRenderFeatureHistory(*viewport,
                                        render_flow::RenderFeatureHistoryInvalidationFlags::Resize |
-                                       render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
+                                           render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
     }
 
     if (!size_changed || output.mode != SceneOutputMode::OffscreenTexture || width == 0 || height == 0) {
@@ -1013,8 +996,8 @@ void Renderer::requestScenePick(uint32_t x, uint32_t y)
         return;
     }
 
-    const uint32_t clamped_x = (std::min) (x, output.extent.width - 1);
-    const uint32_t clamped_y = (std::min) (y, output.extent.height - 1);
+    const uint32_t clamped_x = (std::min)(x, output.extent.width - 1);
+    const uint32_t clamped_y = (std::min)(y, output.extent.height - 1);
     if (clamped_x != x || clamped_y != y) {
         LUNA_RENDERER_DEBUG("Clamped scene pick request from ({}, {}) to ({}, {}) within {}x{}",
                             x,
@@ -1144,7 +1127,8 @@ bool Renderer::addDefaultRenderFeature(std::unique_ptr<render_flow::IRenderFeatu
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(defaultSceneViewport().render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot add default render feature because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot add default render feature because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1165,14 +1149,16 @@ bool Renderer::setDefaultRenderFeatureEnabled(std::string_view name, bool enable
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(defaultSceneViewport().render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot toggle default render feature because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot toggle default render feature because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
     return default_render_flow->setFeatureEnabled(name, enabled);
 }
 
-std::vector<render_flow::RenderFeatureParameterInfo> Renderer::getDefaultRenderFeatureParameters(std::string_view name) const
+std::vector<render_flow::RenderFeatureParameterInfo>
+    Renderer::getDefaultRenderFeatureParameters(std::string_view name) const
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(defaultSceneViewport().render_flow.get());
     if (!default_render_flow) {
@@ -1188,7 +1174,8 @@ bool Renderer::setDefaultRenderFeatureParameter(std::string_view feature_name,
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(defaultSceneViewport().render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot set default render feature parameter because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot set default render feature parameter because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1199,7 +1186,8 @@ bool Renderer::configureDefaultRenderFlow(const DefaultRenderFlowConfigureFuncti
 {
     auto* default_render_flow = dynamic_cast<DefaultRenderFlow*>(defaultSceneViewport().render_flow.get());
     if (!default_render_flow) {
-        LUNA_RENDERER_ERROR("Cannot configure default render flow because the active render flow is not DefaultRenderFlow");
+        LUNA_RENDERER_ERROR(
+            "Cannot configure default render flow because the active render flow is not DefaultRenderFlow");
         return false;
     }
 
@@ -1274,7 +1262,7 @@ RHI::Extent2D Renderer::getFramebufferExtent() const
     int width = 0;
     int height = 0;
     glfwGetFramebufferSize(m_window_context.native_window, &width, &height);
-    return {static_cast<uint32_t>((std::max) (width, 0)), static_cast<uint32_t>((std::max) (height, 0))};
+    return {static_cast<uint32_t>((std::max)(width, 0)), static_cast<uint32_t>((std::max)(height, 0))};
 }
 
 void Renderer::handlePendingResize()
@@ -1329,8 +1317,7 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                 .Width = request.framebuffer_extent.width,
                 .Height = request.framebuffer_extent.height,
                 .Format = RHI::Format::D32_FLOAT,
-                .Usage = RHI::TextureUsageFlags::DepthStencilAttachment |
-                         RHI::TextureUsageFlags::Sampled,
+                .Usage = RHI::TextureUsageFlags::DepthStencilAttachment | RHI::TextureUsageFlags::Sampled,
                 .InitialState = RHI::ResourceState::Undefined,
                 .SampleCount = RHI::SampleCount::Count1,
             });
@@ -1349,13 +1336,11 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
             "SceneOutputColor", output.color, output.color_state, RHI::ResourceState::ShaderRead);
         result.depth = graph_builder.ImportTexture(
             "SceneOutputDepth", output.depth, output.depth_state, RHI::ResourceState::Common);
-        result.pick = graph_builder.ImportTexture(
-            "SceneOutputPick", output.pick, output.pick_state, RHI::ResourceState::Common);
+        result.pick =
+            graph_builder.ImportTexture("SceneOutputPick", output.pick, output.pick_state, RHI::ResourceState::Common);
         if (output.debug_view_mode != RenderDebugViewMode::None && output.debug_color) {
-            result.debug = graph_builder.ImportTexture("SceneDebugOutput",
-                                                       output.debug_color,
-                                                       output.debug_color_state,
-                                                       RHI::ResourceState::ShaderRead);
+            result.debug = graph_builder.ImportTexture(
+                "SceneDebugOutput", output.debug_color, output.debug_color_state, RHI::ResourceState::ShaderRead);
             scene_debug_format = output.debug_color->GetFormat();
         }
         scene_color_format = output.color ? output.color->GetFormat() : request.surface_format;
@@ -1399,13 +1384,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                 .framebuffer_width = scene_width,
                 .framebuffer_height = scene_height,
             };
-            const render_flow::RenderFeatureFrameContext feature_frame_context =
-                makeRenderFeatureFrameContext(viewport,
-                                              request.backend_type,
-                                              output.mode,
-                                              request.frame_index,
-                                              scene_width,
-                                              scene_height);
+            const render_flow::RenderFeatureFrameContext feature_frame_context = makeRenderFeatureFrameContext(
+                viewport, request.backend_type, output.mode, request.frame_index, scene_width, scene_height);
             render_flow::RenderFeatureFrameContext feature_frame_context_with_view = feature_frame_context;
             feature_frame_context_with_view.view =
                 viewport.view_history.beginFrame(viewport.world.camera(),
@@ -1419,7 +1399,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
                                           request.frame_index,
                                           static_cast<uint32_t>(feature_frame_context.history_invalidation_flags));
             }
-            RenderFlowContext flow_context(graph_builder, viewport.world, scene_context, feature_frame_context_with_view);
+            RenderFlowContext flow_context(
+                graph_builder, viewport.world, scene_context, feature_frame_context_with_view);
             viewport.render_flow->render(flow_context);
             if (viewport.world.hasCamera()) {
                 stageRenderFeatureFrameContext(viewport, request.backend_type, output.mode, scene_width, scene_height);
@@ -1452,9 +1433,8 @@ Renderer::SceneViewportRenderResult Renderer::renderSceneViewport(SceneViewportS
             graph_builder.ExportTexture(result.depth, RHI::ResourceState::Common);
         }
         if (result.pick.isValid()) {
-            graph_builder.ExportTexture(result.pick,
-                                        result.issue_pick_readback ? RHI::ResourceState::CopySource
-                                                                   : RHI::ResourceState::Common);
+            graph_builder.ExportTexture(
+                result.pick, result.issue_pick_readback ? RHI::ResourceState::CopySource : RHI::ResourceState::Common);
         }
         if (result.debug.isValid()) {
             graph_builder.ExportTexture(result.debug, RHI::ResourceState::ShaderRead);
@@ -1470,16 +1450,14 @@ void Renderer::invalidateRenderFeatureHistory(SceneViewportState& viewport,
     viewport.feature_history.pending_flags |= flags;
 }
 
-render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(
-    const SceneViewportState& viewport,
-    RHI::BackendType backend_type,
-    SceneOutputMode scene_output_mode,
-    uint64_t frame_index,
-    uint32_t framebuffer_width,
-    uint32_t framebuffer_height) const
+render_flow::RenderFeatureFrameContext Renderer::makeRenderFeatureFrameContext(const SceneViewportState& viewport,
+                                                                               RHI::BackendType backend_type,
+                                                                               SceneOutputMode scene_output_mode,
+                                                                               uint64_t frame_index,
+                                                                               uint32_t framebuffer_width,
+                                                                               uint32_t framebuffer_height) const
 {
-    render_flow::RenderFeatureHistoryInvalidationFlags invalidation_flags =
-        viewport.feature_history.pending_flags;
+    render_flow::RenderFeatureHistoryInvalidationFlags invalidation_flags = viewport.feature_history.pending_flags;
 
     if (!viewport.feature_history.has_previous_frame) {
         invalidation_flags |= render_flow::RenderFeatureHistoryInvalidationFlags::FirstFrame;
@@ -1546,14 +1524,13 @@ void Renderer::commitStagedRenderFeatureFrameContext(SceneViewportState& viewpor
 bool Renderer::hasMatchingSceneOutputTargets(const SceneViewportState& viewport, uint32_t width, uint32_t height) const
 {
     const auto& output = viewport.output;
-    return output.color && output.depth && output.pick && output.debug_color &&
-           output.color->GetWidth() == width && output.color->GetHeight() == height &&
-           output.depth->GetWidth() == width && output.depth->GetHeight() == height &&
-           output.pick->GetWidth() == width && output.pick->GetHeight() == height &&
-           output.debug_color->GetWidth() == width && output.debug_color->GetHeight() == height &&
+    return output.color && output.depth && output.pick && output.debug_color && output.color->GetWidth() == width &&
+           output.color->GetHeight() == height && output.depth->GetWidth() == width &&
+           output.depth->GetHeight() == height && output.pick->GetWidth() == width &&
+           output.pick->GetHeight() == height && output.debug_color->GetWidth() == width &&
+           output.debug_color->GetHeight() == height &&
            output.color->GetFormat() == m_swapchain_manager.surfaceFormat() &&
-           output.depth->GetFormat() == RHI::Format::D32_FLOAT &&
-           output.pick->GetFormat() == RHI::Format::R32_UINT &&
+           output.depth->GetFormat() == RHI::Format::D32_FLOAT && output.pick->GetFormat() == RHI::Format::R32_UINT &&
            output.debug_color->GetFormat() == m_swapchain_manager.surfaceFormat();
 }
 
@@ -1591,25 +1568,24 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
             .SetName("SceneOutputColor")
             .Build());
 
-    output.depth =
-        m_device_context.device()->CreateTexture(RHI::TextureBuilder()
-                                                   .SetSize(width, height)
-                                                   .SetFormat(RHI::Format::D32_FLOAT)
-                                                   .SetUsage(RHI::TextureUsageFlags::DepthStencilAttachment |
-                                                             RHI::TextureUsageFlags::Sampled)
-                                                   .SetInitialState(RHI::ResourceState::Undefined)
-                                                   .SetName("SceneOutputDepth")
-                                                   .Build());
-
-    output.pick = m_device_context.device()->CreateTexture(
+    output.depth = m_device_context.device()->CreateTexture(
         RHI::TextureBuilder()
             .SetSize(width, height)
-            .SetFormat(RHI::Format::R32_UINT)
-            .SetUsage(RHI::TextureUsageFlags::ColorAttachment | RHI::TextureUsageFlags::Sampled |
-                      RHI::TextureUsageFlags::TransferSrc)
+            .SetFormat(RHI::Format::D32_FLOAT)
+            .SetUsage(RHI::TextureUsageFlags::DepthStencilAttachment | RHI::TextureUsageFlags::Sampled)
             .SetInitialState(RHI::ResourceState::Undefined)
-            .SetName("SceneOutputPick")
+            .SetName("SceneOutputDepth")
             .Build());
+
+    output.pick = m_device_context.device()->CreateTexture(RHI::TextureBuilder()
+                                                               .SetSize(width, height)
+                                                               .SetFormat(RHI::Format::R32_UINT)
+                                                               .SetUsage(RHI::TextureUsageFlags::ColorAttachment |
+                                                                         RHI::TextureUsageFlags::Sampled |
+                                                                         RHI::TextureUsageFlags::TransferSrc)
+                                                               .SetInitialState(RHI::ResourceState::Undefined)
+                                                               .SetName("SceneOutputPick")
+                                                               .Build());
 
     output.debug_color = m_device_context.device()->CreateTexture(
         RHI::TextureBuilder()
@@ -1633,7 +1609,8 @@ void Renderer::ensureSceneOutputTargets(SceneViewportState& viewport, uint32_t w
                             static_cast<bool>(output.debug_color));
     } else {
         ++output.generation;
-        invalidateRenderFeatureHistory(viewport, render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
+        invalidateRenderFeatureHistory(viewport,
+                                       render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
         LUNA_RENDERER_INFO("Created scene output targets {}x{}", width, height);
     }
 }
@@ -1655,7 +1632,8 @@ void Renderer::releaseSceneOutputTargets(SceneViewportState& viewport)
     output.debug_pick_marker = {};
     if (had_targets) {
         ++output.generation;
-        invalidateRenderFeatureHistory(viewport, render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
+        invalidateRenderFeatureHistory(viewport,
+                                       render_flow::RenderFeatureHistoryInvalidationFlags::SceneOutputChanged);
         LUNA_RENDERER_INFO("Released scene output targets");
     }
 }
@@ -1663,14 +1641,14 @@ void Renderer::releaseSceneOutputTargets(SceneViewportState& viewport)
 void Renderer::releaseFrameCommandBuffers()
 {
     const FrameResourceReleaseStats stats = m_frame_resources.releaseAll();
-    if (stats.command_buffer_count > 0 || stats.scene_pick_readback_slot_count > 0 ||
-        stats.gpu_timing_slot_count > 0 || stats.transient_texture_cache_count > 0) {
-        LUNA_RENDERER_DEBUG(
-            "Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback slot(s), {} GPU timing slot(s)",
-            stats.command_buffer_count,
-            stats.transient_texture_cache_count,
-            stats.scene_pick_readback_slot_count,
-            stats.gpu_timing_slot_count);
+    if (stats.command_buffer_count > 0 || stats.scene_pick_readback_slot_count > 0 || stats.gpu_timing_slot_count > 0 ||
+        stats.transient_texture_cache_count > 0) {
+        LUNA_RENDERER_DEBUG("Released {} frame command buffer(s), {} transient cache(s), {} scene-pick readback "
+                            "slot(s), {} GPU timing slot(s)",
+                            stats.command_buffer_count,
+                            stats.transient_texture_cache_count,
+                            stats.scene_pick_readback_slot_count,
+                            stats.gpu_timing_slot_count);
     }
 }
 
@@ -1698,11 +1676,12 @@ void Renderer::ensureGpuTimingResources()
     }
 
     frame_resources.resizeGpuTimingSlots(frame_resources.framesInFlight());
-    LUNA_RENDERER_INFO("Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
-                       frame_resources.framesInFlight(),
-                       kRenderGraphGpuTimestampQueryCount,
-                       use_disjoint_timestamps ? "disjoint" : "fixed-period",
-                       timestamp_period_ns);
+    LUNA_RENDERER_INFO(
+        "Creating RenderGraph GPU timing query pools: frames={}, queries_per_frame={}, mode={}, period_ns={:.6f}",
+        frame_resources.framesInFlight(),
+        kRenderGraphGpuTimestampQueryCount,
+        use_disjoint_timestamps ? "disjoint" : "fixed-period",
+        timestamp_period_ns);
     for (uint32_t frame_index = 0; frame_index < frame_resources.framesInFlight(); ++frame_index) {
         auto* slot = frame_resources.gpuTimingSlot(frame_index);
         if (!slot) {
@@ -1785,7 +1764,7 @@ void Renderer::collectCompletedGpuTiming(uint32_t frame_index)
     completed_profile.GpuTimingSupported = true;
     completed_profile.GpuTimingPending = false;
 
-    const size_t pass_count = (std::min) (completed_profile.Passes.size(), timestamps.size() / 2);
+    const size_t pass_count = (std::min)(completed_profile.Passes.size(), timestamps.size() / 2);
     const uint64_t first_timestamp = !timestamps.empty() ? timestamps.front() : 0;
     for (size_t pass_index = 0; pass_index < pass_count; ++pass_index) {
         const uint64_t begin_timestamp = timestamps[pass_index * 2];
@@ -1851,12 +1830,13 @@ void Renderer::ensureScenePickReadbackBuffers()
         if (!slot) {
             continue;
         }
-        slot->buffer = m_device_context.device()->CreateBuffer(RHI::BufferBuilder()
-                                                                  .SetSize(kScenePickReadbackBufferSize)
-                                                                  .SetUsage(RHI::BufferUsageFlags::TransferDst)
-                                                                  .SetMemoryUsage(RHI::BufferMemoryUsage::GpuToCpu)
-                                                                  .SetName("ScenePickReadback_" + std::to_string(frame_index))
-                                                                  .Build());
+        slot->buffer =
+            m_device_context.device()->CreateBuffer(RHI::BufferBuilder()
+                                                        .SetSize(kScenePickReadbackBufferSize)
+                                                        .SetUsage(RHI::BufferUsageFlags::TransferDst)
+                                                        .SetMemoryUsage(RHI::BufferMemoryUsage::GpuToCpu)
+                                                        .SetName("ScenePickReadback_" + std::to_string(frame_index))
+                                                        .Build());
         slot->pending = false;
         if (!slot->buffer) {
             LUNA_RENDERER_WARN("Failed to create scene-pick readback buffer for frame {}", frame_index);

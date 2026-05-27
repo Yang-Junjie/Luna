@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Asset/Asset.h"
-#include "Renderer/Camera.h"
 #include "EntityManager.h"
+#include "Renderer/Camera.h"
+
+#include <cstdint>
 
 #include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
-#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -48,8 +49,8 @@ enum class SceneShadowMode : uint8_t {
 struct SceneShadowSettings {
     SceneShadowMode mode{SceneShadowMode::CascadedShadowMaps};
     float pcfShadowDistance{40.0f};
-    uint32_t pcfMapSize{4096};
-    uint32_t csmCascadeSize{2048};
+    uint32_t pcfMapSize{4'096};
+    uint32_t csmCascadeSize{2'048};
 };
 
 class Scene {

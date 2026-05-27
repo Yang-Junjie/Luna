@@ -147,7 +147,7 @@ void appendHistory(std::vector<luna::editor::RenderGraphProfileSnapshot>& histor
 
 size_t averageBeginIndex(size_t history_size, int average_frames)
 {
-    const size_t frame_count = static_cast<size_t>((std::max) (average_frames, 1));
+    const size_t frame_count = static_cast<size_t>((std::max)(average_frames, 1));
     return history_size > frame_count ? history_size - frame_count : 0;
 }
 
@@ -371,8 +371,8 @@ public:
                     }
                     ui.endPanel();
 
-                    m_average_frames = (std::max) (m_average_frames, 1);
-                    m_average_frames = (std::min) (m_average_frames, static_cast<int>(kMaxHistoryFrames));
+                    m_average_frames = (std::max)(m_average_frames, 1);
+                    m_average_frames = (std::min)(m_average_frames, static_cast<int>(kMaxHistoryFrames));
                     const double average_total_cpu_ms =
                         !m_history.empty() ? averageGraphCpuMs(m_history, m_average_frames) : profile.total_cpu_time_ms;
                     const double average_total_gpu_ms =
@@ -402,9 +402,8 @@ public:
                                   luna::editor::StatusVariant::Neutral);
                         ui.tableNextColumn();
                         ui.metric("Culling",
-                                  culling_stats.available
-                                      ? formatFloat(culling_stats.draw_queue_cpu_ms, 3) + " ms"
-                                      : std::string("-"),
+                                  culling_stats.available ? formatFloat(culling_stats.draw_queue_cpu_ms, 3) + " ms"
+                                                          : std::string("-"),
                                   culling_stats.available
                                       ? formatFloat(culling_stats.avg_us_per_submitted_draw, 2) + " us / draw"
                                       : std::string{},

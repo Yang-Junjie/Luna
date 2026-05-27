@@ -4,10 +4,10 @@
 #include "Core/UUID.h"
 
 #include <cstdint>
-#include <string>
-#include <vector>
 
 #include <glm/vec3.hpp>
+#include <string>
+#include <vector>
 
 namespace luna {
 

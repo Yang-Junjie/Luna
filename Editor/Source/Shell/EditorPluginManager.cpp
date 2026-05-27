@@ -1,5 +1,3 @@
-#include "Shell/EditorPluginManager.h"
-
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
@@ -14,19 +12,19 @@
 #include "EditorApi/EditorWindowService.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Shell/EditorPluginDependencyResolver.h"
+#include "Shell/EditorPluginManager.h"
 #include "Shell/EditorPluginManifest.h"
 
-#include <algorithm>
 #include <cstring>
+
+#include <algorithm>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-namespace {
-
-} // namespace
+namespace {} // namespace
 
 namespace luna::editor {
 
@@ -119,8 +117,8 @@ std::string dependencyFailureMessage(const EditorPluginPackage& package)
     return "Dependencies were not met: " + dependencies;
 }
 
-std::unordered_map<std::string, std::size_t> buildLoadDiagnosticIndex(
-    const std::vector<EditorPluginDiagnostic>& diagnostics)
+std::unordered_map<std::string, std::size_t>
+    buildLoadDiagnosticIndex(const std::vector<EditorPluginDiagnostic>& diagnostics)
 {
     std::unordered_map<std::string, std::size_t> diagnostic_index_by_id;
     for (std::size_t index = 0; index < diagnostics.size(); ++index) {
@@ -304,42 +302,48 @@ uint32_t toNativeSceneEntityComponentFlags(const SceneEntityComponents& componen
 LunaEditorSceneTransform toNativeSceneTransform(const SceneTransform& transform) noexcept
 {
     return LunaEditorSceneTransform{
-        .translation = LunaEditorVec3{
-            .x = transform.translation.x,
-            .y = transform.translation.y,
-            .z = transform.translation.z,
-        },
-        .rotation_degrees = LunaEditorVec3{
-            .x = transform.rotation_degrees.x,
-            .y = transform.rotation_degrees.y,
-            .z = transform.rotation_degrees.z,
-        },
-        .scale = LunaEditorVec3{
-            .x = transform.scale.x,
-            .y = transform.scale.y,
-            .z = transform.scale.z,
-        },
+        .translation =
+            LunaEditorVec3{
+                .x = transform.translation.x,
+                .y = transform.translation.y,
+                .z = transform.translation.z,
+            },
+        .rotation_degrees =
+            LunaEditorVec3{
+                .x = transform.rotation_degrees.x,
+                .y = transform.rotation_degrees.y,
+                .z = transform.rotation_degrees.z,
+            },
+        .scale =
+            LunaEditorVec3{
+                .x = transform.scale.x,
+                .y = transform.scale.y,
+                .z = transform.scale.z,
+            },
     };
 }
 
 SceneTransform toEditorSceneTransform(const LunaEditorSceneTransform& transform) noexcept
 {
     return SceneTransform{
-        .translation = Vec3{
-            .x = transform.translation.x,
-            .y = transform.translation.y,
-            .z = transform.translation.z,
-        },
-        .rotation_degrees = Vec3{
-            .x = transform.rotation_degrees.x,
-            .y = transform.rotation_degrees.y,
-            .z = transform.rotation_degrees.z,
-        },
-        .scale = Vec3{
-            .x = transform.scale.x,
-            .y = transform.scale.y,
-            .z = transform.scale.z,
-        },
+        .translation =
+            Vec3{
+                .x = transform.translation.x,
+                .y = transform.translation.y,
+                .z = transform.translation.z,
+            },
+        .rotation_degrees =
+            Vec3{
+                .x = transform.rotation_degrees.x,
+                .y = transform.rotation_degrees.y,
+                .z = transform.rotation_degrees.z,
+            },
+        .scale =
+            Vec3{
+                .x = transform.scale.x,
+                .y = transform.scale.y,
+                .z = transform.scale.z,
+            },
     };
 }
 
@@ -715,7 +719,8 @@ int nativeUiBeginWindow(void* api_user_data, const char* id, const char* title, 
     }
 
     bool open_value = open == nullptr || *open != 0;
-    const bool visible = ui->beginWindow(nativeString(id), nativeString(title), open != nullptr ? &open_value : nullptr, flags);
+    const bool visible =
+        ui->beginWindow(nativeString(id), nativeString(title), open != nullptr ? &open_value : nullptr, flags);
     if (open != nullptr) {
         *open = open_value ? 1 : 0;
     }
@@ -847,7 +852,10 @@ void nativeUiWindowFramebufferScale(void* api_user_data, LunaEditorVec2* out_val
 int nativeUiButton(void* api_user_data, const char* label, const LunaEditorVec2* size, uint32_t variant)
 {
     Ui* ui = nativeUi(api_user_data);
-    return ui != nullptr && label != nullptr && ui->button(nativeString(label), toEditorVec2(size), toEditorButtonVariant(variant)) ? 1 : 0;
+    return ui != nullptr && label != nullptr &&
+                   ui->button(nativeString(label), toEditorVec2(size), toEditorButtonVariant(variant))
+               ? 1
+               : 0;
 }
 
 int nativeUiCheckbox(void* api_user_data, const char* label, int* value)
@@ -898,26 +906,21 @@ int nativeUiSliderInt(void* api_user_data, const char* label, int* value, int mi
                : 0;
 }
 
-int nativeUiSliderFloat(void* api_user_data,
-                        const char* label,
-                        float* value,
-                        float min_value,
-                        float max_value,
-                        const char* format)
+int nativeUiSliderFloat(
+    void* api_user_data, const char* label, float* value, float min_value, float max_value, const char* format)
 {
     Ui* ui = nativeUi(api_user_data);
     return ui != nullptr && label != nullptr && value != nullptr &&
-                   ui->sliderFloat(nativeString(label), *value, min_value, max_value, format != nullptr ? nativeString(format) : "%.3f")
+                   ui->sliderFloat(nativeString(label),
+                                   *value,
+                                   min_value,
+                                   max_value,
+                                   format != nullptr ? nativeString(format) : "%.3f")
                ? 1
                : 0;
 }
 
-int nativeUiDragInt(void* api_user_data,
-                    const char* label,
-                    int* value,
-                    float speed,
-                    int min_value,
-                    int max_value)
+int nativeUiDragInt(void* api_user_data, const char* label, int* value, float speed, int min_value, int max_value)
 {
     Ui* ui = nativeUi(api_user_data);
     return ui != nullptr && label != nullptr && value != nullptr &&
@@ -936,7 +939,12 @@ int nativeUiDragFloat(void* api_user_data,
 {
     Ui* ui = nativeUi(api_user_data);
     return ui != nullptr && label != nullptr && value != nullptr &&
-                   ui->dragFloat(nativeString(label), *value, speed, min_value, max_value, format != nullptr ? nativeString(format) : "%.3f")
+                   ui->dragFloat(nativeString(label),
+                                 *value,
+                                 speed,
+                                 min_value,
+                                 max_value,
+                                 format != nullptr ? nativeString(format) : "%.3f")
                ? 1
                : 0;
 }
@@ -978,11 +986,7 @@ int nativeUiInputText(void* api_user_data, const char* label, char* value, size_
     return changed ? 1 : 0;
 }
 
-int nativeUiInputTextWithHint(void* api_user_data,
-                              const char* label,
-                              const char* hint,
-                              char* value,
-                              size_t buffer_size)
+int nativeUiInputTextWithHint(void* api_user_data, const char* label, const char* hint, char* value, size_t buffer_size)
 {
     Ui* ui = nativeUi(api_user_data);
     if (ui == nullptr || label == nullptr || hint == nullptr || value == nullptr || buffer_size == 0u) {
@@ -1004,7 +1008,10 @@ int nativeUiTreeNode(void* api_user_data, const char* label)
 int nativeUiTreeNodeEx(void* api_user_data, const char* id, const char* label, uint32_t flags)
 {
     Ui* ui = nativeUi(api_user_data);
-    return ui != nullptr && id != nullptr && label != nullptr && ui->treeNodeEx(nativeString(id), nativeString(label), flags) ? 1 : 0;
+    return ui != nullptr && id != nullptr && label != nullptr &&
+                   ui->treeNodeEx(nativeString(id), nativeString(label), flags)
+               ? 1
+               : 0;
 }
 
 void nativeUiTreePop(void* api_user_data)
@@ -1017,7 +1024,8 @@ void nativeUiTreePop(void* api_user_data)
 int nativeUiBeginCombo(void* api_user_data, const char* label, const char* preview_value)
 {
     Ui* ui = nativeUi(api_user_data);
-    return ui != nullptr && label != nullptr && ui->beginCombo(nativeString(label), nativeString(preview_value)) ? 1 : 0;
+    return ui != nullptr && label != nullptr && ui->beginCombo(nativeString(label), nativeString(preview_value)) ? 1
+                                                                                                                 : 0;
 }
 
 void nativeUiEndCombo(void* api_user_data)
@@ -1086,7 +1094,10 @@ int nativeUiInvisibleButton(void* api_user_data, const char* id, const LunaEdito
 int nativeUiBeginSection(void* api_user_data, const char* id, const char* label, int default_open)
 {
     Ui* ui = nativeUi(api_user_data);
-    return ui != nullptr && id != nullptr && label != nullptr && ui->beginSection(nativeString(id), nativeString(label), default_open != 0) ? 1 : 0;
+    return ui != nullptr && id != nullptr && label != nullptr &&
+                   ui->beginSection(nativeString(id), nativeString(label), default_open != 0)
+               ? 1
+               : 0;
 }
 
 void nativeUiEndSection(void* api_user_data)
@@ -1230,14 +1241,14 @@ void nativeUiScaled(void* api_user_data, const LunaEditorVec2* value, LunaEditor
     }
 }
 
-int nativeUiBeginTable(void* api_user_data,
-                       const char* id,
-                       int column_count,
-                       uint32_t flags,
-                       const LunaEditorVec2* outer_size)
+int nativeUiBeginTable(
+    void* api_user_data, const char* id, int column_count, uint32_t flags, const LunaEditorVec2* outer_size)
 {
     Ui* ui = nativeUi(api_user_data);
-    return ui != nullptr && id != nullptr && ui->beginTable(nativeString(id), column_count, flags, toEditorVec2(outer_size)) ? 1 : 0;
+    return ui != nullptr && id != nullptr &&
+                   ui->beginTable(nativeString(id), column_count, flags, toEditorVec2(outer_size))
+               ? 1
+               : 0;
 }
 
 void nativeUiEndTable(void* api_user_data)
@@ -1547,7 +1558,9 @@ int nativeAssetExists(void* api_user_data, uint64_t handle)
 int nativeAssetPathExists(void* api_user_data, const char* path)
 {
     AssetService* assets = nativeAssets(api_user_data);
-    return assets != nullptr && path != nullptr && assets->assetPathExists(std::filesystem::path(nativeString(path))) ? 1 : 0;
+    return assets != nullptr && path != nullptr && assets->assetPathExists(std::filesystem::path(nativeString(path)))
+               ? 1
+               : 0;
 }
 
 uint64_t nativeFindAssetHandleByPath(void* api_user_data, const char* path)
@@ -1653,7 +1666,10 @@ int nativeIsAssetLoading(void* api_user_data, uint64_t handle)
     return assets != nullptr && assets->isAssetLoading(AssetHandle(handle)) ? 1 : 0;
 }
 
-int nativeAcceptsAssetType(void* api_user_data, uint32_t type, const uint32_t* accepted_types, size_t accepted_type_count)
+int nativeAcceptsAssetType(void* api_user_data,
+                           uint32_t type,
+                           const uint32_t* accepted_types,
+                           size_t accepted_type_count)
 {
     AssetService* assets = nativeAssets(api_user_data);
     if (assets == nullptr) {
@@ -1670,9 +1686,7 @@ int nativeAcceptsAssetType(void* api_user_data, uint32_t type, const uint32_t* a
             editor_accepted_types.push_back(toEditorAssetType(accepted_types[index]));
         }
     }
-    return assets->acceptsAssetType(toEditorAssetType(type),
-                                    editor_accepted_types.data(),
-                                    editor_accepted_types.size())
+    return assets->acceptsAssetType(toEditorAssetType(type), editor_accepted_types.data(), editor_accepted_types.size())
                ? 1
                : 0;
 }
@@ -1872,8 +1886,8 @@ int nativeAddMenuItem(void* api_user_data, const LunaEditorMenuItemDescriptor* d
 
 void nativeRemoveMenuItem(void* api_user_data, const char* menu_path, const char* command_id)
 {
-    if (EditorPluginManagerHost* shell = nativeShell(api_user_data); shell != nullptr && menu_path != nullptr &&
-                                                           command_id != nullptr) {
+    if (EditorPluginManagerHost* shell = nativeShell(api_user_data);
+        shell != nullptr && menu_path != nullptr && command_id != nullptr) {
         shell->menus().removeMenuItem(nativeString(menu_path), nativeString(command_id));
     }
 }
@@ -1971,9 +1985,7 @@ int nativeOpenSceneFile(void* api_user_data, const char* scene_file_path)
                : 0;
 }
 
-size_t nativeEnumerateSceneEntities(void* api_user_data,
-                                    void* user_data,
-                                    LunaEditorEnumerateSceneEntityFn enumerate_fn)
+size_t nativeEnumerateSceneEntities(void* api_user_data, void* user_data, LunaEditorEnumerateSceneEntityFn enumerate_fn)
 {
     SceneService* scene = nativeScene(api_user_data);
     if (scene == nullptr) {
@@ -2035,10 +2047,8 @@ int nativeEntityInfo(void* api_user_data, uint64_t entity_id, LunaEditorSceneEnt
 int nativeIsEntityDescendantOf(void* api_user_data, uint64_t entity_id, uint64_t potential_ancestor_id)
 {
     SceneService* scene = nativeScene(api_user_data);
-    return scene != nullptr &&
-                   scene->isEntityDescendantOf(EntityId(entity_id), EntityId(potential_ancestor_id))
-               ? 1
-               : 0;
+    return scene != nullptr && scene->isEntityDescendantOf(EntityId(entity_id), EntityId(potential_ancestor_id)) ? 1
+                                                                                                                 : 0;
 }
 
 uint64_t nativeCreateEntity(void* api_user_data, const char* name)
@@ -2085,7 +2095,8 @@ int nativeReparentEntity(void* api_user_data, uint64_t entity_id, uint64_t new_p
 int nativeSetEntityName(void* api_user_data, uint64_t entity_id, const char* name)
 {
     SceneService* scene = nativeScene(api_user_data);
-    return scene != nullptr && name != nullptr && scene->setEntityName(EntityId(entity_id), std::string(nativeString(name)))
+    return scene != nullptr && name != nullptr &&
+                   scene->setEntityName(EntityId(entity_id), std::string(nativeString(name)))
                ? 1
                : 0;
 }
@@ -2191,13 +2202,16 @@ int nativeSetMeshComponent(void* api_user_data, uint64_t entity_id, const LunaEd
 int nativeAddComponent(void* api_user_data, uint64_t entity_id, uint32_t component_kind)
 {
     SceneService* scene = nativeScene(api_user_data);
-    return scene != nullptr && scene->addComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind)) ? 1 : 0;
+    return scene != nullptr && scene->addComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind)) ? 1
+                                                                                                                    : 0;
 }
 
 int nativeRemoveComponent(void* api_user_data, uint64_t entity_id, uint32_t component_kind)
 {
     SceneService* scene = nativeScene(api_user_data);
-    return scene != nullptr && scene->removeComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind)) ? 1 : 0;
+    return scene != nullptr && scene->removeComponent(EntityId(entity_id), toEditorSceneComponentKind(component_kind))
+               ? 1
+               : 0;
 }
 
 uint64_t nativeSelectedEntityId(void* api_user_data)
@@ -2263,8 +2277,7 @@ int nativeSyncSceneViewportEx(void* api_user_data,
     }
 
     *out_presentation = toNativeViewportPresentation(viewport->syncSceneViewport(
-        static_cast<ViewportId>(viewport_id),
-        UVec2{.x = framebuffer_width, .y = framebuffer_height}));
+        static_cast<ViewportId>(viewport_id), UVec2{.x = framebuffer_width, .y = framebuffer_height}));
     return 1;
 }
 
@@ -2712,9 +2725,10 @@ bool EditorPluginManager::loadRegisteredPackages()
         }
 
         EditorPluginDiagnostic& diagnostic = m_diagnostics[diagnostic_it->second];
-        diagnostic.state = diagnostic.package.enabled ? EditorPluginLoadState::Registered
-                                                      : EditorPluginLoadState::Disabled;
-        diagnostic.status = diagnostic.package.enabled ? std::string("Registered") : std::string("Disabled by manifest");
+        diagnostic.state =
+            diagnostic.package.enabled ? EditorPluginLoadState::Registered : EditorPluginLoadState::Disabled;
+        diagnostic.status =
+            diagnostic.package.enabled ? std::string("Registered") : std::string("Disabled by manifest");
     }
     for (const EditorPluginDiagnostic& diagnostic : m_diagnostics) {
         if (!diagnostic.load_candidate && diagnostic.state == EditorPluginLoadState::Failed) {
@@ -2864,9 +2878,10 @@ bool EditorPluginManager::loadPackage(EditorPluginPackage& package, std::string&
             return loadNativePackage(package, failure_status);
         case EditorPluginRuntime::Lua:
             failure_status = "Lua editor plugin loading is not implemented yet";
-            LUNA_EDITOR_WARN("Editor plugin package '{}' resolved entry '{}' but Lua editor plugin loading is not implemented yet",
-                             package.id,
-                             package.resolved_entry_path.string());
+            LUNA_EDITOR_WARN(
+                "Editor plugin package '{}' resolved entry '{}' but Lua editor plugin loading is not implemented yet",
+                package.id,
+                package.resolved_entry_path.string());
             return false;
     }
 
@@ -2892,9 +2907,8 @@ bool EditorPluginManager::loadBuiltinPackage(EditorPluginPackage& package, std::
     const PluginDescriptor descriptor = plugin->descriptor();
     if (descriptor.id != package.id) {
         failure_status = "Plugin descriptor id '" + descriptor.id + "' does not match package id";
-        LUNA_EDITOR_WARN("Editor plugin package id '{}' does not match plugin descriptor id '{}'",
-                         package.id,
-                         descriptor.id);
+        LUNA_EDITOR_WARN(
+            "Editor plugin package id '{}' does not match plugin descriptor id '{}'", package.id, descriptor.id);
         return false;
     }
 
@@ -2915,9 +2929,8 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package, std::s
     }
     if (!package.entry_exists) {
         failure_status = "Native plugin entry does not exist: " + package.resolved_entry_path.string();
-        LUNA_EDITOR_WARN("Native editor plugin '{}' entry '{}' does not exist",
-                         package.id,
-                         package.resolved_entry_path.string());
+        LUNA_EDITOR_WARN(
+            "Native editor plugin '{}' entry '{}' does not exist", package.id, package.resolved_entry_path.string());
         return false;
     }
 
@@ -2987,9 +3000,8 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package, std::s
         return false;
     }
     if (instance.plugin_api.api_version != LUNA_EDITOR_PLUGIN_API_VERSION) {
-        failure_status = "Native plugin API version mismatch: got " +
-                         std::to_string(instance.plugin_api.api_version) + ", expected " +
-                         std::to_string(LUNA_EDITOR_PLUGIN_API_VERSION);
+        failure_status = "Native plugin API version mismatch: got " + std::to_string(instance.plugin_api.api_version) +
+                         ", expected " + std::to_string(LUNA_EDITOR_PLUGIN_API_VERSION);
         LUNA_EDITOR_WARN("Native editor plugin '{}' returned API version {} but editor expects {}",
                          package.id,
                          instance.plugin_api.api_version,
@@ -3004,8 +3016,8 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package, std::s
         return false;
     }
     if (package.id != instance.plugin_api.plugin_id) {
-        failure_status = "Native plugin API id '" + std::string(instance.plugin_api.plugin_id) +
-                         "' does not match package id";
+        failure_status =
+            "Native plugin API id '" + std::string(instance.plugin_api.plugin_id) + "' does not match package id";
         LUNA_EDITOR_WARN("Native editor plugin package id '{}' does not match plugin API id '{}'",
                          package.id,
                          instance.plugin_api.plugin_id);
@@ -3027,7 +3039,8 @@ bool EditorPluginManager::loadNativePackage(EditorPluginPackage& package, std::s
 
     LUNA_EDITOR_INFO("Loaded native editor plugin '{}' ({})",
                      package.id,
-                     instance.plugin_api.display_name != nullptr ? instance.plugin_api.display_name : package.display_name);
+                     instance.plugin_api.display_name != nullptr ? instance.plugin_api.display_name
+                                                                 : package.display_name);
     m_native_plugins.push_back(std::move(instance));
     return true;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Authoring/AuthoringTypes.h"
 #include "Asset/Asset.h"
+#include "Authoring/AuthoringTypes.h"
 #include "Core/UUID.h"
 #include "Project/ProjectInfo.h"
 #include "Scene/Entity.h"
@@ -9,6 +9,7 @@
 #include "Script/ScriptPluginManifest.h"
 
 #include <cstddef>
+
 #include <filesystem>
 #include <string>
 #include <vector>

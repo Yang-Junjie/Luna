@@ -1,6 +1,7 @@
 #include "Renderer/RenderFlow/RenderPassGraphContract.h"
 
 #include <cstddef>
+
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -154,22 +155,20 @@ void addPassResourceIssues(const FeatureValidationState& state,
             const auto [seen_it, inserted] = seen.emplace(resource_name, resource.kind);
             if (!inserted && seen_it->second != resource.kind) {
                 issues.push_back("pass '" + std::string(pass.pass_name) + "' resource '" + resource_name +
-                                 "' is declared with different kinds: " +
-                                 graphResourceKindLabel(seen_it->second) + " and " +
-                                 graphResourceKindLabel(resource.kind));
+                                 "' is declared with different kinds: " + graphResourceKindLabel(seen_it->second) +
+                                 " and " + graphResourceKindLabel(resource.kind));
             }
 
             const ResourceDeclaration* declaration = findDeclaration(declarations, resource.name);
             if (declaration == nullptr) {
                 issues.push_back("pass '" + std::string(pass.pass_name) + "' " +
-                                 passResourceAccessLabel(resource.access) + "s graph resource '" +
-                                 resource_name + "' that is not declared by feature contract");
+                                 passResourceAccessLabel(resource.access) + "s graph resource '" + resource_name +
+                                 "' that is not declared by feature contract");
             } else {
                 if (declaration->kind != resource.kind) {
                     issues.push_back("pass '" + std::string(pass.pass_name) + "' resource '" + resource_name +
-                                     "' kind mismatch: pass declares " +
-                                     graphResourceKindLabel(resource.kind) + " but feature contract declares " +
-                                     graphResourceKindLabel(declaration->kind));
+                                     "' kind mismatch: pass declares " + graphResourceKindLabel(resource.kind) +
+                                     " but feature contract declares " + graphResourceKindLabel(declaration->kind));
                 }
                 if (readsResource(resource.access) && !readAllowedByFeatureContract(*declaration)) {
                     issues.push_back("pass '" + std::string(pass.pass_name) + "' reads graph resource '" +
@@ -209,8 +208,7 @@ void addFeatureCoverageIssues(const FeatureValidationState& state,
         }
 
         if (!consumers.contains(std::string(input.name))) {
-            issues.push_back("feature graph input '" + std::string(input.name) +
-                             "' is not read by any declared pass");
+            issues.push_back("feature graph input '" + std::string(input.name) + "' is not read by any declared pass");
         }
     }
 
@@ -247,8 +245,8 @@ void addProducerIssues(const FeatureValidationState& state,
             }
 
             if (!producers.contains(resource_name)) {
-                issues.push_back("pass '" + std::string(pass.pass_name) + "' reads graph resource '" +
-                                 resource_name + "' with no active pass producer");
+                issues.push_back("pass '" + std::string(pass.pass_name) + "' reads graph resource '" + resource_name +
+                                 "' with no active pass producer");
             }
         }
     }
@@ -275,8 +273,8 @@ void addProducerIssues(const FeatureValidationState& state,
 
 } // namespace
 
-std::vector<RenderPassGraphContractResult> validateRenderPassGraphContracts(
-    std::span<const RenderPassGraphContractFeatureInput> features)
+std::vector<RenderPassGraphContractResult>
+    validateRenderPassGraphContracts(std::span<const RenderPassGraphContractFeatureInput> features)
 {
     std::vector<FeatureValidationState> states;
     states.reserve(features.size());

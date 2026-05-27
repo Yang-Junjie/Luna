@@ -2,28 +2,29 @@
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorCommandService.h"
+#include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorStandardCommands.h"
 #include "EditorApi/EditorUi.h"
-#include "EditorApi/EditorScriptPluginService.h"
 #include "EditorApi/EditorWindowService.h"
+#include "EditorStyle.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
-#include "EditorStyle.h"
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorApp.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectInfo.h"
-#include "Scene/Components.h"
 #include "Renderer/RenderWorld/RenderWorldExtractor.h"
+#include "Scene/Components.h"
 #include "Shell/EditorPluginManager.h"
 #include "Shell/EditorShell.h"
 
-#include <algorithm>
 #include <cctype>
 #include <cmath>
+
+#include <algorithm>
 #include <filesystem>
-#include <ImGuizmo.h>
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -52,27 +53,34 @@ LunaEditorLayer::LunaEditorLayer(LunaEditorApplication& application)
       m_application(&application),
       m_rendering(application.getRenderer()),
       m_main_menu(EditorMainMenuController::Actions{
-          .has_project_loaded = [this]() {
-              return hasProjectLoaded();
-          },
-          .open_project = [this](const std::filesystem::path& project_file_path) {
-              (void) openProject(project_file_path);
-          },
-          .sync_project_assets = [this]() {
-              (void) syncProjectAssets();
-          },
-          .refresh_project_script_plugins = [this]() {
-              refreshProjectScriptPlugins();
-          },
-          .create_scene = [this]() {
-              createScene();
-          },
-          .open_scene = [this]() {
-              (void) openScene();
-          },
-          .save_scene = [this]() {
-              (void) saveScene();
-          },
+          .has_project_loaded =
+              [this]() {
+                  return hasProjectLoaded();
+              },
+          .open_project =
+              [this](const std::filesystem::path& project_file_path) {
+                  (void) openProject(project_file_path);
+              },
+          .sync_project_assets =
+              [this]() {
+                  (void) syncProjectAssets();
+              },
+          .refresh_project_script_plugins =
+              [this]() {
+                  refreshProjectScriptPlugins();
+              },
+          .create_scene =
+              [this]() {
+                  createScene();
+              },
+          .open_scene =
+              [this]() {
+                  (void) openScene();
+              },
+          .save_scene =
+              [this]() {
+                  (void) saveScene();
+              },
       })
 {
     m_editor_shell = std::make_unique<editor::EditorShell>(*this, application.editorSettings());
@@ -109,8 +117,7 @@ void LunaEditorLayer::onAttach()
         activeSceneViewportInstance().configureRenderer(m_application->getRenderer(), false);
         syncEditorGridFeatureState();
         LUNA_EDITOR_INFO("ImGui overlay disabled for backend '{}'",
-                         luna::RHI::BackendTypeToString(
-                             m_application->getRenderer().getCapabilities().backend_type));
+                         luna::RHI::BackendTypeToString(m_application->getRenderer().getCapabilities().backend_type));
     }
 }
 
@@ -143,9 +150,8 @@ void LunaEditorLayer::onUpdate(Timestep dt)
     syncDefaultViewportMouseCapture();
 
     const bool runtime_viewport_enabled = m_runtime_viewport.isRuntimeViewportEnabled();
-    const bool allow_editor_camera = !runtime_viewport_enabled &&
-                                     isViewportInputAllowed(defaultSceneViewportId()) &&
-                                     !ImGuizmo::IsUsing();
+    const bool allow_editor_camera =
+        !runtime_viewport_enabled && isViewportInputAllowed(defaultSceneViewportId()) && !ImGuizmo::IsUsing();
     m_editor_camera.setInputEnabled(allow_editor_camera);
     if (!runtime_viewport_enabled) {
         m_editor_camera.onUpdate(dt);
@@ -202,8 +208,7 @@ void LunaEditorLayer::syncEditorUiScale()
     const editor::EditorThemePreset theme_preset = m_application != nullptr
                                                        ? m_application->editorSettings().data().theme_preset
                                                        : editor::EditorThemePreset::ModernLightweight;
-    if (theme_preset == m_editor_theme_preset &&
-        std::abs(ui_scale - m_editor_ui_scale) <= kUiScaleChangeThreshold) {
+    if (theme_preset == m_editor_theme_preset && std::abs(ui_scale - m_editor_ui_scale) <= kUiScaleChangeThreshold) {
         return;
     }
 
@@ -311,10 +316,9 @@ std::filesystem::path LunaEditorLayer::defaultRenderProfileExportPath(std::strin
     return m_rendering.defaultRenderProfileExportPath(backend_name);
 }
 
-bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(
-    const editor::RenderGraphProfileSnapshot& profile,
-    const std::filesystem::path& output_path,
-    std::string* error_message) const
+bool LunaEditorLayer::exportRenderGraphProfileChromeTraceJson(const editor::RenderGraphProfileSnapshot& profile,
+                                                              const std::filesystem::path& output_path,
+                                                              std::string* error_message) const
 {
     return m_rendering.exportRenderGraphProfileChromeTraceJson(profile, output_path, error_message);
 }
@@ -325,7 +329,7 @@ std::vector<editor::RenderFeatureInfo> LunaEditorLayer::getDefaultRenderFeatureI
 }
 
 std::vector<editor::RenderFeatureParameterInfo>
-LunaEditorLayer::getDefaultRenderFeatureParameters(std::string_view feature_name) const
+    LunaEditorLayer::getDefaultRenderFeatureParameters(std::string_view feature_name) const
 {
     return m_rendering.defaultRenderFeatureParameters(feature_name);
 }
@@ -509,14 +513,15 @@ bool LunaEditorLayer::isSceneViewportValid(editor::ViewportId viewport_id) const
     return m_viewports.isSceneViewportValid(viewport_id);
 }
 
-editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::ViewportId viewport_id, editor::UVec2 framebuffer_size)
+editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::ViewportId viewport_id,
+                                                                editor::UVec2 framebuffer_size)
 {
     return syncSceneViewport(viewport_id, framebuffer_size.x, framebuffer_size.y);
 }
 
 editor::ViewportPresentation LunaEditorLayer::syncSceneViewport(editor::ViewportId viewport_id,
-                                                                 uint32_t framebuffer_width,
-                                                                 uint32_t framebuffer_height)
+                                                                uint32_t framebuffer_width,
+                                                                uint32_t framebuffer_height)
 {
     if (m_application == nullptr) {
         return {};
@@ -646,10 +651,9 @@ void LunaEditorLayer::destroyViewportsForOwner(std::string_view owner_id)
     }
 }
 
-const ViewportInteractionState& LunaEditorLayer::recordViewportSurfaceInteraction(
-    editor::ViewportId viewport_id,
-    std::string_view owner_id,
-    const ViewportInteractionInput& input)
+const ViewportInteractionState& LunaEditorLayer::recordViewportSurfaceInteraction(editor::ViewportId viewport_id,
+                                                                                  std::string_view owner_id,
+                                                                                  const ViewportInteractionInput& input)
 {
     return m_viewports.recordViewportSurfaceInteraction(viewport_id, owner_id, input);
 }

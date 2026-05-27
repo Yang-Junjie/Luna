@@ -1,6 +1,5 @@
-#include "ScriptHostBridgeInternal.h"
-
 #include "Scene/Components/CameraComponent.h"
+#include "ScriptHostBridgeInternal.h"
 
 namespace {
 
@@ -107,11 +106,8 @@ int entitySetCameraPrimary(void* scene_context, uint64_t entity_id, int32_t prim
     return 1;
 }
 
-int entitySetPerspectiveCamera(void* scene_context,
-                               uint64_t entity_id,
-                               float vertical_fov_radians,
-                               float near_clip,
-                               float far_clip)
+int entitySetPerspectiveCamera(
+    void* scene_context, uint64_t entity_id, float vertical_fov_radians, float near_clip, float far_clip)
 {
     luna::Scene* scene = luna::getScriptSceneContext(scene_context);
     luna::Entity entity = luna::findScriptEntityById(scene, entity_id);
@@ -127,11 +123,8 @@ int entitySetPerspectiveCamera(void* scene_context,
     return 1;
 }
 
-int entitySetOrthographicCamera(void* scene_context,
-                                uint64_t entity_id,
-                                float vertical_size,
-                                float near_clip,
-                                float far_clip)
+int entitySetOrthographicCamera(
+    void* scene_context, uint64_t entity_id, float vertical_size, float near_clip, float far_clip)
 {
     luna::Scene* scene = luna::getScriptSceneContext(scene_context);
     luna::Entity entity = luna::findScriptEntityById(scene, entity_id);

@@ -1,16 +1,15 @@
-#include "Renderer/RenderFlow/DefaultScene/Environment.h"
-
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "Renderer/Image/ImageDataUtils.h"
+#include "Renderer/RenderFlow/DefaultScene/Environment.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 #include "Renderer/Texture.h"
 
-#include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstring>
 
+#include <algorithm>
+#include <array>
 #include <Builders.h>
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
@@ -23,7 +22,7 @@ namespace luna::render_flow::default_scene {
 
 namespace {
 
-constexpr uint32_t kProceduralSkyWidth = 1024;
+constexpr uint32_t kProceduralSkyWidth = 1'024;
 constexpr uint32_t kProceduralSkyHeight = 512;
 constexpr float kPi = 3.14159265358979323846f;
 constexpr float kTwoPi = 6.28318530717958647692f;
@@ -112,8 +111,7 @@ EnvironmentResources::SourceSignature defaultSkySignature(const RenderEnvironmen
 
 EnvironmentResources::SourceSignature requestedSourceSignature(const RenderEnvironment* environment)
 {
-    if (environment == nullptr ||
-        environment->background_mode == RenderBackgroundMode::ProceduralSky ||
+    if (environment == nullptr || environment->background_mode == RenderBackgroundMode::ProceduralSky ||
         !environment->environment_map_handle.isValid()) {
         return defaultSkySignature(environment);
     }
@@ -143,9 +141,8 @@ uint32_t mipLevelCount(const RHI::Ref<RHI::Texture>& texture)
     return texture->GetMipLevels();
 }
 
-glm::vec3 computeRayleighScattering(const glm::vec3& direction,
-                                    const glm::vec3& zenith_color,
-                                    const glm::vec3& horizon_color)
+glm::vec3
+    computeRayleighScattering(const glm::vec3& direction, const glm::vec3& zenith_color, const glm::vec3& horizon_color)
 {
     const float height = (std::max)(direction.y, 0.0f);
     const float zenith_factor = std::pow(height, 0.5f);
@@ -165,10 +162,8 @@ glm::vec3 computeMieScattering(const glm::vec3& direction, const glm::vec3& sun_
     return glm::vec3(1.0f, 0.9f, 0.7f) * phase * 0.15f;
 }
 
-glm::vec3 computeSunDisc(const glm::vec3& direction,
-                         const glm::vec3& sun_dir,
-                         float sun_angular_radius,
-                         float sun_intensity)
+glm::vec3
+    computeSunDisc(const glm::vec3& direction, const glm::vec3& sun_dir, float sun_angular_radius, float sun_intensity)
 {
     const float radius = (std::max)(sun_angular_radius, 0.0001f);
     const float cos_theta = glm::dot(direction, sun_dir);
@@ -300,26 +295,23 @@ RHI::TextureViewDesc texture2DStorageViewDesc(RHI::Format format)
     };
 }
 
-RHI::Ref<RHI::Texture> createCubeTexture(const RHI::Ref<RHI::Device>& device,
-                                                     uint32_t size,
-                                                     uint32_t mip_levels,
-                                                     std::string_view name)
+RHI::Ref<RHI::Texture>
+    createCubeTexture(const RHI::Ref<RHI::Device>& device, uint32_t size, uint32_t mip_levels, std::string_view name)
 {
     if (!device) {
         return {};
     }
 
-    return device->CreateTexture(
-        RHI::TextureBuilder()
-            .SetType(RHI::TextureType::TextureCube)
-            .SetSize(size, size)
-            .SetArrayLayers(6)
-            .SetMipLevels(mip_levels)
-            .SetFormat(render_flow::default_scene_detail::kEnvironmentIblFormat)
-            .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
-            .SetInitialState(RHI::ResourceState::Undefined)
-            .SetName(std::string(name))
-            .Build());
+    return device->CreateTexture(RHI::TextureBuilder()
+                                     .SetType(RHI::TextureType::TextureCube)
+                                     .SetSize(size, size)
+                                     .SetArrayLayers(6)
+                                     .SetMipLevels(mip_levels)
+                                     .SetFormat(render_flow::default_scene_detail::kEnvironmentIblFormat)
+                                     .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
+                                     .SetInitialState(RHI::ResourceState::Undefined)
+                                     .SetName(std::string(name))
+                                     .Build());
 }
 
 RHI::Ref<RHI::Texture> createBrdfLutTexture(const RHI::Ref<RHI::Device>& device)
@@ -328,15 +320,14 @@ RHI::Ref<RHI::Texture> createBrdfLutTexture(const RHI::Ref<RHI::Device>& device)
         return {};
     }
 
-    return device->CreateTexture(
-        RHI::TextureBuilder()
-            .SetSize(render_flow::default_scene_detail::kEnvironmentBrdfLutSize,
-                     render_flow::default_scene_detail::kEnvironmentBrdfLutSize)
-            .SetFormat(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat)
-            .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
-            .SetInitialState(RHI::ResourceState::Undefined)
-            .SetName("SceneEnvironmentBrdfLut")
-            .Build());
+    return device->CreateTexture(RHI::TextureBuilder()
+                                     .SetSize(render_flow::default_scene_detail::kEnvironmentBrdfLutSize,
+                                              render_flow::default_scene_detail::kEnvironmentBrdfLutSize)
+                                     .SetFormat(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat)
+                                     .SetUsage(RHI::TextureUsageFlags::Sampled | RHI::TextureUsageFlags::Storage)
+                                     .SetInitialState(RHI::ResourceState::Undefined)
+                                     .SetName("SceneEnvironmentBrdfLut")
+                                     .Build());
 }
 
 RHI::Ref<RHI::Sampler> createIblSampler(const RHI::Ref<RHI::Device>& device)
@@ -357,10 +348,9 @@ RHI::Ref<RHI::Sampler> createIblSampler(const RHI::Ref<RHI::Device>& device)
                                      .Build());
 }
 
-RHI::Ref<RHI::PipelineLayout>
-    createComputePipelineLayout(const RHI::Ref<RHI::Device>& device,
-                                const RHI::Ref<RHI::DescriptorSetLayout>& layout,
-                                uint32_t push_constant_size)
+RHI::Ref<RHI::PipelineLayout> createComputePipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                                          const RHI::Ref<RHI::DescriptorSetLayout>& layout,
+                                                          uint32_t push_constant_size)
 {
     if (!device || !layout) {
         return {};
@@ -372,10 +362,9 @@ RHI::Ref<RHI::PipelineLayout>
                                             .Build());
 }
 
-RHI::Ref<RHI::ComputePipeline>
-    createComputePipeline(const RHI::Ref<RHI::Device>& device,
-                          const RHI::Ref<RHI::PipelineLayout>& layout,
-                          const RHI::Ref<RHI::ShaderModule>& shader)
+RHI::Ref<RHI::ComputePipeline> createComputePipeline(const RHI::Ref<RHI::Device>& device,
+                                                     const RHI::Ref<RHI::PipelineLayout>& layout,
+                                                     const RHI::Ref<RHI::ShaderModule>& shader)
 {
     if (!device || !layout || !shader) {
         return {};
@@ -449,14 +438,13 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     SourceSignature source_signature_to_prepare = requested_signature;
     bool requested_texture_is_available = false;
     std::shared_ptr<Texture> requested_texture;
-    const bool source_matches_request =
-        m_has_source_signature && m_source_texture.texture && sameSourceSignature(m_source_signature, requested_signature);
+    const bool source_matches_request = m_has_source_signature && m_source_texture.texture &&
+                                        sameSourceSignature(m_source_signature, requested_signature);
 
     if (!source_matches_request && requested_signature.kind == SourceKind::TextureAsset) {
-        requested_texture =
-            environment != nullptr && environment->allow_async_load
-                ? AssetManager::get().requestAssetAs<Texture>(requested_signature.texture_handle)
-                : AssetManager::get().loadAssetAs<Texture>(requested_signature.texture_handle);
+        requested_texture = environment != nullptr && environment->allow_async_load
+                                ? AssetManager::get().requestAssetAs<Texture>(requested_signature.texture_handle)
+                                : AssetManager::get().loadAssetAs<Texture>(requested_signature.texture_handle);
         requested_texture_is_available = isUsableEnvironmentTexture(requested_texture);
 
         if (!requested_texture_is_available) {
@@ -466,11 +454,12 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                     requested_signature.texture_handle.toString());
             }
 
-            const bool texture_load_is_pending =
-                requested_texture == nullptr && environment != nullptr && environment->allow_async_load &&
-                AssetManager::get().isAssetLoading(requested_signature.texture_handle);
-            source_signature_to_prepare =
-                texture_load_is_pending && m_source_texture.texture ? m_source_signature : defaultSkySignature(environment);
+            const bool texture_load_is_pending = requested_texture == nullptr && environment != nullptr &&
+                                                 environment->allow_async_load &&
+                                                 AssetManager::get().isAssetLoading(requested_signature.texture_handle);
+            source_signature_to_prepare = texture_load_is_pending && m_source_texture.texture
+                                              ? m_source_signature
+                                              : defaultSkySignature(environment);
         }
     }
 
@@ -503,8 +492,10 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
                 procedural_sky_image, render_flow::default_scene_detail::kEnvironmentFormat);
             procedural_sky_image = renderer_detail::generateEnvironmentMipChain(
                 procedural_sky_image, render_flow::default_scene_detail::kEnvironmentFormat);
-            m_source_texture = renderer_detail::createTextureUpload(
-                context.device, procedural_sky_image, Texture::SamplerSettings{}, "SceneEnvironmentProceduralSkySource");
+            m_source_texture = renderer_detail::createTextureUpload(context.device,
+                                                                    procedural_sky_image,
+                                                                    Texture::SamplerSettings{},
+                                                                    "SceneEnvironmentProceduralSkySource");
             LUNA_RENDERER_INFO("Prepared procedural scene environment source texture ({}x{}, mips={})",
                                kProceduralSkyWidth,
                                kProceduralSkyHeight,
@@ -551,8 +542,8 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
         }
     }
     if (!m_brdf_lut_uav && m_brdf_lut_texture) {
-        m_brdf_lut_uav =
-            m_brdf_lut_texture->CreateView(texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat));
+        m_brdf_lut_uav = m_brdf_lut_texture->CreateView(
+            texture2DStorageViewDesc(render_flow::default_scene_detail::kEnvironmentBrdfLutFormat));
     }
 
     if (!m_sampler) {
@@ -560,51 +551,32 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (!m_equirect_to_cube_layout) {
-        m_equirect_to_cube_layout =
-            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
-                                                          .AddBinding(environment_binding::SourceTexture,
-                                                                      RHI::DescriptorType::SampledImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::Sampler,
-                                                                      RHI::DescriptorType::Sampler,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::OutputTexture,
-                                                                      RHI::DescriptorType::StorageImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .Build());
-        m_cube_filter_layout =
-            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
-                                                          .AddBinding(environment_binding::Sampler,
-                                                                      RHI::DescriptorType::Sampler,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::OutputTexture,
-                                                                      RHI::DescriptorType::StorageImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::SourceCubeTexture,
-                                                                      RHI::DescriptorType::SampledImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .Build());
-        m_prefilter_layout =
-            context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
-                                                          .AddBinding(environment_binding::SourceTexture,
-                                                                      RHI::DescriptorType::SampledImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::Sampler,
-                                                                      RHI::DescriptorType::Sampler,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .AddBinding(environment_binding::OutputTexture,
-                                                                      RHI::DescriptorType::StorageImage,
-                                                                      1,
-                                                                      RHI::ShaderStage::Compute)
-                                                          .Build());
+        m_equirect_to_cube_layout = context.device->CreateDescriptorSetLayout(
+            RHI::DescriptorSetLayoutBuilder()
+                .AddBinding(
+                    environment_binding::SourceTexture, RHI::DescriptorType::SampledImage, 1, RHI::ShaderStage::Compute)
+                .AddBinding(environment_binding::Sampler, RHI::DescriptorType::Sampler, 1, RHI::ShaderStage::Compute)
+                .AddBinding(
+                    environment_binding::OutputTexture, RHI::DescriptorType::StorageImage, 1, RHI::ShaderStage::Compute)
+                .Build());
+        m_cube_filter_layout = context.device->CreateDescriptorSetLayout(
+            RHI::DescriptorSetLayoutBuilder()
+                .AddBinding(environment_binding::Sampler, RHI::DescriptorType::Sampler, 1, RHI::ShaderStage::Compute)
+                .AddBinding(
+                    environment_binding::OutputTexture, RHI::DescriptorType::StorageImage, 1, RHI::ShaderStage::Compute)
+                .AddBinding(environment_binding::SourceCubeTexture,
+                            RHI::DescriptorType::SampledImage,
+                            1,
+                            RHI::ShaderStage::Compute)
+                .Build());
+        m_prefilter_layout = context.device->CreateDescriptorSetLayout(
+            RHI::DescriptorSetLayoutBuilder()
+                .AddBinding(
+                    environment_binding::SourceTexture, RHI::DescriptorType::SampledImage, 1, RHI::ShaderStage::Compute)
+                .AddBinding(environment_binding::Sampler, RHI::DescriptorType::Sampler, 1, RHI::ShaderStage::Compute)
+                .AddBinding(
+                    environment_binding::OutputTexture, RHI::DescriptorType::StorageImage, 1, RHI::ShaderStage::Compute)
+                .Build());
         m_brdf_lut_layout =
             context.device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
                                                           .AddBinding(environment_binding::BrdfLutOutputTexture,
@@ -615,13 +587,12 @@ void EnvironmentResources::ensure(const SceneRenderContext& context,
     }
 
     if (!m_descriptor_pool) {
-        m_descriptor_pool =
-            context.device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
-                                                     .SetMaxSets(16)
-                                                     .AddPoolSize(RHI::DescriptorType::SampledImage, 16)
-                                                     .AddPoolSize(RHI::DescriptorType::Sampler, 16)
-                                                     .AddPoolSize(RHI::DescriptorType::StorageImage, 16)
-                                                     .Build());
+        m_descriptor_pool = context.device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
+                                                                     .SetMaxSets(16)
+                                                                     .AddPoolSize(RHI::DescriptorType::SampledImage, 16)
+                                                                     .AddPoolSize(RHI::DescriptorType::Sampler, 16)
+                                                                     .AddPoolSize(RHI::DescriptorType::StorageImage, 16)
+                                                                     .Build());
     }
 
     if (m_descriptor_pool && !m_equirect_to_cube_descriptor_set) {
@@ -737,10 +708,8 @@ void EnvironmentResources::precomputeIfNeeded(RHI::CommandBufferEncoder& command
         commands.Dispatch(divideRoundUp(params.output_size, 8u), divideRoundUp(params.output_size, 8u), 1);
     };
 
-    transitionTexture(commands,
-                      m_environment_cube_texture,
-                      RHI::ResourceState::Undefined,
-                      RHI::ResourceState::UnorderedAccess);
+    transitionTexture(
+        commands, m_environment_cube_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
     m_equirect_to_cube_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::SourceTexture,
         .TextureView = m_source_texture.texture->GetDefaultView(),
@@ -763,10 +732,8 @@ void EnvironmentResources::precomputeIfNeeded(RHI::CommandBufferEncoder& command
                                    .roughness = 0.0f,
                                    .source_mip_levels = source_mip_levels});
     commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
-    transitionTexture(commands,
-                      m_environment_cube_texture,
-                      RHI::ResourceState::UnorderedAccess,
-                      RHI::ResourceState::ShaderRead);
+    transitionTexture(
+        commands, m_environment_cube_texture, RHI::ResourceState::UnorderedAccess, RHI::ResourceState::ShaderRead);
 
     transitionTexture(
         commands, m_irradiance_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
@@ -794,15 +761,11 @@ void EnvironmentResources::precomputeIfNeeded(RHI::CommandBufferEncoder& command
                      .source_mip_levels = source_mip_levels,
                  });
     commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
-    transitionTexture(commands,
-                      m_irradiance_texture,
-                      RHI::ResourceState::UnorderedAccess,
-                      RHI::ResourceState::ShaderRead);
+    transitionTexture(
+        commands, m_irradiance_texture, RHI::ResourceState::UnorderedAccess, RHI::ResourceState::ShaderRead);
 
-    transitionTexture(commands,
-                      m_prefiltered_texture,
-                      RHI::ResourceState::Undefined,
-                      RHI::ResourceState::UnorderedAccess);
+    transitionTexture(
+        commands, m_prefiltered_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
     for (uint32_t mip_level = 0; mip_level < render_flow::default_scene_detail::kEnvironmentPrefilterMipLevels;
          ++mip_level) {
         const uint32_t mip_size =
@@ -839,13 +802,10 @@ void EnvironmentResources::precomputeIfNeeded(RHI::CommandBufferEncoder& command
                      });
         commands.MemoryBarrierFast(RHI::MemoryTransition::AllWriteToAllRead);
     }
-    transitionTexture(commands,
-                      m_prefiltered_texture,
-                      RHI::ResourceState::UnorderedAccess,
-                      RHI::ResourceState::ShaderRead);
-
     transitionTexture(
-        commands, m_brdf_lut_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
+        commands, m_prefiltered_texture, RHI::ResourceState::UnorderedAccess, RHI::ResourceState::ShaderRead);
+
+    transitionTexture(commands, m_brdf_lut_texture, RHI::ResourceState::Undefined, RHI::ResourceState::UnorderedAccess);
     m_brdf_lut_descriptor_set->WriteTexture(RHI::TextureWriteInfo{
         .Binding = environment_binding::BrdfLutOutputTexture,
         .TextureView = m_brdf_lut_uav,

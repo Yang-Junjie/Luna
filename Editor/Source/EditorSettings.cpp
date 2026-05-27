@@ -1,13 +1,12 @@
+#include "Core/Log.h"
 #include "EditorSettings.h"
 
-#include "Core/Log.h"
-
-#include <algorithm>
 #include <cctype>
 #include <cmath>
+
+#include <algorithm>
 #include <fstream>
 #include <system_error>
-
 #include <yaml-cpp/yaml.h>
 
 namespace {
@@ -124,12 +123,14 @@ std::vector<EditorSettingsFontInfo> EditorSettingsStore::listFonts() const
 
     std::error_code ec;
     for (const std::filesystem::path& root : m_font_roots) {
-        if (root.empty() || !std::filesystem::exists(root, ec) || ec || !std::filesystem::is_directory(root, ec) || ec) {
+        if (root.empty() || !std::filesystem::exists(root, ec) || ec || !std::filesystem::is_directory(root, ec) ||
+            ec) {
             ec.clear();
             continue;
         }
 
-        for (std::filesystem::directory_iterator it(root, std::filesystem::directory_options::skip_permission_denied, ec),
+        for (std::filesystem::directory_iterator
+                 it(root, std::filesystem::directory_options::skip_permission_denied, ec),
              end;
              !ec && it != end;
              it.increment(ec)) {
@@ -274,11 +275,10 @@ bool EditorSettingsStore::setEditorFont(std::filesystem::path font_path, float s
     if (font_path.empty()) {
         m_data.font_path.clear();
         m_data.font_size_pixels = sanitizedFontSize(size_pixels);
-        m_restart_required = !samePath(activeFontPath(),
-                                       m_loaded_data.font_path.empty() ? m_default_font_path
-                                                                      : m_loaded_data.font_path) ||
-                             sanitizedFontSize(m_data.font_size_pixels) !=
-                                 sanitizedFontSize(m_loaded_data.font_size_pixels);
+        m_restart_required =
+            !samePath(activeFontPath(),
+                      m_loaded_data.font_path.empty() ? m_default_font_path : m_loaded_data.font_path) ||
+            sanitizedFontSize(m_data.font_size_pixels) != sanitizedFontSize(m_loaded_data.font_size_pixels);
         return true;
     }
     if (!isKnownFontPath(font_path)) {
@@ -288,8 +288,9 @@ bool EditorSettingsStore::setEditorFont(std::filesystem::path font_path, float s
 
     m_data.font_path = std::move(font_path);
     m_data.font_size_pixels = sanitizedFontSize(size_pixels);
-    m_restart_required = !samePath(activeFontPath(), m_loaded_data.font_path.empty() ? m_default_font_path : m_loaded_data.font_path) ||
-                         sanitizedFontSize(m_data.font_size_pixels) != sanitizedFontSize(m_loaded_data.font_size_pixels);
+    m_restart_required =
+        !samePath(activeFontPath(), m_loaded_data.font_path.empty() ? m_default_font_path : m_loaded_data.font_path) ||
+        sanitizedFontSize(m_data.font_size_pixels) != sanitizedFontSize(m_loaded_data.font_size_pixels);
     return true;
 }
 
@@ -298,8 +299,8 @@ bool EditorSettingsStore::resetEditorFont()
     m_last_error.clear();
     m_data.font_path.clear();
     m_data.font_size_pixels = kDefaultFontSizePixels;
-    m_restart_required = !m_loaded_data.font_path.empty() ||
-                         sanitizedFontSize(m_loaded_data.font_size_pixels) != kDefaultFontSizePixels;
+    m_restart_required =
+        !m_loaded_data.font_path.empty() || sanitizedFontSize(m_loaded_data.font_size_pixels) != kDefaultFontSizePixels;
     return true;
 }
 

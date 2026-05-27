@@ -1,12 +1,10 @@
 #include "Shell/EditorPluginDependencyResolver.h"
-
 #include "Shell/EditorPluginManager.h"
 
 namespace luna::editor {
 
-std::vector<std::string> missingEditorPluginDependencies(
-    const EditorPluginPackage& package,
-    const std::unordered_set<std::string>& loaded_plugin_ids)
+std::vector<std::string> missingEditorPluginDependencies(const EditorPluginPackage& package,
+                                                         const std::unordered_set<std::string>& loaded_plugin_ids)
 {
     std::vector<std::string> missing;
     for (const std::string& dependency : package.dependencies) {

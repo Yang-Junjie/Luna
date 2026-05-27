@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
+#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 
 namespace luna {
@@ -30,6 +30,7 @@ public:
     virtual ~IRenderFlow() = default;
 
     virtual void render(RenderFlowContext& context) = 0;
+
     virtual bool commitFrame()
     {
         return false;
@@ -37,8 +38,3 @@ public:
 };
 
 } // namespace luna
-
-
-
-
-

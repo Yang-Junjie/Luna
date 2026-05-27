@@ -58,7 +58,7 @@ void testOffscreenCasterExtendsCascadeDepth(TestContext& context)
         {-2.0f, 2.0f, 2.0f},
     }};
     const glm::vec3 light_direction{0.0f, 0.0f, -1.0f};
-    ShadowCascadeLightBounds bounds = buildShadowCascadeReceiverBounds(receiver_corners, light_direction, 1024);
+    ShadowCascadeLightBounds bounds = buildShadowCascadeReceiverBounds(receiver_corners, light_direction, 1'024);
     const float original_min_z = bounds.min_bounds.z;
     const float original_max_z = bounds.max_bounds.z;
 
@@ -90,7 +90,7 @@ void testLateralCasterDoesNotExpandCascade(TestContext& context)
         {-2.0f, 2.0f, 2.0f},
     }};
     const glm::vec3 light_direction{0.0f, 0.0f, -1.0f};
-    ShadowCascadeLightBounds bounds = buildShadowCascadeReceiverBounds(receiver_corners, light_direction, 1024);
+    ShadowCascadeLightBounds bounds = buildShadowCascadeReceiverBounds(receiver_corners, light_direction, 1'024);
     const glm::vec3 original_min = bounds.min_bounds;
     const glm::vec3 original_max = bounds.max_bounds;
 

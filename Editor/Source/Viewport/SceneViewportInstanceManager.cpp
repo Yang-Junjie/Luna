@@ -1,6 +1,5 @@
-#include "Viewport/SceneViewportInstanceManager.h"
-
 #include "Renderer/Renderer.h"
+#include "Viewport/SceneViewportInstanceManager.h"
 
 namespace luna {
 
@@ -37,8 +36,7 @@ bool SceneViewportInstanceManager::createViewport(editor::ViewportId viewport_id
     }
 
     m_plugin_viewports.emplace(
-        viewport_id,
-        std::make_unique<SceneViewportInstance>(SceneViewportInstance::RendererViewportKind::Owned));
+        viewport_id, std::make_unique<SceneViewportInstance>(SceneViewportInstance::RendererViewportKind::Owned));
     return true;
 }
 

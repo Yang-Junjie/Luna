@@ -1,13 +1,12 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
-
 #include "Core/Log.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Environment.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 #include <optional>
@@ -127,9 +126,8 @@ void updateSceneParameters(PassSharedState& state, const SceneRenderContext& con
 void updateEnvironmentBindings(PassSharedState& state)
 {
     const EnvironmentResources& environment = state.environment();
-    state.pipelines().updateSceneBindings(environment.sourceTexture().texture,
-                                          environment.prefilteredTexture(),
-                                          environment.brdfLutTexture());
+    state.pipelines().updateSceneBindings(
+        environment.sourceTexture().texture, environment.prefilteredTexture(), environment.brdfLutTexture());
 }
 
 RenderGraphTextureHandle readBlackboardTexture(const RenderPassBlackboard& blackboard,

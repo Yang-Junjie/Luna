@@ -1,13 +1,12 @@
-#include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
-
 #include "Core/Log.h"
+#include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 
 #include <string>
 
 namespace luna::render_flow {
 
-RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInfo(
-    std::span<const RenderFeatureDescriptorBinding> bindings)
+RHI::DescriptorSetLayoutCreateInfo
+    makeRenderFeatureDescriptorSetLayoutCreateInfo(std::span<const RenderFeatureDescriptorBinding> bindings)
 {
     RHI::DescriptorSetLayoutCreateInfo create_info;
     create_info.Bindings.reserve(bindings.size());
@@ -22,8 +21,7 @@ RHI::DescriptorSetLayoutCreateInfo makeRenderFeatureDescriptorSetLayoutCreateInf
     return create_info;
 }
 
-ShaderBindingContract makeRenderFeatureShaderBindingContract(
-    const RenderFeatureDescriptorSetContract& descriptor_set)
+ShaderBindingContract makeRenderFeatureShaderBindingContract(const RenderFeatureDescriptorSetContract& descriptor_set)
 {
     ShaderBindingContract contract = makeShaderBindingContract(descriptor_set.contract_name);
     contract.bindings.reserve(descriptor_set.bindings.size());
@@ -44,11 +42,10 @@ ShaderBindingContract makeRenderFeatureShaderBindingContract(
     return contract;
 }
 
-ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
-    const RHI::Ref<RHI::ShaderModule>& shader,
-    const ShaderBindingContract& contract,
-    const std::filesystem::path& shader_file,
-    std::string_view entry_point)
+ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(const RHI::Ref<RHI::ShaderModule>& shader,
+                                                                        const ShaderBindingContract& contract,
+                                                                        const std::filesystem::path& shader_file,
+                                                                        std::string_view entry_point)
 {
     if (!shader) {
         return {};
@@ -65,11 +62,10 @@ ShaderBindingValidationResult validateRenderFeatureShaderModuleBindings(
         shader->GetReflection());
 }
 
-bool validateAndLogRenderFeatureShaderModuleBindings(
-    const RHI::Ref<RHI::ShaderModule>& shader,
-    const ShaderBindingContract& contract,
-    const std::filesystem::path& shader_file,
-    std::string_view entry_point)
+bool validateAndLogRenderFeatureShaderModuleBindings(const RHI::Ref<RHI::ShaderModule>& shader,
+                                                     const ShaderBindingContract& contract,
+                                                     const std::filesystem::path& shader_file,
+                                                     std::string_view entry_point)
 {
     const ShaderBindingValidationResult result =
         validateRenderFeatureShaderModuleBindings(shader, contract, shader_file, entry_point);

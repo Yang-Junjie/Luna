@@ -3,6 +3,7 @@
 #include "EditorApi/EditorTypes.h"
 
 #include <cstddef>
+
 #include <string>
 #include <string_view>
 
@@ -116,9 +117,8 @@ public:
     virtual ViewportPresentation syncSceneViewport(UVec2 framebuffer_size) = 0;
     virtual TextureView sceneTextureView() const = 0;
     virtual void drawDefaultSceneViewport(Ui& ui) = 0;
-    virtual SceneViewportDrawResult drawSceneViewport(Ui& ui,
-                                                      ViewportId viewport_id,
-                                                      SceneViewportDrawOptions options = {}) = 0;
+    virtual SceneViewportDrawResult
+        drawSceneViewport(Ui& ui, ViewportId viewport_id, SceneViewportDrawOptions options = {}) = 0;
 
     virtual ViewportId createTextureViewport(std::string_view debug_name = {}) = 0;
     virtual void destroyTextureViewport(ViewportId viewport_id) = 0;

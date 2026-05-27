@@ -1,32 +1,32 @@
 #pragma once
 
-#include "EditorCamera.h"
 #include "Authoring/EditorAuthoringController.h"
 #include "Authoring/EditorSceneFileController.h"
+#include "Core/Layer.h"
+#include "EditorApi/EditorRenderingService.h"
+#include "EditorApi/EditorSettingsService.h"
+#include "EditorApi/EditorViewportService.h"
+#include "EditorCamera.h"
 #include "EditorDocumentHost.h"
 #include "EditorRuntimeSessionController.h"
 #include "EditorRuntimeViewportController.h"
 #include "EditorStateLifecycleController.h"
-#include "EditorApi/EditorRenderingService.h"
-#include "EditorApi/EditorSettingsService.h"
-#include "EditorApi/EditorViewportService.h"
-#include "Core/Layer.h"
 #include "Events/Event.h"
+#include "Project/EditorProjectSessionController.h"
+#include "Rendering/EditorRenderingController.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
 #include "Script/ScriptPluginManifest.h"
-#include "Project/EditorProjectSessionController.h"
-#include "Rendering/EditorRenderingController.h"
 #include "UI/EditorMainMenuController.h"
 #include "Viewport/EditorDefaultSceneViewportController.h"
 #include "Viewport/EditorViewportCoordinator.h"
 #include "Viewport/EditorViewportGizmoController.h"
 #include "Viewport/PreviewSceneViewportManager.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -49,7 +49,7 @@ namespace editor {
 class EditorPluginManager;
 class EditorShell;
 class Ui;
-}
+} // namespace editor
 
 class LunaEditorLayer final : public Layer, public EditorDocumentHost {
 public:
@@ -108,9 +108,8 @@ public:
     void destroySceneViewport(editor::ViewportId viewport_id);
     bool isSceneViewportValid(editor::ViewportId viewport_id) const noexcept;
     editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id, editor::UVec2 framebuffer_size);
-    editor::ViewportPresentation syncSceneViewport(editor::ViewportId viewport_id,
-                                                   uint32_t framebuffer_width,
-                                                   uint32_t framebuffer_height);
+    editor::ViewportPresentation
+        syncSceneViewport(editor::ViewportId viewport_id, uint32_t framebuffer_width, uint32_t framebuffer_height);
     bool setSceneViewportPreview(editor::ViewportId viewport_id, const editor::SceneViewportPreviewState& state);
     void clearSceneViewportPreview(editor::ViewportId viewport_id);
     editor::ViewportPresentation syncSceneViewport(uint32_t framebuffer_width, uint32_t framebuffer_height);
@@ -187,9 +186,7 @@ private:
     Scene& activeRenderScene();
     SceneViewportInstance& activeSceneViewportInstance() noexcept;
     const SceneViewportInstance& activeSceneViewportInstance() const noexcept;
-    bool syncPreviewSceneViewport(editor::ViewportId viewport_id,
-                                  Renderer& renderer,
-                                  SceneViewportInstance& viewport);
+    bool syncPreviewSceneViewport(editor::ViewportId viewport_id, Renderer& renderer, SceneViewportInstance& viewport);
 
     bool syncProjectAssets();
     bool openProject(const std::filesystem::path& project_file_path);

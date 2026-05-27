@@ -3,6 +3,7 @@
 #include "SceneStatusPlugin.h"
 
 #include <cstdint>
+
 #include <iomanip>
 #include <optional>
 #include <sstream>
@@ -66,8 +67,7 @@ std::string formatUInt64(uint64_t value)
     return std::to_string(value);
 }
 
-void assignBoolParameter(VisibilityDebugControls& controls,
-                         const luna::editor::RenderFeatureParameterInfo& parameter)
+void assignBoolParameter(VisibilityDebugControls& controls, const luna::editor::RenderFeatureParameterInfo& parameter)
 {
     if (parameter.value.type != luna::editor::RenderFeatureParameterType::Bool) {
         return;
@@ -105,8 +105,7 @@ void setVisibilityDebugBool(luna::editor::Host& host, std::string_view parameter
     luna::editor::RenderFeatureParameterValue parameter_value{};
     parameter_value.type = luna::editor::RenderFeatureParameterType::Bool;
     parameter_value.bool_value = value;
-    (void) host.rendering().setDefaultRenderFeatureParameter(
-        kDefaultSceneFeatureName, parameter_name, parameter_value);
+    (void) host.rendering().setDefaultRenderFeatureParameter(kDefaultSceneFeatureName, parameter_name, parameter_value);
 }
 
 void assignVisibilityStat(SceneVisibilityStats& stats, const luna::editor::RenderFeatureRuntimeStat& stat)
@@ -261,8 +260,7 @@ public:
                     const std::optional<SceneVisibilityStats> visibility_stats =
                         findSceneVisibilityStats(render_features);
 
-                    ui.heading("Rendering",
-                               std::string("Luna RHI / ") + host.rendering().backendName());
+                    ui.heading("Rendering", std::string("Luna RHI / ") + host.rendering().backendName());
                     if (ui.beginTable(
                             "##SceneStatusMetrics",
                             2,

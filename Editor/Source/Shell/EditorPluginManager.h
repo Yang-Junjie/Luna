@@ -1,10 +1,10 @@
 #pragma once
 
 #include "Asset/Asset.h"
-#include "EditorEnginePaths.h"
 #include "EditorApi/EditorNativePluginApi.h"
 #include "EditorApi/EditorPlugin.h"
 #include "EditorApi/EditorPluginService.h"
+#include "EditorEnginePaths.h"
 #include "Platform/Common/DynamicLibrary.h"
 #include "Shell/EditorBuiltinPluginRegistry.h"
 #include "Shell/EditorPluginManagerHost.h"

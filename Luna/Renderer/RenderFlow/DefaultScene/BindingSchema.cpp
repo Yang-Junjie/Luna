@@ -129,12 +129,7 @@ const std::array<DescriptorBindingSchema, 11> kGBufferBindings{{
      1,
      kFragmentStage,
      "gGBufferEmissiveAo"},
-    {"GBufferSampler",
-     gbuffer_binding::Sampler,
-     RHI::DescriptorType::Sampler,
-     1,
-     kFragmentStage,
-     "gGBufferSampler"},
+    {"GBufferSampler", gbuffer_binding::Sampler, RHI::DescriptorType::Sampler, 1, kFragmentStage, "gGBufferSampler"},
     {"PickBuffer", gbuffer_binding::Pick, RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gPickBuffer"},
     {"AmbientOcclusion",
      gbuffer_binding::AmbientOcclusion,
@@ -160,12 +155,7 @@ const std::array<DescriptorBindingSchema, 11> kGBufferBindings{{
      1,
      kFragmentStage,
      "gIndirectSpecularTexture"},
-    {"Velocity",
-     gbuffer_binding::Velocity,
-     RHI::DescriptorType::SampledImage,
-     1,
-     kFragmentStage,
-     "gVelocityTexture"},
+    {"Velocity", gbuffer_binding::Velocity, RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gVelocityTexture"},
 }};
 
 const std::array<DescriptorBindingSchema, 7> kSceneBindings{{
@@ -188,12 +178,7 @@ const std::array<DescriptorBindingSchema, 7> kSceneBindings{{
      kFragmentStage,
      "gEnvironmentSampler"},
     {"ShadowMap", scene_binding::ShadowMap, RHI::DescriptorType::SampledImage, 1, kFragmentStage, "gShadowMap"},
-    {"ShadowSampler",
-     scene_binding::ShadowSampler,
-     RHI::DescriptorType::Sampler,
-     1,
-     kFragmentStage,
-     "gShadowSampler"},
+    {"ShadowSampler", scene_binding::ShadowSampler, RHI::DescriptorType::Sampler, 1, kFragmentStage, "gShadowSampler"},
     {"EnvironmentPrefilterTexture",
      scene_binding::EnvironmentPrefilterTexture,
      RHI::DescriptorType::SampledImage,
@@ -238,10 +223,7 @@ const std::array<PipelineLayoutSetSchema, 2> kLightingSets{{
 }};
 
 const std::array<PushConstantSchema, 1> kMeshPushConstants{{
-    {"MeshPushConstants",
-     RHI::ShaderStage::Vertex,
-     0,
-     sizeof(render_flow::default_scene_detail::MeshPushConstants)},
+    {"MeshPushConstants", RHI::ShaderStage::Vertex, 0, sizeof(render_flow::default_scene_detail::MeshPushConstants)},
 }};
 
 const PipelineLayoutSchema kGeometryPipelineLayout{
@@ -335,8 +317,8 @@ RHI::DescriptorSetLayoutCreateInfo makeDescriptorSetLayoutCreateInfo(const Descr
 
 namespace {
 
-const RHI::Ref<RHI::DescriptorSetLayout>&
-    descriptorSetLayoutForSchema(DescriptorSetSchemaId schema_id, const DescriptorSetLayoutRefs& layouts) noexcept
+const RHI::Ref<RHI::DescriptorSetLayout>& descriptorSetLayoutForSchema(DescriptorSetSchemaId schema_id,
+                                                                       const DescriptorSetLayoutRefs& layouts) noexcept
 {
     switch (schema_id) {
         case DescriptorSetSchemaId::Material:
@@ -352,7 +334,7 @@ const RHI::Ref<RHI::DescriptorSetLayout>&
 } // namespace
 
 RHI::PipelineLayoutCreateInfo makePipelineLayoutCreateInfo(const PipelineLayoutSchema& schema,
-                                                                 const DescriptorSetLayoutRefs& layouts)
+                                                           const DescriptorSetLayoutRefs& layouts)
 {
     RHI::PipelineLayoutCreateInfo create_info;
     uint32_t set_count = 0;
@@ -436,9 +418,8 @@ luna::render_flow::ShaderBindingContract
     return contract;
 }
 
-RHI::Ref<RHI::DescriptorSetLayout>
-    createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
-                                        const DescriptorSetSchema& schema)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
+                                                                       const DescriptorSetSchema& schema)
 {
     if (!device) {
         return {};
@@ -447,10 +428,9 @@ RHI::Ref<RHI::DescriptorSetLayout>
     return device->CreateDescriptorSetLayout(makeDescriptorSetLayoutCreateInfo(schema));
 }
 
-RHI::Ref<RHI::PipelineLayout>
-    createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
-                                   const PipelineLayoutSchema& schema,
-                                   const DescriptorSetLayoutRefs& layouts)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayoutFromSchema(const RHI::Ref<RHI::Device>& device,
+                                                             const PipelineLayoutSchema& schema,
+                                                             const DescriptorSetLayoutRefs& layouts)
 {
     if (!device) {
         return {};

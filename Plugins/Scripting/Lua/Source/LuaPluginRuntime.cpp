@@ -1,14 +1,13 @@
-#include "LuaPluginRuntime.h"
-
 #include "Bindings/LuaCoreBindings.h"
 #include "Bindings/LuaInputBindings.h"
 #include "Bindings/LuaSceneBindings.h"
+#include "LuaPluginRuntime.h"
 
-#include <sol/sol.hpp>
+#include <cctype>
 
 #include <algorithm>
-#include <cctype>
 #include <memory>
+#include <sol/sol.hpp>
 #include <string>
 #include <utility>
 
@@ -121,9 +120,8 @@ void LuaPluginRuntime::onRuntimeStart(void* scene_context)
 
     const std::string scene_name = getSceneName(scene_context);
     log(LunaScriptHostLogLevel_Info,
-        "Lua script plugin starting scene '" + scene_name + "' with " +
-            std::to_string(m_scripted_entity_count) + " scripted entity(s) and " +
-            std::to_string(m_script_instances.size()) + " active script instance(s)");
+        "Lua script plugin starting scene '" + scene_name + "' with " + std::to_string(m_scripted_entity_count) +
+            " scripted entity(s) and " + std::to_string(m_script_instances.size()) + " active script instance(s)");
 }
 
 void LuaPluginRuntime::onRuntimeStop(void* scene_context)
@@ -277,9 +275,8 @@ void LuaPluginRuntime::handleScriptInstance(const LunaScriptInstanceDesc& script
         return;
     }
 
-    sol::object returned_object = execute_result.return_count() > 0
-                                      ? execute_result.get<sol::object>()
-                                      : sol::make_object(*m_lua_state, sol::nil);
+    sol::object returned_object = execute_result.return_count() > 0 ? execute_result.get<sol::object>()
+                                                                    : sol::make_object(*m_lua_state, sol::nil);
     sol::table prototype;
     if (returned_object.is<sol::table>()) {
         prototype = returned_object.as<sol::table>();
@@ -314,16 +311,13 @@ void LuaPluginRuntime::handleScriptInstance(const LunaScriptInstanceDesc& script
     instance->environment = std::move(environment);
     instance->self = std::move(instance_table);
 
-    if (sol::object on_create_object = instance->self["OnCreate"];
-        on_create_object.is<sol::protected_function>()) {
+    if (sol::object on_create_object = instance->self["OnCreate"]; on_create_object.is<sol::protected_function>()) {
         instance->on_create = on_create_object.as<sol::protected_function>();
     }
-    if (sol::object on_update_object = instance->self["OnUpdate"];
-        on_update_object.is<sol::protected_function>()) {
+    if (sol::object on_update_object = instance->self["OnUpdate"]; on_update_object.is<sol::protected_function>()) {
         instance->on_update = on_update_object.as<sol::protected_function>();
     }
-    if (sol::object on_destroy_object = instance->self["OnDestroy"];
-        on_destroy_object.is<sol::protected_function>()) {
+    if (sol::object on_destroy_object = instance->self["OnDestroy"]; on_destroy_object.is<sol::protected_function>()) {
         instance->on_destroy = on_destroy_object.as<sol::protected_function>();
     }
 
@@ -334,8 +328,7 @@ void LuaPluginRuntime::logLuaError(const std::string& callback_name,
                                    const std::string& script_name,
                                    const std::string& error) const
 {
-    log(LunaScriptHostLogLevel_Error,
-        "Lua script '" + script_name + "' failed during " + callback_name + ": " + error);
+    log(LunaScriptHostLogLevel_Error, "Lua script '" + script_name + "' failed during " + callback_name + ": " + error);
 }
 
 std::string LuaPluginRuntime::getScriptChunkName(const LunaScriptInstanceDesc& script_instance) const
@@ -407,7 +400,8 @@ void setLuaRuntimeScriptProperty(void* runtime_user_data,
                                  const LunaScriptPropertyValueDesc* property)
 {
     if (runtime_user_data != nullptr && property != nullptr) {
-        static_cast<LuaPluginRuntime*>(runtime_user_data)->setScriptProperty(scene_context, entity_id, script_id, *property);
+        static_cast<LuaPluginRuntime*>(runtime_user_data)
+            ->setScriptProperty(scene_context, entity_id, script_id, *property);
     }
 }
 

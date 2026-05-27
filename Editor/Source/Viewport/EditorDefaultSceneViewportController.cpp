@@ -1,22 +1,21 @@
-#include "Viewport/EditorDefaultSceneViewportController.h"
-
 #include "Authoring/EditorAuthoringController.h"
+#include "EditorApi/EditorUi.h"
 #include "EditorCamera.h"
 #include "EditorRuntimeViewportController.h"
-#include "EditorApi/EditorUi.h"
 #include "EditorStyle.h"
 #include "EditorUI.h"
 #include "Imgui/ImGuiContext.h"
 #include "Renderer/Renderer.h"
+#include "Viewport/EditorDefaultSceneViewportController.h"
 #include "Viewport/EditorViewportCoordinator.h"
 #include "Viewport/EditorViewportGizmoController.h"
 #include "Viewport/SceneViewportInstance.h"
 
-#include <algorithm>
 #include <cmath>
 
-#include <ImGuizmo.h>
+#include <algorithm>
 #include <imgui.h>
+#include <ImGuizmo.h>
 
 namespace {
 
@@ -34,8 +33,8 @@ bool requestViewportPick(luna::Renderer& renderer,
                          luna::RHI::Extent2D texture_extent,
                          bool editor_camera_mouse_captured)
 {
-    if (texture_extent.width == 0 || texture_extent.height == 0 || editor_camera_mouse_captured ||
-        ImGuizmo::IsOver() || ImGuizmo::IsUsing() || !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (texture_extent.width == 0 || texture_extent.height == 0 || editor_camera_mouse_captured || ImGuizmo::IsOver() ||
+        ImGuizmo::IsUsing() || !ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         return false;
     }
 
@@ -58,7 +57,7 @@ bool requestViewportPick(luna::Renderer& renderer,
     const float texture_v = std::clamp(uv0.y + (uv1.y - uv0.y) * local_y, 0.0f, 0.999999f);
 
     const uint32_t pixel_x = static_cast<uint32_t>(texture_u * static_cast<float>(texture_extent.width));
-    const uint32_t color_pixel_y = (std::min) (
+    const uint32_t color_pixel_y = (std::min)(
         static_cast<uint32_t>(texture_v * static_cast<float>(texture_extent.height)), texture_extent.height - 1);
 
     return viewport.requestScenePick(renderer, (std::min)(pixel_x, texture_extent.width - 1), color_pixel_y);
@@ -68,26 +67,24 @@ bool requestViewportPick(luna::Renderer& renderer,
 
 namespace luna {
 
-EditorDefaultSceneViewportController::DrawResult EditorDefaultSceneViewportController::draw(
-    editor::Ui& ui,
-    std::string_view owner_id,
-    Renderer& renderer,
-    EditorCamera& editor_camera,
-    EditorAuthoringController& authoring,
-    EditorRuntimeViewportController& runtime_viewport,
-    EditorViewportCoordinator& viewports,
-    EditorViewportGizmoController& gizmo,
-    SceneViewportInstance& active_viewport,
-    editor::ViewportId active_viewport_id,
-    Entity selected_entity)
+EditorDefaultSceneViewportController::DrawResult
+    EditorDefaultSceneViewportController::draw(editor::Ui& ui,
+                                               std::string_view owner_id,
+                                               Renderer& renderer,
+                                               EditorCamera& editor_camera,
+                                               EditorAuthoringController& authoring,
+                                               EditorRuntimeViewportController& runtime_viewport,
+                                               EditorViewportCoordinator& viewports,
+                                               EditorViewportGizmoController& gizmo,
+                                               SceneViewportInstance& active_viewport,
+                                               editor::ViewportId active_viewport_id,
+                                               Entity selected_entity)
 {
     DrawResult result{};
     result.focused = ImGui::IsWindowFocused();
 
-    gizmo.updateShortcuts(result.focused,
-                          editor_camera.isMouseCaptured(),
-                          ImGui::GetIO().WantTextInput,
-                          authoring.selectedEntityId());
+    gizmo.updateShortcuts(
+        result.focused, editor_camera.isMouseCaptured(), ImGui::GetIO().WantTextInput, authoring.selectedEntityId());
 
     const editor::Vec2 available = ui.contentRegionAvail();
     const editor::Vec2 framebuffer_scale = ui.windowFramebufferScale();
@@ -102,7 +99,8 @@ EditorDefaultSceneViewportController::DrawResult EditorDefaultSceneViewportContr
     }
 
     const auto& viewport_state = active_viewport.sync(renderer, viewport_width, viewport_height);
-    const auto& scene_texture = renderer.getSceneViewportOutputTexture(active_viewport.rendererViewportHandle(renderer));
+    const auto& scene_texture =
+        renderer.getSceneViewportOutputTexture(active_viewport.rendererViewportHandle(renderer));
     const ImTextureID texture_id = ImGuiRhiContext::GetTextureId(scene_texture);
     if (texture_id != 0 && available.x > 0.0f && available.y > 0.0f) {
         const bool flip_uv_y = viewport_state.y_flip;
@@ -118,10 +116,11 @@ EditorDefaultSceneViewportController::DrawResult EditorDefaultSceneViewportContr
             active_viewport_id,
             owner_id,
             ViewportInteractionInput{
-                .rect = ViewportSurfaceRect{
-                    .min = toEditorVec2(viewport_min),
-                    .max = toEditorVec2(viewport_max),
-                },
+                .rect =
+                    ViewportSurfaceRect{
+                        .min = toEditorVec2(viewport_min),
+                        .max = toEditorVec2(viewport_max),
+                    },
                 .hovered = viewport_item_hovered,
                 .active = ImGui::IsItemActive(),
                 .clicked = viewport_item_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left),
@@ -130,24 +129,20 @@ EditorDefaultSceneViewportController::DrawResult EditorDefaultSceneViewportContr
 
         const bool allow_gizmo_interaction =
             viewports.isViewportInputAllowed(active_viewport_id) || gizmo.hasActiveTransformTransaction();
-        const bool gizmo_active = !runtime_viewport.isRuntimeViewportEnabled() &&
-                                  gizmo.draw(viewport_min,
-                                             viewport_size,
-                                             allow_gizmo_interaction,
-                                             editor_camera,
-                                             authoring,
-                                             selected_entity);
+        const bool gizmo_active =
+            !runtime_viewport.isRuntimeViewportEnabled() &&
+            gizmo.draw(viewport_min, viewport_size, allow_gizmo_interaction, editor_camera, authoring, selected_entity);
         if (interaction.clicked && !gizmo_active && !runtime_viewport.isRuntimeViewportEnabled()) {
-            (void) requestViewportPick(
-                renderer,
-                active_viewport,
-                viewport_min,
-                viewport_max,
-                uv0,
-                uv1,
-                scene_texture ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
-                              : luna::RHI::Extent2D{0, 0},
-                editor_camera.isMouseCaptured());
+            (void) requestViewportPick(renderer,
+                                       active_viewport,
+                                       viewport_min,
+                                       viewport_max,
+                                       uv0,
+                                       uv1,
+                                       scene_texture
+                                           ? luna::RHI::Extent2D{scene_texture->GetWidth(), scene_texture->GetHeight()}
+                                           : luna::RHI::Extent2D{0, 0},
+                                       editor_camera.isMouseCaptured());
         }
     } else if (available.x > 0.0f && available.y > 0.0f) {
         ImGui::SetCursorPos(editor::scaleEditorUi(16.0f, 16.0f));

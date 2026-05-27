@@ -3,8 +3,9 @@
 #include "EditorApi/EditorTypes.h"
 #include "EditorApi/EditorViewportService.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 
 namespace luna::editor {
 
@@ -77,10 +78,9 @@ public:
         bool changed = false;
         if (draw_result.dragging) {
             m_state.yaw -= draw_result.mouse_drag_delta.x * m_config.orbit_sensitivity;
-            m_state.pitch =
-                std::clamp(m_state.pitch - draw_result.mouse_drag_delta.y * m_config.orbit_sensitivity,
-                           m_config.min_pitch,
-                           m_config.max_pitch);
+            m_state.pitch = std::clamp(m_state.pitch - draw_result.mouse_drag_delta.y * m_config.orbit_sensitivity,
+                                       m_config.min_pitch,
+                                       m_config.max_pitch);
             wrapYaw();
             changed = true;
         }
@@ -88,9 +88,7 @@ public:
         if (draw_result.hovered && draw_result.mouse_wheel_delta.y != 0.0f) {
             const float zoom_base = std::max(0.01f, 1.0f - std::clamp(m_config.zoom_sensitivity, 0.0f, 0.99f));
             const float zoom_factor = std::pow(zoom_base, draw_result.mouse_wheel_delta.y);
-            m_state.distance = std::clamp(m_state.distance * zoom_factor,
-                                          m_config.min_distance,
-                                          m_config.max_distance);
+            m_state.distance = std::clamp(m_state.distance * zoom_factor, m_config.min_distance, m_config.max_distance);
             changed = true;
         }
 

@@ -10,10 +10,10 @@ namespace luna::editor::native {
 class Project final {
 public:
     constexpr Project() noexcept = default;
+
     explicit constexpr Project(const LunaEditorProjectApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -97,7 +97,7 @@ public:
             return {};
         }
 
-        std::array<char, 1024> buffer{};
+        std::array<char, 1'024> buffer{};
         if (api_->project_root_path(api_->api_user_data, buffer.data(), buffer.size()) == 0) {
             return {};
         }

@@ -157,8 +157,7 @@ struct DescriptorRangeAllocator {
                 break;
             }
 
-            const uint64_t mergedEnd =
-                (std::max)(currentEnd, static_cast<uint64_t>(nextIt->offset) + nextIt->count);
+            const uint64_t mergedEnd = (std::max)(currentEnd, static_cast<uint64_t>(nextIt->offset) + nextIt->count);
             it->count = static_cast<uint32_t>(mergedEnd - it->offset);
             nextIt = freeRanges.erase(nextIt);
         }
@@ -321,16 +320,16 @@ public:
 
     D3D12_CPU_DESCRIPTOR_HANDLE GetSamplerCpuHandle(uint32_t offset) const
     {
-        D3D12_CPU_DESCRIPTOR_HANDLE handle = m_samplerHeap ? m_samplerHeap->GetCPUDescriptorHandleForHeapStart()
-                                                           : D3D12_CPU_DESCRIPTOR_HANDLE{};
+        D3D12_CPU_DESCRIPTOR_HANDLE handle =
+            m_samplerHeap ? m_samplerHeap->GetCPUDescriptorHandleForHeapStart() : D3D12_CPU_DESCRIPTOR_HANDLE{};
         handle.ptr += static_cast<SIZE_T>(offset) * m_samplerDescriptorSize;
         return handle;
     }
 
     D3D12_GPU_DESCRIPTOR_HANDLE GetSamplerGpuHandle(uint32_t offset) const
     {
-        D3D12_GPU_DESCRIPTOR_HANDLE handle = m_samplerHeap ? m_samplerHeap->GetGPUDescriptorHandleForHeapStart()
-                                                           : D3D12_GPU_DESCRIPTOR_HANDLE{};
+        D3D12_GPU_DESCRIPTOR_HANDLE handle =
+            m_samplerHeap ? m_samplerHeap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE{};
         handle.ptr += static_cast<UINT64>(offset) * m_samplerDescriptorSize;
         return handle;
     }

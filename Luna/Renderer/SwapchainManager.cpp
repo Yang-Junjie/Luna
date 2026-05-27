@@ -1,6 +1,5 @@
-#include "Renderer/SwapchainManager.h"
-
 #include "Core/Log.h"
+#include "Renderer/SwapchainManager.h"
 
 #include <Queue.h>
 #include <Swapchain.h>
@@ -15,8 +14,7 @@ bool AcquireResult::acquired() const noexcept
 
 bool AcquireResult::requiresRecreate() const noexcept
 {
-    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal ||
-           result == RHI::Result::DeviceLost;
+    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal || result == RHI::Result::DeviceLost;
 }
 
 bool PresentResult::presented() const noexcept
@@ -26,8 +24,7 @@ bool PresentResult::presented() const noexcept
 
 bool PresentResult::requiresRecreate() const noexcept
 {
-    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal ||
-           result == RHI::Result::DeviceLost;
+    return result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal || result == RHI::Result::DeviceLost;
 }
 
 bool SwapchainManager::create(const SwapchainCreateRequest& request)
@@ -44,8 +41,8 @@ AcquireResult SwapchainManager::acquireNextImage(FrameSyncHandle frame)
     }
 
     int acquired_image_index = -1;
-    const auto result =
-        m_resources.swapchain->AcquireNextImage(m_resources.synchronization, static_cast<int>(frame), acquired_image_index);
+    const auto result = m_resources.swapchain->AcquireNextImage(
+        m_resources.synchronization, static_cast<int>(frame), acquired_image_index);
     if (result != RHI::Result::Success || acquired_image_index < 0) {
         if (result == RHI::Result::OutOfDate || result == RHI::Result::Suboptimal) {
             requestResize();
@@ -94,9 +91,8 @@ bool SwapchainManager::recreateIfRequested(const FramebufferExtentProvider& exte
         return false;
     }
 
-    LUNA_RENDERER_INFO("Recreating swapchain for framebuffer resize to {}x{}",
-                       requested_extent.width,
-                       requested_extent.height);
+    LUNA_RENDERER_INFO(
+        "Recreating swapchain for framebuffer resize to {}x{}", requested_extent.width, requested_extent.height);
     request.graphics_queue->WaitIdle();
     if (request.before_recreate) {
         request.before_recreate();

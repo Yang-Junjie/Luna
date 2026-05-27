@@ -4,6 +4,7 @@
 #include "Scene/Entity.h"
 
 #include <cstdint>
+
 #include <string>
 
 struct ImVec2;

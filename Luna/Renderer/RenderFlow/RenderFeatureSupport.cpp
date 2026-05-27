@@ -111,11 +111,7 @@ RenderFeatureSupportResult evaluateRenderFeatureRequirements(const RenderFeature
                       capabilities.supports_default_render_flow,
                       result,
                       "DefaultRenderFlow");
-    requireCapability(rhi_flags,
-                      RenderFeatureRHICapabilityFlags::ImGui,
-                      capabilities.supports_imgui,
-                      result,
-                      "ImGui");
+    requireCapability(rhi_flags, RenderFeatureRHICapabilityFlags::ImGui, capabilities.supports_imgui, result, "ImGui");
     requireCapability(rhi_flags,
                       RenderFeatureRHICapabilityFlags::ScenePickReadback,
                       capabilities.supports_scene_pick_readback,
@@ -168,7 +164,8 @@ RenderFeatureSupportResult evaluateRenderFeatureRequirements(const RenderFeature
                     capabilities.supports_storage_buffer,
                     result,
                     "StorageBuffer");
-    requireResource(resource_flags, RenderFeatureResourceFlags::Sampler, capabilities.supports_sampler, result, "Sampler");
+    requireResource(
+        resource_flags, RenderFeatureResourceFlags::Sampler, capabilities.supports_sampler, result, "Sampler");
 
     return result;
 }

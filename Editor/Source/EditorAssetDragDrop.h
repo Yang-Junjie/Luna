@@ -3,9 +3,8 @@
 #include "Asset/AssetMetadata.h"
 
 #include <algorithm>
-#include <initializer_list>
-
 #include <imgui.h>
+#include <initializer_list>
 
 namespace luna::editor {
 

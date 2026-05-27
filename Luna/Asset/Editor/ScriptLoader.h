@@ -6,8 +6,9 @@
 #include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginManager.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -21,8 +22,7 @@ inline bool equalsIgnoreCase(std::string_view lhs, std::string_view rhs)
 {
     return lhs.size() == rhs.size() &&
            std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](char left, char right) {
-               return std::tolower(static_cast<unsigned char>(left)) ==
-                      std::tolower(static_cast<unsigned char>(right));
+               return std::tolower(static_cast<unsigned char>(left)) == std::tolower(static_cast<unsigned char>(right));
            });
 }
 

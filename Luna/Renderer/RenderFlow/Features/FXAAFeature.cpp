@@ -1,6 +1,6 @@
-#include "Renderer/RenderFlow/Features/FXAAFeature.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/Features/FXAAFeature.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderFlow/RenderFeatureBindingContract.h"
 #include "Renderer/RenderFlow/RenderFeatureRegistry.h"
@@ -9,20 +9,12 @@
 #include "Renderer/RenderFlow/RenderPass.h"
 #include "Renderer/RenderFlow/RenderSlots.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
+
+#include <cstring>
 
 #include <algorithm>
 #include <array>
-#include <cstring>
-#include <filesystem>
-#include <glm/vec4.hpp>
-#include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <utility>
-
 #include <Buffer.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -30,11 +22,18 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <glm/vec4.hpp>
+#include <memory>
+#include <optional>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <Sampler.h>
 #include <ShaderCompiler.h>
+#include <string>
+#include <string_view>
 #include <Texture.h>
+#include <utility>
 
 namespace luna::render_flow {
 
@@ -86,12 +85,7 @@ constexpr std::array<RenderFeatureDescriptorBinding, 3> kFXAABindings{{
      RHI::DescriptorType::Sampler,
      1,
      RHI::ShaderStage::Fragment},
-    {"Params",
-     "gFXAAParams",
-     FXAABinding::Params,
-     RHI::DescriptorType::UniformBuffer,
-     1,
-     RHI::ShaderStage::Fragment},
+    {"Params", "gFXAAParams", FXAABinding::Params, RHI::DescriptorType::UniformBuffer, 1, RHI::ShaderStage::Fragment},
 }};
 
 bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
@@ -120,8 +114,7 @@ ShaderBindingContract makeFXAAShaderBindingContract()
     });
 }
 
-RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -159,9 +152,8 @@ RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
                                      .Build());
 }
 
-RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
-    const RHI::Ref<RHI::Device>& device,
-    const RHI::Ref<RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                                   const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -170,12 +162,11 @@ RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
     return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline> createPipeline(
-    const RHI::Ref<RHI::Device>& device,
-    const RHI::Ref<RHI::PipelineLayout>& layout,
-    const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-    const RHI::Ref<RHI::ShaderModule>& fragment_shader,
-    RHI::Format color_format)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(const RHI::Ref<RHI::Device>& device,
+                                               const RHI::Ref<RHI::PipelineLayout>& layout,
+                                               const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                               const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+                                               RHI::Format color_format)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
@@ -282,8 +273,8 @@ public:
         m_state.layout = createDescriptorSetLayout(device);
         m_state.descriptor_pool = createDescriptorPool(device);
         m_state.pipeline_layout = createPipelineLayout(device, m_state.layout);
-        m_state.pipeline =
-            createPipeline(device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format);
+        m_state.pipeline = createPipeline(
+            device, m_state.pipeline_layout, m_state.vertex_shader, m_state.fragment_shader, context.color_format);
         m_state.copy_pipeline = createPipeline(
             device, m_state.pipeline_layout, m_state.vertex_shader, m_state.copy_fragment_shader, context.color_format);
         m_state.sampler = createSampler(device);
@@ -312,10 +303,10 @@ public:
     [[nodiscard]] bool isComplete() const noexcept
     {
         return m_resource_set.hasGpuContext() && m_state.vertex_shader && m_state.fragment_shader &&
-               m_state.copy_fragment_shader && m_state.layout && m_state.descriptor_pool &&
-               m_state.pipeline_layout && m_state.pipeline && m_state.copy_pipeline && m_state.sampler &&
-               m_state.params_buffer && m_state.copy_params_buffer && m_state.descriptor_set &&
-               m_state.copy_descriptor_set && m_state.color_format != RHI::Format::UNDEFINED;
+               m_state.copy_fragment_shader && m_state.layout && m_state.descriptor_pool && m_state.pipeline_layout &&
+               m_state.pipeline && m_state.copy_pipeline && m_state.sampler && m_state.params_buffer &&
+               m_state.copy_params_buffer && m_state.descriptor_set && m_state.copy_descriptor_set &&
+               m_state.color_format != RHI::Format::UNDEFINED;
     }
 
     [[nodiscard]] bool isCompleteFor(const SceneRenderContext& context) const noexcept
@@ -333,7 +324,8 @@ public:
 
     void updateCopyBindings(const RHI::Ref<RHI::Texture>& source_color, uint32_t width, uint32_t height)
     {
-        updateDescriptorSet(m_state.copy_descriptor_set, m_state.copy_params_buffer, Options{}, source_color, width, height);
+        updateDescriptorSet(
+            m_state.copy_descriptor_set, m_state.copy_params_buffer, Options{}, source_color, width, height);
     }
 
     void draw(RenderGraphRasterPassContext& pass_context) const

@@ -76,8 +76,7 @@ namespace luna {
 class RenderGraphTransientTextureCache {
 public:
     void BeginFrame();
-    RHI::Ref<RHI::Texture> AcquireTexture(const RHI::Ref<RHI::Device>& device,
-                                                      const RenderGraphTextureDesc& desc);
+    RHI::Ref<RHI::Texture> AcquireTexture(const RHI::Ref<RHI::Device>& device, const RenderGraphTextureDesc& desc);
 
 private:
     struct TextureEntry {
@@ -95,11 +94,11 @@ private:
 class RenderGraphRasterPassBuilder {
 public:
     RenderGraphRasterPassBuilder& ReadTexture(RenderGraphTextureHandle handle);
-    RenderGraphRasterPassBuilder& WriteColor(
-        RenderGraphTextureHandle handle,
-        RHI::AttachmentLoadOp load_op,
-        RHI::AttachmentStoreOp store_op,
-        const RHI::ClearValue& clear_value = RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
+    RenderGraphRasterPassBuilder&
+        WriteColor(RenderGraphTextureHandle handle,
+                   RHI::AttachmentLoadOp load_op,
+                   RHI::AttachmentStoreOp store_op,
+                   const RHI::ClearValue& clear_value = RHI::ClearValue::ColorFloat(0.0f, 0.0f, 0.0f, 1.0f));
     RenderGraphRasterPassBuilder& WriteDepth(RenderGraphTextureHandle handle,
                                              RHI::AttachmentLoadOp load_op,
                                              RHI::AttachmentStoreOp store_op,
@@ -151,9 +150,8 @@ public:
                                        ComputePassSetupCallback setup,
                                        ComputePassExecuteCallback execute,
                                        bool side_effect = false);
-    RenderGraphBuilder& AddCopyPass(const std::string& name,
-                                    RenderGraphTextureHandle source,
-                                    RenderGraphTextureHandle destination);
+    RenderGraphBuilder&
+        AddCopyPass(const std::string& name, RenderGraphTextureHandle source, RenderGraphTextureHandle destination);
 
     std::unique_ptr<RenderGraph> Build();
 
@@ -171,7 +169,3 @@ private:
 };
 
 } // namespace luna
-
-
-
-

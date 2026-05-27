@@ -1,9 +1,9 @@
+#include "Core/Log.h"
 #include "EditorEnginePaths.h"
 
-#include "Core/Log.h"
+#include <cstdlib>
 
 #include <algorithm>
-#include <cstdlib>
 #include <optional>
 #include <string_view>
 
@@ -121,8 +121,7 @@ std::vector<std::filesystem::path> splitEditorPathList(const std::string& value)
 
     while (start <= value.size()) {
         const std::string::size_type end = value.find(separator, start);
-        const std::string item =
-            value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        const std::string item = value.substr(start, end == std::string::npos ? std::string::npos : end - start);
         if (!item.empty()) {
             appendPathIfNotEmpty(paths, std::filesystem::path(item));
         }
@@ -152,8 +151,7 @@ EditorStartupOptions parseEditorStartupOptions(int argc, char** argv)
         }
         constexpr std::string_view engine_data_root_prefix = "--engine-data-root=";
         if (argumentStartsWith(argument, engine_data_root_prefix)) {
-            options.engine_data_root_override =
-                std::filesystem::path(argument.substr(engine_data_root_prefix.size()));
+            options.engine_data_root_override = std::filesystem::path(argument.substr(engine_data_root_prefix.size()));
             continue;
         }
 
@@ -202,8 +200,7 @@ EditorEnginePaths resolveEditorEnginePaths(const EditorStartupOptions& options)
         appendPaths(paths.development_editor_plugin_roots, splitEditorPathList(*env_plugin_path));
     }
 
-    appendPathIfNotEmpty(paths.official_editor_plugin_roots,
-                         sourceRoot() / "Plugins" / "Editor" / "Official");
+    appendPathIfNotEmpty(paths.official_editor_plugin_roots, sourceRoot() / "Plugins" / "Editor" / "Official");
     appendPathIfNotEmpty(paths.development_editor_plugin_roots, sourceRoot() / "Plugins" / "Editor");
     appendPathIfNotEmpty(paths.scripting_plugin_roots, sourceRoot() / "Plugins" / "Scripting");
 

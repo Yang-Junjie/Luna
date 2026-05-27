@@ -1,11 +1,11 @@
 #pragma once
 
-#include "EditorDocumentContext.h"
-
 #include "Core/Timestep.h"
 #include "Core/UUID.h"
+#include "EditorDocumentContext.h"
 
 #include <cstddef>
+
 #include <memory>
 #include <string>
 
@@ -46,9 +46,8 @@ private:
     void endRuntimeViewport();
 
 private:
-    EditorDocumentContext m_runtime_document_context{"luna.document.runtime.scene",
-                                                     EditorDocumentKind::RuntimeSceneSnapshot,
-                                                     false};
+    EditorDocumentContext m_runtime_document_context{
+        "luna.document.runtime.scene", EditorDocumentKind::RuntimeSceneSnapshot, false};
     std::unique_ptr<Scene> m_runtime_scene;
     std::unique_ptr<SceneRuntime> m_runtime_scene_runtime;
     bool m_runtime_viewport_enabled{false};

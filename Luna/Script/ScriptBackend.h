@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ScriptRuntime.h"
 #include "ScriptPropertySchema.h"
+#include "ScriptRuntime.h"
 
 #include <filesystem>
 #include <memory>

@@ -1,8 +1,7 @@
-#include "SceneSerializer.h"
-
 #include "Core/Log.h"
 #include "Entity.h"
 #include "Scene.h"
+#include "SceneSerializer.h"
 
 #include <algorithm>
 #include <fstream>
@@ -123,7 +122,7 @@ bool sceneBackgroundModeHasVisibleSky(luna::SceneBackgroundMode mode)
 uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
 {
     constexpr uint32_t kMinShadowMapSize = 256;
-    constexpr uint32_t kMaxShadowMapSize = 8192;
+    constexpr uint32_t kMaxShadowMapSize = 8'192;
     return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
@@ -183,15 +182,9 @@ luna::ScriptPropertyType readScriptPropertyType(const YAML::Node& node, luna::Sc
 
 bool hasScriptPropertyMetadata(const luna::ScriptPropertyMetadata& metadata)
 {
-    return !metadata.displayName.empty() ||
-           !metadata.description.empty() ||
-           !metadata.category.empty() ||
-           metadata.hasMinValue ||
-           metadata.hasMaxValue ||
-           metadata.hasStepValue ||
-           !metadata.assetType.empty() ||
-           !metadata.entityFilter.empty() ||
-           !metadata.options.empty();
+    return !metadata.displayName.empty() || !metadata.description.empty() || !metadata.category.empty() ||
+           metadata.hasMinValue || metadata.hasMaxValue || metadata.hasStepValue || !metadata.assetType.empty() ||
+           !metadata.entityFilter.empty() || !metadata.options.empty();
 }
 
 void emitScriptPropertyMetadata(YAML::Emitter& out, const luna::ScriptPropertyMetadata& metadata)
@@ -444,8 +437,7 @@ void readSceneEnvironment(const YAML::Node& node, luna::SceneEnvironmentSettings
     if (node["SpecularIntensity"]) {
         environment.specularIntensity = node["SpecularIntensity"].as<float>();
     }
-    environment.proceduralSunDirection =
-        readVec3(node["ProceduralSunDirection"], environment.proceduralSunDirection);
+    environment.proceduralSunDirection = readVec3(node["ProceduralSunDirection"], environment.proceduralSunDirection);
     if (node["ProceduralSunIntensity"]) {
         environment.proceduralSunIntensity = node["ProceduralSunIntensity"].as<float>();
     }
@@ -577,7 +569,7 @@ bool emitSceneYaml(const luna::Scene& scene, YAML::Emitter& out, std::string_vie
             out << YAML::Key << "FixedAspectRatio" << YAML::Value << camera_component.fixedAspectRatio;
             out << YAML::Key << "ProjectionType" << YAML::Value
                 << (camera_component.projectionType == luna::Camera::ProjectionType::Orthographic ? "Orthographic"
-                                                                                                   : "Perspective");
+                                                                                                  : "Perspective");
             out << YAML::Key << "PerspectiveFOV" << YAML::Value
                 << glm::degrees(camera_component.perspectiveVerticalFovRadians);
             out << YAML::Key << "PerspectiveNear" << YAML::Value << camera_component.perspectiveNear;
@@ -663,7 +655,10 @@ namespace luna {
 
 namespace {
 
-bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string scene_name, std::string_view source_name)
+bool deserializeSceneFromNode(Scene& scene,
+                              const YAML::Node& data,
+                              std::string scene_name,
+                              std::string_view source_name)
 {
     if (data["Scene"]) {
         scene_name = data["Scene"].as<std::string>();
@@ -695,7 +690,8 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
                     entity_data.id = id_component["ID"].as<uint64_t>();
                 }
 
-                if (const YAML::Node tag_component = entity_node["TagComponent"]; tag_component && tag_component["Tag"]) {
+                if (const YAML::Node tag_component = entity_node["TagComponent"];
+                    tag_component && tag_component["Tag"]) {
                     entity_data.tag = tag_component["Tag"].as<std::string>();
                 }
 
@@ -707,7 +703,8 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
                     entity_data.transform.scale = readVec3(transform_component["Scale"], entity_data.transform.scale);
                 }
 
-                if (const YAML::Node relationship_component = entity_node["RelationshipComponent"]; relationship_component) {
+                if (const YAML::Node relationship_component = entity_node["RelationshipComponent"];
+                    relationship_component) {
                     if (relationship_component["ParentHandle"]) {
                         entity_data.parent_id = relationship_component["ParentHandle"].as<uint64_t>();
                     }
@@ -732,8 +729,8 @@ bool deserializeSceneFromNode(Scene& scene, const YAML::Node& data, std::string 
                     if (camera_component["ProjectionType"]) {
                         const std::string projection_type = camera_component["ProjectionType"].as<std::string>();
                         entity_data.camera.projectionType = projection_type == "Orthographic"
-                                                              ? Camera::ProjectionType::Orthographic
-                                                              : Camera::ProjectionType::Perspective;
+                                                                ? Camera::ProjectionType::Orthographic
+                                                                : Camera::ProjectionType::Perspective;
                     }
                     if (camera_component["PerspectiveFOV"]) {
                         entity_data.camera.perspectiveVerticalFovRadians =
@@ -952,9 +949,8 @@ bool SceneSerializer::serialize(const Scene& scene, const std::filesystem::path&
     if (!normalized_path.parent_path().empty()) {
         std::filesystem::create_directories(normalized_path.parent_path(), ec);
         if (ec) {
-            LUNA_CORE_ERROR("Failed to create scene directory '{}': {}",
-                            normalized_path.parent_path().string(),
-                            ec.message());
+            LUNA_CORE_ERROR(
+                "Failed to create scene directory '{}': {}", normalized_path.parent_path().string(), ec.message());
             return false;
         }
     }

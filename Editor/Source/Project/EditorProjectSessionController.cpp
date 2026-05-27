@@ -1,11 +1,10 @@
-#include "Project/EditorProjectSessionController.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Core/Log.h"
 #include "EditorApi/EditorAssetService.h"
 #include "EditorApi/EditorScriptPluginService.h"
 #include "Project/BuiltinMaterialOverrides.h"
+#include "Project/EditorProjectSessionController.h"
 #include "Project/ProjectManager.h"
 #include "Scene/SceneSerializer.h"
 #include "Shell/EditorShell.h"
@@ -23,8 +22,8 @@ std::filesystem::path EditorProjectSessionController::projectDialogDefaultPath()
     return std::filesystem::current_path();
 }
 
-std::optional<std::filesystem::path> EditorProjectSessionController::makeScenePathRelativeToProject(
-    const std::filesystem::path& scene_file_path)
+std::optional<std::filesystem::path>
+    EditorProjectSessionController::makeScenePathRelativeToProject(const std::filesystem::path& scene_file_path)
 {
     const auto project_root = ProjectManager::instance().getProjectRootPath();
     if (!project_root || scene_file_path.empty()) {
@@ -148,8 +147,8 @@ std::optional<std::filesystem::path> EditorProjectSessionController::configuredS
     return SceneSerializer::normalizeScenePath((*project_root / project_info->StartScene).lexically_normal());
 }
 
-std::filesystem::path EditorProjectSessionController::sceneDialogDefaultPath(
-    const std::filesystem::path& current_scene_file_path) const
+std::filesystem::path
+    EditorProjectSessionController::sceneDialogDefaultPath(const std::filesystem::path& current_scene_file_path) const
 {
     if (!current_scene_file_path.empty()) {
         const std::filesystem::path parent_path = current_scene_file_path.parent_path();

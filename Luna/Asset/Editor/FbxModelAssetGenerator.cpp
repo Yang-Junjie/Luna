@@ -1,6 +1,5 @@
-#include "Asset/Editor/FbxModelAssetGenerator.h"
-
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/FbxModelAssetGenerator.h"
 #include "Asset/Editor/Importer.h"
 #include "Asset/Editor/MaterialFactory.h"
 #include "Asset/Editor/MaterialImporter.h"
@@ -10,28 +9,28 @@
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
 
+#include <cctype>
+#include <cmath>
+#include <cstdint>
+
 #include <algorithm>
 #include <array>
-#include <cctype>
-#include <cstdint>
-#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <glm/geometric.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 #include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <ufbx.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include <glm/geometric.hpp>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/vec3.hpp>
-#include <glm/vec4.hpp>
-#include <ufbx.h>
 #include <yaml-cpp/yaml.h>
 
 namespace luna::fbx_model_asset_generator_detail {
@@ -109,8 +108,7 @@ bool hasSupportedTextureExtension(const std::filesystem::path& texture_path)
     const std::array<std::string_view, 9> supported_extensions{
         ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".hdr", ".dds", ".ktx", ".ktx2"};
 
-    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) !=
-           supported_extensions.end();
+    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) != supported_extensions.end();
 }
 
 std::optional<std::filesystem::path> makeRelativeToProject(const std::filesystem::path& path)
@@ -193,10 +191,9 @@ bool isIdentityTransform(const ufbx_transform& transform)
     };
 
     return near_zero(transform.translation.x) && near_zero(transform.translation.y) &&
-           near_zero(transform.translation.z) && near_zero(transform.rotation.x) &&
-           near_zero(transform.rotation.y) && near_zero(transform.rotation.z) &&
-           std::abs(std::abs(transform.rotation.w) - 1.0) < kEpsilon && near_one(transform.scale.x) &&
-           near_one(transform.scale.y) && near_one(transform.scale.z);
+           near_zero(transform.translation.z) && near_zero(transform.rotation.x) && near_zero(transform.rotation.y) &&
+           near_zero(transform.rotation.z) && std::abs(std::abs(transform.rotation.w) - 1.0) < kEpsilon &&
+           near_one(transform.scale.x) && near_one(transform.scale.y) && near_one(transform.scale.z);
 }
 
 void attachMeshInfo(GeneratedNode& node, const GeneratedMeshInfo& mesh_info, AssetHandle mesh_handle)
@@ -374,8 +371,8 @@ AssetMetadata ensureTextureMetadata(const std::filesystem::path& texture_path,
                                     FbxModelAssetGenerator::GenerateResult& result)
 {
     AssetMetadata metadata;
-    if (texture_path.empty() || !std::filesystem::exists(texture_path) ||
-        !hasSupportedTextureExtension(texture_path) || !makeRelativeToProject(texture_path).has_value()) {
+    if (texture_path.empty() || !std::filesystem::exists(texture_path) || !hasSupportedTextureExtension(texture_path) ||
+        !makeRelativeToProject(texture_path).has_value()) {
         return metadata;
     }
 
@@ -460,41 +457,38 @@ MaterialAssetDescriptor makeMaterialDescriptor(const std::filesystem::path& fbx_
     descriptor.Surface.MetallicFactor = mapReal(fbx_material.pbr.metalness, 0.0f);
     descriptor.Surface.RoughnessFactor = mapReal(fbx_material.pbr.roughness, 1.0f);
     descriptor.Surface.NormalScale = mapReal(fbx_material.fbx.bump_factor, 1.0f);
-    descriptor.Surface.BlendModeValue =
-        alpha < 0.999f ? Material::BlendMode::Transparent : Material::BlendMode::Opaque;
+    descriptor.Surface.BlendModeValue = alpha < 0.999f ? Material::BlendMode::Transparent : Material::BlendMode::Opaque;
 
-    descriptor.Textures.BaseColor = textureHandleForMaps(fbx_path,
-                                                         material_name,
-                                                         TextureRole::BaseColor,
-                                                         result,
-                                                         {&fbx_material.pbr.base_color, &fbx_material.fbx.diffuse_color});
-    descriptor.Textures.Normal = textureHandleForMaps(fbx_path,
-                                                      material_name,
-                                                      TextureRole::Normal,
-                                                      result,
-                                                      {&fbx_material.pbr.normal_map,
-                                                       &fbx_material.fbx.normal_map,
-                                                       &fbx_material.fbx.bump});
-    descriptor.Textures.MetallicRoughness =
+    descriptor.Textures.BaseColor =
         textureHandleForMaps(fbx_path,
                              material_name,
-                             TextureRole::MetallicRoughness,
+                             TextureRole::BaseColor,
                              result,
-                             {&fbx_material.pbr.roughness,
-                              &fbx_material.pbr.metalness,
-                              &fbx_material.fbx.specular_factor});
-    descriptor.Textures.Emissive = textureHandleForMaps(fbx_path,
-                                                        material_name,
-                                                        TextureRole::Emissive,
-                                                        result,
-                                                        {&fbx_material.pbr.emission_color,
-                                                         &fbx_material.fbx.emission_color});
-    descriptor.Textures.Occlusion = textureHandleForMaps(fbx_path,
-                                                         material_name,
-                                                         TextureRole::Occlusion,
-                                                         result,
-                                                         {&fbx_material.pbr.ambient_occlusion,
-                                                          &fbx_material.fbx.ambient_color});
+                             {&fbx_material.pbr.base_color, &fbx_material.fbx.diffuse_color});
+    descriptor.Textures.Normal =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Normal,
+                             result,
+                             {&fbx_material.pbr.normal_map, &fbx_material.fbx.normal_map, &fbx_material.fbx.bump});
+    descriptor.Textures.MetallicRoughness = textureHandleForMaps(
+        fbx_path,
+        material_name,
+        TextureRole::MetallicRoughness,
+        result,
+        {&fbx_material.pbr.roughness, &fbx_material.pbr.metalness, &fbx_material.fbx.specular_factor});
+    descriptor.Textures.Emissive =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Emissive,
+                             result,
+                             {&fbx_material.pbr.emission_color, &fbx_material.fbx.emission_color});
+    descriptor.Textures.Occlusion =
+        textureHandleForMaps(fbx_path,
+                             material_name,
+                             TextureRole::Occlusion,
+                             result,
+                             {&fbx_material.pbr.ambient_occlusion, &fbx_material.fbx.ambient_color});
 
     return descriptor;
 }
@@ -684,8 +678,7 @@ std::vector<GeneratedNode> buildGeneratedNodes(const ufbx_scene& scene,
         }
         visited.insert(node);
 
-        std::string node_name = sanitizeFileStem(fbx_path.stem().string()) + "_Node_" +
-                                std::to_string(node->typed_id);
+        std::string node_name = sanitizeFileStem(fbx_path.stem().string()) + "_Node_" + std::to_string(node->typed_id);
         const std::string node_label = toString(node->name);
         if (!node_label.empty()) {
             node_name = node_label;
@@ -905,11 +898,11 @@ FbxModelAssetGenerator::GenerateResult
     }
 
     const std::filesystem::path model_path = fbx_path.parent_path() / (fbx_path.stem().string() + ".lmodel");
-    const std::vector<GeneratedMaterial> generated_materials =
-        ensureGeneratedMaterials(*scene, fbx_path, result);
+    const std::vector<GeneratedMaterial> generated_materials = ensureGeneratedMaterials(*scene, fbx_path, result);
     MeshInfoMap mesh_info_by_mesh;
     (void) buildMeshInfos(*scene, generated_materials, mesh_info_by_mesh);
-    const std::vector<GeneratedNode> nodes = buildGeneratedNodes(*scene, fbx_path, mesh_metadata.Handle, mesh_info_by_mesh);
+    const std::vector<GeneratedNode> nodes =
+        buildGeneratedNodes(*scene, fbx_path, mesh_metadata.Handle, mesh_info_by_mesh);
 
     if (!std::filesystem::exists(model_path) || isLegacyGeneratedModelFile(model_path, mesh_metadata)) {
         if (writeModelFile(model_path, mesh_metadata, generated_materials, nodes)) {

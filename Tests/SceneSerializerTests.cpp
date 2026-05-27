@@ -142,12 +142,10 @@ void testScriptPropertyMetadataRoundTrip(TestContext& context)
     script_component.scripts.push_back(std::move(script));
 
     const std::string serialized = luna::SceneSerializer::serializeToString(scene);
-    context.expect(serialized.find("Metadata:") != std::string::npos,
-                   "script property metadata should serialize");
+    context.expect(serialized.find("Metadata:") != std::string::npos, "script property metadata should serialize");
     context.expect(serialized.find("DisplayName: Move Speed") != std::string::npos,
                    "script property display name should serialize");
-    context.expect(serialized.find("Options:") != std::string::npos,
-                   "script property options should serialize");
+    context.expect(serialized.find("Options:") != std::string::npos, "script property options should serialize");
 
     luna::Scene loaded_scene;
     context.expect(luna::SceneSerializer::deserializeFromString(loaded_scene, serialized, "script metadata scene"),
@@ -180,7 +178,8 @@ void testScriptPropertyMetadataRoundTrip(TestContext& context)
     context.expect(loaded_property.metadata.hasStepValue && loaded_property.metadata.stepValue == 0.25f,
                    "script property step should round-trip");
     context.expect(loaded_property.metadata.assetType == "Texture", "script property asset type should round-trip");
-    context.expect(loaded_property.metadata.entityFilter == "Camera", "script property entity filter should round-trip");
+    context.expect(loaded_property.metadata.entityFilter == "Camera",
+                   "script property entity filter should round-trip");
     context.expect(loaded_property.metadata.options.size() == 2, "script property options should round-trip");
     if (loaded_property.metadata.options.size() == 2) {
         context.expect(loaded_property.metadata.options[1].label == "Fly",
@@ -195,12 +194,11 @@ void testSceneShadowSettingsRoundTrip(TestContext& context)
     luna::Scene scene;
     scene.shadowSettings().mode = luna::SceneShadowMode::PcfShadowMap;
     scene.shadowSettings().pcfShadowDistance = 72.0f;
-    scene.shadowSettings().pcfMapSize = 8192;
-    scene.shadowSettings().csmCascadeSize = 4096;
+    scene.shadowSettings().pcfMapSize = 8'192;
+    scene.shadowSettings().csmCascadeSize = 4'096;
 
     const std::string serialized = luna::SceneSerializer::serializeToString(scene);
-    context.expect(serialized.find("Shadows:") != std::string::npos,
-                   "scene shadow settings should serialize");
+    context.expect(serialized.find("Shadows:") != std::string::npos, "scene shadow settings should serialize");
     context.expect(serialized.find("Mode: PcfShadowMap") != std::string::npos,
                    "scene shadow settings should serialize PCF shadow mode");
     context.expect(serialized.find("PcfShadowDistance: 72") != std::string::npos,
@@ -215,12 +213,9 @@ void testSceneShadowSettingsRoundTrip(TestContext& context)
                    "scene with shadow settings should deserialize");
     context.expect(loaded_scene.shadowSettings().mode == luna::SceneShadowMode::PcfShadowMap,
                    "PCF shadow mode should round-trip");
-    context.expect(loaded_scene.shadowSettings().pcfShadowDistance == 72.0f,
-                   "PCF shadow distance should round-trip");
-    context.expect(loaded_scene.shadowSettings().pcfMapSize == 8192,
-                   "PCF map size should round-trip");
-    context.expect(loaded_scene.shadowSettings().csmCascadeSize == 4096,
-                   "CSM cascade size should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfShadowDistance == 72.0f, "PCF shadow distance should round-trip");
+    context.expect(loaded_scene.shadowSettings().pcfMapSize == 8'192, "PCF map size should round-trip");
+    context.expect(loaded_scene.shadowSettings().csmCascadeSize == 4'096, "CSM cascade size should round-trip");
 }
 
 void testLegacyCsmEnabledMigration(TestContext& context)

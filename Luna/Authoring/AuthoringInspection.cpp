@@ -1,12 +1,10 @@
-#include "AuthoringInspection.h"
-
 #include "Authoring/AuthoringSession.h"
+#include "AuthoringInspection.h"
 #include "Renderer/Camera.h"
 #include "Scene/Components.h"
 #include "Scene/Scene.h"
 
 #include <glm/trigonometric.hpp>
-
 #include <utility>
 
 namespace luna::authoring {

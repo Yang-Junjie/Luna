@@ -46,8 +46,7 @@ struct AuthoringCapability {
 [[nodiscard]] Json authoringCapabilitiesJson(const std::vector<AuthoringCapability>& capabilities);
 [[nodiscard]] Json defaultAuthoringCapabilitiesJson();
 
-void writeAuthoringCapabilitiesJson(std::ostream& out,
-                                    const std::vector<AuthoringCapability>& capabilities);
+void writeAuthoringCapabilitiesJson(std::ostream& out, const std::vector<AuthoringCapability>& capabilities);
 
 void writeDefaultAuthoringCapabilitiesJson(std::ostream& out);
 

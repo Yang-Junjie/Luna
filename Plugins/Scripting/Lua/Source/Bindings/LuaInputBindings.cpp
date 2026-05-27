@@ -1,11 +1,8 @@
+#include "../LuaPluginRuntime.h"
 #include "LuaInputBindings.h"
-
 #include "LuaSharedBindings.h"
 
-#include "../LuaPluginRuntime.h"
-
 #include <sol/sol.hpp>
-
 #include <tuple>
 
 namespace lua_plugin {
@@ -55,12 +52,14 @@ void bindLuaInputApi(LuaPluginRuntime& runtime)
         return std::make_tuple(x, y);
     });
     input.set_function("get_mouse_scroll_x", [host_api]() {
-        return host_api != nullptr && host_api->input_get_mouse_scroll_x != nullptr ? host_api->input_get_mouse_scroll_x()
-                                                                                    : 0.0f;
+        return host_api != nullptr && host_api->input_get_mouse_scroll_x != nullptr
+                   ? host_api->input_get_mouse_scroll_x()
+                   : 0.0f;
     });
     input.set_function("get_mouse_scroll_y", [host_api]() {
-        return host_api != nullptr && host_api->input_get_mouse_scroll_y != nullptr ? host_api->input_get_mouse_scroll_y()
-                                                                                    : 0.0f;
+        return host_api != nullptr && host_api->input_get_mouse_scroll_y != nullptr
+                   ? host_api->input_get_mouse_scroll_y()
+                   : 0.0f;
     });
     input.set_function("get_mouse_scroll", [host_api]() {
         const float x = host_api != nullptr && host_api->input_get_mouse_scroll_x != nullptr

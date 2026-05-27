@@ -1,10 +1,8 @@
+#include "Core/Log.h"
 #include "Renderer/RenderDeviceContext.h"
 
-#include "Core/Log.h"
-
-#include <Queue.h>
-
 #include <exception>
+#include <Queue.h>
 
 namespace luna {
 

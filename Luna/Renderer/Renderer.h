@@ -4,23 +4,23 @@
 // Owns device-facing frame state, scene output targets, and the public frame loop,
 // while delegating scene-specific drawing to RenderFlow.
 
-#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/FrameResourceRing.h"
 #include "Renderer/RenderDeviceContext.h"
+#include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderFlow/RenderFlowBuilder.h"
 #include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/RenderFlow/RenderFeature.h"
+#include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderViewState.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
 #include "Renderer/SwapchainImageHistory.h"
 #include "Renderer/SwapchainManager.h"
 
 #include <cstdint>
-#include <functional>
 
 #include <Barrier.h>
 #include <Capabilities.h>
 #include <Core.h>
+#include <functional>
 #include <glm/vec4.hpp>
 #include <Instance.h>
 #include <memory>
@@ -119,8 +119,7 @@ public:
     void setSceneViewportOutputMode(SceneViewportHandle handle, SceneOutputMode mode);
     void setSceneViewportOutputSize(SceneViewportHandle handle, uint32_t width, uint32_t height);
     [[nodiscard]] RHI::Extent2D getSceneViewportOutputSize(SceneViewportHandle handle) const;
-    [[nodiscard]] const RHI::Ref<RHI::Texture>&
-        getSceneViewportOutputTexture(SceneViewportHandle handle) const;
+    [[nodiscard]] const RHI::Ref<RHI::Texture>& getSceneViewportOutputTexture(SceneViewportHandle handle) const;
     [[nodiscard]] RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle);
     [[nodiscard]] const RenderWorld& getSceneViewportRenderWorld(SceneViewportHandle handle) const;
 
@@ -291,13 +290,13 @@ private:
     [[nodiscard]] const SceneViewportState* findSceneViewportByHandle(SceneViewportHandle handle) const;
     void invalidateRenderFeatureHistory(SceneViewportState& viewport,
                                         render_flow::RenderFeatureHistoryInvalidationFlags flags) noexcept;
-    [[nodiscard]] render_flow::RenderFeatureFrameContext makeRenderFeatureFrameContext(
-        const SceneViewportState& viewport,
-        RHI::BackendType backend_type,
-        SceneOutputMode scene_output_mode,
-        uint64_t frame_index,
-        uint32_t framebuffer_width,
-        uint32_t framebuffer_height) const;
+    [[nodiscard]] render_flow::RenderFeatureFrameContext
+        makeRenderFeatureFrameContext(const SceneViewportState& viewport,
+                                      RHI::BackendType backend_type,
+                                      SceneOutputMode scene_output_mode,
+                                      uint64_t frame_index,
+                                      uint32_t framebuffer_width,
+                                      uint32_t framebuffer_height) const;
     void stageRenderFeatureFrameContext(SceneViewportState& viewport,
                                         RHI::BackendType backend_type,
                                         SceneOutputMode scene_output_mode,
@@ -330,7 +329,3 @@ private:
 };
 
 } // namespace luna
-
-
-
-

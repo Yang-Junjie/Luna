@@ -1,8 +1,7 @@
-#include "Viewport/EditorViewportGizmoController.h"
-
 #include "Authoring/EditorAuthoringController.h"
 #include "EditorCamera.h"
 #include "Scene/Components.h"
+#include "Viewport/EditorViewportGizmoController.h"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <imgui.h>
@@ -109,7 +108,7 @@ bool EditorViewportGizmoController::draw(const ImVec2& viewport_min,
     ImGuizmo::SetOrthographic(camera.getProjectionType() == Camera::ProjectionType::Orthographic);
     ImGuizmo::SetDrawlist();
     ImGuizmo::SetRect(viewport_min.x, viewport_min.y, viewport_size.x, viewport_size.y);
-    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7fffffff));
+    ImGuizmo::PushID(static_cast<int>(static_cast<uint64_t>(selected_entity.getUUID()) & 0x7f'ff'ff'ff));
     ImGuizmo::Enable(allow_interaction);
 
     const ImGuizmo::MODE mode = m_operation == GizmoOperation::Scale ? ImGuizmo::LOCAL : toImGuizmoMode(m_mode);

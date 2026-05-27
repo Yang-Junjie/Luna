@@ -51,14 +51,13 @@ public:
     virtual ~IRenderPass() = default;
 
     [[nodiscard]] virtual const char* name() const noexcept = 0;
+
     [[nodiscard]] virtual std::span<const RenderPassResourceUsage> resourceUsages() const noexcept
     {
         return {};
     }
+
     virtual void setup(RenderPassContext& context) = 0;
 };
 
 } // namespace luna::render_flow
-
-
-

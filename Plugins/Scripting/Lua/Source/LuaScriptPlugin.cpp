@@ -2,11 +2,11 @@
 #include "LuaPropertySchema.h"
 
 #if defined(_WIN32)
-#    define LUNA_SCRIPT_PLUGIN_EXPORT __declspec(dllexport)
+#define LUNA_SCRIPT_PLUGIN_EXPORT __declspec(dllexport)
 #elif defined(__GNUC__) || defined(__clang__)
-#    define LUNA_SCRIPT_PLUGIN_EXPORT __attribute__((visibility("default")))
+#define LUNA_SCRIPT_PLUGIN_EXPORT __attribute__((visibility("default")))
 #else
-#    define LUNA_SCRIPT_PLUGIN_EXPORT
+#define LUNA_SCRIPT_PLUGIN_EXPORT
 #endif
 
 namespace {

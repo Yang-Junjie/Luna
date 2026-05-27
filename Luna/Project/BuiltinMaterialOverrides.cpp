@@ -1,15 +1,13 @@
-#include "Project/BuiltinMaterialOverrides.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "Core/Log.h"
+#include "Project/BuiltinMaterialOverrides.h"
 #include "Project/ProjectManager.h"
 #include "Renderer/Material.h"
 
 #include <filesystem>
 #include <fstream>
-
 #include <yaml-cpp/yaml.h>
 
 namespace luna {
@@ -54,7 +52,8 @@ bool applyOverride(AssetHandle handle, const YAML::Node& node)
 
     auto material = AssetManager::get().loadAssetAs<Material>(handle);
     if (!material) {
-        LUNA_CORE_WARN("Failed to apply built-in material override because material {} is not loaded", handle.toString());
+        LUNA_CORE_WARN("Failed to apply built-in material override because material {} is not loaded",
+                       handle.toString());
         return false;
     }
 
@@ -219,9 +218,8 @@ bool BuiltinMaterialOverrides::clearAll()
         std::error_code ec;
         std::filesystem::remove(overrides_path, ec);
         if (ec) {
-            LUNA_CORE_ERROR("Failed to remove built-in material overrides file '{}': {}",
-                            overrides_path.string(),
-                            ec.message());
+            LUNA_CORE_ERROR(
+                "Failed to remove built-in material overrides file '{}': {}", overrides_path.string(), ec.message());
             return false;
         }
         LUNA_CORE_INFO("Removed built-in material overrides file '{}'", overrides_path.string());

@@ -1,7 +1,6 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.h"
-
 #include "Core/Log.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/PostProcessPass.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
@@ -24,7 +23,9 @@ constexpr std::array<RenderPassResourceUsage, 2> kPostProcessPassResources{{
 
 } // namespace
 
-PostProcessPass::PostProcessPass(PassSharedState& state) : m_state(&state) {}
+PostProcessPass::PostProcessPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* PostProcessPass::name() const noexcept
 {

@@ -173,16 +173,10 @@ typedef struct LunaScriptHostApi {
     int (*entity_get_camera)(void* scene_context, uint64_t entity_id, LunaScriptCameraDesc* out_camera);
     int (*entity_set_camera)(void* scene_context, uint64_t entity_id, const LunaScriptCameraDesc* camera);
     int (*entity_set_camera_primary)(void* scene_context, uint64_t entity_id, int32_t primary);
-    int (*entity_set_perspective_camera)(void* scene_context,
-                                         uint64_t entity_id,
-                                         float vertical_fov_radians,
-                                         float near_clip,
-                                         float far_clip);
-    int (*entity_set_orthographic_camera)(void* scene_context,
-                                          uint64_t entity_id,
-                                          float vertical_size,
-                                          float near_clip,
-                                          float far_clip);
+    int (*entity_set_perspective_camera)(
+        void* scene_context, uint64_t entity_id, float vertical_fov_radians, float near_clip, float far_clip);
+    int (*entity_set_orthographic_camera)(
+        void* scene_context, uint64_t entity_id, float vertical_size, float near_clip, float far_clip);
 
     // Input
     int (*input_is_key_pressed)(int32_t key_code);

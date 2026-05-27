@@ -1,9 +1,9 @@
 #include "AuthoringProtocol.h"
-
 #include "AuthoringSession.h"
 
-#include <charconv>
 #include <cstddef>
+
+#include <charconv>
 #include <string_view>
 #include <utility>
 
@@ -399,9 +399,24 @@ bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
             }
             command.kind = AuthoringCommandKind::SetTransform;
             command.entity.value = tokens[index++];
-            if (!readVec3(tokens, index, "transform", command_name, command_index, command.translation, errors, diagnostics) ||
-                !readVec3(tokens, index + 3, "transform", command_name, command_index, command.rotation_degrees, errors, diagnostics) ||
-                !readVec3(tokens, index + 6, "transform", command_name, command_index, command.scale, errors, diagnostics)) {
+            if (!readVec3(tokens,
+                          index,
+                          "transform",
+                          command_name,
+                          command_index,
+                          command.translation,
+                          errors,
+                          diagnostics) ||
+                !readVec3(tokens,
+                          index + 3,
+                          "transform",
+                          command_name,
+                          command_index,
+                          command.rotation_degrees,
+                          errors,
+                          diagnostics) ||
+                !readVec3(
+                    tokens, index + 6, "transform", command_name, command_index, command.scale, errors, diagnostics)) {
                 return false;
             }
             index += 9;
@@ -435,7 +450,8 @@ bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
             }
             command.kind = AuthoringCommandKind::SetLightColor;
             command.entity.value = tokens[index++];
-            if (!readVec3(tokens, index, "light color", command_name, command_index, command.color, errors, diagnostics)) {
+            if (!readVec3(
+                    tokens, index, "light color", command_name, command_index, command.color, errors, diagnostics)) {
                 return false;
             }
             index += 3;
@@ -449,8 +465,7 @@ bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
             }
             command.kind = AuthoringCommandKind::SetCameraPerspective;
             command.entity.value = tokens[index++];
-            if (!parseFloat(tokens[index++], command.fov_degrees) ||
-                !parseFloat(tokens[index++], command.near_plane) ||
+            if (!parseFloat(tokens[index++], command.fov_degrees) || !parseFloat(tokens[index++], command.near_plane) ||
                 !parseFloat(tokens[index++], command.far_plane)) {
                 addParseDiagnostic(errors,
                                    diagnostics,
@@ -470,8 +485,7 @@ bool parseAuthoringCommandTokens(const std::vector<std::string>& tokens,
             }
             command.kind = AuthoringCommandKind::SetCameraOrthographic;
             command.entity.value = tokens[index++];
-            if (!parseFloat(tokens[index++], command.size) ||
-                !parseFloat(tokens[index++], command.near_plane) ||
+            if (!parseFloat(tokens[index++], command.size) || !parseFloat(tokens[index++], command.near_plane) ||
                 !parseFloat(tokens[index++], command.far_plane)) {
                 addParseDiagnostic(errors,
                                    diagnostics,

@@ -4,10 +4,9 @@
 // Converts meshes, materials, and textures into uploaded resources and descriptor sets,
 // then reuses them across frames until pipeline/device state changes.
 
+#include "Asset/Asset.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/Resources/TextureUpload.h"
-
-#include "Asset/Asset.h"
 
 #include <memory>
 #include <span>
@@ -95,11 +94,12 @@ private:
     std::shared_ptr<renderer_detail::PendingTextureUpload>
         getOrCreateUploadedTexture(const std::shared_ptr<Texture>& texture, const Bindings& bindings);
     UploadedMaterial& getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings);
-    std::shared_ptr<renderer_detail::PendingTextureUpload> createMaterialTexture(const Material& material,
-                                                                                 const std::shared_ptr<Texture>& texture,
-                                                                                 const ImageData& fallback_image,
-                                                                                 std::string_view suffix,
-                                                                                 const Bindings& bindings);
+    std::shared_ptr<renderer_detail::PendingTextureUpload>
+        createMaterialTexture(const Material& material,
+                              const std::shared_ptr<Texture>& texture,
+                              const ImageData& fallback_image,
+                              std::string_view suffix,
+                              const Bindings& bindings);
     void bindMaterialResources(const Material& material, UploadedMaterial& uploaded_material, const Bindings& bindings);
     static void uploadMaterialParamsIfNeeded(const Material& material, UploadedMaterial& uploaded_material);
     void uploadMaterialIfNeeded(RHI::CommandBufferEncoder& commands, UploadedMaterial& uploaded_material);
@@ -113,8 +113,3 @@ private:
 };
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

@@ -1,22 +1,21 @@
+#include "Core/Log.h"
 #include "Platform/Common/NativeWindowHandle.h"
 
-#include "Core/Log.h"
-
 #if defined(_WIN32)
-#    define GLFW_EXPOSE_NATIVE_WIN32
-#    if !defined(WIN32_LEAN_AND_MEAN)
-#        define WIN32_LEAN_AND_MEAN
-#    endif
-#    if !defined(NOMINMAX)
-#        define NOMINMAX
-#    endif
-#    include <Windows.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#if !defined(WIN32_LEAN_AND_MEAN)
+#define WIN32_LEAN_AND_MEAN
+#endif
+#if !defined(NOMINMAX)
+#define NOMINMAX
+#endif
+#include <Windows.h>
 #elif defined(__linux__) && !defined(__ANDROID__)
-#    if defined(USE_WAYLAND)
-#        define GLFW_EXPOSE_NATIVE_WAYLAND
-#    elif defined(USE_XLIB)
-#        define GLFW_EXPOSE_NATIVE_X11
-#    endif
+#if defined(USE_WAYLAND)
+#define GLFW_EXPOSE_NATIVE_WAYLAND
+#elif defined(USE_XLIB)
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 #endif
 
 #include <GLFW/glfw3.h>
@@ -55,17 +54,17 @@ RHI::NativeWindowHandle createNativeWindowHandle(const Window& window)
     handle.hWnd = glfwGetWin32Window(native_window);
     handle.hInst = GetModuleHandleW(nullptr);
 #elif defined(__linux__) && !defined(__ANDROID__)
-#    if defined(USE_WAYLAND)
+#if defined(USE_WAYLAND)
     handle.wlDisplay = glfwGetWaylandDisplay();
     handle.wlSurface = glfwGetWaylandWindow(native_window);
-#    elif defined(USE_XLIB)
+#elif defined(USE_XLIB)
     handle.x11Display = glfwGetX11Display();
     handle.x11Window = static_cast<std::uintptr_t>(glfwGetX11Window(native_window));
-#    elif defined(USE_XCB)
+#elif defined(USE_XCB)
     LUNA_PLATFORM_ERROR("GLFW does not expose an XCB native window handle; build Luna with USE_XLIB or USE_WAYLAND");
-#    else
+#else
     LUNA_PLATFORM_ERROR("No Linux native window backend selected for GLFW");
-#    endif
+#endif
 #elif defined(__ANDROID__)
     LUNA_PLATFORM_ERROR("Android native window handle conversion is not implemented for GLFW windows");
 #endif

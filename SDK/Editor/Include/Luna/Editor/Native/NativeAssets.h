@@ -10,10 +10,10 @@ namespace luna::editor::native {
 class Assets final {
 public:
     constexpr Assets() noexcept = default;
+
     explicit constexpr Assets(const LunaEditorAssetApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -94,8 +94,7 @@ public:
 
     [[nodiscard]] bool exists(uint64_t handle) const noexcept
     {
-        return api_ != nullptr && api_->asset_exists != nullptr &&
-               api_->asset_exists(api_->api_user_data, handle) != 0;
+        return api_ != nullptr && api_->asset_exists != nullptr && api_->asset_exists(api_->api_user_data, handle) != 0;
     }
 
     [[nodiscard]] bool pathExists(const char* path) const noexcept
@@ -123,13 +122,13 @@ public:
         return readPath(&LunaEditorAssetApi::assets_root_path);
     }
 
-    [[nodiscard]] bool resolveProjectPath(const char* project_relative_path,
-                                          char* out_path,
-                                          size_t out_path_size) const noexcept
+    [[nodiscard]] bool
+        resolveProjectPath(const char* project_relative_path, char* out_path, size_t out_path_size) const noexcept
     {
         return api_ != nullptr && api_->resolve_project_asset_path != nullptr && project_relative_path != nullptr &&
                out_path != nullptr &&
-               api_->resolve_project_asset_path(api_->api_user_data, project_relative_path, out_path, out_path_size) != 0;
+               api_->resolve_project_asset_path(api_->api_user_data, project_relative_path, out_path, out_path_size) !=
+                   0;
     }
 
     [[nodiscard]] std::string resolveProjectPath(const char* project_relative_path) const
@@ -200,15 +199,11 @@ public:
         return result;
     }
 
-    [[nodiscard]] bool acceptsType(uint32_t type,
-                                   const uint32_t* accepted_types,
-                                   size_t accepted_type_count) const noexcept
+    [[nodiscard]] bool
+        acceptsType(uint32_t type, const uint32_t* accepted_types, size_t accepted_type_count) const noexcept
     {
         return api_ != nullptr && api_->accepts_asset_type != nullptr &&
-               api_->accepts_asset_type(api_->api_user_data,
-                                        type,
-                                        accepted_types,
-                                        accepted_type_count) != 0;
+               api_->accepts_asset_type(api_->api_user_data, type, accepted_types, accepted_type_count) != 0;
     }
 
     [[nodiscard]] bool meshSubmeshCount(AssetHandle mesh_handle, size_t* out_count) const noexcept
@@ -244,10 +239,11 @@ private:
     using PathConvertMember = PathConvertFn LunaEditorAssetApi::*;
 
     template <size_t LabelSize, size_t DetailSize, size_t ProjectPathSize, size_t AbsolutePathSize>
-    [[nodiscard]] static LunaEditorAssetInfo makeNativeAssetInfo(std::array<char, LabelSize>& label,
-                                                                 std::array<char, DetailSize>& detail,
-                                                                 std::array<char, ProjectPathSize>& project_path,
-                                                                 std::array<char, AbsolutePathSize>& absolute_path) noexcept
+    [[nodiscard]] static LunaEditorAssetInfo
+        makeNativeAssetInfo(std::array<char, LabelSize>& label,
+                            std::array<char, DetailSize>& detail,
+                            std::array<char, ProjectPathSize>& project_path,
+                            std::array<char, AbsolutePathSize>& absolute_path) noexcept
     {
         LunaEditorAssetInfo info{};
         info.struct_size = sizeof(LunaEditorAssetInfo);
@@ -304,7 +300,7 @@ private:
             return {};
         }
 
-        std::array<char, 1024> buffer{};
+        std::array<char, 1'024> buffer{};
         if ((api_->*read_fn)(api_->api_user_data, buffer.data(), buffer.size()) == 0) {
             return {};
         }
@@ -317,7 +313,7 @@ private:
             return {};
         }
 
-        std::array<char, 1024> buffer{};
+        std::array<char, 1'024> buffer{};
         if ((api_->*read_fn)(api_->api_user_data, path, buffer.data(), buffer.size()) == 0) {
             return {};
         }

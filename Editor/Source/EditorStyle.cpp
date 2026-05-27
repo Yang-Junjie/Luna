@@ -1,11 +1,11 @@
 #include "EditorStyle.h"
 
+#include <cmath>
+
 #include <algorithm>
 #include <array>
-#include <cmath>
-#include <string_view>
-
 #include <imgui.h>
+#include <string_view>
 
 namespace luna::editor {
 namespace {
@@ -456,7 +456,8 @@ void applyActiveEditorTheme()
 
     colors[ImGuiCol_TableHeaderBg] = color(0.165f, 0.180f, 0.204f);
     colors[ImGuiCol_TableBorderStrong] = palette.panel_border;
-    colors[ImGuiCol_TableBorderLight] = ImVec4{palette.panel_border.x, palette.panel_border.y, palette.panel_border.z, 0.55f};
+    colors[ImGuiCol_TableBorderLight] =
+        ImVec4{palette.panel_border.x, palette.panel_border.y, palette.panel_border.z, 0.55f};
     colors[ImGuiCol_TableRowBg] = color(1.0f, 1.0f, 1.0f, 0.010f);
     colors[ImGuiCol_TableRowBgAlt] = color(1.0f, 1.0f, 1.0f, 0.035f);
 

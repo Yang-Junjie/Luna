@@ -17,8 +17,7 @@ public:
                                  EditorProjectSessionController& project_session,
                                  bool update_project_start_scene);
 
-    [[nodiscard]] bool saveScene(EditorAuthoringController& authoring,
-                                 EditorProjectSessionController& project_session);
+    [[nodiscard]] bool saveScene(EditorAuthoringController& authoring, EditorProjectSessionController& project_session);
     [[nodiscard]] bool saveSceneAsDialog(EditorAuthoringController& authoring,
                                          EditorProjectSessionController& project_session);
     [[nodiscard]] bool saveSceneAs(const std::filesystem::path& scene_file_path,

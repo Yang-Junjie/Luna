@@ -54,8 +54,7 @@ void DrawQueue::clear() noexcept
 void DrawQueue::reserveForFrame(const DrawQueueStats& previous_stats)
 {
     m_camera_visible_draw_commands.reserve(previous_stats.camera_visible);
-    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::DepthOnly)].reserve(
-        previous_stats.phase_depth_only);
+    m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::DepthOnly)].reserve(previous_stats.phase_depth_only);
     m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::GBuffer)].reserve(previous_stats.phase_gbuffer);
     m_draw_commands_by_phase[static_cast<std::size_t>(RenderPhase::ForwardOpaque)].reserve(
         previous_stats.phase_forward_opaque);
@@ -129,8 +128,7 @@ DrawPacketVisibilityResult DrawQueue::classifyDrawPacketVisibility(const RenderD
     return result;
 }
 
-void DrawQueue::recordDrawPacketVisibility(const RenderDrawPacket& packet,
-                                           const DrawPacketVisibilityResult& visibility)
+void DrawQueue::recordDrawPacketVisibility(const RenderDrawPacket& packet, const DrawPacketVisibilityResult& visibility)
 {
     if (visibility.cameraVisible()) {
         m_camera_visible_draw_commands.push_back(packet);
@@ -217,8 +215,7 @@ void DrawQueue::captureVisibilityDebugFrustum(const Camera& camera, float aspect
     ++m_visibility_debug_stats.culling_frustums;
 }
 
-void DrawQueue::captureVisibilityDebugItem(const RenderDrawPacket& packet,
-                                           VisibilityDebugClassification classification)
+void DrawQueue::captureVisibilityDebugItem(const RenderDrawPacket& packet, VisibilityDebugClassification classification)
 {
     const bool capture_item = classification == VisibilityDebugClassification::CameraCulled
                                   ? m_visibility_debug_options.capture_culled_bounds

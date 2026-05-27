@@ -3,7 +3,6 @@
 #include "Renderer/SwapchainResources.h"
 
 #include <Core.h>
-
 #include <functional>
 
 namespace luna::RHI {

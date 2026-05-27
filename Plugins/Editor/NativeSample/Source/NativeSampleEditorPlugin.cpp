@@ -1,7 +1,8 @@
 #include "Luna/Editor/Native/NativePlugin.h"
 
-#include <algorithm>
 #include <cstdio>
+
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -200,10 +201,10 @@ void drawProjectSection(const native::Host& host, const native::Ui& ui, NativeSa
     ui.textWrapped(("Selected Script Plugin: " +
                     (project.selected_script_plugin_id.empty() ? std::string("-") : project.selected_script_plugin_id))
                        .c_str());
-    ui.textWrapped(("Selected Script Backend: " +
-                    (project.selected_script_backend_name.empty() ? std::string("-")
-                                                                  : project.selected_script_backend_name))
-                       .c_str());
+    ui.textWrapped(
+        ("Selected Script Backend: " +
+         (project.selected_script_backend_name.empty() ? std::string("-") : project.selected_script_backend_name))
+            .c_str());
 
     if (ui.button("Save Project", native::fillWidth(), LunaEditorButtonVariant_Subtle)) {
         state.project_note = host.project().save() ? "Project save requested." : "Project save failed.";
@@ -277,8 +278,8 @@ void drawAssetSection(const native::Host& host, const native::Ui& ui, NativeSamp
         }
     }
 
-    const uint32_t table_flags = LunaEditorTableFlag_RowBg | LunaEditorTableFlag_BordersInnerH |
-                                 LunaEditorTableFlag_SizingStretchProp;
+    const uint32_t table_flags =
+        LunaEditorTableFlag_RowBg | LunaEditorTableFlag_BordersInnerH | LunaEditorTableFlag_SizingStretchProp;
     if (!ui.beginTable("NativeSampleAssets", 4, table_flags)) {
         return;
     }
@@ -496,10 +497,8 @@ void drawViewportSection(const native::Host& host, const native::Ui& ui, NativeS
     const float height = (std::max)(width * 0.5625f, 180.0f);
 
     LunaEditorViewportPresentation presentation = native::makeViewportPresentation();
-    if (host.viewport().syncSceneViewport(state.preview_viewport.id(),
-                                          static_cast<uint32_t>(width),
-                                          static_cast<uint32_t>(height),
-                                          &presentation) &&
+    if (host.viewport().syncSceneViewport(
+            state.preview_viewport.id(), static_cast<uint32_t>(width), static_cast<uint32_t>(height), &presentation) &&
         presentation.presentable != 0) {
         (void) ui.image(presentation.scene_texture, native::vec2(width, height));
         if (ui.isItemHovered()) {
@@ -581,7 +580,8 @@ int loadNativeSample(void* plugin_user_data, const LunaEditorHostApi* host_api)
         !host.pluginAssets().available() || !host.project().available() || !host.assets().available() ||
         !host.scene().available() || !host.selection().available() || !host.viewport().available() ||
         !host.runtimeViewport().available()) {
-        host.log().error("Native sample requires command, window, menu, asset, project, scene, selection, viewport, and runtime viewport APIs.");
+        host.log().error("Native sample requires command, window, menu, asset, project, scene, selection, viewport, "
+                         "and runtime viewport APIs.");
         return 0;
     }
 

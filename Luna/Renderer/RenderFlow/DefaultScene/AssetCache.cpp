@@ -1,20 +1,19 @@
-#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
-
 #include "Core/Log.h"
+#include "Renderer/Image/ImageDataUtils.h"
 #include "Renderer/Material.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/Image/ImageDataUtils.h"
+#include "Renderer/RendererUtilities.h"
+#include "Renderer/RenderFlow/DefaultScene/AssetCache.h"
 #include "Renderer/RenderFlow/DefaultScene/BindingSchema.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
-#include "Renderer/RendererUtilities.h"
+
+#include <cstring>
 
 #include <Builders.h>
 #include <DescriptorPool.h>
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
-
-#include <cstring>
 #include <string_view>
 
 namespace luna::render_flow::default_scene {
@@ -40,11 +39,12 @@ void AssetCache::clear(ClearMode mode)
 {
     const bool clear_meshes = mode == ClearMode::All;
     if (!m_uploaded_materials.empty() || !m_uploaded_textures.empty() || (clear_meshes && !m_uploaded_meshes.empty())) {
-        LUNA_RENDERER_DEBUG("Clearing scene render flow asset cache: materials={} textures={} meshes={} clear_meshes={}",
-                            m_uploaded_materials.size(),
-                            m_uploaded_textures.size(),
-                            m_uploaded_meshes.size(),
-                            clear_meshes);
+        LUNA_RENDERER_DEBUG(
+            "Clearing scene render flow asset cache: materials={} textures={} meshes={} clear_meshes={}",
+            m_uploaded_materials.size(),
+            m_uploaded_textures.size(),
+            m_uploaded_meshes.size(),
+            clear_meshes);
     }
 
     m_uploaded_materials.clear();
@@ -69,7 +69,8 @@ void AssetCache::prepareDraws(RHI::CommandBufferEncoder& commands,
         }
 
         (void) getOrCreateUploadedMesh(*draw_command.mesh, bindings);
-        auto& uploaded_material = getOrCreateUploadedMaterial(resolveMaterial(draw_command.material, default_material), bindings);
+        auto& uploaded_material =
+            getOrCreateUploadedMaterial(resolveMaterial(draw_command.material, default_material), bindings);
         uploadMaterialIfNeeded(commands, uploaded_material);
     }
 }
@@ -93,8 +94,9 @@ AssetCache::DrawResources AssetCache::resolveDrawResources(const DrawCommand& dr
     const Material& material = resolveMaterial(draw_command.material, default_material);
     const auto uploaded_material_it = m_uploaded_materials.find(&material);
     if (uploaded_material_it == m_uploaded_materials.end() || !uploaded_material_it->second.descriptor_set) {
-        LUNA_RENDERER_FRAME_TRACE("Cannot resolve draw resources for material '{}' because descriptor set is unavailable",
-                                  material.getName().empty() ? "Material" : material.getName());
+        LUNA_RENDERER_FRAME_TRACE(
+            "Cannot resolve draw resources for material '{}' because descriptor set is unavailable",
+            material.getName().empty() ? "Material" : material.getName());
         return resolved;
     }
 
@@ -154,24 +156,26 @@ AssetCache::UploadedMesh& AssetCache::getOrCreateUploadedMesh(const Mesh& mesh, 
         const std::string sub_mesh_name =
             sub_mesh.Name.empty() ? mesh.getName() + "_SubMesh_" + std::to_string(submesh_index) : sub_mesh.Name;
 
-        uploaded_sub_mesh.vertex_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
-                                                                            .SetSize(sub_mesh.Vertices.size() *
-                                                                                     sizeof(StaticMeshVertex))
-                                                                            .SetUsage(RHI::BufferUsageFlags::VertexBuffer)
-                                                                            .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
-                                                                            .SetName(sub_mesh_name + "_VertexBuffer")
-                                                                            .Build());
-        uploaded_sub_mesh.index_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
-                                                                           .SetSize(sub_mesh.Indices.size() * sizeof(uint32_t))
-                                                                           .SetUsage(RHI::BufferUsageFlags::IndexBuffer)
-                                                                           .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
-                                                                           .SetName(sub_mesh_name + "_IndexBuffer")
-                                                                           .Build());
+        uploaded_sub_mesh.vertex_buffer =
+            bindings.device->CreateBuffer(RHI::BufferBuilder()
+                                              .SetSize(sub_mesh.Vertices.size() * sizeof(StaticMeshVertex))
+                                              .SetUsage(RHI::BufferUsageFlags::VertexBuffer)
+                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
+                                              .SetName(sub_mesh_name + "_VertexBuffer")
+                                              .Build());
+        uploaded_sub_mesh.index_buffer =
+            bindings.device->CreateBuffer(RHI::BufferBuilder()
+                                              .SetSize(sub_mesh.Indices.size() * sizeof(uint32_t))
+                                              .SetUsage(RHI::BufferUsageFlags::IndexBuffer)
+                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
+                                              .SetName(sub_mesh_name + "_IndexBuffer")
+                                              .Build());
         uploaded_sub_mesh.index_count = static_cast<uint32_t>(sub_mesh.Indices.size());
 
         if (uploaded_sub_mesh.vertex_buffer) {
             if (void* vertex_memory = uploaded_sub_mesh.vertex_buffer->Map()) {
-                std::memcpy(vertex_memory, sub_mesh.Vertices.data(), sub_mesh.Vertices.size() * sizeof(StaticMeshVertex));
+                std::memcpy(
+                    vertex_memory, sub_mesh.Vertices.data(), sub_mesh.Vertices.size() * sizeof(StaticMeshVertex));
                 uploaded_sub_mesh.vertex_buffer->Flush();
                 uploaded_sub_mesh.vertex_buffer->Unmap();
             } else {
@@ -221,13 +225,15 @@ std::shared_ptr<renderer_detail::PendingTextureUpload>
     }
 
     const std::string debug_name = texture->getName().empty() ? std::string("Texture") : texture->getName();
-    auto uploaded_texture = std::make_shared<renderer_detail::PendingTextureUpload>(
-        renderer_detail::createTextureUpload(bindings.device, texture->getImageData(), texture->getSamplerSettings(), debug_name));
+    auto uploaded_texture =
+        std::make_shared<renderer_detail::PendingTextureUpload>(renderer_detail::createTextureUpload(
+            bindings.device, texture->getImageData(), texture->getSamplerSettings(), debug_name));
     m_uploaded_textures.emplace(texture.get(), uploaded_texture);
     return uploaded_texture;
 }
 
-AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Material& material, const Bindings& bindings)
+AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Material& material,
+                                                                      const Bindings& bindings)
 {
     const auto it = m_uploaded_materials.find(&material);
     if (it != m_uploaded_materials.end()) {
@@ -247,12 +253,13 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
     LUNA_RENDERER_DEBUG("Uploading material '{}'", material_name);
 
     if (bindings.device) {
-        uploaded_material.params_buffer = bindings.device->CreateBuffer(RHI::BufferBuilder()
-                                                                            .SetSize(sizeof(render_flow::default_scene_detail::MaterialGpuParams))
-                                                                            .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
-                                                                            .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
-                                                                            .SetName(material_name + "_Params")
-                                                                            .Build());
+        uploaded_material.params_buffer =
+            bindings.device->CreateBuffer(RHI::BufferBuilder()
+                                              .SetSize(sizeof(render_flow::default_scene_detail::MaterialGpuParams))
+                                              .SetUsage(RHI::BufferUsageFlags::UniformBuffer)
+                                              .SetMemoryUsage(RHI::BufferMemoryUsage::CpuToGpu)
+                                              .SetName(material_name + "_Params")
+                                              .Build());
     }
     bindMaterialResources(material, uploaded_material, bindings);
     uploadMaterialParamsIfNeeded(material, uploaded_material);
@@ -261,11 +268,11 @@ AssetCache::UploadedMaterial& AssetCache::getOrCreateUploadedMaterial(const Mate
 }
 
 std::shared_ptr<renderer_detail::PendingTextureUpload>
-AssetCache::createMaterialTexture(const Material& material,
-                                  const std::shared_ptr<Texture>& texture,
-                                  const ImageData& fallback_image,
-                                  std::string_view suffix,
-                                  const Bindings& bindings)
+    AssetCache::createMaterialTexture(const Material& material,
+                                      const std::shared_ptr<Texture>& texture,
+                                      const ImageData& fallback_image,
+                                      std::string_view suffix,
+                                      const Bindings& bindings)
 {
     if (texture != nullptr && texture->isValid()) {
         return getOrCreateUploadedTexture(texture, bindings);
@@ -278,13 +285,19 @@ AssetCache::createMaterialTexture(const Material& material,
         renderer_detail::createTextureUpload(bindings.device, fallback_image, default_sampler_settings, texture_name));
 }
 
-void AssetCache::bindMaterialResources(const Material& material, UploadedMaterial& uploaded_material, const Bindings& bindings)
+void AssetCache::bindMaterialResources(const Material& material,
+                                       UploadedMaterial& uploaded_material,
+                                       const Bindings& bindings)
 {
     const auto& textures = material.getTextures();
     const std::string material_name = material.getName().empty() ? "Material" : material.getName();
 
-    uploaded_material.base_color_texture = createMaterialTexture(
-        material, textures.BaseColor, renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)), "BaseColor", bindings);
+    uploaded_material.base_color_texture =
+        createMaterialTexture(material,
+                              textures.BaseColor,
+                              renderer_detail::createFallbackColorImageData(glm::vec4(1.0f)),
+                              "BaseColor",
+                              bindings);
     uploaded_material.normal_texture =
         createMaterialTexture(material,
                               textures.Normal,
@@ -334,7 +347,8 @@ void AssetCache::bindMaterialResources(const Material& material, UploadedMateria
         !uploaded_material.roughness_texture->sampler || !uploaded_material.emissive_texture->sampler ||
         !uploaded_material.occlusion_texture->sampler || !uploaded_material.params_buffer) {
         LUNA_RENDERER_WARN(
-            "Material '{}' upload is incomplete: bindings={} base={} normal={} metallic_roughness={} metallic={} roughness={} emissive={} occlusion={} params_buffer={}",
+            "Material '{}' upload is incomplete: bindings={} base={} normal={} metallic_roughness={} metallic={} "
+            "roughness={} emissive={} occlusion={} params_buffer={}",
             material_name,
             bindings.isValid(),
             static_cast<bool>(uploaded_material.base_color_texture && uploaded_material.base_color_texture->texture &&
@@ -512,8 +526,3 @@ const Material& AssetCache::resolveMaterial(const std::shared_ptr<Material>& mat
 }
 
 } // namespace luna::render_flow::default_scene
-
-
-
-
-

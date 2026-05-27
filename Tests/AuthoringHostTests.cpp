@@ -134,9 +134,11 @@ void testHostUndoRedoAndEvents(TestContext& context)
     context.expect(host.canRedo(), "host should expose redo availability");
     context.expect(host.captureSceneSnapshot().entity_count == 0, "undo should restore empty scene");
     const auto undo_events = host.consumeEvents();
-    context.expect(std::any_of(undo_events.begin(), undo_events.end(), [](const auto& event) {
-                       return event.type == luna::authoring::AuthoringEventType::HistoryChanged;
-                   }),
+    context.expect(std::any_of(undo_events.begin(),
+                               undo_events.end(),
+                               [](const auto& event) {
+                                   return event.type == luna::authoring::AuthoringEventType::HistoryChanged;
+                               }),
                    "undo should emit a history event");
 
     context.expect(host.redo(), "host should redo the executed plan");
@@ -200,9 +202,11 @@ void testHostCapabilities(TestContext& context)
 
     const auto capabilities = host.capabilities();
     context.expect(!capabilities.empty(), "host should expose authoring capabilities");
-    context.expect(std::any_of(capabilities.begin(), capabilities.end(), [](const auto& capability) {
-                       return capability.op == "snapshot";
-                   }),
+    context.expect(std::any_of(capabilities.begin(),
+                               capabilities.end(),
+                               [](const auto& capability) {
+                                   return capability.op == "snapshot";
+                               }),
                    "host capabilities should include snapshot");
 }
 

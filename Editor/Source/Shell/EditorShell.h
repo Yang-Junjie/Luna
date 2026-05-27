@@ -9,8 +9,8 @@
 #include <functional>
 #include <initializer_list>
 #include <memory>
-#include <vector>
 #include <string_view>
+#include <vector>
 
 namespace luna {
 

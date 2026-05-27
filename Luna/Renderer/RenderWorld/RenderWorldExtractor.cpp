@@ -16,7 +16,7 @@ namespace {
 uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
 {
     constexpr uint32_t kMinShadowMapSize = 256;
-    constexpr uint32_t kMaxShadowMapSize = 8192;
+    constexpr uint32_t kMaxShadowMapSize = 8'192;
     return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
@@ -135,8 +135,8 @@ void RenderWorldExtractor::extract(Scene& scene, const Camera& camera, RenderWor
     render_world.setShadowSettings(RenderShadowSettings{
         .mode = resolveShadowMode(scene.shadowSettings()),
         .pcf_shadow_distance = std::clamp(scene.shadowSettings().pcfShadowDistance, 1.0f, 1000.0f),
-        .pcf_map_size = sanitizeShadowMapSize(scene.shadowSettings().pcfMapSize, 4096),
-        .csm_cascade_size = sanitizeShadowMapSize(scene.shadowSettings().csmCascadeSize, 2048),
+        .pcf_map_size = sanitizeShadowMapSize(scene.shadowSettings().pcfMapSize, 4'096),
+        .csm_cascade_size = sanitizeShadowMapSize(scene.shadowSettings().csmCascadeSize, 2'048),
     });
 
     bool has_directional_light = false;

@@ -1,13 +1,13 @@
-#include "InspectorPlugin.h"
-
 #include "EditorApi/EditorApi.h"
+#include "InspectorPlugin.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
-#include <algorithm>
-#include <charconv>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
+#include <charconv>
 #include <initializer_list>
 #include <optional>
 #include <string>
@@ -67,17 +67,15 @@ bool sameScriptPropertyOption(const luna::editor::SceneScriptPropertyOption& lhs
 bool sameScriptPropertyMetadata(const luna::editor::SceneScriptPropertyMetadata& lhs,
                                 const luna::editor::SceneScriptPropertyMetadata& rhs)
 {
-    return lhs.display_name == rhs.display_name && lhs.description == rhs.description &&
-           lhs.category == rhs.category && lhs.has_min_value == rhs.has_min_value &&
-           lhs.has_max_value == rhs.has_max_value && lhs.has_step_value == rhs.has_step_value &&
-           lhs.min_value == rhs.min_value && lhs.max_value == rhs.max_value && lhs.step_value == rhs.step_value &&
-           lhs.asset_type == rhs.asset_type && lhs.entity_filter == rhs.entity_filter &&
-           lhs.options.size() == rhs.options.size() &&
+    return lhs.display_name == rhs.display_name && lhs.description == rhs.description && lhs.category == rhs.category &&
+           lhs.has_min_value == rhs.has_min_value && lhs.has_max_value == rhs.has_max_value &&
+           lhs.has_step_value == rhs.has_step_value && lhs.min_value == rhs.min_value &&
+           lhs.max_value == rhs.max_value && lhs.step_value == rhs.step_value && lhs.asset_type == rhs.asset_type &&
+           lhs.entity_filter == rhs.entity_filter && lhs.options.size() == rhs.options.size() &&
            std::equal(lhs.options.begin(), lhs.options.end(), rhs.options.begin(), sameScriptPropertyOption);
 }
 
-bool sameScriptProperty(const luna::editor::SceneScriptProperty& lhs,
-                        const luna::editor::SceneScriptProperty& rhs)
+bool sameScriptProperty(const luna::editor::SceneScriptProperty& lhs, const luna::editor::SceneScriptProperty& rhs)
 {
     return lhs.name == rhs.name && lhs.type == rhs.type && lhs.bool_value == rhs.bool_value &&
            lhs.int_value == rhs.int_value && lhs.float_value == rhs.float_value &&
@@ -227,9 +225,7 @@ bool entityMatchesFilter(const luna::editor::SceneEntityDetails& entity, std::st
     return true;
 }
 
-bool entityMatchesFilter(luna::editor::Host& host,
-                         luna::editor::EntityId entity_id,
-                         std::string_view entity_filter)
+bool entityMatchesFilter(luna::editor::Host& host, luna::editor::EntityId entity_id, std::string_view entity_filter)
 {
     if (entity_filter.empty() || equalsIgnoreCase(entity_filter, "Any")) {
         return true;
@@ -341,7 +337,7 @@ std::string makeUniquePropertyName(const luna::editor::SceneScriptEntry& script,
     }
 
     const std::string base_name = desired_name;
-    for (uint32_t suffix = 1; suffix < 10000; ++suffix) {
+    for (uint32_t suffix = 1; suffix < 10'000; ++suffix) {
         std::string candidate = base_name + std::to_string(suffix);
         if (is_name_available(candidate)) {
             return candidate;
@@ -416,9 +412,7 @@ std::string hiddenLabel(std::string_view id, std::string_view suffix)
 
 bool fullWidthButton(luna::editor::Ui& ui, std::string_view label)
 {
-    return ui.button(label,
-                     luna::editor::Vec2{.x = -1.0f, .y = 0.0f},
-                     luna::editor::ButtonVariant::Subtle);
+    return ui.button(label, luna::editor::Vec2{.x = -1.0f, .y = 0.0f}, luna::editor::ButtonVariant::Subtle);
 }
 
 std::string assetDetailText(const luna::editor::AssetInfo& asset, bool has_asset)
@@ -481,8 +475,7 @@ luna::editor::StatusVariant assetFieldVariant(const luna::editor::AssetInfo& ass
 
 bool beginPropertyTable(luna::editor::Ui& ui, std::string_view id, float label_width = kPropertyLabelWidth)
 {
-    const luna::editor::TableFlags flags = luna::editor::TableFlag::RowBg |
-                                           luna::editor::TableFlag::BordersInnerH |
+    const luna::editor::TableFlags flags = luna::editor::TableFlag::RowBg | luna::editor::TableFlag::BordersInnerH |
                                            luna::editor::TableFlag::SizingStretchProp;
     if (!ui.beginTable(id, 2, flags)) {
         return false;
@@ -511,11 +504,8 @@ void drawTextProperty(luna::editor::Ui& ui, std::string_view label, std::string_
     ui.textDisabled(value);
 }
 
-bool drawInputTextProperty(luna::editor::Ui& ui,
-                           std::string_view label,
-                           std::string_view id,
-                           std::string& value,
-                           std::size_t buffer_size)
+bool drawInputTextProperty(
+    luna::editor::Ui& ui, std::string_view label, std::string_view id, std::string& value, std::size_t buffer_size)
 {
     beginPropertyRow(ui, label);
     return ui.inputText(hiddenLabel(id), value, buffer_size);
@@ -574,10 +564,7 @@ DragFloat3Edit drawDragFloat3Property(luna::editor::Ui& ui,
     };
 }
 
-bool drawColor3Property(luna::editor::Ui& ui,
-                        std::string_view label,
-                        std::string_view id,
-                        luna::editor::Vec3& value)
+bool drawColor3Property(luna::editor::Ui& ui, std::string_view label, std::string_view id, luna::editor::Vec3& value)
 {
     beginPropertyRow(ui, label);
     return ui.colorEdit3(hiddenLabel(id), value);
@@ -870,9 +857,7 @@ void drawAddComponentActions(luna::editor::Host& host,
     if (!host.scene().canEditScene()) {
         ui.beginDisabled();
     }
-    if (ui.button("Add Component",
-                  luna::editor::Vec2{.x = -1.0f, .y = 0.0f},
-                  luna::editor::ButtonVariant::Subtle)) {
+    if (ui.button("Add Component", luna::editor::Vec2{.x = -1.0f, .y = 0.0f}, luna::editor::ButtonVariant::Subtle)) {
         ui.openPopup(kAddComponentPopupId);
     }
     drawAddComponentPopup(host, ui, details);
@@ -909,13 +894,13 @@ void drawTransform(luna::editor::Host& host,
     bool changed = false;
     bool edit_finished = false;
     if (beginPropertyTable(ui, "TransformProperties")) {
-        const DragFloat3Edit translation_edit =
-            drawDragFloat3Property(ui, "Translation", "TransformTranslation", transform.translation, 0.05f, 0.0f, 0.0f, "%.2f");
+        const DragFloat3Edit translation_edit = drawDragFloat3Property(
+            ui, "Translation", "TransformTranslation", transform.translation, 0.05f, 0.0f, 0.0f, "%.2f");
         changed |= translation_edit.changed;
         edit_finished |= translation_edit.deactivated_after_edit;
 
-        const DragFloat3Edit rotation_edit =
-            drawDragFloat3Property(ui, "Rotation", "TransformRotation", transform.rotation_degrees, 0.25f, 0.0f, 0.0f, "%.2f");
+        const DragFloat3Edit rotation_edit = drawDragFloat3Property(
+            ui, "Rotation", "TransformRotation", transform.rotation_degrees, 0.25f, 0.0f, 0.0f, "%.2f");
         changed |= rotation_edit.changed;
         edit_finished |= rotation_edit.deactivated_after_edit;
 
@@ -949,11 +934,7 @@ void drawCamera(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui,
-                              "InspectorCamera",
-                              "Camera",
-                              host.scene().canEditScene(),
-                              "Remove Component");
+        beginInspectorSection(ui, "InspectorCamera", "Camera", host.scene().canEditScene(), "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Camera);
@@ -1005,8 +986,7 @@ void drawCamera(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
         ui.endDisabled();
     }
 
-    camera.perspective_vertical_fov_degrees =
-        std::clamp(camera.perspective_vertical_fov_degrees, 1.0f, 179.0f);
+    camera.perspective_vertical_fov_degrees = std::clamp(camera.perspective_vertical_fov_degrees, 1.0f, 179.0f);
     camera.perspective_near = std::clamp(camera.perspective_near, 0.001f, 1000.0f);
     camera.perspective_far = std::clamp(camera.perspective_far, 0.001f, 10000.0f);
     camera.orthographic_size = std::clamp(camera.orthographic_size, 0.001f, 10000.0f);
@@ -1027,11 +1007,7 @@ void drawLight(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edito
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui,
-                              "InspectorLight",
-                              "Light",
-                              host.scene().canEditScene(),
-                              "Remove Component");
+        beginInspectorSection(ui, "InspectorLight", "Light", host.scene().canEditScene(), "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Light);
@@ -1054,7 +1030,8 @@ void drawLight(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edito
         beginPropertyRow(ui, "Type");
         changed |= drawLightTypeCombo(ui, light.type, "##LightType");
         changed |= drawColor3Property(ui, "Color", "LightColor", light.color);
-        changed |= drawDragFloatProperty(ui, "Intensity", "LightIntensity", light.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
+        changed |=
+            drawDragFloatProperty(ui, "Intensity", "LightIntensity", light.intensity, 0.05f, 0.0f, 100.0f, "%.2f");
 
         if (light.type == luna::editor::SceneLightType::Point || light.type == luna::editor::SceneLightType::Spot) {
             changed |= drawDragFloatProperty(ui, "Range", "LightRange", light.range, 0.1f, 0.001f, 1000.0f, "%.2f");
@@ -1075,9 +1052,7 @@ void drawLight(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edito
     light.intensity = std::clamp(light.intensity, 0.0f, 100.0f);
     light.range = std::clamp(light.range, 0.001f, 1000.0f);
     light.inner_cone_angle_degrees = std::clamp(light.inner_cone_angle_degrees, 0.1f, 89.0f);
-    light.outer_cone_angle_degrees = std::clamp(light.outer_cone_angle_degrees,
-                                                light.inner_cone_angle_degrees,
-                                                89.0f);
+    light.outer_cone_angle_degrees = std::clamp(light.outer_cone_angle_degrees, light.inner_cone_angle_degrees, 89.0f);
 
     if (changed && !sameLight(light, *details.light)) {
         (void) host.scene().setLightComponent(details.id, light);
@@ -1092,11 +1067,8 @@ void drawMesh(luna::editor::Host& host, luna::editor::Ui& ui, const luna::editor
         return;
     }
 
-    const InspectorSection section = beginInspectorSection(ui,
-                                                           "InspectorMesh",
-                                                           "Mesh",
-                                                           host.scene().canEditScene(),
-                                                           "Remove Component");
+    const InspectorSection section =
+        beginInspectorSection(ui, "InspectorMesh", "Mesh", host.scene().canEditScene(), "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Mesh);
@@ -1213,11 +1185,8 @@ bool drawScriptAssetSelector(luna::editor::Host& host,
                              std::string_view id_suffix)
 {
     const luna::AssetHandle previous_script_asset = script.script_asset;
-    bool changed = drawAssetField(host,
-                                  ui,
-                                  std::string("ScriptAsset") + std::string(id_suffix),
-                                  script.script_asset,
-                                  {luna::AssetType::Script});
+    bool changed = drawAssetField(
+        host, ui, std::string("ScriptAsset") + std::string(id_suffix), script.script_asset, {luna::AssetType::Script});
 
     const luna::editor::ScriptAssetValidation validation = host.scripts().validateScriptAsset(script.script_asset);
     std::string rejected_message;
@@ -1314,11 +1283,8 @@ bool drawScriptAssetProperty(luna::editor::Host& host,
     const luna::AssetType required_type = parseAssetTypeFilter(property.metadata.asset_type);
     bool changed = false;
     if (required_type == luna::AssetType::None) {
-        changed = drawAssetField(host,
-                                 ui,
-                                 std::string("ScriptPropertyAsset") + std::string(id_suffix),
-                                 property.asset_value,
-                                 {});
+        changed = drawAssetField(
+            host, ui, std::string("ScriptPropertyAsset") + std::string(id_suffix), property.asset_value, {});
     } else {
         changed = drawAssetField(host,
                                  ui,
@@ -1393,8 +1359,8 @@ bool drawScriptEntityProperty(luna::editor::Host& host,
         if (entityMatchesFilter(*entity, property.metadata.entity_filter)) {
             ui.textDisabled("Resolved Entity: " + entity->name);
         } else {
-            ui.textDisabled("Referenced entity does not match required filter '" +
-                            property.metadata.entity_filter + "'.");
+            ui.textDisabled("Referenced entity does not match required filter '" + property.metadata.entity_filter +
+                            "'.");
         }
     } else {
         ui.textDisabled("Referenced entity does not exist in this scene.");
@@ -1420,15 +1386,12 @@ bool drawScriptPropertyValue(luna::editor::Host& host,
             if (!metadata.options.empty()) {
                 changed |= drawScriptPropertyOptionCombo(ui, property, id_suffix);
             } else {
-                changed |= ui.dragInt(hiddenLabel("Value", id_suffix),
-                                      property.int_value,
-                                      static_cast<float>(scriptIntStep(metadata)),
-                                      metadata.has_min_value && metadata.has_max_value
-                                          ? static_cast<int>(metadata.min_value)
-                                          : 0,
-                                      metadata.has_min_value && metadata.has_max_value
-                                          ? static_cast<int>(metadata.max_value)
-                                          : 0);
+                changed |= ui.dragInt(
+                    hiddenLabel("Value", id_suffix),
+                    property.int_value,
+                    static_cast<float>(scriptIntStep(metadata)),
+                    metadata.has_min_value && metadata.has_max_value ? static_cast<int>(metadata.min_value) : 0,
+                    metadata.has_min_value && metadata.has_max_value ? static_cast<int>(metadata.max_value) : 0);
                 if (changed) {
                     property.int_value = clampInt(property.int_value, metadata);
                 }
@@ -1498,12 +1461,8 @@ bool drawScriptProperty(luna::editor::Host& host,
     const std::string property_section_id =
         "InspectorScriptProperty" + std::to_string(script_index) + "_" + std::to_string(property_index);
     const std::string property_section_label = display_name + " (" + scriptPropertyTypeLabel(property.type) + ")";
-    const InspectorSection section = beginInspectorSection(
-        ui,
-        property_section_id,
-        property_section_label,
-        allow_structure_edit,
-        "Remove Property");
+    const InspectorSection section =
+        beginInspectorSection(ui, property_section_id, property_section_label, allow_structure_edit, "Remove Property");
     if (section.remove_requested) {
         script.properties.erase(script.properties.begin() + static_cast<std::ptrdiff_t>(property_index));
         removed_property = true;
@@ -1528,12 +1487,14 @@ bool drawScriptProperty(luna::editor::Host& host,
     bool type_changed = false;
     bool value_changed = false;
 
-    if (beginPropertyTable(ui, "ScriptPropertyTable" + std::to_string(script_index) + "_" + std::to_string(property_index))) {
+    if (beginPropertyTable(
+            ui, "ScriptPropertyTable" + std::to_string(script_index) + "_" + std::to_string(property_index))) {
         if (!allow_structure_edit) {
             ui.beginDisabled();
         }
         const std::string name_before_edit = property.name;
-        name_changed = drawInputTextProperty(ui, "Name", std::string("Name") + std::string(id_suffix), property.name, 256);
+        name_changed =
+            drawInputTextProperty(ui, "Name", std::string("Name") + std::string(id_suffix), property.name, 256);
         bool normalized_name_changed = false;
         if (ui.isItemDeactivatedAfterEdit()) {
             const std::string normalized_name = makeUniquePropertyName(script, property_index, property.name);
@@ -1589,11 +1550,7 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
     }
 
     const InspectorSection section =
-        beginInspectorSection(ui,
-                              "InspectorScript",
-                              "Script",
-                              host.scene().canEditScene(),
-                              "Remove Component");
+        beginInspectorSection(ui, "InspectorScript", "Script", host.scene().canEditScene(), "Remove Component");
     if (section.remove_requested) {
         endInspectorSection(ui, section);
         (void) host.scene().removeComponent(details.id, luna::editor::SceneComponentKind::Script);
@@ -1607,8 +1564,7 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
     luna::editor::SceneScriptComponent script_component = *details.script;
     bool changed = false;
     const bool allow_structure_edit = host.scene().canEditScene();
-    const bool allow_property_value_edit =
-        allow_structure_edit || host.runtimeViewport().isRuntimeViewportEnabled();
+    const bool allow_property_value_edit = allow_structure_edit || host.runtimeViewport().isRuntimeViewportEnabled();
 
     const luna::editor::ScriptLanguageStatus language_status = host.scripts().projectScriptLanguage();
     if (beginPropertyTable(ui, "ScriptComponentProperties")) {
@@ -1648,13 +1604,10 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
 
         const std::string script_section_id = "InspectorScriptEntry" + std::to_string(script_index);
         const InspectorSection script_section = beginInspectorSection(
-            ui,
-            script_section_id,
-            "Script " + std::to_string(script_index),
-            allow_structure_edit,
-            "Remove Script");
+            ui, script_section_id, "Script " + std::to_string(script_index), allow_structure_edit, "Remove Script");
         if (script_section.remove_requested) {
-            script_component.scripts.erase(script_component.scripts.begin() + static_cast<std::ptrdiff_t>(script_index));
+            script_component.scripts.erase(script_component.scripts.begin() +
+                                           static_cast<std::ptrdiff_t>(script_index));
             changed = true;
             endInspectorSection(ui, script_section);
             break;
@@ -1668,12 +1621,19 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
             if (!allow_structure_edit) {
                 ui.beginDisabled();
             }
-            changed |= drawCheckboxProperty(ui, "Enabled", std::string("ScriptEnabled") + script_suffix, script.enabled);
-            changed |= drawInputTextProperty(ui, "Type Name", std::string("ScriptTypeName") + script_suffix, script.type_name, 256);
+            changed |=
+                drawCheckboxProperty(ui, "Enabled", std::string("ScriptEnabled") + script_suffix, script.enabled);
+            changed |= drawInputTextProperty(
+                ui, "Type Name", std::string("ScriptTypeName") + script_suffix, script.type_name, 256);
             beginPropertyRow(ui, "Asset");
             changed |= drawScriptAssetSelector(host, ui, script, script_suffix);
-            changed |= drawDragIntProperty(
-                ui, "Execution Order", std::string("ScriptExecutionOrder") + script_suffix, script.execution_order, 1.0f, -10000, 10000);
+            changed |= drawDragIntProperty(ui,
+                                           "Execution Order",
+                                           std::string("ScriptExecutionOrder") + script_suffix,
+                                           script.execution_order,
+                                           1.0f,
+                                           -10'000,
+                                           10'000);
             if (!allow_structure_edit) {
                 ui.endDisabled();
             }
@@ -1728,7 +1688,8 @@ void drawScript(luna::editor::Host& host, luna::editor::Ui& ui, const luna::edit
             if (allow_structure_edit) {
                 changed |= property_changed;
             } else if (property_value_changed && property_index < script.properties.size()) {
-                (void) host.scene().setScriptProperty(details.id, script_index, property_index, script.properties[property_index]);
+                (void) host.scene().setScriptProperty(
+                    details.id, script_index, property_index, script.properties[property_index]);
             }
             if (removed_property) {
                 break;

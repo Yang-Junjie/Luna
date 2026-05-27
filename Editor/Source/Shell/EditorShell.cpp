@@ -13,8 +13,8 @@
 #include "Imgui/ImGuiContext.h"
 #include "LunaEditorLayer.h"
 #include "Project/ProjectManager.h"
-#include "Renderer/Mesh.h"
 #include "Renderer/Material.h"
+#include "Renderer/Mesh.h"
 #include "Renderer/Texture.h"
 #include "Scene/Scene.h"
 #include "Script/ScriptAsset.h"
@@ -51,7 +51,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
 #include <yaml-cpp/yaml.h>
 
 namespace {
@@ -98,7 +97,8 @@ ImVec4 statusAccent(luna::editor::StatusVariant variant)
 
 ImVec4 statusFill(luna::editor::StatusVariant variant, float amount)
 {
-    return mixColor(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg), statusAccent(variant), amount);
+    return mixColor(
+        luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg), statusAccent(variant), amount);
 }
 
 void drawRectBorder(ImDrawList& draw_list, ImVec2 min, ImVec2 max, const ImVec4& color, float rounding)
@@ -111,11 +111,11 @@ void drawSectionChrome(ImVec2 min, ImVec2 max, bool hovered)
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     const float rounding = luna::editor::editorThemeMetric(luna::editor::EditorThemeMetric::FrameRounding);
     const float accent_width = luna::editor::editorThemeMetric(luna::editor::EditorThemeMetric::SectionAccentWidth);
-    draw_list->AddRectFilled(min,
-                             ImVec2{min.x + accent_width, max.y},
-                             ImGui::GetColorU32(
-                                 luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Accent, 0.74f)),
-                             rounding);
+    draw_list->AddRectFilled(
+        min,
+        ImVec2{min.x + accent_width, max.y},
+        ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Accent, 0.74f)),
+        rounding);
     drawRectBorder(*draw_list,
                    min,
                    max,
@@ -138,7 +138,7 @@ ImVec2 multilineTextSize(std::string_view value)
         }
 
         const ImVec2 line_size = ImGui::CalcTextSize(value.data() + offset, value.data() + line_end);
-        width = (std::max) (width, line_size.x);
+        width = (std::max)(width, line_size.x);
         ++line_count;
 
         if (newline == std::string_view::npos) {
@@ -147,10 +147,11 @@ ImVec2 multilineTextSize(std::string_view value)
         offset = newline + 1;
     }
 
-    return ImVec2{width, line_height * static_cast<float>((std::max) (line_count, 1))};
+    return ImVec2{width, line_height * static_cast<float>((std::max)(line_count, 1))};
 }
 
-void addMultilineText(ImDrawList& draw_list, ImVec2 position, const ImVec4& clip_rect, ImU32 color, std::string_view value)
+void addMultilineText(
+    ImDrawList& draw_list, ImVec2 position, const ImVec4& clip_rect, ImU32 color, std::string_view value)
 {
     const float line_height = ImGui::GetTextLineHeight();
     float y = position.y;
@@ -201,12 +202,10 @@ bool pushButtonVariant(luna::editor::ButtonVariant variant)
         case luna::editor::ButtonVariant::Primary:
             ImGui::PushStyleColor(ImGuiCol_Button,
                                   luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimary));
-            ImGui::PushStyleColor(
-                ImGuiCol_ButtonHovered,
-                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryHovered));
-            ImGui::PushStyleColor(
-                ImGuiCol_ButtonActive,
-                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryActive));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryHovered));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonPrimaryActive));
             return true;
         case luna::editor::ButtonVariant::Danger:
             ImGui::PushStyleColor(ImGuiCol_Button,
@@ -217,9 +216,8 @@ bool pushButtonVariant(luna::editor::ButtonVariant variant)
                                   luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonDangerActive));
             return true;
         case luna::editor::ButtonVariant::Subtle:
-            ImGui::PushStyleColor(
-                ImGuiCol_Button,
-                luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Button, 0.72f));
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                                  luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Button, 0.72f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
                                   luna::editor::editorThemeColor(luna::editor::EditorThemeColor::ButtonHovered));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,
@@ -253,7 +251,7 @@ std::vector<std::string> splitMenuPath(std::string_view path)
 std::string joinMenuPath(const std::vector<std::string>& parts, size_t count)
 {
     std::string result;
-    const size_t part_count = (std::min) (count, parts.size());
+    const size_t part_count = (std::min)(count, parts.size());
     for (size_t index = 0; index < part_count; ++index) {
         if (!result.empty()) {
             result += '/';
@@ -304,14 +302,14 @@ luna::editor::Vec2 fitTextureViewportDrawSize(const luna::editor::TextureView& t
     if (!options.preserve_aspect) {
         return options.fill_available ? available
                                       : luna::editor::Vec2{
-                                            .x = (std::min) (static_cast<float>(texture.size.x), available.x),
-                                            .y = (std::min) (static_cast<float>(texture.size.y), available.y),
+                                            .x = (std::min)(static_cast<float>(texture.size.x), available.x),
+                                            .y = (std::min)(static_cast<float>(texture.size.y), available.y),
                                         };
     }
 
     const float aspect =
         texture.size.y > 0u ? static_cast<float>(texture.size.x) / static_cast<float>(texture.size.y) : 1.0f;
-    float width = options.fill_available ? available.x : (std::min) (static_cast<float>(texture.size.x), available.x);
+    float width = options.fill_available ? available.x : (std::min)(static_cast<float>(texture.size.x), available.x);
     float height = width / aspect;
     if (height > available.y) {
         height = available.y;
@@ -319,8 +317,8 @@ luna::editor::Vec2 fitTextureViewportDrawSize(const luna::editor::TextureView& t
     }
 
     return luna::editor::Vec2{
-        .x = (std::max) (width, 1.0f),
-        .y = (std::max) (height, 1.0f),
+        .x = (std::max)(width, 1.0f),
+        .y = (std::max)(height, 1.0f),
     };
 }
 
@@ -330,8 +328,8 @@ luna::editor::UVec2 framebufferSizeForUi(luna::editor::Ui& ui, luna::editor::Vec
     const float scale_x = std::isfinite(framebuffer_scale.x) && framebuffer_scale.x > 0.0f ? framebuffer_scale.x : 1.0f;
     const float scale_y = std::isfinite(framebuffer_scale.y) && framebuffer_scale.y > 0.0f ? framebuffer_scale.y : 1.0f;
     return luna::editor::UVec2{
-        .x = static_cast<uint32_t>((std::max) (size.x * scale_x, 0.0f)),
-        .y = static_cast<uint32_t>((std::max) (size.y * scale_y, 0.0f)),
+        .x = static_cast<uint32_t>((std::max)(size.x * scale_x, 0.0f)),
+        .y = static_cast<uint32_t>((std::max)(size.y * scale_y, 0.0f)),
     };
 }
 
@@ -617,9 +615,9 @@ luna::editor::TextureHandle toEditorTextureHandle(ImTextureID texture_id) noexce
 
 std::vector<char> makeTextEditBuffer(const std::string& value, std::size_t buffer_size)
 {
-    const std::size_t size = (std::max) (buffer_size, value.size() + 1);
+    const std::size_t size = (std::max)(buffer_size, value.size() + 1);
     std::vector<char> buffer(size, '\0');
-    const std::size_t copy_size = (std::min) (value.size(), buffer.size() - 1);
+    const std::size_t copy_size = (std::min)(value.size(), buffer.size() - 1);
     std::copy_n(value.data(), copy_size, buffer.data());
     return buffer;
 }
@@ -1112,11 +1110,10 @@ public:
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
         const float accent_offset_y = editorThemeMetric(EditorThemeMetric::HeadingAccentOffsetY);
         const float accent_width = editorThemeMetric(EditorThemeMetric::HeadingAccentWidth);
-        draw_list->AddRectFilled(
-            ImVec2{cursor.x, cursor.y + accent_offset_y},
-            ImVec2{cursor.x + accent_width, cursor.y + line_height},
-            ImGui::GetColorU32(statusAccent(StatusVariant::Info)),
-            editorThemeMetric(EditorThemeMetric::HeadingAccentRounding));
+        draw_list->AddRectFilled(ImVec2{cursor.x, cursor.y + accent_offset_y},
+                                 ImVec2{cursor.x + accent_width, cursor.y + line_height},
+                                 ImGui::GetColorU32(statusAccent(StatusVariant::Info)),
+                                 editorThemeMetric(EditorThemeMetric::HeadingAccentRounding));
 
         const float heading_indent = editorThemeMetric(EditorThemeMetric::HeadingIndent);
         ImGui::Indent(heading_indent);
@@ -1129,10 +1126,10 @@ public:
 
         const ImVec2 separator_min{ImGui::GetCursorScreenPos().x, ImGui::GetCursorScreenPos().y + style.ItemSpacing.y};
         const ImVec2 separator_max{separator_min.x + ImGui::GetContentRegionAvail().x, separator_min.y};
-        draw_list->AddLine(separator_min,
-                           separator_max,
-                           ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.72f)));
+        draw_list->AddLine(
+            separator_min,
+            separator_max,
+            ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.72f)));
         ImGui::Dummy(ImVec2{0.0f, style.ItemSpacing.y});
     }
 
@@ -1162,10 +1159,9 @@ public:
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 text_size = multilineTextSize(label);
-        const ImVec2 padding =
-            editorThemeMetric(EditorThemeMetric::BadgePaddingX, EditorThemeMetric::BadgePaddingY);
+        const ImVec2 padding = editorThemeMetric(EditorThemeMetric::BadgePaddingX, EditorThemeMetric::BadgePaddingY);
         const ImVec2 size{text_size.x + padding.x * 2.0f,
-                          (std::max) (text_size.y + padding.y * 2.0f, ImGui::GetFrameHeight() * 0.72f)};
+                          (std::max)(text_size.y + padding.y * 2.0f, ImGui::GetFrameHeight() * 0.72f)};
         const ImVec2 min = ImGui::GetCursorScreenPos();
         const ImVec2 max{min.x + size.x, min.y + size.y};
         ImGui::Dummy(size);
@@ -1173,7 +1169,7 @@ public:
         const ImVec4 accent = statusAccent(variant);
         const ImVec4 fill = statusFill(variant, variant == StatusVariant::Neutral ? 0.10f : 0.16f);
         ImDrawList* draw_list = ImGui::GetWindowDrawList();
-        const float rounding = (std::min) (style.FrameRounding, editorThemeMetric(EditorThemeMetric::BadgeRounding));
+        const float rounding = (std::min)(style.FrameRounding, editorThemeMetric(EditorThemeMetric::BadgeRounding));
         draw_list->AddRectFilled(min, max, ImGui::GetColorU32(fill), rounding);
         drawRectBorder(*draw_list, min, max, withAlpha(accent, 0.58f), rounding);
         addMultilineText(*draw_list,
@@ -1197,15 +1193,15 @@ public:
         const float text_top_padding = editorThemeMetric(EditorThemeMetric::MetricPaddingTop);
         const float text_bottom_padding = editorThemeMetric(EditorThemeMetric::MetricPaddingBottom);
         const float line_gap = editorThemeMetric(EditorThemeMetric::MetricLineGap);
-        const float text_height = label_size.y + line_gap + value_size.y +
-                                  (!detail.empty() ? line_gap + detail_size.y : 0.0f);
-        const float default_height = (std::max) (
-            text_height + text_top_padding + text_bottom_padding,
-            editorThemeMetric(detail.empty() ? EditorThemeMetric::MetricDefaultHeight
-                                             : EditorThemeMetric::MetricDetailedHeight));
+        const float text_height =
+            label_size.y + line_gap + value_size.y + (!detail.empty() ? line_gap + detail_size.y : 0.0f);
+        const float default_height =
+            (std::max)(text_height + text_top_padding + text_bottom_padding,
+                       editorThemeMetric(detail.empty() ? EditorThemeMetric::MetricDefaultHeight
+                                                        : EditorThemeMetric::MetricDetailedHeight));
         ImVec2 draw_size{
             size.x > 0.0f ? scaleEditorUi(size.x)
-                          : (size.x < 0.0f ? (std::max) (available.x + size.x, 1.0f) : available.x),
+                          : (size.x < 0.0f ? (std::max)(available.x + size.x, 1.0f) : available.x),
             size.y > 0.0f ? scaleEditorUi(size.y) : default_height,
         };
         if (draw_size.x <= 0.0f) {
@@ -1247,34 +1243,30 @@ public:
                        ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::Text)),
                        value);
         if (!detail.empty()) {
-            addClippedText(*draw_list,
-                           ImVec2{text_min.x, text_min.y + label_size.y + line_gap + value_size.y + line_gap},
-                           text_min,
-                           text_max,
-                           ImGui::GetColorU32(
-                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted)),
-                           detail);
+            addClippedText(
+                *draw_list,
+                ImVec2{text_min.x, text_min.y + label_size.y + line_gap + value_size.y + line_gap},
+                text_min,
+                text_max,
+                ImGui::GetColorU32(luna::editor::editorThemeColor(luna::editor::EditorThemeColor::TextMuted)),
+                detail);
         }
     }
 
-    bool assetField(std::string_view id,
-                    std::string_view label,
-                    std::string_view detail,
-                    StatusVariant variant,
-                    Vec2 size) override
+    bool assetField(
+        std::string_view id, std::string_view label, std::string_view detail, StatusVariant variant, Vec2 size) override
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 available = ImGui::GetContentRegionAvail();
         const bool has_detail = !detail.empty();
         const float line_height = ImGui::GetTextLineHeight();
         const float line_gap = has_detail ? editorThemeMetric(EditorThemeMetric::AssetPreviewLineGap) : 0.0f;
-        const float default_height = line_height * (has_detail ? 2.0f : 1.0f) + line_gap +
-                                     style.FramePadding.y * 2.0f +
+        const float default_height = line_height * (has_detail ? 2.0f : 1.0f) + line_gap + style.FramePadding.y * 2.0f +
                                      editorThemeMetric(EditorThemeMetric::AssetPreviewExtraHeight);
 
         ImVec2 draw_size{
             size.x > 0.0f ? scaleEditorUi(size.x)
-                          : (size.x < 0.0f ? (std::max) (available.x + size.x, 1.0f) : available.x),
+                          : (size.x < 0.0f ? (std::max)(available.x + size.x, 1.0f) : available.x),
             size.y > 0.0f ? scaleEditorUi(size.y) : default_height,
         };
         if (draw_size.x <= 0.0f) {
@@ -1289,17 +1281,16 @@ public:
         const ImVec2 max{min.x + draw_size.x, min.y + draw_size.y};
 
         const ImVec4 accent = statusAccent(variant);
-        const float fill_amount = variant == StatusVariant::Neutral ? 0.045f
-                                  : variant == StatusVariant::Danger  ? 0.14f
-                                                                      : 0.08f;
+        const float fill_amount = variant == StatusVariant::Neutral  ? 0.045f
+                                  : variant == StatusVariant::Danger ? 0.14f
+                                                                     : 0.08f;
         const ImVec4 fill = statusFill(variant, hovered || active ? fill_amount + 0.05f : fill_amount);
-        const ImVec4 border = hovered || active ? withAlpha(accent, 0.72f)
-                                                : editorThemeColor(EditorThemeColor::PanelBorder, 0.78f);
-        const ImVec4 title_color = variant == StatusVariant::Danger
-                                       ? editorThemeColor(EditorThemeColor::Danger)
-                                       : editorThemeColor(variant == StatusVariant::Neutral
-                                                              ? EditorThemeColor::TextMuted
-                                                              : EditorThemeColor::Text);
+        const ImVec4 border =
+            hovered || active ? withAlpha(accent, 0.72f) : editorThemeColor(EditorThemeColor::PanelBorder, 0.78f);
+        const ImVec4 title_color = variant == StatusVariant::Danger ? editorThemeColor(EditorThemeColor::Danger)
+                                                                    : editorThemeColor(variant == StatusVariant::Neutral
+                                                                                           ? EditorThemeColor::TextMuted
+                                                                                           : EditorThemeColor::Text);
         const ImVec4 detail_color = variant == StatusVariant::Danger ? editorThemeColor(EditorThemeColor::Danger)
                                                                      : editorThemeColor(EditorThemeColor::TextMuted);
 
@@ -1337,7 +1328,7 @@ public:
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         const ImVec2 available = ImGui::GetContentRegionAvail();
-        const float width = (std::max) (available.x, editorThemeMetric(EditorThemeMetric::EmptyStateMinWidth));
+        const float width = (std::max)(available.x, editorThemeMetric(EditorThemeMetric::EmptyStateMinWidth));
         const float height = editorThemeMetric(detail.empty() ? EditorThemeMetric::EmptyStateHeight
                                                               : EditorThemeMetric::EmptyStateDetailedHeight);
         const ImVec2 min = ImGui::GetCursorScreenPos();
@@ -1391,9 +1382,8 @@ public:
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.0f);
         ImGui::PushStyleColor(ImGuiCol_ChildBg,
                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBg));
-        ImGui::PushStyleColor(
-            ImGuiCol_Border,
-            luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.86f));
+        ImGui::PushStyleColor(ImGuiCol_Border,
+                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::PanelBorder, 0.86f));
         ImGuiChildFlags child_flags = ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding;
         if (size.y <= 0.0f) {
             child_flags |= ImGuiChildFlags_AutoResizeY;
@@ -1635,11 +1625,10 @@ public:
             flags |= ImGuiTreeNodeFlags_DefaultOpen;
         }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
-                            editorThemeMetric(EditorThemeMetric::SectionFramePaddingX,
-                                              EditorThemeMetric::SectionFramePaddingY));
-        ImGui::PushStyleColor(ImGuiCol_Header,
-                              luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg));
+        ImGui::PushStyleVar(
+            ImGuiStyleVar_FramePadding,
+            editorThemeMetric(EditorThemeMetric::SectionFramePaddingX, EditorThemeMetric::SectionFramePaddingY));
+        ImGui::PushStyleColor(ImGuiCol_Header, luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBg));
         ImGui::PushStyleColor(ImGuiCol_HeaderHovered,
                               luna::editor::editorThemeColor(luna::editor::EditorThemeColor::FrameBgHovered));
         ImGui::PushStyleColor(ImGuiCol_HeaderActive,
@@ -2472,12 +2461,12 @@ private:
     static Material::SurfaceProperties toRuntimeSurface(const MaterialSurfaceProperties& surface) noexcept
     {
         Material::SurfaceProperties result;
-        result.BaseColorFactor =
-            glm::vec4(surface.base_color_factor.x,
-                      surface.base_color_factor.y,
-                      surface.base_color_factor.z,
-                      surface.base_color_factor.w);
-        result.EmissiveFactor = glm::vec3(surface.emissive_factor.x, surface.emissive_factor.y, surface.emissive_factor.z);
+        result.BaseColorFactor = glm::vec4(surface.base_color_factor.x,
+                                           surface.base_color_factor.y,
+                                           surface.base_color_factor.z,
+                                           surface.base_color_factor.w);
+        result.EmissiveFactor =
+            glm::vec3(surface.emissive_factor.x, surface.emissive_factor.y, surface.emissive_factor.z);
         result.MetallicFactor = surface.metallic_factor;
         result.RoughnessFactor = surface.roughness_factor;
         result.NormalScale = surface.normal_scale;
@@ -2510,12 +2499,12 @@ private:
             .Normal = textures.normal.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.normal)
                                                 : std::shared_ptr<Texture>{},
             .MetallicRoughness = textures.metallic_roughness.isValid()
-                                      ? AssetManager::get().loadAssetAs<Texture>(textures.metallic_roughness)
-                                      : std::shared_ptr<Texture>{},
+                                     ? AssetManager::get().loadAssetAs<Texture>(textures.metallic_roughness)
+                                     : std::shared_ptr<Texture>{},
             .Metallic = textures.metallic.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.metallic)
-                                                     : std::shared_ptr<Texture>{},
+                                                    : std::shared_ptr<Texture>{},
             .Roughness = textures.roughness.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.roughness)
-                                                       : std::shared_ptr<Texture>{},
+                                                      : std::shared_ptr<Texture>{},
             .Emissive = textures.emissive.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.emissive)
                                                     : std::shared_ptr<Texture>{},
             .Occlusion = textures.occlusion.isValid() ? AssetManager::get().loadAssetAs<Texture>(textures.occlusion)
@@ -2628,7 +2617,8 @@ private:
             const YAML::Node surface_node = material_node["Surface"] ? material_node["Surface"] : material_node;
             document.surface.base_color_factor =
                 readVec4(surface_node["BaseColorFactor"], document.surface.base_color_factor);
-            document.surface.emissive_factor = readVec3(surface_node["EmissiveFactor"], document.surface.emissive_factor);
+            document.surface.emissive_factor =
+                readVec3(surface_node["EmissiveFactor"], document.surface.emissive_factor);
             if (surface_node["MetallicFactor"]) {
                 document.surface.metallic_factor = surface_node["MetallicFactor"].as<float>();
             }
@@ -2654,7 +2644,8 @@ private:
                 surface_node["BlendMode"] ? surface_node["BlendMode"] : material_node["BlendMode"];
             document.surface.blend_mode = parseBlendMode(blend_mode_node, document.surface.blend_mode);
         } catch (const YAML::Exception& error) {
-            LUNA_EDITOR_WARN("Failed to read material document '{}': {}", document.absolute_path.string(), error.what());
+            LUNA_EDITOR_WARN(
+                "Failed to read material document '{}': {}", document.absolute_path.string(), error.what());
         }
     }
 
@@ -2669,7 +2660,8 @@ private:
         document.dirty = false;
 
         const AssetService* asset_service = assets();
-        const std::optional<AssetInfo> asset_info = asset_service != nullptr ? asset_service->assetInfo(handle) : std::nullopt;
+        const std::optional<AssetInfo> asset_info =
+            asset_service != nullptr ? asset_service->assetInfo(handle) : std::nullopt;
         if (!asset_info || asset_info->type != AssetType::Material || !asset_info->exists) {
             return document;
         }
@@ -4952,7 +4944,8 @@ public:
 
         const auto dockspace_order_it = m_dockspace_order_by_id.find(key);
         if (dockspace_order_it != m_dockspace_order_by_id.end()) {
-            m_dockspace_order.erase(m_dockspace_order.begin() + static_cast<std::ptrdiff_t>(dockspace_order_it->second));
+            m_dockspace_order.erase(m_dockspace_order.begin() +
+                                    static_cast<std::ptrdiff_t>(dockspace_order_it->second));
             rebuildDockspaceOrderMap();
         }
 
@@ -5152,8 +5145,8 @@ private:
         }
 
         const std::string label = imguiWindowLabel(descriptor.id, descriptor.title);
-        const ImGuiWindowFlags window_flags = toImGuiWindowFlags(descriptor.flags) | ImGuiWindowFlags_NoScrollbar |
-                                              ImGuiWindowFlags_NoScrollWithMouse;
+        const ImGuiWindowFlags window_flags =
+            toImGuiWindowFlags(descriptor.flags) | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
         const bool visible = ImGui::Begin(label.c_str(), &dockspace.open, window_flags);
         if (no_padding) {
             ImGui::PopStyleVar();
@@ -5242,7 +5235,8 @@ public:
 
     EditorThemePreset editorTheme() const override
     {
-        return m_settings_store != nullptr ? m_settings_store->data().theme_preset : EditorThemePreset::ModernLightweight;
+        return m_settings_store != nullptr ? m_settings_store->data().theme_preset
+                                           : EditorThemePreset::ModernLightweight;
     }
 
     EditorFontSettings editorFont() const override

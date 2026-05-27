@@ -1,8 +1,7 @@
-#include "ScriptHostBridgeInternal.h"
-
 #include "Core/Input.h"
 #include "Core/KeyCodes.h"
 #include "Core/MouseCodes.h"
+#include "ScriptHostBridgeInternal.h"
 
 namespace {
 

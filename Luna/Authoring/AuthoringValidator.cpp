@@ -1,16 +1,16 @@
-#include "AuthoringValidator.h"
-
 #include "Asset/BuiltinAssets.h"
 #include "Authoring/AuthoringSession.h"
+#include "AuthoringValidator.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
-#include <algorithm>
-#include <charconv>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
+#include <charconv>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -522,8 +522,8 @@ bool validateSavePath(const AuthoringCommand& command,
         addValidationDiagnostic(report,
                                 AuthoringDiagnosticSeverity::Error,
                                 AuthoringDiagnosticCode::SaveSceneFailed,
-                                "Failed to inspect scene file '" + normalized_scene_path.string() + "': " +
-                                    ec.message() + ".",
+                                "Failed to inspect scene file '" + normalized_scene_path.string() +
+                                    "': " + ec.message() + ".",
                                 command_index,
                                 command,
                                 {},
@@ -709,8 +709,7 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
     const size_t errors_before = report.errors.size();
     report.scene = captureAuthoringSceneSnapshot(session);
 
-    if (plan.protocol.name != kAuthoringProtocolName ||
-        plan.protocol.version != kAuthoringProtocolVersion) {
+    if (plan.protocol.name != kAuthoringProtocolName || plan.protocol.version != kAuthoringProtocolVersion) {
         addPlanDiagnostic(report,
                           AuthoringDiagnosticCode::ProtocolMismatch,
                           "Unsupported authoring protocol '" + plan.protocol.name + "' version '" +
@@ -843,33 +842,22 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                 break;
 
             case AuthoringCommandKind::SetTransform:
-                if (requireComponent(command,
-                                     command.entity.value,
-                                     "Transform",
-                                     session,
-                                     state,
-                                     report,
-                                     command_index)) {
+                if (requireComponent(
+                        command, command.entity.value, "Transform", session, state, report, command_index)) {
                     markSceneMutated(state);
                 }
                 break;
 
             case AuthoringCommandKind::SetLightIntensity:
             case AuthoringCommandKind::SetLightColor:
-                if (requireComponent(command,
-                                     command.entity.value,
-                                     "Light",
-                                     session,
-                                     state,
-                                     report,
-                                     command_index)) {
+                if (requireComponent(command, command.entity.value, "Light", session, state, report, command_index)) {
                     markSceneMutated(state);
                 }
                 break;
 
             case AuthoringCommandKind::SetCameraPerspective:
-                if (command.fov_degrees <= 0.0f || command.fov_degrees >= 180.0f ||
-                    command.near_plane <= 0.0f || command.far_plane <= command.near_plane) {
+                if (command.fov_degrees <= 0.0f || command.fov_degrees >= 180.0f || command.near_plane <= 0.0f ||
+                    command.far_plane <= command.near_plane) {
                     addValidationDiagnostic(report,
                                             AuthoringDiagnosticSeverity::Error,
                                             AuthoringDiagnosticCode::InvalidArgument,
@@ -881,18 +869,13 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             {},
                                             "parameters",
                                             "0 < fovDeg < 180 and 0 < near < far",
-                                            "fovDeg=" + std::to_string(command.fov_degrees) + ", near=" +
-                                                std::to_string(command.near_plane) + ", far=" +
-                                                std::to_string(command.far_plane));
+                                            "fovDeg=" + std::to_string(command.fov_degrees) +
+                                                ", near=" + std::to_string(command.near_plane) +
+                                                ", far=" + std::to_string(command.far_plane));
                     break;
                 }
                 if (const size_t errors_before = report.errors.size();
-                    (resolveEntityFacts(command,
-                                        command.entity.value,
-                                        session,
-                                        state,
-                                        report,
-                                        command_index)
+                    (resolveEntityFacts(command, command.entity.value, session, state, report, command_index)
                          .has_value() ||
                      state.scene_knowledge == SceneKnowledge::OpenedSceneUnknown) &&
                     report.errors.size() == errors_before) {
@@ -916,18 +899,13 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                                             {},
                                             "parameters",
                                             "size > 0 and near < far",
-                                            "size=" + std::to_string(command.size) + ", near=" +
-                                                std::to_string(command.near_plane) + ", far=" +
-                                                std::to_string(command.far_plane));
+                                            "size=" + std::to_string(command.size) +
+                                                ", near=" + std::to_string(command.near_plane) +
+                                                ", far=" + std::to_string(command.far_plane));
                     break;
                 }
                 if (const size_t errors_before = report.errors.size();
-                    (resolveEntityFacts(command,
-                                        command.entity.value,
-                                        session,
-                                        state,
-                                        report,
-                                        command_index)
+                    (resolveEntityFacts(command, command.entity.value, session, state, report, command_index)
                          .has_value() ||
                      state.scene_knowledge == SceneKnowledge::OpenedSceneUnknown) &&
                     report.errors.size() == errors_before) {
@@ -971,13 +949,8 @@ bool validateAuthoringPlan(const AuthoringPlan& plan,
                 break;
 
             case AuthoringCommandKind::VerifyHasComponent:
-                (void) requireComponent(command,
-                                        command.entity.value,
-                                        command.component,
-                                        session,
-                                        state,
-                                        report,
-                                        command_index);
+                (void) requireComponent(
+                    command, command.entity.value, command.component, session, state, report, command_index);
                 break;
 
             case AuthoringCommandKind::VerifyEntityCountAtLeast:

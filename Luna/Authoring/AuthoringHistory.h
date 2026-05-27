@@ -3,6 +3,7 @@
 #include "Scene/Scene.h"
 
 #include <cstddef>
+
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -29,9 +30,8 @@ public:
                                         const Scene& scene,
                                         const std::filesystem::path& scene_file_path,
                                         bool scene_dirty);
-    [[nodiscard]] bool commitTransaction(const Scene& scene,
-                                         const std::filesystem::path& scene_file_path,
-                                         bool scene_dirty);
+    [[nodiscard]] bool
+        commitTransaction(const Scene& scene, const std::filesystem::path& scene_file_path, bool scene_dirty);
     [[nodiscard]] std::optional<AuthoringSceneState> rollbackTransaction();
 
     [[nodiscard]] std::optional<AuthoringSceneState> undo();
@@ -47,9 +47,8 @@ public:
     [[nodiscard]] size_t redoDepth() const noexcept;
 
 private:
-    [[nodiscard]] static AuthoringSceneState captureState(const Scene& scene,
-                                                          const std::filesystem::path& scene_file_path,
-                                                          bool scene_dirty);
+    [[nodiscard]] static AuthoringSceneState
+        captureState(const Scene& scene, const std::filesystem::path& scene_file_path, bool scene_dirty);
     [[nodiscard]] static AuthoringSceneState cloneState(const AuthoringSceneState& state);
     [[nodiscard]] static bool statesEquivalent(const AuthoringSceneState& lhs, const AuthoringSceneState& rhs);
     void trimUndoStack();

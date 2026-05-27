@@ -18,6 +18,7 @@ class Renderer;
 class EditorViewportCoordinator final {
 public:
     [[nodiscard]] editor::ViewportId defaultSceneViewportId() const noexcept;
+
     [[nodiscard]] static constexpr editor::ViewportId runtimeSceneViewportId() noexcept
     {
         return (std::numeric_limits<editor::ViewportId>::max)();
@@ -49,10 +50,8 @@ public:
     void beginFrameInteractions() noexcept;
     void clearInteractions() noexcept;
     void clearViewportInteraction(editor::ViewportId viewport_id);
-    [[nodiscard]] const ViewportInteractionState&
-        recordViewportSurfaceInteraction(editor::ViewportId viewport_id,
-                                         std::string_view owner_id,
-                                         const ViewportInteractionInput& input);
+    [[nodiscard]] const ViewportInteractionState& recordViewportSurfaceInteraction(
+        editor::ViewportId viewport_id, std::string_view owner_id, const ViewportInteractionInput& input);
     [[nodiscard]] bool isViewportInputAllowed(editor::ViewportId viewport_id) const noexcept;
     void setDefaultViewportMouseCaptured(bool captured);
 

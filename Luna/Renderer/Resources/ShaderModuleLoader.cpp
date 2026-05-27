@@ -6,10 +6,10 @@
 namespace luna::renderer_detail {
 
 RHI::Ref<RHI::ShaderModule> loadShaderModule(const RHI::Ref<RHI::Device>& device,
-                                                         const RHI::Ref<RHI::ShaderCompiler>& compiler,
-                                                         const std::filesystem::path& path,
-                                                         std::string_view entry_point,
-                                                         RHI::ShaderStage stage)
+                                             const RHI::Ref<RHI::ShaderCompiler>& compiler,
+                                             const std::filesystem::path& path,
+                                             std::string_view entry_point,
+                                             RHI::ShaderStage stage)
 {
     if (!device || !compiler) {
         return {};

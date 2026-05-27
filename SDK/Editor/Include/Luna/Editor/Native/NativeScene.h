@@ -12,10 +12,10 @@ namespace luna::editor::native {
 class Scene final {
 public:
     constexpr Scene() noexcept = default;
+
     explicit constexpr Scene(const LunaEditorSceneApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {
@@ -134,15 +134,12 @@ public:
                api_->destroy_entity(api_->api_user_data, entity_id) != 0;
     }
 
-    [[nodiscard]] bool reparentEntity(EntityId entity_id,
-                                      EntityId new_parent_id,
-                                      bool preserve_world_transform = true) const noexcept
+    [[nodiscard]] bool
+        reparentEntity(EntityId entity_id, EntityId new_parent_id, bool preserve_world_transform = true) const noexcept
     {
         return api_ != nullptr && api_->reparent_entity != nullptr &&
-               api_->reparent_entity(api_->api_user_data,
-                                     entity_id,
-                                     new_parent_id,
-                                     preserve_world_transform ? 1 : 0) != 0;
+               api_->reparent_entity(api_->api_user_data, entity_id, new_parent_id, preserve_world_transform ? 1 : 0) !=
+                   0;
     }
 
     [[nodiscard]] bool setEntityName(EntityId entity_id, const char* name) const noexcept
@@ -170,7 +167,8 @@ public:
                api_->set_entity_transform(api_->api_user_data, entity_id, &transform) != 0;
     }
 
-    [[nodiscard]] bool getCameraComponent(uint64_t entity_id, LunaEditorSceneCameraComponent* out_component) const noexcept
+    [[nodiscard]] bool getCameraComponent(uint64_t entity_id,
+                                          LunaEditorSceneCameraComponent* out_component) const noexcept
     {
         return api_ != nullptr && api_->get_camera_component != nullptr && out_component != nullptr &&
                api_->get_camera_component(api_->api_user_data, entity_id, out_component) != 0;
@@ -183,7 +181,8 @@ public:
                api_->set_camera_component(api_->api_user_data, entity_id, &component) != 0;
     }
 
-    [[nodiscard]] bool getLightComponent(EntityId entity_id, LunaEditorSceneLightComponent* out_component) const noexcept
+    [[nodiscard]] bool getLightComponent(EntityId entity_id,
+                                         LunaEditorSceneLightComponent* out_component) const noexcept
     {
         return api_ != nullptr && api_->get_light_component != nullptr && out_component != nullptr &&
                api_->get_light_component(api_->api_user_data, entity_id, out_component) != 0;
@@ -196,8 +195,7 @@ public:
                api_->set_light_component(api_->api_user_data, entity_id, &component) != 0;
     }
 
-    [[nodiscard]] bool getMeshComponent(EntityId entity_id,
-                                        LunaEditorSceneMeshComponent* out_component) const noexcept
+    [[nodiscard]] bool getMeshComponent(EntityId entity_id, LunaEditorSceneMeshComponent* out_component) const noexcept
     {
         return api_ != nullptr && api_->get_mesh_component != nullptr && out_component != nullptr &&
                api_->get_mesh_component(api_->api_user_data, entity_id, out_component) != 0;
@@ -215,13 +213,13 @@ public:
         result.mesh_handle = native_mesh.mesh_handle;
         result.first_submesh = native_mesh.first_submesh;
         result.submesh_count = native_mesh.submesh_count;
-        result.submesh_material_handles.assign(materials.begin(),
-                                               materials.begin() +
-                                                   (std::min)(materials.size(), native_mesh.submesh_material_count));
+        result.submesh_material_handles.assign(
+            materials.begin(), materials.begin() + (std::min)(materials.size(), native_mesh.submesh_material_count));
         return result;
     }
 
-    [[nodiscard]] bool setMeshComponent(EntityId entity_id, const LunaEditorSceneMeshComponent& component) const noexcept
+    [[nodiscard]] bool setMeshComponent(EntityId entity_id,
+                                        const LunaEditorSceneMeshComponent& component) const noexcept
     {
         return api_ != nullptr && api_->set_mesh_component != nullptr &&
                api_->set_mesh_component(api_->api_user_data, entity_id, &component) != 0;
@@ -257,8 +255,8 @@ public:
 
 private:
     template <size_t NameSize, size_t ParentNameSize>
-    [[nodiscard]] static LunaEditorSceneEntityInfo makeNativeEntityInfo(std::array<char, NameSize>& name,
-                                                                        std::array<char, ParentNameSize>& parent_name) noexcept
+    [[nodiscard]] static LunaEditorSceneEntityInfo
+        makeNativeEntityInfo(std::array<char, NameSize>& name, std::array<char, ParentNameSize>& parent_name) noexcept
     {
         LunaEditorSceneEntityInfo info{};
         info.struct_size = sizeof(LunaEditorSceneEntityInfo);
@@ -282,7 +280,8 @@ private:
         };
     }
 
-    [[nodiscard]] static LunaEditorSceneMeshComponent makeMeshComponentView(std::vector<AssetHandle>& materials) noexcept
+    [[nodiscard]] static LunaEditorSceneMeshComponent
+        makeMeshComponentView(std::vector<AssetHandle>& materials) noexcept
     {
         LunaEditorSceneMeshComponent component{};
         component.struct_size = sizeof(LunaEditorSceneMeshComponent);

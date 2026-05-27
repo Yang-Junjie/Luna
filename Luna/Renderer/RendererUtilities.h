@@ -6,10 +6,9 @@
 
 #include <Adapter.h>
 #include <Instance.h>
+#include <string>
 #include <Surface.h>
 #include <Swapchain.h>
-
-#include <string>
 #include <vector>
 
 namespace luna::renderer_detail {
@@ -24,7 +23,7 @@ bool supportsDefaultRenderFlow(RHI::BackendType type);
 bool isPresentModeSupported(const std::vector<RHI::PresentMode>& supported_modes, RHI::PresentMode mode);
 std::string describePresentModes(const std::vector<RHI::PresentMode>& supported_modes);
 RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supported_modes,
-                                         RHI::PresentMode requested_mode);
+                                   RHI::PresentMode requested_mode);
 
 } // namespace luna::renderer_detail
 
@@ -35,7 +34,3 @@ RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supporte
 #define LUNA_RENDERER_FRAME_TRACE(...) ((void) 0)
 #define LUNA_RENDERER_FRAME_DEBUG(...) ((void) 0)
 #endif
-
-
-
-

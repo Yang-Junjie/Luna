@@ -1,6 +1,5 @@
-#include "Viewport/EditorViewportCoordinator.h"
-
 #include "Renderer/Renderer.h"
+#include "Viewport/EditorViewportCoordinator.h"
 
 namespace {
 
@@ -9,8 +8,8 @@ std::string toOwnedString(std::string_view value)
     return std::string(value.data(), value.size());
 }
 
-luna::editor::TextureViewportPresentation toEditorTextureViewportPresentation(
-    const luna::TextureViewportPresentation& presentation)
+luna::editor::TextureViewportPresentation
+    toEditorTextureViewportPresentation(const luna::TextureViewportPresentation& presentation)
 {
     return luna::editor::TextureViewportPresentation{
         .texture = presentation.texture,
@@ -38,7 +37,8 @@ SceneViewportInstance& EditorViewportCoordinator::activeSceneViewport(bool runti
     return runtime_viewport_enabled ? m_scene_viewports.runtimeViewport() : m_scene_viewports.defaultViewport();
 }
 
-const SceneViewportInstance& EditorViewportCoordinator::activeSceneViewport(bool runtime_viewport_enabled) const noexcept
+const SceneViewportInstance&
+    EditorViewportCoordinator::activeSceneViewport(bool runtime_viewport_enabled) const noexcept
 {
     return runtime_viewport_enabled ? m_scene_viewports.runtimeViewport() : m_scene_viewports.defaultViewport();
 }
@@ -199,9 +199,7 @@ void EditorViewportCoordinator::clearViewportInteraction(editor::ViewportId view
 }
 
 const ViewportInteractionState& EditorViewportCoordinator::recordViewportSurfaceInteraction(
-    editor::ViewportId viewport_id,
-    std::string_view owner_id,
-    const ViewportInteractionInput& input)
+    editor::ViewportId viewport_id, std::string_view owner_id, const ViewportInteractionInput& input)
 {
     return m_interactions.recordSurface(viewport_id, owner_id, input);
 }
@@ -220,8 +218,7 @@ editor::ViewportId EditorViewportCoordinator::allocateViewportId() noexcept
 {
     editor::ViewportId viewport_id = m_next_viewport_id++;
     while (viewport_id == editor::kInvalidViewportId || viewport_id == defaultSceneViewportId() ||
-           viewport_id == runtimeSceneViewportId() ||
-           m_scene_viewports.isViewportValid(viewport_id) ||
+           viewport_id == runtimeSceneViewportId() || m_scene_viewports.isViewportValid(viewport_id) ||
            m_texture_viewports.isViewportValid(viewport_id)) {
         viewport_id = m_next_viewport_id++;
     }

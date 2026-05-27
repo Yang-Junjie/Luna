@@ -80,12 +80,7 @@ constexpr uint32_t Params = 4;
 } // namespace ssao_binding
 
 const std::array<RenderFeatureDescriptorBinding, 5> kSsaoBindings{{
-    {"Depth",
-     "gDepthTexture",
-     ssao_binding::Depth,
-     RHI::DescriptorType::SampledImage,
-     1,
-     RHI::ShaderStage::Fragment},
+    {"Depth", "gDepthTexture", ssao_binding::Depth, RHI::DescriptorType::SampledImage, 1, RHI::ShaderStage::Fragment},
     {"NormalMetallic",
      "gNormalMetallicTexture",
      ssao_binding::NormalMetallic,
@@ -98,18 +93,8 @@ const std::array<RenderFeatureDescriptorBinding, 5> kSsaoBindings{{
      RHI::DescriptorType::SampledImage,
      1,
      RHI::ShaderStage::Fragment},
-    {"Sampler",
-     "gSsaoSampler",
-     ssao_binding::Sampler,
-     RHI::DescriptorType::Sampler,
-     1,
-     RHI::ShaderStage::Fragment},
-    {"Params",
-     "gSsaoParams",
-     ssao_binding::Params,
-     RHI::DescriptorType::UniformBuffer,
-     1,
-     RHI::ShaderStage::Fragment},
+    {"Sampler", "gSsaoSampler", ssao_binding::Sampler, RHI::DescriptorType::Sampler, 1, RHI::ShaderStage::Fragment},
+    {"Params", "gSsaoParams", ssao_binding::Params, RHI::DescriptorType::UniformBuffer, 1, RHI::ShaderStage::Fragment},
 }};
 
 std::filesystem::path shaderPath()
@@ -134,8 +119,7 @@ ShaderBindingContract makeSsaoShaderBindingContract()
     });
 }
 
-RHI::Ref<RHI::DescriptorSetLayout>
-    createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
@@ -173,9 +157,8 @@ RHI::Ref<RHI::Sampler> createSampler(const RHI::Ref<RHI::Device>& device)
                                      .Build());
 }
 
-RHI::Ref<RHI::PipelineLayout>
-    createPipelineLayout(const RHI::Ref<RHI::Device>& device,
-                         const RHI::Ref<RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                                   const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -184,11 +167,10 @@ RHI::Ref<RHI::PipelineLayout>
     return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline>
-    createPipeline(const RHI::Ref<RHI::Device>& device,
-                   const RHI::Ref<RHI::PipelineLayout>& layout,
-                   const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-                   const RHI::Ref<RHI::ShaderModule>& fragment_shader)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(const RHI::Ref<RHI::Device>& device,
+                                               const RHI::Ref<RHI::PipelineLayout>& layout,
+                                               const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                               const RHI::Ref<RHI::ShaderModule>& fragment_shader)
 {
     if (!device || !layout || !vertex_shader || !fragment_shader) {
         return {};
@@ -289,8 +271,7 @@ public:
 
     [[nodiscard]] bool ensure(const SceneRenderContext& context)
     {
-        const RenderFeatureGpuResourceDecision decision =
-            m_resource_set.prepareGpuResourceBuild(context, isComplete());
+        const RenderFeatureGpuResourceDecision decision = m_resource_set.prepareGpuResourceBuild(context, isComplete());
         if (decision.action == RenderFeatureGpuResourceAction::InvalidContext) {
             return false;
         }
@@ -337,20 +318,18 @@ public:
     [[nodiscard]] bool ensureAmbientOcclusion(const SceneRenderContext& context)
     {
         m_ambient_occlusion_evaluated = true;
-        return m_resource_set.ensurePersistentTexture2D(m_ambient_occlusion,
-                                                        context,
-                                                        makeAmbientOcclusionPersistentDesc(context));
+        return m_resource_set.ensurePersistentTexture2D(
+            m_ambient_occlusion, context, makeAmbientOcclusionPersistentDesc(context));
     }
 
     [[nodiscard]] RenderGraphTextureHandle importAmbientOcclusion(RenderGraphBuilder& graph)
     {
-        return m_resource_set.importPersistentTexture2D(
-            graph,
-            m_ambient_occlusion,
-            RenderFeatureTextureImportOptions{
-                .name = "ScreenSpaceAmbientOcclusion",
-                .final_state = RHI::ResourceState::ShaderRead,
-            });
+        return m_resource_set.importPersistentTexture2D(graph,
+                                                        m_ambient_occlusion,
+                                                        RenderFeatureTextureImportOptions{
+                                                            .name = "ScreenSpaceAmbientOcclusion",
+                                                            .final_state = RHI::ResourceState::ShaderRead,
+                                                        });
     }
 
     [[nodiscard]] bool isComplete() const noexcept
@@ -634,21 +613,22 @@ RenderFeatureContract ScreenSpaceAmbientOcclusionFeature::contract() const noexc
         .display_name = "Screen Space Ambient Occlusion",
         .category = "Lighting",
         .runtime_toggleable = true,
-        .requirements = RenderFeatureRequirements{
-            .scene_inputs = RenderFeatureSceneInputFlags::Depth |
-                            RenderFeatureSceneInputFlags::GBufferNormalMetallic |
-                            RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
-            .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
-                         RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
-                         RenderFeatureResourceFlags::Sampler,
-            .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
-            .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
-            .graph_inputs = kGraphInputs,
-            .graph_outputs = kGraphOutputs,
-            .requires_framebuffer_size = true,
-            .uses_persistent_resources = true,
-            .uses_history_resources = false,
-        },
+        .requirements =
+            RenderFeatureRequirements{
+                .scene_inputs = RenderFeatureSceneInputFlags::Depth |
+                                RenderFeatureSceneInputFlags::GBufferNormalMetallic |
+                                RenderFeatureSceneInputFlags::GBufferWorldPositionRoughness,
+                .resources = RenderFeatureResourceFlags::GraphicsPipeline | RenderFeatureResourceFlags::SampledTexture |
+                             RenderFeatureResourceFlags::ColorAttachment | RenderFeatureResourceFlags::UniformBuffer |
+                             RenderFeatureResourceFlags::Sampler,
+                .lighting_outputs = RenderFeatureLightingOutputFlags::AmbientOcclusion,
+                .rhi_capabilities = RenderFeatureRHICapabilityFlags::DefaultRenderFlow,
+                .graph_inputs = kGraphInputs,
+                .graph_outputs = kGraphOutputs,
+                .requires_framebuffer_size = true,
+                .uses_persistent_resources = true,
+                .uses_history_resources = false,
+            },
     };
 }
 

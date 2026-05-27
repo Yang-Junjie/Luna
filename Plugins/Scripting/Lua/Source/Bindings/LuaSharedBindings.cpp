@@ -1,10 +1,9 @@
 #include "LuaSharedBindings.h"
-
 #include "Script/ScriptHostApi.h"
 
-#include <glm/vec3.hpp>
-
 #include <cstddef>
+
+#include <glm/vec3.hpp>
 
 namespace {
 

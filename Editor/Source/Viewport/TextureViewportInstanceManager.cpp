@@ -24,7 +24,8 @@ TextureViewportInstance* TextureViewportInstanceManager::findViewport(editor::Vi
     return viewport_it != m_viewports.end() ? viewport_it->second.get() : nullptr;
 }
 
-const TextureViewportInstance* TextureViewportInstanceManager::findViewport(editor::ViewportId viewport_id) const noexcept
+const TextureViewportInstance*
+    TextureViewportInstanceManager::findViewport(editor::ViewportId viewport_id) const noexcept
 {
     const auto viewport_it = m_viewports.find(viewport_id);
     return viewport_it != m_viewports.end() ? viewport_it->second.get() : nullptr;

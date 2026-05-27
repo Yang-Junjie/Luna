@@ -8,10 +8,10 @@ namespace luna::editor::native {
 class Menus final {
 public:
     constexpr Menus() noexcept = default;
+
     explicit constexpr Menus(const LunaEditorMenuApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool canAdd() const noexcept
     {
@@ -47,8 +47,8 @@ public:
                                    : RegisteredMenuItemsForCommand{};
     }
 
-    [[nodiscard]] RegisteredMenuItemsForCommand addScopedItemsForCommand(
-        const LunaEditorMenuItemDescriptor& descriptor) const
+    [[nodiscard]] RegisteredMenuItemsForCommand
+        addScopedItemsForCommand(const LunaEditorMenuItemDescriptor& descriptor) const
     {
         return addItem(descriptor) ? RegisteredMenuItemsForCommand(api_, descriptor.command_id)
                                    : RegisteredMenuItemsForCommand{};

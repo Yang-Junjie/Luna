@@ -1,22 +1,23 @@
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
+#include "Asset/Editor/ImporterManager.h"
+#include "Asset/Editor/ScriptLoader.h"
 #include "Core/Log.h"
 #include "Project/ProjectInfo.h"
 #include "Project/ProjectManager.h"
 #include "Scene/Components/CameraComponent.h"
 #include "Scene/Entity.h"
 #include "Scene/Scene.h"
-#include "Asset/Editor/ImporterManager.h"
-#include "Asset/Editor/ScriptLoader.h"
+#include "Script/ScriptAsset.h"
 #include "Script/ScriptPluginDiscovery.h"
 #include "Script/ScriptPluginManager.h"
-#include "Script/ScriptAsset.h"
 #include "yaml-cpp/yaml.h"
+
+#include <cmath>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -35,8 +36,7 @@ public:
     explicit TempDirectory(std::string_view name)
     {
         const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
-        m_path = std::filesystem::temp_directory_path() /
-                 ("Luna-" + std::string(name) + "-" + std::to_string(now));
+        m_path = std::filesystem::temp_directory_path() / ("Luna-" + std::string(name) + "-" + std::to_string(now));
         std::filesystem::create_directories(m_path);
     }
 
@@ -398,10 +398,8 @@ void testProjectSelectionContract(TestContext& context)
     context.expect(manager.findDiscoveredPlugin("luna.official.lua") != nullptr,
                    "official Lua script plugin should be discoverable from engine plugins");
 
-    expectState(context,
-                manager.resolveProjectSelection(nullptr),
-                luna::ScriptPluginSelectionState::NoProject,
-                "null project");
+    expectState(
+        context, manager.resolveProjectSelection(nullptr), luna::ScriptPluginSelectionState::NoProject, "null project");
 
     luna::ProjectInfo project;
     expectState(context,
@@ -573,10 +571,8 @@ void testHostCameraAndInputApiContract(TestContext& context)
                    "host camera API should set perspective projection type");
     context.expect(perspective_camera.perspectiveVerticalFovRadians == 1.0f,
                    "host camera API should set perspective FOV");
-    context.expect(perspective_camera.perspectiveNear == 0.1f,
-                   "host camera API should set perspective near clip");
-    context.expect(perspective_camera.perspectiveFar == 250.0f,
-                   "host camera API should set perspective far clip");
+    context.expect(perspective_camera.perspectiveNear == 0.1f, "host camera API should set perspective near clip");
+    context.expect(perspective_camera.perspectiveFar == 250.0f, "host camera API should set perspective far clip");
 
     luna::Entity plain_entity = scene.entityManager().createEntity("Plain");
     context.expect(host_api.entity_has_camera(&scene, static_cast<uint64_t>(plain_entity.getUUID())) == 0,
@@ -595,7 +591,7 @@ void testLuaRuntimeConstructorCallContract(TestContext& context)
                 luna::ScriptPluginSelectionState::Resolved,
                 "official Lua plugin load for constructor call contract");
 
-    constexpr uint64_t kLargeScriptHandle = 11073451620522104979ull;
+    constexpr uint64_t kLargeScriptHandle = 11'073'451'620'522'104'979ull;
     const luna::AssetHandle script_handle{kLargeScriptHandle};
 
     auto script_asset = std::make_shared<luna::ScriptAsset>();
@@ -666,8 +662,7 @@ return ConstructorSmoke
     context.expect(camera.primary, "Camera() should construct values accepted by set_camera");
     context.expect(camera.projectionType == luna::Camera::ProjectionType::Orthographic,
                    "Camera() should preserve projection type");
-    context.expect(std::fabs(camera.orthographicSize - 12.0f) <= 0.0001f,
-                   "Camera() should preserve orthographic size");
+    context.expect(std::fabs(camera.orthographicSize - 12.0f) <= 0.0001f, "Camera() should preserve orthographic size");
 }
 
 void testLuaPropertySchemaMetadataContract(TestContext& context)
@@ -759,8 +754,7 @@ return MetadataSmoke
         if (capture_button->metadata.options.size() == 2) {
             context.expect(capture_button->metadata.options[0].label == "Right Mouse",
                            "int option label should be preserved");
-            context.expect(capture_button->metadata.options[0].intValue == 2,
-                           "int option value should be preserved");
+            context.expect(capture_button->metadata.options[0].intValue == 2, "int option value should be preserved");
         }
     }
 
@@ -769,8 +763,7 @@ return MetadataSmoke
         context.expect(mode->metadata.options.size() == 2, "string options should be preserved");
         if (mode->metadata.options.size() == 2) {
             context.expect(mode->metadata.options[1].label == "Fly", "string option label should be preserved");
-            context.expect(mode->metadata.options[1].stringValue == "fly",
-                           "string option value should be preserved");
+            context.expect(mode->metadata.options[1].stringValue == "fly", "string option value should be preserved");
         }
     }
 

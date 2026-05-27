@@ -8,7 +8,8 @@ namespace {
 
 uint32_t resolveMipLevelCount(const D3D11Texture& texture, const TextureViewDesc& desc)
 {
-    const uint32_t available = texture.GetMipLevels() > desc.BaseMipLevel ? texture.GetMipLevels() - desc.BaseMipLevel : 1u;
+    const uint32_t available =
+        texture.GetMipLevels() > desc.BaseMipLevel ? texture.GetMipLevels() - desc.BaseMipLevel : 1u;
     return desc.MipLevelCount == 0 ? available : std::min(desc.MipLevelCount, available);
 }
 

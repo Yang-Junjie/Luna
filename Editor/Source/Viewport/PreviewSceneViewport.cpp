@@ -1,11 +1,10 @@
-#include "Viewport/PreviewSceneViewport.h"
-
 #include "Asset/BuiltinAssets.h"
-#include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/RenderWorld/RenderWorldExtractor.h"
 #include "Scene/Components.h"
-#include "Scene/Scene.h"
 #include "Scene/Entity.h"
+#include "Scene/Scene.h"
+#include "Viewport/PreviewSceneViewport.h"
 #include "Viewport/SceneViewportInstance.h"
 
 #include <algorithm>
@@ -33,8 +32,8 @@ luna::SceneBackgroundMode toSceneBackgroundMode(luna::editor::SceneViewportPrevi
     return luna::SceneBackgroundMode::ProceduralSky;
 }
 
-luna::SceneEnvironmentSettings toSceneEnvironmentSettings(
-    const luna::editor::SceneViewportPreviewEnvironment& environment)
+luna::SceneEnvironmentSettings
+    toSceneEnvironmentSettings(const luna::editor::SceneViewportPreviewEnvironment& environment)
 {
     luna::SceneEnvironmentSettings settings{};
     settings.backgroundMode = toSceneBackgroundMode(environment.background);
@@ -113,9 +112,8 @@ void PreviewSceneViewport::sync(Renderer& renderer, SceneViewportInstance& viewp
         applyCamera(m_camera, m_state);
     }
 
-    RenderWorldExtractor{}.extract(m_scene,
-                                   m_camera,
-                                   renderer.getSceneViewportRenderWorld(viewport.rendererViewportHandle(renderer)));
+    RenderWorldExtractor{}.extract(
+        m_scene, m_camera, renderer.getSceneViewportRenderWorld(viewport.rendererViewportHandle(renderer)));
 }
 
 AssetHandle PreviewSceneViewport::previewMeshHandle(const editor::SceneViewportPreviewState& state)
@@ -145,8 +143,8 @@ void PreviewSceneViewport::rebuildScene()
     scene.environmentSettings() = toSceneEnvironmentSettings(m_state.environment);
     scene.shadowSettings().mode = SceneShadowMode::PcfShadowMap;
     scene.shadowSettings().pcfShadowDistance = 12.0f;
-    scene.shadowSettings().pcfMapSize = 1024;
-    scene.shadowSettings().csmCascadeSize = 1024;
+    scene.shadowSettings().pcfMapSize = 1'024;
+    scene.shadowSettings().csmCascadeSize = 1'024;
 
     Entity material_entity = scene.entityManager().createEntity("Preview Mesh");
     material_entity.transform().translation = glm::vec3{0.0f, 0.0f, 0.0f};

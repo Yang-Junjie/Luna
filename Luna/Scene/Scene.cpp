@@ -6,10 +6,9 @@
 
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
-
 #include <memory>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -175,8 +174,9 @@ bool Scene::findPrimaryRuntimeCamera(Camera& camera) const
         if (has_parent) {
             glm::vec3 world_translation{};
             glm::quat world_orientation{};
-            if (decomposeCameraTransform(
-                    m_entity_manager.getWorldSpaceTransformMatrix(entity_handle), world_translation, world_orientation)) {
+            if (decomposeCameraTransform(m_entity_manager.getWorldSpaceTransformMatrix(entity_handle),
+                                         world_translation,
+                                         world_orientation)) {
                 camera.setPosition(world_translation);
                 camera.setOrientation(world_orientation);
                 return true;

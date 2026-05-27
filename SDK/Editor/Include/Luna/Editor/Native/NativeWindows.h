@@ -8,10 +8,10 @@ namespace luna::editor::native {
 class Windows final {
 public:
     constexpr Windows() noexcept = default;
+
     explicit constexpr Windows(const LunaEditorWindowApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool canRegister() const noexcept
     {
@@ -53,8 +53,7 @@ public:
 
     [[nodiscard]] bool isOpen(const char* id) const noexcept
     {
-        return api_ != nullptr && api_->is_window_open != nullptr &&
-               api_->is_window_open(api_->api_user_data, id) != 0;
+        return api_ != nullptr && api_->is_window_open != nullptr && api_->is_window_open(api_->api_user_data, id) != 0;
     }
 
     void setOpen(const char* id, bool open) const noexcept

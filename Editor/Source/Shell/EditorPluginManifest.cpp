@@ -1,10 +1,10 @@
-#include "Shell/EditorPluginManifest.h"
-
 #include "Core/Log.h"
+#include "Shell/EditorPluginManifest.h"
 #include "yaml-cpp/yaml.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -58,7 +58,7 @@ bool architectureKeyMatchesCurrentArchitecture(std::string_view key)
 }
 
 std::optional<luna::editor::EditorPluginRuntime> readRuntime(const YAML::Node& runtime_node,
-                                                            const std::filesystem::path& manifest_path)
+                                                             const std::filesystem::path& manifest_path)
 {
     if (!runtime_node) {
         return luna::editor::EditorPluginRuntime::BuiltinNative;
@@ -80,9 +80,8 @@ std::optional<luna::editor::EditorPluginRuntime> readRuntime(const YAML::Node& r
         return luna::editor::EditorPluginRuntime::Lua;
     }
 
-    LUNA_EDITOR_WARN("Skipped editor plugin manifest '{}' because runtime '{}' is unknown",
-                     manifest_path.string(),
-                     runtime);
+    LUNA_EDITOR_WARN(
+        "Skipped editor plugin manifest '{}' because runtime '{}' is unknown", manifest_path.string(), runtime);
     return std::nullopt;
 }
 
@@ -109,9 +108,8 @@ std::optional<luna::editor::EditorPluginCategory> readCategory(const YAML::Node&
         return luna::editor::EditorPluginCategory::Diagnostics;
     }
 
-    LUNA_EDITOR_WARN("Skipped editor plugin manifest '{}' because category '{}' is unknown",
-                     manifest_path.string(),
-                     category);
+    LUNA_EDITOR_WARN(
+        "Skipped editor plugin manifest '{}' because category '{}' is unknown", manifest_path.string(), category);
     return std::nullopt;
 }
 
@@ -152,9 +150,8 @@ std::vector<std::string> readDependencies(const YAML::Node& dependencies_node,
     return dependencies;
 }
 
-std::optional<std::filesystem::path> readEntryValue(const YAML::Node& entry_value,
-                                                    const std::filesystem::path& manifest_path,
-                                                    std::string_view key_path)
+std::optional<std::filesystem::path>
+    readEntryValue(const YAML::Node& entry_value, const std::filesystem::path& manifest_path, std::string_view key_path)
 {
     if (!entry_value) {
         return std::nullopt;
@@ -173,10 +170,8 @@ std::optional<std::filesystem::path> readEntryValue(const YAML::Node& entry_valu
     for (const auto& entry : entry_value) {
         const std::string key = entry.first.as<std::string>();
         if (!entry.second.IsScalar()) {
-            LUNA_EDITOR_WARN("Skipped non-scalar 'EditorPlugin.Entry.{}.{}' in '{}'",
-                             key_path,
-                             key,
-                             manifest_path.string());
+            LUNA_EDITOR_WARN(
+                "Skipped non-scalar 'EditorPlugin.Entry.{}.{}' in '{}'", key_path, key, manifest_path.string());
             continue;
         }
 
@@ -228,7 +223,7 @@ std::optional<std::filesystem::path> readEntryPathForCurrentPlatform(const YAML:
 namespace luna::editor {
 
 std::optional<EditorPluginPackage>
-EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_path) const
+    EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_path) const
 {
     try {
         const YAML::Node data = YAML::LoadFile(manifest_path.string());
@@ -265,7 +260,8 @@ EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_pa
             return std::nullopt;
         }
         package.dependencies = readDependencies(plugin["Dependencies"], manifest_path);
-        if (std::optional<std::filesystem::path> entry = readEntryPathForCurrentPlatform(plugin["Entry"], manifest_path)) {
+        if (std::optional<std::filesystem::path> entry =
+                readEntryPathForCurrentPlatform(plugin["Entry"], manifest_path)) {
             package.entry_path = std::move(*entry);
         }
 
@@ -282,14 +278,15 @@ EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_pa
         }
         if ((package.runtime == EditorPluginRuntime::Native || package.runtime == EditorPluginRuntime::Lua) &&
             package.entry_path.empty()) {
-            LUNA_EDITOR_WARN("Skipped editor plugin manifest '{}' because 'EditorPlugin.Entry' is required for this runtime",
-                             manifest_path.string());
+            LUNA_EDITOR_WARN(
+                "Skipped editor plugin manifest '{}' because 'EditorPlugin.Entry' is required for this runtime",
+                manifest_path.string());
             return std::nullopt;
         }
         if (!package.entry_path.empty()) {
-            package.resolved_entry_path =
-                package.entry_path.is_absolute() ? package.entry_path.lexically_normal()
-                                                 : (package.root_path / package.entry_path).lexically_normal();
+            package.resolved_entry_path = package.entry_path.is_absolute()
+                                              ? package.entry_path.lexically_normal()
+                                              : (package.root_path / package.entry_path).lexically_normal();
 
             std::error_code exists_ec;
             package.entry_exists = std::filesystem::exists(package.resolved_entry_path, exists_ec) && !exists_ec;
@@ -303,7 +300,7 @@ EditorPluginManifestLoader::loadPackage(const std::filesystem::path& manifest_pa
 }
 
 std::vector<EditorPluginPackage>
-EditorPluginManifestLoader::loadPackagesFromRoot(const std::filesystem::path& root_path) const
+    EditorPluginManifestLoader::loadPackagesFromRoot(const std::filesystem::path& root_path) const
 {
     std::vector<EditorPluginPackage> packages;
     if (root_path.empty()) {
@@ -313,9 +310,8 @@ EditorPluginManifestLoader::loadPackagesFromRoot(const std::filesystem::path& ro
     std::error_code exists_ec;
     if (!std::filesystem::exists(root_path, exists_ec) || exists_ec) {
         if (exists_ec) {
-            LUNA_EDITOR_WARN("Failed to check editor plugin directory '{}': {}",
-                             root_path.string(),
-                             exists_ec.message());
+            LUNA_EDITOR_WARN(
+                "Failed to check editor plugin directory '{}': {}", root_path.string(), exists_ec.message());
         }
         return packages;
     }
@@ -330,9 +326,8 @@ EditorPluginManifestLoader::loadPackagesFromRoot(const std::filesystem::path& ro
 
     for (const std::filesystem::recursive_directory_iterator end; iterator != end; iterator.increment(iterator_ec)) {
         if (iterator_ec) {
-            LUNA_EDITOR_WARN("Failed to advance editor plugin scan under '{}': {}",
-                             root_path.string(),
-                             iterator_ec.message());
+            LUNA_EDITOR_WARN(
+                "Failed to advance editor plugin scan under '{}': {}", root_path.string(), iterator_ec.message());
             iterator_ec.clear();
             continue;
         }

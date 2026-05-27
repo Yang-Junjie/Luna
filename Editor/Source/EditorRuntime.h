@@ -77,8 +77,7 @@ public:
     [[nodiscard]] bool setSceneEnvironmentSettings(const SceneEnvironmentSettings& settings);
     [[nodiscard]] bool setSceneShadowSettings(const SceneShadowSettings& settings);
 
-    [[nodiscard]] bool executeAuthoringPlan(const authoring::AuthoringPlan& plan,
-                                            authoring::AuthoringReport& report);
+    [[nodiscard]] bool executeAuthoringPlan(const authoring::AuthoringPlan& plan, authoring::AuthoringReport& report);
     [[nodiscard]] authoring::AuthoringSceneSnapshot captureSceneSnapshot() const;
     [[nodiscard]] std::vector<authoring::AuthoringEvent> consumeAuthoringEvents();
 

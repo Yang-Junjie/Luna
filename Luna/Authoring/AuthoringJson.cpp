@@ -1,10 +1,8 @@
 #include "AuthoringHostJson.h"
 #include "AuthoringJson.h"
 
-#include <nlohmann/json.hpp>
-
 #include <glm/vec3.hpp>
-
+#include <nlohmann/json.hpp>
 #include <ostream>
 #include <string>
 #include <string_view>

@@ -4,11 +4,11 @@
 #include "Authoring/AuthoringVerification.h"
 #include "Core/UUID.h"
 
-#include <glm/vec3.hpp>
-
 #include <cstddef>
 #include <cstdint>
+
 #include <filesystem>
+#include <glm/vec3.hpp>
 #include <string>
 #include <string_view>
 #include <vector>

@@ -1,6 +1,5 @@
-#include "Authoring/EditorSceneFileController.h"
-
 #include "Authoring/EditorAuthoringController.h"
+#include "Authoring/EditorSceneFileController.h"
 #include "Core/Log.h"
 #include "Platform/Common/FileDialogs.h"
 #include "Project/EditorProjectSessionController.h"
@@ -18,8 +17,8 @@ bool EditorSceneFileController::openSceneDialog(EditorAuthoringController& autho
                                                 EditorProjectSessionController& project_session,
                                                 bool update_project_start_scene)
 {
-    const std::filesystem::path scene_file_path =
-        FileDialogs::openFile(kSceneFileFilter, project_session.sceneDialogDefaultPath(authoring.sceneFilePath()).string());
+    const std::filesystem::path scene_file_path = FileDialogs::openFile(
+        kSceneFileFilter, project_session.sceneDialogDefaultPath(authoring.sceneFilePath()).string());
     if (scene_file_path.empty()) {
         return false;
     }
@@ -46,10 +45,9 @@ bool EditorSceneFileController::openScene(const std::filesystem::path& scene_fil
         project_session.syncStartScene(normalized_scene_path);
     }
 
-    LUNA_EDITOR_INFO(
-        "Opened scene '{}' with {} entities",
-        normalized_scene_path.string(),
-        authoring.scene().entityManager().entityCount());
+    LUNA_EDITOR_INFO("Opened scene '{}' with {} entities",
+                     normalized_scene_path.string(),
+                     authoring.scene().entityManager().entityCount());
     return true;
 }
 
@@ -66,8 +64,8 @@ bool EditorSceneFileController::saveScene(EditorAuthoringController& authoring,
 bool EditorSceneFileController::saveSceneAsDialog(EditorAuthoringController& authoring,
                                                   EditorProjectSessionController& project_session)
 {
-    const std::filesystem::path scene_file_path =
-        FileDialogs::saveFile(kSceneFileFilter, project_session.sceneDialogDefaultPath(authoring.sceneFilePath()).string());
+    const std::filesystem::path scene_file_path = FileDialogs::saveFile(
+        kSceneFileFilter, project_session.sceneDialogDefaultPath(authoring.sceneFilePath()).string());
     if (scene_file_path.empty()) {
         return false;
     }

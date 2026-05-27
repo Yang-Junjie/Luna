@@ -4,14 +4,15 @@
 // Owns rebuild invalidation policy and default shader path resolution; concrete GPU objects
 // live in PipelineState.
 
-#include "Renderer/RenderFlow/RenderFlowTypes.h"
-#include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/PassResources.h"
+#include "Renderer/RenderFlow/DefaultScene/PipelineState.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
+#include "Renderer/RenderFlow/RenderFlowTypes.h"
+
+#include <cstdint>
 
 #include <array>
-#include <cstdint>
 #include <glm/vec4.hpp>
 
 namespace luna {

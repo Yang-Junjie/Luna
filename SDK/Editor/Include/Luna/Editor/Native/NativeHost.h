@@ -18,10 +18,10 @@ namespace luna::editor::native {
 class Host final {
 public:
     constexpr Host() noexcept = default;
+
     explicit constexpr Host(const LunaEditorHostApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool valid() const noexcept
     {

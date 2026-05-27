@@ -10,8 +10,9 @@
 #include "Project/ProjectManager.h"
 #include "Scene/Scene.h"
 
-#include <algorithm>
 #include <cstddef>
+
+#include <algorithm>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -39,43 +40,42 @@ struct ParsedCliOptions {
 
 void printUsage()
 {
-    std::cout
-        << "LunaCLI\n"
-        << "\n"
-        << "Usage:\n"
-        << "  LunaCLI [--json] [--dry-run] [--project <path>] <commands...>\n"
-        << "  LunaCLI [--json] [--dry-run] [--project <path>] plan <plan.json>\n"
-        << "  LunaCLI capabilities [--json]\n"
-        << "\n"
-        << "Commands run left-to-right:\n"
-        << "  new\n"
-        << "  open <scene-path>\n"
-        << "  save <scene-path>\n"
-        << "  entity <alias> <name>\n"
-        << "  camera <alias>\n"
-        << "  directional-light <alias>\n"
-        << "  point-light <alias>\n"
-        << "  spot-light <alias>\n"
-        << "  primitive <alias> <Cube|Sphere|Plane|Cylinder|Cone>\n"
-        << "  parent <child-ref> <parent-ref>\n"
-        << "  unparent <child-ref>\n"
-        << "  name <entity-ref> <name>\n"
-        << "  transform <entity-ref> tx ty tz rxDeg ryDeg rzDeg sx sy sz\n"
-        << "  light-intensity <entity-ref> <value>\n"
-        << "  light-color <entity-ref> r g b\n"
-        << "  camera-perspective <entity-ref> fovDeg near far\n"
-        << "  camera-orthographic <entity-ref> size near far\n"
-        << "  inspect scene\n"
-        << "  inspect entity <entity-ref>\n"
-        << "  inspect hierarchy\n"
-        << "  snapshot\n"
-        << "  verify saved\n"
-        << "  verify entity <entity-ref>\n"
-        << "  verify component <entity-ref> <component>\n"
-        << "  verify entity-count-at-least <count>\n"
-        << "  summary\n"
-        << "\n"
-        << "Entity refs are aliases created earlier in the same command, or numeric UUIDs.\n";
+    std::cout << "LunaCLI\n"
+              << "\n"
+              << "Usage:\n"
+              << "  LunaCLI [--json] [--dry-run] [--project <path>] <commands...>\n"
+              << "  LunaCLI [--json] [--dry-run] [--project <path>] plan <plan.json>\n"
+              << "  LunaCLI capabilities [--json]\n"
+              << "\n"
+              << "Commands run left-to-right:\n"
+              << "  new\n"
+              << "  open <scene-path>\n"
+              << "  save <scene-path>\n"
+              << "  entity <alias> <name>\n"
+              << "  camera <alias>\n"
+              << "  directional-light <alias>\n"
+              << "  point-light <alias>\n"
+              << "  spot-light <alias>\n"
+              << "  primitive <alias> <Cube|Sphere|Plane|Cylinder|Cone>\n"
+              << "  parent <child-ref> <parent-ref>\n"
+              << "  unparent <child-ref>\n"
+              << "  name <entity-ref> <name>\n"
+              << "  transform <entity-ref> tx ty tz rxDeg ryDeg rzDeg sx sy sz\n"
+              << "  light-intensity <entity-ref> <value>\n"
+              << "  light-color <entity-ref> r g b\n"
+              << "  camera-perspective <entity-ref> fovDeg near far\n"
+              << "  camera-orthographic <entity-ref> size near far\n"
+              << "  inspect scene\n"
+              << "  inspect entity <entity-ref>\n"
+              << "  inspect hierarchy\n"
+              << "  snapshot\n"
+              << "  verify saved\n"
+              << "  verify entity <entity-ref>\n"
+              << "  verify component <entity-ref> <component>\n"
+              << "  verify entity-count-at-least <count>\n"
+              << "  summary\n"
+              << "\n"
+              << "Entity refs are aliases created earlier in the same command, or numeric UUIDs.\n";
 }
 
 void reportError(CliState& state, std::string message)
@@ -214,8 +214,7 @@ void printSummary(const CliState& state)
 {
     std::cout << "Scene: " << state.scene.getName() << "\n";
     std::cout << "Scene File: "
-              << (state.session.sceneFilePath().empty() ? "<unsaved>" : state.session.sceneFilePath().string())
-              << "\n";
+              << (state.session.sceneFilePath().empty() ? "<unsaved>" : state.session.sceneFilePath().string()) << "\n";
     std::cout << "Entities: " << state.scene.entityManager().entityCount() << "\n";
     std::cout << "Dirty: " << (state.session.isSceneDirty() ? "true" : "false") << "\n";
 }
@@ -275,9 +274,8 @@ int main(int argc, char** argv)
     luna::authoring::AuthoringPlan plan;
 
     if (ok && command_args.empty()) {
-        reportPlanDiagnostic(state,
-                             luna::authoring::AuthoringDiagnosticCode::MissingArgument,
-                             "No commands specified.");
+        reportPlanDiagnostic(
+            state, luna::authoring::AuthoringDiagnosticCode::MissingArgument, "No commands specified.");
         ok = false;
     }
 

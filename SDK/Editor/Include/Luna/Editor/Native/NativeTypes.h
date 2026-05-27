@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+
 #include <string>
 #include <vector>
 
@@ -209,7 +210,8 @@ struct PluginDescriptor {
            host_api->struct_size >= sizeof(LunaEditorHostApi) && host_api->api_version == LUNA_EDITOR_HOST_API_VERSION;
 }
 
-[[nodiscard]] inline bool writePluginApi(const PluginDescriptor& descriptor, LunaEditorPluginApi* out_plugin_api) noexcept
+[[nodiscard]] inline bool writePluginApi(const PluginDescriptor& descriptor,
+                                         LunaEditorPluginApi* out_plugin_api) noexcept
 {
     if (out_plugin_api == nullptr || descriptor.plugin_id == nullptr || descriptor.display_name == nullptr ||
         descriptor.version == nullptr || descriptor.on_load == nullptr || descriptor.on_unload == nullptr) {

@@ -8,8 +8,8 @@
 #include "MeshImporter.h"
 #include "ModelImporter.h"
 #include "Project/ProjectManager.h"
-#include "ScriptImporter.h"
 #include "Script/ScriptPluginManager.h"
+#include "ScriptImporter.h"
 #include "TextureImporter.h"
 
 #include <cctype>
@@ -132,8 +132,7 @@ ResolvedScriptImportSupport resolveScriptImportSupport(bool log_failures)
 std::unordered_set<std::string> collectManifestScriptExtensions()
 {
     std::unordered_set<std::string> extensions;
-    for (const luna::ScriptPluginCandidate& candidate :
-         luna::ScriptPluginManager::instance().getDiscoveredPlugins()) {
+    for (const luna::ScriptPluginCandidate& candidate : luna::ScriptPluginManager::instance().getDiscoveredPlugins()) {
         for (const std::string& extension : candidate.Manifest.SupportedExtensions) {
             const std::string normalized_extension = luna::importer_detail::normalizeExtension(extension);
             if (!normalized_extension.empty()) {
@@ -278,11 +277,11 @@ SupportedAssetResult processSupportedAsset(const SupportedAssetWorkItem& work_it
 
 uint32_t computeParallelMinRange(const luna::TaskSystem& task_system, size_t work_item_count)
 {
-    const uint32_t worker_count = (std::max) (task_system.getWorkerThreadCount(), 1u);
+    const uint32_t worker_count = (std::max)(task_system.getWorkerThreadCount(), 1u);
     const uint32_t task_count =
-        static_cast<uint32_t>((std::min) (work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
-    const uint32_t target_chunk_count = (std::max) (worker_count * 4u, 1u);
-    return (std::max) (1u, (task_count + target_chunk_count - 1u) / target_chunk_count);
+        static_cast<uint32_t>((std::min)(work_item_count, static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+    const uint32_t target_chunk_count = (std::max)(worker_count * 4u, 1u);
+    return (std::max)(1u, (task_count + target_chunk_count - 1u) / target_chunk_count);
 }
 
 } // namespace
@@ -410,14 +409,14 @@ ImporterManager::ImportStats ImporterManager::syncProjectAssets(TaskSystem* task
         TaskSubmitDesc submit_desc{};
         submit_desc.priority = enki::TASK_PRIORITY_MED;
         submit_desc.set_size = static_cast<uint32_t>(
-            (std::min) (supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
+            (std::min)(supported_assets.size(), static_cast<size_t>(std::numeric_limits<uint32_t>::max())));
         submit_desc.min_range = computeParallelMinRange(*task_system, supported_assets.size());
 
         TaskHandle task = task_system->submitParallel(
             [&](enki::TaskSetPartition range, uint32_t) {
                 for (uint32_t index = range.start; index < range.end; ++index) {
-                    results[index] = processSupportedAsset(supported_assets[index], *project_root,
-                                                           expected_script_language);
+                    results[index] =
+                        processSupportedAsset(supported_assets[index], *project_root, expected_script_language);
                 }
             },
             submit_desc);

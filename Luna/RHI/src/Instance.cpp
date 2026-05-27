@@ -1,6 +1,5 @@
-#include <Instance.h>
-
 #include <algorithm>
+#include <Instance.h>
 #include <stdexcept>
 #include <string_view>
 
@@ -146,9 +145,9 @@ Ref<Instance> Instance::Create(const InstanceCreateInfo& createInfo)
     }
 
     if (!IsBackendCompiled(resolved.type)) {
-        throw std::runtime_error("Requested RHI backend '" + std::string(BackendTypeToString(resolved.type)) +
-                                 "' is not compiled into this build. Compiled backends: " +
-                                 compiledBackendListString());
+        throw std::runtime_error(
+            "Requested RHI backend '" + std::string(BackendTypeToString(resolved.type)) +
+            "' is not compiled into this build. Compiled backends: " + compiledBackendListString());
     }
 
     switch (resolved.type) {

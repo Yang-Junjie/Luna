@@ -1,9 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 #include <Core.h>
 #include <Swapchain.h>
-
-#include <cstdint>
 
 namespace luna::RHI {
 class Synchronization;

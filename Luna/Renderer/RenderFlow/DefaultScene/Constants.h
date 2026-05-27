@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Core.h>
-
 #include <cstdint>
+
+#include <Core.h>
 
 namespace luna::render_flow::default_scene_detail {
 
@@ -15,7 +15,7 @@ inline constexpr RHI::Format kShadowMapFormat = RHI::Format::R32_FLOAT;
 inline constexpr uint32_t kShadowCascadeCount = 4;
 inline constexpr uint32_t kShadowCascadeAtlasColumns = 2;
 inline constexpr uint32_t kShadowCascadeAtlasRows = 2;
-inline constexpr uint32_t kShadowCascadeTileSize = 2048;
+inline constexpr uint32_t kShadowCascadeTileSize = 2'048;
 inline constexpr uint32_t kShadowCascadeAtlasSize = kShadowCascadeTileSize * kShadowCascadeAtlasColumns;
 
 inline constexpr RHI::Format kEnvironmentFormat = RHI::Format::RGBA32_FLOAT;
@@ -27,7 +27,7 @@ inline constexpr uint32_t kEnvironmentPrefilterCubeSize = 128;
 inline constexpr uint32_t kEnvironmentPrefilterMipLevels = 8;
 inline constexpr uint32_t kEnvironmentBrdfLutSize = 256;
 inline constexpr uint32_t kEnvironmentIrradianceSampleCount = 64;
-inline constexpr uint32_t kEnvironmentPrefilterSampleCount = 1024;
+inline constexpr uint32_t kEnvironmentPrefilterSampleCount = 1'024;
 inline constexpr uint32_t kEnvironmentBrdfSampleCount = 128;
 inline constexpr float kEnvironmentFallbackValue = 0.08f;
 

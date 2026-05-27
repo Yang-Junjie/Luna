@@ -9,7 +9,6 @@
 #include "Script/ScriptPluginManager.h"
 
 #include <Backend.h>
-
 #include <exception>
 #include <filesystem>
 #include <glm/trigonometric.hpp>
@@ -158,8 +157,7 @@ void logBackendStartupSelection(luna::RHI::BackendType requested_backend)
     if (requested_backend == luna::RHI::BackendType::Auto) {
         try {
             const luna::RHI::BackendType default_backend = luna::RHI::Instance::GetDefaultBackend();
-            LUNA_RUNTIME_INFO("Auto RHI backend will resolve to '{}'",
-                              luna::RHI::BackendTypeToString(default_backend));
+            LUNA_RUNTIME_INFO("Auto RHI backend will resolve to '{}'", luna::RHI::BackendTypeToString(default_backend));
         } catch (const std::exception& error) {
             LUNA_RUNTIME_WARN("Failed to resolve default RHI backend: {}", error.what());
         }

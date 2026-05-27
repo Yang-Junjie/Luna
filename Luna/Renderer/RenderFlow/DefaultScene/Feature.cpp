@@ -151,13 +151,12 @@ bool registerScenePasses(RenderFlowBuilder& builder,
                extension_slots::AfterPostProcess,
                std::string(extension_slots::BeforeOverlay),
                std::make_unique<RenderSlotPass>(std::string(extension_slots::BeforeOverlay))) &&
-           builder.insertFeaturePassAfter(kFeatureName,
-                                          extension_slots::BeforeOverlay,
-                                          "VisibilityBoundsOverlay",
-                                          std::make_unique<VisibilityBoundsOverlayPass>(
-                                              state,
-                                              visibility_bounds_overlay),
-                                          100);
+           builder.insertFeaturePassAfter(
+               kFeatureName,
+               extension_slots::BeforeOverlay,
+               "VisibilityBoundsOverlay",
+               std::make_unique<VisibilityBoundsOverlayPass>(state, visibility_bounds_overlay),
+               100);
 }
 
 AssetCache::ClearMode toClearMode(PipelineResources::Invalidation invalidation)
@@ -176,9 +175,7 @@ bool drawStatsEqual(const DrawQueueStats& lhs, const DrawQueueStats& rhs)
            lhs.phase_picking == rhs.phase_picking;
 }
 
-RenderFeatureParameterInfo makeBoolParameter(std::string_view name,
-                                             std::string_view display_name,
-                                             bool value)
+RenderFeatureParameterInfo makeBoolParameter(std::string_view name, std::string_view display_name, bool value)
 {
     RenderFeatureParameterInfo parameter{};
     parameter.name = name;
@@ -217,8 +214,7 @@ RenderFeatureRuntimeStat makeRuntimeBoolStat(std::string name, bool value)
     };
 }
 
-double elapsedMilliseconds(std::chrono::steady_clock::time_point begin,
-                           std::chrono::steady_clock::time_point end)
+double elapsedMilliseconds(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
 {
     return std::chrono::duration<double, std::milli>(end - begin).count();
 }
@@ -377,9 +373,9 @@ void Feature::prepareFrame(const RenderWorld& world,
 
     const float aspect_ratio = scene_context.framebuffer_height == 0
                                    ? 1.0f
-                                   : (std::max) (static_cast<float>(scene_context.framebuffer_width) /
-                                                     static_cast<float>(scene_context.framebuffer_height),
-                                                 0.001f);
+                                   : (std::max)(static_cast<float>(scene_context.framebuffer_width) /
+                                                    static_cast<float>(scene_context.framebuffer_height),
+                                                0.001f);
     if (m_visibility_debug.freeze_culling_camera && !m_has_frozen_culling_camera) {
         m_frozen_culling_camera = world.camera();
         m_frozen_culling_aspect_ratio = aspect_ratio;
@@ -387,24 +383,24 @@ void Feature::prepareFrame(const RenderWorld& world,
         LUNA_RENDERER_DEBUG("Visibility debug culling camera frozen");
     }
 
-    const Camera& culling_camera =
-        m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera ? m_frozen_culling_camera
-                                                                               : world.camera();
-    const float culling_aspect_ratio =
-        m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera ? m_frozen_culling_aspect_ratio
-                                                                               : aspect_ratio;
+    const Camera& culling_camera = m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera
+                                       ? m_frozen_culling_camera
+                                       : world.camera();
+    const float culling_aspect_ratio = m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera
+                                           ? m_frozen_culling_aspect_ratio
+                                           : aspect_ratio;
     const auto draw_queue_begin = std::chrono::steady_clock::now();
-    m_draw_queue.beginScene(world.camera(),
-                            aspect_ratio,
-                            culling_camera,
-                            culling_aspect_ratio,
-                            VisibilityDebugCaptureOptions{
-                                .capture_visible_bounds = m_visibility_debug.show_visible_bounds,
-                                .capture_culled_bounds = m_visibility_debug.show_culled_bounds,
-                                .capture_culling_frustum = m_visibility_debug.show_culling_frustum,
-                                .culling_frustum_frozen =
-                                    m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera,
-                            });
+    m_draw_queue.beginScene(
+        world.camera(),
+        aspect_ratio,
+        culling_camera,
+        culling_aspect_ratio,
+        VisibilityDebugCaptureOptions{
+            .capture_visible_bounds = m_visibility_debug.show_visible_bounds,
+            .capture_culled_bounds = m_visibility_debug.show_culled_bounds,
+            .capture_culling_frustum = m_visibility_debug.show_culling_frustum,
+            .culling_frustum_frozen = m_visibility_debug.freeze_culling_camera && m_has_frozen_culling_camera,
+        });
     m_draw_queue.reserveForFrame(m_last_draw_stats);
     const auto submit_packets_begin = std::chrono::steady_clock::now();
     for (const auto& packet : world.drawPackets()) {
@@ -421,7 +417,8 @@ void Feature::prepareFrame(const RenderWorld& world,
             : 0.0;
     m_last_visibility_debug_stats = m_draw_queue.visibilityDebugStats();
     LUNA_RENDERER_FRAME_DEBUG(
-        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} culling_ms={:.3f} begin_ms={:.3f} submit_ms={:.3f} visibility_debug_items={} culling_frustums={}",
+        "Scene draw culling: submitted={} camera_visible={} camera_culled={} invalid_bounds={} shadow_unculled={} "
+        "culling_ms={:.3f} begin_ms={:.3f} submit_ms={:.3f} visibility_debug_items={} culling_frustums={}",
         m_last_draw_stats.submitted,
         m_last_draw_stats.camera_visible,
         m_last_draw_stats.camera_culled,

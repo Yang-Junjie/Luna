@@ -71,9 +71,8 @@ void addPushConstantRequirements(ShaderBindingContract& contract,
                                  std::string_view name,
                                  std::span<const RHI::PushConstantRange> push_constants);
 
-[[nodiscard]] ShaderBindingValidationResult
-    validateShaderBindingContract(const ShaderBindingValidationContext& context,
-                                  const ShaderBindingContract& contract,
-                                  const RHI::ShaderReflectionData& reflection);
+[[nodiscard]] ShaderBindingValidationResult validateShaderBindingContract(const ShaderBindingValidationContext& context,
+                                                                          const ShaderBindingContract& contract,
+                                                                          const RHI::ShaderReflectionData& reflection);
 
 } // namespace luna::render_flow

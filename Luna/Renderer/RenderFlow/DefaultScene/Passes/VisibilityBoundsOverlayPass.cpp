@@ -1,21 +1,16 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.h"
-
 #include "Core/Log.h"
 #include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/VisibilityBoundsOverlayPass.h"
 #include "Renderer/RenderFlow/DefaultScene/SharedState.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/Resources/ShaderModuleLoader.h"
 
+#include <cstring>
+
 #include <algorithm>
 #include <array>
-#include <cstring>
-#include <filesystem>
-#include <limits>
-#include <optional>
-#include <utility>
-
 #include <Buffer.h>
 #include <Builders.h>
 #include <CommandBufferEncoder.h>
@@ -23,10 +18,14 @@
 #include <DescriptorSet.h>
 #include <DescriptorSetLayout.h>
 #include <Device.h>
+#include <filesystem>
+#include <limits>
+#include <optional>
 #include <Pipeline.h>
 #include <PipelineLayout.h>
 #include <ShaderCompiler.h>
 #include <ShaderModule.h>
+#include <utility>
 
 namespace luna::render_flow::default_scene {
 namespace {
@@ -67,8 +66,7 @@ bool isValidTextureHandle(const std::optional<RenderGraphTextureHandle>& handle)
 
 std::filesystem::path shaderPath()
 {
-    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" /
-           "VisibilityBoundsOverlay.slang";
+    return std::filesystem::path(LUNA_PROJECT_ROOT) / "Luna" / "Renderer" / "Shaders" / "VisibilityBoundsOverlay.slang";
 }
 
 RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
@@ -85,18 +83,15 @@ RHI::ColorBlendAttachmentState makeAlphaBlendAttachment()
     return blend_attachment;
 }
 
-RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(
-    const RHI::Ref<RHI::Device>& device)
+RHI::Ref<RHI::DescriptorSetLayout> createDescriptorSetLayout(const RHI::Ref<RHI::Device>& device)
 {
     if (!device) {
         return {};
     }
-    return device->CreateDescriptorSetLayout(RHI::DescriptorSetLayoutBuilder()
-                                                 .AddBinding(overlay_binding::Params,
-                                                             RHI::DescriptorType::UniformBuffer,
-                                                             1,
-                                                             RHI::ShaderStage::Vertex)
-                                                 .Build());
+    return device->CreateDescriptorSetLayout(
+        RHI::DescriptorSetLayoutBuilder()
+            .AddBinding(overlay_binding::Params, RHI::DescriptorType::UniformBuffer, 1, RHI::ShaderStage::Vertex)
+            .Build());
 }
 
 RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& device)
@@ -104,15 +99,12 @@ RHI::Ref<RHI::DescriptorPool> createDescriptorPool(const RHI::Ref<RHI::Device>& 
     if (!device) {
         return {};
     }
-    return device->CreateDescriptorPool(RHI::DescriptorPoolBuilder()
-                                            .SetMaxSets(1)
-                                            .AddPoolSize(RHI::DescriptorType::UniformBuffer, 1)
-                                            .Build());
+    return device->CreateDescriptorPool(
+        RHI::DescriptorPoolBuilder().SetMaxSets(1).AddPoolSize(RHI::DescriptorType::UniformBuffer, 1).Build());
 }
 
-RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
-    const RHI::Ref<RHI::Device>& device,
-    const RHI::Ref<RHI::DescriptorSetLayout>& layout)
+RHI::Ref<RHI::PipelineLayout> createPipelineLayout(const RHI::Ref<RHI::Device>& device,
+                                                   const RHI::Ref<RHI::DescriptorSetLayout>& layout)
 {
     if (!device || !layout) {
         return {};
@@ -120,15 +112,13 @@ RHI::Ref<RHI::PipelineLayout> createPipelineLayout(
     return device->CreatePipelineLayout(RHI::PipelineLayoutBuilder().AddSetLayout(layout).Build());
 }
 
-RHI::Ref<RHI::GraphicsPipeline> createPipeline(
-    const RHI::Ref<RHI::Device>& device,
-    const RHI::Ref<RHI::PipelineLayout>& layout,
-    const RHI::Ref<RHI::ShaderModule>& vertex_shader,
-    const RHI::Ref<RHI::ShaderModule>& fragment_shader,
-    RHI::Format color_format)
+RHI::Ref<RHI::GraphicsPipeline> createPipeline(const RHI::Ref<RHI::Device>& device,
+                                               const RHI::Ref<RHI::PipelineLayout>& layout,
+                                               const RHI::Ref<RHI::ShaderModule>& vertex_shader,
+                                               const RHI::Ref<RHI::ShaderModule>& fragment_shader,
+                                               RHI::Format color_format)
 {
-    if (!device || !layout || !vertex_shader || !fragment_shader ||
-        color_format == RHI::Format::UNDEFINED) {
+    if (!device || !layout || !vertex_shader || !fragment_shader || color_format == RHI::Format::UNDEFINED) {
         return {};
     }
 
@@ -136,18 +126,10 @@ RHI::Ref<RHI::GraphicsPipeline> createPipeline(
         RHI::GraphicsPipelineBuilder()
             .SetShaders({vertex_shader, fragment_shader})
             .AddVertexBinding(0, sizeof(VisibilityBoundsOverlayVertex), RHI::VertexInputRate::Vertex)
-            .AddVertexAttribute(0,
-                                0,
-                                RHI::Format::RGB32_FLOAT,
-                                offsetof(VisibilityBoundsOverlayVertex, world_position),
-                                "POSITION",
-                                0)
-            .AddVertexAttribute(1,
-                                0,
-                                RHI::Format::RGBA32_FLOAT,
-                                offsetof(VisibilityBoundsOverlayVertex, color),
-                                "COLOR",
-                                0)
+            .AddVertexAttribute(
+                0, 0, RHI::Format::RGB32_FLOAT, offsetof(VisibilityBoundsOverlayVertex, world_position), "POSITION", 0)
+            .AddVertexAttribute(
+                1, 0, RHI::Format::RGBA32_FLOAT, offsetof(VisibilityBoundsOverlayVertex, color), "COLOR", 0)
             .SetTopology(RHI::PrimitiveTopology::LineList)
             .SetCullMode(RHI::CullMode::None)
             .SetFrontFace(RHI::FrontFace::CounterClockwise)
@@ -210,17 +192,17 @@ glm::vec4 visibilityBoundsOverlayColor(VisibilityDebugClassification classificat
     return {1.0f, 1.0f, 1.0f, 0.9f};
 }
 
-VisibilityBoundsOverlayBuildStats buildVisibilityBoundsOverlayVertices(
-    std::span<const VisibilityDebugItem> items,
-    std::span<const VisibilityDebugFrustumItem> frustums,
-    std::vector<VisibilityBoundsOverlayVertex>& vertices)
+VisibilityBoundsOverlayBuildStats
+    buildVisibilityBoundsOverlayVertices(std::span<const VisibilityDebugItem> items,
+                                         std::span<const VisibilityDebugFrustumItem> frustums,
+                                         std::vector<VisibilityBoundsOverlayVertex>& vertices)
 {
     vertices.clear();
     vertices.reserve((items.size() + frustums.size()) * kBoxEdges.size() * 2);
 
     VisibilityBoundsOverlayBuildStats stats{};
-    stats.items = static_cast<uint32_t>((std::min) (items.size(),
-                                                   static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    stats.items =
+        static_cast<uint32_t>((std::min)(items.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
     for (const VisibilityDebugItem& item : items) {
         const glm::vec4 color = visibilityBoundsOverlayColor(item.classification);
         if (item.world_bounds.isValid()) {
@@ -234,14 +216,14 @@ VisibilityBoundsOverlayBuildStats buildVisibilityBoundsOverlayVertices(
         ++stats.invalid_markers;
     }
 
-    stats.frustums = static_cast<uint32_t>((std::min) (frustums.size(),
-                                                       static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    stats.frustums =
+        static_cast<uint32_t>((std::min)(frustums.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
     for (const VisibilityDebugFrustumItem& frustum : frustums) {
         appendBoxLineVertices(frustum.corners, frustum.color, vertices);
     }
 
-    stats.vertices = static_cast<uint32_t>((std::min) (vertices.size(),
-                                                      static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    stats.vertices =
+        static_cast<uint32_t>((std::min)(vertices.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
     return stats;
 }
 
@@ -263,9 +245,8 @@ struct VisibilityBoundsOverlayResources::State {
 
     [[nodiscard]] bool pipelineReady() const noexcept
     {
-        return device && vertex_shader && fragment_shader && pipeline_layout && pipeline &&
-               descriptor_set_layout && descriptor_pool && descriptor_set && params_buffer &&
-               color_format != RHI::Format::UNDEFINED;
+        return device && vertex_shader && fragment_shader && pipeline_layout && pipeline && descriptor_set_layout &&
+               descriptor_pool && descriptor_set && params_buffer && color_format != RHI::Format::UNDEFINED;
     }
 };
 
@@ -305,16 +286,10 @@ bool VisibilityBoundsOverlayResources::ensurePipeline(const SceneRenderContext& 
     m_state->color_format = context.color_format;
 
     const std::filesystem::path path = shaderPath();
-    m_state->vertex_shader = renderer_detail::loadShaderModule(context.device,
-                                                               context.compiler,
-                                                               path,
-                                                               "visibilityBoundsOverlayVertexMain",
-                                                               RHI::ShaderStage::Vertex);
-    m_state->fragment_shader = renderer_detail::loadShaderModule(context.device,
-                                                                 context.compiler,
-                                                                 path,
-                                                                 "visibilityBoundsOverlayFragmentMain",
-                                                                 RHI::ShaderStage::Fragment);
+    m_state->vertex_shader = renderer_detail::loadShaderModule(
+        context.device, context.compiler, path, "visibilityBoundsOverlayVertexMain", RHI::ShaderStage::Vertex);
+    m_state->fragment_shader = renderer_detail::loadShaderModule(
+        context.device, context.compiler, path, "visibilityBoundsOverlayFragmentMain", RHI::ShaderStage::Fragment);
     m_state->descriptor_set_layout = createDescriptorSetLayout(context.device);
     m_state->descriptor_pool = createDescriptorPool(context.device);
     if (m_state->descriptor_pool && m_state->descriptor_set_layout) {
@@ -380,8 +355,7 @@ void updateOverlayParams(const RHI::Ref<RHI::Buffer>& params_buffer,
     descriptor_set->Update();
 }
 
-bool VisibilityBoundsOverlayResources::ensureVertexBuffer(const SceneRenderContext& context,
-                                                          uint64_t required_bytes)
+bool VisibilityBoundsOverlayResources::ensureVertexBuffer(const SceneRenderContext& context, uint64_t required_bytes)
 {
     if (required_bytes == 0 || !context.device) {
         return false;
@@ -390,7 +364,7 @@ bool VisibilityBoundsOverlayResources::ensureVertexBuffer(const SceneRenderConte
         return true;
     }
 
-    const uint64_t capacity = (std::max) (required_bytes, m_state->vertex_buffer_bytes * 2);
+    const uint64_t capacity = (std::max)(required_bytes, m_state->vertex_buffer_bytes * 2);
     m_state->vertex_buffer = context.device->CreateBuffer(RHI::BufferBuilder()
                                                               .SetSize(capacity)
                                                               .SetUsage(RHI::BufferUsageFlags::VertexBuffer)
@@ -438,8 +412,7 @@ bool VisibilityBoundsOverlayResources::upload(const SceneRenderContext& context,
     return false;
 }
 
-void VisibilityBoundsOverlayResources::draw(RenderGraphRasterPassContext& pass_context,
-                                            uint32_t vertex_count) const
+void VisibilityBoundsOverlayResources::draw(RenderGraphRasterPassContext& pass_context, uint32_t vertex_count) const
 {
     if (!m_state->pipelineReady() || !m_state->vertex_buffer || vertex_count == 0) {
         clearOverlayPass(pass_context);
@@ -503,8 +476,7 @@ void VisibilityBoundsOverlayPass::setup(RenderPassContext& context)
 
     const auto scene_color = context.blackboard().get(blackboard::SceneFinalColor);
     if (!isValidTextureHandle(scene_color)) {
-        LUNA_RENDERER_WARN("VisibilityBoundsOverlay missing input texture '{}'",
-                           blackboard::SceneFinalColor.value());
+        LUNA_RENDERER_WARN("VisibilityBoundsOverlay missing input texture '{}'", blackboard::SceneFinalColor.value());
         return;
     }
 
@@ -513,10 +485,8 @@ void VisibilityBoundsOverlayPass::setup(RenderPassContext& context)
         return;
     }
 
-    if (!m_resources->upload(context.sceneContext(),
-                             debug_items,
-                             debug_frustums,
-                             frame_context->view.current.view_projection)) {
+    if (!m_resources->upload(
+            context.sceneContext(), debug_items, debug_frustums, frame_context->view.current.view_projection)) {
         return;
     }
 
@@ -530,9 +500,7 @@ void VisibilityBoundsOverlayPass::setup(RenderPassContext& context)
     context.graph().AddRasterPass(
         name(),
         [scene_color = *scene_color](RenderGraphRasterPassBuilder& pass_builder) {
-            pass_builder.WriteColor(scene_color,
-                                    RHI::AttachmentLoadOp::Load,
-                                    RHI::AttachmentStoreOp::Store);
+            pass_builder.WriteColor(scene_color, RHI::AttachmentLoadOp::Load, RHI::AttachmentStoreOp::Store);
         },
         [this, vertex_count](RenderGraphRasterPassContext& pass_context) {
             if (m_resources == nullptr) {

@@ -8,10 +8,10 @@ namespace luna::editor::native {
 class Commands final {
 public:
     constexpr Commands() noexcept = default;
+
     explicit constexpr Commands(const LunaEditorCommandApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool canRegister() const noexcept
     {

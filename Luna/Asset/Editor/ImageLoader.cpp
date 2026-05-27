@@ -324,11 +324,8 @@ ImageData loadHDRImageUsingSTBLoader(const uint8_t* data, std::size_t size)
     };
 }
 
-std::vector<uint8_t> extractCubemapFace(const ImageData& image,
-                                        uint32_t face_x,
-                                        uint32_t face_y,
-                                        uint32_t face_width,
-                                        uint32_t face_height)
+std::vector<uint8_t> extractCubemapFace(
+    const ImageData& image, uint32_t face_x, uint32_t face_y, uint32_t face_width, uint32_t face_height)
 {
     const size_t pixel_stride =
         image.ImageFormat == luna::RHI::Format::RGBA32_FLOAT ? sizeof(float) * 4u : sizeof(uint8_t) * 4u;

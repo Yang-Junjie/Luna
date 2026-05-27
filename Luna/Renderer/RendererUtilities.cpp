@@ -22,8 +22,7 @@ RHI::Ref<RHI::Adapter> selectAdapter(const std::vector<RHI::Ref<RHI::Adapter>>& 
 RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<RHI::SurfaceFormat>& formats)
 {
     const auto preferred = std::find_if(formats.begin(), formats.end(), [](const RHI::SurfaceFormat& format) {
-        return format.format == RHI::Format::BGRA8_UNORM &&
-               format.colorSpace == RHI::ColorSpace::SRGB_NONLINEAR;
+        return format.format == RHI::Format::BGRA8_UNORM && format.colorSpace == RHI::ColorSpace::SRGB_NONLINEAR;
     });
     if (preferred != formats.end()) {
         return *preferred;
@@ -36,9 +35,8 @@ RHI::SurfaceFormat chooseSurfaceFormat(const std::vector<RHI::SurfaceFormat>& fo
         return *fallback;
     }
 
-    return formats.empty()
-               ? RHI::SurfaceFormat{RHI::Format::BGRA8_UNORM, RHI::ColorSpace::SRGB_NONLINEAR}
-               : formats.front();
+    return formats.empty() ? RHI::SurfaceFormat{RHI::Format::BGRA8_UNORM, RHI::ColorSpace::SRGB_NONLINEAR}
+                           : formats.front();
 }
 
 const char* presentModeToString(RHI::PresentMode mode)
@@ -146,7 +144,7 @@ std::string describePresentModes(const std::vector<RHI::PresentMode>& supported_
 }
 
 RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supported_modes,
-                                         RHI::PresentMode requested_mode)
+                                   RHI::PresentMode requested_mode)
 {
     if (isPresentModeSupported(supported_modes, requested_mode)) {
         return requested_mode;
@@ -154,27 +152,24 @@ RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supporte
 
     switch (requested_mode) {
         case RHI::PresentMode::Mailbox:
-            for (const auto fallback_mode : std::array{RHI::PresentMode::Immediate,
-                                                       RHI::PresentMode::FifoRelaxed,
-                                                       RHI::PresentMode::Fifo}) {
+            for (const auto fallback_mode :
+                 std::array{RHI::PresentMode::Immediate, RHI::PresentMode::FifoRelaxed, RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
         case RHI::PresentMode::Immediate:
-            for (const auto fallback_mode : std::array{RHI::PresentMode::Mailbox,
-                                                       RHI::PresentMode::FifoRelaxed,
-                                                       RHI::PresentMode::Fifo}) {
+            for (const auto fallback_mode :
+                 std::array{RHI::PresentMode::Mailbox, RHI::PresentMode::FifoRelaxed, RHI::PresentMode::Fifo}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
             }
             break;
         case RHI::PresentMode::FifoRelaxed:
-            for (const auto fallback_mode : std::array{RHI::PresentMode::Fifo,
-                                                       RHI::PresentMode::Immediate,
-                                                       RHI::PresentMode::Mailbox}) {
+            for (const auto fallback_mode :
+                 std::array{RHI::PresentMode::Fifo, RHI::PresentMode::Immediate, RHI::PresentMode::Mailbox}) {
                 if (isPresentModeSupported(supported_modes, fallback_mode)) {
                     return fallback_mode;
                 }
@@ -193,7 +188,3 @@ RHI::PresentMode choosePresentMode(const std::vector<RHI::PresentMode>& supporte
 }
 
 } // namespace luna::renderer_detail
-
-
-
-

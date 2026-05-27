@@ -168,9 +168,11 @@ void testExecutorAppliesTypedPlan(TestContext& context)
     context.expect(report.entities.size() == 2, "report should include two explicit aliases");
     context.expect(report.inspections.size() == 3, "report should include requested inspections and snapshot");
     context.expect(report.verifications.size() == 4, "report should include requested verifications");
-    context.expect(std::all_of(report.verifications.begin(), report.verifications.end(), [](const auto& verification) {
-                       return verification.ok;
-                   }),
+    context.expect(std::all_of(report.verifications.begin(),
+                               report.verifications.end(),
+                               [](const auto& verification) {
+                                   return verification.ok;
+                               }),
                    "all requested verifications should pass");
     context.expect(report.saved_scenes.size() == 1, "report should include saved scene path");
     context.expect(report.saved_scenes.front() == normalized_scene_path, "saved scene path should be normalized");
@@ -234,13 +236,11 @@ void testExecutorReportsStructuredDiagnostics(TestContext& context)
         context.expect(diagnostic.has_command_index && diagnostic.command_index == 1,
                        "unknown entity should include failing command index");
         context.expect(diagnostic.command == "name", "unknown entity should include command name");
-        context.expect(diagnostic.entity_ref == "MissingEntity",
-                       "unknown entity should include unresolved entity ref");
+        context.expect(diagnostic.entity_ref == "MissingEntity", "unknown entity should include unresolved entity ref");
         context.expect(diagnostic.recoverable, "unknown entity should be recoverable");
         context.expect(diagnostic.expected == "resolvable entity reference",
                        "unknown entity should include expected value");
-        context.expect(diagnostic.actual == "MissingEntity",
-                       "unknown entity should include actual value");
+        context.expect(diagnostic.actual == "MissingEntity", "unknown entity should include actual value");
     }
 }
 
@@ -269,9 +269,8 @@ void testExecutorRollsBackFailedPlan(TestContext& context)
     context.expect(!executor.execute(plan, report), "failed executor plan should report failure");
     context.expect(scene.entityManager().entityCount() == entity_count_before,
                    "failed executor plan should rollback scene mutations");
-    context.expect(!scene.entityManager().findEntityByUUID(report.entities.empty()
-                                                               ? luna::UUID(0)
-                                                               : report.entities.front().entity_id),
+    context.expect(!scene.entityManager().findEntityByUUID(report.entities.empty() ? luna::UUID(0)
+                                                                                   : report.entities.front().entity_id),
                    "failed executor plan should remove created alias entity from the scene");
     context.expect(!session.hasOpenTransaction(), "failed executor plan should close its transaction");
 }
@@ -410,8 +409,7 @@ void testExecutorValidateDoesNotMutateOrWriteFiles(TestContext& context)
     context.expect(report.diagnostics.empty(), "valid dry-run plan should not report diagnostics");
     context.expect(scene.entityManager().entityCount() == entity_count_before,
                    "dry-run validation should not mutate the scene");
-    context.expect(!std::filesystem::exists(normalized_scene_path),
-                   "dry-run validation should not write scene files");
+    context.expect(!std::filesystem::exists(normalized_scene_path), "dry-run validation should not write scene files");
 }
 
 void testExecutorValidateReportsOverwriteWarning(TestContext& context)

@@ -1,18 +1,17 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
-
 #include "Core/Log.h"
 #include "Math/Math.h"
 #include "Renderer/Material.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
 #include "Renderer/RenderFlow/DefaultScene/DrawQueue.h"
 #include "Renderer/RenderFlow/DefaultScene/GpuTypes.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/ShadowPass.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/DefaultScene/ShadowCascadeBounds.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
 #include "Renderer/RenderWorld/RenderWorld.h"
-#include "Renderer/RendererUtilities.h"
 #include "Renderer/Visibility/Frustum.h"
 
 #include <cmath>
@@ -43,7 +42,7 @@ constexpr float kShadowDepthBias = 0.0018f;
 uint32_t sanitizeShadowMapSize(uint32_t size, uint32_t fallback)
 {
     constexpr uint32_t kMinShadowMapSize = 256;
-    constexpr uint32_t kMaxShadowMapSize = 8192;
+    constexpr uint32_t kMaxShadowMapSize = 8'192;
     return std::clamp(size == 0 ? fallback : size, kMinShadowMapSize, kMaxShadowMapSize);
 }
 
@@ -74,7 +73,7 @@ ShadowResources createShadowResources(RenderGraphBuilder& graph, uint32_t shadow
 
 uint32_t csmCascadeSize(const RenderWorld* world)
 {
-    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().csm_cascade_size : 2048u, 2048u);
+    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().csm_cascade_size : 2'048u, 2'048u);
 }
 
 uint32_t csmAtlasSize(uint32_t cascade_size)
@@ -84,7 +83,7 @@ uint32_t csmAtlasSize(uint32_t cascade_size)
 
 uint32_t pcfShadowMapSize(const RenderWorld* world)
 {
-    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().pcf_map_size : 4096u, 4096u);
+    return sanitizeShadowMapSize(world != nullptr ? world->shadowSettings().pcf_map_size : 4'096u, 4'096u);
 }
 
 ShadowResources createCascadedShadowResources(RenderGraphBuilder& graph, uint32_t cascade_size)
@@ -295,7 +294,7 @@ CascadeShadowProjection buildCascadeShadowProjection(const std::array<glm::vec3,
     const float world_texel_size =
         render_flow::default_scene_detail::shadowCascadeWorldTexelSize(bounds, shadow_map_size);
     for (const DrawCommand& draw_command : shadow_draw_commands) {
-        (void)render_flow::default_scene_detail::expandShadowCascadeDepthForCaster(bounds, draw_command.world_bounds);
+        (void) render_flow::default_scene_detail::expandShadowCascadeDepthForCaster(bounds, draw_command.world_bounds);
     }
     render_flow::default_scene_detail::padShadowCascadeDepth(bounds, kCascadeLightDepthPadding);
     return CascadeShadowProjection{
@@ -362,8 +361,7 @@ render_flow::default_scene_detail::ShadowRenderParams buildDirectionalShadowPara
         for (uint32_t cascade_index = 0; cascade_index < shadow_count; ++cascade_index) {
             const float cascade_far = splits[cascade_index];
             const float overlap = calculateCascadeOverlap(cascade_near, cascade_far);
-            const float shadow_near =
-                cascade_index == 0u ? cascade_near : std::max(near_clip, cascade_near - overlap);
+            const float shadow_near = cascade_index == 0u ? cascade_near : std::max(near_clip, cascade_near - overlap);
             const float shadow_far =
                 cascade_index + 1u >= shadow_count ? cascade_far : std::min(far_clip, cascade_far + overlap);
             const auto corners = perspectiveFrustumCorners(camera, aspect_ratio, shadow_near, shadow_far);
@@ -436,10 +434,8 @@ void ShadowDepthPass::setup(RenderPassContext& context)
                                     RHI::AttachmentStoreOp::Store,
                                     RHI::ClearValue::ColorFloat(1.0f, 1.0f, 1.0f, 1.0f));
             if (shadow.shadow_depth.isValid()) {
-                pass_builder.WriteDepth(shadow.shadow_depth,
-                                        RHI::AttachmentLoadOp::Clear,
-                                        RHI::AttachmentStoreOp::Store,
-                                        {1.0f, 0});
+                pass_builder.WriteDepth(
+                    shadow.shadow_depth, RHI::AttachmentLoadOp::Clear, RHI::AttachmentStoreOp::Store, {1.0f, 0});
             }
         },
         [this, scene_context = context.sceneContext()](RenderGraphRasterPassContext& pass_context) {
@@ -497,9 +493,8 @@ void ShadowDepthPass::execute(RenderGraphRasterPassContext& pass_context, const 
                                                   unique_visible_shadow_draw_command_ids,
                                                   shadow_culling_stats);
     }
-    shadow_culling_stats.unique_visible =
-        static_cast<uint32_t>(std::min(unique_visible_shadow_draw_commands.size(),
-                                       static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
+    shadow_culling_stats.unique_visible = static_cast<uint32_t>(std::min(
+        unique_visible_shadow_draw_commands.size(), static_cast<size_t>((std::numeric_limits<uint32_t>::max)())));
     shadow_culling_stats.unique_culled =
         shadow_culling_stats.candidate_casters > shadow_culling_stats.unique_visible
             ? shadow_culling_stats.candidate_casters - shadow_culling_stats.unique_visible

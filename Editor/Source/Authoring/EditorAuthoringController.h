@@ -71,14 +71,11 @@ public:
     void updateAssetLabel();
 
 private:
-    [[nodiscard]] static std::filesystem::path relativeScenePathToProject(
-        const std::filesystem::path& scene_file_path);
+    [[nodiscard]] static std::filesystem::path relativeScenePathToProject(const std::filesystem::path& scene_file_path);
     [[nodiscard]] static std::string makeAssetLabel(const EditorRuntime& runtime);
 
     EditorRuntime m_runtime;
-    EditorDocumentContext m_document_context{"luna.document.authoring.scene",
-                                             EditorDocumentKind::AuthoringScene,
-                                             true};
+    EditorDocumentContext m_document_context{"luna.document.authoring.scene", EditorDocumentKind::AuthoringScene, true};
     std::string m_asset_label{"No scene loaded"};
 };
 

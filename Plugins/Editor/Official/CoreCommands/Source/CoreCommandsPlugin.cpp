@@ -1,5 +1,4 @@
 #include "CoreCommandsPlugin.h"
-
 #include "EditorApi/EditorApi.h"
 #include "Luna/Editor/EditorBuiltinPluginRegistration.h"
 
@@ -27,9 +26,10 @@ public:
             .id = luna::editor::commands::kUndo,
             .label = "Undo",
             .description = "Undo the last scene authoring operation.",
-            .can_execute = [](luna::editor::Host& host) {
-                return host.history().canUndo();
-            },
+            .can_execute =
+                [](luna::editor::Host& host) {
+                    return host.history().canUndo();
+                },
             .execute =
                 [](luna::editor::Host& host) {
                     (void) host.history().undo();
@@ -40,58 +40,63 @@ public:
             .id = luna::editor::commands::kRedo,
             .label = "Redo",
             .description = "Redo the next scene authoring operation.",
-            .can_execute = [](luna::editor::Host& host) {
-                return host.history().canRedo();
-            },
+            .can_execute =
+                [](luna::editor::Host& host) {
+                    return host.history().canRedo();
+                },
             .execute =
                 [](luna::editor::Host& host) {
                     (void) host.history().redo();
                 },
         });
 
-        const bool runtime_viewport_registered =
-            host.commands().registerCommand(luna::editor::CommandDescriptor{
-                .id = luna::editor::commands::kToggleRuntimeViewport,
-                .label = "Runtime Viewport",
-                .description = "Toggle the viewport between editor rendering and runtime scene simulation.",
-                .can_execute = [](luna::editor::Host&) {
+        const bool runtime_viewport_registered = host.commands().registerCommand(luna::editor::CommandDescriptor{
+            .id = luna::editor::commands::kToggleRuntimeViewport,
+            .label = "Runtime Viewport",
+            .description = "Toggle the viewport between editor rendering and runtime scene simulation.",
+            .can_execute =
+                [](luna::editor::Host&) {
                     return true;
                 },
-                .is_checked = [](luna::editor::Host& host) {
+            .is_checked =
+                [](luna::editor::Host& host) {
                     return host.runtimeViewport().isRuntimeViewportRequested();
                 },
-                .execute =
-                    [](luna::editor::Host& host) {
-                        const bool requested = host.runtimeViewport().isRuntimeViewportRequested();
-                        host.runtimeViewport().setRuntimeViewportRequested(!requested);
-                    },
-            });
+            .execute =
+                [](luna::editor::Host& host) {
+                    const bool requested = host.runtimeViewport().isRuntimeViewportRequested();
+                    host.runtimeViewport().setRuntimeViewportRequested(!requested);
+                },
+        });
 
         const bool undo_shortcut_registered = host.shortcuts().registerShortcut(luna::editor::ShortcutDescriptor{
             .id = kUndoShortcutId,
             .command_id = luna::editor::commands::kUndo,
-            .chord = luna::editor::ShortcutChord{
-                .key = luna::KeyCode::Z,
-                .primary = true,
-            },
+            .chord =
+                luna::editor::ShortcutChord{
+                    .key = luna::KeyCode::Z,
+                    .primary = true,
+                },
         });
         const bool redo_alternate_shortcut_registered =
             host.shortcuts().registerShortcut(luna::editor::ShortcutDescriptor{
                 .id = kRedoAlternateShortcutId,
                 .command_id = luna::editor::commands::kRedo,
-                .chord = luna::editor::ShortcutChord{
-                    .key = luna::KeyCode::Z,
-                    .primary = true,
-                    .shift = true,
-                },
+                .chord =
+                    luna::editor::ShortcutChord{
+                        .key = luna::KeyCode::Z,
+                        .primary = true,
+                        .shift = true,
+                    },
             });
         const bool redo_shortcut_registered = host.shortcuts().registerShortcut(luna::editor::ShortcutDescriptor{
             .id = kRedoShortcutId,
             .command_id = luna::editor::commands::kRedo,
-            .chord = luna::editor::ShortcutChord{
-                .key = luna::KeyCode::Y,
-                .primary = true,
-            },
+            .chord =
+                luna::editor::ShortcutChord{
+                    .key = luna::KeyCode::Y,
+                    .primary = true,
+                },
         });
 
         const bool undo_menu_registered = host.menus().addMenuItem(luna::editor::MenuItemDescriptor{

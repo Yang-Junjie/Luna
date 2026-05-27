@@ -2,11 +2,12 @@
 
 #include "EditorApi/EditorTypes.h"
 
-#include <functional>
 #include <cstdint>
-#include <vector>
+
+#include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace luna::editor {
 

@@ -1,7 +1,6 @@
-#include "EditorStateLifecycleController.h"
-
 #include "Authoring/EditorAuthoringController.h"
 #include "EditorRuntimeViewportController.h"
+#include "EditorStateLifecycleController.h"
 #include "Viewport/EditorViewportCoordinator.h"
 #include "Viewport/SceneViewportInstance.h"
 
@@ -43,8 +42,8 @@ void EditorStateLifecycleController::resetAuthoringViewportState(EditorRuntimeVi
 }
 
 void EditorStateLifecycleController::syncPickDebugVisualization(const SceneViewportInstance& active_viewport,
-                                                               Renderer* renderer,
-                                                               bool enabled) const
+                                                                Renderer* renderer,
+                                                                bool enabled) const
 {
     if (renderer == nullptr) {
         return;

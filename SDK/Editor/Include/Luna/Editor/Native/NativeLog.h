@@ -7,10 +7,10 @@ namespace luna::editor::native {
 class Log final {
 public:
     constexpr Log() noexcept = default;
+
     explicit constexpr Log(const LunaEditorLogApi* api) noexcept
         : api_(api)
-    {
-    }
+    {}
 
     [[nodiscard]] bool available() const noexcept
     {

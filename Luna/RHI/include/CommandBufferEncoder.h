@@ -247,11 +247,13 @@ public:
                                    const Ref<Texture>& dstImage,
                                    ImageLayout dstImageLayout,
                                    std::span<const BufferImageCopy> regions) = 0;
+
     virtual void CopyImageToBuffer(const Ref<Texture>& srcImage,
                                    ImageLayout srcImageLayout,
                                    const Ref<Buffer>& dstBuffer,
                                    std::span<const BufferImageCopy> regions)
     {}
+
     virtual ~CommandBufferEncoder() = default;
     virtual CommandBufferType GetCommandBufferType() const = 0;
     virtual void CopyBuffer(const Ref<Buffer>& srcBuffer,
@@ -302,6 +304,7 @@ public:
     virtual void EndQuery(const Ref<QueryPool>& pool, uint32_t queryIndex) = 0;
     virtual void WriteTimestamp(const Ref<QueryPool>& pool, uint32_t queryIndex) = 0;
     virtual void ResetQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) = 0;
+
     virtual void ResolveQueryPool(const Ref<QueryPool>& pool, uint32_t first, uint32_t count) {}
 
     virtual void

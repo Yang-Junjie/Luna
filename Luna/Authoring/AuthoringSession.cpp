@@ -1,19 +1,18 @@
-#include "AuthoringSession.h"
-
 #include "Asset/AssetDatabase.h"
 #include "Asset/AssetManager.h"
 #include "Asset/BuiltinAssets.h"
 #include "Asset/Model.h"
+#include "AuthoringSession.h"
 #include "Core/Log.h"
 #include "Renderer/Mesh.h"
 #include "Scene/Components.h"
 #include "Scene/SceneSerializer.h"
 
-#include <glm/trigonometric.hpp>
-
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+
+#include <algorithm>
+#include <glm/trigonometric.hpp>
 #include <optional>
 #include <string>
 #include <utility>
@@ -74,17 +73,12 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs,
-                             const luna::SceneEnvironmentSettings& rhs)
+bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs, const luna::SceneEnvironmentSettings& rhs)
 {
-    return lhs.backgroundMode == rhs.backgroundMode &&
-           sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
-           lhs.enabled == rhs.enabled &&
-           lhs.iblEnabled == rhs.iblEnabled &&
-           lhs.environmentMapHandle == rhs.environmentMapHandle &&
-           lhs.intensity == rhs.intensity &&
-           lhs.skyIntensity == rhs.skyIntensity &&
-           lhs.diffuseIntensity == rhs.diffuseIntensity &&
+    return lhs.backgroundMode == rhs.backgroundMode && sameVec3(lhs.backgroundColor, rhs.backgroundColor) &&
+           lhs.enabled == rhs.enabled && lhs.iblEnabled == rhs.iblEnabled &&
+           lhs.environmentMapHandle == rhs.environmentMapHandle && lhs.intensity == rhs.intensity &&
+           lhs.skyIntensity == rhs.skyIntensity && lhs.diffuseIntensity == rhs.diffuseIntensity &&
            lhs.specularIntensity == rhs.specularIntensity &&
            sameVec3(lhs.proceduralSunDirection, rhs.proceduralSunDirection) &&
            lhs.proceduralSunIntensity == rhs.proceduralSunIntensity &&
@@ -97,9 +91,7 @@ bool sameEnvironmentSettings(const luna::SceneEnvironmentSettings& lhs,
 
 bool sameShadowSettings(const luna::SceneShadowSettings& lhs, const luna::SceneShadowSettings& rhs)
 {
-    return lhs.mode == rhs.mode &&
-           lhs.pcfShadowDistance == rhs.pcfShadowDistance &&
-           lhs.pcfMapSize == rhs.pcfMapSize &&
+    return lhs.mode == rhs.mode && lhs.pcfShadowDistance == rhs.pcfShadowDistance && lhs.pcfMapSize == rhs.pcfMapSize &&
            lhs.csmCascadeSize == rhs.csmCascadeSize;
 }
 
@@ -110,83 +102,60 @@ bool isBoundSceneEntity(luna::Scene& scene, luna::Entity entity)
 
 bool sameTransformComponent(const luna::TransformComponent& lhs, const luna::TransformComponent& rhs)
 {
-    return sameVec3(lhs.translation, rhs.translation) &&
-           sameVec3(lhs.rotation, rhs.rotation) &&
+    return sameVec3(lhs.translation, rhs.translation) && sameVec3(lhs.rotation, rhs.rotation) &&
            sameVec3(lhs.scale, rhs.scale);
 }
 
 bool sameCameraComponent(const luna::CameraComponent& lhs, const luna::CameraComponent& rhs)
 {
-    return lhs.primary == rhs.primary &&
-           lhs.fixedAspectRatio == rhs.fixedAspectRatio &&
+    return lhs.primary == rhs.primary && lhs.fixedAspectRatio == rhs.fixedAspectRatio &&
            lhs.projectionType == rhs.projectionType &&
            lhs.perspectiveVerticalFovRadians == rhs.perspectiveVerticalFovRadians &&
-           lhs.perspectiveNear == rhs.perspectiveNear &&
-           lhs.perspectiveFar == rhs.perspectiveFar &&
-           lhs.orthographicSize == rhs.orthographicSize &&
-           lhs.orthographicNear == rhs.orthographicNear &&
+           lhs.perspectiveNear == rhs.perspectiveNear && lhs.perspectiveFar == rhs.perspectiveFar &&
+           lhs.orthographicSize == rhs.orthographicSize && lhs.orthographicNear == rhs.orthographicNear &&
            lhs.orthographicFar == rhs.orthographicFar;
 }
 
 bool sameLightComponent(const luna::LightComponent& lhs, const luna::LightComponent& rhs)
 {
-    return lhs.type == rhs.type &&
-           lhs.enabled == rhs.enabled &&
-           sameVec3(lhs.color, rhs.color) &&
-           lhs.intensity == rhs.intensity &&
-           lhs.range == rhs.range &&
+    return lhs.type == rhs.type && lhs.enabled == rhs.enabled && sameVec3(lhs.color, rhs.color) &&
+           lhs.intensity == rhs.intensity && lhs.range == rhs.range &&
            lhs.innerConeAngleRadians == rhs.innerConeAngleRadians &&
            lhs.outerConeAngleRadians == rhs.outerConeAngleRadians;
 }
 
 bool sameMeshComponent(const luna::MeshComponent& lhs, const luna::MeshComponent& rhs)
 {
-    return lhs.meshHandle == rhs.meshHandle &&
-           lhs.firstSubmesh == rhs.firstSubmesh &&
-           lhs.submeshCount == rhs.submeshCount &&
-           lhs.submeshMaterials == rhs.submeshMaterials;
+    return lhs.meshHandle == rhs.meshHandle && lhs.firstSubmesh == rhs.firstSubmesh &&
+           lhs.submeshCount == rhs.submeshCount && lhs.submeshMaterials == rhs.submeshMaterials;
 }
 
 bool sameScriptProperty(const luna::ScriptProperty& lhs, const luna::ScriptProperty& rhs)
 {
-    return lhs.name == rhs.name &&
-           lhs.type == rhs.type &&
-           lhs.boolValue == rhs.boolValue &&
-           lhs.intValue == rhs.intValue &&
-           lhs.floatValue == rhs.floatValue &&
-           lhs.stringValue == rhs.stringValue &&
-           sameVec3(lhs.vec3Value, rhs.vec3Value) &&
-           lhs.entityValue == rhs.entityValue &&
-           lhs.assetValue == rhs.assetValue &&
-           lhs.metadata.displayName == rhs.metadata.displayName &&
-           lhs.metadata.description == rhs.metadata.description &&
-           lhs.metadata.category == rhs.metadata.category &&
+    return lhs.name == rhs.name && lhs.type == rhs.type && lhs.boolValue == rhs.boolValue &&
+           lhs.intValue == rhs.intValue && lhs.floatValue == rhs.floatValue && lhs.stringValue == rhs.stringValue &&
+           sameVec3(lhs.vec3Value, rhs.vec3Value) && lhs.entityValue == rhs.entityValue &&
+           lhs.assetValue == rhs.assetValue && lhs.metadata.displayName == rhs.metadata.displayName &&
+           lhs.metadata.description == rhs.metadata.description && lhs.metadata.category == rhs.metadata.category &&
            lhs.metadata.hasMinValue == rhs.metadata.hasMinValue &&
            lhs.metadata.hasMaxValue == rhs.metadata.hasMaxValue &&
-           lhs.metadata.hasStepValue == rhs.metadata.hasStepValue &&
-           lhs.metadata.minValue == rhs.metadata.minValue &&
-           lhs.metadata.maxValue == rhs.metadata.maxValue &&
-           lhs.metadata.stepValue == rhs.metadata.stepValue &&
-           lhs.metadata.assetType == rhs.metadata.assetType &&
-           lhs.metadata.entityFilter == rhs.metadata.entityFilter &&
+           lhs.metadata.hasStepValue == rhs.metadata.hasStepValue && lhs.metadata.minValue == rhs.metadata.minValue &&
+           lhs.metadata.maxValue == rhs.metadata.maxValue && lhs.metadata.stepValue == rhs.metadata.stepValue &&
+           lhs.metadata.assetType == rhs.metadata.assetType && lhs.metadata.entityFilter == rhs.metadata.entityFilter &&
            lhs.metadata.options.size() == rhs.metadata.options.size() &&
            std::equal(lhs.metadata.options.begin(),
                       lhs.metadata.options.end(),
                       rhs.metadata.options.begin(),
                       [](const luna::ScriptPropertyOption& left, const luna::ScriptPropertyOption& right) {
-                          return left.label == right.label &&
-                                 left.intValue == right.intValue &&
+                          return left.label == right.label && left.intValue == right.intValue &&
                                  left.stringValue == right.stringValue;
                       });
 }
 
 bool sameScriptEntry(const luna::ScriptEntry& lhs, const luna::ScriptEntry& rhs)
 {
-    if (lhs.id != rhs.id ||
-        lhs.enabled != rhs.enabled ||
-        lhs.scriptAsset != rhs.scriptAsset ||
-        lhs.typeName != rhs.typeName ||
-        lhs.executionOrder != rhs.executionOrder ||
+    if (lhs.id != rhs.id || lhs.enabled != rhs.enabled || lhs.scriptAsset != rhs.scriptAsset ||
+        lhs.typeName != rhs.typeName || lhs.executionOrder != rhs.executionOrder ||
         lhs.properties.size() != rhs.properties.size()) {
         return false;
     }
@@ -532,8 +501,8 @@ Entity AuthoringSession::createEntity(const std::string& name, Entity parent)
     }
 
     const bool implicit_transaction = beginImplicitTransaction("Create Entity");
-    Entity entity = parent ? scene().entityManager().createChildEntity(parent, name)
-                           : scene().entityManager().createEntity(name);
+    Entity entity =
+        parent ? scene().entityManager().createChildEntity(parent, name) : scene().entityManager().createEntity(name);
     if (!entity) {
         (void) finishImplicitTransaction(implicit_transaction, false);
         return {};

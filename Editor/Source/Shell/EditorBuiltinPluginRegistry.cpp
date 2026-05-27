@@ -1,6 +1,5 @@
-#include "Shell/EditorBuiltinPluginRegistry.h"
-
 #include "Core/Log.h"
+#include "Shell/EditorBuiltinPluginRegistry.h"
 
 #include <unordered_map>
 #include <utility>
@@ -40,9 +39,8 @@ EditorBuiltinPluginFactory EditorBuiltinPluginRegistry::findFactory(std::string_
     return it != factories.end() ? it->second : EditorBuiltinPluginFactory{};
 }
 
-EditorBuiltinPluginFactoryRegistration::EditorBuiltinPluginFactoryRegistration(
-    std::string plugin_id,
-    EditorBuiltinPluginFactory factory)
+EditorBuiltinPluginFactoryRegistration::EditorBuiltinPluginFactoryRegistration(std::string plugin_id,
+                                                                               EditorBuiltinPluginFactory factory)
 {
     (void) registerBuiltinEditorPluginFactory(std::move(plugin_id), std::move(factory));
 }

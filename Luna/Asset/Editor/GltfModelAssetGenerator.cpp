@@ -1,6 +1,5 @@
-#include "Asset/Editor/GltfModelAssetGenerator.h"
-
 #include "Asset/AssetDatabase.h"
+#include "Asset/Editor/GltfModelAssetGenerator.h"
 #include "Asset/Editor/Importer.h"
 #include "Asset/Editor/MaterialFactory.h"
 #include "Asset/Editor/MaterialImporter.h"
@@ -10,27 +9,27 @@
 #include "Core/Log.h"
 #include "Project/ProjectManager.h"
 
-#include <algorithm>
-#include <array>
 #include <cctype>
 #include <cstdint>
-#include <glm/geometric.hpp>
-#include <filesystem>
-#include <fstream>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <variant>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 
+#include <algorithm>
+#include <array>
 #include <fastgltf/core.hpp>
 #include <fastgltf/math.hpp>
 #include <fastgltf/types.hpp>
+#include <filesystem>
+#include <fstream>
+#include <glm/geometric.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 #include <yaml-cpp/yaml.h>
 
 namespace luna::gltf_model_asset_generator_detail {
@@ -123,8 +122,7 @@ bool hasSupportedTextureExtension(const std::filesystem::path& texture_path)
     const std::array<std::string_view, 9> supported_extensions{
         ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".hdr", ".dds", ".ktx", ".ktx2"};
 
-    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) !=
-           supported_extensions.end();
+    return std::find(supported_extensions.begin(), supported_extensions.end(), extension) != supported_extensions.end();
 }
 
 std::optional<std::filesystem::path> makeRelativeToProject(const std::filesystem::path& path)
@@ -162,8 +160,7 @@ fastgltf::Extensions supportedGltfExtensions()
 {
     return fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_mesh_quantization |
            fastgltf::Extensions::MSFT_texture_dds | fastgltf::Extensions::EXT_texture_webp |
-           fastgltf::Extensions::KHR_materials_unlit |
-           fastgltf::Extensions::KHR_materials_emissive_strength;
+           fastgltf::Extensions::KHR_materials_unlit | fastgltf::Extensions::KHR_materials_emissive_strength;
 }
 
 fastgltf::Category companionParseCategories()
@@ -182,10 +179,8 @@ std::optional<fastgltf::Asset> loadGltfForCompanionGeneration(const std::filesys
     }
 
     fastgltf::Parser parser(supportedGltfExtensions());
-    auto asset = parser.loadGltf(data.get(),
-                                 gltf_path.parent_path(),
-                                 fastgltf::Options::DecomposeNodeMatrices,
-                                 companionParseCategories());
+    auto asset = parser.loadGltf(
+        data.get(), gltf_path.parent_path(), fastgltf::Options::DecomposeNodeMatrices, companionParseCategories());
     if (asset.error() != fastgltf::Error::None) {
         return std::nullopt;
     }
@@ -216,9 +211,8 @@ std::optional<size_t> imageIndexForTexture(const fastgltf::Asset& asset, size_t 
     return std::nullopt;
 }
 
-std::optional<std::filesystem::path> externalImagePath(const fastgltf::Asset& asset,
-                                                       const std::filesystem::path& gltf_path,
-                                                       size_t texture_index)
+std::optional<std::filesystem::path>
+    externalImagePath(const fastgltf::Asset& asset, const std::filesystem::path& gltf_path, size_t texture_index)
 {
     const auto image_index = imageIndexForTexture(asset, texture_index);
     if (!image_index.has_value() || *image_index >= asset.images.size()) {
@@ -268,8 +262,8 @@ AssetMetadata ensureTextureMetadata(const std::filesystem::path& texture_path,
                                     GltfModelAssetGenerator::GenerateResult& result)
 {
     AssetMetadata metadata;
-    if (texture_path.empty() || !std::filesystem::exists(texture_path) ||
-        !hasSupportedTextureExtension(texture_path) || !makeRelativeToProject(texture_path).has_value()) {
+    if (texture_path.empty() || !std::filesystem::exists(texture_path) || !hasSupportedTextureExtension(texture_path) ||
+        !makeRelativeToProject(texture_path).has_value()) {
         return metadata;
     }
 
@@ -350,10 +344,9 @@ MaterialAssetDescriptor makeMaterialDescriptor(const fastgltf::Asset& asset,
                                                    gltf_material.pbrData.baseColorFactor[1],
                                                    gltf_material.pbrData.baseColorFactor[2],
                                                    gltf_material.pbrData.baseColorFactor[3]);
-    descriptor.Surface.EmissiveFactor = glm::vec3(gltf_material.emissiveFactor[0],
-                                                  gltf_material.emissiveFactor[1],
-                                                  gltf_material.emissiveFactor[2]) *
-                                        static_cast<float>(gltf_material.emissiveStrength);
+    descriptor.Surface.EmissiveFactor =
+        glm::vec3(gltf_material.emissiveFactor[0], gltf_material.emissiveFactor[1], gltf_material.emissiveFactor[2]) *
+        static_cast<float>(gltf_material.emissiveStrength);
     descriptor.Surface.MetallicFactor = static_cast<float>(gltf_material.pbrData.metallicFactor);
     descriptor.Surface.RoughnessFactor = static_cast<float>(gltf_material.pbrData.roughnessFactor);
     descriptor.Surface.AlphaCutoff = static_cast<float>(gltf_material.alphaCutoff);
@@ -368,37 +361,20 @@ MaterialAssetDescriptor makeMaterialDescriptor(const fastgltf::Asset& asset,
         descriptor.Surface.OcclusionStrength = static_cast<float>(gltf_material.occlusionTexture->strength);
     }
 
-    descriptor.Textures.BaseColor = textureHandleForInfo(asset,
-                                                         gltf_path,
-                                                         material_name,
-                                                         gltf_material.pbrData.baseColorTexture,
-                                                         TextureRole::BaseColor,
-                                                         result);
-    descriptor.Textures.Normal = textureHandleForInfo(asset,
-                                                      gltf_path,
-                                                      material_name,
-                                                      gltf_material.normalTexture,
-                                                      TextureRole::Normal,
-                                                      result);
-    descriptor.Textures.MetallicRoughness =
-        textureHandleForInfo(asset,
-                             gltf_path,
-                             material_name,
-                             gltf_material.pbrData.metallicRoughnessTexture,
-                             TextureRole::MetallicRoughness,
-                             result);
-    descriptor.Textures.Emissive = textureHandleForInfo(asset,
-                                                        gltf_path,
-                                                        material_name,
-                                                        gltf_material.emissiveTexture,
-                                                        TextureRole::Emissive,
-                                                        result);
-    descriptor.Textures.Occlusion = textureHandleForInfo(asset,
-                                                         gltf_path,
-                                                         material_name,
-                                                         gltf_material.occlusionTexture,
-                                                         TextureRole::Occlusion,
-                                                         result);
+    descriptor.Textures.BaseColor = textureHandleForInfo(
+        asset, gltf_path, material_name, gltf_material.pbrData.baseColorTexture, TextureRole::BaseColor, result);
+    descriptor.Textures.Normal =
+        textureHandleForInfo(asset, gltf_path, material_name, gltf_material.normalTexture, TextureRole::Normal, result);
+    descriptor.Textures.MetallicRoughness = textureHandleForInfo(asset,
+                                                                 gltf_path,
+                                                                 material_name,
+                                                                 gltf_material.pbrData.metallicRoughnessTexture,
+                                                                 TextureRole::MetallicRoughness,
+                                                                 result);
+    descriptor.Textures.Emissive = textureHandleForInfo(
+        asset, gltf_path, material_name, gltf_material.emissiveTexture, TextureRole::Emissive, result);
+    descriptor.Textures.Occlusion = textureHandleForInfo(
+        asset, gltf_path, material_name, gltf_material.occlusionTexture, TextureRole::Occlusion, result);
 
     return descriptor;
 }
@@ -448,8 +424,7 @@ std::vector<GeneratedMaterial> ensureGeneratedMaterials(const fastgltf::Asset& a
     for (size_t material_index = 0; material_index < asset.materials.size(); ++material_index) {
         const fastgltf::Material& gltf_material = asset.materials[material_index];
         const std::string gltf_material_name =
-            gltf_material.name.empty() ? "Material_" + std::to_string(material_index)
-                                       : std::string(gltf_material.name);
+            gltf_material.name.empty() ? "Material_" + std::to_string(material_index) : std::string(gltf_material.name);
         const std::string material_name = model_stem + "_" + sanitizeFileStem(gltf_material_name);
         const std::filesystem::path material_path =
             material_directory / (std::to_string(material_index) + "_" + material_name + ".lunamat");
@@ -518,11 +493,8 @@ std::vector<GeneratedMeshInfo> buildMeshInfos(const fastgltf::Asset& asset,
     return mesh_infos;
 }
 
-GeneratedNode makeGeneratedNode(std::string name,
-                                int32_t parent,
-                                glm::vec3 translation,
-                                glm::vec3 rotation,
-                                glm::vec3 scale)
+GeneratedNode
+    makeGeneratedNode(std::string name, int32_t parent, glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale)
 {
     GeneratedNode node;
     node.Name = std::move(name);
@@ -833,8 +805,7 @@ GltfModelAssetGenerator::GenerateResult
     }
 
     const std::filesystem::path model_path = gltf_path.parent_path() / (gltf_path.stem().string() + ".lmodel");
-    const std::vector<GeneratedMaterial> generated_materials =
-        ensureGeneratedMaterials(*asset, gltf_path, result);
+    const std::vector<GeneratedMaterial> generated_materials = ensureGeneratedMaterials(*asset, gltf_path, result);
     const std::vector<GeneratedMeshInfo> mesh_infos = buildMeshInfos(*asset, generated_materials);
     const std::vector<GeneratedNode> nodes = buildGeneratedNodes(*asset, gltf_path, mesh_metadata.Handle, mesh_infos);
 

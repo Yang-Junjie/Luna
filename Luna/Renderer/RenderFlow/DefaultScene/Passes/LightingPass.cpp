@@ -1,13 +1,12 @@
-#include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
-
 #include "Core/Log.h"
+#include "Renderer/RendererUtilities.h"
 #include "Renderer/RenderFlow/DefaultScene/Constants.h"
+#include "Renderer/RenderFlow/DefaultScene/Passes/LightingPass.h"
 #include "Renderer/RenderFlow/DefaultScene/Passes/PassCommon.h"
 #include "Renderer/RenderFlow/DefaultScene/PipelineResources.h"
 #include "Renderer/RenderFlow/LightingExtensionInputs.h"
 #include "Renderer/RenderFlow/RenderBlackboardKeys.h"
 #include "Renderer/RenderGraphBuilder.h"
-#include "Renderer/RendererUtilities.h"
 
 #include <array>
 
@@ -58,7 +57,9 @@ RenderGraphTextureDesc makeSceneHdrColorDesc(const SceneRenderContext& scene_con
 
 } // namespace
 
-LightingPass::LightingPass(PassSharedState& state) : m_state(&state) {}
+LightingPass::LightingPass(PassSharedState& state)
+    : m_state(&state)
+{}
 
 const char* LightingPass::name() const noexcept
 {
@@ -73,7 +74,8 @@ std::span<const RenderPassResourceUsage> LightingPass::resourceUsages() const no
 void LightingPass::setup(RenderPassContext& context)
 {
     const SceneRenderContext& scene_context = context.sceneContext();
-    const RenderGraphTextureHandle scene_hdr_color = context.graph().CreateTexture(makeSceneHdrColorDesc(scene_context));
+    const RenderGraphTextureHandle scene_hdr_color =
+        context.graph().CreateTexture(makeSceneHdrColorDesc(scene_context));
     if (!scene_hdr_color.isValid()) {
         return;
     }
@@ -88,8 +90,7 @@ void LightingPass::setup(RenderPassContext& context)
     };
     const RenderGraphTextureHandle shadow_map =
         readBlackboardTexture(context.blackboard(), blackboard::ShadowMap, name());
-    const RenderGraphTextureHandle pick_texture =
-        readBlackboardTexture(context.blackboard(), blackboard::Pick, name());
+    const RenderGraphTextureHandle pick_texture = readBlackboardTexture(context.blackboard(), blackboard::Pick, name());
     const LightingExtensionInputSet extension_inputs = getLightingExtensionInputs(context.blackboard());
 
     context.graph().AddRasterPass(
@@ -108,11 +109,12 @@ void LightingPass::setup(RenderPassContext& context)
                                     RHI::AttachmentLoadOp::Clear,
                                     RHI::AttachmentStoreOp::Store,
                                     RHI::ClearValue::ColorFloat(scene_context.clear_color.r,
-                                                                     scene_context.clear_color.g,
-                                                                     scene_context.clear_color.b,
-                                                                     scene_context.clear_color.a));
+                                                                scene_context.clear_color.g,
+                                                                scene_context.clear_color.b,
+                                                                scene_context.clear_color.a));
         },
-        [this, scene_context, gbuffer, shadow_map, pick_texture, extension_inputs](RenderGraphRasterPassContext& pass_context) {
+        [this, scene_context, gbuffer, shadow_map, pick_texture, extension_inputs](
+            RenderGraphRasterPassContext& pass_context) {
             execute(pass_context, scene_context, gbuffer, shadow_map, pick_texture, extension_inputs);
         });
 
@@ -149,12 +151,12 @@ void LightingPass::execute(RenderGraphRasterPassContext& pass_context,
 
     const LightingPassResources pass_resources = pipelines.lightingPassResources();
     if (!pass_resources.isValid()) {
-        LUNA_RENDERER_ERROR(
-            "Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} lighting_scene_descriptor_set={} gbuffer_sampler={}",
-            static_cast<bool>(pass_resources.pipeline),
-            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
-            static_cast<bool>(pass_resources.scene_descriptor_set),
-            static_cast<bool>(pass_resources.gbuffer_sampler));
+        LUNA_RENDERER_ERROR("Scene lighting pass aborted: lighting_pipeline={} gbuffer_descriptor_set={} "
+                            "lighting_scene_descriptor_set={} gbuffer_sampler={}",
+                            static_cast<bool>(pass_resources.pipeline),
+                            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
+                            static_cast<bool>(pass_resources.scene_descriptor_set),
+                            static_cast<bool>(pass_resources.gbuffer_sampler));
         return;
     }
 
@@ -169,7 +171,8 @@ void LightingPass::execute(RenderGraphRasterPassContext& pass_context,
         resolveLightingExtensionInputTextures(pass_context, extension_inputs);
     if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao ||
         !velocity_texture || !shadow_map || !pick_texture) {
-        LUNA_RENDERER_WARN("Scene lighting pass aborted because one or more lighting textures are missing: base={} normal={} position={} emissive={} velocity={} shadow={} pick={}",
+        LUNA_RENDERER_WARN("Scene lighting pass aborted because one or more lighting textures are missing: base={} "
+                           "normal={} position={} emissive={} velocity={} shadow={} pick={}",
                            static_cast<bool>(gbuffer_base_color),
                            static_cast<bool>(gbuffer_normal_metallic),
                            static_cast<bool>(gbuffer_world_position_roughness),
@@ -212,12 +215,12 @@ void LightingPass::executeDebugView(RenderGraphRasterPassContext& pass_context,
 
     const DebugViewPassResources pass_resources = pipelines.debugViewPassResources();
     if (!pass_resources.isValid()) {
-        LUNA_RENDERER_ERROR(
-            "Scene debug view pass aborted: debug_pipeline={} gbuffer_descriptor_set={} scene_descriptor_set={} gbuffer_sampler={}",
-            static_cast<bool>(pass_resources.pipeline),
-            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
-            static_cast<bool>(pass_resources.scene_descriptor_set),
-            static_cast<bool>(pass_resources.gbuffer_sampler));
+        LUNA_RENDERER_ERROR("Scene debug view pass aborted: debug_pipeline={} gbuffer_descriptor_set={} "
+                            "scene_descriptor_set={} gbuffer_sampler={}",
+                            static_cast<bool>(pass_resources.pipeline),
+                            static_cast<bool>(pass_resources.gbuffer_descriptor_set),
+                            static_cast<bool>(pass_resources.scene_descriptor_set),
+                            static_cast<bool>(pass_resources.gbuffer_sampler));
         return;
     }
 
@@ -229,7 +232,8 @@ void LightingPass::executeDebugView(RenderGraphRasterPassContext& pass_context,
     const auto& pick_texture = pass_context.getTexture(pick_texture_handle);
     if (!gbuffer_base_color || !gbuffer_normal_metallic || !gbuffer_world_position_roughness || !gbuffer_emissive_ao ||
         !velocity_texture || !pick_texture) {
-        LUNA_RENDERER_WARN("Scene debug view pass aborted because one or more textures are missing: base={} normal={} position={} emissive={} velocity={} pick={}",
+        LUNA_RENDERER_WARN("Scene debug view pass aborted because one or more textures are missing: base={} normal={} "
+                           "position={} emissive={} velocity={} pick={}",
                            static_cast<bool>(gbuffer_base_color),
                            static_cast<bool>(gbuffer_normal_metallic),
                            static_cast<bool>(gbuffer_world_position_roughness),

@@ -113,7 +113,8 @@ inline std::shared_ptr<Material> loadFromYaml(const std::filesystem::path& path,
         textures.Normal = loadTextureRelative(path.parent_path(), textures_node, "Normal", asset_name + "_Normal");
         textures.MetallicRoughness = loadTextureRelative(
             path.parent_path(), textures_node, "MetallicRoughness", asset_name + "_MetallicRoughness");
-        textures.Metallic = loadTextureRelative(path.parent_path(), textures_node, "Metallic", asset_name + "_Metallic");
+        textures.Metallic =
+            loadTextureRelative(path.parent_path(), textures_node, "Metallic", asset_name + "_Metallic");
         textures.Roughness =
             loadTextureRelative(path.parent_path(), textures_node, "Roughness", asset_name + "_Roughness");
         textures.Emissive =
@@ -195,7 +196,8 @@ inline std::shared_ptr<Material> loadFromMtl(const std::filesystem::path& path, 
     Material::TextureSet textures;
     textures.BaseColor = load_texture(selected_material->diffuse_texname, "_BaseColor");
     textures.Normal = load_texture(selected_material->normal_texname, "_Normal");
-    if (!selected_material->metallic_texname.empty() && selected_material->metallic_texname == selected_material->roughness_texname) {
+    if (!selected_material->metallic_texname.empty() &&
+        selected_material->metallic_texname == selected_material->roughness_texname) {
         textures.MetallicRoughness = load_texture(selected_material->metallic_texname, "_MetallicRoughness");
     } else {
         textures.Metallic = load_texture(selected_material->metallic_texname, "_Metallic");

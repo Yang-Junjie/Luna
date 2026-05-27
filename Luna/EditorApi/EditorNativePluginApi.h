@@ -3,37 +3,37 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define LUNA_EDITOR_HOST_API_VERSION 1u
-#define LUNA_EDITOR_PLUGIN_API_VERSION 1u
-#define LUNA_EDITOR_LOG_API_VERSION 1u
-#define LUNA_EDITOR_UI_API_VERSION 1u
-#define LUNA_EDITOR_COMMAND_API_VERSION 1u
-#define LUNA_EDITOR_WINDOW_API_VERSION 1u
-#define LUNA_EDITOR_ASSET_API_VERSION 1u
-#define LUNA_EDITOR_PLUGIN_ASSET_API_VERSION 1u
-#define LUNA_EDITOR_MENU_API_VERSION 1u
-#define LUNA_EDITOR_PROJECT_API_VERSION 1u
-#define LUNA_EDITOR_SCENE_API_VERSION 1u
-#define LUNA_EDITOR_SELECTION_API_VERSION 1u
-#define LUNA_EDITOR_VIEWPORT_API_VERSION 1u
-#define LUNA_EDITOR_RUNTIME_VIEWPORT_API_VERSION 1u
-#define LUNA_EDITOR_SCENE_CAMERA_COMPONENT_API_VERSION 1u
-#define LUNA_EDITOR_SCENE_LIGHT_COMPONENT_API_VERSION 1u
-#define LUNA_EDITOR_SCENE_MESH_COMPONENT_API_VERSION 1u
-#define LUNA_EDITOR_COMMAND_DESCRIPTOR_API_VERSION 1u
-#define LUNA_EDITOR_WINDOW_DESCRIPTOR_API_VERSION 1u
-#define LUNA_EDITOR_ASSET_INFO_API_VERSION 1u
-#define LUNA_EDITOR_ASSET_REFRESH_RESULT_API_VERSION 1u
-#define LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION 1u
-#define LUNA_EDITOR_PROJECT_INFO_API_VERSION 1u
-#define LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION 1u
+#define LUNA_EDITOR_HOST_API_VERSION                        1u
+#define LUNA_EDITOR_PLUGIN_API_VERSION                      1u
+#define LUNA_EDITOR_LOG_API_VERSION                         1u
+#define LUNA_EDITOR_UI_API_VERSION                          1u
+#define LUNA_EDITOR_COMMAND_API_VERSION                     1u
+#define LUNA_EDITOR_WINDOW_API_VERSION                      1u
+#define LUNA_EDITOR_ASSET_API_VERSION                       1u
+#define LUNA_EDITOR_PLUGIN_ASSET_API_VERSION                1u
+#define LUNA_EDITOR_MENU_API_VERSION                        1u
+#define LUNA_EDITOR_PROJECT_API_VERSION                     1u
+#define LUNA_EDITOR_SCENE_API_VERSION                       1u
+#define LUNA_EDITOR_SELECTION_API_VERSION                   1u
+#define LUNA_EDITOR_VIEWPORT_API_VERSION                    1u
+#define LUNA_EDITOR_RUNTIME_VIEWPORT_API_VERSION            1u
+#define LUNA_EDITOR_SCENE_CAMERA_COMPONENT_API_VERSION      1u
+#define LUNA_EDITOR_SCENE_LIGHT_COMPONENT_API_VERSION       1u
+#define LUNA_EDITOR_SCENE_MESH_COMPONENT_API_VERSION        1u
+#define LUNA_EDITOR_COMMAND_DESCRIPTOR_API_VERSION          1u
+#define LUNA_EDITOR_WINDOW_DESCRIPTOR_API_VERSION           1u
+#define LUNA_EDITOR_ASSET_INFO_API_VERSION                  1u
+#define LUNA_EDITOR_ASSET_REFRESH_RESULT_API_VERSION        1u
+#define LUNA_EDITOR_MENU_ITEM_DESCRIPTOR_API_VERSION        1u
+#define LUNA_EDITOR_PROJECT_INFO_API_VERSION                1u
+#define LUNA_EDITOR_SCENE_ENTITY_INFO_API_VERSION           1u
 #define LUNA_EDITOR_SCENE_ENTITY_CREATE_REQUEST_API_VERSION 1u
-#define LUNA_EDITOR_CREATE_PLUGIN_SYMBOL "LunaCreateEditorPlugin"
+#define LUNA_EDITOR_CREATE_PLUGIN_SYMBOL                    "LunaCreateEditorPlugin"
 
 #if defined(_WIN32)
-#    define LUNA_EDITOR_PLUGIN_EXPORT __declspec(dllexport)
+#define LUNA_EDITOR_PLUGIN_EXPORT __declspec(dllexport)
 #else
-#    define LUNA_EDITOR_PLUGIN_EXPORT __attribute__((visibility("default")))
+#define LUNA_EDITOR_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
 #ifdef __cplusplus
@@ -184,11 +184,7 @@ typedef struct LunaEditorUiApi {
     uint32_t api_version;
     void* api_user_data;
 
-    int (*begin_window)(void* api_user_data,
-                        const char* id,
-                        const char* title,
-                        int* open,
-                        uint32_t flags);
+    int (*begin_window)(void* api_user_data, const char* id, const char* title, int* open, uint32_t flags);
     void (*end_window)(void* api_user_data);
 
     void (*text)(void* api_user_data, const char* value);
@@ -207,26 +203,14 @@ typedef struct LunaEditorUiApi {
     void (*content_region_avail)(void* api_user_data, LunaEditorVec2* out_value);
     void (*window_framebuffer_scale)(void* api_user_data, LunaEditorVec2* out_value);
 
-    int (*button)(void* api_user_data,
-                  const char* label,
-                  const LunaEditorVec2* size,
-                  uint32_t variant);
+    int (*button)(void* api_user_data, const char* label, const LunaEditorVec2* size, uint32_t variant);
     int (*checkbox)(void* api_user_data, const char* label, int* value);
     int (*color_edit3)(void* api_user_data, const char* label, LunaEditorVec3* value);
     int (*color_edit4)(void* api_user_data, const char* label, LunaEditorVec4* value);
     int (*slider_int)(void* api_user_data, const char* label, int* value, int min_value, int max_value);
-    int (*slider_float)(void* api_user_data,
-                        const char* label,
-                        float* value,
-                        float min_value,
-                        float max_value,
-                        const char* format);
-    int (*drag_int)(void* api_user_data,
-                    const char* label,
-                    int* value,
-                    float speed,
-                    int min_value,
-                    int max_value);
+    int (*slider_float)(
+        void* api_user_data, const char* label, float* value, float min_value, float max_value, const char* format);
+    int (*drag_int)(void* api_user_data, const char* label, int* value, float speed, int min_value, int max_value);
     int (*drag_float)(void* api_user_data,
                       const char* label,
                       float* value,
@@ -242,11 +226,8 @@ typedef struct LunaEditorUiApi {
                        float max_value,
                        const char* format);
     int (*input_text)(void* api_user_data, const char* label, char* value, size_t buffer_size);
-    int (*input_text_with_hint)(void* api_user_data,
-                                const char* label,
-                                const char* hint,
-                                char* value,
-                                size_t buffer_size);
+    int (*input_text_with_hint)(
+        void* api_user_data, const char* label, const char* hint, char* value, size_t buffer_size);
 
     int (*tree_node)(void* api_user_data, const char* label);
     int (*tree_node_ex)(void* api_user_data, const char* id, const char* label, uint32_t flags);
@@ -284,16 +265,10 @@ typedef struct LunaEditorUiApi {
     float (*scale)(void* api_user_data, float value);
     void (*scaled)(void* api_user_data, const LunaEditorVec2* value, LunaEditorVec2* out_value);
 
-    int (*begin_table)(void* api_user_data,
-                       const char* id,
-                       int column_count,
-                       uint32_t flags,
-                       const LunaEditorVec2* outer_size);
+    int (*begin_table)(
+        void* api_user_data, const char* id, int column_count, uint32_t flags, const LunaEditorVec2* outer_size);
     void (*end_table)(void* api_user_data);
-    void (*table_setup_column)(void* api_user_data,
-                               const char* label,
-                               uint32_t flags,
-                               float init_width_or_weight);
+    void (*table_setup_column)(void* api_user_data, const char* label, uint32_t flags, float init_width_or_weight);
     void (*table_headers_row)(void* api_user_data);
     void (*table_next_row)(void* api_user_data);
     int (*table_next_column)(void* api_user_data);
@@ -603,21 +578,24 @@ typedef struct LunaEditorSceneApi {
     size_t (*entity_count)(void* api_user_data);
     int (*can_edit_scene)(void* api_user_data);
     int (*open_scene_file)(void* api_user_data, const char* scene_file_path);
-    size_t (*enumerate_entities)(void* api_user_data,
-                                 void* user_data,
-                                 LunaEditorEnumerateSceneEntityFn enumerate_fn);
+    size_t (*enumerate_entities)(void* api_user_data, void* user_data, LunaEditorEnumerateSceneEntityFn enumerate_fn);
     int (*entity_exists)(void* api_user_data, uint64_t entity_id);
     int (*entity_info)(void* api_user_data, uint64_t entity_id, LunaEditorSceneEntityInfo* out_info);
     int (*is_entity_descendant_of)(void* api_user_data, uint64_t entity_id, uint64_t potential_ancestor_id);
     uint64_t (*create_entity)(void* api_user_data, const char* name);
     uint64_t (*create_entity_ex)(void* api_user_data, const LunaEditorSceneEntityCreateRequest* request);
     int (*destroy_entity)(void* api_user_data, uint64_t entity_id);
-    int (*reparent_entity)(void* api_user_data, uint64_t entity_id, uint64_t new_parent_id, int preserve_world_transform);
+    int (*reparent_entity)(void* api_user_data,
+                           uint64_t entity_id,
+                           uint64_t new_parent_id,
+                           int preserve_world_transform);
     int (*set_entity_name)(void* api_user_data, uint64_t entity_id, const char* name);
     int (*get_entity_transform)(void* api_user_data, uint64_t entity_id, LunaEditorSceneTransform* out_transform);
     int (*set_entity_transform)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneTransform* transform);
     int (*get_camera_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneCameraComponent* out_component);
-    int (*set_camera_component)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneCameraComponent* component);
+    int (*set_camera_component)(void* api_user_data,
+                                uint64_t entity_id,
+                                const LunaEditorSceneCameraComponent* component);
     int (*get_light_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneLightComponent* out_component);
     int (*set_light_component)(void* api_user_data, uint64_t entity_id, const LunaEditorSceneLightComponent* component);
     int (*get_mesh_component)(void* api_user_data, uint64_t entity_id, LunaEditorSceneMeshComponent* out_component);

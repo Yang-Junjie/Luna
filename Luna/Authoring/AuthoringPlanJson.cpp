@@ -1,13 +1,13 @@
 #include "AuthoringPlanJson.h"
 
-#include <nlohmann/json.hpp>
-
 #include <cmath>
+
 #include <exception>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <istream>
+#include <nlohmann/json.hpp>
 #include <ostream>
 #include <string>
 #include <string_view>
@@ -115,13 +115,8 @@ bool validateCommandFields(const PlanJsonContext& context,
                            std::string_view command,
                            std::initializer_list<std::string_view> allowed_fields)
 {
-    return validateObjectFields(context,
-                                node,
-                                "commands[" + std::to_string(command_index) + "]",
-                                allowed_fields,
-                                command_index,
-                                true,
-                                command);
+    return validateObjectFields(
+        context, node, "commands[" + std::to_string(command_index) + "]", allowed_fields, command_index, true, command);
 }
 
 bool readStringValue(const PlanJsonContext& context,
@@ -427,13 +422,7 @@ bool parseCommand(const PlanJsonContext& context,
     }
 
     std::string op;
-    if (!readStringField(context,
-                         command_node,
-                         "op",
-                         commandFieldName(command_index, "op"),
-                         op,
-                         command_index,
-                         true)) {
+    if (!readStringField(context, command_node, "op", commandFieldName(command_index, "op"), op, command_index, true)) {
         return false;
     }
 
@@ -656,11 +645,8 @@ bool parseCommand(const PlanJsonContext& context,
                                      command.scale,
                                      command_index,
                                      op) &&
-               validateCommandFields(context,
-                                     command_node,
-                                     command_index,
-                                     op,
-                                     {"op", "entity", "translation", "rotationDeg", "scale"});
+               validateCommandFields(
+                   context, command_node, command_index, op, {"op", "entity", "translation", "rotationDeg", "scale"});
     }
 
     if (op == "light-intensity") {
@@ -734,11 +720,8 @@ bool parseCommand(const PlanJsonContext& context,
                               command.far_plane,
                               command_index,
                               op) &&
-               validateCommandFields(context,
-                                     command_node,
-                                     command_index,
-                                     op,
-                                     {"op", "entity", "fovDeg", "near", "far"});
+               validateCommandFields(
+                   context, command_node, command_index, op, {"op", "entity", "fovDeg", "near", "far"});
     }
 
     if (op == "camera-orthographic") {
@@ -772,11 +755,7 @@ bool parseCommand(const PlanJsonContext& context,
                               command.far_plane,
                               command_index,
                               op) &&
-               validateCommandFields(context,
-                                     command_node,
-                                     command_index,
-                                     op,
-                                     {"op", "entity", "size", "near", "far"});
+               validateCommandFields(context, command_node, command_index, op, {"op", "entity", "size", "near", "far"});
     }
 
     if (op == "inspect") {
@@ -873,11 +852,8 @@ bool parseCommand(const PlanJsonContext& context,
                                    command_index,
                                    true,
                                    op) &&
-                   validateCommandFields(context,
-                                         command_node,
-                                         command_index,
-                                         op,
-                                         {"op", "check", "entity", "component"});
+                   validateCommandFields(
+                       context, command_node, command_index, op, {"op", "check", "entity", "component"});
         }
         if (check == "entityCountAtLeast") {
             command.kind = AuthoringCommandKind::VerifyEntityCountAtLeast;

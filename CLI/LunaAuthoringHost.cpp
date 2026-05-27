@@ -19,11 +19,11 @@ namespace {
 
 using Json = luna::authoring::Json;
 
-constexpr int kParseError = -32700;
-constexpr int kInvalidRequest = -32600;
-constexpr int kMethodNotFound = -32601;
-constexpr int kInvalidParams = -32602;
-constexpr int kInternalError = -32603;
+constexpr int kParseError = -32'700;
+constexpr int kInvalidRequest = -32'600;
+constexpr int kMethodNotFound = -32'601;
+constexpr int kInvalidParams = -32'602;
+constexpr int kInternalError = -32'603;
 
 struct HostState {
     luna::Scene scene;
@@ -71,9 +71,7 @@ Json makeError(const Json& id, int code, std::string message, Json data = nullpt
     return response;
 }
 
-bool loadPlanFromJson(const Json& input,
-                      luna::authoring::AuthoringPlan& plan,
-                      Json& error_data)
+bool loadPlanFromJson(const Json& input, luna::authoring::AuthoringPlan& plan, Json& error_data)
 {
     std::istringstream stream(input.dump());
     std::vector<std::string> errors;

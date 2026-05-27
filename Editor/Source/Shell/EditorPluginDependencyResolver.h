@@ -8,12 +8,11 @@ namespace luna::editor {
 
 struct EditorPluginPackage;
 
-[[nodiscard]] std::vector<std::string> missingEditorPluginDependencies(
-    const EditorPluginPackage& package,
-    const std::unordered_set<std::string>& loaded_plugin_ids);
+[[nodiscard]] std::vector<std::string>
+    missingEditorPluginDependencies(const EditorPluginPackage& package,
+                                    const std::unordered_set<std::string>& loaded_plugin_ids);
 
-[[nodiscard]] bool areEditorPluginDependenciesLoaded(
-    const EditorPluginPackage& package,
-    const std::unordered_set<std::string>& loaded_plugin_ids);
+[[nodiscard]] bool areEditorPluginDependenciesLoaded(const EditorPluginPackage& package,
+                                                     const std::unordered_set<std::string>& loaded_plugin_ids);
 
 } // namespace luna::editor

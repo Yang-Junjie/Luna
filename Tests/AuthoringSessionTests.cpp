@@ -74,8 +74,7 @@ bool sameVec3(const glm::vec3& lhs, const glm::vec3& rhs)
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
 }
 
-bool hasEventType(const std::vector<luna::authoring::AuthoringEvent>& events,
-                  luna::authoring::AuthoringEventType type)
+bool hasEventType(const std::vector<luna::authoring::AuthoringEvent>& events, luna::authoring::AuthoringEventType type)
 {
     return std::any_of(events.begin(), events.end(), [type](const auto& event) {
         return event.type == type;
@@ -126,8 +125,7 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
 
     context.expect(session.reparentEntity(spot_light, point_light, false),
                    "reparent helper should move an entity under a new parent");
-    context.expect(spot_light.getParentUUID() == point_light.getUUID(),
-                   "spot light should remember the new parent");
+    context.expect(spot_light.getParentUUID() == point_light.getUUID(), "spot light should remember the new parent");
 
     luna::SceneEnvironmentSettings environment_settings = scene.environmentSettings();
     environment_settings.backgroundMode = luna::SceneBackgroundMode::SolidColor;
@@ -138,15 +136,12 @@ void testAuthoringSessionSceneLifecycle(TestContext& context)
 
     luna::SceneShadowSettings shadow_settings = scene.shadowSettings();
     shadow_settings.mode = luna::SceneShadowMode::None;
-    context.expect(session.setSceneShadowSettings(shadow_settings),
-                   "setting scene shadows should report a change");
+    context.expect(session.setSceneShadowSettings(shadow_settings), "setting scene shadows should report a change");
 
-    context.expect(session.setEntityName(point_light, "Key Point Light"),
-                   "entity rename should report a change");
+    context.expect(session.setEntityName(point_light, "Key Point Light"), "entity rename should report a change");
     luna::TransformComponent point_transform = point_light.transform();
     point_transform.translation = {1.0f, 2.0f, 3.0f};
-    context.expect(session.setEntityTransform(point_light, point_transform),
-                   "transform update should report a change");
+    context.expect(session.setEntityTransform(point_light, point_transform), "transform update should report a change");
 
     luna::CameraComponent camera_component = bootstrap.camera.getComponent<luna::CameraComponent>();
     camera_component.primary = false;
@@ -280,10 +275,8 @@ void testAuthoringSessionHistory(TestContext& context)
                    "created entity should increase entity count");
 
     context.expect(session.undo(), "undo should restore the scene before entity creation");
-    context.expect(scene.entityManager().entityCount() == bootstrap_count,
-                   "undo should remove created entity");
-    context.expect(!scene.entityManager().containsEntity(entity_id),
-                   "undo should remove created entity UUID");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count, "undo should remove created entity");
+    context.expect(!scene.entityManager().containsEntity(entity_id), "undo should remove created entity UUID");
     context.expect(session.canRedo(), "undo should enable redo");
 
     context.expect(session.redo(), "redo should restore entity creation");
@@ -294,8 +287,7 @@ void testAuthoringSessionHistory(TestContext& context)
 
     luna::TransformComponent transform = entity.transform();
     transform.translation = {4.0f, 5.0f, 6.0f};
-    context.expect(session.setEntityTransform(entity, transform),
-                   "transform edit should create a history step");
+    context.expect(session.setEntityTransform(entity, transform), "transform edit should create a history step");
     context.expect(session.undo(), "undo should restore previous transform");
     entity = scene.entityManager().findEntityByUUID(entity_id);
     context.expect(entity && sameVec3(entity.transform().translation, glm::vec3{0.0f, 0.0f, 0.0f}),
@@ -317,8 +309,7 @@ void testAuthoringSessionHistory(TestContext& context)
     context.expect(session.undo(), "undo should revert the whole explicit transaction");
     context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
                    "batch undo should remove both batch entities");
-    context.expect(!scene.entityManager().containsEntity(first_id) &&
-                       !scene.entityManager().containsEntity(second_id),
+    context.expect(!scene.entityManager().containsEntity(first_id) && !scene.entityManager().containsEntity(second_id),
                    "batch undo should remove both entity UUIDs");
 
     const bool can_undo_before_rollback = session.canUndo();
@@ -329,10 +320,8 @@ void testAuthoringSessionHistory(TestContext& context)
     context.expect(session.rollbackTransaction(), "rollback transaction should restore previous state");
     context.expect(!scene.entityManager().containsEntity(rollback_entity_id),
                    "rollback should remove temporary entity");
-    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1,
-                   "rollback should preserve entity count");
-    context.expect(session.canUndo() == can_undo_before_rollback,
-                   "rollback should not add a new undo step");
+    context.expect(scene.entityManager().entityCount() == bootstrap_count + 1, "rollback should preserve entity count");
+    context.expect(session.canUndo() == can_undo_before_rollback, "rollback should not add a new undo step");
 }
 
 void testModelHierarchyRoundTrip(TestContext& context)
@@ -384,8 +373,8 @@ void testModelHierarchyRoundTrip(TestContext& context)
     luna::AssetDatabase::clear();
     luna::AssetManager::get().clear();
 
-    const luna::AssetHandle mesh_handle(9001);
-    const luna::AssetHandle model_handle(9002);
+    const luna::AssetHandle mesh_handle(9'001);
+    const luna::AssetHandle model_handle(9'002);
 
     std::vector<luna::SubMesh> sub_meshes;
     for (int submesh_index = 0; submesh_index < 2; ++submesh_index) {
@@ -437,7 +426,8 @@ void testModelHierarchyRoundTrip(TestContext& context)
                        "child node should keep its grandchild relation");
         context.expect(nodes[0].FirstSubmesh == 1 && nodes[0].SubmeshCount == 1,
                        "root node should preserve submesh range");
-        context.expect(nodes[0].SubmeshMaterials.size() == 1 && nodes[0].SubmeshMaterials[0] == luna::AssetHandle(9102),
+        context.expect(nodes[0].SubmeshMaterials.size() == 1 &&
+                           nodes[0].SubmeshMaterials[0] == luna::AssetHandle(9'102),
                        "root node should preserve submesh materials");
     }
 
@@ -471,12 +461,11 @@ void testModelHierarchyRoundTrip(TestContext& context)
                                "imported mesh component should preserve submesh count");
                 context.expect(mesh_component.getSubmeshMaterialCount() == 1,
                                "imported mesh component should keep the active material slot count");
-                context.expect(mesh_component.getSubmeshMaterial(0) == luna::AssetHandle(9102),
+                context.expect(mesh_component.getSubmeshMaterial(0) == luna::AssetHandle(9'102),
                                "imported mesh component should keep the source material binding");
             }
 
-            const luna::Entity child_node =
-                scene.entityManager().findEntityByUUID(root_node.getChildren().front());
+            const luna::Entity child_node = scene.entityManager().findEntityByUUID(root_node.getChildren().front());
             context.expect(child_node && child_node.getName() == "ChildNode",
                            "second imported node should keep its source name");
             if (child_node) {

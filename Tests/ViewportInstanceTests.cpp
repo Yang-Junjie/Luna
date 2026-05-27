@@ -32,7 +32,7 @@ private:
 luna::editor::TextureView validTexture(bool y_flip = false)
 {
     return luna::editor::TextureView{
-        .id = 0x1234u,
+        .id = 0x12'34u,
         .size = luna::editor::UVec2{.x = 128u, .y = 64u},
         .y_flip = y_flip,
     };

@@ -1,19 +1,17 @@
-#include "Rendering/EditorRenderingController.h"
-
 #include "Core/Application.h"
 #include "Imgui/ImGuiContext.h"
+#include "Renderer/Renderer.h"
 #include "Renderer/RenderFlow/RenderFeature.h"
 #include "Renderer/RenderProfileExporter.h"
-#include "Renderer/Renderer.h"
-
-#include <Backend.h>
-#include <Instance.h>
+#include "Rendering/EditorRenderingController.h"
 
 #include <algorithm>
 #include <array>
+#include <Backend.h>
 #include <exception>
 #include <glm/vec4.hpp>
 #include <imgui.h>
+#include <Instance.h>
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -34,21 +32,15 @@ constexpr std::array<RenderDebugModeItem, 19> kRenderDebugModes{{
     {luna::RenderDebugViewMode::HistoryValidity,
      luna::editor::RenderDebugViewMode::HistoryValidity,
      "History Validity"},
-    {luna::RenderDebugViewMode::ShadowCascades,
-     luna::editor::RenderDebugViewMode::ShadowCascades,
-     "Shadow Cascades"},
+    {luna::RenderDebugViewMode::ShadowCascades, luna::editor::RenderDebugViewMode::ShadowCascades, "Shadow Cascades"},
     {luna::RenderDebugViewMode::BaseColor, luna::editor::RenderDebugViewMode::BaseColor, "Base Color"},
     {luna::RenderDebugViewMode::Normal, luna::editor::RenderDebugViewMode::Normal, "Normal"},
     {luna::RenderDebugViewMode::Metallic, luna::editor::RenderDebugViewMode::Metallic, "Metallic"},
     {luna::RenderDebugViewMode::Roughness, luna::editor::RenderDebugViewMode::Roughness, "Roughness"},
-    {luna::RenderDebugViewMode::DirectLighting,
-     luna::editor::RenderDebugViewMode::DirectLighting,
-     "Direct Lighting"},
+    {luna::RenderDebugViewMode::DirectLighting, luna::editor::RenderDebugViewMode::DirectLighting, "Direct Lighting"},
     {luna::RenderDebugViewMode::SpecularIbl, luna::editor::RenderDebugViewMode::SpecularIbl, "Specular IBL"},
     {luna::RenderDebugViewMode::BloomInput, luna::editor::RenderDebugViewMode::BloomInput, "Bloom Input HDR"},
-    {luna::RenderDebugViewMode::BloomPrefilter,
-     luna::editor::RenderDebugViewMode::BloomPrefilter,
-     "Bloom Prefilter"},
+    {luna::RenderDebugViewMode::BloomPrefilter, luna::editor::RenderDebugViewMode::BloomPrefilter, "Bloom Prefilter"},
     {luna::RenderDebugViewMode::BloomMip0, luna::editor::RenderDebugViewMode::BloomMip0, "Bloom Mip 0"},
     {luna::RenderDebugViewMode::BloomMip1, luna::editor::RenderDebugViewMode::BloomMip1, "Bloom Mip 1"},
     {luna::RenderDebugViewMode::BloomMip2, luna::editor::RenderDebugViewMode::BloomMip2, "Bloom Mip 2"},
@@ -112,8 +104,7 @@ const char* renderGraphPassTypeToString(luna::RenderGraphPassType type)
     }
 }
 
-luna::editor::RenderGraphProfileSnapshot toEditorRenderGraphProfile(
-    const luna::RenderGraphProfileSnapshot& profile)
+luna::editor::RenderGraphProfileSnapshot toEditorRenderGraphProfile(const luna::RenderGraphProfileSnapshot& profile)
 {
     luna::editor::RenderGraphProfileSnapshot result{};
     result.frame_index = profile.FrameIndex;
@@ -173,8 +164,8 @@ luna::RenderGraphProfileSnapshot toEngineRenderGraphProfile(const luna::editor::
     return result;
 }
 
-luna::editor::RenderFeatureGraphResourceKind toEditorRenderFeatureGraphResourceKind(
-    luna::render_flow::RenderFeatureGraphResourceKind kind)
+luna::editor::RenderFeatureGraphResourceKind
+    toEditorRenderFeatureGraphResourceKind(luna::render_flow::RenderFeatureGraphResourceKind kind)
 {
     switch (kind) {
         case luna::render_flow::RenderFeatureGraphResourceKind::Texture:
@@ -185,8 +176,8 @@ luna::editor::RenderFeatureGraphResourceKind toEditorRenderFeatureGraphResourceK
     return luna::editor::RenderFeatureGraphResourceKind::Texture;
 }
 
-luna::editor::RenderFeatureGraphResourceFlags toEditorRenderFeatureGraphResourceFlags(
-    luna::render_flow::RenderFeatureGraphResourceFlags flags)
+luna::editor::RenderFeatureGraphResourceFlags
+    toEditorRenderFeatureGraphResourceFlags(luna::render_flow::RenderFeatureGraphResourceFlags flags)
 {
     using EditorFlags = luna::editor::RenderFeatureGraphResourceFlags;
     using EngineFlags = luna::render_flow::RenderFeatureGraphResourceFlags;
@@ -201,8 +192,8 @@ luna::editor::RenderFeatureGraphResourceFlags toEditorRenderFeatureGraphResource
     return result;
 }
 
-luna::editor::RenderFeatureGraphResource toEditorRenderFeatureGraphResource(
-    const luna::render_flow::RenderFeatureGraphResource& resource)
+luna::editor::RenderFeatureGraphResource
+    toEditorRenderFeatureGraphResource(const luna::render_flow::RenderFeatureGraphResource& resource)
 {
     return luna::editor::RenderFeatureGraphResource{
         .name = toOwnedString(resource.name),
@@ -211,8 +202,8 @@ luna::editor::RenderFeatureGraphResource toEditorRenderFeatureGraphResource(
     };
 }
 
-luna::editor::RenderPassResourceAccess toEditorRenderPassResourceAccess(
-    luna::render_flow::RenderPassResourceAccess access)
+luna::editor::RenderPassResourceAccess
+    toEditorRenderPassResourceAccess(luna::render_flow::RenderPassResourceAccess access)
 {
     switch (access) {
         case luna::render_flow::RenderPassResourceAccess::Read:
@@ -225,8 +216,8 @@ luna::editor::RenderPassResourceAccess toEditorRenderPassResourceAccess(
     return luna::editor::RenderPassResourceAccess::Read;
 }
 
-luna::editor::RenderPassResourceUsage toEditorRenderPassResourceUsage(
-    const luna::render_flow::RenderPassResourceUsage& resource)
+luna::editor::RenderPassResourceUsage
+    toEditorRenderPassResourceUsage(const luna::render_flow::RenderPassResourceUsage& resource)
 {
     return luna::editor::RenderPassResourceUsage{
         .name = toOwnedString(resource.name),
@@ -236,8 +227,8 @@ luna::editor::RenderPassResourceUsage toEditorRenderPassResourceUsage(
     };
 }
 
-std::vector<luna::editor::RenderFeatureGraphResource> toEditorRenderFeatureGraphResources(
-    const std::vector<luna::render_flow::RenderFeatureGraphResource>& resources)
+std::vector<luna::editor::RenderFeatureGraphResource>
+    toEditorRenderFeatureGraphResources(const std::vector<luna::render_flow::RenderFeatureGraphResource>& resources)
 {
     std::vector<luna::editor::RenderFeatureGraphResource> result;
     result.reserve(resources.size());
@@ -247,8 +238,8 @@ std::vector<luna::editor::RenderFeatureGraphResource> toEditorRenderFeatureGraph
     return result;
 }
 
-std::vector<luna::editor::RenderPassResourceUsage> toEditorRenderPassResourceUsages(
-    const std::vector<luna::render_flow::RenderPassResourceUsage>& resources)
+std::vector<luna::editor::RenderPassResourceUsage>
+    toEditorRenderPassResourceUsages(const std::vector<luna::render_flow::RenderPassResourceUsage>& resources)
 {
     std::vector<luna::editor::RenderPassResourceUsage> result;
     result.reserve(resources.size());
@@ -258,8 +249,7 @@ std::vector<luna::editor::RenderPassResourceUsage> toEditorRenderPassResourceUsa
     return result;
 }
 
-luna::editor::RenderFeaturePassInfo toEditorRenderFeaturePassInfo(
-    const luna::render_flow::RenderFeaturePassInfo& pass)
+luna::editor::RenderFeaturePassInfo toEditorRenderFeaturePassInfo(const luna::render_flow::RenderFeaturePassInfo& pass)
 {
     return luna::editor::RenderFeaturePassInfo{
         .name = pass.name,
@@ -267,8 +257,8 @@ luna::editor::RenderFeaturePassInfo toEditorRenderFeaturePassInfo(
     };
 }
 
-std::vector<luna::editor::RenderFeaturePassInfo> toEditorRenderFeaturePassInfos(
-    const std::vector<luna::render_flow::RenderFeaturePassInfo>& passes)
+std::vector<luna::editor::RenderFeaturePassInfo>
+    toEditorRenderFeaturePassInfos(const std::vector<luna::render_flow::RenderFeaturePassInfo>& passes)
 {
     std::vector<luna::editor::RenderFeaturePassInfo> result;
     result.reserve(passes.size());
@@ -278,8 +268,8 @@ std::vector<luna::editor::RenderFeaturePassInfo> toEditorRenderFeaturePassInfos(
     return result;
 }
 
-luna::editor::RenderFeatureStatusEntry toEditorRenderFeatureStatusEntry(
-    const luna::render_flow::RenderFeatureStatusEntry& entry)
+luna::editor::RenderFeatureStatusEntry
+    toEditorRenderFeatureStatusEntry(const luna::render_flow::RenderFeatureStatusEntry& entry)
 {
     return luna::editor::RenderFeatureStatusEntry{
         .name = entry.name,
@@ -287,8 +277,8 @@ luna::editor::RenderFeatureStatusEntry toEditorRenderFeatureStatusEntry(
     };
 }
 
-std::vector<luna::editor::RenderFeatureStatusEntry> toEditorRenderFeatureStatusEntries(
-    const std::vector<luna::render_flow::RenderFeatureStatusEntry>& entries)
+std::vector<luna::editor::RenderFeatureStatusEntry>
+    toEditorRenderFeatureStatusEntries(const std::vector<luna::render_flow::RenderFeatureStatusEntry>& entries)
 {
     std::vector<luna::editor::RenderFeatureStatusEntry> result;
     result.reserve(entries.size());
@@ -298,8 +288,8 @@ std::vector<luna::editor::RenderFeatureStatusEntry> toEditorRenderFeatureStatusE
     return result;
 }
 
-luna::editor::RenderFeatureRuntimeStatType toEditorRenderFeatureRuntimeStatType(
-    luna::render_flow::RenderFeatureRuntimeStatType type)
+luna::editor::RenderFeatureRuntimeStatType
+    toEditorRenderFeatureRuntimeStatType(luna::render_flow::RenderFeatureRuntimeStatType type)
 {
     switch (type) {
         case luna::render_flow::RenderFeatureRuntimeStatType::UnsignedInteger:
@@ -312,8 +302,8 @@ luna::editor::RenderFeatureRuntimeStatType toEditorRenderFeatureRuntimeStatType(
     return luna::editor::RenderFeatureRuntimeStatType::UnsignedInteger;
 }
 
-luna::editor::RenderFeatureRuntimeStat toEditorRenderFeatureRuntimeStat(
-    const luna::render_flow::RenderFeatureRuntimeStat& stat)
+luna::editor::RenderFeatureRuntimeStat
+    toEditorRenderFeatureRuntimeStat(const luna::render_flow::RenderFeatureRuntimeStat& stat)
 {
     return luna::editor::RenderFeatureRuntimeStat{
         .name = stat.name,
@@ -324,8 +314,8 @@ luna::editor::RenderFeatureRuntimeStat toEditorRenderFeatureRuntimeStat(
     };
 }
 
-std::vector<luna::editor::RenderFeatureRuntimeStat> toEditorRenderFeatureRuntimeStats(
-    const std::vector<luna::render_flow::RenderFeatureRuntimeStat>& stats)
+std::vector<luna::editor::RenderFeatureRuntimeStat>
+    toEditorRenderFeatureRuntimeStats(const std::vector<luna::render_flow::RenderFeatureRuntimeStat>& stats)
 {
     std::vector<luna::editor::RenderFeatureRuntimeStat> result;
     result.reserve(stats.size());
@@ -335,8 +325,8 @@ std::vector<luna::editor::RenderFeatureRuntimeStat> toEditorRenderFeatureRuntime
     return result;
 }
 
-luna::editor::RenderFeatureDiagnostics toEditorRenderFeatureDiagnostics(
-    const luna::render_flow::RenderFeatureDiagnostics& diagnostics)
+luna::editor::RenderFeatureDiagnostics
+    toEditorRenderFeatureDiagnostics(const luna::render_flow::RenderFeatureDiagnostics& diagnostics)
 {
     return luna::editor::RenderFeatureDiagnostics{
         .binding_contract_valid = diagnostics.binding_contract_valid,
@@ -376,8 +366,8 @@ luna::editor::RenderFeatureInfo toEditorRenderFeatureInfo(const luna::render_flo
     };
 }
 
-luna::editor::RenderFeatureParameterType toEditorRenderFeatureParameterType(
-    luna::render_flow::RenderFeatureParameterType type)
+luna::editor::RenderFeatureParameterType
+    toEditorRenderFeatureParameterType(luna::render_flow::RenderFeatureParameterType type)
 {
     switch (type) {
         case luna::render_flow::RenderFeatureParameterType::Bool:
@@ -392,8 +382,8 @@ luna::editor::RenderFeatureParameterType toEditorRenderFeatureParameterType(
     return luna::editor::RenderFeatureParameterType::Float;
 }
 
-luna::render_flow::RenderFeatureParameterType toEngineRenderFeatureParameterType(
-    luna::editor::RenderFeatureParameterType type)
+luna::render_flow::RenderFeatureParameterType
+    toEngineRenderFeatureParameterType(luna::editor::RenderFeatureParameterType type)
 {
     switch (type) {
         case luna::editor::RenderFeatureParameterType::Bool:
@@ -408,8 +398,8 @@ luna::render_flow::RenderFeatureParameterType toEngineRenderFeatureParameterType
     return luna::render_flow::RenderFeatureParameterType::Float;
 }
 
-luna::editor::RenderFeatureParameterValue toEditorRenderFeatureParameterValue(
-    const luna::render_flow::RenderFeatureParameterValue& value)
+luna::editor::RenderFeatureParameterValue
+    toEditorRenderFeatureParameterValue(const luna::render_flow::RenderFeatureParameterValue& value)
 {
     return luna::editor::RenderFeatureParameterValue{
         .type = toEditorRenderFeatureParameterType(value.type),
@@ -417,28 +407,25 @@ luna::editor::RenderFeatureParameterValue toEditorRenderFeatureParameterValue(
         .int_value = value.int_value,
         .float_value = value.float_value,
         .color_value =
-            luna::editor::Vec4{.x = value.color_value.x,
-                               .y = value.color_value.y,
-                               .z = value.color_value.z,
-                               .w = value.color_value.w},
+            luna::editor::Vec4{
+                .x = value.color_value.x, .y = value.color_value.y, .z = value.color_value.z, .w = value.color_value.w},
     };
 }
 
-luna::render_flow::RenderFeatureParameterValue toEngineRenderFeatureParameterValue(
-    const luna::editor::RenderFeatureParameterValue& value)
+luna::render_flow::RenderFeatureParameterValue
+    toEngineRenderFeatureParameterValue(const luna::editor::RenderFeatureParameterValue& value)
 {
     luna::render_flow::RenderFeatureParameterValue result{};
     result.type = toEngineRenderFeatureParameterType(value.type);
     result.bool_value = value.bool_value;
     result.int_value = value.int_value;
     result.float_value = value.float_value;
-    result.color_value =
-        glm::vec4{value.color_value.x, value.color_value.y, value.color_value.z, value.color_value.w};
+    result.color_value = glm::vec4{value.color_value.x, value.color_value.y, value.color_value.z, value.color_value.w};
     return result;
 }
 
-luna::editor::RenderFeatureParameterInfo toEditorRenderFeatureParameterInfo(
-    const luna::render_flow::RenderFeatureParameterInfo& parameter)
+luna::editor::RenderFeatureParameterInfo
+    toEditorRenderFeatureParameterInfo(const luna::render_flow::RenderFeatureParameterInfo& parameter)
 {
     return luna::editor::RenderFeatureParameterInfo{
         .name = toOwnedString(parameter.name),
@@ -534,8 +521,7 @@ editor::RenderingBackendCapabilities EditorRenderingController::backendCapabilit
     result.supports_storage_buffer = renderer_capabilities.supports_storage_buffer;
     result.supports_sampler = renderer_capabilities.supports_sampler;
 
-    result.conventions.requires_projection_y_flip =
-        renderer_capabilities.conventions.requires_projection_y_flip;
+    result.conventions.requires_projection_y_flip = renderer_capabilities.conventions.requires_projection_y_flip;
     result.conventions.imgui_clip_top_y_is_negative_one =
         renderer_capabilities.conventions.imgui_clip_top_y_is_negative_one;
     result.conventions.imgui_render_target_requires_uv_y_flip =
@@ -603,7 +589,7 @@ std::vector<editor::RenderFeatureInfo> EditorRenderingController::defaultRenderF
 }
 
 std::vector<editor::RenderFeatureParameterInfo>
-EditorRenderingController::defaultRenderFeatureParameters(std::string_view feature_name) const
+    EditorRenderingController::defaultRenderFeatureParameters(std::string_view feature_name) const
 {
     if (m_renderer == nullptr) {
         return {};

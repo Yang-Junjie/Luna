@@ -6,13 +6,13 @@
 #include "Scene/Entity.h"
 
 #include <cstddef>
-#include <functional>
-#include <initializer_list>
-#include <string>
 
+#include <functional>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <imgui.h>
+#include <initializer_list>
+#include <string>
 
 namespace luna::editor::ui {
 
@@ -39,7 +39,8 @@ struct PropertyLayout {
 
     [[nodiscard]] float scaledLabelWidth() const noexcept
     {
-        return label_width > 0.0f ? scale(label_width) : editor::editorThemeMetric(editor::EditorThemeMetric::PropertyLabelWidth);
+        return label_width > 0.0f ? scale(label_width)
+                                  : editor::editorThemeMetric(editor::EditorThemeMetric::PropertyLabelWidth);
     }
 
     [[nodiscard]] float scaledRowPaddingY() const noexcept
@@ -81,7 +82,9 @@ bool drawCombo(const char* label,
                const char* preview_value,
                const std::function<bool()>& draw_options,
                const PropertyLayout& layout = {});
-bool drawButton(const char* label, ButtonVariant variant = ButtonVariant::Default, const ImVec2& size = ImVec2{0.0f, 0.0f});
+bool drawButton(const char* label,
+                ButtonVariant variant = ButtonVariant::Default,
+                const ImVec2& size = ImVec2{0.0f, 0.0f});
 
 void pushCompactInspectorStyle();
 void popCompactInspectorStyle();
@@ -135,7 +138,8 @@ bool drawComponentSection(const char* label, Entity entity, UIFunction&& ui_func
     }
 
     if (open) {
-        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, editor::editorThemeMetric(editor::EditorThemeMetric::ComponentIndentSpacing));
+        ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing,
+                            editor::editorThemeMetric(editor::EditorThemeMetric::ComponentIndentSpacing));
         changed |= ui_function(component);
         ImGui::PopStyleVar();
         endSection();

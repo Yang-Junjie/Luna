@@ -151,8 +151,7 @@ private:
     void recordDrawPacketVisibility(const RenderDrawPacket& packet, const DrawPacketVisibilityResult& visibility);
     void cacheDrawCommandForPhases(const RenderDrawPacket& packet, bool camera_visible);
     void captureVisibilityDebugFrustum(const Camera& camera, float aspect_ratio);
-    void captureVisibilityDebugItem(const RenderDrawPacket& packet,
-                                    VisibilityDebugClassification classification);
+    void captureVisibilityDebugItem(const RenderDrawPacket& packet, VisibilityDebugClassification classification);
 
     Camera m_camera{};
     Camera m_culling_camera{};
